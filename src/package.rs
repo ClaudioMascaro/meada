@@ -8,6 +8,11 @@
 //! turns the entries that name one into consumers. Meada reads no lockfile and queries no
 //! registry: a dependency on anything outside the workspace adds nothing.
 //!
+//! This file holds what the ecosystems share: the `Ecosystem` trait with its defaults (Node's
+//! rule for the ways in, the candidates and the provider view), the list `ECOSYSTEMS`, the
+//! summary types and the workspace steps. Each ecosystem's own rules live in its module under
+//! `package/` (`npm`, `pypi`, `cargo`, `go`).
+//!
 //! Imports cross too: `extract` stores every call through a binding imported from a bare
 //! specifier, and `import`, a workspace step after `consume`, resolves those whose package the
 //! workspace provides into the provider's symbol, through its entry fields and what its files
@@ -27,255 +32,296 @@ use serde_json::Value;
 use crate::contract::{ContractKind, Found, Hit, Level, Link, Role, Search, Site};
 use crate::entry;
 use crate::index::{self, CallSite, Consumer, Export, Provider};
-use crate::lang::python;
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
+use crate::lang::{MAX_BYTES, python};
 use crate::literals::Literals;
 use crate::render::{Files, label, rank, section};
 use crate::resolve::{Code, Exported};
 use crate::shape::{self, Shape, Want};
 use crate::workspace::Repository;
 
-pub mod cargo;
+mod cargo;
 mod go;
+mod npm;
 mod pypi;
+
+use cargo::Cargo;
+use go::Go;
+use npm::{Npm, exported};
+use pypi::Pypi;
 
 pub struct Packages;
 
 /// The start of every package contract identifier.
 const PREFIX: &str = "package::";
 
-/// A package ecosystem: the manifests it reads, the contract its packages provide, and its
-/// rules for checking a range. How an import names a package is its own too (`split` for npm,
-/// `pypi_resolutions` for PyPI). An npm and a PyPI package of one name are two contracts.
-#[derive(Serialize, Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[serde(rename_all = "lowercase")]
-pub enum Ecosystem {
-    Npm,
-    Pypi,
-    Cargo,
-    Go,
-}
+/// A package ecosystem: the manifests it reads, the contract its packages provide, and the rules
+/// its imports and dependency entries follow. Every question but the first six has a default
+/// body; an adapter answers differently only where its ecosystem does. An npm and a PyPI package
+/// of one name are two contracts. A new ecosystem implements this and appends to `ECOSYSTEMS`:
+/// the order of the list fixes the order `of` and `of_contract` search in and the order `inherit`
+/// runs in.
+trait Ecosystem {
+    /// Its name, as the contract identifier and the export spell it.
+    fn name(&self) -> &'static str;
 
-impl Ecosystem {
-    /// Whether it is npm's, the ecosystem a package of the export names only when it is not.
-    pub fn is_npm(&self) -> bool {
-        *self == Ecosystem::Npm
-    }
+    /// Whether the file `file_name` is one of its manifests.
+    fn is_manifest(&self, file_name: &str) -> bool;
 
-    /// Its name, as the contract identifier spells it.
-    pub fn name(self) -> &'static str {
-        match self {
-            Ecosystem::Npm => "npm",
-            Ecosystem::Pypi => "pypi",
-            Ecosystem::Cargo => "cargo",
-            Ecosystem::Go => "go",
-        }
-    }
+    /// What the manifest at `path` says, read from its bytes; never fails, hostile bytes read
+    /// as empty.
+    fn read(&self, path: &str, src: &[u8]) -> Summary;
 
-    /// The ecosystem of the manifest at `path`, by its file name: `package.json` is npm's,
-    /// `pyproject.toml` and `requirements*.txt` PyPI's, `Cargo.toml` Cargo's, `go.mod` Go's; `None` for
-    /// any other file.
-    pub fn of(path: &str) -> Option<Self> {
-        match path.rsplit('/').next()? {
-            "package.json" => Some(Ecosystem::Npm),
-            "pyproject.toml" => Some(Ecosystem::Pypi),
-            "Cargo.toml" => Some(Ecosystem::Cargo),
-            "go.mod" => Some(Ecosystem::Go),
-            name if pypi::is_requirements(name) => Some(Ecosystem::Pypi),
-            _ => None,
-        }
-    }
+    /// The extensions of the source files whose imports name its packages.
+    fn sources(&self) -> &'static [&'static str];
 
-    /// The ecosystem whose packages the source file at `path` imports: PyPI's for a `.py`
-    /// file, Cargo's for a `.rs` file, Go's for a `.go` file, npm's for the TS/JS pack's.
-    fn of_source(path: &str) -> Option<Self> {
-        match path.rsplit_once('.').map(|(_, extension)| extension) {
-            Some("py") => Some(Ecosystem::Pypi),
-            Some("rs") => Some(Ecosystem::Cargo),
-            Some("go") => Some(Ecosystem::Go),
-            _ => Some(Ecosystem::Npm),
-        }
-    }
+    /// Whether a bare `specifier` may name one of its packages.
+    fn names_package(&self, specifier: &str) -> bool;
 
-    /// The ecosystem of a package contract identifier.
-    fn of_contract(contract: &str) -> Option<Self> {
-        [
-            Ecosystem::Npm,
-            Ecosystem::Pypi,
-            Ecosystem::Cargo,
-            Ecosystem::Go,
-        ]
-        .into_iter()
-        .find(|e| contract.starts_with(e.prefix()))
-    }
+    /// The dependency entries an import of `specifier` by the file `from.1` of the repository
+    /// `from.0` may name, each with the subpath inside the package.
+    fn entries<'e>(
+        &self,
+        exports: &'e [Export],
+        providers: &Providers,
+        from: (usize, &str),
+        specifier: &str,
+    ) -> Vec<(&'e Entry, String)>;
 
     /// The start of its contract identifiers.
-    fn prefix(self) -> &'static str {
-        match self {
-            Ecosystem::Npm => "package::npm::",
-            Ecosystem::Pypi => "package::pypi::",
-            Ecosystem::Cargo => "package::cargo::",
-            Ecosystem::Go => "package::go::",
-        }
+    fn prefix(&self) -> String {
+        format!("{PREFIX}{}::", self.name())
     }
 
-    /// The contract a package name of the ecosystem provides.
-    fn contract(self, name: &str) -> String {
-        format!("{}{name}", self.prefix())
+    /// What the dependency `range` says of the provider's `version`: never evaluated.
+    fn flag(&self, _range: Option<&str>, _version: Option<&str>) -> Option<Flag> {
+        Some(Flag::Unchecked)
     }
 
-    /// What the manifest at `path` says, read from its bytes; never fails.
-    fn read(self, path: &str, src: &[u8]) -> Summary {
-        match (self, path.ends_with("pyproject.toml")) {
-            (Ecosystem::Npm, _) => read(src),
-            (Ecosystem::Cargo, _) => cargo::read(path, src),
-            (Ecosystem::Go, _) => go::read(path, src),
-            (Ecosystem::Pypi, true) => pypi::read_pyproject(src),
-            (Ecosystem::Pypi, false) => pypi::read_requirements(src),
-        }
-    }
-
-    /// What the dependency `range` says of the provider's `version`: npm checks it (`flag`);
-    /// a PyPI, Cargo or Go range is never evaluated, so it is always `Unchecked`.
-    fn flag(self, range: Option<&str>, version: Option<&str>) -> Option<Flag> {
-        match self {
-            Ecosystem::Npm => flag(range, version),
-            Ecosystem::Pypi | Ecosystem::Cargo | Ecosystem::Go => Some(Flag::Unchecked),
-        }
-    }
-
-    /// Whether a dependency may reach the provider whose manifest is `provider` in the
-    /// repository `to`, from a manifest of `from` (each repository by identity and root): an npm
-    /// `workspace:` range keeps only the dependent's own repository; a Cargo `path` entry only the
-    /// crate at that path (`via`), a `git` one only the repository of that remote; anything else
-    /// reaches every provider. A Cargo path that leaves its repository (`../`) is matched
-    /// against the provider's location by the two roots, folded lexically: nothing is read.
+    /// Whether a dependency entry of source `(via, range)` may reach the provider whose
+    /// manifest is `to.1` in the repository `to.0`, from a manifest of `from` (each repository
+    /// by identity and root): every provider.
     fn reaches(
-        self,
-        (via, range): (Option<&str>, Option<&str>),
-        from: (&str, &Path),
-        ((to, to_root), provider): ((&str, &Path), &str),
+        &self,
+        _source: (Option<&str>, Option<&str>),
+        _from: (&str, &Path),
+        _to: ((&str, &Path), &str),
     ) -> bool {
-        match (self, via) {
-            (Ecosystem::Npm, _) => from.0 == to || !range.is_some_and(|r| r.starts_with(WORKSPACE)),
-            (Ecosystem::Cargo | Ecosystem::Go, Some(via)) => match via.split_once(' ') {
-                Some(("path", manifest)) if manifest.starts_with("../") => {
-                    folded(&from.1.join(manifest)) == folded(&to_root.join(provider))
-                }
-                Some(("path", manifest)) => from.0 == to && provider == manifest,
-                Some(("git", identity)) => to == identity,
-                _ => false,
-            },
-            _ => true,
-        }
+        true
     }
+
+    /// Whether `manifest`, one of its manifests, bounds the package of the files under it.
+    fn owns(&self, _manifest: &Manifest) -> bool {
+        true
+    }
+
+    /// The ways an import of `subpath` of the package at `manifest` may be followed: Node's
+    /// rule (`ways`).
+    fn ways(&self, manifest: &Manifest, subpath: &str) -> Vec<(How, Vec<String>)> {
+        ways(manifest, subpath)
+    }
+
+    /// The symbol an import of `subpath` of the package at `manifest` of `repository`, through
+    /// `entry` and named `specifier`, names as `chain` in the provider `at`, by Node's rule: of
+    /// the ways in (`Ecosystem::ways`), the first that leads to a source file the package owns
+    /// wins, `exact` through the declared field or rule, `inferred` through the package's
+    /// `outDir` and `rootDir` (`sources`); a present field that leads nowhere does not stop the
+    /// search. When none does, the import is `ambiguous`, named by the first way, and every
+    /// source file of the package that exports the chain's head gives a symbol
+    /// (`Provided::candidates`).
+    fn resolve(
+        &self,
+        at: &Provided,
+        repository: &str,
+        manifest: &Manifest,
+        (_entry, subpath): (&Entry, &str),
+        (_specifier, chain): (&str, &str),
+        known: &dyn Fn(&str) -> bool,
+    ) -> Option<Resolved> {
+        let tried = self.ways(manifest, subpath);
+        let first = tried.first()?.0;
+        let Some((file, how, level)) = at.entry(manifest, &tried) else {
+            let targets = at.candidates(repository, manifest, chain, known);
+            return (!targets.is_empty()).then_some(Resolved {
+                how: first,
+                level: Level::Ambiguous,
+                targets,
+            });
+        };
+        let id = at.reach(repository, &file, chain, known)?;
+        Some(Resolved {
+            how,
+            level,
+            targets: vec![id],
+        })
+    }
+
+    /// Where the name `chain`, which the file `from.1` of the repository `from.0` imports from
+    /// `specifier`, resolves: each entry the import may name (`Ecosystem::entries`), and each
+    /// provider of the entry's package that the entry reaches and where the name resolves there
+    /// (`Ecosystem::resolve`). `at` gives a repository's provider view, `known` which of its
+    /// ids the name may resolve to.
+    fn resolutions<'e>(
+        &self,
+        exports: &'e [Export],
+        providers: &Providers,
+        at: &dyn Fn(usize) -> &'e Provided<'e>,
+        (n, from): (usize, &str),
+        (specifier, chain): (&str, &str),
+        known: &dyn Fn(&Provided<'e>, &str) -> bool,
+    ) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
+        let mut out = Vec::new();
+        for (entry, subpath) in self.entries(exports, providers, (n, from), specifier) {
+            let mut resolved = Vec::new();
+            for &(m, i) in providers.of(self.name(), &entry.name) {
+                let manifest = &exports[m].manifests[i];
+                let source = (entry.via.as_deref(), entry.range.as_deref());
+                let to = (exports[m].place(), manifest.path.as_str());
+                if !self.reaches(source, exports[n].place(), to) {
+                    continue;
+                }
+                let at = at(m);
+                let known = |id: &str| known(at, id);
+                let repository = &exports[m].repository;
+                let import = ((entry, subpath.as_str()), (specifier, chain));
+                if let Some(r) = self.resolve(at, repository, manifest, import.0, import.1, &known)
+                {
+                    resolved.push((m, manifest, at, r));
+                }
+            }
+            out.push((entry, resolved));
+        }
+        out
+    }
+
+    /// Whether shapes cross its packages (`surface`).
+    fn shapes(&self) -> bool {
+        false
+    }
+
+    /// The program entry points its manifests declare, as `(file, function)`, given the files
+    /// of the repository: none.
+    fn programs(&self, _manifests: &[Manifest], _files: &[&str]) -> Vec<(String, String)> {
+        Vec::new()
+    }
+
+    /// Fills what a member manifest of `manifests` inherits from a parent one: nothing.
+    fn inherit(&self, _manifests: &mut [Manifest]) {}
+}
+
+/// Every ecosystem, in the order `of` and `of_contract` search and `inherit` runs.
+const ECOSYSTEMS: &[&dyn Ecosystem] = &[&Npm, &Pypi, &Cargo, &Go];
+
+/// The ecosystem of the manifest at `path`, by its file name (`Ecosystem::is_manifest`); `None`
+/// for any other file.
+fn of(path: &str) -> Option<&'static dyn Ecosystem> {
+    let name = path.rsplit('/').next()?;
+    ECOSYSTEMS.iter().copied().find(|e| e.is_manifest(name))
+}
+
+/// The ecosystem whose packages the source file at `path` imports, by its extension
+/// (`Ecosystem::sources`); `None` for a file no ecosystem claims.
+fn of_source(path: &str) -> Option<&'static dyn Ecosystem> {
+    let (_, extension) = path.rsplit_once('.')?;
+    (ECOSYSTEMS.iter().copied()).find(|e| e.sources().contains(&extension))
+}
+
+/// The program entry points the manifests of every ecosystem declare (`Ecosystem::programs`),
+/// sorted, without repeats, for the index writer.
+pub fn programs(manifests: &[Manifest], files: &[&str]) -> Vec<(String, String)> {
+    programs_of(ECOSYSTEMS, manifests, files)
+}
+
+fn programs_of(
+    list: &[&dyn Ecosystem],
+    manifests: &[Manifest],
+    files: &[&str],
+) -> Vec<(String, String)> {
+    let mut found: Vec<_> = (list.iter())
+        .flat_map(|e| e.programs(manifests, files))
+        .collect();
+    found.sort();
+    found.dedup();
+    found
+}
+
+/// Lets every ecosystem fill what its member manifests inherit (`Ecosystem::inherit`), in the
+/// order of the list, for the index writer.
+pub fn inherit(manifests: &mut [Manifest]) {
+    inherit_of(ECOSYSTEMS, manifests);
+}
+
+fn inherit_of(list: &[&dyn Ecosystem], manifests: &mut [Manifest]) {
+    for e in list {
+        e.inherit(manifests);
+    }
+}
+
+/// The ecosystem of a package contract identifier, by its prefix.
+fn of_contract(contract: &str) -> Option<&'static dyn Ecosystem> {
+    (ECOSYSTEMS.iter().copied()).find(|e| contract.starts_with(&e.prefix()))
+}
+
+/// The contract a package name of `ecosystem` provides.
+fn contract(ecosystem: &dyn Ecosystem, name: &str) -> String {
+    format!("{}{name}", ecosystem.prefix())
+}
+
+/// Whether `ecosystem` is npm's, the one a package of the export names only when it is not: the
+/// export's compatibility rule, since the `ecosystem` field did not exist when npm was the only
+/// one and the goldens leave it out.
+fn is_npm(ecosystem: &&'static dyn Ecosystem) -> bool {
+    ecosystem.name() == Npm.name()
+}
+
+/// The export's `ecosystem` field: the ecosystem's name.
+fn serialize_name<S: serde::Serializer>(
+    ecosystem: &&'static dyn Ecosystem,
+    s: S,
+) -> Result<S::Ok, S::Error> {
+    s.serialize_str(ecosystem.name())
 }
 
 /// Whether the file at `path` is one the manifests table holds: a manifest of an ecosystem or
 /// a `tsconfig.json`.
 pub fn is_manifest(path: &str) -> bool {
-    is_tsconfig(path) || Ecosystem::of(path).is_some()
+    is_tsconfig(path) || of(path).is_some()
 }
 
-/// What the manifest at `path` says (see `Ecosystem::of`); empty for a file of no ecosystem.
+/// What the manifest at `path` says (see `of`); empty for a file of no ecosystem.
 pub fn read_manifest(path: &str, src: &[u8]) -> Summary {
-    Ecosystem::of(path).map_or_else(Summary::default, |e| e.read(path, src))
+    of(path).map_or_else(Summary::default, |e| e.read(path, src))
 }
 
 /// The longest package name read, in bytes; a longer one makes no provider.
 // ponytail: npm's own limit, for PyPI names too; a name past it is not a package.
 const MAX_NAME: usize = 214;
 
-/// The largest manifest read (`package.json`, `pyproject.toml`, `requirements*.txt`) and the
-/// largest `tsconfig.json`; a larger one counts as empty. Real manifests are a few kilobytes,
-/// and the stored summary and the export stay proportional to what is read.
-// ponytail: a flat 1 MiB; a streaming reader that keeps only the dependency tables lifts it.
-pub(crate) const MAX_BYTES: usize = 1 << 20;
-
-/// The dependency fields of a manifest that `read` collects.
-const FIELDS: [&str; 4] = [
-    "dependencies",
-    "devDependencies",
-    "peerDependencies",
-    "optionalDependencies",
-];
-
-/// The prefix of an npm range that keeps a dependency inside its own repository.
-const WORKSPACE: &str = "workspace:";
-
-/// The conditions of an `exports` target Meada reads, in order: at each level the first one
-/// present is taken, and no other is followed.
-const CONDITIONS: [&str; 4] = ["types", "import", "default", "require"];
-
 /// The longest chain of `export *` a lookup in a provider follows; a name further down is not
 /// found.
 // ponytail: real packages re-export a few levels deep; this bounds the walk over a hostile one.
 const MAX_REEXPORTS: usize = 64;
 
-/// The deepest an `exports` target nests conditions; deeper, the subpath has no target.
-// ponytail: real maps nest two or three levels; this bounds the walk over a hostile one.
-const MAX_CONDITIONS: usize = 32;
-
-/// The target the `exports` field of a manifest gives `subpath` (`.` for the bare name, else
-/// `./<rest>`), as written, `*` replaced: exact keys first, then the pattern with one `*` whose
-/// prefix is the longest. A string, or an object without subpath keys, is the target of `.`. A
-/// `null` target, an array of fallbacks, a key or a target with two `*`, keys that mix subpaths
-/// and conditions, or none of `CONDITIONS` present give no target.
-fn exported(exports: &Value, subpath: &str) -> Option<String> {
-    let map = match exports {
-        Value::Object(map) if map.keys().any(|k| k.starts_with('.')) => map,
-        _ => return (subpath == ".").then(|| target(exports, None, 0))?,
-    };
-    if !map.keys().all(|k| k.starts_with('.')) {
-        return None;
-    }
-    if let Some(value) = map.get(subpath) {
-        return target(value, None, 0);
-    }
-    let (_, star, value) = (map.iter())
-        .filter_map(|(key, value)| {
-            let (prefix, suffix) = key.split_once('*')?;
-            let star = subpath.strip_prefix(prefix)?.strip_suffix(suffix)?;
-            (!suffix.contains('*') && !star.is_empty()).then_some((
-                (prefix.len(), key.len()),
-                star,
-                value,
-            ))
-        })
-        .max_by_key(|(rank, _, _)| *rank)?;
-    target(value, Some(star), 0)
-}
-
-/// The path a target of `exports` names, through its conditions (see `exported`).
-fn target(value: &Value, star: Option<&str>, depth: usize) -> Option<String> {
-    match value {
-        // One `*` at most, as in a key: the expansion stays the size of the subpath.
-        Value::String(t) if t.matches('*').nth(1).is_none() => {
-            Some(star.map_or_else(|| t.clone(), |s| t.replace('*', s)))
-        }
-        Value::Object(conditions) if depth < MAX_CONDITIONS => {
-            let taken = CONDITIONS.iter().find_map(|c| conditions.get(*c))?;
-            target(taken, star, depth + 1)
-        }
-        _ => None,
-    }
-}
-
-/// What Meada read from one `package.json`. Nothing else of the file is kept.
+/// What Meada read from one manifest of any ecosystem (a `package.json`, `pyproject.toml`,
+/// `requirements*.txt`, `Cargo.toml` or `go.mod`). Nothing else of the file is kept; a field
+/// the ecosystem has no use for stays empty.
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
 pub struct Summary {
-    /// A valid npm name; `None` when absent, not a string or not valid, which makes no provider.
+    /// The package's name as its ecosystem spells it; `None` when absent, not a string or not
+    /// valid there, which makes no provider.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// The declared version; `None` when absent or when the format carries none (`go.mod`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
     /// Sorted by field, then name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dependencies: Vec<Entry>,
-    /// The `exports` field as written; `None` when absent or `null`.
+    /// The `exports` field as written; `None` when absent or `null` (npm only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exports: Option<Value>,
-    /// The `types`, `module` and `main` entry fields; a field that is not a string is absent.
+    /// The `types`, `module` and `main` entry fields; a field that is not a string is absent
+    /// (npm only, except `main`, which Cargo sets too).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub types: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -295,7 +341,7 @@ pub struct Summary {
     /// Cargo only: `[lib] name` when it differs from what a path writes for the package's name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lib_name: Option<String>,
-    /// Cargo only: `version.workspace = true`, until `cargo::inherit` fills `version`.
+    /// Cargo only: `version.workspace = true`, until the seam's `inherit` fills `version`.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub inherits_version: bool,
     /// Cargo only: the `[workspace.package] version` a member may inherit.
@@ -318,7 +364,7 @@ pub struct Entry {
     /// for a version.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub via: Option<String>,
-    /// Cargo only: `workspace = true`, until `cargo::inherit` fills the entry.
+    /// Cargo only: `workspace = true`, until the seam's `inherit` fills the entry.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub inherits: bool,
 }
@@ -330,7 +376,7 @@ impl Entry {
     }
 }
 
-/// A `package.json` of the index: its repository-relative path and what was read of it.
+/// A manifest of the index: its repository-relative path and what was read of it.
 pub struct Manifest {
     pub path: String,
     pub summary: Summary,
@@ -346,8 +392,8 @@ pub struct Package {
     /// The directory of the manifest, relative to the repository root: `.` for the root.
     pub directory: String,
     /// Its ecosystem, shown only when it is not npm's.
-    #[serde(skip_serializing_if = "Ecosystem::is_npm")]
-    pub ecosystem: Ecosystem,
+    #[serde(skip_serializing_if = "is_npm", serialize_with = "serialize_name")]
+    ecosystem: &'static dyn Ecosystem,
     /// The path of the manifest.
     #[serde(skip)]
     pub manifest: String,
@@ -529,52 +575,6 @@ pub fn is_tsconfig(path: &str) -> bool {
     path.rsplit('/').next() == Some("tsconfig.json")
 }
 
-/// Reads a `package.json` from its bytes. Hostile input: a file too large, not JSON, nested
-/// past `serde_json`'s depth limit or not an object reads as empty; a field of another type
-/// counts as absent; a name that breaks npm's rules makes no provider.
-pub fn read(src: &[u8]) -> Summary {
-    if src.len() > MAX_BYTES {
-        return Summary::default();
-    }
-    let Ok(Value::Object(root)) = serde_json::from_slice(src) else {
-        return Summary::default();
-    };
-    let text = |v: Option<&Value>| match v {
-        Some(Value::String(s)) if !s.is_empty() => Some(s.clone()),
-        _ => None,
-    };
-    let mut dependencies = Vec::new();
-    for field in FIELDS {
-        let Some(Value::Object(table)) = root.get(field) else {
-            continue;
-        };
-        for (name, range) in table {
-            if valid_name(name) {
-                dependencies.push(Entry {
-                    field: field.to_string(),
-                    name: name.clone(),
-                    range: text(Some(range)),
-                    ..Entry::default()
-                });
-            }
-        }
-    }
-    dependencies.sort_by(|a, b| (&a.field, &a.name).cmp(&(&b.field, &b.name)));
-    Summary {
-        name: text(root.get("name")).filter(|n| valid_name(n)),
-        version: text(root.get("version")),
-        dependencies,
-        exports: root.get("exports").filter(|v| !v.is_null()).cloned(),
-        types: text(root.get("types")),
-        module: text(root.get("module")),
-        main: text(root.get("main")),
-        roots: Vec::new(),
-        scripts: Vec::new(),
-        workspace: Vec::new(),
-        ..Summary::default()
-    }
-}
-
 /// Whether `name` can be a package name: not empty, at most `MAX_NAME` bytes, and no
 /// control character, whitespace or `:` (which would break the `::` of a contract identifier).
 fn valid_name(name: &str) -> bool {
@@ -588,6 +588,39 @@ fn valid_name(name: &str) -> bool {
 /// The site of the manifest at `path` of `repository`.
 fn site(repository: &str, path: &str) -> String {
     format!("{repository}::{path}")
+}
+
+/// The directory of the manifest at `path`: `.` for one at the root.
+fn directory(path: &str) -> &str {
+    path.rsplit_once('/').map_or(".", |(dir, _)| dir)
+}
+
+/// The directory of the manifest at `path` as a repository path to join onto: the root is empty.
+fn bare_directory(path: &str) -> &str {
+    path.rsplit_once('/').map_or("", |(dir, _)| dir)
+}
+
+/// Whether a Cargo or Go entry of source `via` may reach the provider whose manifest is
+/// `provider` in the repository `to`, from a manifest of `from` (each repository by identity and
+/// root): a `path` entry only the package at that path, a `git` one only the repository of that
+/// remote; an entry with no source every provider. A path that leaves its repository (`../`) is
+/// matched against the provider's location by the two roots, folded lexically: nothing is read.
+fn sourced(
+    via: Option<&str>,
+    from: (&str, &Path),
+    ((to, to_root), provider): ((&str, &Path), &str),
+) -> bool {
+    let Some(via) = via else {
+        return true;
+    };
+    match via.split_once(' ') {
+        Some(("path", manifest)) if manifest.starts_with("../") => {
+            folded(&from.1.join(manifest)) == folded(&to_root.join(provider))
+        }
+        Some(("path", manifest)) => from.0 == to && provider == manifest,
+        Some(("git", identity)) => to == identity,
+        _ => false,
+    }
 }
 
 /// `path` with its `.` and `..` folded without touching the file system, so a symlink never
@@ -606,29 +639,15 @@ fn folded(path: &Path) -> PathBuf {
     out
 }
 
-/// The directory of the manifest at `path`: `.` for one at the root.
-fn directory(path: &str) -> &str {
-    path.rsplit_once('/').map_or(".", |(dir, _)| dir)
-}
-
-/// The package a bare specifier names and the subpath inside it: `@a/b/c` is `@a/b` and
-/// `./c`, `x` is `x` and `.`. `None` for a relative or absolute specifier, or a name npm does not
-/// accept (`node:fs` among them).
-fn split(specifier: &str) -> Option<(&str, String)> {
-    if specifier.starts_with(['.', '/']) {
-        return None;
-    }
-    let segments = if specifier.starts_with('@') { 2 } else { 1 };
-    let end = (specifier.match_indices('/').nth(segments - 1)).map_or(specifier.len(), |(i, _)| i);
-    let (name, rest) = specifier.split_at(end);
-    (valid_name(name) && (segments == 1 || name.contains('/'))).then(|| (name, format!(".{rest}")))
-}
-
 /// Every manifest of `ecosystem` whose directory holds `path`, the deepest directory first and
 /// those of one directory by path (a `pyproject.toml` before the `requirements*.txt` beside it).
-fn holding<'m>(manifests: &'m [Manifest], path: &str, ecosystem: Ecosystem) -> Vec<&'m Manifest> {
+fn holding<'m>(
+    manifests: &'m [Manifest],
+    path: &str,
+    ecosystem: &dyn Ecosystem,
+) -> Vec<&'m Manifest> {
     let mut found: Vec<&Manifest> = (manifests.iter())
-        .filter(|m| Ecosystem::of(&m.path) == Some(ecosystem))
+        .filter(|m| (m.path.rsplit('/').next()).is_some_and(|name| ecosystem.is_manifest(name)))
         .filter(|m| match directory(&m.path) {
             "." => true,
             dir => path
@@ -647,21 +666,19 @@ fn holding<'m>(manifests: &'m [Manifest], path: &str, ecosystem: Ecosystem) -> V
 fn nearest<'m>(
     manifests: &'m [Manifest],
     path: &str,
-    ecosystem: Ecosystem,
+    ecosystem: &dyn Ecosystem,
 ) -> Option<&'m Manifest> {
     holding(manifests, path, ecosystem).into_iter().next()
 }
 
-/// The manifest of the package `path` belongs to: the nearest `package.json` for npm, the
-/// nearest `pyproject.toml` for PyPI (a `requirements*.txt` names no package, so it bounds none),
-/// the nearest `Cargo.toml` with a package for Cargo (a virtual workspace root has none), the
-/// nearest `go.mod` for Go.
-fn owner<'m>(manifests: &'m [Manifest], path: &str, ecosystem: Ecosystem) -> Option<&'m Manifest> {
-    (holding(manifests, path, ecosystem).into_iter()).find(|m| match ecosystem {
-        Ecosystem::Npm | Ecosystem::Go => true,
-        Ecosystem::Pypi => m.path.rsplit('/').next() == Some("pyproject.toml"),
-        Ecosystem::Cargo => m.summary.name.is_some(),
-    })
+/// The manifest of the package `path` belongs to: the nearest manifest of `ecosystem` that
+/// bounds a package (`Ecosystem::owns`).
+fn owner<'m>(
+    manifests: &'m [Manifest],
+    path: &str,
+    ecosystem: &dyn Ecosystem,
+) -> Option<&'m Manifest> {
+    (holding(manifests, path, ecosystem).into_iter()).find(|m| ecosystem.owns(m))
 }
 
 /// The ways an import of `subpath` of the package at `manifest` may be followed, in the order to
@@ -669,18 +686,11 @@ fn owner<'m>(manifests: &'m [Manifest], path: &str, ecosystem: Ecosystem) -> Opt
 /// when the manifest has it, the only way in; else, for the bare name, one for each of `types`,
 /// `module` and `main` present; else the subpath as a path inside the package, with the trunk's
 /// extension and `index` rules (`path`), the bare name being `./index`. Every file stays inside
-/// the package directory.
+/// the package directory. Node's rule, every ecosystem's unless it says otherwise
+/// (`Ecosystem::ways`).
 fn ways(manifest: &Manifest, subpath: &str) -> Vec<(How, Vec<String>)> {
     let dir = directory(&manifest.path);
     let s = &manifest.summary;
-    if Ecosystem::of(&manifest.path) == Some(Ecosystem::Cargo) {
-        // The crate is its library's root file, a path of the repository as `cargo::read` folded
-        // it; a subpath is a module path, followed by name.
-        return match (subpath, &s.main) {
-            (".", Some(root)) => vec![(How::CrateName, vec![root.clone()])],
-            _ => Vec::new(),
-        };
-    }
     let path = |subpath: &str| {
         let files = with_extensions(&inside(dir, subpath.strip_prefix("./")?)?);
         Some((How::Path, files))
@@ -717,49 +727,6 @@ fn ways(manifest: &Manifest, subpath: &str) -> Vec<(How, Vec<String>)> {
             Some((how, vec![inside(dir, t.strip_prefix("./").unwrap_or(t))?]))
         })
         .collect()
-}
-
-/// The source roots of the PyPI package at `manifest`, as the Python pack reads a repository's:
-/// its directory, then the roots its `pyproject.toml` declares, or its `src` when none is.
-fn python_roots(manifest: &Manifest) -> Vec<String> {
-    let base = match directory(&manifest.path) {
-        "." => "",
-        dir => dir,
-    };
-    python::pyproject::source_roots(base, &manifest.summary.roots)
-}
-
-/// The program entry points the console scripts of the PyPI manifests name, as the file of the
-/// script's module (the one an import of it from the package finds, `python_roots`) and the
-/// function. A script whose module is no file of the package names nothing. Sorted, without
-/// repeats.
-pub fn python_programs(manifests: &[Manifest], files: &[&str]) -> Vec<(String, String)> {
-    let mut found = Vec::new();
-    for manifest in manifests {
-        let own = Ecosystem::of(&manifest.path) == Some(Ecosystem::Pypi)
-            && manifest.path.ends_with("pyproject.toml");
-        if !own {
-            continue;
-        }
-        let roots = python_roots(manifest);
-        for (module, function) in &manifest.summary.scripts {
-            let name = module.replace('.', "/");
-            // The first candidate that exists and is this package's, as `Provided::module`
-            // finds it: a file of a nested package is not.
-            let owned = |f: &String| {
-                files.contains(&f.as_str())
-                    && owner(manifests, f, Ecosystem::Pypi)
-                        .is_some_and(|m| directory(&m.path) == directory(&manifest.path))
-            };
-            let file = (roots.iter())
-                .flat_map(|root| python::files(root, &name))
-                .find(owned);
-            found.extend(file.map(|f| (f, function.clone())));
-        }
-    }
-    found.sort();
-    found.dedup();
-    found
 }
 
 /// `path`, relative to the package directory `dir`, as a path of the repository; `None` when
@@ -812,12 +779,13 @@ struct Provided<'e> {
     /// The shapes the provider keeps for what its files export (issue #175), by the symbol-like
     /// identity of the constant or type (`<repository>::<path>::<name>`) and the view.
     shapes: HashMap<(String, Want), &'e Shape>,
-    /// The source files that export something, by the path of the manifest that is their
-    /// nearest, none under a `node_modules` directory. Built the first time an ambiguous import
-    /// asks (`candidates`), once for all.
-    owned: OnceCell<HashMap<&'e str, Vec<&'e str>>>,
+    /// The source files that export something, by the path of the manifest that is their nearest
+    /// in the ecosystem, none under a `node_modules` directory: one table per ecosystem of
+    /// `ECOSYSTEMS`, in its order, built the first time an ambiguous import of that ecosystem
+    /// asks (`candidates`).
+    owned: [OnceCell<HashMap<&'e str, Vec<&'e str>>>; ECOSYSTEMS.len()],
     /// The Go source files that are no tests, by directory. Built the first time a Go import
-    /// asks (`package`), once for all.
+    /// asks (`Go::resolve`), once for all.
     go_dirs: OnceCell<HashMap<&'e str, Vec<&'e str>>>,
 }
 
@@ -847,7 +815,7 @@ impl<'e> Provided<'e> {
                     ((id, k.want), &k.shape)
                 })
                 .collect(),
-            owned: OnceCell::new(),
+            owned: Default::default(),
             go_dirs: OnceCell::new(),
         }
     }
@@ -860,90 +828,6 @@ impl<'e> Provided<'e> {
     /// Whether `path` is a source file the provider indexes (a declaration file is none).
     fn source(&self, path: &str) -> bool {
         self.files.contains(path) && !path.ends_with(".d.ts")
-    }
-
-    /// The symbol an import of `subpath` of the package at `manifest` of `repository` names as
-    /// `chain`. The entry must be a source file the provider indexes: found by the declared
-    /// field or rule that names it, the import is `exact`; found through the package's `outDir`
-    /// and `rootDir` (`sources`), `inferred`. Of the ways in (`ways`), the first that leads
-    /// to a file wins; a present field that leads nowhere does not stop the search. When none
-    /// does, the import is `ambiguous`, named by the first way, and every source file of the
-    /// package that exports the chain's head gives a symbol (`candidates`). The chain's head is
-    /// what the file exports, and each further name a member of that definition or a name the
-    /// whole file exports.
-    fn resolve(
-        &self,
-        repository: &str,
-        manifest: &Manifest,
-        subpath: &str,
-        chain: &str,
-        known: &dyn Fn(&str) -> bool,
-    ) -> Option<Resolved> {
-        if Ecosystem::of(&manifest.path) == Some(Ecosystem::Go) {
-            return self.package(repository, manifest, subpath, chain, known);
-        }
-        let tried = ways(manifest, subpath);
-        let first = tried.first()?.0;
-        let Some((file, how, level)) = self.entry(manifest, &tried) else {
-            if Ecosystem::of(&manifest.path) == Some(Ecosystem::Cargo) {
-                return None;
-            }
-            let targets = self.candidates(repository, manifest, chain, known);
-            return (!targets.is_empty()).then_some(Resolved {
-                how: first,
-                level: Level::Ambiguous,
-                targets,
-            });
-        };
-        let id = self.reach(repository, &file, chain, known)?;
-        Some(Resolved {
-            how,
-            level,
-            targets: vec![id],
-        })
-    }
-
-    /// The symbol `chain` names in the Go package at `subpath` (`.` for the module's root, else
-    /// `./<directory>`) of the module at `manifest`: the exported name of the one source file of
-    /// that directory (a test file or one of a nested module is none) that defines it. `exact`
-    /// when found; none when the directory lacks or the name is not exported there.
-    fn package(
-        &self,
-        repository: &str,
-        manifest: &Manifest,
-        subpath: &str,
-        chain: &str,
-        known: &dyn Fn(&str) -> bool,
-    ) -> Option<Resolved> {
-        let base = directory(&manifest.path);
-        let dir = match subpath.strip_prefix("./") {
-            Some(rest) => inside(base, rest)?,
-            None if base == "." => String::new(),
-            None => base.to_string(),
-        };
-        let by_dir = self.go_dirs.get_or_init(|| {
-            let mut by_dir: HashMap<&str, Vec<&str>> = HashMap::new();
-            for &f in self.files.iter().filter(|f| f.ends_with(".go")) {
-                if !f.ends_with("_test.go") {
-                    by_dir
-                        .entry(f.rsplit_once('/').map_or("", |(d, _)| d))
-                        .or_default()
-                        .push(f);
-                }
-            }
-            by_dir
-        });
-        let mut ids: Vec<String> = (by_dir.get(dir.as_str()).into_iter().flatten())
-            .filter(|f| self.owned_source(manifest, f))
-            .filter_map(|f| self.reach(repository, f, chain, known))
-            .collect();
-        ids.sort();
-        ids.dedup();
-        (ids.len() == 1).then_some(Resolved {
-            how: How::ModulePath,
-            level: Level::Exact,
-            targets: ids,
-        })
     }
 
     /// The source file the first of the ways `tried` that leads to one names, with how and at
@@ -979,23 +863,14 @@ impl<'e> Provided<'e> {
             .find(|s| self.owned_source(manifest, s))
     }
 
-    /// The file of the Python module `specifier` (dotted, `a.b`) of the PyPI package at
-    /// `manifest`: `a/b/__init__.py` or `a/b.py` under the first of its source roots
-    /// (`python_roots`) that holds one the package owns (`owned_source`).
-    fn module(&self, manifest: &Manifest, specifier: &str) -> Option<String> {
-        let name = specifier.replace('.', "/");
-        (python_roots(manifest).iter())
-            .flat_map(|root| python::files(root, &name))
-            .find(|f| self.owned_source(manifest, f))
-    }
-
     /// Whether `path` is a source file the provider indexes (`source`) whose nearest manifest
     /// is `manifest`: a file of a nested package is not the outer package's.
     fn owned_source(&self, manifest: &Manifest, path: &str) -> bool {
-        let ecosystem = Ecosystem::of(&manifest.path).unwrap_or(Ecosystem::Npm);
-        self.source(path)
-            && owner(self.manifests, path, ecosystem)
-                .is_some_and(|m| directory(&m.path) == directory(&manifest.path))
+        of(&manifest.path).is_some_and(|ecosystem| {
+            self.source(path)
+                && owner(self.manifests, path, ecosystem)
+                    .is_some_and(|m| directory(&m.path) == directory(&manifest.path))
+        })
     }
 
     /// The symbols `chain` names in the source files of the package at `manifest` (those whose
@@ -1010,13 +885,19 @@ impl<'e> Provided<'e> {
         known: &dyn Fn(&str) -> bool,
     ) -> Vec<String> {
         let head = chain.split('.').next();
-        let owned = self.owned.get_or_init(|| {
+        let Some(ecosystem) = of(&manifest.path) else {
+            return Vec::new();
+        };
+        let at = (ECOSYSTEMS.iter())
+            .position(|e| e.name() == ecosystem.name())
+            .expect("`of` answers from ECOSYSTEMS");
+        let owned = self.owned[at].get_or_init(|| {
             let mut owned: HashMap<&str, Vec<&str>> = HashMap::new();
             for &path in self.exported.keys() {
-                if self.source(path)
-                    && !path.split('/').any(|s| s == "node_modules")
-                    && let Some(m) = nearest(self.manifests, path, Ecosystem::Npm)
-                {
+                if !self.source(path) || path.split('/').any(|s| s == "node_modules") {
+                    continue;
+                }
+                if let Some(m) = nearest(self.manifests, path, ecosystem) {
                     owned.entry(&m.path).or_default().push(path);
                 }
             }
@@ -1115,19 +996,20 @@ impl<'e> Provided<'e> {
     }
 }
 
-/// The providers of each package of the workspace, by ecosystem and name, as positions: the
+/// The providers of each package of the workspace, by ecosystem name and package name, so two
+/// ecosystems never link, as positions: the
 /// repository in `exports`, then its manifest in `Export::manifests`. Built once for the
 /// workspace steps (`consume`, `import`), both of which only add to the exports and never move
 /// a manifest.
-struct Providers(HashMap<(Ecosystem, String), Vec<(usize, usize)>>);
+struct Providers(HashMap<(&'static str, String), Vec<(usize, usize)>>);
 
 impl Providers {
     fn new(exports: &[Export]) -> Self {
         let mut providers: HashMap<_, Vec<(usize, usize)>> = HashMap::new();
         for (n, export) in exports.iter().enumerate() {
             for (i, m) in export.manifests.iter().enumerate() {
-                if let (Some(name), Some(ecosystem)) = (&m.summary.name, Ecosystem::of(&m.path)) {
-                    let key = (ecosystem, name.clone());
+                if let (Some(name), Some(ecosystem)) = (&m.summary.name, of(&m.path)) {
+                    let key = (ecosystem.name(), name.clone());
                     providers.entry(key).or_default().push((n, i));
                 }
             }
@@ -1135,7 +1017,8 @@ impl Providers {
         Self(providers)
     }
 
-    fn of(&self, ecosystem: Ecosystem, name: &str) -> &[(usize, usize)] {
+    /// The providers of the package `name` of the ecosystem named `ecosystem`.
+    fn of(&self, ecosystem: &'static str, name: &str) -> &[(usize, usize)] {
         (self.0.get(&(ecosystem, name.to_string()))).map_or(&[], Vec::as_slice)
     }
 }
@@ -1158,7 +1041,7 @@ fn import(exports: &mut [Export], providers: &Providers) {
         for call in &export.import_calls {
             let (from, chain) = ((n, call.path.as_str()), call.chain.as_str());
             let symbol = |at: &Provided, id: &str| at.symbol(id);
-            let Some(ecosystem) = Ecosystem::of_source(&call.path) else {
+            let Some(ecosystem) = of_source(&call.path) else {
                 continue;
             };
             for (entry, resolved) in resolutions(
@@ -1202,7 +1085,7 @@ fn import(exports: &mut [Export], providers: &Providers) {
                 }
                 if !hops.is_empty() {
                     consumers.push(Consumer {
-                        contract: Some(ecosystem.contract(&entry.name)),
+                        contract: Some(contract(ecosystem, &entry.name)),
                         site: call.site.clone(),
                         via: entry.via.clone(),
                         shape: None,
@@ -1256,7 +1139,7 @@ fn shapes(exports: &mut [Export], providers: &Providers) {
 
 /// The shape the name `import` names keeps in the package it imports from, as the repository
 /// `n` reaches it: the package the nearest manifest of the importing file depends on, resolved in
-/// each repository providing it (`Provided::resolve`, the rules of a call through an import) to
+/// each repository providing it (`Ecosystem::resolve`, the rules of a call through an import) to
 /// a constant or type that keeps a shape for the import's view, with that repository and the
 /// level it resolved at (`inferred` through an `outDir` mapping). `None`
 /// when no provider resolves it, when one resolves it `ambiguous` or to several names, or when
@@ -1304,166 +1187,26 @@ fn kept<'e>(
 type Resolution<'e> = (usize, &'e Manifest, &'e Provided<'e>, Resolved);
 
 /// Where the name `chain`, which the file `from.1` of the repository `from.0` imports from
-/// `specifier`, resolves, by the rules of the file's ecosystem (`Ecosystem::of_source`): each
-/// dependency entry of the file's nearest manifest (PyPI: of every manifest above it) that
-/// names a package the import reaches, and each repository providing it that the entry
-/// reaches and where the name resolves there, with that repository's position, its manifest
-/// and its `Provided`. `known` says which ids of a
-/// provider the name may resolve to. Empty when the import names no dependency of the file;
-/// npm gives one entry at most.
+/// `specifier`, resolves, by the rules of the file's ecosystem (`of_source`,
+/// `Ecosystem::resolutions`): each dependency entry the import may name, and each repository
+/// providing its package that the entry reaches and where the name resolves there, with that
+/// repository's position, its manifest and its `Provided`. `known` says which ids of a
+/// provider the name may resolve to. Empty when the import names no dependency of the file, or
+/// the file is of no ecosystem.
 fn resolutions<'e>(
     exports: &'e [Export],
     providers: &Providers,
     provided: &'e [OnceCell<Provided<'e>>],
-    (n, from): (usize, &str),
+    from: (usize, &str),
     specifier: &str,
     chain: &str,
     known: impl Fn(&Provided<'e>, &str) -> bool,
 ) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
+    let Some(ecosystem) = of_source(from.1) else {
+        return Vec::new();
+    };
     let at = |m: usize| provided[m].get_or_init(|| Provided::new(&exports[m]));
-    if Ecosystem::of_source(from) == Some(Ecosystem::Pypi) {
-        return pypi_resolutions(exports, providers, &at, (n, from), specifier, chain, known);
-    }
-    let ecosystem = Ecosystem::of_source(from).unwrap_or(Ecosystem::Npm);
-    let (entry, subpath) = match ecosystem {
-        Ecosystem::Cargo => {
-            // The specifier is the crate a `use` names: the key of a renamed dependency, else
-            // the name of the library of the package it names (the package's own, with no
-            // provider to ask), hyphens as underscores.
-            let heads = |e: &Entry| match (e.alias.is_some(), providers.of(ecosystem, &e.name)) {
-                (false, of) if !of.is_empty() => (of.iter()).any(|&(m, i)| {
-                    cargo::lib_head(&exports[m].manifests[i].summary).as_deref() == Some(specifier)
-                }),
-                _ => cargo::import_name(e) == specifier,
-            };
-            let entry = (owner(&exports[n].manifests, from, ecosystem))
-                .filter(|_| cargo::names_crate(specifier))
-                .and_then(|m| m.summary.dependencies.iter().find(|e| heads(e)));
-            (entry, ".".to_string())
-        }
-        Ecosystem::Go => {
-            // The module of the nearest `go.mod` whose path the import starts with, the longest.
-            let found = (owner(&exports[n].manifests, from, ecosystem)).and_then(|m| {
-                (m.summary.dependencies.iter())
-                    .filter_map(|e| {
-                        Some((e, crate::lang::go::modfile::inside(specifier, &e.name)?))
-                    })
-                    .max_by_key(|(e, _)| e.name.len())
-            });
-            let subpath = match found {
-                Some((_, rest)) if !rest.is_empty() => format!("./{rest}"),
-                _ => ".".to_string(),
-            };
-            (found.map(|(e, _)| e), subpath)
-        }
-        _ => {
-            let Some((name, subpath)) = split(specifier) else {
-                return Vec::new();
-            };
-            let entry = (nearest(&exports[n].manifests, from, ecosystem))
-                .and_then(|m| m.summary.dependencies.iter().find(|e| e.name == name));
-            (entry, subpath)
-        }
-    };
-    let Some(entry) = entry else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    for &(m, i) in providers.of(ecosystem, &entry.name) {
-        let manifest = &exports[m].manifests[i];
-        // An entry that does not rename a Cargo package reaches the libraries named as it writes.
-        let by_lib = ecosystem == Ecosystem::Cargo && entry.alias.is_none();
-        if by_lib && cargo::lib_head(&manifest.summary).as_deref() != Some(specifier) {
-            continue;
-        }
-        let source = (entry.via.as_deref(), entry.range.as_deref());
-        if !ecosystem.reaches(
-            source,
-            exports[n].place(),
-            (exports[m].place(), &manifest.path),
-        ) {
-            continue;
-        }
-        let at = at(m);
-        let known = |id: &str| known(at, id);
-        if let Some(resolved) =
-            at.resolve(&exports[m].repository, manifest, &subpath, chain, &known)
-        {
-            out.push((m, manifest, at, resolved));
-        }
-    }
-    vec![(entry, out)]
-}
-
-/// `resolutions` for a Python import: the import names a module, not a distribution, so each
-/// distribution a PyPI manifest of a directory holding the file depends on (`holding`: every
-/// `pyproject.toml` and `requirements*.txt` above it, the nearest first, whose entry gives the
-/// range) is a candidate when a provider of it exposes the import's top-level module under
-/// its source roots. The import is `exact` (`import module name`) when that module is the
-/// distribution's name with `-` turned into `_`, `inferred` (`import top-level module`) when it
-/// is only one of the provider's top-level modules, and `ambiguous` when several distributions
-/// expose it. The module the import names is then found under the same roots
-/// (`Provided::module`) and `chain` followed from it.
-fn pypi_resolutions<'e>(
-    exports: &'e [Export],
-    providers: &Providers,
-    at: &dyn Fn(usize) -> &'e Provided<'e>,
-    (n, from): (usize, &str),
-    specifier: &str,
-    chain: &str,
-    known: impl Fn(&Provided<'e>, &str) -> bool,
-) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
-    let top = specifier.split('.').next().unwrap_or_default();
-    if top.is_empty() {
-        return Vec::new();
-    }
-    let mut seen = HashSet::new();
-    let entries = holding(&exports[n].manifests, from, Ecosystem::Pypi)
-        .into_iter()
-        .flat_map(|m| &m.summary.dependencies)
-        .filter(|e| seen.insert(e.name.as_str()));
-    let mut out = Vec::new();
-    for entry in entries {
-        let (mut exposed, mut resolved) = (false, Vec::new());
-        for &(m, i) in providers.of(Ecosystem::Pypi, &entry.name) {
-            let (at, manifest) = (at(m), &exports[m].manifests[i]);
-            if at.module(manifest, top).is_none() {
-                continue;
-            }
-            exposed = true;
-            let (how, level) = match pypi::import_name(&entry.name) == top {
-                true => (How::ModuleName, Level::Exact),
-                false => (How::TopLevel, Level::Inferred),
-            };
-            let known = |id: &str| known(at, id);
-            let target = (at.module(manifest, specifier))
-                .and_then(|file| at.reach(&exports[m].repository, &file, chain, &known));
-            if let Some(target) = target {
-                let targets = vec![target];
-                resolved.push((
-                    m,
-                    manifest,
-                    at,
-                    Resolved {
-                        how,
-                        level,
-                        targets,
-                    },
-                ));
-            }
-        }
-        if exposed {
-            out.push((entry, resolved));
-        }
-    }
-    if out.len() > 1 {
-        for (_, resolved) in &mut out {
-            for r in resolved {
-                r.3.level = Level::Ambiguous;
-            }
-        }
-    }
-    out
+    ecosystem.resolutions(exports, providers, &at, from, (specifier, chain), &known)
 }
 
 /// The files of a repository an import of one of its packages can reach (issue #175), so the
@@ -1488,17 +1231,15 @@ pub fn surface(
         manifests,
         configs,
         shapes: HashMap::new(),
-        owned: OnceCell::new(),
+        owned: Default::default(),
         go_dirs: OnceCell::new(),
     };
     let mut queue = Vec::new();
-    // Shapes cross through npm packages alone: no reader keeps one for a Python file.
-    let npm = |m: &&Manifest| Ecosystem::of(&m.path) == Some(Ecosystem::Npm);
-    for m in manifests
-        .iter()
-        .filter(npm)
-        .filter(|m| m.summary.name.is_some())
-    {
+    // Shapes cross through the packages of an ecosystem that says so (`Ecosystem::shapes`).
+    let crossing = (manifests.iter())
+        .filter_map(|m| Some((m, of(&m.path).filter(|e| e.shapes())?)))
+        .filter(|(m, _)| m.summary.name.is_some());
+    for (m, ecosystem) in crossing {
         let subpaths: Vec<String> = match &m.summary.exports {
             Some(Value::Object(keys)) if keys.keys().any(|k| k.starts_with('.')) => (keys.keys())
                 .filter(|k| k.starts_with('.') && !k.contains('*'))
@@ -1507,7 +1248,8 @@ pub fn surface(
             _ => vec![".".to_string()],
         };
         for subpath in subpaths {
-            queue.extend(provided.entry(m, &ways(m, &subpath)).map(|(file, ..)| file));
+            let tried = ecosystem.ways(m, &subpath);
+            queue.extend(provided.entry(m, &tried).map(|(file, ..)| file));
         }
     }
     let mut seen = HashSet::new();
@@ -1579,12 +1321,12 @@ fn consume(exports: &mut [Export], providers: &Providers) {
             let mut consumers = Vec::new();
             let mut dependencies = Vec::new();
             for manifest in &export.manifests {
-                let Some(ecosystem) = Ecosystem::of(&manifest.path) else {
+                let Some(ecosystem) = of(&manifest.path) else {
                     continue;
                 };
                 for e in &manifest.summary.dependencies {
                     let source = (e.via.as_deref(), e.range.as_deref());
-                    let of = providers.of(ecosystem, &e.name);
+                    let of = providers.of(ecosystem.name(), &e.name);
                     let reaches = |&&(m, i): &&(usize, usize)| {
                         let at = &exports[m].manifests[i];
                         ecosystem.reaches(source, export.place(), (exports[m].place(), &at.path))
@@ -1593,7 +1335,7 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                         continue;
                     }
                     consumers.push(Consumer {
-                        contract: Some(ecosystem.contract(&e.name)),
+                        contract: Some(contract(ecosystem, &e.name)),
                         site: format!(
                             "{}::{}::{}::{}",
                             export.repository,
@@ -1634,11 +1376,6 @@ fn consume(exports: &mut [Export], providers: &Providers) {
     }
 }
 
-/// The longest range checked, in bytes; a longer one is `range unchecked`. The crate sets no
-/// limit of its own on a range, and a real one is a few dozen bytes.
-// ponytail: a flat 256 (the crate's own limit for versions); a measured need lifts it.
-const MAX_RANGE: usize = 256;
-
 /// What checking a dependency range against the provider's version found, when it is not a
 /// plain accept.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1659,54 +1396,10 @@ impl Flag {
     }
 }
 
-/// Whether the dependency `range` accepts the provider's `version`, by npm's semantics: `None`
-/// when it does, else the `Flag`. A missing range or version, a `workspace:`, `file:`, `link:`
-/// or `npm:` range, a git or URL source (anything holding `:` or `/`), a tag such as `latest`
-/// and a range past `MAX_RANGE` are `Unchecked`. The crate lets garbage through in a range of
-/// several tokens (`foo 1.2.3` parses as `1.2.3`), so each token must also look like a
-/// comparator.
-fn flag(range: Option<&str>, version: Option<&str>) -> Option<Flag> {
-    let (Some(range), Some(version)) = (range, version) else {
-        return Some(Flag::Unchecked);
-    };
-    let parsed = (range.len() <= MAX_RANGE && comparators(range))
-        .then(|| nodejs_semver::Range::parse(range).ok())
-        .flatten()
-        .zip(nodejs_semver::Version::parse(version).ok());
-    match parsed {
-        None => Some(Flag::Unchecked),
-        Some((range, version)) if range.satisfies(&version) => None,
-        Some(_) => Some(Flag::Mismatch),
-    }
-}
-
-/// Whether every token of `range` looks like part of an npm range: `||` separates sets of at
-/// least one token, `-` joins a hyphen range, and a comparator is an optional operator then a
-/// version body that begins with a digit, or is a wildcard (`x`, `X`, `*`) alone or followed by
-/// `.` (so no `:` or `/` gets through, nor `xyz`).
-fn comparators(range: &str) -> bool {
-    range.split("||").all(|set| {
-        let mut tokens = set.split_whitespace().peekable();
-        tokens.peek().is_some()
-            && tokens.all(|t| {
-                let body = t.trim_start_matches(['^', '~', '<', '>', '=', 'v']);
-                t == "-"
-                    || body.is_empty()
-                    || ((body.starts_with(|c: char| c.is_ascii_digit())
-                        || matches!(body, "x" | "X" | "*")
-                        || body.starts_with(['x', 'X', '*']) && body[1..].starts_with('.'))
-                        && body
-                            .chars()
-                            .all(|c| c.is_ascii_alphanumeric() || ".+-*".contains(c)))
-            })
-    })
-}
-
 /// What a dependency `range` on the package `contract` says of the provider's `version`, by
 /// the contract's ecosystem (`Ecosystem::flag`).
 fn flag_of(contract: &str, range: Option<&str>, version: Option<&str>) -> Option<Flag> {
-    let ecosystem = Ecosystem::of_contract(contract).unwrap_or(Ecosystem::Npm);
-    ecosystem.flag(range, version)
+    of_contract(contract)?.flag(range, version)
 }
 
 /// The reason of a package link: `<identifier> <range|none> (local <version|none>)`, then
@@ -1788,8 +1481,8 @@ impl ContractKind for Packages {
         let rest = site.strip_prefix(repository)?.strip_prefix("::")?;
         let parts: Vec<&str> = rest.split("::").collect();
         match parts[..] {
-            [path] if Ecosystem::of(path).is_some() => Some(path.to_string()),
-            [path, field, _] if Ecosystem::of(path).is_some() => Some(format!("{path} {field}")),
+            [path] if of(path).is_some() => Some(path.to_string()),
+            [path, field, _] if of(path).is_some() => Some(format!("{path} {field}")),
             _ => None,
         }
     }
@@ -1817,7 +1510,7 @@ impl ContractKind for Packages {
                 None => p.name.clone(),
             };
             let n = entries.get(p.site().as_str()).copied().unwrap_or(0);
-            let name = match p.ecosystem.is_npm() {
+            let name = match is_npm(&p.ecosystem) {
                 true => name,
                 false => format!("{name} ({})", p.ecosystem.name()),
             };
@@ -1839,22 +1532,15 @@ impl ContractKind for Packages {
     fn extract(&self, code: &Code) -> Vec<Found> {
         let mut found = Vec::new();
         // A file of no ecosystem imports no package.
-        let files = (code.files().iter()).filter(|(path, _)| Ecosystem::of_source(path).is_some());
-        for (&path, facts) in files {
+        let files = (code.files().iter())
+            .filter_map(|(&path, facts)| Some((path, facts, of_source(path)?)));
+        for (path, facts, ecosystem) in files {
             for (index, call) in facts.calls.iter().enumerate() {
                 let Some((specifier, chain)) = code.imported(path, &call.scope, &call.callee)
                 else {
                     continue;
                 };
-                let package = match Ecosystem::of_source(path) {
-                    Some(Ecosystem::Cargo) => cargo::names_crate(specifier),
-                    // Any path that can be a contract name may name a module of the workspace: a
-                    // module path needs no dot (`module kit` with a local `replace`), and the
-                    // standard library stays external since no `require` names it.
-                    Some(Ecosystem::Go) => valid_name(specifier),
-                    _ => split(specifier).is_some(),
-                };
-                if chain.is_empty() || !package {
+                if chain.is_empty() || !ecosystem.names_package(specifier) {
                     continue;
                 }
                 found.push(Found {
@@ -1878,11 +1564,11 @@ impl ContractKind for Packages {
     fn declare(&self, repo: &Repository, export: &mut Export) {
         let mut packages = Vec::new();
         for m in &export.manifests {
-            let (Some(name), Some(ecosystem)) = (&m.summary.name, Ecosystem::of(&m.path)) else {
+            let (Some(name), Some(ecosystem)) = (&m.summary.name, of(&m.path)) else {
                 continue;
             };
             export.providers.push(Provider {
-                contract: ecosystem.contract(name),
+                contract: contract(ecosystem, name),
                 site: site(&repo.identity, &m.path),
                 version: m.summary.version.clone(),
                 ..Provider::default()
@@ -1986,7 +1672,9 @@ impl ContractKind for Packages {
             return Vec::new();
         };
         let range = consumer.method.as_deref();
-        let ecosystem = Ecosystem::of_contract(contract).unwrap_or(Ecosystem::Npm);
+        let Some(ecosystem) = of_contract(contract) else {
+            return Vec::new();
+        };
         let source = (consumer.via.as_deref(), range);
         let fits: Vec<_> = (providers.iter())
             .filter(|(repo, p)| {
@@ -2045,6 +1733,7 @@ impl ContractKind for Packages {
 mod tests {
     use super::*;
     use crate::index::Span;
+    use std::path::PathBuf;
 
     #[test]
     fn an_ambiguous_package_link_is_no_call_for_a_person() {
@@ -2114,7 +1803,7 @@ mod tests {
 
     #[test]
     fn the_own_search_lists_a_package_by_name_with_the_entries_linked_to_it() {
-        let package = |name: &str, ecosystem| Package {
+        let package = |name: &str, ecosystem: &'static dyn Ecosystem| Package {
             name: name.into(),
             version: Some("1.0.0".into()),
             repository: "r".into(),
@@ -2124,9 +1813,9 @@ mod tests {
         };
         let export = Export {
             packages: vec![
-                package("@a/Kit", Ecosystem::Npm),
-                package("kit-py", Ecosystem::Pypi),
-                package("other", Ecosystem::Npm),
+                package("@a/Kit", &Npm),
+                package("kit-py", &Pypi),
+                package("other", &Npm),
             ],
             ..Export::default()
         };
@@ -2158,92 +1847,6 @@ mod tests {
         );
     }
 
-    fn entries(s: &Summary) -> Vec<(&str, &str, Option<&str>)> {
-        (s.dependencies.iter())
-            .map(|e| (e.field.as_str(), e.name.as_str(), e.range.as_deref()))
-            .collect()
-    }
-
-    #[test]
-    fn a_console_script_names_the_function_of_the_file_its_module_is() {
-        let pypi = |path: &str, scripts: &[(&str, &str)], roots: &[&str]| Manifest {
-            path: path.to_string(),
-            summary: Summary {
-                scripts: (scripts.iter())
-                    .map(|(m, f)| (m.to_string(), f.to_string()))
-                    .collect(),
-                roots: roots.iter().map(|r| r.to_string()).collect(),
-                ..Summary::default()
-            },
-        };
-        let all = [
-            pypi(
-                "pyproject.toml",
-                &[("app.cli", "main"), ("tool", "run")],
-                &[],
-            ),
-            pypi(
-                "lib/pyproject.toml",
-                &[("pkg", "start"), ("none", "x")],
-                &["src"],
-            ),
-            pypi(
-                "outer/pyproject.toml",
-                &[("inner", "go"), ("pkg.cli", "main")],
-                &[],
-            ),
-            pypi("outer/inner/pyproject.toml", &[], &[]),
-        ];
-        let files = [
-            "app/cli.py",
-            "tool/__init__.py",
-            "tool.py",
-            "lib/src/pkg/__init__.py",
-            "outer/inner.py",
-            "outer/pkg.py",
-            "outer/inner/pkg/cli.py",
-        ];
-
-        let found = python_programs(&all, &files);
-
-        // `tool/__init__.py` over `tool.py`, as an import finds it; the `src` root of `lib`;
-        // `none` has no file; `outer`'s `inner.py` is its own, and `pkg/cli.py` is not in
-        // `outer`'s reach.
-        assert_eq!(
-            found,
-            [
-                ("app/cli.py".to_string(), "main".to_string()),
-                ("lib/src/pkg/__init__.py".to_string(), "start".to_string()),
-                ("outer/inner.py".to_string(), "go".to_string()),
-                ("tool/__init__.py".to_string(), "run".to_string()),
-            ]
-        );
-    }
-
-    #[test]
-    fn a_console_script_skips_a_candidate_another_package_owns() {
-        let pypi = |path: &str, scripts: &[(&str, &str)]| Manifest {
-            path: path.to_string(),
-            summary: Summary {
-                scripts: (scripts.iter())
-                    .map(|(m, f)| (m.to_string(), f.to_string()))
-                    .collect(),
-                ..Summary::default()
-            },
-        };
-        let all = [
-            pypi("pyproject.toml", &[("inner.mod", "go")]),
-            pypi("inner/pyproject.toml", &[]),
-        ];
-        // `inner/mod.py` comes first among the roots but belongs to the nested package.
-        let files = ["inner/mod.py", "src/inner/mod.py"];
-
-        assert_eq!(
-            python_programs(&all, &files),
-            [("src/inner/mod.py".to_string(), "go".to_string())]
-        );
-    }
-
     #[test]
     fn a_package_site_shows_its_manifest_and_field() {
         let repo = "example.com/a";
@@ -2268,152 +1871,6 @@ mod tests {
     }
 
     #[test]
-    fn a_manifest_reads_its_name_version_and_dependency_entries() {
-        let src = br#"{"name": "@a/b", "version": "1.0.0",
-            "devDependencies": {"z": "^1"}, "dependencies": {"y": "~2", "x": "*"}}"#;
-        let s = read(src);
-        assert_eq!(s.name.as_deref(), Some("@a/b"));
-        assert_eq!(s.version.as_deref(), Some("1.0.0"));
-        assert_eq!(
-            entries(&s),
-            [
-                ("dependencies", "x", Some("*")),
-                ("dependencies", "y", Some("~2")),
-                ("devDependencies", "z", Some("^1")),
-            ]
-        );
-    }
-
-    #[test]
-    fn a_field_of_another_type_counts_as_absent() {
-        let s = read(
-            br#"{"name": 3, "version": ["1"], "dependencies": {"a": true, "b": null, "c": ""},
-                "devDependencies": ["a"], "peerDependencies": "a"}"#,
-        );
-        assert_eq!((&s.name, &s.version), (&None, &None));
-        assert_eq!(
-            entries(&s),
-            [
-                ("dependencies", "a", None),
-                ("dependencies", "b", None),
-                ("dependencies", "c", None),
-            ]
-        );
-    }
-
-    #[test]
-    fn a_name_that_breaks_the_rules_makes_no_provider() {
-        let long = "a".repeat(MAX_NAME + 1);
-        for name in [long.as_str(), "", "a b", "a\nb", "a\u{7}b", "a::b", "a\tb"] {
-            let src = format!(r#"{{"name": {}}}"#, serde_json::to_string(name).unwrap());
-            assert_eq!(read(src.as_bytes()).name, None, "{name:?}");
-        }
-        let longest = "a".repeat(MAX_NAME);
-        let src = format!(r#"{{"name": "{longest}"}}"#);
-        assert_eq!(read(src.as_bytes()).name.as_deref(), Some(longest.as_str()));
-    }
-
-    #[test]
-    fn a_dependency_with_an_invalid_name_is_left_out() {
-        let s = read(br#"{"dependencies": {"a b": "1", "ok": "1"}}"#);
-        assert_eq!(entries(&s), [("dependencies", "ok", Some("1"))]);
-    }
-
-    #[test]
-    fn a_file_too_large_or_not_an_object_reads_as_empty() {
-        let pad = " ".repeat(MAX_BYTES);
-        let big = format!(r#"{{"name": "a"{pad}}}"#);
-        assert_eq!(read(big.as_bytes()), Summary::default());
-        for src in ["", "not json", "[1]", "\"a\"", "null"] {
-            assert_eq!(read(src.as_bytes()), Summary::default(), "{src}");
-        }
-        let at_limit = format!(r#"{{"name": "a"{}}}"#, " ".repeat(MAX_BYTES - 13));
-        assert_eq!(at_limit.len(), MAX_BYTES);
-        assert_eq!(read(at_limit.as_bytes()).name.as_deref(), Some("a"));
-    }
-
-    #[test]
-    fn deeply_nested_input_reads_as_empty() {
-        let n = 10_000;
-        let src = format!(
-            r#"{{"name": "a", "x": {}{}}}"#,
-            "[".repeat(n),
-            "]".repeat(n)
-        );
-        assert_eq!(read(src.as_bytes()), Summary::default());
-    }
-
-    const MISMATCH: Option<Flag> = Some(Flag::Mismatch);
-    const UNCHECKED: Option<Flag> = Some(Flag::Unchecked);
-
-    #[test]
-    fn npm_ranges_are_checked_against_the_local_version() {
-        let table = [
-            ("^1.0.0", "1.2.0", None),
-            ("^1.0.0", "2.0.0", MISMATCH),
-            ("^0.2.3", "0.2.9", None),
-            ("^0.2.3", "0.3.0", MISMATCH),
-            ("~1.1.0", "1.1.9", None),
-            ("~1.1.0", "1.2.0", MISMATCH),
-            ("1.x", "1.9.0", None),
-            ("1.x", "2.0.0", MISMATCH),
-            ("*", "7.0.0", None),
-            ("1.2.0 - 1.4.0", "1.3.0", None),
-            ("1.2.0 - 1.4.0", "1.5.0", MISMATCH),
-            ("^1.0.0 || ^3.0.0", "3.1.0", None),
-            ("^1.0.0 || ^3.0.0", "2.0.0", MISMATCH),
-            (">=1.0.0 <2.0.0", "1.5.0", None),
-            (">=1.0.0 <2.0.0", "2.0.0", MISMATCH),
-            ("1.2.0", "1.2.0", None),
-            ("1.2.0", "1.2.1", MISMATCH),
-            // A prerelease matches only a comparator on the same major.minor.patch.
-            ("^1.0.0", "1.2.0-beta.1", MISMATCH),
-            ("^1.2.0-beta.0", "1.2.0-beta.1", None),
-            ("^1.2.0-beta.0", "1.3.0-beta.1", MISMATCH),
-        ];
-        for (range, version, want) in table {
-            assert_eq!(
-                flag(Some(range), Some(version)),
-                want,
-                "{range} / {version}"
-            );
-        }
-    }
-
-    #[test]
-    fn a_range_that_cannot_be_checked_is_unchecked() {
-        let ranges = [
-            "workspace:*",
-            "workspace:^1.0.0",
-            "file:../shared",
-            "link:../shared",
-            "npm:other@^1.0.0",
-            "git+https://example.com/a.git",
-            "github:user/repo",
-            "user/repo",
-            "https://example.com/a.tgz",
-            "latest",
-            "next",
-            "foo 1.2.3",
-            "xyz 1.2.3",
-            "x-foo",
-            "1.2.3 foo",
-            "^1.0.0 || bar",
-            "",
-        ];
-        for range in ranges {
-            assert_eq!(flag(Some(range), Some("1.2.0")), UNCHECKED, "{range:?}");
-        }
-        assert_eq!(flag(None, Some("1.2.0")), UNCHECKED);
-        assert_eq!(flag(Some("^1.0.0"), None), UNCHECKED);
-        // A local version that is not a version cannot be compared either.
-        assert_eq!(flag(Some("^1.0.0"), Some("not-a-version")), UNCHECKED);
-        let long = "^1.0.0 || ".repeat(MAX_RANGE);
-        assert!(long.len() > MAX_RANGE);
-        assert_eq!(flag(Some(&long), Some("1.2.0")), UNCHECKED);
-    }
-
-    #[test]
     fn the_reason_ends_with_the_flag() {
         let said = |range, version| reason("package::npm::a", range, version);
         assert_eq!(
@@ -2434,92 +1891,10 @@ mod tests {
         );
     }
 
-    #[test]
-    fn the_exports_map_gives_each_subpath_its_target() {
-        let map = serde_json::json!({
-            ".": {"types": "./src/index.ts", "require": "./dist/index.cjs"},
-            "./format": "./src/format.ts",
-            "./conditions": {"node": "./node.ts", "import": "./import.ts", "default": "./d.ts"},
-            "./nested": {"default": {"require": "./r.ts", "import": "./i.ts"}},
-            "./required": {"require": "./required.ts"},
-            "./none": {"node": "./node.ts"},
-            "./utils/*": {"import": "./src/utils/*.ts"},
-            "./utils/special/*": "./src/special/*.js",
-            "./utils/blocked/*": null,
-            "./blocked": null,
-            "./typed": {"types": null, "default": "./typed.ts"},
-            "./fallbacks": ["./a.ts", "./b.ts"],
-            "./many/*/x/*": "./many.ts",
-            "./two/*": "./src/*/*.ts",
-        });
-        let cases: [(&str, Option<&str>); 18] = [
-            // The first of `types`, `import`, `default`, `require` present is taken.
-            (".", Some("./src/index.ts")),
-            ("./format", Some("./src/format.ts")),
-            ("./conditions", Some("./import.ts")),
-            ("./nested", Some("./i.ts")),
-            ("./required", Some("./required.ts")),
-            // Other conditions are not followed.
-            ("./none", None),
-            // Exact keys first, then the pattern with the longest prefix; `*` is replaced.
-            ("./utils/slug", Some("./src/utils/slug.ts")),
-            ("./utils/a/b", Some("./src/utils/a/b.ts")),
-            ("./utils/special/x", Some("./src/special/x.js")),
-            ("./utils/", None),
-            // A `null` target blocks the subpath, even under a condition taken.
-            ("./utils/blocked/x", None),
-            ("./blocked", None),
-            ("./typed", None),
-            // Fallback arrays and keys with two `*` are not read.
-            ("./fallbacks", None),
-            ("./many/a/x/b", None),
-            // A target with two `*` is not read either.
-            ("./two/x", None),
-            ("./missing", None),
-            ("./format/more", None),
-        ];
-        for (subpath, expected) in cases {
-            assert_eq!(exported(&map, subpath).as_deref(), expected, "{subpath}");
-        }
-        // A string or an object of conditions is the target of `.` alone; keys that mix
-        // subpaths and conditions make no target.
-        let sugar = serde_json::json!("./main.ts");
-        assert_eq!(exported(&sugar, ".").as_deref(), Some("./main.ts"));
-        assert_eq!(exported(&sugar, "./x"), None);
-        let conditions = serde_json::json!({"import": "./i.ts", "require": "./r.ts"});
-        assert_eq!(exported(&conditions, ".").as_deref(), Some("./i.ts"));
-        let mixed = serde_json::json!({".": "./a.ts", "import": "./b.ts"});
-        assert_eq!(exported(&mixed, "."), None);
-    }
-
-    #[test]
-    fn a_target_of_many_stars_is_not_expanded() {
-        let stars = format!("./{}.ts", "*".repeat(1 << 20));
-        let map = serde_json::json!({ "./h/*": stars, ".": stars });
-        assert_eq!(exported(&map, &format!("./h/{}", "x".repeat(64))), None);
-        assert_eq!(exported(&map, "."), None);
-    }
-
-    #[test]
-    fn conditions_nested_past_the_limit_give_no_target() {
-        let nest = |n: usize| {
-            let mut v = serde_json::json!("./deep.ts");
-            for _ in 0..n {
-                v = serde_json::json!({ "default": v });
-            }
-            v
-        };
-        assert_eq!(
-            exported(&nest(MAX_CONDITIONS), ".").as_deref(),
-            Some("./deep.ts")
-        );
-        assert_eq!(exported(&nest(MAX_CONDITIONS + 1), "."), None);
-    }
-
     fn manifest(path: &str, json: &str) -> Manifest {
         Manifest {
             path: path.to_string(),
-            summary: read(json.as_bytes()),
+            summary: read_manifest(path, json.as_bytes()),
         }
     }
 
@@ -2640,28 +2015,17 @@ mod tests {
     }
 
     #[test]
-    fn a_specifier_splits_into_its_package_and_subpath() {
-        assert_eq!(split("x"), Some(("x", ".".into())));
-        assert_eq!(split("x/a/b"), Some(("x", "./a/b".into())));
-        assert_eq!(split("@a/b"), Some(("@a/b", ".".into())));
-        assert_eq!(split("@a/b/c"), Some(("@a/b", "./c".into())));
-        for none in ["./x", "../x", "/x", "node:fs", "@a", "a b"] {
-            assert_eq!(split(none), None, "{none}");
-        }
-    }
-
-    #[test]
     fn the_nearest_manifest_is_in_the_deepest_directory_holding_the_file() {
         let all = [
             manifest("package.json", "{}"),
             manifest("packages/a/package.json", "{}"),
             manifest("packages/ab/package.json", "{}"),
         ];
-        let of = |path| nearest(&all, path, Ecosystem::Npm).map(|m| m.path.as_str());
+        let of = |path| nearest(&all, path, &Npm).map(|m| m.path.as_str());
         assert_eq!(of("packages/a/src/x.ts"), Some("packages/a/package.json"));
         assert_eq!(of("packages/abc/x.ts"), Some("package.json"));
         assert_eq!(of("x.ts"), Some("package.json"));
-        assert!(nearest(&all[1..], "x.ts", Ecosystem::Npm).is_none());
+        assert!(nearest(&all[1..], "x.ts", &Npm).is_none());
     }
 
     #[test]
@@ -2678,14 +2042,14 @@ mod tests {
             manifest("app/web/package.json", "{}"),
             pypi("tools/requirements.txt"),
         ];
-        let holding = |path, e| -> Vec<&str> {
+        let holding = |path, e: &dyn Ecosystem| -> Vec<&str> {
             (holding(&all, path, e).into_iter())
                 .map(|m| m.path.as_str())
                 .collect()
         };
         // Every manifest of the ecosystem above the file, the deepest directory first.
         assert_eq!(
-            holding("app/web/x.py", Ecosystem::Pypi),
+            holding("app/web/x.py", &Pypi),
             [
                 "app/pyproject.toml",
                 "app/requirements-dev.txt",
@@ -2694,7 +2058,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            holding("tools/x.py", Ecosystem::Pypi),
+            holding("tools/x.py", &Pypi),
             [
                 "tools/requirements.txt",
                 "pyproject.toml",
@@ -2702,87 +2066,274 @@ mod tests {
             ]
         );
         // A manifest of another ecosystem, deeper or not, is not the file's.
-        assert_eq!(
-            holding("app/web/x.ts", Ecosystem::Npm),
-            ["app/web/package.json"]
-        );
-        assert!(holding("x.ts", Ecosystem::Npm).is_empty());
+        assert_eq!(holding("app/web/x.ts", &Npm), ["app/web/package.json"]);
+        assert!(holding("x.ts", &Npm).is_empty());
         // A requirements file names no package: the file belongs to the nearest
         // `pyproject.toml`, and to the nearest `package.json` for npm.
-        let owner = |path, e| owner(&all, path, e).map(|m| m.path.as_str());
-        assert_eq!(owner("tools/x.py", Ecosystem::Pypi), Some("pyproject.toml"));
+        let owner = |path, e: &dyn Ecosystem| owner(&all, path, e).map(|m| m.path.as_str());
+        assert_eq!(owner("tools/x.py", &Pypi), Some("pyproject.toml"));
+        assert_eq!(owner("app/x.py", &Pypi), Some("app/pyproject.toml"));
+        assert_eq!(owner("app/web/x.ts", &Npm), Some("app/web/package.json"));
+    }
+
+    /// The name of the ecosystem the seam answers, for comparing answers.
+    fn named(e: Option<&dyn Ecosystem>) -> Option<&'static str> {
+        e.map(|e| e.name())
+    }
+
+    /// A stand-in adapter: `programs` answers `scripts`, `inherit` appends its name to the
+    /// path of the first manifest, so the order the seam runs the adapters in is observable.
+    struct Stand(&'static str, &'static [(&'static str, &'static str)]);
+
+    impl Ecosystem for Stand {
+        fn name(&self) -> &'static str {
+            self.0
+        }
+        fn is_manifest(&self, _file_name: &str) -> bool {
+            false
+        }
+        fn read(&self, _path: &str, _src: &[u8]) -> Summary {
+            Summary::default()
+        }
+        fn sources(&self) -> &'static [&'static str] {
+            &[]
+        }
+        fn names_package(&self, _specifier: &str) -> bool {
+            false
+        }
+        fn entries<'e>(
+            &self,
+            _exports: &'e [Export],
+            _providers: &Providers,
+            _from: (usize, &str),
+            _specifier: &str,
+        ) -> Vec<(&'e Entry, String)> {
+            Vec::new()
+        }
+        fn programs(&self, _manifests: &[Manifest], _files: &[&str]) -> Vec<(String, String)> {
+            (self.1.iter())
+                .map(|(file, def)| (file.to_string(), def.to_string()))
+                .collect()
+        }
+        fn inherit(&self, manifests: &mut [Manifest]) {
+            manifests[0].path.push_str(self.0);
+        }
+    }
+
+    fn read_at(path: &str, src: &str) -> Manifest {
+        Manifest {
+            path: path.to_string(),
+            summary: read_manifest(path, src.as_bytes()),
+        }
+    }
+
+    #[test]
+    fn the_programs_of_every_adapter_come_sorted_without_repeats() {
+        let first = Stand("a", &[("z.py", "main"), ("b.py", "run")]);
+        let second = Stand("b", &[("b.py", "run"), ("a.py", "go")]);
+        let found = programs_of(&[&first, &second], &[], &[]);
+        let pair = |f: &str, d: &str| (f.to_string(), d.to_string());
         assert_eq!(
-            owner("app/x.py", Ecosystem::Pypi),
-            Some("app/pyproject.toml")
+            found,
+            [
+                pair("a.py", "go"),
+                pair("b.py", "run"),
+                pair("z.py", "main")
+            ]
         );
+    }
+
+    #[test]
+    fn the_seam_finds_the_console_scripts_of_the_pypi_manifests() {
+        let manifests = [
+            read_at("web/package.json", r#"{"name": "web"}"#),
+            read_at(
+                "pyproject.toml",
+                "[project]\nname = \"acme\"\n[project.scripts]\nacme = \"acme.cli:main\"\n",
+            ),
+        ];
         assert_eq!(
-            owner("app/web/x.ts", Ecosystem::Npm),
-            Some("app/web/package.json")
+            programs(&manifests, &["acme/cli.py"]),
+            [("acme/cli.py".to_string(), "main".to_string())]
+        );
+    }
+
+    #[test]
+    fn the_adapters_inherit_in_list_order() {
+        let mut manifests = vec![read_at("package.json", "{}")];
+        inherit_of(
+            &[&Stand("1", &[]), &Stand("2", &[]), &Stand("3", &[])],
+            &mut manifests,
+        );
+        assert_eq!(manifests[0].path, "package.json123");
+    }
+
+    #[test]
+    fn cargo_inherits_through_the_seam_among_manifests_of_other_ecosystems() {
+        let mut manifests = vec![
+            read_at("pyproject.toml", "[project]\nname = \"p\"\n"),
+            read_at(
+                "Cargo.toml",
+                "[workspace]\nmembers = [\"m\"]\n[workspace.package]\nversion = \"3.1.0\"\n",
+            ),
+            read_at(
+                "m/Cargo.toml",
+                "[package]\nname = \"m\"\nversion.workspace = true\n",
+            ),
+            read_at("web/package.json", r#"{"name": "web"}"#),
+        ];
+        inherit(&mut manifests);
+        let versions: Vec<_> = (manifests.iter())
+            .map(|m| m.summary.version.as_deref())
+            .collect();
+        assert_eq!(versions, [None, None, Some("3.1.0"), None]);
+    }
+
+    #[test]
+    fn the_list_names_each_ecosystem_once_in_its_order() {
+        let names: Vec<_> = ECOSYSTEMS.iter().map(|e| e.name()).collect();
+        assert_eq!(names, ["npm", "pypi", "cargo", "go"]);
+        let prefixes: Vec<_> = ECOSYSTEMS.iter().map(|e| e.prefix()).collect();
+        assert_eq!(
+            prefixes,
+            [
+                "package::npm::",
+                "package::pypi::",
+                "package::cargo::",
+                "package::go::"
+            ]
+        );
+    }
+
+    #[test]
+    fn each_file_is_claimed_by_one_ecosystem_at_most() {
+        let mut extensions = HashSet::new();
+        for e in ECOSYSTEMS {
+            for extension in e.sources() {
+                assert!(extensions.insert(*extension), "{extension}");
+            }
+        }
+        for manifest in [
+            "package.json",
+            "pyproject.toml",
+            "requirements.txt",
+            "requirements-dev.txt",
+            "Cargo.toml",
+            "go.mod",
+        ] {
+            let claims = ECOSYSTEMS.iter().filter(|e| e.is_manifest(manifest));
+            assert_eq!(claims.count(), 1, "{manifest}");
+        }
+    }
+
+    #[test]
+    fn sources_contracts_and_manifests_round_trip_each_ecosystem() {
+        let sources = [
+            ("a.py", "pypi"),
+            ("a.rs", "cargo"),
+            ("a.go", "go"),
+            ("a.ts", "npm"),
+            ("a.tsx", "npm"),
+            ("a.js", "npm"),
+            ("a.jsx", "npm"),
+            ("a.mjs", "npm"),
+            ("a.cjs", "npm"),
+        ];
+        for (path, want) in sources {
+            assert_eq!(named(of_source(path)), Some(want), "{path}");
+        }
+        for e in ECOSYSTEMS {
+            for extension in e.sources() {
+                let path = format!("src/a.{extension}");
+                assert_eq!(named(of_source(&path)), Some(e.name()), "{path}");
+            }
+            assert_eq!(named(of_contract(&contract(*e, "x"))), Some(e.name()));
+        }
+        for (manifest, want) in [
+            ("package.json", "npm"),
+            ("pyproject.toml", "pypi"),
+            ("a/requirements.txt", "pypi"),
+            ("Cargo.toml", "cargo"),
+            ("a/go.mod", "go"),
+        ] {
+            assert_eq!(named(of(manifest)), Some(want), "{manifest}");
+        }
+    }
+
+    #[test]
+    fn a_file_no_ecosystem_claims_is_none() {
+        for path in [
+            "A.java",
+            "notes.txt",
+            "Makefile",
+            "tsconfig.json",
+            "pom.xml",
+        ] {
+            assert!(of_source(path).is_none(), "{path}");
+            assert!(of(path).is_none(), "{path}");
+        }
+        assert!(of_contract("package::maven::x").is_none());
+    }
+
+    #[test]
+    fn a_contract_of_no_ecosystem_has_no_flag_no_suffix_and_no_link() {
+        let contract = "package::maven::x";
+        assert!(of_contract(contract).is_none());
+        assert_eq!(flag_of(contract, Some("1"), Some("2")), None);
+        assert_eq!(
+            reason(contract, Some("1"), Some("2")),
+            "package::maven::x 1 (local 2)"
+        );
+        let consumer = Consumer {
+            contract: Some(contract.into()),
+            site: "r::pom.xml".into(),
+            via: None,
+            shape: None,
+            method: Some("1".into()),
+            fragments: Vec::new(),
+            hops: Vec::new(),
+        };
+        let repo = Repository {
+            root: "/nonexistent".into(),
+            identity: "r".into(),
+            config: Default::default(),
+            decisions: Default::default(),
+        };
+        let provider = Provider {
+            contract: contract.into(),
+            site: "r::pom.xml".into(),
+            version: Some("2".into()),
+            ..Provider::default()
+        };
+        assert!(
+            Packages
+                .link(&consumer, &repo, &[(&repo, &provider)], &[])
+                .is_empty()
         );
     }
 
     #[test]
     fn manifests_and_contracts_name_their_ecosystem() {
         for (path, want) in [
-            ("package.json", Some(Ecosystem::Npm)),
-            ("a/pyproject.toml", Some(Ecosystem::Pypi)),
-            ("requirements.txt", Some(Ecosystem::Pypi)),
-            ("a/requirements-dev.txt", Some(Ecosystem::Pypi)),
+            ("package.json", Some("npm")),
+            ("a/pyproject.toml", Some("pypi")),
+            ("requirements.txt", Some("pypi")),
+            ("a/requirements-dev.txt", Some("pypi")),
             ("requirements/base.txt", None),
             ("a/requirements.in", None),
             ("tsconfig.json", None),
             ("a/package.json.bak", None),
         ] {
-            assert_eq!(Ecosystem::of(path), want, "{path}");
+            assert_eq!(named(of(path)), want, "{path}");
         }
-        assert_eq!(
-            Ecosystem::Pypi.contract("shared-lib"),
-            "package::pypi::shared-lib"
-        );
-        assert_eq!(
-            Ecosystem::of_contract("package::pypi::x"),
-            Some(Ecosystem::Pypi)
-        );
-        assert_eq!(
-            Ecosystem::of_contract("package::npm::x"),
-            Some(Ecosystem::Npm)
-        );
-        // PyPI ranges are never evaluated, and no PyPI range keeps to its repository.
-        assert_eq!(Ecosystem::Pypi.flag(Some("==1.0"), Some("1.0")), UNCHECKED);
+        assert_eq!(contract(&Pypi, "shared-lib"), "package::pypi::shared-lib");
+        assert_eq!(named(of_contract("package::pypi::x")), Some("pypi"));
+        assert_eq!(named(of_contract("package::npm::x")), Some("npm"));
+        // The reason says the flag of the contract's ecosystem.
         assert_eq!(
             reason("package::pypi::a", Some(">=1"), Some("1.2")),
             "package::pypi::a >=1 (local 1.2), range unchecked"
         );
-        let at = |id| {
-            let root = match id {
-                "a" => "/w/a",
-                "b" => "/w/b",
-                _ => "/w/x",
-            };
-            (id, Path::new(root))
-        };
-        let (workspace, there) = ((None, Some("workspace:*")), (at("b"), "package.json"));
-        assert!(Ecosystem::Pypi.reaches(workspace, at("a"), there));
-        assert!(!Ecosystem::Npm.reaches(workspace, at("a"), there));
-        assert!(Ecosystem::Npm.reaches(workspace, at("b"), there));
-        // A Cargo path keeps the crate at that path of the dependent's repository, a source
-        // from a remote the repository of that remote, a version every repository.
-        let path = (Some("path core/Cargo.toml"), None);
-        assert!(Ecosystem::Cargo.reaches(path, at("a"), (at("a"), "core/Cargo.toml")));
-        assert!(!Ecosystem::Cargo.reaches(path, at("a"), (at("a"), "other/Cargo.toml")));
-        assert!(!Ecosystem::Cargo.reaches(path, at("a"), (at("b"), "core/Cargo.toml")));
-        let remote = (Some("git example.com/org/lib"), Some("1"));
-        let lib = ("example.com/org/lib", Path::new("/w/lib"));
-        assert!(Ecosystem::Cargo.reaches(remote, at("a"), (lib, "Cargo.toml")));
-        assert!(!Ecosystem::Cargo.reaches(remote, at("a"), (at("b"), "Cargo.toml")));
-        assert!(Ecosystem::Cargo.reaches((None, Some("1")), at("a"), (at("b"), "Cargo.toml")));
-        // A path out of the repository lands where the two roots say, folded without reading.
-        let out = (Some("path ../b/core/Cargo.toml"), None);
-        assert!(Ecosystem::Cargo.reaches(out, at("a"), (at("b"), "core/Cargo.toml")));
-        assert!(!Ecosystem::Cargo.reaches(out, at("a"), (at("b"), "Cargo.toml")));
-        assert!(!Ecosystem::Cargo.reaches(out, at("a"), (at("x"), "core/Cargo.toml")));
-        let back = (Some("path ../a/core/Cargo.toml"), None);
-        assert!(Ecosystem::Cargo.reaches(back, at("a"), (at("a"), "core/Cargo.toml")));
     }
 
     #[test]
@@ -3028,7 +2579,7 @@ mod tests {
             manifests: &[],
             configs: &[],
             shapes: HashMap::new(),
-            owned: OnceCell::new(),
+            owned: Default::default(),
             go_dirs: OnceCell::new(),
         }
     }
@@ -3141,7 +2692,11 @@ mod tests {
     fn candidates_are_the_exporting_source_files_of_that_package_alone() {
         let root = manifest("package.json", "{}");
         let nested = manifest("sealed/package.json", "{}");
-        let manifests = [root, nested];
+        let pyproject = Manifest {
+            path: "pyproject.toml".into(),
+            summary: Summary::default(),
+        };
+        let manifests = [root, nested, pyproject];
         let paths = [
             "src/a.ts",
             "src/a.d.ts",
@@ -3158,6 +2713,19 @@ mod tests {
         p.symbols = ids.iter().map(String::as_str).collect();
         p.manifests = &manifests;
 
+        // Another ecosystem asking first keeps its own view of the files: npm's stays npm's.
+        assert_eq!(
+            p.candidates("r", &manifests[2], "f", &|id| p.symbol(id)),
+            ["r::sealed/src/b.ts::f", "r::src/a.ts::f"]
+        );
+        // Only the asking ecosystem's table is built (PyPI is the second of `ECOSYSTEMS`).
+        assert!(p.owned[1].get().is_some());
+        assert!(
+            p.owned
+                .iter()
+                .enumerate()
+                .all(|(i, t)| i == 1 || t.get().is_none())
+        );
         // The root package does not take the nested package's file (a directory-prefix test
         // would), a declaration file, or one under `node_modules`; the nested one neither.
         assert_eq!(

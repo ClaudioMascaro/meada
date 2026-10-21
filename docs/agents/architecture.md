@@ -47,8 +47,9 @@ one for the area a change touches.
   requests, httpx and aiohttp consumers, whose rows also list reqwest and ureq; `http/rust.rs`
   and `http/rust/axum.rs`, actix-web, Rocket and axum providers; `http/go.rs` and
   `http/go/clients.rs`, net/http, gin, echo, chi and gorilla/mux providers and their consumers
-  with resty), resource and channel kinds. `package.rs`: npm, PyPI, Cargo and Go packages as contracts (specs #22,
-  #24, #30 and #25). Detail:
+  with resty), resource and channel kinds. `package.rs` and `package/`: npm, PyPI, Cargo and Go packages as
+  contracts (specs #22, #24, #30 and #25), the shared steps and one module per ecosystem behind
+  the `Ecosystem` trait (spec #225). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `shape.rs`, `literals.rs`, `zod.rs`: OpenAPI and AsyncAPI provider documents, the
   shape a contract carries, and the shapes read from a handler's returned literals and zod
@@ -299,34 +300,68 @@ one for the area a change touches.
   `Code::constant` of the writer's name, and a `Topic` field written anywhere in the repository
   (`Code::field_written`, the markers of #79) leaves it unresolved; a writer a function made, or one with no topic, is read from each message. The
   `xlang-go-*` fixtures carry a TypeScript producer to the Go consumer group.
-- New **package ecosystem** (spec #22 user story 26, track B packs): a variant of
-  `package::Ecosystem` (npm, PyPI, Cargo and Go today) plugs in another manifest format (`Cargo.toml`,
-  `go.mod`) without a new kind of contract. `Ecosystem::of` names the manifest files by file
-  name, which `package::is_manifest` makes `manifests_found` (`index.rs`) stamp into
-  `manifests`; `Ecosystem::read` (behind `package::read_manifest`) turns the bytes into the same
-  `Summary` (name, version, dependency entries, entry fields, source roots, console scripts) and never fails;
-  `Ecosystem::prefix` gives the contract `package::<ecosystem>::<name>`, so `PREFIX` still
-  routes it to the same `declare`, `consume`, `link`, `place` and `reached`; `Providers` is
-  keyed by ecosystem and name, so two ecosystems never link; and the reason grammar
-  (`reason`) stays one function, with `Ecosystem::flag` checking the range (npm semver through
-  `flag`; PyPI's, Cargo's and Go's are never evaluated, `range unchecked`) and `Ecosystem::reaches` holding a
-  range rule like npm's `workspace:`. Which ecosystem a call through an import belongs to is
-  its file's (`Ecosystem::of_source`; Cargo's for a `.rs` file, Go's for a `.go` one), and resolving the import into the provider is the
-  ecosystem's own rule in `resolutions` (npm: `split`, `ways`, `Provided::resolve`; PyPI:
-  `pypi_resolutions`, `Provided::module`; Cargo: `cargo::names_crate`, the `use` head matched to
-  the key of a renamed dependency or to the provider's library name (`cargo::lib_head`), then
-  `Provided::resolve` from the crate's library root, `How::CrateName`; Go: any import path that
-  is a valid contract name (`valid_name`), matched to the longest module path of the nearest
-  `go.mod`'s entries (`modfile::inside`), then `Provided::package` looks in the one directory of the provider the rest
-  names, `How::ModulePath`; `go::read` takes `require` and `replace` from `lang::go::modfile`, the
-  Go pack's one `go.mod` reader, and gives a local `replace` the Cargo `path` form in `Entry::via`). A step outside
-  `ContractKind` fills what a manifest inherits: `cargo::inherit`, run in
-  `index::read_manifests` over the whole manifest list after the reads, fills the `workspace =
-  true` entries and `version.workspace = true` of each `Cargo.toml` from the nearest one above it,
-  so a refresh equals a cold export. `Ecosystem::reaches` takes the repositories' roots (`Export::root`, set by
-  `Engine::exports`) for a Cargo `path` that leaves its repository: it folds both locations as
-  paths, never opening one, so a symlink changes nothing. A change to what is stored re-blesses
-  `tests/golden/schema.txt`.
+- New **package ecosystem** (spec #22 user story 26, spec #225; track B packs): implement the
+  `Ecosystem` trait of `package.rs` in a module of its own under `package/` (`npm`, `pypi`,
+  `cargo`, `go` today) and add it to `ECOSYSTEMS`; the package kind, the index writer and the
+  packs learn no name. An arm for one ecosystem added to the shared code is a finding. It plugs
+  in another manifest format (`Cargo.toml`, `go.mod`) without a new kind of contract: the
+  contract `package::<name>::<package>` (`Ecosystem::prefix`, derived from `name`) still routes
+  to the same `Packages` steps (`declare`, `consume`, `import`, `shapes`, `link`, `place`,
+  `reached`), `Providers` is keyed by ecosystem name and package name, so two ecosystems never
+  link, and the reason grammar (`reason`) stays one function that asks the ecosystem.
+  The questions, each with its default (an adapter overrides only what its ecosystem answers
+  differently):
+  - Required: `name` (the contract prefix and the export's `ecosystem` field spell it);
+    `is_manifest(file name)`; `read(path, bytes)` (the same `Summary` for every ecosystem: name,
+    version, dependency entries, entry fields, source roots, console scripts; it never fails,
+    hostile bytes read as empty); `sources()` (the extensions of the source files whose imports
+    name its packages); `names_package(specifier)`; `entries(..)` (the dependency entries an
+    import of a file may name, each with the subpath inside the package).
+  - `flag`: the range is unchecked (`range unchecked`); npm checks semver.
+  - `reaches`: every provider; npm's `workspace:` keeps the dependent's own repository, Cargo
+    and Go share `sourced`, in the seam (a `path` by the folded location, a `git` by the
+    remote's identity).
+  - `owns`: every manifest of the ecosystem bounds the files under it; PyPI only a
+    `pyproject.toml`, Cargo only a manifest with a `[package]`.
+  - `ways` and `resolve`: Node's rule (`exports`, else `types`, `module` and `main`, else the
+    subpath as a path, or `index.<ext>` for the bare name when none of the three exists, `exact`;
+    then the candidates among the files the manifest owns); Cargo follows the crate's library root alone
+    (`How::CrateName`, no candidates, and the library-head check of an entry that does not
+    rename its crate); Go looks in the one directory the subpath names (`How::ModulePath`).
+  - `resolutions`: the single-entry loop (the entries, each provider the entry `reaches`,
+    `resolve` in it); PyPI replaces it whole, since its imports name a module and several
+    distributions may expose it.
+  - `shapes`: false; npm's packages carry them. `programs`: none; PyPI's console scripts.
+    `inherit`: nothing; Cargo's workspace entries and version.
+  Callers use the seam's free functions, never the adapters: `of` (the adapter whose manifest a
+  file is), `of_source` (the adapter whose sources a file is, none for a file no ecosystem
+  claims, so a pack whose ecosystem has not landed imports nothing), `of_contract` (by prefix),
+  `is_manifest` and `read_manifest`, `programs` (every adapter's, sorted, without repeats) and
+  `inherit` (every adapter's, in list order). `package::is_manifest` makes `manifests_found`
+  (`index.rs`) stamp the manifest files into `manifests`. The list order fixes the order `of`
+  and `of_contract` search in and the order `inherit` runs in; a new ecosystem appends. The
+  deliberate extras: `is_npm`, the export's compatibility rule (it names the ecosystem only when
+  it is not npm, so the goldens that predate the field stay); a reader in a language pack when the manifest is also a pack config (as
+  `go.mod`, read by `lang::go::modfile`, and `Cargo.toml`, read by `lang::rust::crates`, are;
+  the adapter calls the pack's reader, never the other way); and, for a user-visible ecosystem,
+  the README state line and the CHANGELOG.
+  Which ecosystem a call through an import belongs to is its file's (`of_source`; Cargo's for a
+  `.rs` file, Go's for a `.go` one), and resolving the import into the provider is the
+  ecosystem's own rule behind `resolutions` (npm: `split`, then `ways` and `resolve` by Node's
+  rule; PyPI: the module found under the provider's roots; Cargo: `cargo::names_crate`, the
+  `use` head matched to the key of a renamed dependency or to the provider's library name
+  (`cargo::lib_head`), then the crate's library root; Go: any import path that is a valid
+  contract name (`valid_name`), matched to the longest module path of the nearest `go.mod`'s
+  entries (`modfile::inside`), then the one directory of the provider the rest names; `Go::read`
+  takes `require` and `replace` from `lang::go::modfile`, the Go pack's one `go.mod` reader, and
+  gives a local `replace` the Cargo `path` form in `Entry::via`). A step outside `ContractKind`
+  fills what a manifest inherits: the seam's `inherit`, run in `index::read_manifests` over the
+  whole manifest list after the reads, has Cargo fill the `workspace = true` entries and
+  `version.workspace = true` of each `Cargo.toml` from the nearest one above it, so a refresh
+  equals a cold export. `Ecosystem::reaches` takes the repositories' roots (`Export::root`, set
+  by `Engine::exports`) for a Cargo `path` that leaves its repository: it folds both locations
+  as paths, never opening one, so a symlink changes nothing. A change to what is stored
+  re-blesses `tests/golden/schema.txt`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
   `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`; Rust: `lang/rust/messages.rs`; Go: `lang/go/messages.rs`), matching a call's
   method and the `Code::origins` of its receiver, asked with the policy its language needs (TS/JS:
@@ -390,8 +425,8 @@ one for the area a change touches.
   `index::refresh` runs after the kinds' `extract`, as
   `Role::Shape` rows; each source reads its own: `Types::exported`, `Zod::exported`,
   `Literals::exported`). The workspace step `package::shapes`, after `import` in the package
-  kind's `workspace_step` (which `Engine::exports` runs), resolves each import as a call through it resolves (`Provided::resolve`,
-  over the `exports` rows, which name constants and types too) and fills it with
+  kind's `workspace_step` (which `Engine::exports` runs), resolves each import as a call through it resolves (the ecosystem's
+  `resolutions`, over the `exports` rows, which name constants and types too) and fills it with
   `shape::fill`, the one recursion and the one place its limits live, carrying the
   resolution's level: through one that is not `exact` (an `outDir` mapping) a provider's part is
   `guessed` and a consumer's paths are not declared, so no drift on them is `exact`. A new source that reads
@@ -505,12 +540,12 @@ one for the area a change touches.
   belong to it) and names it. A name with no symbol is dropped silently: the pack's conformance
   golden catches a wrong one. A form declared outside the code file (Python `[project.scripts]`,
   which names a function of another file) needs a repository-level step feeding
-  `entry::Local::programs` with `entry::Program`s: for Python, `package::python_programs` maps the
-  `Summary::scripts` of each `pyproject.toml` (stored with the manifest rows, whose digest makes an
-  edit re-extract) to files through `python_roots`. A form only the whole repository tells
+  `entry::Local::programs` with `entry::Program`s: for Python, the seam's `package::programs` has the
+  PyPI adapter map the `Summary::scripts` of each `pyproject.toml` (stored with the manifest
+  rows, whose digest makes an edit re-extract) to files through the package's source roots. A form only the whole repository tells
   (Rust `fn main`, a program only in a binary target's root, which one file's `parse` cannot
   see) is `Layout::programs`, which `refresh` takes from each pack's `layout` beside
-  `python_programs`; Rust asks the crate `Tree` for its binary roots (`Tree::bins`). The forms per language are spec #31 "Program entry points per language
+  the seam's `programs`; Rust asks the crate `Tree` for its binary roots (`Tree::bins`). The forms per language are spec #31 "Program entry points per language
   pack": Python `if __name__ == "__main__":` as symbol `__main__` plus each `[project.scripts]`
   target; Go `func main` in package `main`; Java `public static void main(String[])`; Kotlin a
   top-level `fun main`; C# a `static Main` and, for top-level statements, a symbol `Main`; Swift
@@ -677,7 +712,7 @@ one for the area a change touches.
   (rows rewritten only when they differ). An unreadable `contracts.fragments` value is read as
   no fragments, since only `refresh` writes it. A manifest or pack config file (`package.json`,
   `pyproject.toml`, `requirements*.txt`, `Cargo.toml`, `go.mod`, `tsconfig.json`, `jsconfig.json`) is read up to one
-  byte past `package::MAX_BYTES`, and a provider document up to one byte past
+  byte past `lang::MAX_BYTES`, and a provider document up to one byte past
   `document::MAX_BYTES` (`read_up_to`), which their readers take as invalid whatever the rest
   holds, so the `manifests` and `documents` hashes and the config digest are of what was read. A
   pack config, at the root or at any depth (`**/`), is read through no symbolic link
@@ -840,7 +875,7 @@ one for the area a change touches.
   specifier, which names nothing), so a call through it links to nothing. An import of two
   modules of the repository that declare one path names nothing unless a `replace` picks one; a
   `replace` by a module or a directory outside the repository makes the replaced module an
-  outside one; a `vendor/` directory is not followed. A `go.mod` past `package::MAX_BYTES`
+  outside one; a `vendor/` directory is not followed. A `go.mod` past `lang::MAX_BYTES`
   (read up to one byte past it, as every pack config is, so its last line may be cut) declares no
   module for the imports either (`modfile::Modules::new`).
 - `lang/rust.rs` (types): `written` and `parameter` read a type and climb to the items that
@@ -912,11 +947,10 @@ one for the area a change touches.
 - `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
   across the workspace), and an exchange's type is not read: every binding pattern follows
   topic-exchange rules.
-- `package.rs`: a manifest never fails indexing, so its reader has fixed limits. `MAX_BYTES`
-  (1 MiB; a larger file reads as empty, but is read whole first, as code and documents are) and
-  `MAX_NAME` (214 bytes; a longer name is no package). A range is stored as written, with no
-  length limit beyond `MAX_BYTES`; `flag` checks only one of at most `MAX_RANGE` (256 bytes) and
-  calls a longer one `range unchecked`. PyPI (`package/pypi.rs`, spec #24): `MAX_NAME` and
+- `package.rs`: a manifest never fails indexing, so its reader has fixed limits. `MAX_NAME`
+  (214 bytes; a longer name is no package) and `MAX_BYTES` (under `lang/mod.rs`). A range is
+  stored as written, with no length limit beyond `MAX_BYTES`; npm's `flag` (`package/npm.rs`) checks only one of at most
+  `MAX_RANGE` (256 bytes) and calls a longer one `range unchecked`. PyPI (`package/pypi.rs`, spec #24): `MAX_NAME` and
   `MAX_BYTES` hold for `pyproject.toml` and `requirements*.txt` too (a file past it, not UTF-8
   or not TOML reads as empty; the toml crate's own depth limit stops nested input); a
   requirements file is read line by line, its option lines (`-r`, `-e`, `-c`, `--index-url`),
@@ -944,8 +978,8 @@ one for the area a change touches.
   followed (a `use` writes it, unless the key renames the crate); `version.workspace = true`
   reads the nearest `[workspace.package] version`, and no other inherited field is read. A `use`
   follows `pub mod` and `pub use` rows alone, so an item behind a private module is not
-  reached (no marker). Import resolution: `exported` follows at most
-  `MAX_CONDITIONS` (32) nested conditions and `lookup` at most `MAX_REEXPORTS` (64) `export *`
+  reached (no marker). Import resolution: `exported` (`package/npm.rs`) follows at most
+  `MAX_CONDITIONS` (32) nested conditions and `lookup` (`package.rs`) at most `MAX_REEXPORTS` (64) `export *`
   levels; deeper is no target. An array of fallbacks in `exports` and a key with two `*` are not
   read (one `*` in a target keeps every expansion the size of the subpath). `read_tsconfig` reads
   like `read`: past `MAX_BYTES` or `serde_json`'s depth limit, not UTF-8 or not an object it is
@@ -991,6 +1025,9 @@ one for the area a change touches.
   function-local `const out = Schema.parse(..)`) is followed, unlike in `literals.rs`, and
   nothing records a later write to it (`Object.assign(out, { extra: 1 })`), so it is still
   read as the schema's shape (no marker).
+- `lang/mod.rs`: `MAX_BYTES` (1 MiB, beside the packs that read their configs by it) bounds every
+  manifest and pack config the package readers and the packs take; a larger file reads as empty,
+  and the index reads it up to one byte past the limit (`read_up_to`).
 - Declared types (spec #23, `declared.rs`, `lang/ts/types.rs`): a type is read to at most
   `TYPE_DEPTH` (32) levels, both when it is written (`lang/mod.rs`, the nesting of an object or
   array type) and when a consumer's cast, type argument or annotation is followed through
@@ -1126,7 +1163,7 @@ one for the area a change touches.
   builder chain costs one value per call. A closure written as an argument of a call is a
   `Kind::Inline` definition; any other closure is not, and neither is a `let mut`, a name bound
   twice in its scope or assigned again, or a destructuring a constant. A string literal with an escape sequence is
-  `Unknown`. A `Cargo.toml` past `package::MAX_BYTES` (read up to one byte past it, as every
+  `Unknown`. A `Cargo.toml` past `lang::MAX_BYTES` (read up to one byte past it, as every
   pack config is), not UTF-8 or not TOML declares no crate, with no status line. Every `Cargo.toml` with
   a `[package]`, at any depth, is a crate (a workspace's `members` and `exclude` add or remove
   none, and a vendored or fixture crate the walk finds is indexed too); `tests/`, `examples/`,

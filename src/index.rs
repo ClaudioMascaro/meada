@@ -274,7 +274,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         "manifests",
         &manifests_found(&all),
         now,
-        |abs| read_up_to(abs, package::MAX_BYTES),
+        |abs| read_up_to(abs, lang::MAX_BYTES),
         |path, src| match package::is_tsconfig(path) {
             true => Ok(serde_json::to_string(&package::read_tsconfig(src))?),
             false => Ok(serde_json::to_string(&package::read_manifest(path, src))?),
@@ -624,7 +624,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     }
     let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
     // The programs the packs declare per file, and the console scripts of the manifests.
-    let scripts = package::python_programs(&manifests, &files);
+    let scripts = package::programs(&manifests, &files);
     let programs: Vec<entry::Program> = (all.iter())
         .flat_map(|(&path, &facts)| {
             (facts.programs.iter()).map(move |def| (path.to_string(), def.clone()))
@@ -751,13 +751,13 @@ fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
 
 /// The pack config file at `path` under `root` (`tsconfig.json`, `pyproject.toml`, each
 /// `Cargo.toml`), read as a manifest is (`read_up_to`): the pack's reader takes one past
-/// `package::MAX_BYTES` as invalid. Like the walk, the read goes through no symbolic link.
+/// `lang::MAX_BYTES` as invalid. Like the walk, the read goes through no symbolic link.
 pub(crate) fn read_config(root: &Path, path: &str) -> Option<Vec<u8>> {
-    read_up_to(&plain_file(root, path)?, package::MAX_BYTES).ok()
+    read_up_to(&plain_file(root, path)?, lang::MAX_BYTES).ok()
 }
 
 /// A file read up to one byte past `max`, the size its reader takes as invalid past, whatever
-/// the rest holds (`package::MAX_BYTES` for a manifest or pack config, `document::MAX_BYTES`
+/// the rest holds (`lang::MAX_BYTES` for a manifest or pack config, `document::MAX_BYTES`
 /// for a provider document): the rest is never read, and what was read stands for the whole
 /// file wherever it is hashed.
 fn read_up_to(abs: &Path, max: usize) -> std::io::Result<Vec<u8>> {
@@ -1543,7 +1543,7 @@ fn read_manifests(rows: Vec<(String, String)>) -> Result<(Vec<Manifest>, Vec<Con
         }
     }
     // A Cargo member's `workspace = true` entries read from a manifest above it.
-    package::cargo::inherit(&mut manifests);
+    package::inherit(&mut manifests);
     Ok((manifests, tsconfigs))
 }
 
@@ -1606,18 +1606,14 @@ mod tests {
     fn a_config_file_is_read_up_to_one_byte_past_the_size_limit() {
         let root = std::env::temp_dir().join(format!("meada-index-config-{}", std::process::id()));
         fs::create_dir_all(&root).unwrap();
-        fs::write(
-            root.join("tsconfig.json"),
-            " ".repeat(package::MAX_BYTES * 2),
-        )
-        .unwrap();
+        fs::write(root.join("tsconfig.json"), " ".repeat(lang::MAX_BYTES * 2)).unwrap();
         fs::write(root.join("jsconfig.json"), "{}").unwrap();
 
         let large = read_config(&root, "tsconfig.json").map(|src| src.len());
         let small = read_config(&root, "jsconfig.json");
         fs::remove_dir_all(&root).unwrap();
 
-        assert_eq!(large, Some(package::MAX_BYTES + 1));
+        assert_eq!(large, Some(lang::MAX_BYTES + 1));
         assert_eq!(small.as_deref(), Some(&b"{}"[..]));
     }
 
@@ -1644,7 +1640,8 @@ mod tests {
             actual += &format!("\n{name}\n{summary}\n");
         }
         let src = fs::read(tests.join("fixtures/schema/sample.package.json")).unwrap();
-        let summary = serde_json::to_string_pretty(&package::read(&src)).unwrap();
+        let summary =
+            serde_json::to_string_pretty(&package::read_manifest("package.json", &src)).unwrap();
         actual += &format!("\nsample.package.json\n{summary}\n");
         for (name, path) in [
             ("sample.Cargo.toml", "Cargo.toml"),
