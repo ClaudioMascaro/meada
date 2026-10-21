@@ -45,12 +45,15 @@ pub fn head(root: &Path) -> Result<String> {
 }
 
 /// What `git status` lists in the checkout at `root`, changed, untracked and ignored files
-/// alike: empty for a clean mirror. It writes nothing, not even the index's stat cache.
-pub fn unclean(root: &Path) -> Result<String> {
-    run(
-        root,
-        &["--no-optional-locks", "status", "--porcelain", "--ignored"],
-    )
+/// alike: empty for a clean mirror. It writes nothing, not even the index's stat cache. With
+/// `submodules` false (a mirror pulled from a store) it does not descend into a submodule,
+/// whose configuration git would run.
+pub fn unclean(root: &Path, submodules: bool) -> Result<String> {
+    let mut args = vec!["--no-optional-locks", "status", "--porcelain", "--ignored"];
+    if !submodules {
+        args.push("--ignore-submodules=all");
+    }
+    run(root, &args)
 }
 
 /// Lower-cased host and path, with no scheme, user, port or `.git` suffix, so the SSH and
@@ -185,7 +188,7 @@ static ISOLATED: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
 
 /// Every `git` call Meada makes in a directory under `dir` runs with `GIT_CONFIG_NOSYSTEM=1`
 /// and no global configuration, so only the repository's own configuration (the minimal one
-/// the pull wrote) applies.
+/// the pull wrote) applies, and with `core.fsmonitor=false`, so no fsmonitor runs either.
 pub fn isolate(dir: &Path) {
     if let Ok(real) = dir.canonicalize() {
         let mut isolated = ISOLATED.lock().unwrap_or_else(|e| e.into_inner());
@@ -204,7 +207,8 @@ fn command(dir: &Path) -> Command {
     if (real.as_ref()).is_some_and(|real| isolated.iter().any(|d| real.starts_with(d))) {
         let null = if cfg!(windows) { "NUL" } else { "/dev/null" };
         git.env("GIT_CONFIG_NOSYSTEM", "1")
-            .env("GIT_CONFIG_GLOBAL", null);
+            .env("GIT_CONFIG_GLOBAL", null)
+            .args(["-c", "core.fsmonitor=false"]);
     }
     drop(isolated);
     let trusted = TRUSTED.lock().unwrap_or_else(|e| e.into_inner());
@@ -310,6 +314,9 @@ mod tests {
             ("GIT_CONFIG_NOSYSTEM".to_string(), "1".to_string()),
         ];
         assert_eq!(envs(&pulled.join("mirror")), expected);
+        let git = command(&pulled.join("mirror"));
+        let args: Vec<_> = git.get_args().map(|a| a.to_string_lossy()).collect();
+        assert_eq!(args[..2], ["-c", "core.fsmonitor=false"]);
         assert!(envs(&other).is_empty());
         let _ = std::fs::remove_dir_all(&dir);
     }

@@ -933,3 +933,97 @@ fn a_pulled_mirror_runs_nothing_its_bundle_configured() {
         "git status in the pulled mirror ran the script"
     );
 }
+
+/// A bundle carrying a nested repository behind a gitlink, its configuration running a script
+/// through `core.fsmonitor`: as a `.git` directory in the submodule, or as a gitfile pointing
+/// into `.git/modules`. `git status` in the mirror descends into it and runs the script, so the
+/// pull refuses the entry, runs nothing and keeps the previous generation.
+#[cfg(unix)]
+#[test]
+fn a_nested_repository_fails_the_pull_and_runs_nothing() {
+    use std::os::unix::fs::PermissionsExt;
+    let Some(endpoint) = service() else { return };
+    let name = bucket_name("snapshot-nested");
+    let s3 = bucket(&endpoint, &name);
+    let dir = store_manifest("snapshot_nested", &endpoint, &name, SECRET);
+    let (_, stderr, code) = publish(&dir, MANIFEST);
+    assert_eq!(code, Some(0), "{stderr}");
+    let (manifest, local) = node(&dir, &endpoint, &name);
+    let (_, stderr, code) = pull(&dir, &manifest, &[]);
+    assert_eq!(code, Some(0), "{stderr}");
+    let before = held(&local);
+
+    let (identity, path) = CHAIN[0];
+    let index = dir.join("indexes").join(identity).join("index.db");
+    let ran = dir.join("ran");
+    let script = dir.join("hook.sh");
+    let text = format!("#!/bin/sh\necho \"$0\" >> {}\n", ran.display());
+    fs::write(&script, text).unwrap();
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+    let fsmonitor = format!("[core]\n\tfsmonitor = {}\n", script.display());
+
+    for layout in ["directory", "gitfile"] {
+        // The web mirror with `sub`, a repository of its own, committed as a gitlink.
+        let hostile = dir.join(format!("hostile-{layout}"));
+        let _ = fs::remove_dir_all(&hostile);
+        let mut copy = Command::new("cp");
+        copy.arg("-a").arg(dir.join(path)).arg(&hostile);
+        assert!(copy.status().unwrap().success());
+        let sub = hostile.join("sub");
+        fs::create_dir_all(&sub).unwrap();
+        git(&sub, &["-c", "init.defaultBranch=main", "init", "-q"]);
+        fs::write(sub.join("a.txt"), "a\n").unwrap();
+        git(&sub, &["add", "a.txt"]);
+        git(&sub, &["commit", "-q", "-m", "sub"]);
+        git(&hostile, &["add", "sub"]);
+        git(&hostile, &["commit", "-q", "-m", "gitlink"]);
+        let config = match layout {
+            "directory" => sub.join(".git/config"),
+            _ => {
+                let modules = hostile.join(".git/modules");
+                fs::create_dir_all(&modules).unwrap();
+                fs::rename(sub.join(".git"), modules.join("sub")).unwrap();
+                fs::write(sub.join(".git"), "gitdir: ../.git/modules/sub\n").unwrap();
+                let config = modules.join("sub/config");
+                let file = config.to_str().unwrap();
+                git(
+                    &hostile,
+                    &["config", "-f", file, "core.worktree", "../../../sub"],
+                );
+                config
+            }
+        };
+        let text = fs::read_to_string(&config).unwrap();
+        fs::write(&config, format!("{text}{fsmonitor}")).unwrap();
+        // Where it stays, `git status` in the mirror runs the submodule's script.
+        let out = Command::new("git")
+            .current_dir(&hostile)
+            .args(["status", "--porcelain"])
+            .output()
+            .unwrap();
+        let err = String::from_utf8_lossy(&out.stderr);
+        assert!(out.status.success(), "{layout}: {err}");
+        assert!(
+            ran.exists(),
+            "{layout}: the nested configuration runs the script"
+        );
+        fs::remove_file(&ran).unwrap();
+
+        let head = git(&hostile, &["rev-parse", "HEAD"]).trim().to_string();
+        stage(
+            &s3,
+            identity,
+            &head,
+            &bundle_of(&index, &hostile, &[]),
+            None,
+        );
+        let (stdout, stderr, code) = pull(&dir, &manifest, &[]);
+        assert_eq!((stdout.as_str(), code), ("", Some(1)), "{layout}: {stderr}");
+        assert!(
+            stderr.contains("entry `mirror/") && stderr.contains("nested repository"),
+            "{layout}: {stderr}"
+        );
+        assert!(!ran.exists(), "{layout}: the pull ran the script");
+        assert_eq!(held(&local), before, "{layout}");
+    }
+}

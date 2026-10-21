@@ -288,7 +288,8 @@ fn checked(
 /// whose URL gives the entry's identity), and its `hooks`, `commondir` and
 /// `objects/info/alternates` (which point git elsewhere) are removed. Then, with `git` isolated
 /// from any system or global configuration (`repo::isolate`), the mirror must be a checkout of
-/// that identity at the entry's `HEAD`, with nothing changed, untracked or ignored.
+/// that identity at the entry's `HEAD`, with nothing changed, untracked or ignored, read
+/// without descending into a submodule (`extract` already refused any nested repository).
 fn settle(mirror: &Path, entry: &Entry) -> std::result::Result<(), String> {
     let git = mirror.join(".git");
     if !fs::symlink_metadata(&git).is_ok_and(|m| m.is_dir()) {
@@ -329,7 +330,10 @@ fn settle(mirror: &Path, entry: &Entry) -> std::result::Result<(), String> {
         }
         .text());
     }
-    if !repo::unclean(mirror).map_err(|e| e.to_string())?.is_empty() {
+    if !repo::unclean(mirror, false)
+        .map_err(|e| e.to_string())?
+        .is_empty()
+    {
         let repo = entry.identity.as_str();
         return Err(Msg::SnapshotDirty {
             repo,
@@ -362,7 +366,9 @@ struct Budget {
 /// is under it; no absolute path and no `.` or `..` component; nothing written through a
 /// symbolic link or over an earlier entry; a symbolic link only to a relative target inside
 /// the mirror, through no other symbolic link; a hard link only to a regular file of the
-/// mirror extracted before it; no device, FIFO or other special file. Entries and the bytes of
+/// mirror extracted before it; no nested repository (a `.git` component below the mirror's
+/// own, or anything under its `.git/modules`); no device, FIFO or other special file. Entries
+/// and the bytes of
 /// regular files are charged to `budget`. A regular file is written `0644`, or `0755` when the
 /// archive gives it any execute bit.
 fn extract(tar: &Path, dest: &Path, budget: &mut Budget) -> std::result::Result<(), String> {
@@ -402,6 +408,14 @@ fn extract(tar: &Path, dest: &Path, budget: &mut Budget) -> std::result::Result<
         };
         if !placed {
             return Err(refuse(Msg::SnapshotEntryPath));
+        }
+        // Only the mirror's own `.git`: git runs the configuration of a nested repository when
+        // `git status` descends into it as a submodule.
+        let git = |part: &OsStr| part.eq_ignore_ascii_case(".git");
+        let nested = parts.iter().skip(2).any(|part| git(part))
+            || (parts.len() > 2 && git(parts[1]) && parts[2] == "modules");
+        if nested {
+            return Err(refuse(Msg::SnapshotEntryNested));
         }
         first = false;
         let target = dest.join(&path);
@@ -893,6 +907,9 @@ mod tests {
             Item::Link(b"mirror/src/l", EntryType::Symlink, b"../run.sh"),
             Item::Link(b"mirror/h", EntryType::Link, b"mirror/src/a.ts"),
             Item::File(b"mirror/deep/er/x", b"x"),
+            Item::Dir(b"mirror/.git"),
+            Item::File(b"mirror/.git/config", b"[core]"),
+            Item::File(b"mirror/src/.gitignore", b"x"),
         ]);
         let (dest, result) = extracted("valid", &bytes, &mut budget());
         result.unwrap();
@@ -1017,6 +1034,40 @@ mod tests {
             e.contains("mirror/a/b/c/l") && e.contains("through a symbolic link"),
             "{e}"
         );
+    }
+
+    /// A pulled mirror never needs a nested repository: git would run its configuration when
+    /// `git status` descends into it as a submodule.
+    #[test]
+    fn a_nested_git_directory_file_or_link_is_refused() {
+        for item in [
+            Item::Dir(b"mirror/sub/.git"),
+            Item::File(b"mirror/sub/.git/config", b"[core]"),
+            Item::File(b"mirror/sub/.git", b"gitdir: ../.git/modules/sub"),
+            Item::Link(b"mirror/sub/.git", EntryType::Symlink, b"../x"),
+            Item::Link(b"mirror/a/b/.GIT", EntryType::Symlink, b"../x"),
+            Item::File(b"mirror/a/.git/x/y", b"x"),
+        ] {
+            let e = refused("nested", &[item]);
+            assert!(
+                e.contains("entry `mirror/") && e.contains("nested repository"),
+                "{e}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_modules_of_the_mirror_s_own_git_are_refused() {
+        for item in [
+            Item::Dir(b"mirror/.git/modules"),
+            Item::File(b"mirror/.git/modules/sub/config", b"[core]"),
+        ] {
+            let e = refused("modules", &[Item::Dir(b"mirror/.git"), item]);
+            assert!(
+                e.contains("entry `mirror/.git/modules") && e.contains("nested repository"),
+                "{e}"
+            );
+        }
     }
 
     #[test]

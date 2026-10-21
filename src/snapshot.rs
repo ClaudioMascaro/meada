@@ -379,7 +379,7 @@ pub fn publish(manifest: &Path) -> Result<String> {
                 }
                 .text()));
             }
-            if !repo::unclean(&r.root)?.is_empty() {
+            if !repo::unclean(&r.root, true)?.is_empty() {
                 let mirror = r.root.display().to_string();
                 return Ok(Err(Msg::SnapshotDirty {
                     repo: repo_id,

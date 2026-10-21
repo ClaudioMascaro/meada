@@ -270,6 +270,8 @@ pub enum Msg<'a> {
     #[cfg(feature = "snapshot")]
     SnapshotEntryPath,
     #[cfg(feature = "snapshot")]
+    SnapshotEntryNested,
+    #[cfg(feature = "snapshot")]
     SnapshotEntryLink,
     #[cfg(feature = "snapshot")]
     SnapshotEntryThrough,
@@ -903,6 +905,14 @@ impl Msg<'_> {
             Msg::SnapshotEntryHeader(max) => pick(
                 format!("a long name or a pax header past the ceiling of {max} bytes"),
                 format!("um nome longo ou um cabeçalho pax acima do teto de {max} bytes"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEntryNested => pick(
+                "a nested repository: a `.git` below the mirror's own, or under its `.git/modules`"
+                    .into(),
+                "um repositório aninhado: um `.git` abaixo do próprio do espelho, ou sob o seu \
+                 `.git/modules`"
+                    .into(),
             ),
             #[cfg(feature = "snapshot")]
             Msg::SnapshotEntryPath => pick(

@@ -140,11 +140,15 @@ one for the area a change touches.
   normal components; regular files created `create_new`, `0644` or `0755`; directories made
   without following a link; symbolic links only to relative targets that fold inside the
   mirror, and after the last entry none through another link; hard links only to an earlier
-  regular file of the mirror; any other type refused); `settle` replaces `.git/config` with
-  `[core]` and the identity's `origin`, removes `hooks`, `commondir` and
-  `objects/info/alternates`, and checks the checkout, identity, `HEAD` and a clean `git
-  status`. `repo::isolate(local_dir)` makes every `git` call under it run with
-  `GIT_CONFIG_NOSYSTEM=1` and `GIT_CONFIG_GLOBAL` set to the null device. Then the partial
+  regular file of the mirror; no nested repository, that is no `.git` component, in any case,
+  below the mirror's own `.git` and nothing under its `.git/modules`, since git runs a
+  submodule's own configuration when `git status` descends into it; any other type refused);
+  `settle` replaces `.git/config` with `[core]` and the identity's `origin`, removes `hooks`,
+  `commondir` and `objects/info/alternates`, and checks the checkout, identity, `HEAD` and a
+  clean `git status` that does not descend into submodules (`repo::unclean(_, false)`; the
+  publish check on the operator's own mirrors keeps descending). `repo::isolate(local_dir)`
+  makes every `git` call under it run with `GIT_CONFIG_NOSYSTEM=1`, `GIT_CONFIG_GLOBAL` set to
+  the null device and `-c core.fsmonitor=false`. Then the partial
   directory is renamed to `<generation id>/`, `current.new` is written, synced and renamed over
   `current`, and every id-named directory but the new current and the one just replaced is
   deleted. A failure removes the partial directory and leaves the pointer and every held
