@@ -5570,7 +5570,7 @@ mod tests {
                 path,
                 scope,
                 Of::Name(name),
-                Follow::Values { passes: UNION },
+                Follow::Values { passes: TABLE },
             );
             origin_lines(code, sources, found, Shown::Nothing)
         })
@@ -5590,7 +5590,7 @@ mod tests {
                 path,
                 scope,
                 Of::Name(name),
-                Follow::Values { passes: UNION },
+                Follow::Values { passes: TABLE },
             );
             origin_lines(code, sources, found, Shown::All)
         })
@@ -5610,7 +5610,7 @@ mod tests {
         (origin.starts_with("axum.") && ["route", "nest", "layer"].contains(&method))
             || (origin.starts_with("actix_web.") && method == "service")
     }
-    const UNION: Passes = framework_table;
+    const TABLE: Passes = framework_table;
 
     /// The `Values` origins of the value written as the argument of `probe(..)` in `path`, asked
     /// with the table `passes`, as `origin_lines` shows them.
@@ -5629,14 +5629,14 @@ mod tests {
         })
     }
 
-    /// `probe_passing` with the Rust readers' table.
+    /// `probe_passing` with the test-local table (`TABLE`).
     fn probe_lines(
         pack: &'static dyn LanguagePack,
         sources: &[(&'static str, &str)],
         path: &'static str,
         shown: Shown,
     ) -> Vec<String> {
-        probe_passing(pack, sources, path, shown, UNION)
+        probe_passing(pack, sources, path, shown, TABLE)
     }
 
     /// What the value written as the argument of `probe(..)` in `path` may hold.
