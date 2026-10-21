@@ -84,3 +84,7 @@ in the same change:
   one of them is a finding. What cannot be a question (a stored field, the phrase in the MCP
   `search` doc string, a variant of `entry::EntryKind`, a reader in `document`) is named under
   "Seams and what extends them".
+- A package ecosystem's rule lives in its own module under `package/`, behind the `Ecosystem`
+  trait in `package.rs`. The shared package steps and the index writer ask the trait and the
+  seam's free functions (`of`, `of_source`, `programs`, `inherit`) and name no ecosystem; an arm
+  for one ecosystem added to the shared code is a finding.

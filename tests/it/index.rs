@@ -211,7 +211,7 @@ fn an_oversized_document_is_read_up_to_the_limit_and_refreshes_as_cold() {
 
 #[test]
 fn an_oversized_manifest_is_read_up_to_the_limit_and_refreshes_as_cold() {
-    // One byte past `package::MAX_BYTES`, the size limit of every manifest and config.
+    // One byte past `lang::MAX_BYTES`, the size limit of every manifest and config.
     let read = (1 << 20) + 1;
     let config = |repo: &Path| {
         let valid = fs::read_to_string(repo.join("tsconfig.json")).unwrap();

@@ -209,10 +209,10 @@ modules updates it.
   reaches the documented consumer (an `amqp` side of a document is a queue name, never an
   exchange, so it is never a publish). It sorts `providers` and `consumers` into the index's
   order afterwards.
-- `package.rs` (spec #22): packages as contracts. `read(bytes)` turns a `package.json` into a
+- `package.rs` (spec #22): packages as contracts. `Npm::read` (`package/npm.rs`) turns a `package.json` into a
   `Summary {name, version, dependencies: [Entry {field, name, range}], exports, types, module,
   main}` (the four dependency fields, sorted by field then name; `exports` as written, `null`
-  counting as absent) and never fails: a file over `MAX_BYTES` (1 MiB), not a JSON
+  counting as absent) and never fails: a file over `lang::MAX_BYTES` (1 MiB), not a JSON
   object or nested past `serde_json`'s depth limit reads as empty, a field of another type or an
   empty string counts as absent, and a name that is empty, over `MAX_NAME` (214), or holds a
   control character, whitespace or `:` is no name (a dependency entry with such a name is dropped).
@@ -224,7 +224,7 @@ modules updates it.
   named manifest, private ones too. `Packages::workspace_step`, which `Engine::exports` runs after
   every repository's `declare` (one repository cannot see another's providers), builds the
   `Providers` index of package names to their manifests once and runs `consume`, `import`,
-  the dropped export entry points and `shapes` over it (`reaches` is the one place the
+  the dropped export entry points and `shapes` over it (npm's `reaches` is the one place the
   `workspace:` rule lives). `consume(exports, providers)` is the first: for
   each dependency entry whose package some repository of the workspace provides (a `workspace:`
   range needs one in its own repository), it adds a consumer at `<repository>::<manifest
@@ -234,8 +234,8 @@ modules updates it.
   candidate, `workspace:` keeping the consumer's repository), with the reason `<identifier>
   <range|none> (local <version|none>)`, prefixed `<n> providers fit; ` when ambiguous.
   `reason()` is the one place it is built; it ends with `, range mismatch` or `, range
-  unchecked` when `flag(range, version) -> Option<Flag>` (private; the `consumers:` section calls it too, and
-  nobody parses the reason back) says so. `flag` checks with `nodejs-semver` (npm syntax: `^ ~
+  unchecked` when the ecosystem's `flag(range, version) -> Option<Flag>` (the trait's; the `consumers:` section
+  asks it too, and nobody parses the reason back) says so. npm's `flag` checks with `nodejs-semver` (npm syntax: `^ ~
   x - ||`, prereleases as npm): `Mismatch` when the range does not accept the local version,
   `Unchecked` for a missing range or version, a `workspace:`/`file:`/`link:`/`npm:` range, a git
   or URL source, a tag such as `latest`, a range past `MAX_RANGE`, and any range with a token
@@ -244,7 +244,7 @@ modules updates it.
   `consume`: for each import row whose package the importing file's nearest manifest
   (`nearest`: the deepest directory holding it, named or not) depends on in any field, it
   resolves the call in every provider of that package (a `workspace:` range: its own repository
-  only) through `Provided::resolve`: `ways` gives the ways in, each with the files it names and
+  only) through the ecosystem's `resolve` (npm's is the trait's default, Node's rule): `ways` gives the ways in, each with the files it names and
   its `How` (`exports` through `exported`, the table-tested lookup of spec #22: exact key, then
   the `*` pattern with the longest prefix, the first of `types`, `import`, `default`, `require`
   at each level, `null` blocking, a key or a target with two `*` not read, the only way in when
@@ -302,7 +302,7 @@ modules updates it.
   providers)`, the third workspace step, fills every provider and consumer shape holding a
   `shape::Import` through `shape::fill`, whose lookup `kept` resolves the import like a call
   (`nearest` manifest of the importing file, its dependency entry, `reaches`, then
-  `Provided::resolve` with the chain the import names, `known` being the kept shapes of the
+  `resolve` with the chain the import names, `known` being the kept shapes of the
   import's view instead of the symbols) and gives the resolution's level (the weaker of two
   providers keeping the same shape); none, `ambiguous`, several names or two providers keeping
   different shapes is unresolved. A consumer left with no field has no shape.
@@ -313,17 +313,30 @@ modules updates it.
   entry, or one under `replace` when nothing here requires the module, the Cargo `path` form in
   `via`; a `replace` by anything else marks the entry `outside`, which reaches no provider). A call
   from a `.go` file through an import of a module the nearest `go.mod` requires (a path with no dot included) resolves in the provider
-  directory the import path names (`Provided::package`): the exported name of the one non-test
+  directory the import path names (Go's `resolve`): the exported name of the one non-test
   source file of that directory (nested modules left out) that defines it, `exact`, `How::ModulePath`.
-  Ecosystems (spec #24): everything above is npm's, behind `Ecosystem` (`Npm`, `Pypi`), which
-  names a manifest by its file name (`of`), gives the contract prefix (`package::npm::`,
-  `package::pypi::`), reads the bytes (`read`), checks a range (`flag`) and holds the
-  `workspace:` rule (`reaches`, npm only); `Providers` is keyed by ecosystem and name, so an
-  npm and a PyPI package of one name never link, and `nearest` takes the ecosystem (a file's
-  nearest `package.json` and nearest `pyproject.toml` are apart). A file belongs to the package
-  of its `owner`: the nearest `package.json`, or the nearest `pyproject.toml` (a
-  `requirements*.txt` names no package, so it bounds none; a `Cargo.toml` with no `[package]`, a
-  virtual workspace root, bounds none either). `package/pypi.rs` reads a
+  Ecosystems (specs #24, #25, #30 and #225): everything above is npm's, one adapter among four.
+  Each ecosystem is a module under `package/` behind the `Ecosystem` trait (`Npm`, `Pypi`,
+  `Cargo`, `Go`), registered in the list `ECOSYSTEMS`; the shared steps ask the trait and match
+  on no ecosystem, and a new one appends to the list (its order is the search order of `of` and
+  `of_contract` and the run order of `inherit`). An ecosystem must say which files are its
+  manifests (`is_manifest`, by file name; `of` finds the adapter), its `name` (the contract
+  prefix `package::<name>::`, `package::npm::` and `package::pypi::` among them, and the export's
+  `ecosystem` field, left out for npm), how a manifest reads (`read`, never failing), which
+  source files import its packages (`sources`; `of_source` is none for a file no ecosystem
+  claims), whether a specifier may name a package (`names_package`) and which dependency entries
+  an import may name (`entries`). The rest has a default body: `flag` (unchecked), `reaches`
+  (every provider), `owns` (every manifest of the ecosystem), `ways` and `resolve` (Node's
+  rule), `resolutions` (the single-entry loop), `shapes` (false), `programs` (none) and
+  `inherit` (nothing). The overrides: npm answers `flag` (semver), `reaches` (a `workspace:`
+  range keeps the dependent's own repository) and `shapes`; PyPI `owns`, `resolutions` and
+  `programs`; Cargo `reaches`, `owns`, `ways`, `resolve` and `inherit`; Go `reaches` and
+  `resolve`. `Providers` is keyed by ecosystem name and package name, so an npm and a PyPI
+  package of one name never link, and `nearest` takes the ecosystem (a file's nearest
+  `package.json` and nearest `pyproject.toml` are apart). A file belongs to the package of its
+  `owner`: the nearest manifest its ecosystem's `owns` accepts (for PyPI the nearest
+  `pyproject.toml`, since a `requirements*.txt` names no package and bounds none; for Cargo the
+  nearest `Cargo.toml` with a `[package]`, since a virtual workspace root bounds none either). `package/pypi.rs` reads a
   `pyproject.toml` (through `lang::python::pyproject::Pyproject`, the one parse the pack's
   source roots share: `[project] name`, else `[tool.poetry] name`, `version`, `[project]
   dependencies` as PEP 508 strings, `[tool.poetry.dependencies]` but `python`, the declared
@@ -333,12 +346,12 @@ modules updates it.
   written, extras and markers dropped (`requirement`). A PyPI range is never evaluated:
   `reason` ends `, range unchecked`; a Poetry `git` or `url` source without a `path` is a direct
   reference, no entry, as `name @ url` is, and a requirements line ending in `\` continues on
-  the next. A call from a `.py` file (`Ecosystem::of_source`) resolves through
-  `pypi_resolutions`: the import names a module, so each distribution a PyPI manifest of a
+  the next. A call from a `.py` file (`of_source`) resolves through
+  PyPI's `resolutions`: the import names a module, so each distribution a PyPI manifest of a
   directory holding the file depends on (`holding`: every `pyproject.toml` and
   `requirements*.txt` above it, the nearest first, whose entry gives the range) is a candidate when a provider exposes the import's top-level module under its roots
-  (`python_roots`: the manifest's directory, then its declared roots or `src`;
-  `Provided::module` finds `a/b/__init__.py` or `a/b.py`), `exact` with `How::ModuleName`
+  (`roots`: the manifest's directory, then its declared roots or `src`;
+  `module` finds `a/b/__init__.py` or `a/b.py`), `exact` with `How::ModuleName`
   (reason `; import module name`) when that module is the normalized name with `-` turned into
   `_`, `inferred` with `How::TopLevel` (`; import top-level module`) otherwise, and `ambiguous`
   for each when several distributions expose it (one consumer per distribution at the call
@@ -347,7 +360,7 @@ modules updates it.
   `shared_lib.api`, then `greet`), and `Provided::member` takes a package's submodule when its
   `__init__.py` exports no such name. `surface` reads npm manifests alone: no shape crosses a
   PyPI package.
-  Cargo (spec #30): `Ecosystem::Cargo` names `Cargo.toml`. `package/cargo.rs` reads one through
+  Cargo (spec #30): the `Cargo` adapter names `Cargo.toml`. `package/cargo.rs` reads one through
   the Rust pack's walker (`lang::rust::crates::entries`, also what the module trees use): `name`
   and `version` of `[package]`, `main` the library root as a path of the repository (`crates::lib_root`:
   `[lib] path`, else `src/lib.rs`, folded from the manifest's directory), `lib_name` the `[lib]
@@ -361,11 +374,11 @@ modules updates it.
   mistyped `path`, `git` or `package`, an absolute `path`, both `path` and `git`) is dropped, not
   read as a version dependency. A `workspace = true` entry is kept as `inherits`,
   `[workspace.dependencies]` as `Summary::workspace`, `version.workspace = true` as
-  `inherits_version` and `[workspace.package] version` as `workspace_version`; `cargo::inherit`,
-  run by `index::read_manifests` over the whole list, fills each from the nearest manifest above
-  it, so a refresh equals a cold export. The consumer site names the key
+  `inherits_version` and `[workspace.package] version` as `workspace_version`; the seam's `inherit`,
+  run by `index::read_manifests` over the whole list, has Cargo fill each from the nearest
+  manifest above it, so a refresh equals a cold export. The consumer site names the key
   (`<repository>::<path>::<field>::<key>`) and `Consumer::via` carries `Entry::via`, which
-  `Ecosystem::reaches` checks against the provider: a `path` of the repository only the manifest
+  Cargo's `reaches` checks against the provider: a `path` of the repository only the manifest
   at that path of the same repository, a `path` that starts with `../` only the manifest whose
   location, `Export::root` (set by `Engine::exports`, or `Repository::root` in `link`) joined with
   its path, folds to the same absolute location (lexical, nothing is read outside a repository,
@@ -375,7 +388,7 @@ modules updates it.
   crate head, `cargo::names_crate`: not `std`, `core` or `alloc`) resolves in `resolutions`
   through the file's nearest named `Cargo.toml`: the head, hyphens as underscores, must equal the
   key of a renamed dependency or, for one that is not renamed, the provider's library name
-  (`cargo::lib_head`: `[lib] name`, else the package name), and `Provided::resolve` then follows
+  (`cargo::lib_head`: `[lib] name`, else the package name), and Cargo's `resolve` then follows
   the chain from the provider's library root through the `exported` rows of the Rust pack (`pub
   mod`, `pub use`; an item behind a private module is not reached), `exact` with `How::CrateName`
   (`; import crate name`) and no `ambiguous` fallback. A crate of the repository itself is
