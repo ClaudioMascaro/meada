@@ -13,13 +13,13 @@ use crate::contract::{ContractKind, Found, Level, Link, Related, Role, Site};
 use crate::document;
 use crate::entry::EntryKind;
 use crate::index::{self, Binding, Consumer, Export, Indexed, Provider, Publish};
-use crate::lang::python;
 use crate::resolve::Code;
 use crate::shape::Shape;
 use crate::workspace::Repository;
 
 mod go;
 pub(crate) mod message;
+mod python;
 mod rust;
 mod ts;
 use message::{Handler, Message, Side};
@@ -183,7 +183,7 @@ impl ContractKind for Channel {
         // Each reader answers for its own pack only; the order is the order found.
         let messages: Vec<Message> = [
             ts::messages(code),
-            python::messages::messages(code),
+            python::messages(code),
             rust::messages(code),
             go::messages(code),
         ]

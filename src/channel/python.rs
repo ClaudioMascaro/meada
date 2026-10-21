@@ -1,10 +1,10 @@
-//! The message libraries of the Python pack (spec #20, #73). A form is a method called on a
-//! client that traces back to the library's constructor (`Code::origins` with `Follow::Values`
-//! on the receiver), imported from the library's package: a `produce` on anything else is no
-//! producer. The constructor is named by `Code::imported`, the head of its callee, not by the
-//! `outside` an origin carries, which reads the whole name.
+//! The channel kind's Python forms (spec #20, #73): the message libraries of the Python pack. A
+//! form is a method called on a client that traces back to the library's constructor
+//! (`Code::origins` with `Follow::Values` on the receiver), imported from the library's package:
+//! a `produce` on anything else is no producer. The constructor is named by `Code::imported`, the
+//! head of its callee, not by the `outside` an origin carries, which reads the whole name.
 
-use crate::channel::message::{
+use super::message::{
     Handler, Message, bind, channel_name as name, consume, produce, publish, queue_name, topic,
     topics,
 };
@@ -70,7 +70,7 @@ struct Maker<'a> {
     call: &'a Call,
 }
 
-pub(crate) fn messages(code: &Code) -> Vec<Message> {
+pub(super) fn messages(code: &Code) -> Vec<Message> {
     if !code.pack().extensions().contains(&"py") {
         return Vec::new();
     }
@@ -303,5 +303,60 @@ fn streams(args: &[Value], kwargs: &Keywords) -> Option<Vec<Option<String>>> {
             .collect(),
         Value::Ref(_) => None,
         _ => Some(vec![None]),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::channel::message::Side;
+    use crate::lang::LanguagePack;
+    use crate::lang::python::Python;
+    use crate::resolve::Resolver;
+    use std::collections::BTreeMap;
+
+    /// A line per message of the Python file `src`: broker, name (or `unresolved`), role, handler.
+    fn lines(src: &str) -> Vec<String> {
+        let facts = Python.parse("x.py", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("x.py", &facts)]);
+        let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &Python);
+        let code = Code::new(&resolver, &files, &Python);
+        (messages(&code).into_iter())
+            .map(|m| {
+                let name = m.name.as_deref().unwrap_or("unresolved");
+                let (role, handler) = match &m.role {
+                    Side::Producer => ("producer", String::new()),
+                    Side::Consumer(Handler::Def { name, .. }) => ("consumer", format!(" {name}")),
+                    _ => ("other", String::new()),
+                };
+                format!("{} {name} {role}{handler}", m.broker)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_nats_client_produces_and_consumes_with_its_handler() {
+        let src = r#"
+import os
+import nats
+
+async def on_message(msg):
+    pass
+
+async def run():
+    nc = await nats.connect("nats://nats:4222")
+    await nc.publish("orders.created", b"o")
+    await nc.publish(os.getenv("SUBJECT"), b"o")
+    await nc.subscribe("orders.created", cb=on_message)
+"#;
+        assert_eq!(
+            lines(src),
+            [
+                "nats orders.created producer",
+                "nats unresolved producer",
+                "nats orders.created consumer on_message"
+            ]
+        );
     }
 }
