@@ -309,30 +309,19 @@ fn streams(args: &[Value], kwargs: &Keywords) -> Option<Vec<Option<String>>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::channel::message::Side;
     use crate::lang::LanguagePack;
     use crate::lang::python::Python;
     use crate::resolve::Resolver;
     use std::collections::BTreeMap;
 
-    /// A line per message of the Python file `src`: broker, name (or `unresolved`), role, handler.
+    /// The messages of the Python file `src` as lines.
     fn lines(src: &str) -> Vec<String> {
         let facts = Python.parse("x.py", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("x.py", &facts)]);
         let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
         let resolver = Resolver::new(&files, modules, &Python);
         let code = Code::new(&resolver, &files, &Python);
-        (messages(&code).into_iter())
-            .map(|m| {
-                let name = m.name.as_deref().unwrap_or("unresolved");
-                let (role, handler) = match &m.role {
-                    Side::Producer => ("producer", String::new()),
-                    Side::Consumer(Handler::Def { name, .. }) => ("consumer", format!(" {name}")),
-                    _ => ("other", String::new()),
-                };
-                format!("{} {name} {role}{handler}", m.broker)
-            })
-            .collect()
+        crate::channel::message::lines(messages(&code))
     }
 
     #[test]
@@ -355,7 +344,7 @@ async def run():
             [
                 "nats orders.created producer",
                 "nats unresolved producer",
-                "nats orders.created consumer on_message"
+                "nats orders.created consumer x.py::on_message"
             ]
         );
     }

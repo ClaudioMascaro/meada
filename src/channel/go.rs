@@ -496,35 +496,19 @@ fn one(args: &[Value], _: &Keywords) -> Option<Vec<Option<String>>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::channel::message::Side;
     use crate::lang::LanguagePack;
     use crate::lang::go::Go;
     use crate::resolve::Resolver;
     use std::collections::BTreeMap;
 
-    /// A line per message of the Go file `src`: broker, name (or `unresolved`), role, handler.
+    /// The messages of the Go file `src` as lines.
     fn lines(src: &str) -> Vec<String> {
         let facts = Go.parse("x.go", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("x.go", &facts)]);
         let modules = Go.modules(&[], &BTreeMap::new()).unwrap();
         let resolver = Resolver::new(&files, modules, &Go);
         let code = Code::new(&resolver, &files, &Go);
-        (messages(&code).into_iter())
-            .map(|m| {
-                let name = m.name.as_deref().unwrap_or("unresolved");
-                let (role, handler) = match &m.role {
-                    Side::Producer => ("producer", String::new()),
-                    Side::Consumer(Handler::Inline { def, .. }) => {
-                        // The position of the literal is a byte offset: keep what encloses it.
-                        let (parent, _) = def.rsplit_once('@').unwrap();
-                        ("consumer", format!(" {parent}@"))
-                    }
-                    Side::Consumer(Handler::Def { name, .. }) => ("consumer", format!(" {name}")),
-                    _ => ("other", String::new()),
-                };
-                format!("{} {name} {role}{handler}", m.broker)
-            })
-            .collect()
+        crate::channel::message::lines(messages(&code))
     }
 
     #[test]
@@ -544,13 +528,14 @@ func run() {
 	nc.Subscribe("orders.created", func(m *nats.Msg) {})
 }
 "#;
-        let found = lines(src);
+        // The handler is the function literal, named by its byte offset.
+        let at = src.find("func(m *nats.Msg)").unwrap();
         assert_eq!(
-            found,
+            lines(src),
             [
-                "nats orders.created producer",
-                "nats unresolved producer",
-                "nats orders.created consumer run.@"
+                "nats orders.created producer".to_string(),
+                "nats unresolved producer".to_string(),
+                format!("nats orders.created consumer inline x.go::run.@{at}"),
             ]
         );
     }

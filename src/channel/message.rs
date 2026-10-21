@@ -228,3 +228,24 @@ pub fn publication(exchange: Option<String>, key: Option<String>) -> (Option<Str
         None => (None, Side::Producer),
     }
 }
+
+/// The messages as lines, for the readers' tests: broker, name (or `unresolved`), role and, for a
+/// consumer, its handler (`path::name` for a definition, `inline path::def` for an anonymous
+/// function).
+#[cfg(test)]
+pub fn lines(messages: Vec<Message>) -> Vec<String> {
+    (messages.into_iter())
+        .map(|m| {
+            let name = m.name.as_deref().unwrap_or("unresolved");
+            let role = match m.role {
+                Side::Producer => "producer".to_string(),
+                Side::Consumer(Handler::Def { path, name }) => format!("consumer {path}::{name}"),
+                Side::Consumer(Handler::Inline { path, def }) => {
+                    format!("consumer inline {path}::{def}")
+                }
+                _ => "other".to_string(),
+            };
+            format!("{} {name} {role}", m.broker)
+        })
+        .collect()
+}

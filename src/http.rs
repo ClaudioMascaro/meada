@@ -350,6 +350,16 @@ fn render(parts: &[Part]) -> String {
 /// Python clients send requests with them.
 const HTTP_METHODS: &[&str] = &["get", "post", "put", "delete", "patch", "options", "head"];
 
+/// An HTTP client library of Python or Rust, by what it names outside the repository: the
+/// Python rows are `python/clients.rs`'s, the Rust rows `rust/frameworks.rs`'s.
+struct Library {
+    /// The modules whose functions send a request (`requests.get`, `reqwest.blocking.get`).
+    modules: &'static [&'static str],
+    /// What constructs a client, an object whose methods send requests. A Rust builder chain
+    /// (`Client::builder().build()?`) is the constructor that starts it.
+    clients: &'static [&'static str],
+}
+
 /// A call by its file and index: what creates an app or a router, or a URLconf entry.
 type CallAt<'a> = (&'a str, usize);
 

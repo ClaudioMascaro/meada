@@ -368,44 +368,26 @@ fn keys(args: &[Value], _: &Keywords) -> Option<Vec<Option<String>>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::channel::message::{Handler, Side};
     use crate::lang::LanguagePack;
     use crate::lang::rust::Rust;
     use crate::resolve::Resolver;
     use std::collections::BTreeMap;
 
-    /// The messages of the Rust file `src` as lines: broker, name (`?` when unresolved), role
-    /// and handler.
+    /// The messages of the Rust file `src` as lines.
     fn lines(src: &str) -> Vec<String> {
         let facts = Rust.parse("x.rs", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("x.rs", &facts)]);
         let modules = Rust.modules(&[], &BTreeMap::new()).unwrap();
         let resolver = Resolver::new(&files, modules, &Rust);
         let code = Code::new(&resolver, &files, &Rust);
-        messages(&code)
-            .into_iter()
-            .map(|m| {
-                let name = m.name.as_deref().unwrap_or("?");
-                let role = match m.role {
-                    Side::Producer => "producer".to_string(),
-                    Side::Consumer(Handler::Def { path, name }) => {
-                        format!("consumer {path}::{name}")
-                    }
-                    Side::Consumer(Handler::Inline { path, def }) => {
-                        format!("consumer inline {path}::{def}")
-                    }
-                    _ => "other".to_string(),
-                };
-                format!("{} {name} {role}", m.broker)
-            })
-            .collect()
+        crate::channel::message::lines(messages(&code))
     }
 
     #[test]
     fn a_client_of_a_library_is_a_producer_or_a_consumer_by_its_method() {
         let src = "use async_nats::connect;\n\
             async fn produce() {\n    let c = connect(\"u\").await.unwrap();\n    c.publish(\"orders.created\", b.into()).await.unwrap();\n}\n\
-            async fn consume() {\n    let c = connect(\"u\").await.unwrap();\n    c.subscribe(\"orders.created\").await.unwrap();\n    c.subscribe(std::env::var(\"T\").unwrap()).await.unwrap();\n    tokio::spawn(async move {\n        c.subscribe(\"inline\").await.unwrap();\n    });\n}\n\
+            async fn consume() {\n    let c = connect(\"u\").await.unwrap();\n    c.subscribe(\"orders.created\").await.unwrap();\n    c.subscribe(std::env::var(\"T\").unwrap()).await.unwrap();\n    tokio::spawn(async move {\n        c.subscribe(\"spawned\").await.unwrap();\n    });\n}\n\
             fn other(c: Other) {\n    c.publish(\"nope\", b.into());\n}\n";
         // A subscribe inside a closure is handled by the function that holds the closure.
         assert_eq!(
@@ -413,8 +395,8 @@ mod tests {
             [
                 "nats orders.created producer",
                 "nats orders.created consumer x.rs::consume",
-                "nats ? consumer x.rs::consume",
-                "nats inline consumer x.rs::consume",
+                "nats unresolved consumer x.rs::consume",
+                "nats spawned consumer x.rs::consume",
             ]
         );
     }
