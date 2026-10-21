@@ -227,6 +227,50 @@ mod tests {
         assert!(e.contains("meada snapshot pull"), "{e}");
     }
 
+    /// A held generation is as hostile as the store it came from: a document that does not
+    /// hold what the pull checked is refused before any path is built from it.
+    #[test]
+    fn a_held_document_the_pull_would_refuse_is_not_served() {
+        let local = scratch("hostile");
+        generation(&local, A, &[("a.ts", "export function alpha() {}\n")]);
+        point(&local, A);
+        assert!(held(&local).is_ok());
+        let file = local.join(A).join(pull::DOCUMENT).display().to_string();
+        let not = format!("{file}: not the generation document of its id");
+        let entry = |edit: &dyn Fn(&mut serde_json::Value)| {
+            let mut document = document(A);
+            edit(&mut document["repositories"][0]);
+            document
+        };
+        let cases = [
+            (
+                "a bundle id that is not an id",
+                entry(&|e| e["bundle"] = format!("prod/repos/{REPO}/../../x.tar").into()),
+                not.clone(),
+            ),
+            (
+                "blocks that are not an object",
+                entry(&|e| e["blocks"] = serde_json::json!(["serve"])),
+                not.clone(),
+            ),
+            (
+                "another generation's document",
+                serde_json::json!({"generation": B, "repositories": document(A)["repositories"]}),
+                not.clone(),
+            ),
+            (
+                "an invalid identity",
+                entry(&|e| e["identity"] = "example.com/../escaped".into()),
+                format!("{file}: example.com/../escaped: "),
+            ),
+        ];
+        for (case, document, expected) in cases {
+            write(&local, A, &document);
+            let e = refused(&local);
+            assert!(e.contains(&expected), "{case}: {e}");
+        }
+    }
+
     /// A pull of the generation already current changes nothing: the fix of a missing index
     /// removes the generation's directory first, or publishes another one.
     #[test]
