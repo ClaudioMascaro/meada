@@ -7,12 +7,10 @@ use tree_sitter::{Language, Node, Parser};
 
 use super::{
     Binds, Call, Const, Def, Export, Facts, Field, Import, Imported, Invocation, Kind,
-    LanguagePack, Message, Modules, Param, Part, Ty, Value, children, named, text,
+    LanguagePack, Modules, Param, Part, Ty, Value, children, named, text,
 };
-use crate::resolve::Code;
 use crate::{Result, package, qualify};
 
-mod messages;
 mod types;
 mod uses;
 
@@ -230,10 +228,6 @@ impl LanguagePack for TsJs {
 
     fn globals(&self) -> &'static [&'static str] {
         &["fetch"]
-    }
-
-    fn messages(&self, code: &Code) -> Vec<Message> {
-        messages::messages(code)
     }
 
     fn modules(&self, configs: &[(&str, &[u8])], _: &BTreeMap<&str, &Facts>) -> Result<Modules> {

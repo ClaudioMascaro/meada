@@ -83,7 +83,7 @@ modules updates it.
   subcommunity) and aggregation (nodes numbered by smallest member), until an iteration moves
   and merges nothing, with no cap. `export` loads the rows as `Export::communities`.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
-  `config_files`, `modules`, `messages`, `receiver`: a keyword naming the enclosing class's
+  `config_files`, `modules`, `receiver`: a keyword naming the enclosing class's
   instance, `this` for TS/JS, none for Python, `base_receiver`: a keyword naming its base, whose
   members are not resolved, `super` for TS/JS, none for Python, whose `super()` is a call, and
   `globals`: names bound everywhere that contract kinds read through `Code::binds_everywhere`,
@@ -128,16 +128,17 @@ modules updates it.
   parameter may set it) and `literal(parts)` are shared by kinds and packs. An anonymous function
   written as a property of an options object passed as an argument (`run({ eachMessage: () =>
   {} })`, or an object method there) is a `Kind::Inline` definition and a `Value::Function`,
-  like a function argument. `messages(code) -> Vec<Message>` (default: none) is the **producer
-  and consumer output** (spec #20): `Message {broker, name: Option<String>, path, call, role}`,
-  `role` `Producer` or `Consumer(Handler)`, `Handler::Def {path, name}` (a definition; a name
+  like a function argument. The channel kind's readers (`channel/{ts,python,rust,go}.rs`, each
+  `messages(code) -> Vec<Message>`, answering for its own pack; the types are in
+  `channel/message.rs`) give the **producer and consumer output** (spec #20): `Message {broker, name: Option<String>, path, call, role}`,
+  `role` (`Side`) `Producer` or `Consumer(Handler)`, `Handler::Def {path, name}` (a definition; a name
   that folds to nothing is the top level, so a pack passes a call's `scope` for "the enclosing
-  function") or `Handler::Inline {path, def}`; `Role::Publish {exchange}` (a publish to a named
-  exchange, `name` the routing key) and `Role::Binding {exchange, pattern}` (`name` the queue)
+  function") or `Handler::Inline {path, def}`; `Side::Publish {exchange}` (a publish to a named
+  exchange, `name` the routing key) and `Side::Binding {exchange, pattern}` (`name` the queue)
   are the RabbitMQ roles that are neither a plain producer nor a consumer. `name` is `None`
-  when it cannot be evaluated (an unresolved side). The pack reads facts through `Code` (values, `Code::origins`,
-  `Code::outside`, `Code::expand`) and reports; the channel kind turns the output into contracts. TS/JS library
-  forms live in `lang/ts/messages.rs`: kafkajs `send({topic})` on a `new Kafka().producer()`,
+  when it cannot be evaluated (an unresolved side). A reader asks `Code` (values, `Code::origins`,
+  `Code::outside`, `Code::expand`) and reports; the pack holds none of it, and the channel kind turns the output into contracts. TS/JS library
+  forms live in `channel/ts.rs`: kafkajs `send({topic})` on a `new Kafka().producer()`,
   `subscribe({topic})` or `({topics})` on a `new Kafka().consumer()`, with the handler of the
   first `run({eachMessage|eachBatch})` on the same consumer binding (else the function whose
   call subscribes); AWS SDK v3 `SendMessageCommand` / `ReceiveMessageCommand` (the queue is the
@@ -161,7 +162,7 @@ modules updates it.
   form can start at a constructor, and `value` reads through `await`, so `const nc = await
   connect()` or `const channel = await conn.createChannel()` is a traced binding. Both are in
   every export (`Kafka#0` and the like: unresolved calls, no target).
-- Python message forms live in `lang/python/messages.rs`, which finds the client of a call with
+- Python message forms live in `channel/python.rs`, which finds the client of a call with
   `Code::origins` with `Follow::Values` (which follows `self.x`, parameters and returns, as
   `Follow::Constants` does not) and
   names the constructor it reached from the file's imports (`Code::imported`:
@@ -182,17 +183,18 @@ modules updates it.
   client's handler is the function that subscribes. The pack's `value` reads `await x` as `x`
   (a traced `nc = await nats.connect()`) and a dict literal as `Value::Object` (a key that is
   no string literal is the entry `[]` holding the key and the value, so `Code::expand` folds
-  it). `lang::channel_name` and `lang::queue_name` evaluate a channel name and an SQS queue URL
-  for both packs.
-- `lang/rust/frameworks.rs` (`FRAMEWORKS`): per object of axum, actix-web, Rocket, reqwest and
-  ureq, the outside names of its constructors and the methods that hand it back; `RustPack::passes`
-  reads it (else `messages::passes`) and the HTTP kind asks it what a constructor makes
-  (`frameworks::made`). `VERBS` (the `Method` constants) lives there too.
-- Rust message forms live in `lang/rust/messages.rs`, beside the TS and Python ones and without
+  it). `message::channel_name` and `message::queue_name` (`channel/message.rs`) evaluate a channel name and an SQS queue URL
+  for every reader.
+- `http/rust/frameworks.rs` (`FRAMEWORKS`): per object of axum, actix-web, Rocket, reqwest and
+  ureq, the outside names of its constructors and the methods that hand it back; the HTTP
+  kind's readers hand `passes_on` to the question (`Follow::Values { passes }`) and ask what a
+  constructor makes (`frameworks::made`). `VERBS` (the `Method` constants, in `lang/rust.rs`) is
+  the one pack constant a kind reads: the pack folds `Method::GET` at parse time with it.
+- Rust message forms live in `channel/rust.rs`, beside the TS and Python ones and without
   a parallel path into `channel.rs`. The `LIBRARIES` table names each crate's constructors
   (suffix-matched on `Code::outside`, without the path flag, over the constructor the
   `Follow::Values` origin reached) and the methods that hand back the same object
-  (`passes`, which `RustPack::passes` falls through to, so `flow` follows `set`, `create_channel`,
+  (`passes`, the predicate the channel reader hands the question, so `flow` follows `set`, `create_channel`,
   `connect` and the like). Forms: rdkafka `send` of a `FutureRecord::to(topic)` or
   `BaseRecord::to(topic)` (the record is found from the argument, down its chain) and
   `subscribe(&[topics])`, on a client from `ClientConfig::new()`; lapin `basic_publish`,
@@ -201,8 +203,8 @@ modules updates it.
   queue is the last URL segment); async-nats `publish`, `subscribe`, `queue_subscribe`; redis
   `xadd` and the keys of `xread_options`, only with a `group` option. A polling or stream
   client's handler is the function that holds the call. The shared evaluation (`produce`,
-  `consume`, `topic`, `topics`, `publication`, `queue_name`) lives in `lang/mod.rs`, used by
-  the three packs. A `let mut` bound once keeps its call as `Facts::mutable`, read by
+  `consume`, `topic`, `topics`, `publication`, `queue_name`) lives in `channel/message.rs`, used by
+  the four readers. A `let mut` bound once keeps its call as `Facts::mutable`, read by
   `Code::mutable`, so a redis connection held by one is traced.
 - `lang/python.rs` yields `Kind::Method` for a function directly in a class body, keeps the first of
   two definitions of one name, spans a decorated definition with its decorators, and exports

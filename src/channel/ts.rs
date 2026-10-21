@@ -1,17 +1,15 @@
-//! The message libraries of the TypeScript and JavaScript pack (spec #20). A form is a method
-//! called on a client whose origin is the library's own factory, imported from the library's
-//! package: a `send` on anything else is no producer. The origin is the one question,
-//! `Code::origins` with `Follow::Constants`: only `const` bindings are followed, so a client
-//! passed in as a parameter or returned by a function has none (certain or absent). `factory`
-//! rebuilds the spelling each form table matches (`new Kafka().producer()`) from the origin's
-//! form, outside name and steps.
+//! The channel kind's TypeScript and JavaScript forms (spec #20): the message libraries of the
+//! pack. A form is a method called on a client whose origin is the library's own factory,
+//! imported from the library's package: a `send` on anything else is no producer. The origin is
+//! the one question, `Code::origins` with `Follow::Constants`: only `const` bindings are
+//! followed, so a client passed in as a parameter or returned by a function has none (certain or
+//! absent). `factory` rebuilds the spelling each form table matches (`new Kafka().producer()`)
+//! from the origin's form, outside name and steps.
 
 use std::collections::BTreeMap;
 
-use crate::lang::{
-    Handler, Message, Role, Value, bind, channel_name as name, literal, property, publish,
-    queue_name,
-};
+use super::message::{Handler, Message, Side, bind, channel_name as name, publish, queue_name};
+use crate::lang::{Value, literal, property};
 use crate::resolve::{Code, Expand, Expanded, Follow, Form, Of};
 
 const KAFKAJS: &str = "kafkajs";
@@ -77,6 +75,9 @@ fn factory<'a>(
 type Read<'a> = &'a dyn Fn(&[Value]) -> Option<Vec<Option<String>>>;
 
 pub(super) fn messages(code: &Code) -> Vec<Message> {
+    if !code.pack().extensions().contains(&"js") {
+        return Vec::new();
+    }
     let mut out = Vec::new();
     // kafkajs subscriptions, each with the consumer binding it is made on.
     let mut subscriptions = Vec::new();
@@ -127,7 +128,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                             name,
                             path: site.into(),
                             call: at,
-                            role: Role::Consumer(handler.clone()),
+                            role: Side::Consumer(handler.clone()),
                         })
                     },
                 )
@@ -240,7 +241,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 name,
                 path: site.into(),
                 call: at,
-                role: Role::Consumer(handler.clone()),
+                role: Side::Consumer(handler.clone()),
             }));
         }
     }
@@ -261,7 +262,7 @@ fn producers(broker: &'static str, found: Vec<Expanded<Vec<Option<String>>>>) ->
                     name,
                     path: site.into(),
                     call: at,
-                    role: Role::Producer,
+                    role: Side::Producer,
                 })
             },
         )
@@ -402,4 +403,53 @@ fn keys(args: &[Value]) -> Option<Vec<Option<String>>> {
 /// depends on a parameter, `Some(None)` when it is not a literal string.
 fn arg_name(args: &[Value], at: usize) -> Option<Option<String>> {
     args.get(at).map_or(Some(None), name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::LanguagePack;
+    use crate::lang::ts::TsJs;
+    use crate::resolve::Resolver;
+
+    /// The messages of the TypeScript file `src` as lines.
+    fn lines(src: &str) -> Vec<String> {
+        let facts = TsJs.parse("x.ts", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("x.ts", &facts)]);
+        let modules = TsJs.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &TsJs);
+        let code = Code::new(&resolver, &files, &TsJs);
+        crate::channel::message::lines(messages(&code))
+    }
+
+    #[test]
+    fn a_kafkajs_client_is_a_producer_or_a_consumer_by_its_method() {
+        let src = r#"import { Kafka } from 'kafkajs';
+const kafka = new Kafka({ brokers: [] });
+const producer = kafka.producer();
+const consumer = kafka.consumer({ groupId: 'g' });
+async function produce() {
+  await producer.send({ topic: 'orders.created', messages: [] });
+}
+async function consume(topic: string) {
+  await consumer.subscribe({ topic: 'orders.created' });
+  await consumer.subscribe({ topic });
+  await consumer.run({ eachMessage: async () => {} });
+}
+function other(p: Other) {
+  p.send({ topic: 'nope' });
+}
+"#;
+        // The `run` handler is the inline arrow, named by its offset: both subscriptions point
+        // at it.
+        let at = src.find("async () =>").unwrap();
+        assert_eq!(
+            lines(src),
+            [
+                "kafka orders.created producer".to_string(),
+                format!("kafka orders.created consumer inline x.ts::consume.@{at}"),
+                format!("kafka unresolved consumer inline x.ts::consume.@{at}"),
+            ]
+        );
+    }
 }

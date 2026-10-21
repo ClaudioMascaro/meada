@@ -40,7 +40,9 @@ one for the area a change touches.
   forms), `Code::outside` for what an import from outside binds a name to, and `Code::expand`
   for wrappers). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
-- `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs`: the
+- `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs` and its `channel/` submodules
+  (`channel/message.rs`: the message types and broker helpers; `channel/{ts,python,rust,go}.rs`:
+  the message libraries of each language): the
   `ContractKind` trait and the HTTP kind (`http.rs`: the contract and path rules, the mount
   machinery and the shared consumer readers; one submodule per language: `http/ts.rs` and
   `http/ts/clients.rs`, Express and Next.js route-file providers and `fetch` consumers;
@@ -179,7 +181,9 @@ one for the area a change touches.
 - New **contract kind**: implement `ContractKind` (`contract.rs`) and add it to `KINDS`, at the
   end: the order of the list is the order of the steps and of the output. Nothing in
   `engine.rs`, `items.rs`, `decisions.rs`, `trace.rs`, `entry.rs` or the extraction loop of
-  `index.rs` names a kind, and a kind's rule stays in its own file. Three questions are
+  `index.rs` names a kind, and a kind's rule stays in its own file, with the library forms it reads in each
+  language (one module per language: `http/<language>.rs`, `channel/<language>.rs`), never in
+  the pack. Three questions are
   required: `prefix`, `extract` (receives `Code`, never the syntax tree, and `Indexed`, what the
   index read of the repository besides: the manifests and tsconfigs, the exported rows and the
   files of every pack, which a kind reads when its contracts depend on what the manifests say;
@@ -227,9 +231,11 @@ one for the area a change touches.
   A step no function of the repository answers passes the receiver on; one only a name match
   found does when the chain starts at a constructor of an outside crate (whose method it then
   is), else the flow ends. Which methods pass the object on is listed per object, with its
-  constructors: `FRAMEWORKS` in `lang/rust/frameworks.rs` for the web frameworks and HTTP
-  clients (`passes`, and `frameworks::made`, which the HTTP kind reads), `LIBRARIES` in
-  `lang/rust/messages.rs` for the brokers. A kind reads a route off each call of the chain (`http/rust/axum.rs`, and `http/rust.rs`: actix-web
+  constructors: `FRAMEWORKS` in `http/rust/frameworks.rs` for the web frameworks and HTTP
+  clients (`passes_on`, and `frameworks::made`), `LIBRARIES` in `channel/rust.rs` for the
+  brokers. The tables live under the kinds, never in the pack: the kind hands the question its
+  predicate (`Follow::Values { passes }`, `passes_nothing` for a reader with no table) and the
+  filter reads it. A kind reads a route off each call of the chain (`http/rust/axum.rs`, and `http/rust.rs`: actix-web
   `App`, `web::scope`, `web::resource`, `.configure(f)` and Rocket's `build().mount(..)`, whose
   `routes![..]` the Rust pack reads as a list of the handlers' paths).
   `Code::returned` and `Code::constant` give a kind the values a call may return and a
@@ -286,7 +292,7 @@ one for the area a change touches.
   makes every read of a URL a hole when it holds two. `http.rs` `locate` and `link` map the
   head `Env` as for every language. The `xlang-go-*` fixtures are the cross-language chain: a
   repository of another language joins by one more `common::xlang_go` entry.
-- **Go channels** (spec #25, #82): `lang/go/messages.rs` lists each library (`LIBRARIES`: the
+- **Go channels** (spec #25, #82): `channel/go.rs` lists each library (`LIBRARIES`: the
   import path without its module's major version, `modfile::unversioned`, which the Go routers
   and clients use too, and the constructors that make its client)
   and reads a call when `Code::origins` with `Follow::Declarations` traces its receiver to one of them (the
@@ -366,8 +372,8 @@ one for the area a change touches.
   by `Engine::exports`) for a Cargo `path` that leaves its repository: it folds both locations
   as paths, never opening one, so a symlink changes nothing. A change to what is stored
   re-blesses `tests/golden/schema.txt`.
-- New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
-  `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`; Rust: `lang/rust/messages.rs`; Go: `lang/go/messages.rs`), matching a call's
+- New **message library** (spec #20, tickets after #45 and track B packs): a form in the
+  channel kind's module for that language (TS/JS: `channel/ts.rs`; Python: `channel/python.rs`; Rust: `channel/rust.rs`; Go: `channel/go.rs`), never in the pack, matching a call's
   method and the `Code::origins` of its receiver, asked with the policy its language needs (TS/JS:
   `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Python and Rust:
   `Values`, the constructors named by the file's imports), reading the name through `Code::expand` (a reader that
@@ -470,7 +476,10 @@ one for the area a change touches.
   live; `engine.rs` and `trace.rs` render through them.
 - New **language pack**: add it to `PACKS` in `lang/mod.rs`, a fixture
   `tests/fixtures/conformance-<language>/` and one `conform(...)` test in `tests/it/conformance.rs`.
-  A pack is done when that suite passes. A pack whose facts depend on its config files
+  A pack is done when that suite passes. A pack ships syntax and value evaluation only: no
+  table of libraries and no form of one. The forms of its web frameworks, HTTP clients and message
+  libraries are separate tickets, each a module of the pack's language in the kind that reads
+  them (`http/<language>.rs`, `channel/<language>.rs`). A pack whose facts depend on its config files
   (Rust's default features) also gives `settings` (a string per file path, stored as
   `files.setting` and `Facts::setting`) and takes it in `parse_with`; a file whose setting
   changed is parsed again, whatever its content. Besides `parse` and `modules`, it says what the
@@ -790,7 +799,7 @@ one for the area a change touches.
   the name in the whole function for constants (absence only: a router or path written outside
   the block after such a binding yields no provider; the receivers of the pack hold a name for a
   region, constants do not).
-- `lang/go/messages.rs` (spec #25, #82): a receiver that does not trace back to a library's
+- `channel/go.rs` (spec #25, #82): a receiver that does not trace back to a library's
   constructor or type makes no side (a type of the repository with a `Publish` or
   `WriteMessages` method is never one). A confluent `Produce` takes the topic from
   `TopicPartition.Topic` of the message literal written in the call or held by one name; a
@@ -907,7 +916,7 @@ one for the area a change touches.
 - `resolve.rs` (`Code::origins` with `Follow::Constants`): only `const` bindings with a plain name are followed; a client
   held by `let`, a class field, `this.x`, a destructuring or a parameter, or chained without a
   binding (`new Kafka().producer().send`), is not recognized (no marker).
-- `lang/ts/messages.rs`: a kafkajs handler passed through a wrapper's parameter is not followed
+- `channel/ts.rs`: a kafkajs handler passed through a wrapper's parameter is not followed
   (the function that subscribes handles); only the first `run` on a consumer binding counts. An
   amqplib `bindQueue` whose queue, exchange or pattern is not a literal is dropped.
   A BullMQ `Queue` is named by its own `new Queue(name)` binding: `new Queue(name).add(...)` with
@@ -915,7 +924,7 @@ one for the area a change touches.
   node-redis client made as `await createClient().connect()` is not traced (the `connect` chain
   has no binding); a BullMQ processor given as a file path is not followed (the function that
   makes the `Worker` handles).
-- `lang/python/messages.rs`: a client is traced to its constructor by `Code::origins` (a name its
+- `channel/python.rs`: a client is traced to its constructor by `Code::origins` (a name its
   scope binds once, an attribute assigned a call once, a parameter every exact caller passes, a
   value a function returns, or a call written in place: `boto3.client("sqs").send_message(...)`,
   `pika.BlockingConnection(p).channel().basic_publish(...)`), with one level of `channel()` or
@@ -928,7 +937,7 @@ one for the area a change touches.
   (`on_message_callback=handler`, `cb=self.on_job`); a lambda or anything else leaves the
   function that subscribes. The streams of an `xreadgroup` are read from a dict literal (or a
   constant folded to one); a dict built otherwise is an unresolved stream.
-- `lang/rust/messages.rs`: a client is recognized when its receiver traces back to the library's
+- `channel/rust.rs`: a client is recognized when its receiver traces back to the library's
   constructor (`Code::origins` with `Follow::Values`, then `Code::outside`, one constructor per `LIBRARIES`
   entry); a client held in a struct field, passed as `&mut con` to a parameter, or rebound by
   assignment is not followed. `lapin` `set_delegate` closures are not followed (the function
@@ -1281,7 +1290,7 @@ one for the area a change touches.
   `RequestBuilder::build` are not followed; a `Url::parse(..)?` or `join` URL is unknown.
   A value derived from a client (a response, a header map, a JSON value, the result of an
   extension trait's method) is no client: a method passes the object on only when the
-  object's entry lists it (`FRAMEWORKS` in `lang/rust/frameworks.rs`, the constructors named
+  object's entry lists it (`FRAMEWORKS` in `http/rust/frameworks.rs`, the constructors named
   exactly: what a name of the crate that is no listed constructor makes passes nothing), so a
   setter missing from the list ends the chain and its client (or its router, app, scope,
   resource or Rocket instance) is not read.

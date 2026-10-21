@@ -90,3 +90,10 @@ in the same change:
   seam's free functions (`programs`, `inherit`, `is_manifest`, `read_manifest`) and imports no
   ecosystem module. Neither names an ecosystem; an arm for one added to the shared code is a
   finding.
+- A language pack holds syntax and value evaluation, no library table and no library form. The
+  forms of the libraries a kind reads (web frameworks and HTTP clients, message brokers) live
+  under the kind, one module per language (`http/<language>.rs`, `channel/<language>.rs`); a
+  form may live in a submodule of that module (`http/rust/frameworks.rs`). A table or a form of
+  a library in a pack is a finding, and the kind owns it. The one exception is decided: the Rust
+  pack folds `Method::GET` constants at parse time (`METHOD_CRATES` and `VERBS`) and keeps them,
+  `VERBS` being the one pack constant a kind reads. A table anywhere else in a pack is a finding.

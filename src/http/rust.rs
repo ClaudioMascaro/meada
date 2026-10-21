@@ -17,8 +17,12 @@
 //! A handler is a node of its own: one a call names (as an argument, `routes![..]` included)
 //! is served only where a mount Meada reads puts it, and nowhere when it reads none. One no call
 //! names is served at its own path, with no prefix.
+//!
+//! The frameworks and clients are this module's table (`frameworks`). The one constant a kind
+//! reads from the Rust pack is `VERBS`, the verbs its parse-time fold of `Method::GET` knows.
 
 mod axum;
+pub(super) mod frameworks;
 
 use std::cell::{Cell, OnceCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -28,9 +32,10 @@ use super::{
     provider,
 };
 use crate::contract::{Found, Site};
-use crate::lang::rust::frameworks::{self, Made, VERBS};
+use crate::lang::rust::VERBS;
 use crate::lang::{Call, Class, Value};
 use crate::resolve::{Code, Follow, Of, Outside, scope_of};
+use frameworks::Made;
 
 /// How many values the expansions of `items` (constants, the functions a call answers) may add,
 /// over every call of the repository; past it a list is read no further.
@@ -224,9 +229,14 @@ impl<'c, 'a> Web<'c, 'a> {
     /// The places the value a method is called on may be: the apps, scopes, resources and
     /// Rocket instances the value flow reaches, and the service configuration it is.
     fn places(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Vec<Place<'a>> {
-        let origins = self
-            .code
-            .origins(path, scope, Of::Value(value), Follow::Values);
+        let origins = self.code.origins(
+            path,
+            scope,
+            Of::Value(value),
+            Follow::Values {
+                passes: frameworks::passes_on,
+            },
+        );
         let mut out: Vec<Place> = (origins.into_iter())
             .filter(|o| o.outside.as_ref().and_then(made_of).is_some())
             .filter_map(|o| o.call.map(Place::Made))
@@ -513,7 +523,14 @@ impl<'c, 'a> Web<'c, 'a> {
                 continue;
             }
             let (path, scope, arg) = item;
-            for origin in code.origins(path, scope, Of::Value(arg), Follow::Values) {
+            for origin in code.origins(
+                path,
+                scope,
+                Of::Value(arg),
+                Follow::Values {
+                    passes: frameworks::passes_on,
+                },
+            ) {
                 let made = origin.outside.as_ref().and_then(made_of);
                 let (true, Some(child)) = (
                     matches!(made, Some(Made::Scope | Made::Resource)),

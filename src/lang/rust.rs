@@ -12,17 +12,14 @@ use std::rc::Rc;
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Kind, LanguagePack,
-    Layout, Message, Modules, Param, Receiver, Star, children, named, text,
+    Layout, Modules, Param, Receiver, Star, children, named, text,
 };
-use crate::resolve::Code;
 use crate::{Result, qualify};
 
 mod builders;
 pub(crate) mod cfg;
 pub(crate) mod crates;
-pub(crate) mod frameworks;
 mod mentions;
-mod messages;
 mod values;
 
 use crates::{MOD, PATH, Tree};
@@ -54,6 +51,13 @@ const SELF: &str = "mod";
 const PATH_DEPTH: usize = 256;
 
 const MAIN: &str = "main";
+
+/// The HTTP methods the `Method` constants of the HTTP crates name, which an actix-web
+/// `web::method(Method::X)` may be given. The pack folds them at parse time (`values.rs`), and
+/// the HTTP kind's Rust reader reads the same list: the one pack constant a kind reads.
+pub(crate) const VERBS: &[&str] = &[
+    "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "CONNECT", "TRACE",
+];
 
 /// The attributes that register the function they sit on as a route, in actix-web and Rocket:
 /// `#[get("/x")]` and its kin, and actix-web's `#[route("/x", method = "GET")]`. The pack emits
@@ -114,13 +118,6 @@ impl LanguagePack for Rust {
         true
     }
 
-    fn passes(&self, origin: &str, method: &str) -> bool {
-        match frameworks::made(origin) {
-            Some(made) => frameworks::passes(made).contains(&method),
-            None => messages::passes(origin, method),
-        }
-    }
-
     fn modules(
         &self,
         configs: &[(&str, &[u8])],
@@ -144,10 +141,6 @@ impl LanguagePack for Rust {
             reaches: Some(Box::new(move |from, to| tree.reaches(from, to))),
             shared: Vec::new(),
         })
-    }
-
-    fn messages(&self, code: &Code) -> Vec<Message> {
-        messages::messages(code)
     }
 }
 

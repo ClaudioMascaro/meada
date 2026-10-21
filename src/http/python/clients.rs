@@ -3,29 +3,22 @@
 //! (`session.get(url)`); its HTTP method is its name or, for `request(method, url)`, its first
 //! argument. The client's `base_url=` is joined by the root's `based`, a wrapper is read at each
 //! of its call sites (`Code::expand`), and the URL and method are read by the root's `fetch`.
-//! The rows of `LIBRARIES` also list reqwest and ureq (spec #30), so the Rust pack's clients are
-//! read by the same rules (the Rust pack gives the receiver's value, so a receiver that is a
-//! call is read there). The receiver's client is found with `Code::origins` (`Follow::Values`:
-//! assignments, `with`, `self` attributes, arguments and return values), and a constructor is
-//! named by `Code::outside` read as a name (`by_path` false, also for the Rust rows), not by the
+//! The libraries read also include reqwest and ureq (spec #30), whose rows (modules and
+//! constructors) are the Rust HTTP module's (`http/rust/frameworks.rs`), so the Rust clients are
+//! read by the same rules (the Rust pack gives the receiver's value, so a receiver that is a call
+//! is read there). The receiver's client is found with `Code::origins` (`Follow::Values`: assignments, `with`,
+//! `self` attributes, arguments and return values), and a constructor is named by
+//! `Code::outside` read as a name (`by_path` false, also for the Rust rows), not by the
 //! `outside` an origin carries, which a Rust path call reads as a path.
 
-use super::super::{HTTP_METHODS, based, consumer, fetch};
+use super::super::rust::frameworks::{self, CLIENT_LIBRARIES};
+use super::super::{HTTP_METHODS, Library, based, consumer, fetch};
 use crate::contract::Found;
-use crate::lang::rust::frameworks::{REQWEST_CLIENTS, UREQ_AGENTS};
 use crate::lang::{Facts, Imported, Part, Value};
 use crate::resolve::{Code, Expand, Expanded, Follow, Of, Origin};
 
-/// An HTTP client library of Python or Rust, by what it names outside the repository.
-struct Library {
-    /// The modules whose functions send a request (`requests.get`, `reqwest.blocking.get`).
-    modules: &'static [&'static str],
-    /// What constructs a client, an object whose methods send requests. A Rust builder chain
-    /// (`Client::builder().build()?`) is the constructor that starts it.
-    clients: &'static [&'static str],
-}
-
-const LIBRARIES: &[Library] = &[
+/// The Python rows of the libraries read; the Rust rows are `CLIENT_LIBRARIES`.
+const PYTHON_LIBRARIES: &[Library] = &[
     Library {
         modules: &["requests"],
         clients: &["requests.Session"],
@@ -38,21 +31,17 @@ const LIBRARIES: &[Library] = &[
         modules: &[],
         clients: &["aiohttp.ClientSession"],
     },
-    Library {
-        modules: &["reqwest", "reqwest.blocking"],
-        clients: REQWEST_CLIENTS,
-    },
-    Library {
-        modules: &["ureq"],
-        clients: UREQ_AGENTS,
-    },
 ];
 
-/// Whether the file names a library of `LIBRARIES` outside the repository: Python imports its
-/// module, Rust uses a path under its crate or writes one with no `use`.
+/// Every library read, the Python rows first.
+fn libraries() -> impl Iterator<Item = &'static Library> {
+    PYTHON_LIBRARIES.iter().chain(CLIENT_LIBRARIES)
+}
+
+/// Whether the file names a library outside the repository: Python imports its module, Rust
+/// uses a path under its crate or writes one with no `use`.
 fn names_library(facts: &Facts) -> bool {
-    let roots = LIBRARIES
-        .iter()
+    let roots = libraries()
         .flat_map(|l| l.modules.iter().chain(l.clients))
         .filter_map(|n| n.split('.').next());
     let roots: Vec<&str> = roots.collect();
@@ -82,11 +71,7 @@ fn client_base<'a>(code: &Code<'a>, origins: Vec<Origin<'a>>) -> Option<Option<V
             continue;
         };
         let name = code.outside(at, &ctor.scope, &ctor.callee, false);
-        if !name.is_some_and(|n| {
-            LIBRARIES
-                .iter()
-                .any(|l| l.clients.contains(&n.spelled.as_str()))
-        }) {
+        if !name.is_some_and(|n| libraries().any(|l| l.clients.contains(&n.spelled.as_str()))) {
             continue;
         }
         let base = match ctor.keyword("base_url") {
@@ -122,7 +107,7 @@ pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
                 .flatten()
                 .and_then(|outside| {
                     let (module, function) = outside.spelled.rsplit_once('.')?;
-                    let library = LIBRARIES.iter().any(|l| l.modules.contains(&module));
+                    let library = libraries().any(|l| l.modules.contains(&module));
                     (library && sends(function)).then(|| (function.to_string(), None))
                 });
             let method =
@@ -133,11 +118,23 @@ pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
                     // A pack that gives the receiver's value reads a receiver that is a call;
                     // Python's is a name.
                     let origins = match code.receiver(path, n) {
-                        Some(value) => {
-                            code.origins(path, &call.scope, Of::Value(value), Follow::Values)
-                        }
+                        Some(value) => code.origins(
+                            path,
+                            &call.scope,
+                            Of::Value(value),
+                            Follow::Values {
+                                passes: frameworks::passes_on,
+                            },
+                        ),
                         None if receiver.starts_with('(') => continue,
-                        None => code.origins(path, &call.scope, Of::Name(receiver), Follow::Values),
+                        None => code.origins(
+                            path,
+                            &call.scope,
+                            Of::Name(receiver),
+                            Follow::Values {
+                                passes: frameworks::passes_on,
+                            },
+                        ),
                     };
                     match client_base(code, origins) {
                         Some(base) => (member.to_string(), base),

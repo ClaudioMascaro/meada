@@ -1,13 +1,14 @@
-//! The message libraries of the Python pack (spec #20, #73). A form is a method called on a
-//! client that traces back to the library's constructor (`Code::origins` with `Follow::Values`
-//! on the receiver), imported from the library's package: a `produce` on anything else is no
-//! producer. The constructor is named by `Code::imported`, the head of its callee, not by the
-//! `outside` an origin carries, which reads the whole name.
+//! The channel kind's Python forms (spec #20, #73): the message libraries of the Python pack. A
+//! form is a method called on a client that traces back to the library's constructor
+//! (`Code::origins` with `Follow::Values` on the receiver), imported from the library's package:
+//! a `produce` on anything else is no producer. The constructor is named by `Code::imported`, the
+//! head of its callee, not by the `outside` an origin carries, which reads the whole name.
 
-use crate::lang::{
-    Call, Handler, Message, Value, bind, channel_name as name, consume, literal, produce, publish,
-    queue_name, topic, topics,
+use super::message::{
+    Handler, Message, bind, channel_name as name, consume, produce, publish, queue_name, topic,
+    topics,
 };
+use crate::lang::{Call, Value, literal};
 use crate::resolve::{Code, Follow, Keywords, Of};
 
 const CONFLUENT_PRODUCER: &str = "confluent_kafka.Producer";
@@ -70,6 +71,9 @@ struct Maker<'a> {
 }
 
 pub(super) fn messages(code: &Code) -> Vec<Message> {
+    if !code.pack().extensions().contains(&"py") {
+        return Vec::new();
+    }
     let mut out = Vec::new();
     for (&path, facts) in code.files() {
         let kafka = facts.imports.iter().any(|i| i.source == "kafka");
@@ -187,7 +191,14 @@ fn receivers<'a>(code: &Code<'a>, path: &'a str, form: &'a Call, through: bool) 
             .collect()
     } else {
         (code
-            .origins(path, &form.scope, Of::Name(receiver), Follow::Values)
+            .origins(
+                path,
+                &form.scope,
+                Of::Name(receiver),
+                Follow::Values {
+                    passes: crate::resolve::passes_nothing,
+                },
+            )
             .iter())
         .filter_map(|o| o.call)
         .filter_map(|(at, i)| Some((at, code.call(at, i)?)))
@@ -292,5 +303,49 @@ fn streams(args: &[Value], kwargs: &Keywords) -> Option<Vec<Option<String>>> {
             .collect(),
         Value::Ref(_) => None,
         _ => Some(vec![None]),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::LanguagePack;
+    use crate::lang::python::Python;
+    use crate::resolve::Resolver;
+    use std::collections::BTreeMap;
+
+    /// The messages of the Python file `src` as lines.
+    fn lines(src: &str) -> Vec<String> {
+        let facts = Python.parse("x.py", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("x.py", &facts)]);
+        let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &Python);
+        let code = Code::new(&resolver, &files, &Python);
+        crate::channel::message::lines(messages(&code))
+    }
+
+    #[test]
+    fn a_nats_client_produces_and_consumes_with_its_handler() {
+        let src = r#"
+import os
+import nats
+
+async def on_message(msg):
+    pass
+
+async def run():
+    nc = await nats.connect("nats://nats:4222")
+    await nc.publish("orders.created", b"o")
+    await nc.publish(os.getenv("SUBJECT"), b"o")
+    await nc.subscribe("orders.created", cb=on_message)
+"#;
+        assert_eq!(
+            lines(src),
+            [
+                "nats orders.created producer",
+                "nats unresolved producer",
+                "nats orders.created consumer x.py::on_message"
+            ]
+        );
     }
 }
