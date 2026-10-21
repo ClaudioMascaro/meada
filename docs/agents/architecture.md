@@ -790,7 +790,7 @@ one for the area a change touches.
   the name in the whole function for constants (absence only: a router or path written outside
   the block after such a binding yields no provider; the receivers of the pack hold a name for a
   region, constants do not).
-- `lang/go/messages.rs` (spec #25, #82): a receiver that does not trace back to a library's
+- `channel/go.rs` (spec #25, #82): a receiver that does not trace back to a library's
   constructor or type makes no side (a type of the repository with a `Publish` or
   `WriteMessages` method is never one). A confluent `Produce` takes the topic from
   `TopicPartition.Topic` of the message literal written in the call or held by one name; a
