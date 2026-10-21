@@ -5604,8 +5604,13 @@ mod tests {
         (call.scope.as_str(), &call.args[0])
     }
 
-    /// The table the Rust readers pass the question: the frameworks and the brokers together.
-    const UNION: Passes = crate::lang::rust::passes;
+    /// The table the probes ask with, test-local as the kinds' tables are theirs: axum's builder
+    /// methods and actix-web's `service`; no other method hands an object back.
+    fn framework_table(origin: &str, method: &str) -> bool {
+        (origin.starts_with("axum.") && ["route", "nest", "layer"].contains(&method))
+            || (origin.starts_with("actix_web.") && method == "service")
+    }
+    const UNION: Passes = framework_table;
 
     /// The `Values` origins of the value written as the argument of `probe(..)` in `path`, asked
     /// with the table `passes`, as `origin_lines` shows them.

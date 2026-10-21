@@ -227,7 +227,7 @@ one for the area a change touches.
   A step no function of the repository answers passes the receiver on; one only a name match
   found does when the chain starts at a constructor of an outside crate (whose method it then
   is), else the flow ends. Which methods pass the object on is listed per object, with its
-  constructors: `FRAMEWORKS` in `lang/rust/frameworks.rs` for the web frameworks and HTTP
+  constructors: `FRAMEWORKS` in `http/rust/frameworks.rs` for the web frameworks and HTTP
   clients (`passes`, and `frameworks::made`, which the HTTP kind reads), `LIBRARIES` in
   `lang/rust/messages.rs` for the brokers. A kind reads a route off each call of the chain (`http/rust/axum.rs`, and `http/rust.rs`: actix-web
   `App`, `web::scope`, `web::resource`, `.configure(f)` and Rocket's `build().mount(..)`, whose
@@ -1281,7 +1281,7 @@ one for the area a change touches.
   `RequestBuilder::build` are not followed; a `Url::parse(..)?` or `join` URL is unknown.
   A value derived from a client (a response, a header map, a JSON value, the result of an
   extension trait's method) is no client: a method passes the object on only when the
-  object's entry lists it (`FRAMEWORKS` in `lang/rust/frameworks.rs`, the constructors named
+  object's entry lists it (`FRAMEWORKS` in `http/rust/frameworks.rs`, the constructors named
   exactly: what a name of the crate that is no listed constructor makes passes nothing), so a
   setter missing from the list ends the chain and its client (or its router, app, scope,
   resource or Rocket instance) is not read.
