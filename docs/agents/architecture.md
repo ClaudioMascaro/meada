@@ -895,6 +895,11 @@ one for the area a change touches.
 - `mcp.rs`: the stop signal drains for at most `DRAIN` (25 seconds, no flag, under Kubernetes'
   30-second default grace period); past it the connections left are dropped, an answer still
   waiting on an index lock included, and the exit is 0.
+- `render.rs`: a source file an answer reads (`render::source`, for `path:line` and a symbol's
+  source) is read only through plain relative parts of its path, through no symbolic link, as a
+  regular file of at most `SOURCE_MAX` (16 MiB); anything else renders as unavailable, the path
+  without its line, as a missing file does. An answer keeps each file it reads, so several
+  large files add up.
 - `engine.rs`: one connection attaches every peer, so a workspace reads at most 10 peers
   (`MAX_PEERS`, SQLite's attach limit). `search` scans every symbol.
 - `index.rs`: every contract is extracted again and every call resolved again on any change

@@ -1,7 +1,6 @@
 //! The query engine: opens a workspace from a directory and answers over its indexes.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
@@ -959,8 +958,7 @@ fn span_text(root: &Path, export: &Export, symbol: &Symbol) -> Option<(usize, Ve
         .iter()
         .find(|f| f.path == *path)
         .map(|f| &f.hash);
-    let text = fs::read(root.join(path))
-        .ok()
+    let text = render::source(root, path)
         .filter(|src| indexed.is_some_and(|h| blake3::hash(src).to_hex().as_str() == h.as_str()));
     let src = text?;
     let span = src.get(symbol.span.start as usize..symbol.span.end as usize)?;
