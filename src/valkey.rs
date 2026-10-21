@@ -385,8 +385,13 @@ mod tests {
     }
 
     async fn admin(url: &str) -> redis::aio::MultiplexedConnection {
+        // The defaults (1 s to connect, 500 ms per response) fail under load.
+        let config = redis::AsyncConnectionConfig::new()
+            .set_connection_timeout(Some(NETWORK_TIMEOUT))
+            .set_response_timeout(Some(NETWORK_TIMEOUT));
         let client = Client::open(url).unwrap();
-        client.get_multiplexed_async_connection().await.unwrap()
+        let connected = client.get_multiplexed_async_connection_with_config(&config);
+        (connected.await).unwrap_or_else(|e| panic!("the admin connection to {url}: {e}"))
     }
 
     /// A TLS handshake with a port that closes every connection fails with an error. In a build
