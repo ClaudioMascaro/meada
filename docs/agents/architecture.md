@@ -40,7 +40,7 @@ one for the area a change touches.
   forms), `Code::outside` for what an import from outside binds a name to, and `Code::expand`
   for wrappers). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
-- `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs`: the
+- `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs` and `channel/message.rs` (the message types and broker helpers): the
   `ContractKind` trait and the HTTP kind (`http.rs`: the contract and path rules, the mount
   machinery and the shared consumer readers; one submodule per language: `http/ts.rs` and
   `http/ts/clients.rs`, Express and Next.js route-file providers and `fetch` consumers;
@@ -367,7 +367,7 @@ one for the area a change touches.
   as paths, never opening one, so a symlink changes nothing. A change to what is stored
   re-blesses `tests/golden/schema.txt`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
-  `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`; Rust: `lang/rust/messages.rs`; Go: `lang/go/messages.rs`), matching a call's
+  message reader (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`; Rust: `lang/rust/messages.rs`; Go: `lang/go/messages.rs`), matching a call's
   method and the `Code::origins` of its receiver, asked with the policy its language needs (TS/JS:
   `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Python and Rust:
   `Values`, the constructors named by the file's imports), reading the name through `Code::expand` (a reader that

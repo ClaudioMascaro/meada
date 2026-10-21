@@ -1,7 +1,7 @@
 //! Channels (spec #20): the queues and topics of a broker, identified by
-//! `channel::<broker>::<name>`. Language packs report the producer and consumer calls of their
-//! message libraries (`LanguagePack::messages`); this kind turns them into contracts and links
-//! every consumer of a channel to every producer of it, in any repository of the workspace,
+//! `channel::<broker>::<name>`. This kind owns the forms of the message libraries of each
+//! language (a reader per pack under `lang`, each answering for its own pack only, as the HTTP
+//! kind's readers do) and turns the calls they find into contracts and links every consumer of a channel to every producer of it, in any repository of the workspace,
 //! its own included. Producers are the provider side: messages go from the producing call to
 //! the consumer's handler. A RabbitMQ publish to a named exchange is no channel's side by
 //! itself: the bindings of the workspace route it to queues (`Routes`).
@@ -12,10 +12,13 @@ use crate::contract::{ContractKind, Found, Level, Link, Related, Role, Site};
 use crate::document;
 use crate::entry::EntryKind;
 use crate::index::{self, Binding, Consumer, Export, Indexed, Provider, Publish};
-use crate::lang::{self, Handler};
+use crate::lang::{go, python, rust, ts};
 use crate::resolve::Code;
 use crate::shape::Shape;
 use crate::workspace::Repository;
+
+pub(crate) mod message;
+use message::{Handler, Message, Side};
 
 pub struct Channel;
 
@@ -83,7 +86,7 @@ fn pattern_matches(pattern: &str, key: &str) -> bool {
 }
 
 /// The call a message was made at.
-fn call(m: &lang::Message) -> Site {
+fn call(m: &Message) -> Site {
     Site::Call {
         path: m.path.clone(),
         index: m.call,
@@ -173,12 +176,21 @@ impl ContractKind for Channel {
     }
 
     fn extract(&self, code: &Code, _: &Indexed) -> Vec<Found> {
-        let messages = code.pack().messages(code);
+        // Each reader answers for its own pack only; the order is the order found.
+        let messages: Vec<Message> = [
+            ts::messages::messages(code),
+            python::messages::messages(code),
+            rust::messages::messages(code),
+            go::messages::messages(code),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
         // An inline handler is named after its broker kind and the channels it handles, in
         // the order found: `kafka orders.created`.
         let mut inline: HashMap<(&str, &str), (&str, Vec<&str>)> = HashMap::new();
         for m in &messages {
-            if let lang::Role::Consumer(Handler::Inline { path, def }) = &m.role {
+            if let Side::Consumer(Handler::Inline { path, def }) = &m.role {
                 let (_, names) = inline.entry((path, def)).or_insert((m.broker, Vec::new()));
                 if let Some(name) = m.name.as_deref().filter(|n| !names.contains(n)) {
                     names.push(name);
@@ -191,10 +203,10 @@ impl ContractKind for Channel {
                 let mut contract = Some(contract(m.broker, m.name.as_deref()));
                 let (mut via, mut method) = (None, None);
                 let (role, site) = match &m.role {
-                    lang::Role::Producer => (Role::Provider, call(m)),
+                    Side::Producer => (Role::Provider, call(m)),
                     // A publish whose routing key could not be evaluated is an unresolved
                     // producer.
-                    lang::Role::Publish { exchange } => match &m.name {
+                    Side::Publish { exchange } => match &m.name {
                         Some(key) => {
                             (contract, via, method) =
                                 (None, Some(exchange.clone()), Some(key.clone()));
@@ -202,18 +214,18 @@ impl ContractKind for Channel {
                         }
                         None => (Role::Provider, call(m)),
                     },
-                    lang::Role::Binding { exchange, pattern } => {
+                    Side::Binding { exchange, pattern } => {
                         (via, method) = (Some(exchange.clone()), Some(pattern.clone()));
                         (Role::Binding, call(m))
                     }
-                    lang::Role::Consumer(Handler::Def { path, name }) => (
+                    Side::Consumer(Handler::Def { path, name }) => (
                         Role::Consumer,
                         Site::Def {
                             path: path.clone(),
                             name: name.clone(),
                         },
                     ),
-                    lang::Role::Consumer(Handler::Inline { path, def }) => {
+                    Side::Consumer(Handler::Inline { path, def }) => {
                         let (broker, names) = &inline[&(path.as_str(), def.as_str())];
                         let name = std::iter::once(*broker).chain(names.iter().copied());
                         let name = name.collect::<Vec<_>>().join(" ");

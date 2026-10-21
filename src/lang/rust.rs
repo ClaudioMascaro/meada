@@ -12,9 +12,8 @@ use std::rc::Rc;
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Kind, LanguagePack,
-    Layout, Message, Modules, Param, Receiver, Star, children, named, text,
+    Layout, Modules, Param, Receiver, Star, children, named, text,
 };
-use crate::resolve::Code;
 use crate::{Result, qualify};
 
 mod builders;
@@ -22,7 +21,7 @@ pub(crate) mod cfg;
 pub(crate) mod crates;
 pub(crate) mod frameworks;
 mod mentions;
-mod messages;
+pub(crate) mod messages;
 mod values;
 
 use crates::{MOD, PATH, Tree};
@@ -148,10 +147,6 @@ impl LanguagePack for Rust {
             reaches: Some(Box::new(move |from, to| tree.reaches(from, to))),
             shared: Vec::new(),
         })
-    }
-
-    fn messages(&self, code: &Code) -> Vec<Message> {
-        messages::messages(code)
     }
 }
 

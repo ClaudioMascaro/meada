@@ -10,9 +10,10 @@
 //! Every client of these crates is polled or streamed, so the function that holds the call
 //! naming the topic or the queue handles what it receives.
 
-use crate::lang::{
-    Call, Message, Value, bind, channel_name as name, consume, produce, publish, queue_name, topics,
+use crate::channel::message::{
+    Message, bind, channel_name as name, consume, produce, publish, queue_name, topics,
 };
+use crate::lang::{Call, Value};
 use crate::resolve::{Code, Follow, Keywords, Of};
 
 /// How many calls of a builder chain (`Code::chain`) a form is read through:
@@ -130,7 +131,10 @@ pub(super) fn passes(origin: &str, method: &str) -> bool {
         .any(|l| l.made(origin) && (l.passes.contains(&method) || UNWRAPS.contains(&method)))
 }
 
-pub(super) fn messages(code: &Code) -> Vec<Message> {
+pub(crate) fn messages(code: &Code) -> Vec<Message> {
+    if !code.pack().extensions().contains(&"rs") {
+        return Vec::new();
+    }
     let mut out = Vec::new();
     for (&path, facts) in code.files() {
         for (n, call) in facts.calls.iter().enumerate() {
