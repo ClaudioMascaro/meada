@@ -1101,7 +1101,7 @@ pub fn index_workspace(manifest: &Path) -> Result<Vec<String>> {
 /// servable: its mirror is a checkout of the identity listed and its index opens read-only at
 /// the current schema version. Otherwise every problem, one per line, each index problem naming
 /// `meada index --workspace`. It only reads.
-pub(crate) fn served(manifest: &Path) -> Result<Manifest> {
+pub fn served(manifest: &Path) -> Result<Manifest> {
     let listed = Manifest::read(manifest)?;
     let shown = manifest.display().to_string();
     let problems: Vec<String> = (listed.entries.iter())

@@ -99,11 +99,18 @@ fn main() -> ExitCode {
                 _ => meada::mcp::serve(),
             }
         }
-        Command::Status { workspace } => match workspace {
-            Some(manifest) => engine::status_workspace(&manifest),
-            None => engine::status(here),
+        Command::Status {
+            workspace: Some(manifest),
+        } => engine::status_workspace(&manifest).map(|status| {
+            print!("{status}");
+            // A readiness probe (ADR 0011): the predicate `mcp --listen` checks before it binds.
+            if engine::served(&manifest).is_err() {
+                std::process::exit(1);
+            }
+        }),
+        Command::Status { workspace: None } => {
+            engine::status(here).map(|status| print!("{status}"))
         }
-        .map(|status| print!("{status}")),
         // Every repository's problem on its own line; the others are refreshed all the same.
         Command::Index {
             workspace: Some(manifest),

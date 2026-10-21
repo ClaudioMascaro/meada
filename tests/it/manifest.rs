@@ -193,7 +193,8 @@ fn status_reports_every_listed_repository_and_the_peers_the_manifest_leaves_out(
     );
 
     let (unindexed, stderr, ok) = run(&dir, "status");
-    assert!(ok, "{stderr}");
+    // Not servable (no index yet): the readiness probe fails, the text is the same.
+    assert!(!ok && stderr.is_empty(), "{stderr}");
     assert_eq!(
         unindexed,
         "example.com/chain/gateway (../chain-gateway) not indexed\n\
@@ -280,7 +281,8 @@ fn each_unservable_entry_is_refused_and_the_others_are_still_indexed() {
     assert!(!dir.join("bare.git/.meada").exists());
 
     let (status, _, ok) = run(&dir, "status");
-    assert!(ok);
+    // A listed repository that is not an identity cannot be served: exit 1.
+    assert!(!ok);
     assert!(
         status.starts_with(
             "example.com/chain/web (../chain-web) indexed, 5 files\n\
@@ -611,4 +613,22 @@ fn each_mirrors_decisions_are_replayed_and_the_stale_ones_reported() {
     decisions(&web, "chain-web-unfit");
     let (status, _, _) = run(&dir, "status");
     assert!(status.contains("\n  stale decision: "), "{status}");
+}
+
+/// `status --workspace` as a readiness probe: 0 when every repository is servable, 1 when one
+/// is not (here the gateway's index is missing), whatever the text says. Without `--workspace`
+/// the exit code is what it was.
+#[test]
+fn status_exits_zero_only_when_every_repository_can_be_served() {
+    let dir = chain_manifest("manifest_status_probe");
+    assert!(run(&dir, "index").2);
+    let (all, _, ok) = run(&dir, "status");
+    assert!(ok);
+    let gateway = dir.join("indexes/example.com/chain/gateway/index.db");
+    fs::remove_file(&gateway).unwrap();
+    let (some, stderr, ok) = run(&dir, "status");
+    assert!(!ok && stderr.is_empty(), "{stderr}");
+    assert_ne!(some, all);
+    assert!(some.contains("example.com/chain/gateway (../chain-gateway) not indexed\n"));
+    assert!(some.contains("example.com/chain/web (../chain-web) indexed, "));
 }

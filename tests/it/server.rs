@@ -383,8 +383,16 @@ fn refuses_to_start_listing_every_repository_that_cannot_be_served() {
             .expect("meada runs");
         (String::from_utf8(out.stderr).unwrap(), out.status.code())
     };
-    let (stderr, code) = start(&["mcp", "--listen", "127.0.0.1:0", "--workspace", MANIFEST]);
+    // Nothing listens while the checks fail: the port is free before and after.
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let at = format!("127.0.0.1:{port}");
+    let (stderr, code) = start(&["mcp", "--listen", &at, "--workspace", MANIFEST]);
     assert_eq!(code, Some(1));
+    assert!(std::net::TcpStream::connect(&at).is_err());
     let fix = "not indexed; run meada index --workspace ops/meada.workspace.toml";
     assert_eq!(
         stderr,

@@ -48,7 +48,7 @@ one for the area a change touches.
   roots, and in server mode streamable HTTP (`meada mcp --listen`, stateless, JSON responses on
   a hyper listener), one endpoint per repository of the manifest at `/<identity>`, a 404
   listing the identities served elsewhere (it answers before the `Origin` check, which refuses
-  any request carrying one with 403; no `Host` check). `listen` installs the SIGINT and SIGTERM
+  any request carrying one with 403; no `Host` check). `listen` runs every start check (`engine::served`, the predicate `status --workspace` exits on) before it binds, so an open port means indexes present, then installs the SIGINT and SIGTERM
   handlers before it prints the address, then on a signal drops the listener and lets each
   connection finish its answer in flight (`graceful_shutdown`) before it returns, so the process
   exits 0; the rmcp `cancellation_token` is left alone, since cancelling it ends calls in
