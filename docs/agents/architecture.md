@@ -913,7 +913,7 @@ one for the area a change touches.
   across the workspace), and an exchange's type is not read: every binding pattern follows
   topic-exchange rules.
 - `package.rs`: a manifest never fails indexing, so its reader has fixed limits. `MAX_BYTES`
-  (1 MiB; a larger file reads as empty, but is read whole first, as code and documents are) and
+  (1 MiB, in `lang/mod.rs` beside the packs that read their configs by it; a larger file reads as empty, but is read whole first, as code and documents are) and
   `MAX_NAME` (214 bytes; a longer name is no package). A range is stored as written, with no
   length limit beyond `MAX_BYTES`; `flag` checks only one of at most `MAX_RANGE` (256 bytes) and
   calls a longer one `range unchecked`. PyPI (`package/pypi.rs`, spec #24): `MAX_NAME` and

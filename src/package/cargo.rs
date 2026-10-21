@@ -29,7 +29,7 @@ use super::{
 };
 use crate::index::Export;
 use crate::lang::rust::crates::{crate_name, entries, lib_name, lib_root, workspace_deps};
-use crate::repo::normalize_remote;
+use crate::repo::{normalize_remote, relative};
 
 /// The field a `[workspace.dependencies]` entry is kept under, in `Summary::workspace`.
 const WORKSPACE: &str = "workspace.dependencies";
@@ -150,32 +150,12 @@ fn source(dir: &str, spec: &toml::Value) -> Option<Option<String>> {
     })
 }
 
-/// `rel` joined to the directory `dir`, `.` and `..` folded without touching the file system: a
-/// path of the repository, or one that starts with `..` segments when it leaves it. `None` when
-/// `rel` is absolute.
-pub(crate) fn relative(dir: &str, rel: &str) -> Option<String> {
-    if rel.starts_with('/') || rel.contains('\\') {
-        return None;
-    }
-    let mut parts: Vec<&str> = dir.split('/').filter(|p| !p.is_empty()).collect();
-    for part in rel.split('/') {
-        match part {
-            "" | "." => {}
-            ".." if parts.last().is_some_and(|p| *p != "..") => {
-                parts.pop();
-            }
-            part => parts.push(part),
-        }
-    }
-    Some(parts.join("/"))
-}
-
 /// Fills each `workspace = true` entry of a Cargo manifest from the `[workspace.dependencies]`
 /// of the nearest manifest above it (or itself) that has any, and `version.workspace = true`
 /// from that manifest's `[workspace.package] version`; an entry that finds no entry of its key
 /// is dropped, as Cargo refuses it. The member keeps its own table (`dev-dependencies`...) and
 /// key, so a workspace entry that renames a crate renames it for the member too.
-pub fn inherit(manifests: &mut [Manifest]) {
+fn inherit(manifests: &mut [Manifest]) {
     type Root = (String, HashMap<String, Entry>, Option<String>);
     let roots: Vec<Root> = (manifests.iter())
         .filter(|m| m.path.ends_with("Cargo.toml"))
@@ -315,6 +295,10 @@ impl Ecosystem for Cargo {
 
     fn sources(&self) -> &'static [&'static str] {
         &["rs"]
+    }
+
+    fn inherit(&self, manifests: &mut [Manifest]) {
+        inherit(manifests);
     }
 
     fn names_package(&self, specifier: &str) -> bool {

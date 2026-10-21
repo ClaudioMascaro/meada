@@ -22,7 +22,7 @@ use crate::{channel, http};
 
 /// The largest document read; a larger one is unreadable. The largest public single-file
 /// descriptions are 10 to 15 MB (GitHub's REST API, Stripe's SDK spec), far past the manifests'
-/// `package::MAX_BYTES`.
+/// `lang::MAX_BYTES`.
 // ponytail: a flat 16 MiB, parsed whole in memory; a streaming reader that keeps only the
 // paths, servers and channels lifts it.
 pub(crate) const MAX_BYTES: usize = 16 << 20;

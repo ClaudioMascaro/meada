@@ -27,15 +27,15 @@ use serde_json::Value;
 use crate::contract::{ContractKind, Found, Hit, Level, Link, Role, Search, Site};
 use crate::entry;
 use crate::index::{self, CallSite, Consumer, Export, Provider};
-use crate::lang::python;
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
+use crate::lang::{MAX_BYTES, python};
 use crate::literals::Literals;
 use crate::render::{Files, label, rank, section};
 use crate::resolve::{Code, Exported};
 use crate::shape::{self, Shape, Want};
 use crate::workspace::Repository;
 
-pub mod cargo;
+mod cargo;
 mod go;
 mod npm;
 mod pypi;
@@ -191,6 +191,15 @@ trait Ecosystem {
     fn shapes(&self) -> bool {
         false
     }
+
+    /// The program entry points its manifests declare, as `(file, function)`, given the files
+    /// of the repository: none.
+    fn programs(&self, _manifests: &[Manifest], _files: &[&str]) -> Vec<(String, String)> {
+        Vec::new()
+    }
+
+    /// Fills what a member manifest of `manifests` inherits from a parent one: nothing.
+    fn inherit(&self, _manifests: &mut [Manifest]) {}
 }
 
 /// Every ecosystem, in the order `of` and `of_contract` search.
@@ -208,6 +217,37 @@ fn of(path: &str) -> Option<&'static dyn Ecosystem> {
 fn of_source(path: &str) -> Option<&'static dyn Ecosystem> {
     let (_, extension) = path.rsplit_once('.')?;
     (ECOSYSTEMS.iter().copied()).find(|e| e.sources().contains(&extension))
+}
+
+/// The program entry points the manifests of every ecosystem declare (`Ecosystem::programs`),
+/// sorted, without repeats, for the index writer.
+pub fn programs(manifests: &[Manifest], files: &[&str]) -> Vec<(String, String)> {
+    programs_of(ECOSYSTEMS, manifests, files)
+}
+
+fn programs_of(
+    list: &[&dyn Ecosystem],
+    manifests: &[Manifest],
+    files: &[&str],
+) -> Vec<(String, String)> {
+    let mut found: Vec<_> = (list.iter())
+        .flat_map(|e| e.programs(manifests, files))
+        .collect();
+    found.sort();
+    found.dedup();
+    found
+}
+
+/// Lets every ecosystem fill what its member manifests inherit (`Ecosystem::inherit`), in the
+/// order of the list, for the index writer.
+pub fn inherit(manifests: &mut [Manifest]) {
+    inherit_of(ECOSYSTEMS, manifests);
+}
+
+fn inherit_of(list: &[&dyn Ecosystem], manifests: &mut [Manifest]) {
+    for e in list {
+        e.inherit(manifests);
+    }
 }
 
 /// The ecosystem of a package contract identifier, by its prefix.
@@ -247,12 +287,6 @@ pub fn read_manifest(path: &str, src: &[u8]) -> Summary {
 /// The longest package name read, in bytes; a longer one makes no provider.
 // ponytail: npm's own limit, for PyPI names too; a name past it is not a package.
 const MAX_NAME: usize = 214;
-
-/// The largest manifest read (`package.json`, `pyproject.toml`, `requirements*.txt`) and the
-/// largest `tsconfig.json`; a larger one counts as empty. Real manifests are a few kilobytes,
-/// and the stored summary and the export stay proportional to what is read.
-// ponytail: a flat 1 MiB; a streaming reader that keeps only the dependency tables lifts it.
-pub(crate) const MAX_BYTES: usize = 1 << 20;
 
 /// The dependency fields of a manifest that `read` collects.
 const FIELDS: [&str; 4] = [
@@ -758,12 +792,6 @@ fn ways(manifest: &Manifest, subpath: &str) -> Vec<(How, Vec<String>)> {
             Some((how, vec![inside(dir, t.strip_prefix("./").unwrap_or(t))?]))
         })
         .collect()
-}
-
-/// The program entry points the console scripts of the PyPI manifests name (`pypi::programs`),
-/// for the index writer.
-pub fn python_programs(manifests: &[Manifest], files: &[&str]) -> Vec<(String, String)> {
-    pypi::programs(manifests, files)
 }
 
 /// `path`, relative to the package directory `dir`, as a path of the repository; `None` when
@@ -2408,6 +2436,101 @@ mod tests {
     /// The name of the ecosystem the seam answers, for comparing answers.
     fn named(e: Option<&dyn Ecosystem>) -> Option<&'static str> {
         e.map(|e| e.name())
+    }
+
+    /// A stand-in adapter: `programs` answers `scripts`, `inherit` appends its name to the
+    /// path of the first manifest, so the order the seam runs the adapters in is observable.
+    struct Stand(&'static str, &'static [(&'static str, &'static str)]);
+
+    impl Ecosystem for Stand {
+        fn name(&self) -> &'static str {
+            self.0
+        }
+        fn is_manifest(&self, _file_name: &str) -> bool {
+            false
+        }
+        fn read(&self, _path: &str, _src: &[u8]) -> Summary {
+            Summary::default()
+        }
+        fn sources(&self) -> &'static [&'static str] {
+            &[]
+        }
+        fn names_package(&self, _specifier: &str) -> bool {
+            false
+        }
+        fn entries<'e>(
+            &self,
+            _exports: &'e [Export],
+            _providers: &Providers,
+            _from: (usize, &str),
+            _specifier: &str,
+        ) -> Vec<(&'e Entry, String)> {
+            Vec::new()
+        }
+        fn programs(&self, _manifests: &[Manifest], _files: &[&str]) -> Vec<(String, String)> {
+            (self.1.iter())
+                .map(|(file, def)| (file.to_string(), def.to_string()))
+                .collect()
+        }
+        fn inherit(&self, manifests: &mut [Manifest]) {
+            manifests[0].path.push_str(self.0);
+        }
+    }
+
+    fn read_at(path: &str, src: &str) -> Manifest {
+        Manifest {
+            path: path.to_string(),
+            summary: read_manifest(path, src.as_bytes()),
+        }
+    }
+
+    #[test]
+    fn the_programs_of_every_adapter_come_sorted_without_repeats() {
+        let first = Stand("a", &[("z.py", "main"), ("b.py", "run")]);
+        let second = Stand("b", &[("b.py", "run"), ("a.py", "go")]);
+        let found = programs_of(&[&first, &second], &[], &[]);
+        let pair = |f: &str, d: &str| (f.to_string(), d.to_string());
+        assert_eq!(
+            found,
+            [
+                pair("a.py", "go"),
+                pair("b.py", "run"),
+                pair("z.py", "main")
+            ]
+        );
+        // The ecosystems with no console scripts add none.
+        assert!(programs(&[], &[]).is_empty());
+    }
+
+    #[test]
+    fn the_adapters_inherit_in_list_order() {
+        let mut manifests = vec![read_at("package.json", "{}")];
+        inherit_of(
+            &[&Stand("1", &[]), &Stand("2", &[]), &Stand("3", &[])],
+            &mut manifests,
+        );
+        assert_eq!(manifests[0].path, "package.json123");
+    }
+
+    #[test]
+    fn cargo_inherits_through_the_seam_among_manifests_of_other_ecosystems() {
+        let mut manifests = vec![
+            read_at("pyproject.toml", "[project]\nname = \"p\"\n"),
+            read_at(
+                "Cargo.toml",
+                "[workspace]\nmembers = [\"m\"]\n[workspace.package]\nversion = \"3.1.0\"\n",
+            ),
+            read_at(
+                "m/Cargo.toml",
+                "[package]\nname = \"m\"\nversion.workspace = true\n",
+            ),
+            read_at("web/package.json", r#"{"name": "web"}"#),
+        ];
+        inherit(&mut manifests);
+        let versions: Vec<_> = (manifests.iter())
+            .map(|m| m.summary.version.as_deref())
+            .collect();
+        assert_eq!(versions, [None, None, Some("3.1.0"), None]);
     }
 
     #[test]

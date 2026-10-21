@@ -269,12 +269,12 @@ pub fn join(dir: &str, rel: &str) -> Option<String> {
 }
 
 /// Every `Cargo.toml` among `configs` that parses, by directory. One past
-/// `package::MAX_BYTES` is invalid, as `package::cargo::read` takes it: the index reads a config
+/// `lang::MAX_BYTES` is invalid, as `package::cargo::read` takes it: the index reads a config
 /// only up to one byte past that size.
 fn tables<'c>(configs: &[(&'c str, &'c [u8])]) -> Vec<(&'c str, toml::Table)> {
     let mut tables: Vec<(&str, toml::Table)> = configs
         .iter()
-        .filter(|(_, src)| src.len() <= crate::package::MAX_BYTES)
+        .filter(|(_, src)| src.len() <= crate::lang::MAX_BYTES)
         .filter_map(|(path, src)| {
             let dir = path.strip_suffix("Cargo.toml")?;
             let dir = dir.strip_suffix('/').unwrap_or(dir);
@@ -498,16 +498,13 @@ mod tests {
         let facts = Facts::default();
         let files = BTreeMap::from([("a/src/lib.rs", &facts), ("b/src/lib.rs", &facts)]);
         let head = "[package]\nname = \"a\"\n#";
-        let at = format!(
-            "{head}{}",
-            " ".repeat(crate::package::MAX_BYTES - head.len())
-        );
+        let at = format!("{head}{}", " ".repeat(crate::lang::MAX_BYTES - head.len()));
         // What the index hands over for a larger file: its first `MAX_BYTES + 1` bytes.
         let past = format!(
             "[package]\nname = \"b\"\n{}",
-            "#".repeat(crate::package::MAX_BYTES)
+            "#".repeat(crate::lang::MAX_BYTES)
         );
-        let past = &past.as_bytes()[..crate::package::MAX_BYTES + 1];
+        let past = &past.as_bytes()[..crate::lang::MAX_BYTES + 1];
         let configs: [(&str, &[u8]); 2] = [("a/Cargo.toml", at.as_bytes()), ("b/Cargo.toml", past)];
         let found: Vec<String> = (roots(&tables(&configs), &files).into_iter())
             .map(|(file, _, _)| file)
