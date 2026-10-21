@@ -20,7 +20,6 @@ mod builders;
 pub(crate) mod cfg;
 pub(crate) mod crates;
 mod mentions;
-pub(crate) mod messages;
 mod values;
 
 use crates::{MOD, PATH, Tree};
