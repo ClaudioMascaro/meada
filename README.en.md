@@ -174,7 +174,8 @@ refused.
   `:port` or `port`; the host is an IP literal or `localhost`, never resolved, and the default
   is loopback. The first stderr line is `listening on http://<host>:<port>`. SIGINT or SIGTERM
   stop the server: it stops accepting connections, lets the answers in flight finish and exits
-  with code 0.
+  with code 0. The wait is bounded at 25 seconds, under Kubernetes' default 30-second grace
+  period: past the bound the remaining connections are dropped and the exit is still 0.
 - Each repository is one endpoint, `http://<host>:<port>/<identity>` (for example
   `http://meada.internal:7333/github.com/acme/web`); a client configures one URL per repository
   it works on. Any other path answers 404 with the identities served.
@@ -189,6 +190,50 @@ refused.
 - `meada status --workspace <manifest>` shows each index's state, and
   `meada export --workspace <manifest> --repo <identity>` prints one repository's index, for
   instance to feed a knowledge base.
+
+### Several nodes
+
+Several servers over the same indexes work with no cloud module, provided the operator keeps
+to one writer per index.
+
+- **Layout A, each node indexes its own mirrors.** Each node has a local `index_dir` and runs
+  `meada index --workspace` over the mirrors it fetches. It is the simplest, but nodes drift:
+  each sees the commit it fetched, and two calls to the same endpoint may answer differently
+  until every node has fetched.
+- **Layout B, one job builds and nodes receive.** One job fetches the mirrors and indexes all
+  of them at one commit; nodes receive the finished mirrors and indexes and swap them in by
+  `rename`. A rebuild uses the same swap (`index.db.new.<pid>` under `index.db.lock`, renamed
+  over `index.db`), so a reader sees the old index or the whole new one. Rename an index in
+  only while no `meada index` writes it: the live `index.db-journal` of an in-place refresh
+  would be taken as the new file's journal.
+- **Unsupported: `index_dir` on a network filesystem (NFS, EFS) shared by a writer and
+  readers.** SQLite is not reliable over a network (see
+  [sqlite.org/useovernet.html](https://sqlite.org/useovernet.html)). Give each node a local
+  `index_dir`, or a volume only it writes.
+- **Read-only.** `index_dir` and the mirrors may be read-only (a volume filled by an init step,
+  an image layer): the server creates nothing there. A mirror owned by another user is trusted
+  through `-c safe.directory`, for the manifest's mirrors only, which needs git 2.38 or later;
+  Ubuntu 22.04 and RHEL 8 ship an older git, so set `safe.directory` in the system config there.
+- **No session.** The transport is stateless: no sticky sessions are needed, and clients on
+  protocol 2026-07-28 have no session at all.
+- **Reverse proxy.** Forward `MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name` and every
+  `Mcp-Param-*` header unchanged (SEP-2243: rmcp rejects a request whose headers disagree with
+  its body); the proxy may route on them. Forward `Mcp-Session-Id` for legacy clients and the
+  `Meada-Generation` response header. Add no `Origin` header: Meada answers 403 to any request
+  that carries one, so a browser page cannot call it directly. Meada checks no `Host`, and
+  `--listen` takes an IP literal or `localhost`, never a name it resolves.
+- **Readiness.** An init step first (`meada index --workspace` or the copy of the indexes). Then
+  a TCP probe, or `meada status --workspace <manifest>` as an exec probe: it exits 0 when every
+  repository can be served and 1 otherwise, waits at most 50 ms on a commit in progress and
+  counts a locked index as ready. `--listen` binds only after its start checks, so an open port
+  means the indexes are present. The 404 at `/` lists identities and is not a health check.
+- **Single writer.** Run the indexing job with no overlap (for example a CronJob with
+  `concurrencyPolicy: Forbid`). Set `terminationGracePeriodSeconds` above the 25 s SIGTERM drain
+  bound, and a `preStop` delay matched to the load balancer's deregistration.
+
+### Cloud modules
+
+Opt-in modules, off by default; each is documented below when it lands.
 
 ## Decisions
 

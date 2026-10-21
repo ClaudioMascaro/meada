@@ -180,7 +180,9 @@ Un espejo es un checkout con árbol de trabajo; un clon bare no tiene qué index
   `host:puerto`, `:puerto` o `puerto`; el host es una IP o `localhost`, nunca resuelto, y el
   valor por defecto es el loopback. La primera línea de stderr es
   `listening on http://<host>:<puerto>`. SIGINT o SIGTERM detienen el servidor: deja de aceptar
-  conexiones, termina las respuestas en curso y sale con código 0.
+  conexiones, termina las respuestas en curso y sale con código 0. La espera tiene un límite fijo de 25
+  segundos, por debajo de los 30 s de gracia por defecto de Kubernetes: pasado el límite, las
+  conexiones restantes se descartan y la salida sigue siendo 0.
 - Cada repositorio es un endpoint, `http://<host>:<puerto>/<identidad>` (por ejemplo
   `http://meada.internal:7333/github.com/acme/web`); el cliente configura una URL por
   repositorio en que trabaja. Cualquier otra ruta responde 404 con las identidades servidas.
@@ -195,6 +197,53 @@ Un espejo es un checkout con árbol de trabajo; un clon bare no tiene qué index
 - `meada status --workspace <manifiesto>` muestra el estado de cada índice, y
   `meada export --workspace <manifiesto> --repo <identidad>` imprime el índice de un
   repositorio, por ejemplo para alimentar una base de conocimiento.
+
+### Varios nodos
+
+Varios servidores sobre los mismos índices funcionan sin módulo de nube, siempre que el
+operador respete un único escritor por índice.
+
+- **Layout A, cada nodo indexa sus propios espejos.** Cada nodo tiene un `index_dir` local y
+  ejecuta `meada index --workspace` sobre los espejos que obtiene. Es lo más simple, pero los
+  nodos divergen: cada uno ve el commit que obtuvo, y dos llamadas al mismo endpoint pueden
+  responder distinto hasta que todos obtengan.
+- **Layout B, un job construye y los nodos reciben.** Un job obtiene los espejos e indexa todo
+  en un único commit; los nodos reciben los espejos e índices terminados y los cambian por
+  `rename`. La reconstrucción usa el mismo cambio (`index.db.new.<pid>` bajo `index.db.lock`,
+  renombrado sobre `index.db`), así que un lector ve el índice antiguo o el nuevo completo.
+  Cambie un índice por `rename` solo mientras ningún `meada index` lo escribe: el
+  `index.db-journal` vivo de un refresh in situ se tomaría como journal del archivo nuevo.
+- **Sin soporte: `index_dir` en un sistema de archivos de red (NFS, EFS) compartido por un
+  escritor y lectores.** SQLite no es fiable sobre la red (vea
+  [sqlite.org/useovernet.html](https://sqlite.org/useovernet.html)). Dé a cada nodo un
+  `index_dir` local, o un volumen que solo él escribe.
+- **Solo lectura.** `index_dir` y los espejos pueden ser de solo lectura (un volumen llenado por
+  un init, una capa de imagen): el servidor no crea nada allí. Un espejo de otro usuario se
+  acepta con `-c safe.directory`, solo para los espejos del manifiesto, lo que exige git 2.38 o
+  posterior; Ubuntu 22.04 y RHEL 8 traen un git más antiguo, así que defina `safe.directory` en
+  la configuración del sistema.
+- **Sin sesión.** El transporte es sin estado: no hacen falta sesiones pegajosas (sticky
+  sessions), y los clientes en el protocolo 2026-07-28 ni siquiera tienen sesión.
+- **Proxy inverso.** Reenvíe sin cambios `MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name` y todo
+  encabezado `Mcp-Param-*` (SEP-2243: rmcp rechaza una petición cuyos encabezados discrepan del
+  cuerpo); el proxy puede enrutar por ellos. Reenvíe `Mcp-Session-Id` para clientes antiguos y
+  el encabezado de respuesta `Meada-Generation`. No añada `Origin`: Meada responde 403 a toda
+  petición que lo lleve, así una página de navegador no puede llamarlo directamente. Meada no
+  comprueba `Host`, y `--listen` acepta una IP o `localhost`, nunca un nombre que resuelva.
+- **Disponibilidad.** Primero un paso de init (`meada index --workspace` o la copia de los
+  índices). Luego una sonda TCP, o `meada status --workspace <manifiesto>` como sonda exec: sale
+  con 0 cuando todo repositorio puede servirse y con 1 en caso contrario, espera como máximo
+  50 ms por un commit en curso y cuenta un índice bloqueado como listo. `--listen` abre el
+  puerto solo tras las comprobaciones de inicio, así que un puerto abierto indica índices
+  presentes. El 404 en `/` lista identidades y no es un health check.
+- **Escritor único.** Ejecute el job de indexación sin solapamiento (por ejemplo un CronJob con
+  `concurrencyPolicy: Forbid`). Defina `terminationGracePeriodSeconds` por encima del límite de
+  25 s del SIGTERM y un retraso de `preStop` igual al tiempo que el balanceador tarda en
+  retirar el nodo.
+
+### Módulos de nube
+
+Módulos opt-in, desactivados por defecto; cada uno se documenta abajo cuando llegue.
 
 ## Decisiones
 

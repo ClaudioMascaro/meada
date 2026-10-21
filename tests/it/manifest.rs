@@ -740,6 +740,9 @@ fn a_mirror_owned_by_another_user_is_trusted_in_server_mode() {
             .args(args)
             .env("LANG", "en_US.UTF-8")
             .env("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
+            // A runner's own `safe.directory` (even `*`) must not trust the mirror.
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
             .output()
             .expect("meada runs");
         (
@@ -749,15 +752,21 @@ fn a_mirror_owned_by_another_user_is_trusted_in_server_mode() {
     };
     let mirror = dir.join("chain-web");
 
-    // Without the option, git refuses.
+    // Without the option, git refuses; a git that does not (older than 2.38, or one that
+    // ignores the variable) cannot be tested here.
     let refused = Command::new("git")
         .arg("-C")
         .arg(&mirror)
         .args(["rev-parse", "--show-toplevel"])
         .env("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
         .output()
         .unwrap();
-    assert!(!refused.status.success());
+    if refused.status.success() {
+        eprintln!("skipped: this git does not refuse a mirror owned by another user");
+        return;
+    }
 
     let (code, stderr) = owned(&dir, &["status", "--workspace", MANIFEST]);
     assert_eq!((code, stderr.as_str()), (Some(0), ""));
@@ -769,6 +778,8 @@ fn a_mirror_owned_by_another_user_is_trusted_in_server_mode() {
         .current_dir(&dir)
         .args(["mcp", "--listen", "127.0.0.1:0", "--workspace", MANIFEST])
         .env("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::piped())
         .spawn()
@@ -787,6 +798,8 @@ fn a_mirror_owned_by_another_user_is_trusted_in_server_mode() {
         .arg("status")
         .env("LANG", "en_US.UTF-8")
         .env("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
         .output()
         .expect("meada runs");
     let shown = String::from_utf8_lossy(&local.stdout);
