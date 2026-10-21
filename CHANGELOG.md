@@ -42,15 +42,25 @@ All notable changes to Meada are recorded here. The format follows
   `.git/hooks`, and swaps the node's pointer file (`<local_dir>/current`, `<generation id>
   <fence>`) by rename, keeping the current and the previous generation. Meada's `git` calls on
   pulled mirrors read no system or global configuration. One pull runs at a time per
-  `local_dir`; `--every <seconds>` repeats it. A failed pull changes nothing.
+  `local_dir`; `--every <seconds>` repeats it. A failed pull changes nothing. A pull refuses an
+  `index.db` that is not in rollback journal mode or holds any schema object (a view, a
+  trigger, a table or an index) other than the ones this build creates, naming the repository
+  and the object.
 - Server mode, serving generations (ADR 0012, feature `snapshot`): `meada mcp --listen <addr>
   --workspace <manifest> --generations` serves the generation `<local_dir>/current` names; each
-  call reads the pointer file and opens the engine over that generation's mirrors and indexes
-  (read-only, nothing written per call), so a call open before a swap finishes on its
-  generation and the next one sees the new. The node's manifest contributes only its module
+  request reads the pointer file, reads a generation's document and mirror configuration once
+  (each `meada.toml` and `meada.decisions.toml` at most 1 MiB), and the call opens the engine
+  over the generation its request was routed by (read-only, defensive, nothing written per
+  call), so a call open before a swap finishes on its generation and the next one sees the
+  new. A source path from an index renders only inside its mirror, through no symbolic link,
+  from a regular file of at most 16 MiB; any other shows as unavailable. A node with no
+  servable generation answers 503 with the body `no servable generation`, the reason on
+  stderr. The node's manifest contributes only its module
   sections, nodes never run `meada index`, and the server refuses to start without a servable
   current generation (naming `meada snapshot pull`, or the repository and generation of an
-  index at another schema version). `meada status --workspace <manifest> --generations` prints
+  index at another schema version or with a schema object this build does not create). A
+  missing or interrupted index names the generation's directory to remove before pulling
+  again. `meada status --workspace <manifest> --generations` prints
   the current id, the held ids and `store: reachable` or `store: unreachable (<reason>)`, and
   exits 1 only without a servable current generation, whatever the store; `meada export
   --workspace <manifest> --repo <identity> --generations` exports from it. The flag is absent
