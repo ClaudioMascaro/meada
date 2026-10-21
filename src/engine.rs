@@ -11,7 +11,7 @@ pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
 use crate::entry::{self, EntryPoint};
 use crate::index::{Export, State, Symbol, schema};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
-use crate::msg::Msg;
+use crate::msg::{Fix, Msg};
 use crate::render::{
     DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, mark, rank, section, unresolved,
 };
@@ -49,7 +49,11 @@ impl Engine {
     /// for it. A missing or unreadable index, or one a commit in progress locks past the busy
     /// timeout, is an error naming the repository (`index::open_read`).
     pub fn open_manifest(manifest: &Path, repo: &str) -> Result<Self> {
-        Self::read(Manifest::read(manifest)?.workspace(repo)?, manifest)
+        let shown = manifest.display().to_string();
+        Self::read(
+            Manifest::read(manifest)?.workspace(repo)?,
+            Fix::Index(&shown),
+        )
     }
 
     /// `open_manifest` over `listed`, the manifest at `manifest` as `served` read it when the
@@ -58,17 +62,37 @@ impl Engine {
     pub(crate) fn open_listed(listed: &Manifest, repo: &str, manifest: &Path) -> Result<Self> {
         let workspace = listed.clone().workspace(repo)?;
         (workspace.repos[0].recheck()).map_err(|problem| format!("{repo}: {problem}"))?;
-        Self::read(workspace, manifest)
+        Self::read(workspace, Fix::Index(&manifest.display().to_string()))
     }
 
-    /// Opens every index of `workspace`, listed by the manifest at `manifest`, read-only.
-    fn read(workspace: Workspace, manifest: &Path) -> Result<Self> {
+    /// `open_manifest` over the generation `<local_dir>/current` names (`--generations`, feature
+    /// `snapshot`), `repo` first, for one answer: the repositories, mirrors and indexes are the
+    /// ones the generation recorded and every index opens read-only. The pointer file and the
+    /// generation document are all it reads before the indexes; the mirrors are not touched
+    /// with `git`, since the pull checked them. A call of `meada mcp --listen --generations`.
+    #[cfg(feature = "snapshot")]
+    pub(crate) fn open_generation(local_dir: &Path, repo: &str) -> Result<Self> {
+        let held = crate::snapshot::serve::held(local_dir)?;
+        Self::read(held.listed.workspace(repo)?, Fix::Generation(&held.id))
+    }
+
+    /// `open_generation` over the `local_dir` of the node manifest at `manifest`
+    /// (`meada export --generations`).
+    #[cfg(feature = "snapshot")]
+    pub fn open_node(manifest: &Path, repo: &str) -> Result<Self> {
+        let (_, local) = crate::snapshot::serve::node(manifest)?;
+        repo::isolate(&local);
+        Self::open_generation(&local, repo)
+    }
+
+    /// Opens every index of `workspace` read-only; `fix` says where an index that cannot be
+    /// read is fixed.
+    fn read(workspace: Workspace, fix: Fix) -> Result<Self> {
         fits(&workspace)?;
-        let manifest = manifest.display().to_string();
         let repos: Vec<(&Path, &str)> = (workspace.repos.iter())
             .map(|r| (r.index.as_path(), r.identity.as_str()))
             .collect();
-        let db = index::open_read(&repos, &manifest)?;
+        let db = index::open_read(&repos, fix)?;
         let here = &workspace.repos[0];
         Ok(Self {
             db,
@@ -1038,6 +1062,7 @@ pub fn status(dir: &Path) -> Result<String> {
 /// `Engine::open_manifest` does.
 pub fn status_workspace(manifest: &Path) -> Result<String> {
     let listed = Manifest::read(manifest)?;
+    let shown = manifest.display().to_string();
     let missing = listed.missing();
     // Informational: the exit code of the probe depends on local state only.
     #[cfg(feature = "valkey")]
@@ -1067,7 +1092,7 @@ pub fn status_workspace(manifest: &Path) -> Result<String> {
     let first = rows.first().map(|(repo, _, _)| repo.clone());
     let report = match (indexed, first) {
         (true, Some(first)) => (listed.workspace(&first))
-            .and_then(|workspace| Engine::read(workspace, manifest))
+            .and_then(|workspace| Engine::read(workspace, Fix::Index(&shown)))
             .and_then(|engine| engine.status_report())
             .unwrap_or_default(),
         _ => Default::default(),
@@ -1113,7 +1138,7 @@ pub fn served(manifest: &Path) -> Result<Manifest> {
     let shown = manifest.display().to_string();
     let problems: Vec<String> = (listed.entries.iter())
         .filter_map(|l| match &l.repository {
-            Ok(r) => (index::open_read(&[(&r.index, &r.identity)], &shown))
+            Ok(r) => (index::open_read(&[(&r.index, &r.identity)], Fix::Index(&shown)))
                 .err()
                 .map(|e| e.to_string()),
             Err(problem) => Some(format!("{}: {problem}", l.repo)),
@@ -1146,6 +1171,57 @@ pub fn ready(manifest: &Path) -> bool {
         .collect();
     (states.iter()).any(|s| matches!(s, Ok(State::Locked)))
         && (states.iter()).all(|s| matches!(s, Ok(State::Indexed { .. } | State::Locked)))
+}
+
+/// The start check of `meada mcp --listen --generations` (feature `snapshot`) and the predicate
+/// `status --generations` exits on: the node holds a current generation (otherwise the error
+/// names `meada snapshot pull`), every mirror of it is a checkout of the identity recorded, every
+/// index opens read-only at this build's schema version and the whole workspace opens. Every
+/// problem, one per line. It only reads, and asks the store nothing. Returns the node's
+/// `local_dir` and the identities the generation serves.
+#[cfg(feature = "snapshot")]
+pub fn served_generation(manifest: &Path) -> Result<(PathBuf, Vec<String>)> {
+    let (_, local) = crate::snapshot::serve::node(manifest)?;
+    repo::isolate(&local);
+    let held = crate::snapshot::serve::held(&local)?;
+    let fix = Fix::Generation(&held.id);
+    let problems: Vec<String> = (held.listed.entries.iter())
+        .filter_map(|l| {
+            let r = l.repository.as_ref().ok()?;
+            repo::trust(&r.root);
+            match r.recheck() {
+                Err(problem) => Some(format!("{}: {problem}", l.repo)),
+                Ok(()) => (index::open_read(&[(&r.index, &r.identity)], fix))
+                    .err()
+                    .map(|e| e.to_string()),
+            }
+        })
+        .collect();
+    if !problems.is_empty() {
+        return Err(problems.join("\n").into());
+    }
+    let first = (held.listed.entries.first())
+        .ok_or_else(|| format!("{}: no repository listed", local.display()))?;
+    Engine::open_generation(&local, &first.repo)?;
+    let served = held.listed.entries.iter().map(|l| l.repo.clone());
+    Ok((local, served.collect()))
+}
+
+/// `status` for a node that serves generations (feature `snapshot`): the id of its current
+/// generation, the ids it holds and whether the store answers, with the id the store holds. The
+/// store is informational: whether the node can serve is `served_generation`, local state only.
+#[cfg(feature = "snapshot")]
+pub fn status_generations(manifest: &Path) -> Result<String> {
+    use crate::snapshot::{pull, serve};
+    let (config, local) = serve::node(manifest)?;
+    let current = pull::current(&local).ok().flatten().map(|(id, _)| id);
+    let store = match serve::reach(&config) {
+        Ok(id) => Msg::SnapshotStoreReachable(&id).text(),
+        Err(reason) => Msg::SnapshotStoreUnreachable(&reason).text(),
+    };
+    let current = Msg::SnapshotStatusCurrent(current.as_deref()).text();
+    let held = Msg::SnapshotStatusHeld(&serve::ids(&local)).text();
+    Ok(format!("{current}\n{held}\n{store}\n"))
 }
 
 /// An index state as `status` shows it, `other` for an index of another schema.

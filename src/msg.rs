@@ -14,6 +14,16 @@ pub fn init(lang: Option<&str>) {
     PT.store(lang.is_some_and(|l| l.starts_with("pt")), Ordering::Relaxed);
 }
 
+/// Where an index that cannot be read is fixed (`index::open_read`).
+#[derive(Clone, Copy)]
+pub enum Fix<'a> {
+    /// `meada index --workspace <manifest>`.
+    Index(&'a str),
+    /// A node's generation (`--generations`, feature `snapshot`) that only a publish from this
+    /// build and a pull replace.
+    Generation(&'a str),
+}
+
 pub enum Msg<'a> {
     NotIndexed,
     OtherVersion,
@@ -46,16 +56,16 @@ pub enum Msg<'a> {
     },
     IndexMissing {
         repo: &'a str,
-        manifest: &'a str,
+        fix: Fix<'a>,
     },
     IndexOtherVersion {
         repo: &'a str,
-        manifest: &'a str,
+        fix: Fix<'a>,
     },
     StateLocked,
     IndexInterrupted {
         repo: &'a str,
-        manifest: &'a str,
+        fix: Fix<'a>,
     },
     IndexLocked {
         repo: &'a str,
@@ -284,6 +294,20 @@ pub enum Msg<'a> {
         found: &'a str,
         head: &'a str,
     },
+    #[cfg(feature = "snapshot")]
+    SnapshotNoneHeld(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotTimeout(u64),
+    #[cfg(feature = "snapshot")]
+    SnapshotStatusCurrent(Option<&'a str>),
+    #[cfg(feature = "snapshot")]
+    SnapshotStatusHeld(&'a [String]),
+    #[cfg(feature = "snapshot")]
+    SnapshotStoreReachable(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotStoreUnreachable(&'a str),
+    #[cfg(feature = "snapshot")]
+    GenerationsHelp,
     About,
     Index,
     Status,
@@ -435,28 +459,60 @@ impl Msg<'_> {
                      meada.toml"
                 ),
             ),
-            Msg::IndexMissing { repo, manifest } => pick(
-                format!("{repo}: not indexed; run meada index --workspace {manifest}"),
-                format!("{repo}: não indexado; rode meada index --workspace {manifest}"),
-            ),
-            Msg::IndexOtherVersion { repo, manifest } => pick(
-                format!(
-                    "{repo}: indexed by another version; run meada index --workspace {manifest}"
+            Msg::IndexMissing { repo, fix } => match fix {
+                Fix::Index(manifest) => pick(
+                    format!("{repo}: not indexed; run meada index --workspace {manifest}"),
+                    format!("{repo}: não indexado; rode meada index --workspace {manifest}"),
                 ),
-                format!(
-                    "{repo}: indexado por outra versão; rode meada index --workspace {manifest}"
+                Fix::Generation(id) => pick(
+                    format!("{repo}: no index in generation {id}; run meada snapshot pull"),
+                    format!("{repo}: sem índice na geração {id}; rode meada snapshot pull"),
                 ),
-            ),
-            Msg::IndexInterrupted { repo, manifest } => pick(
-                format!(
-                    "{repo}: its index holds an interrupted commit; run meada index --workspace \
-                     {manifest}"
+            },
+            Msg::IndexOtherVersion { repo, fix } => match fix {
+                Fix::Index(manifest) => pick(
+                    format!(
+                        "{repo}: indexed by another version; run meada index --workspace \
+                         {manifest}"
+                    ),
+                    format!(
+                        "{repo}: indexado por outra versão; rode meada index --workspace \
+                         {manifest}"
+                    ),
                 ),
-                format!(
-                    "{repo}: seu índice guarda um commit interrompido; rode meada index \
-                     --workspace {manifest}"
+                Fix::Generation(id) => pick(
+                    format!(
+                        "{repo}: indexed by another version in generation {id}; publish a \
+                         generation from this build, then run meada snapshot pull"
+                    ),
+                    format!(
+                        "{repo}: indexado por outra versão na geração {id}; publique uma geração \
+                         deste build e rode meada snapshot pull"
+                    ),
                 ),
-            ),
+            },
+            Msg::IndexInterrupted { repo, fix } => match fix {
+                Fix::Index(manifest) => pick(
+                    format!(
+                        "{repo}: its index holds an interrupted commit; run meada index \
+                         --workspace {manifest}"
+                    ),
+                    format!(
+                        "{repo}: seu índice guarda um commit interrompido; rode meada index \
+                         --workspace {manifest}"
+                    ),
+                ),
+                Fix::Generation(id) => pick(
+                    format!(
+                        "{repo}: its index in generation {id} holds an interrupted commit; \
+                         publish a new generation, then run meada snapshot pull"
+                    ),
+                    format!(
+                        "{repo}: seu índice na geração {id} guarda um commit interrompido; \
+                         publique uma nova geração e rode meada snapshot pull"
+                    ),
+                ),
+            },
             Msg::StateLocked => pick(
                 "locked by a commit in progress past the busy timeout".into(),
                 "travado por um commit em andamento além do tempo de espera".into(),
@@ -947,6 +1003,48 @@ impl Msg<'_> {
             Msg::SnapshotHead { found, head } => pick(
                 format!("the mirror's HEAD is {found}, not the document's {head}"),
                 format!("o HEAD do espelho é {found}, não o {head} do documento"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotNoneHeld(dir) => pick(
+                format!("{dir} holds no generation: run meada snapshot pull"),
+                format!("{dir} não guarda nenhuma geração: rode meada snapshot pull"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotTimeout(ms) => pick(
+                format!("no answer within {ms} ms"),
+                format!("sem resposta em {ms} ms"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotStatusCurrent(id) => pick(
+                format!("current: {}", id.unwrap_or("none")),
+                format!("atual: {}", id.unwrap_or("nenhuma")),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotStatusHeld(ids) => match ids.is_empty() {
+                true => pick("held: none".into(), "retidas: nenhuma".into()),
+                false => pick(
+                    format!("held: {}", ids.join(" ")),
+                    format!("retidas: {}", ids.join(" ")),
+                ),
+            },
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotStoreReachable(id) => pick(
+                format!("store: reachable (current {id})"),
+                format!("store: alcançável (atual {id})"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotStoreUnreachable(reason) => pick(
+                format!("store: unreachable ({reason})"),
+                format!("store: inalcançável ({reason})"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::GenerationsHelp => pick(
+                "Use the generation `meada snapshot pull` made current on this node, with \
+                 the --workspace manifest's [snapshot] section"
+                    .into(),
+                "Usa a geração que `meada snapshot pull` tornou atual neste nó, com a seção \
+                 [snapshot] do manifesto de --workspace"
+                    .into(),
             ),
             Msg::About => pick(
                 "LLM-free code graph for agents and people".into(),

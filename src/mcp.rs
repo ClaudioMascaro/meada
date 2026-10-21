@@ -88,6 +88,14 @@ enum Source {
         manifest: Arc<Path>,
         identity: Arc<str>,
     },
+    /// The generation `<local_dir>/current` names when the call arrives, `identity` first (server
+    /// mode with `--generations`, feature `snapshot`): as `Served`, with the repositories the
+    /// generation recorded.
+    #[cfg(feature = "snapshot")]
+    Generation {
+        local_dir: Arc<Path>,
+        identity: Arc<str>,
+    },
 }
 
 impl Meada {
@@ -109,6 +117,11 @@ impl Meada {
                 manifest,
                 identity,
             } => tokio::task::block_in_place(|| Engine::open_listed(listed, identity, manifest)),
+            #[cfg(feature = "snapshot")]
+            Source::Generation {
+                local_dir,
+                identity,
+            } => tokio::task::block_in_place(|| Engine::open_generation(local_dir, identity)),
         };
         tokio::task::block_in_place(|| open.and_then(|engine| ask(&engine)))
             .map_err(|e| e.to_string())
@@ -199,7 +212,7 @@ impl Meada {
             }
             _ => return Err("pass either `from` or `changes: uncommitted`".into()),
         };
-        if matches!(start, Start::Uncommitted) && matches!(self.source, Source::Served { .. }) {
+        if matches!(start, Start::Uncommitted) && !matches!(self.source, Source::Roots) {
             return Err(
                 "server mode has no working tree to diff: run Meada locally for \
                         `changes: uncommitted`"
@@ -224,6 +237,10 @@ impl ServerHandler for Meada {
         let instructions = match &self.source {
             Source::Roots => "Code graph of the current repository.".to_string(),
             Source::Served { identity, .. } => format!("Code graph of the repository {identity}."),
+            #[cfg(feature = "snapshot")]
+            Source::Generation { identity, .. } => {
+                format!("Code graph of the repository {identity}.")
+            }
         };
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("meada", env!("CARGO_PKG_VERSION")))
@@ -268,6 +285,32 @@ pub fn with_drain_bound<T>(bound: Duration, f: impl FnOnce() -> T) -> T {
 /// One repository's MCP endpoint.
 type Endpoint = StreamableHttpService<Meada, NeverSessionManager>;
 
+/// The endpoints a server answers at.
+enum Routes {
+    /// One per repository of the manifest, fixed at start, and the 404's body.
+    Listed {
+        endpoints: HashMap<String, Endpoint>,
+        listing: String,
+    },
+    /// One per repository of the generation current when the request arrives, made then: a
+    /// pull that adds a repository needs no restart.
+    #[cfg(feature = "snapshot")]
+    Generation {
+        local_dir: Arc<Path>,
+        config: StreamableHttpServerConfig,
+    },
+}
+
+/// The MCP service of `source`, stateless with JSON responses.
+fn endpoint(source: Source, config: &StreamableHttpServerConfig) -> Endpoint {
+    let meada = Meada::new(source);
+    StreamableHttpService::new(
+        move || Ok(meada.clone()),
+        Default::default(),
+        config.clone(),
+    )
+}
+
 /// Server mode (ADR 0011): serves the tools over MCP streamable HTTP at `listen` (`host:port`,
 /// `:port` or `port`, the loopback interface without a host), one endpoint per repository the
 /// manifest at `manifest` lists, at `/<identity>`. Refuses to start unless every repository is
@@ -284,6 +327,43 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
     let address = address(listen)?;
     let listed = Arc::new(engine::served(manifest)?);
     let served: Vec<String> = listed.entries.iter().map(|l| l.repo.clone()).collect();
+    let manifest: Arc<Path> = manifest.into();
+    run(address, move |config| {
+        let endpoints: HashMap<String, Endpoint> = (served.iter())
+            .map(|identity| {
+                let source = Source::Served {
+                    listed: listed.clone(),
+                    manifest: manifest.clone(),
+                    identity: identity.as_str().into(),
+                };
+                (identity.clone(), endpoint(source, config))
+            })
+            .collect();
+        let listing = served.iter().map(|i| format!("{i}\n")).collect();
+        Routes::Listed { endpoints, listing }
+    })
+}
+
+/// `listen` over the generations a node pulls (`--generations`, feature `snapshot`): refuses to
+/// start unless the node's current generation is servable (`engine::served_generation`), and
+/// answers every call from the generation current when it arrives.
+#[cfg(feature = "snapshot")]
+pub fn listen_generations(listen: &str, manifest: &Path) -> crate::Result<()> {
+    let address = address(listen)?;
+    let (local_dir, _) = engine::served_generation(manifest)?;
+    let local_dir: Arc<Path> = local_dir.into();
+    run(address, move |config| Routes::Generation {
+        local_dir,
+        config: config.clone(),
+    })
+}
+
+/// The server over `address` with the endpoints `routes` makes from the transport's
+/// configuration.
+fn run(
+    address: SocketAddr,
+    routes: impl FnOnce(&StreamableHttpServerConfig) -> Routes,
+) -> crate::Result<()> {
     let drain = DRAIN_BOUND.get();
     let runtime = tokio::runtime::Runtime::new()?;
     let stopped: crate::Result<()> = runtime.block_on(async {
@@ -296,27 +376,7 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
             .with_json_response(true)
             .disable_allowed_hosts()
             .enforce_origin_validation();
-        let manifest: Arc<Path> = manifest.into();
-        let endpoints: HashMap<String, Endpoint> = (served.iter())
-            .map(|identity| {
-                let meada = Meada::new(Source::Served {
-                    listed: listed.clone(),
-                    manifest: manifest.clone(),
-                    identity: identity.as_str().into(),
-                });
-                let endpoint = StreamableHttpService::new(
-                    move || Ok(meada.clone()),
-                    Default::default(),
-                    config.clone(),
-                );
-                (identity.clone(), endpoint)
-            })
-            .collect();
-        let listing: String = served
-            .iter()
-            .map(|identity| format!("{identity}\n"))
-            .collect();
-        let routes = Arc::new((endpoints, listing));
+        let routes = Arc::new(routes(&config));
         let (stopping, _) = tokio::sync::watch::channel(());
         let mut connections = tokio::task::JoinSet::new();
         loop {
@@ -338,7 +398,7 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
             connections.spawn(async move {
                 let service = service_fn(move |request| {
                     let routes = routes.clone();
-                    async move { Ok::<_, Infallible>(route(&routes.0, &routes.1, request).await) }
+                    async move { Ok::<_, Infallible>(route(&routes, request).await) }
                 });
                 // A connection that breaks ends only itself; the timer is what makes hyper's
                 // header read timeout close one that sends nothing.
@@ -417,24 +477,49 @@ impl Stop {
 }
 
 /// The endpoint `request`'s path names (`/<identity>`, percent-decoded, a trailing slash
-/// tolerated) answers it;
-/// any other path, the root included, is a 404 listing the identities served, one per line.
+/// tolerated) answers it; any other path, the root included, is a 404 listing the identities
+/// served, one per line.
 async fn route(
-    endpoints: &HashMap<String, Endpoint>,
-    listing: &str,
+    routes: &Routes,
     request: Request<Incoming>,
 ) -> Response<BoxBody<Bytes, Infallible>> {
     let path = percent_decode_str(request.uri().path()).decode_utf8();
     let path = path.as_deref().unwrap_or("");
     let identity = path.strip_prefix('/').unwrap_or(path);
     let identity = identity.strip_suffix('/').unwrap_or(identity);
-    match endpoints.get(identity) {
-        Some(endpoint) => endpoint.handle(request).await,
-        None => Response::builder()
-            .status(StatusCode::NOT_FOUND)
+    let plain = |status, body: String| {
+        Response::builder()
+            .status(status)
             .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
-            .body(Full::from(listing.to_string()).boxed())
-            .expect("a valid response"),
+            .body(Full::from(body).boxed())
+            .expect("a valid response")
+    };
+    match routes {
+        Routes::Listed { endpoints, listing } => match endpoints.get(identity) {
+            Some(endpoint) => endpoint.handle(request).await,
+            None => plain(StatusCode::NOT_FOUND, listing.clone()),
+        },
+        #[cfg(feature = "snapshot")]
+        Routes::Generation { local_dir, config } => {
+            let served: Result<Vec<String>, String> = tokio::task::block_in_place(|| {
+                let held = crate::snapshot::serve::held(local_dir).map_err(|e| e.to_string())?;
+                Ok(held.listed.entries.into_iter().map(|l| l.repo).collect())
+            });
+            match served {
+                Ok(served) if served.iter().any(|repo| repo == identity) => {
+                    let source = Source::Generation {
+                        local_dir: local_dir.clone(),
+                        identity: identity.into(),
+                    };
+                    endpoint(source, config).handle(request).await
+                }
+                Ok(served) => plain(
+                    StatusCode::NOT_FOUND,
+                    served.iter().map(|repo| format!("{repo}\n")).collect(),
+                ),
+                Err(problem) => plain(StatusCode::SERVICE_UNAVAILABLE, format!("{problem}\n")),
+            }
+        }
     }
 }
 

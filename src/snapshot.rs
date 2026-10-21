@@ -10,6 +10,7 @@
 //! object carries its size and BLAKE3 hash as metadata (`store::Stored`).
 
 pub mod pull;
+pub mod serve;
 pub mod store;
 
 use std::io::{self, Write};
@@ -17,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::msg::Msg;
+use crate::msg::{Fix, Msg};
 use crate::workspace::Manifest;
 use crate::{Result, index, repo};
 use store::{Store, Stored};
@@ -370,7 +371,7 @@ pub fn publish(manifest: &Path) -> Result<String> {
         };
         let repo_id = r.identity.as_str();
         let checked = (|| -> Result<std::result::Result<rusqlite::Connection, String>> {
-            let db = index::open_read(&[(&r.index, repo_id)], &shown)?;
+            let db = index::open_read(&[(&r.index, repo_id)], Fix::Index(&shown))?;
             if !index::fresh(&db, &r.root, repo_id, &r.config.serve)? {
                 let manifest = shown.as_str();
                 return Ok(Err(Msg::SnapshotBehind {
@@ -443,7 +444,7 @@ pub fn publish(manifest: &Path) -> Result<String> {
 }
 
 /// The bundle id of a bundle key, `<...>/<bundle id>.tar`.
-fn bundle_of(key: &str) -> &str {
+pub(crate) fn bundle_of(key: &str) -> &str {
     let name = key.rsplit('/').next().unwrap_or(key);
     name.strip_suffix(".tar").unwrap_or(name)
 }

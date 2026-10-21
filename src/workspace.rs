@@ -345,6 +345,65 @@ impl Manifest {
         })
     }
 
+    /// The workspace of a pulled generation (`meada snapshot pull`, ADR 0012), which `dir`
+    /// (`<local_dir>/<generation id>`) holds and `document` records: per entry, the mirror at
+    /// `<bundle id>/mirror` and the index at `<bundle id>/index.db`, the entry's blocks as the
+    /// document records them, or the mirror's own `meada.toml` whole. It touches no mirror
+    /// with `git`: the pull checked each one. The paths are built only from ids and identities
+    /// checked here, since the document came from a store.
+    #[cfg(feature = "snapshot")]
+    pub(crate) fn of_generation(dir: &Path, document: &crate::snapshot::Document) -> Result<Self> {
+        let shown = dir
+            .join(crate::snapshot::pull::DOCUMENT)
+            .display()
+            .to_string();
+        let not = || Msg::SnapshotNotDocument(&shown).text();
+        let mut entries = Vec::new();
+        for entry in &document.repositories {
+            let repo = entry.identity.as_str();
+            let bad = |problem: String| format!("{shown}: {repo}: {problem}");
+            if let Some(problem) = identity_problem(repo) {
+                return Err(bad(problem).into());
+            }
+            let bundle = crate::snapshot::bundle_of(&entry.bundle);
+            if !crate::snapshot::is_id(bundle) {
+                return Err(not().into());
+            }
+            let root = dir.join(bundle).join("mirror");
+            let serde_json::Value::Object(mut written) = entry.blocks.clone() else {
+                return Err(not().into());
+            };
+            written.insert("repo".into(), repo.into());
+            written.insert("path".into(), "".into());
+            let file: EntryFile =
+                serde_json::from_value(written.into()).map_err(|e| bad(e.to_string()))?;
+            let blocks = file.blocks();
+            let (config, ignored) = match config::load_own(&root).map_err(|e| bad(e.to_string()))? {
+                Some(own) => (own, blocks),
+                None => (file.config(), Vec::new()),
+            };
+            entries.push(Listed {
+                repo: repo.to_string(),
+                path: root.display().to_string(),
+                repository: Ok(Repository {
+                    config,
+                    decisions: decisions::load(&root).map_err(|e| bad(e.to_string()))?,
+                    index: dir.join(bundle).join("index.db"),
+                    root,
+                    identity: repo.to_string(),
+                }),
+                ignored,
+                blocks: entry.blocks.clone(),
+            });
+        }
+        Ok(Self {
+            entries,
+            #[cfg(feature = "valkey")]
+            valkey: None,
+            snapshot: None,
+        })
+    }
+
     /// The peers a servable repository's `meada.toml` names that the manifest does not list,
     /// sorted: server mode looks for nothing by path hint or sibling clone.
     pub fn missing(&self) -> Vec<Missing> {

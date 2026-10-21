@@ -141,7 +141,7 @@ async fn pull_locked(config: &Config, local: &Path) -> std::result::Result<Pulle
 }
 
 /// The id the store's `current` holds: the id and a newline, nothing else.
-fn store_pointer(key: &str, bytes: &[u8]) -> std::result::Result<String, String> {
+pub(super) fn store_pointer(key: &str, bytes: &[u8]) -> std::result::Result<String, String> {
     (std::str::from_utf8(bytes).ok())
         .and_then(|text| text.strip_suffix('\n'))
         .filter(|id| is_id(id))

@@ -20,7 +20,7 @@ use crate::decisions::Stale;
 use crate::document::{self, Format, Summary};
 use crate::entry::{self, EntryKind, EntryPoint};
 use crate::lang::{self, Facts};
-use crate::msg::Msg;
+use crate::msg::{Fix, Msg};
 use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package};
 use crate::resolve::{Code, Exported, Resolution, Resolver, Target};
 use crate::shape::{Shape, Want};
@@ -185,23 +185,23 @@ fn read_only(path: &Path) -> rusqlite::Result<Connection> {
 /// reads (ADR 0011): the first as `main`, each other attached as `schema(n)`. Nothing is
 /// created, rebuilt or written. A missing index, one of another schema, one a commit left
 /// interrupted, or one a commit in progress keeps locked past the busy timeout is an error
-/// naming its repository, all but the last with `meada index --workspace <manifest>`.
-pub fn open_read(repos: &[(&Path, &str)], manifest: &str) -> Result<Connection> {
+/// naming its repository, all but the last with its fix (`Fix`).
+pub fn open_read(repos: &[(&Path, &str)], fix: Fix) -> Result<Connection> {
     let [(index, repo), ..] = repos else {
         return Err("no repository to open".into());
     };
-    let db = read_only(index).map_err(|e| unreadable(e, index, repo, manifest))?;
+    let db = read_only(index).map_err(|e| unreadable(e, index, repo, fix))?;
     for (n, (index, repo)) in repos.iter().enumerate().skip(1) {
         let path = index.to_str().ok_or("index path is not UTF-8")?;
         (db.execute(&format!("ATTACH DATABASE ?1 AS {}", schema(n)), [path]))
-            .map_err(|e| unreadable(e, index, repo, manifest))?;
+            .map_err(|e| unreadable(e, index, repo, fix))?;
     }
     // One read transaction, held until the connection closes (and then rolled back, nothing
     // being written): its first read of each index takes the lock a commit waits on, so every
     // answer read through it sees each index as one commit left it (ADR 0011).
     db.execute_batch("BEGIN DEFERRED")?;
     for (n, (index, repo)) in repos.iter().enumerate() {
-        check_read(&db, &schema(n), index, repo, manifest)?;
+        check_read(&db, &schema(n), index, repo, fix)?;
     }
     Ok(db)
 }
@@ -216,19 +216,13 @@ pub fn schema(n: usize) -> String {
 }
 
 /// The schema version check of a read-only open; the first read, so the one that waits.
-fn check_read(
-    db: &Connection,
-    schema: &str,
-    index: &Path,
-    repo: &str,
-    manifest: &str,
-) -> Result<()> {
+fn check_read(db: &Connection, schema: &str, index: &Path, repo: &str, fix: Fix) -> Result<()> {
     let version = (db.query_row(&format!("PRAGMA {schema}.user_version"), [], |r| {
         r.get::<_, i32>(0)
     }))
-    .map_err(|e| unreadable(e, index, repo, manifest))?;
+    .map_err(|e| unreadable(e, index, repo, fix))?;
     if version != schema_version() {
-        return Err(Msg::IndexOtherVersion { repo, manifest }.text().into());
+        return Err(Msg::IndexOtherVersion { repo, fix }.text().into());
     }
     Ok(())
 }
@@ -238,13 +232,13 @@ fn unreadable(
     e: rusqlite::Error,
     index: &Path,
     repo: &str,
-    manifest: &str,
+    fix: Fix,
 ) -> Box<dyn std::error::Error> {
     let text = match e.sqlite_error_code() {
-        Some(ErrorCode::CannotOpen) => Msg::IndexMissing { repo, manifest }.text(),
-        Some(ErrorCode::NotADatabase) => Msg::IndexOtherVersion { repo, manifest }.text(),
+        Some(ErrorCode::CannotOpen) => Msg::IndexMissing { repo, fix }.text(),
+        Some(ErrorCode::NotADatabase) => Msg::IndexOtherVersion { repo, fix }.text(),
         // A hot journal (a writer stopped mid-commit) that only a write can roll back.
-        Some(ErrorCode::ReadOnly) => Msg::IndexInterrupted { repo, manifest }.text(),
+        Some(ErrorCode::ReadOnly) => Msg::IndexInterrupted { repo, fix }.text(),
         Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked) => Msg::IndexLocked {
             repo,
             index: &index.display().to_string(),
@@ -1943,6 +1937,7 @@ mod tests {
         SCHEMA, State, open, open_read, read_config, refresh_stamped, state, with_busy_timeout,
     };
     use crate::config::Serve;
+    use crate::msg::Fix;
     use crate::{document, lang, package};
 
     const REPO: &str = "example.com/acme/web";
@@ -1958,7 +1953,7 @@ mod tests {
 
     /// The index of `REPO` at `index`, opened as server mode reads it.
     fn read(index: &Path) -> crate::Result<Connection> {
-        open_read(&[(index, REPO)], MANIFEST)
+        open_read(&[(index, REPO)], Fix::Index(MANIFEST))
     }
 
     fn communities(db: &Connection) -> i64 {
