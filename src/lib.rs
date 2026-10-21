@@ -29,6 +29,8 @@ pub mod repo;
 mod resolve;
 mod resource;
 mod shape;
+#[cfg(feature = "snapshot")]
+pub mod snapshot;
 mod trace;
 #[cfg(feature = "valkey")]
 mod valkey;

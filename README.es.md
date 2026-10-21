@@ -243,7 +243,46 @@ operador respete un único escritor por índice.
 
 ### Módulos de nube
 
-Módulos opt-in, desactivados por defecto; cada uno se documenta abajo cuando llegue.
+Módulos opt-in, desactivados por defecto; cada uno se documenta abajo cuando llegue. Un módulo
+es una feature de cargo más una sección de `meada.workspace.toml`; los binarios de release son el
+build por defecto, sin ninguno, y una sección en un build sin su feature es un error que nombra la
+feature.
+
+**Snapshot** (feature `snapshot`, `cargo install meada --features snapshot`). Un job indexa y
+publica; los nodos reciben el resultado entero, en vez de indexar cada uno sus propios espejos.
+Después de `meada index --workspace`, que sigue sin red, el job ejecuta
+`meada snapshot publish --workspace <manifiesto>`. Comprueba, solo leyendo, que cada índice es
+igual a su espejo y que cada espejo está limpio (`git status` no lista nada, ni un archivo
+ignorado), y rechaza listando cada repositorio y el comando `meada index --workspace` que lo
+resuelve. Luego sube una generación: un bundle por repositorio (un tar del espejo, `.git`
+incluido, y de su `index.db`), un documento que los lista con su tamaño y su hash BLAKE3, y al
+final el puntero `current`. Su única línea en stdout es el id de la generación. Un bundle o una
+generación ya guardados no se suben de nuevo, y nada se escribe en la máquina que publica.
+
+```toml
+[snapshot]
+endpoint = "https://s3.us-east-1.amazonaws.com"   # cualquier endpoint compatible con S3
+region = "us-east-1"
+bucket = "ejemplo-meada"
+prefix = "prod"                                    # opcional
+path_style = false                                 # true en la mayoría de los stores self-hosted
+credentials = "static"                             # o "web-identity", "pod-identity", "instance"
+access_key_id_env = "AWS_ACCESS_KEY_ID"            # valores por defecto; o las claves *_file
+secret_access_key_env = "AWS_SECRET_ACCESS_KEY"
+session_token_env = "AWS_SESSION_TOKEN"            # opcional
+local_dir = "/var/lib/meada/generations"           # para el pull y el servicio de generaciones
+```
+
+El publish solo se conecta al `endpoint`, con TLS fuera de loopback, y al endpoint de credencial
+de la fuente elegida; ninguna petición sigue una redirección ni pasa por un proxy. Las
+credenciales vienen de una sola fuente, la que nombra `credentials`: `static` lee la clave y el
+secreto de las variables o los archivos que nombra la sección (nunca del manifiesto);
+`web-identity` (IRSA) lee `AWS_WEB_IDENTITY_TOKEN_FILE` y `AWS_ROLE_ARN` e intercambia el token
+con STS en la `region`, por https; `pod-identity` (EKS Pod Identity) llama al agente en
+`AWS_CONTAINER_CREDENTIALS_FULL_URI`, solo `http://169.254.170.23` o `http://[fd00:ec2::23]`,
+con el token de `AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`; `instance` usa el servicio de metadatos
+de la instancia (IMDSv2, `http://169.254.169.254`), y solo cuando la sección lo indica. Las
+credenciales quedan solo en memoria, y ningún secreto aparece en un error.
 
 ## Decisiones
 

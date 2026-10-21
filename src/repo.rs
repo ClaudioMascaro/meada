@@ -37,6 +37,22 @@ pub fn identity(root: &Path) -> String {
     }
 }
 
+/// The commit `HEAD` names in the checkout at `root`.
+pub fn head(root: &Path) -> Result<String> {
+    Ok(run(root, &["rev-parse", "--verify", "HEAD"])?
+        .trim()
+        .to_string())
+}
+
+/// What `git status` lists in the checkout at `root`, changed, untracked and ignored files
+/// alike: empty for a clean mirror. It writes nothing, not even the index's stat cache.
+pub fn unclean(root: &Path) -> Result<String> {
+    run(
+        root,
+        &["--no-optional-locks", "status", "--porcelain", "--ignored"],
+    )
+}
+
 /// Lower-cased host and path, with no scheme, user, port or `.git` suffix, so the SSH and
 /// HTTPS forms of one remote are equal.
 pub fn normalize_remote(url: &str) -> String {

@@ -23,6 +23,16 @@ All notable changes to Meada are recorded here. The format follows
   user, the password only from an environment variable or a file, standalone or cluster, every
   key under `key_prefix`); `meada status --workspace` says whether Valkey is reachable and its
   exit code does not depend on it. The release binaries stay the default build.
+- Server mode, snapshot store (ADR 0012, feature `snapshot`, section `[snapshot]`): `meada
+  snapshot publish --workspace <manifest>` checks, reading only, that every index equals its
+  mirror and every mirror is clean, then uploads the workspace to an S3-compatible bucket as a
+  generation (one tar bundle per repository, its mirror and `index.db`, a generation document
+  with each bundle's size and BLAKE3 hash, then the `current` pointer) and prints its id. Ids
+  derive from the commits, the schema and binary versions and the entries' blocks, so a
+  republish or a second machine at the same commits uploads nothing. Credentials come from one
+  source (`static` keys from variables or files, `web-identity`, `pod-identity` or `instance`),
+  TLS is required outside loopback, and no request follows a redirect. `meada index` stays
+  offline.
 - npm installer (spec #32): cargo-dist builds and publishes an npm package named `meada` with each
   release, at the crate's version, so `npx meada mcp` launches the MCP server and `npx meada
   <command>` runs any command; the release configuration is planned as a dry run on pull requests.

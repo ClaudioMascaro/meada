@@ -236,7 +236,45 @@ respeite um único escritor por índice.
 
 ### Módulos de nuvem
 
-Módulos opt-in, desligados por padrão; cada um é documentado abaixo quando chegar.
+Módulos opt-in, desligados por padrão; cada um é documentado abaixo quando chegar. Um módulo é
+uma feature do cargo mais uma seção de `meada.workspace.toml`; os binários de release são o build
+padrão, sem nenhum, e uma seção num build sem a sua feature é um erro que nomeia a feature.
+
+**Snapshot** (feature `snapshot`, `cargo install meada --features snapshot`). Um job indexa e
+publica; os nós recebem o resultado inteiro, em vez de cada um indexar os próprios espelhos.
+Depois de `meada index --workspace`, que continua sem rede, o job roda
+`meada snapshot publish --workspace <manifesto>`. Ele confere, só lendo, que cada índice é igual
+ao seu espelho e que cada espelho está limpo (`git status` sem nada, nem arquivo ignorado), e
+recusa listando cada repositório e o comando `meada index --workspace` que resolve. Então envia
+uma geração: um bundle por repositório (um tar do espelho, `.git` incluído, e do seu
+`index.db`), um documento que os lista com tamanho e hash BLAKE3, e por último o ponteiro
+`current`. A única linha em stdout é o id da geração. Um bundle ou uma geração já guardados não
+são enviados de novo, e nada é escrito na máquina que publica.
+
+```toml
+[snapshot]
+endpoint = "https://s3.us-east-1.amazonaws.com"   # qualquer endpoint compatível com S3
+region = "us-east-1"
+bucket = "exemplo-meada"
+prefix = "prod"                                    # opcional
+path_style = false                                 # true na maioria dos stores self-hosted
+credentials = "static"                             # ou "web-identity", "pod-identity", "instance"
+access_key_id_env = "AWS_ACCESS_KEY_ID"            # padrões; ou as chaves *_file
+secret_access_key_env = "AWS_SECRET_ACCESS_KEY"
+session_token_env = "AWS_SESSION_TOKEN"            # opcional
+local_dir = "/var/lib/meada/generations"           # para o pull e o serviço das gerações
+```
+
+O publish só conecta ao `endpoint`, com TLS fora de loopback, e ao endpoint de credencial da
+fonte escolhida; nenhuma requisição segue um redirecionamento nem passa por proxy. As
+credenciais vêm de uma fonte só, a que `credentials` nomeia: `static` lê a chave e o segredo das
+variáveis ou dos arquivos que a seção nomeia (nunca do manifesto); `web-identity` (IRSA) lê
+`AWS_WEB_IDENTITY_TOKEN_FILE` e `AWS_ROLE_ARN` e troca o token no STS da `region`, por https;
+`pod-identity` (EKS Pod Identity) chama o agente em `AWS_CONTAINER_CREDENTIALS_FULL_URI`, só
+`http://169.254.170.23` ou `http://[fd00:ec2::23]`, com o token de
+`AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`; `instance` usa o serviço de metadados da instância
+(IMDSv2, `http://169.254.169.254`) e só quando escrito na seção. As credenciais ficam só em
+memória, e nenhum segredo aparece num erro.
 
 ## Decisões
 
