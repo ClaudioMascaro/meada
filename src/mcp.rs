@@ -514,11 +514,20 @@ async fn route(
                         .map(|l| format!("{}\n", l.repo))
                         .collect(),
                 ),
-                Err(problem) => plain(StatusCode::SERVICE_UNAVAILABLE, format!("{problem}\n")),
+                // The body is fixed: the request may come from anyone, before the `Origin`
+                // check, and the problem names local paths.
+                Err(problem) => {
+                    eprintln!("meada: {problem}");
+                    plain(StatusCode::SERVICE_UNAVAILABLE, UNSERVABLE.into())
+                }
             }
         }
     }
 }
+
+/// The body of the 503 a node answers while it holds no servable generation.
+#[cfg(feature = "snapshot")]
+const UNSERVABLE: &str = "no servable generation\n";
 
 /// The address `--listen` names: `host:port`, `:port` or `port`, the host an IP address or
 /// `localhost`; without one, the loopback interface. No name is resolved.

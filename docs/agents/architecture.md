@@ -93,7 +93,7 @@ one for the area a change touches.
   a hyper listener), one endpoint per repository of the manifest at `/<identity>`, a 404
   listing the identities served elsewhere (with `--generations`, `listen_generations` makes
   the endpoint per request from the current generation's identities, so a pull that adds a
-  repository needs no restart, and a node with no readable generation answers 503; it answers before the `Origin` check, which refuses
+  repository needs no restart, and a node with no readable generation answers 503 with the fixed body `no servable generation`, the problem on stderr; it answers before the `Origin` check, which refuses
   any request carrying one with 403; no `Host` check). `listen` runs every start check (`engine::served`, the predicate `status --workspace` exits on) before it binds, so an open port means indexes present (the probe counts an index locked by a commit in progress as ready, after a 50 ms wait), then installs the SIGINT and SIGTERM
   handlers before it prints the address, then on a signal drops the listener and lets each
   connection finish its answer in flight (`graceful_shutdown`), for at most `DRAIN` (25 s; the

@@ -2,7 +2,8 @@
 //! --workspace <node manifest> --generations`, `meada status --generations` and `meada export
 //! --generations` over `local_dir`s two nodes pulled from the local S3-compatible server
 //! `MEADA_TEST_S3_ENDPOINT` names. Without it these tests print why and skip; with
-//! `MEADA_TEST_SERVICES_REQUIRED=1` they fail.
+//! `MEADA_TEST_SERVICES_REQUIRED=1` they fail. The ones over a generation made by hand
+//! (`hand_node`) need no store.
 #![cfg(feature = "snapshot")]
 
 use std::fs;
@@ -10,8 +11,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
-use crate::common::assert_golden;
-use crate::manifest::{CHAIN, MANIFEST, contents, run_args};
+use crate::common::{assert_golden, git};
+use crate::manifest::{CHAIN, MANIFEST, chain_manifest, contents, run, run_args};
 use crate::server::{Server, call, get, text};
 use crate::snapshot::{
     HOSTILE_SCHEMAS, KEY_ID, SECRET, block_on, bucket, bucket_name, crafted_index, named_node,
@@ -307,4 +308,97 @@ fn the_probe_and_the_start_depend_on_the_nodes_generation_and_not_on_the_store()
         stderr.contains("`snapshot.local_dir` is not set"),
         "{stderr}"
     );
+}
+
+/// The generation id of `hand_node`.
+const HAND: &str = "00000000000000aa";
+
+/// A node holding a generation made by hand, as a pull leaves one, with no store: the chain's
+/// mirrors (copied, `.git` included) and indexes under `<case>/hand/generations/HAND/`, its
+/// document and the pointer naming it. Returns the case directory, the node's manifest relative
+/// to it and its `local_dir`.
+fn hand_node(case: &str) -> (PathBuf, String, PathBuf) {
+    let dir = chain_manifest(case);
+    assert!(run(&dir, "index").2, "index");
+    let (manifest, local) = named_node(&dir, "hand", "http://127.0.0.1:1", "meada-hand");
+    let mut repositories = Vec::new();
+    for (n, (repo, path)) in CHAIN.iter().enumerate() {
+        let bundle = format!("{n:016x}");
+        let to = local.join(HAND).join(&bundle);
+        fs::create_dir_all(&to).unwrap();
+        let copied = Command::new("cp")
+            .arg("-a")
+            .arg(dir.join(path))
+            .arg(to.join("mirror"))
+            .status()
+            .unwrap();
+        assert!(copied.success());
+        fs::copy(
+            dir.join("indexes").join(repo).join("index.db"),
+            to.join("index.db"),
+        )
+        .unwrap();
+        let head = git(&to.join("mirror"), &["rev-parse", "HEAD"]);
+        repositories.push(serde_json::json!({
+            "identity": repo, "head": head.trim(), "blocks": {}, "size": 0,
+            "bundle": format!("prod/meada/repos/{repo}/{bundle}.tar"), "blake3": "0".repeat(64)}));
+    }
+    let document = serde_json::json!({"generation": HAND, "repositories": repositories});
+    let document = serde_json::to_vec(&document).unwrap();
+    fs::write(local.join(HAND).join("generation.json"), document).unwrap();
+    fs::write(local.join("current"), format!("{HAND} 0\n")).unwrap();
+    (dir, manifest, local)
+}
+
+/// A node whose current generation stops being servable answers every request 503 with a fixed
+/// body: no local path and no parse error reaches a client the `Origin` check has not seen.
+#[test]
+fn a_node_with_no_servable_generation_answers_503_with_a_fixed_body() {
+    let (dir, manifest, local) = hand_node("serving_unservable");
+    let server = serve(&dir, &manifest);
+    let listing: String = CHAIN.iter().map(|(repo, _)| format!("{repo}\n")).collect();
+    assert_eq!(get(&server.url).2, listing);
+    // A document that no longer parses, then a pointer to no generation.
+    fs::write(local.join(HAND).join("generation.json"), b"{").unwrap();
+    let other = "00000000000000bb";
+    fs::write(local.join("current"), format!("{other} 0\n")).unwrap();
+    for path in ["", &format!("/{WEB}")] {
+        let (status, _, body) = get(&format!("{}{path}", server.url));
+        assert_eq!((status, body.as_str()), (503, "no servable generation\n"));
+    }
+}
+
+/// An index row naming a file outside the mirror (an absolute path, `..`) renders as a source
+/// that cannot be read, and the answer still comes: `/dev/zero` would fill the memory, and a
+/// path outside would show the line layout of another file.
+#[test]
+fn an_index_naming_files_outside_its_mirror_answers_without_reading_them() {
+    let (dir, manifest, local) = hand_node("serving_outside");
+    let index = local
+        .join(HAND)
+        .join(format!("{:016x}", 0))
+        .join("index.db");
+    let db = rusqlite::Connection::open(&index).unwrap();
+    db.execute_batch(
+        "UPDATE symbols SET path = '/dev/zero'; UPDATE calls SET path = '../../../../etc/hostname';",
+    )
+    .unwrap();
+    drop(db);
+    let server = serve(&dir, &manifest);
+    block_on(async {
+        let client = server.client(&format!("/{WEB}")).await;
+        let found = client
+            .call_tool(call("search", serde_json::json!({"query": "dashboard"})))
+            .await
+            .unwrap();
+        let found = text(&found).to_string();
+        assert!(found.contains(" /dev/zero "), "{found}");
+        assert!(!found.contains("/dev/zero:"), "{found}");
+        let symbol = serde_json::json!({"symbol": "dashboard"});
+        let context = client.call_tool(call("context", symbol)).await.unwrap();
+        let context = text(&context).to_string();
+        assert!(!context.contains("/dev/zero:"), "{context}");
+        assert!(!context.contains("hostname:"), "{context}");
+        client.cancel().await.unwrap();
+    });
 }
