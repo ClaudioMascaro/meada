@@ -64,6 +64,8 @@ pub enum Msg<'a> {
     },
     StateLocked,
     #[cfg(feature = "snapshot")]
+    IndexNotRollback(&'a str),
+    #[cfg(feature = "snapshot")]
     IndexSchemaObject {
         repo: &'a str,
         kind: &'a str,
@@ -519,6 +521,11 @@ impl Msg<'_> {
                     ),
                 ),
             },
+            #[cfg(feature = "snapshot")]
+            Msg::IndexNotRollback(repo) => pick(
+                format!("{repo}: index.db: not a database in rollback journal mode"),
+                format!("{repo}: index.db: não é um banco em modo rollback journal"),
+            ),
             #[cfg(feature = "snapshot")]
             Msg::IndexSchemaObject { repo, kind, name } => pick(
                 format!(

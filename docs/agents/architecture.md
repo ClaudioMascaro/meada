@@ -168,7 +168,9 @@ one for the area a change touches.
   submodule's own configuration when `git status` descends into it; any other type refused);
   `index::vet` requires the extracted `index.db` to hold exactly the schema objects this build
   creates (type, name, table and SQL against a fresh in-memory index: no view, trigger, table
-  or index more, none altered), naming the repository and the object;
+  or index more, none altered) and its header to name the rollback journal (bytes 18 and 19
+  both 1, so no read-only open makes `-wal` or `-shm` files), naming the repository and the
+  object;
   `settle` replaces `.git/config` with `[core]` and the identity's `origin`, removes `hooks`,
   `commondir` and `objects/info/alternates`, and checks the checkout, identity, `HEAD` and a
   clean `git status` that does not descend into submodules (`repo::unclean(_, false)`; the

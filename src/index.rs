@@ -199,11 +199,18 @@ fn objects(db: &Connection) -> rusqlite::Result<Vec<[Option<String>; 4]>> {
 /// The index at `index`, of the repository `repo` in a pulled generation, holds exactly the
 /// schema objects this build creates (`SCHEMA`): no view, trigger, table or index more, and
 /// none altered or missing, compared by type, name, table and SQL with a fresh index. A
-/// crafted `symbols` view with an endless recursive query would hang every call. Checked by
-/// `meada snapshot pull` and the start check of `--generations`; the error names the
-/// repository and the object.
+/// crafted `symbols` view with an endless recursive query would hang every call. Before it is
+/// opened, its header must name the rollback journal (bytes 18 and 19 both 1): a read-only open
+/// of a WAL index would create `-wal` and `-shm` files in the generation. Checked by `meada
+/// snapshot pull` and the start check of `--generations`; the error names the repository and
+/// the object.
 #[cfg(feature = "snapshot")]
 pub fn vet(index: &Path, repo: &str, fix: Fix) -> Result<()> {
+    let mut header = [0; 20];
+    let read = fs::File::open(index).and_then(|mut f| f.read_exact(&mut header));
+    if read.is_err() || header[18..20] != [1, 1] {
+        return Err(Msg::IndexNotRollback(repo).text().into());
+    }
     let db = read_only(index).map_err(|e| unreadable(e, index, repo, fix))?;
     let found = objects(&db).map_err(|e| unreadable(e, index, repo, fix))?;
     let fresh = Connection::open_in_memory()?;
@@ -2072,6 +2079,21 @@ mod tests {
             .unwrap();
         db.execute_batch(sql).unwrap();
         index
+    }
+
+    #[cfg(feature = "snapshot")]
+    #[test]
+    fn an_index_not_in_rollback_journal_mode_is_refused_before_it_is_opened() {
+        let fix = Fix::Generation("0123456789abcdef");
+        let index = crafted("wal", "PRAGMA journal_mode = WAL;");
+        let e = super::vet(&index, REPO, fix).unwrap_err().to_string();
+        assert!(e.starts_with(&format!("{REPO}: index.db: ")), "{e}");
+        assert!(e.contains("rollback journal"), "{e}");
+        for left in ["index.db-wal", "index.db-shm"] {
+            assert!(!index.with_file_name(left).exists(), "{left}");
+        }
+        fs::write(&index, b"short").unwrap();
+        assert!(super::vet(&index, REPO, fix).is_err());
     }
 
     #[cfg(feature = "snapshot")]
