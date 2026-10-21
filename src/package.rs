@@ -298,12 +298,6 @@ const MAX_NAME: usize = 214;
 // ponytail: real packages re-export a few levels deep; this bounds the walk over a hostile one.
 const MAX_REEXPORTS: usize = 64;
 
-/// The largest manifest read (`package.json`, `pyproject.toml`, `requirements*.txt`) and the
-/// largest `tsconfig.json`; a larger one counts as empty. Real manifests are a few kilobytes,
-/// and the stored summary and the export stay proportional to what is read.
-// ponytail: a flat 1 MiB; a streaming reader that keeps only the dependency tables lifts it.
-pub(crate) const MAX_BYTES: usize = 1 << 20;
-
 /// What Meada read from one `package.json`. Nothing else of the file is kept.
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
 pub struct Summary {
