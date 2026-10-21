@@ -493,7 +493,7 @@ fn a_retained_generation_that_fails_to_pull_does_not_block_the_current_one() {
         assert!(stderr.starts_with(&warning), "{stderr}");
         assert!(stderr.contains(&document), "{stderr}");
         assert_eq!(stderr.lines().count(), 1, "{stderr}");
-        assert_eq!(held(&local), [g2.clone()]);
+        assert_eq!(held(&local), std::slice::from_ref(&g2));
         let pointer = fs::read_to_string(local.join("current")).unwrap();
         assert_eq!(pointer, format!("{g2} 0\n"));
     }

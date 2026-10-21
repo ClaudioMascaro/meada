@@ -693,8 +693,10 @@ fn pull_takes_the_published_generation_and_keeps_the_previous_one() {
     let _ = every.kill();
     let _ = every.wait();
     assert_eq!(line.as_deref().map(str::trim), Ok(third.as_str()));
-    let both = vec![second.clone(), third.clone()];
-    assert_eq!(held(&local), (names(both), format!("{third} 0\n")));
+    // The pointer named the generation fetched again, so that is the one it replaced: the
+    // second one goes.
+    let one = vec![third.clone()];
+    assert_eq!(held(&local), (names(one), format!("{third} 0\n")));
 }
 
 /// Puts `bytes` at `key` with the metadata Meada stores every object with.
