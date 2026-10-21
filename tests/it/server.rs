@@ -403,3 +403,25 @@ fn refuses_to_start_listing_every_repository_that_cannot_be_served() {
     let (stderr, code) = start(&["mcp", "--workspace", MANIFEST]);
     assert!(code == Some(2) && stderr.contains("--listen"), "{stderr}");
 }
+
+/// SIGTERM after a completed call: the server stops and exits 0 (graceful stop, spec #259).
+#[cfg(unix)]
+#[tokio::test]
+async fn exits_zero_on_sigterm_after_a_call() {
+    let dir = chain_manifest("server_sigterm");
+    assert!(run(&dir, "index").2);
+    let mut server = Server::start(&dir, "127.0.0.1:0");
+    let client = server.client(&format!("/{WEB}")).await;
+    let result = client
+        .call_tool(call("trace", serde_json::json!({"from": "dashboard"})))
+        .await
+        .unwrap();
+    assert!(!text(&result).is_empty());
+    // The client keeps its connection open: the stop does not wait for it.
+    let kill = Command::new("kill")
+        .args(["-TERM", &server.child.id().to_string()])
+        .status()
+        .unwrap();
+    assert!(kill.success());
+    assert_eq!(server.child.wait().unwrap().code(), Some(0));
+}
