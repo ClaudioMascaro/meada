@@ -12,6 +12,10 @@
 
 #[cfg(feature = "generation-pointer")]
 pub mod generations;
+#[cfg(feature = "refresh-lock")]
+pub mod lock;
+#[cfg(all(feature = "refresh-lock", not(unix)))]
+compile_error!("the refresh-lock feature is Unix only");
 pub mod pull;
 pub mod serve;
 pub mod store;
@@ -370,6 +374,12 @@ pub fn publish(manifest: &Path) -> Result<String> {
     let Some(config) = listed.snapshot.clone() else {
         return Err(Msg::SnapshotNoSection(&shown).text().into());
     };
+    // With `[refresh_lock]`, only under `meada snapshot lock`: its token and fence.
+    #[cfg(feature = "refresh-lock")]
+    let held = match listed.refresh_lock {
+        Some(_) => Some(lock::from_env()?),
+        None => None,
+    };
     let mut bundles = Vec::new();
     let mut problems = Vec::new();
     for entry in &listed.entries {
@@ -451,6 +461,8 @@ pub fn publish(manifest: &Path) -> Result<String> {
     let pointer = Pointer {
         #[cfg(feature = "generation-pointer")]
         generations: (listed.generations.clone()).zip(listed.valkey.clone()),
+        #[cfg(feature = "refresh-lock")]
+        held,
     };
     let stored = runtime.block_on(store_generation(&config, &generation, bundles, pointer));
     runtime.shutdown_background();
@@ -469,6 +481,10 @@ pub(crate) fn bundle_of(key: &str) -> &str {
 struct Pointer {
     #[cfg(feature = "generation-pointer")]
     generations: Option<(generations::Config, crate::valkey::Config)>,
+    /// The refresh lock's token and fence (`[refresh_lock]`): checked before each upload and
+    /// handed to the pointer script.
+    #[cfg(feature = "refresh-lock")]
+    held: Option<lock::Held>,
 }
 
 /// Stores the generation `generation` of `bundles`, then points `pointer` at it.
@@ -485,6 +501,21 @@ async fn store_generation(
         Some((_, valkey)) => Some(crate::valkey::Valkey::connect(valkey).await?),
         None => None,
     };
+    // With the refresh lock: an error unless the lock still holds this job's token, checked
+    // before each upload, so a job that lost it uploads nothing more.
+    #[cfg(feature = "refresh-lock")]
+    let guard = async || match (&pointer.held, &valkey, &pointer.generations) {
+        (Some(held), Some(valkey), Some((_, config))) => {
+            lock::holds(valkey, config, &held.token).await
+        }
+        (None, ..) => Ok(()),
+        // `Manifest::read` refuses `[refresh_lock]` without `[generations]`: never fail open.
+        (Some(_), ..) => Err(Msg::NeedsSections {
+            section: "refresh_lock",
+            needed: &["generations"],
+        }
+        .text()),
+    };
     let document = config.key(&format!("generations/{generation}.json"));
     match store.get(&document, DOCUMENT_MAX).await? {
         Some(bytes) => verify(&store, &document, &bytes, generation, &bundles).await?,
@@ -494,6 +525,8 @@ async fn store_generation(
                 let stored = match store.stored(&bundle.key).await? {
                     Some(stored) => stored,
                     None => {
+                        #[cfg(feature = "refresh-lock")]
+                        guard().await?;
                         upload(&store, &bundle).await?;
                         let stored = store.stored(&bundle.key).await?;
                         stored.ok_or_else(|| Msg::SnapshotObjectBad(&bundle.key).text())?
@@ -514,13 +547,22 @@ async fn store_generation(
             };
             let mut text = serde_json::to_vec_pretty(&document_text).map_err(|e| e.to_string())?;
             text.push(b'\n');
+            #[cfg(feature = "refresh-lock")]
+            guard().await?;
             store.put(&document, text).await?;
         }
     }
     #[cfg(feature = "generation-pointer")]
     if let (Some((section, config)), Some(valkey)) = (&pointer.generations, &valkey) {
         let keep = section.keep;
-        return generations::point(valkey, config, keep, generation, None, 0).await;
+        #[cfg(feature = "refresh-lock")]
+        let (token, fence) = match &pointer.held {
+            Some(held) => (Some(held.token.as_str()), held.fence),
+            None => (None, 0),
+        };
+        #[cfg(not(feature = "refresh-lock"))]
+        let (token, fence) = (None, 0);
+        return generations::point(valkey, config, keep, generation, token, fence).await;
     }
     let current = config.key("current");
     let pointer = format!("{generation}\n").into_bytes();

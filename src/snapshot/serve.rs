@@ -169,33 +169,33 @@ pub fn reach(config: &Config) -> std::result::Result<String, String> {
     })
 }
 
-/// With `[generations]`: the current generation id Valkey holds, once the store answers that it
-/// holds its document, or why Valkey or the store did not say within `REACH_TIMEOUT`, the reason
-/// prefixed with which one.
+/// With `[generations]`: the current generation id Valkey holds and its fence, once the store
+/// answers that it holds its document, or why Valkey or the store did not say within
+/// `REACH_TIMEOUT`, the reason prefixed with which one.
 #[cfg(feature = "generation-pointer")]
 pub fn reach_pointer(
     config: &Config,
     valkey: &crate::valkey::Config,
-) -> std::result::Result<String, String> {
+) -> std::result::Result<(String, u64), String> {
     within(async {
         let read = async {
             let connection = crate::valkey::Valkey::connect(valkey).await?;
             super::generations::current(&connection, valkey).await
         };
-        let (id, _) = read.await.map_err(|e| format!("valkey: {e}"))?;
+        let (id, fence) = read.await.map_err(|e| format!("valkey: {e}"))?;
         let key = config.key(&format!("generations/{id}.json"));
         let stored = async { Store::connect(config)?.stored(&key).await };
         match stored.await.map_err(|e| format!("store: {e}"))? {
-            Some(_) => Ok(id),
+            Some(_) => Ok((id, fence)),
             None => Err(format!("store: {}", Msg::SnapshotNoCurrent(&key).text())),
         }
     })
 }
 
 /// `ask` on a runtime of its own, or a timeout after `REACH_TIMEOUT`.
-fn within(
-    ask: impl Future<Output = std::result::Result<String, String>>,
-) -> std::result::Result<String, String> {
+fn within<T>(
+    ask: impl Future<Output = std::result::Result<T, String>>,
+) -> std::result::Result<T, String> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

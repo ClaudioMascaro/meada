@@ -78,6 +78,12 @@ tree-sitter-typescript = "0.23.2"
 ureq = { version = "3.4.2", default-features = false, features = ["rustls"] }
 yaml-rust2 = { version = "0.13.0", default-features = false }
 
+# The refresh lock's child supervision (`meada snapshot lock`), only behind `refresh-lock` and
+# Unix only: a signal to the child's process group and, on Linux, the signal the child gets when
+# `lock` dies.
+[target.'cfg(unix)'.dependencies]
+nix = { version = "=0.31.3", optional = true, default-features = false, features = ["signal"] }
+
 # Cloud modules (ADR 0012), all off by default: a build without a feature carries none of its
 # crates. `valkey` is internal, enabled through the modules that need it.
 [features]
@@ -93,6 +99,8 @@ snapshot = [
 ]
 # The current and retained generations in Valkey, and pins (`[generations]`). No crate of its own.
 generation-pointer = ["snapshot", "valkey"]
+# The refresh lock and its fencing tokens (`[refresh_lock]`, `meada snapshot lock`).
+refresh-lock = ["generation-pointer", "dep:nix"]
 
 # `cargo test` runs the example's own tests too.
 [[example]]

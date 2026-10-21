@@ -1175,6 +1175,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "ignore",
+ "nix",
  "nodejs-semver",
  "object_store",
  "percent-encoding",

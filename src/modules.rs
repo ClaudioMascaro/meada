@@ -33,12 +33,12 @@ pub const MODULES: [Module; 6] = [
         feature: "generation-pointer",
         built: cfg!(feature = "generation-pointer"),
     },
-    // The sections below belong to modules not built yet: no build has their feature.
     Module {
         section: "refresh_lock",
         feature: "refresh-lock",
-        built: false,
+        built: cfg!(feature = "refresh-lock"),
     },
+    // The sections below belong to modules not built yet: no build has their feature.
     Module {
         section: "sessions",
         feature: "session-store",
@@ -115,6 +115,17 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.ends_with("the generation-pointer feature"), "{err}");
+    }
+
+    #[cfg(not(feature = "refresh-lock"))]
+    #[test]
+    fn the_refresh_lock_section_without_its_feature_names_it() {
+        let src = "index_dir = \"i\"\n[refresh_lock]\nttl_seconds = 300\n";
+        let err = check(Path::new("m.toml"), src).unwrap_err().to_string();
+        assert_eq!(
+            err,
+            "m.toml:2: [refresh_lock] needs a Meada built with the refresh-lock feature"
+        );
     }
 
     #[test]

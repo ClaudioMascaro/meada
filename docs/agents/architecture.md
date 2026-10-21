@@ -212,11 +212,15 @@ one for the area a change touches.
   `modules::needs`). It owns the Valkey keys, both under the `[valkey]` prefix's hash tag:
   `{<key_prefix>}:current`, a hash `{id, fence}`, and `{<key_prefix>}:retained`, a list of
   `<id>:<fence>` newest first, each id once, trimmed to `keep`. `point` runs the one script that
-  writes both (`EVAL`; KEYS current and retained, ARGV id, fence, keep and the refresh lock's
-  token, empty without one): it removes every entry of the id, pushes `<id>:<fence>`, trims and
-  sets the hash. `publish` connects to Valkey before any upload and calls `point` last, with
-  fence `0` and no token, instead of writing the store's `current`; #276's lock and fence check
-  go in that script. `read` is the pull's side: `HMGET current id fence` and `LRANGE retained 0
+  writes both (`EVAL`; KEYS current, retained and `{<key_prefix>}:lock`, ARGV id, fence, keep
+  and the refresh lock's token, empty without one): with a token it returns 0 unless the lock
+  holds it (`Msg::LockNotHeld`) and -1 unless the fence is above `current`'s
+  (`Msg::FenceRefused`, naming `{<key_prefix>}:fence` and the recovery; the two fences compare
+  as decimal text, leading zeros dropped, so none loses precision as a Lua number, and -2 for a
+  stored fence that is no decimal); then it removes every entry of the id, pushes
+  `<id>:<fence>`, trims and sets the hash. `publish` connects to Valkey before any upload and
+  calls `point` last, with fence `0` and no token without `[refresh_lock]`, instead of writing
+  the store's `current`. `read` is the pull's side: `HMGET current id fence` and `LRANGE retained 0
   keep-1`, every id checked by `is_id` and every fence by `snapshot::fence` before anything
   else; a missing pointer, an empty list or a malformed entry is an error naming the key. With
   it, `pull_locked` (through `Source::wanted`) fetches the current generation if the node lacks
@@ -225,7 +229,32 @@ one for the area a change touches.
   (`Msg::SnapshotRetainedSkipped`, naming the id and the cause, on stderr) that blocks nothing
   and that the next pull retries, then deletes every held id outside the current, the retained
   and the one just replaced. A pull that re-fetched the current generation (its directory gone)
-  reports `Pulled::Swapped`, so `--every` prints its id.
+  reports `Pulled::Swapped`, so `--every` prints its id. Before any fetch, a current generation
+  whose fence is below the one in the node pointer file fails the pull with
+  `Msg::FenceBelowNode` and changes nothing; with no pointer file the node takes it whatever
+  its fence. `engine::status_generations` adds a `fence: stuck: ...` line (`Msg::FenceStuck`)
+  when the node's fence is above the one `reach_pointer` read, with no effect on the exit code.
+  `snapshot/lock.rs` (feature `refresh-lock`, which implies `generation-pointer`; crate `nix`,
+  Unix only, a `compile_error!` elsewhere) is the refresh lock, section `[refresh_lock]` (`ttl_seconds`, default 300, at
+  least 10; `Manifest::read` refuses it without `[generations]`). Keys under the same hash tag:
+  `{<key_prefix>}:lock` and `{<key_prefix>}:fence`, which Meada only `INCR`s. `run` is `meada
+  snapshot lock`: `SET lock <token> NX PX <ttl>` (a token of 16 bytes of `/dev/urandom` in hex;
+  a lock already held is `Msg::LockHeld`, nothing run; a `SET` that errs releases the token
+  anyway, since the server may have taken it), `INCR fence` (a result that is not a
+  positive `u64` is `Msg::LockBadFence`), then the child, spawned on the main thread in a
+  process group of its own (`process_group(0)`) with `MEADA_REFRESH_LOCK` and
+  `MEADA_REFRESH_FENCE`; on Linux its `pre_exec` arms `PR_SET_PDEATHSIG` (SIGTERM) and refuses
+  to run if `lock` already died, the crate's one `unsafe`. A thread waits for the child; the
+  `select!` loop renews every `ttl/3` (`RENEW`, compare-and-extend, each try bounded by the next
+  deadline and polled as a branch of its own, so no signal or exit waits for Valkey), counts a renewal from the instant before it was sent, and calls the lock lost when
+  a renewal finds another token or none succeeded for a whole TTL. Lost, or a SIGTERM, SIGINT,
+  SIGHUP or SIGQUIT to `lock`: SIGTERM to the group, SIGKILL after `KILL_GRACE` (10 s). Once the child exits, the
+  group gets SIGKILL (nothing is left in it; a grandchild that calls `setsid` escapes), `RELEASE` (compare-and-delete) runs within `RELEASE_TIMEOUT`,
+  and `run` returns the child's code (128 plus the signal) or `Msg::LockLost`. `from_env` is
+  `publish`'s side: with `[refresh_lock]` it needs both variables (`Msg::LockEnv`), `holds` (`GET
+  lock` equals the token) runs before each bundle upload and before the document's (a token
+  with no `[generations]` is an error, never a pass), and the
+  token and fence go to `point`.
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.

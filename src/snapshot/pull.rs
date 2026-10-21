@@ -10,7 +10,9 @@
 //! changes): the node holds every retained generation and deletes the others, never the current
 //! one or the one it just replaced, and its pointer file carries the fence read with the id. The
 //! current generation is fetched and swapped in first; a retained one that fails after it is a
-//! warning, retried by the next pull, and blocks nothing.
+//! warning, retried by the next pull, and blocks nothing. A current generation whose fence is
+//! below the one in the node's pointer file (a refresh lock's fence lost in Valkey) is an error
+//! that changes nothing; without a pointer file the node takes it whatever its fence.
 //!
 //! Layout under `local_dir`: `current` (the node pointer file, one line `<generation id>
 //! <fence>`), `pull.lock` (one pull at a time), and per held generation `<generation id>/`, with
@@ -151,6 +153,23 @@ async fn pull_locked(
     let previous_id = previous.as_ref().map(|(id, _)| id.clone());
     let store = Store::connect(config)?;
     let (id, fence, retained) = source.wanted(&store, config).await?;
+    // Never to a lower fence than the node's (a refresh lock's; without one every fence is 0).
+    // Without a pointer file the node takes the current generation whatever its fence.
+    #[cfg(feature = "generation-pointer")]
+    if let (Some((_, valkey)), Some((_, held))) = (&source.generations, &previous)
+        && fence < *held
+    {
+        let pointer = local.join(POINTER).display().to_string();
+        return Err(Msg::FenceBelowNode {
+            current: &super::generations::keys(valkey).0,
+            id: &id,
+            fence,
+            held: *held,
+            pointer: &pointer,
+            fence_key: &valkey.key("fence", true),
+        }
+        .text());
+    }
     let held = |id: &str| fs::symlink_metadata(local.join(id)).is_ok_and(|m| m.is_dir());
     if retained.is_none() && held(&id) && previous_id.as_deref() == Some(id.as_str()) {
         return Ok((Pulled::Current(id), Vec::new()));
