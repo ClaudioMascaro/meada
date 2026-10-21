@@ -2498,8 +2498,21 @@ mod tests {
                 pair("z.py", "main")
             ]
         );
-        // The ecosystems with no console scripts add none.
-        assert!(programs(&[], &[]).is_empty());
+    }
+
+    #[test]
+    fn the_seam_finds_the_console_scripts_of_the_pypi_manifests() {
+        let manifests = [
+            read_at("web/package.json", r#"{"name": "web"}"#),
+            read_at(
+                "pyproject.toml",
+                "[project]\nname = \"acme\"\n[project.scripts]\nacme = \"acme.cli:main\"\n",
+            ),
+        ];
+        assert_eq!(
+            programs(&manifests, &["acme/cli.py"]),
+            [("acme/cli.py".to_string(), "main".to_string())]
+        );
     }
 
     #[test]
