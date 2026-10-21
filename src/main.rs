@@ -54,6 +54,20 @@ enum Command {
     },
 }
 
+/// `meada mcp --listen`. In debug builds `MEADA_DRAIN_MS` shortens the drain bound (a knob for
+/// tests and not documented; a release binary has no way to shorten the bound).
+fn listen_at(listen: &str, manifest: &Path) -> meada::Result<()> {
+    #[cfg(debug_assertions)]
+    if let Some(bound) = std::env::var("MEADA_DRAIN_MS")
+        .ok()
+        .and_then(|ms| ms.parse().ok())
+        .map(std::time::Duration::from_millis)
+    {
+        return meada::mcp::with_drain_bound(bound, || meada::mcp::listen(listen, manifest));
+    }
+    meada::mcp::listen(listen, manifest)
+}
+
 fn main() -> ExitCode {
     msg::init(std::env::var("LANG").ok().as_deref());
     let matches = Cli::command()
@@ -96,19 +110,7 @@ fn main() -> ExitCode {
             // The MCP surface is English whatever `LANG` says (ADR 0008).
             msg::init(None);
             match (listen, workspace) {
-                (Some(listen), Some(manifest)) => {
-                    // A knob for tests, not documented: the drain bound in milliseconds.
-                    let drain = std::env::var("MEADA_DRAIN_MS")
-                        .ok()
-                        .and_then(|ms| ms.parse().ok())
-                        .map(std::time::Duration::from_millis);
-                    match drain {
-                        Some(bound) => meada::mcp::with_drain_bound(bound, || {
-                            meada::mcp::listen(&listen, &manifest)
-                        }),
-                        None => meada::mcp::listen(&listen, &manifest),
-                    }
-                }
+                (Some(listen), Some(manifest)) => listen_at(&listen, &manifest),
                 _ => meada::mcp::serve(),
             }
         }

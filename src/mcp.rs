@@ -252,7 +252,7 @@ thread_local! {
 }
 
 /// Runs `f` with `listen` on this thread draining for at most `bound` instead of 25 seconds.
-/// No option or setting reaches it: tests, through `MEADA_DRAIN_MS` in `main`.
+/// No option or setting reaches it: tests, through `MEADA_DRAIN_MS` in `main`, debug builds only.
 #[doc(hidden)]
 pub fn with_drain_bound<T>(bound: Duration, f: impl FnOnce() -> T) -> T {
     struct Restore(Duration);
@@ -278,7 +278,8 @@ type Endpoint = StreamableHttpService<Meada, NeverSessionManager>;
 /// forwards its own hostname; a request with an `Origin` header (a browser, as on a DNS
 /// rebinding page) is refused instead, since MCP clients send none. Meada authenticates
 /// nobody: the operator's proxy admits clients. On SIGINT or SIGTERM it stops accepting, lets the
-/// answers in flight finish for at most `DRAIN`, drops what is left and returns.
+/// answers in flight finish for at most `DRAIN` (a second signal ends the wait), drops what
+/// is left and returns.
 pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
     let address = address(listen)?;
     let listed = Arc::new(engine::served(manifest)?);
@@ -288,7 +289,7 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
     let stopped: crate::Result<()> = runtime.block_on(async {
         let listener = tokio::net::TcpListener::bind(address).await?;
         // Before the address is printed: a signal sent on reading it is never lost.
-        let mut stop = std::pin::pin!(stop_signal()?);
+        let mut stop = Stop::install()?;
         eprintln!("listening on http://{}", listener.local_addr()?);
         let config = StreamableHttpServerConfig::default()
             .with_legacy_session_mode(false)
@@ -321,7 +322,7 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
         loop {
             let accepted = tokio::select! {
                 accepted = listener.accept() => accepted,
-                () = &mut stop => break,
+                () = stop.wait() => break,
             };
             let stream = match accepted {
                 Ok((stream, _)) => stream,
@@ -358,11 +359,15 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
         // an error instead of letting them finish.
         drop(listener);
         drop(stopping);
+        // A second signal ends the drain at once.
         let drained = tokio::time::timeout(drain, async {
             while connections.join_next().await.is_some() {}
         });
-        if drained.await.is_err() {
-            eprintln!("meada: dropping connections still open after {drain:?}");
+        tokio::select! {
+            drained = drained => if drained.is_err() {
+                eprintln!("meada: dropping connections still open after {drain:?}");
+            },
+            () = stop.wait() => eprintln!("meada: second signal, dropping connections still open"),
         }
         config.cancellation_token.cancel();
         Ok(())
@@ -373,23 +378,42 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
     stopped
 }
 
-/// Resolves on SIGINT or SIGTERM (Ctrl-C alone off Unix). The handlers are installed on the
-/// call, so a signal sent once the address is printed is never lost.
+/// The stop signals: SIGINT and SIGTERM (Ctrl-C alone off Unix). Installed on `install`, so a
+/// signal sent once the address is printed is never lost; `wait` resolves once per signal
+/// (signals that arrive together count as one).
 #[cfg(unix)]
-fn stop_signal() -> crate::Result<impl std::future::Future<Output = ()>> {
-    use tokio::signal::unix::{SignalKind, signal};
-    let mut term = signal(SignalKind::terminate())?;
-    let mut int = signal(SignalKind::interrupt())?;
-    Ok(async move {
-        tokio::select! { _ = int.recv() => {}, _ = term.recv() => {} }
-    })
+struct Stop {
+    term: tokio::signal::unix::Signal,
+    int: tokio::signal::unix::Signal,
+}
+
+#[cfg(unix)]
+impl Stop {
+    fn install() -> crate::Result<Self> {
+        use tokio::signal::unix::{SignalKind, signal};
+        Ok(Self {
+            term: signal(SignalKind::terminate())?,
+            int: signal(SignalKind::interrupt())?,
+        })
+    }
+
+    async fn wait(&mut self) {
+        tokio::select! { _ = self.int.recv() => {}, _ = self.term.recv() => {} }
+    }
 }
 
 #[cfg(not(unix))]
-fn stop_signal() -> crate::Result<impl std::future::Future<Output = ()>> {
-    Ok(async {
+struct Stop;
+
+#[cfg(not(unix))]
+impl Stop {
+    fn install() -> crate::Result<Self> {
+        Ok(Self)
+    }
+
+    async fn wait(&mut self) {
         let _ = tokio::signal::ctrl_c().await;
-    })
+    }
 }
 
 /// The endpoint `request`'s path names (`/<identity>`, percent-decoded, a trailing slash

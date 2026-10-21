@@ -72,7 +72,7 @@ one for the area a change touches.
   any request carrying one with 403; no `Host` check). `listen` runs every start check (`engine::served`, the predicate `status --workspace` exits on) before it binds, so an open port means indexes present (the probe counts an index locked by a commit in progress as ready, after a 50 ms wait), then installs the SIGINT and SIGTERM
   handlers before it prints the address, then on a signal drops the listener and lets each
   connection finish its answer in flight (`graceful_shutdown`), for at most `DRAIN` (25 s; the
-  hidden `with_drain_bound` shortens it, `main.rs` reads `MEADA_DRAIN_MS` for it), then cancels
+  hidden `with_drain_bound` shortens it, `main.rs` reads `MEADA_DRAIN_MS` for it in debug builds only, a second signal ends the wait), then cancels
   rmcp's `cancellation_token` (earlier it would end calls in flight with an error), drops what
   is left and exits 0 without waiting for the runtime's threads. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).

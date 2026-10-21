@@ -104,6 +104,15 @@ fn exit_within(server: &mut Server, wait: Duration) -> Option<Option<i32>> {
     None
 }
 
+/// Waits for a call just sent to reach the server and block on the index lock. The server shows
+/// nothing when it has read a request, so this is a margin, not a signal: a SIGTERM that won
+/// the race would find an idle connection and close it, failing the test. A loaded machine
+/// needs far less than a second to read one request.
+#[cfg(unix)]
+async fn in_flight() {
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+}
+
 /// `WEB`'s index held under a commit in progress until dropped: a call to the server waits
 /// for it (the busy timeout is 10 seconds), so it stays in flight as long as the test wants.
 #[cfg(unix)]
@@ -547,7 +556,7 @@ async fn an_answer_in_flight_when_sigterm_arrives_is_received() {
             .call_tool(call("trace", serde_json::json!({"from": "dashboard"})))
             .await
     });
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    in_flight().await;
     terminate(&server);
     tokio::time::sleep(Duration::from_millis(500)).await;
     // Still draining, and no longer accepting.
@@ -565,7 +574,7 @@ async fn an_answer_in_flight_when_sigterm_arrives_is_received() {
 
 /// Past the drain bound what is left is dropped and the exit is still 0: a connection that sent
 /// part of a request and went quiet does not hold the exit, nor does an answer still waiting.
-#[cfg(unix)]
+#[cfg(all(unix, debug_assertions))]
 #[tokio::test]
 async fn the_drain_bound_drops_an_idle_connection_and_an_answer_still_waiting() {
     use std::io::Write;
@@ -582,7 +591,7 @@ async fn the_drain_bound_drops_an_idle_connection_and_an_answer_still_waiting() 
             .call_tool(call("trace", serde_json::json!({"from": "dashboard"})))
             .await
     });
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    in_flight().await;
     let start = Instant::now();
     terminate(&server);
     assert_eq!(
@@ -593,6 +602,35 @@ async fn the_drain_bound_drops_an_idle_connection_and_an_answer_still_waiting() 
         start.elapsed() >= Duration::from_millis(900),
         "{:?}",
         start.elapsed()
+    );
+    assert!(answer.await.unwrap().is_err());
+}
+
+/// A second signal during the drain ends it at once, with the default 25-second bound and an
+/// answer still waiting: the exit is 0 and the answer is dropped.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_second_signal_ends_the_drain_at_once() {
+    let dir = chain_manifest("server_drain_second_signal");
+    assert!(run(&dir, "index").2);
+    let mut server = Server::start(&dir, "127.0.0.1:0");
+    let client = server.client(&format!("/{WEB}")).await;
+    let _commit = commit_in_progress(&dir);
+    let answer = tokio::spawn(async move {
+        client
+            .call_tool(call("trace", serde_json::json!({"from": "dashboard"})))
+            .await
+    });
+    in_flight().await;
+    terminate(&server);
+    // Draining: the answer is still waiting. (Signals that arrive together count as one, so
+    // the second comes after the server has seen the first.)
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    assert_eq!(server.child.try_wait().unwrap(), None);
+    terminate(&server);
+    assert_eq!(
+        exit_within(&mut server, Duration::from_secs(3)),
+        Some(Some(0))
     );
     assert!(answer.await.unwrap().is_err());
 }
