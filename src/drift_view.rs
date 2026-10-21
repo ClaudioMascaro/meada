@@ -1,5 +1,5 @@
-//! Shape drift as `context`, `search` and `meada status` show it (spec #23). It shows the one
-//! value `http::drift` sets on `Link::drift` and computes no drift of its own; to place each
+//! Shape drift as `context`, `search` and `meada status` show it (spec #23). It shows the stored
+//! `Link::drift` (set by a kind's pass after links) and computes no drift of its own; to place each
 //! consumer it reads the exports' consumer shapes and finds the consumer's call.
 
 use crate::contract::{self, Hit, Level, Link};

@@ -757,7 +757,7 @@ mod tests {
     /// `context` on a route lists its providers and calls its shape `response`; a contract that
     /// is no route has no such view.
     #[test]
-    fn a_route_is_viewed_by_its_providers_with_a_response_and_drift_and_a_non_route_not_at_all() {
+    fn a_route_is_viewed_by_its_providers_with_a_response_and_a_non_route_not_at_all() {
         let view = Http.view("http::GET::/users/{}").unwrap();
         let expected = View {
             provider: "provider",

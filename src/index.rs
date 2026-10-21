@@ -215,6 +215,7 @@ struct Rows {
 pub struct Indexed<'a> {
     /// The manifests, as `read_manifests` returns them (the Cargo inheritance applied).
     pub manifests: &'a [Manifest],
+    /// The `tsconfig.json` files read, as the manifest reading step returns them.
     pub tsconfigs: &'a [Config],
     /// What the files of every pack export (the `exports` table).
     pub exported: &'a [Exported],
