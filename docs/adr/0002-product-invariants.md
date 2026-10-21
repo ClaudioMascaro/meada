@@ -18,22 +18,34 @@ amended for it (2 and 4) and one was added (6).
 
 ## Decision
 
-1. Indexing never calls an LLM or the network.
+1. Indexing never calls an LLM or the network. (Amended 2026-10-21; ADR 0012: `meada index`
+   reads source from local disk only and opens no connection. Moving what indexing built is a
+   separate command the operator runs, `meada snapshot publish`, part of an opt-in cloud
+   module.)
 2. Local-first: no account, no telemetry, and no key needed to run. Source code never leaves
    the machine, with one exception: the opt-in `meada decide` command may send the minimal code
    excerpt a decision needs to a provider the user configured with their own key (ADR 0006).
    Indexing and the MCP server never do. (Amended 2026-10-21; in server mode, ADR 0011, "the
    machine" is the operator's boundary: the HTTP server returns span text to the clients the
-   operator admits, the stdio server is unchanged.)
+   operator admits, the stdio server is unchanged.) (Amended 2026-10-21; ADR 0012: an opt-in
+   cloud module connects only to endpoints the operator configured inside the operator's
+   boundary, with credentials the operator supplies from the environment or a file. The default
+   build and local use still need no account and no key, no module needs an account with Meada
+   or with a vendor the operator did not choose, and a generation published to the operator's
+   store stays within that boundary.)
 3. Meada writes only inside its own index directory. Changes to the user's files (agent
    instructions, editor configuration, hooks) happen only through an explicit command the user
-   runs.
+   runs. (Amended 2026-10-21; ADR 0012: with a cloud module, Meada's own index also covers the
+   object prefix of the snapshot store, the Valkey key prefix and the local generations
+   directory the manifest names; Meada writes nothing outside them and never into a mirror.)
 4. The MCP server has no tool that writes: it never changes the user's files, configuration or
    decisions. Its only write is refreshing Meada's own index before it answers (invariant 3,
    ADR 0004). (Amended 2026-10-21; in server mode, ADR 0011, the server writes nothing: the
    operator refreshes with `meada index`.) It exposes few tools and returns compact output under a default token budget. A
    write tool needs a new ADR. Peers are local paths only: Meada never clones or fetches a peer,
-   so the network stays out of indexing.
+   so the network stays out of indexing. (Amended 2026-10-21; ADR 0012: with the session-store
+   module the server also writes MCP session state under its key prefix; no tool writes.
+   `meada snapshot pull` moves bundles Meada published; it never fetches from a git remote.)
 5. Each repository keeps its own index; cross-repo context links indexes without merging them.
 6. Determinism: the same inputs (the source tree, `meada.toml` and `meada.decisions.toml`) give
    the same answers and the same canonical export (`meada export`, sorted JSON). The index file

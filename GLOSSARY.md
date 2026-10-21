@@ -44,8 +44,28 @@ _Avoid_: cluster, module, component
 **Server mode**:
 Meada run once for an organisation: `meada mcp --listen` serves the tools over HTTP from mirrors
 of the repositories that a workspace manifest lists, each index outside its checkout, refreshed
-by `meada index` rather than on every query (ADR 0011).
+by `meada index` rather than on every query (ADR 0011). With the snapshot module, nodes do not
+run `meada index`: they serve generations a job published (ADR 0012).
 _Avoid_: hosted mode, cloud, daemon
+
+**Cloud module**:
+An opt-in part of server mode for a deployment on several nodes: a cargo feature, off by
+default, plus one section of the workspace manifest (the snapshot store, the generation
+pointer, the refresh lock, the session store, OIDC). A build without the feature carries none
+of its crates, and with no section a build behaves as the default one (ADR 0012).
+_Avoid_: plugin, extension, cloud mode
+
+**Generation**:
+The workspace's mirrors and indexes at one commit each, published by one job and served whole
+by every node: one bundle per repository, never merged, named by a 16-hex id derived from the
+commits, the schema version, the binary version and the entries' blocks (ADR 0012). A client
+pins one with `/<identity>@<generation>`.
+_Avoid_: snapshot, version, release
+
+**Snapshot store**:
+The S3-compatible bucket and prefix the operator configures, where `meada snapshot publish`
+uploads generations and from which `meada snapshot pull` downloads them onto a node.
+_Avoid_: cache, registry, artifact store
 
 ### Across repositories
 

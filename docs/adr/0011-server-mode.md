@@ -58,21 +58,33 @@ before: the stdio server, discovery and freshness on demand are unchanged.
 - Meada does no authentication in this phase: the reverse proxy admits clients (TLS, tokens,
   SSO, network policy). rmcp's `auth` feature is the later option to weigh when an operator
   needs Meada itself to check credentials (in rmcp 3.5.1 its OAuth support is mostly the
-  client's side), and that needs its own decision.
+  client's side), and that needs its own decision. (Amended 2026-10-21; ADR 0012: the opt-in
+  OIDC module validates a bearer JWT inside Meada, as an OAuth resource server; the reverse
+  proxy stays the documented default admission.)
 - Nothing else changes: no account, no telemetry, no key, and indexing still never calls a model
-  or the network. Accepting connections opens no outbound one.
+  or the network. Accepting connections opens no outbound one. (Amended 2026-10-21; ADR 0012:
+  unless an opt-in cloud module is configured, and then only to its configured endpoints.)
 
 ### Naming the repository
 
 - A remote client names the repository it asks about in the endpoint path: the repository's
   identity is the path, as in `http://meada.internal:7333/github.com/acme/web`. Each repository
   is one MCP endpoint, so a client configures one URL per repository it works on, and the tools
-  and their descriptions do not change (ADR 0008 is untouched).
+  and their descriptions do not change (ADR 0008 is untouched). (Amended 2026-10-21; ADR 0012:
+  with the generation pointer module, `/<identity>@<generation>` pins a generation the node
+  holds, the generation being what follows the last `@`, while `/<identity>` serves the current
+  one.)
 - The named repository plays the part of the repository where Meada runs: `search`, `context`
   and `trace` answer from it, across the workspace.
 - A request that names no repository, or one the manifest does not list, is refused with HTTP
   404, and the body lists the identities the server serves. There is no default repository: a
-  default would answer about the wrong repository without saying so.
+  default would answer about the wrong repository without saying so. (Amended 2026-10-21;
+  ADR 0012: a pin naming a generation the node does not hold is a 404 too, naming the requested
+  generation, the current one and the held ones. With the OIDC module a 401 precedes any 404: a
+  caller without a valid token learns no identity or generation, and a valid token's 404 lists
+  only what it may read. The protected resource metadata,
+  `/.well-known/oauth-protected-resource/<identity>` and its pinned form, is served with that
+  module, without a token.)
 - `trace` with `changes: uncommitted` is refused in server mode: the working tree it would diff
   is on the client's machine, not the mirror's. The stdio server keeps it.
 
@@ -175,7 +187,9 @@ mirrors are kept clean by the operator's job.
   of PRs to keep in sync, and repositories the organisation does not control stay out.
 - **Authentication inside Meada now** (rmcp `auth`, a bearer token flag, mTLS). The operator's
   proxy already does it, and credentials checked by Meada are a security surface of its own,
-  with a decision of its own. Left for later.
+  with a decision of its own. Left for later. (Amended 2026-10-21; ADR 0012 is that decision:
+  the opt-in OIDC module validates a bearer JWT inside Meada, as an OAuth resource server, and
+  the reverse proxy stays the default.)
 - **Binding every interface by default.** Serves source to the network by accident.
 - **The repository in a header.** Not every MCP client lets a configuration set headers, and
   a proxy may drop them; a path is visible in every log and routable by the proxy.
@@ -204,7 +218,9 @@ mirrors are kept clean by the operator's job.
 - **Meada fetching mirrors itself.** Puts the network in Meada (invariant 4).
 - **A snapshot of the whole workspace per refresh.** Needs one database or a generation scheme
   across indexes (invariant 5); per-repository consistency suffices while links derive at query
-  time.
+  time. (Amended 2026-10-21; ADR 0012: the snapshot module adopts it as opt-in, for several
+  nodes serving the same commits. A generation is stored as one bundle per repository, never
+  merged, so invariant 5 holds.)
 - **Bare clones as mirrors.** Reading blobs from the object store is a second walk to keep
   equal to the first.
 

@@ -34,6 +34,47 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: cargo test --locked
 
+  # Cloud modules (ADR 0012): every feature, against a local Valkey and S3-compatible server.
+  cloud:
+    runs-on: ubuntu-latest
+    services:
+      valkey:
+        # 7.2 is the oldest Valkey ADR 0012 supports.
+        image: valkey/valkey:7.2-alpine
+        ports:
+          - 6379:6379
+      s3:
+        image: rustfs/rustfs:1.0.1
+        ports:
+          - 9000:9000
+        env:
+          RUSTFS_ACCESS_KEY: meada-test
+          RUSTFS_SECRET_KEY: meada-test-secret
+    env:
+      MEADA_TEST_VALKEY_URL: redis://127.0.0.1:6379
+      MEADA_TEST_S3_ENDPOINT: http://127.0.0.1:9000
+      MEADA_TEST_SERVICES_REQUIRED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Default build carries no module crate
+        run: |
+          # Each module ticket adds the crates its feature brings, space-separated.
+          forbidden=""
+          crates=$(cargo tree --locked -e normal --prefix none --format '{p}' | cut -d' ' -f1 | sort -u)
+          status=0
+          for c in $forbidden; do
+            if grep -qx "$c" <<<"$crates"; then echo "default build lists $c"; status=1; fi
+          done
+          exit $status
+      - name: Wait for the services
+        run: |
+          for port in 6379 9000; do
+            timeout 60 bash -c "until (echo > /dev/tcp/127.0.0.1/$port) 2>/dev/null; do sleep 1; done"
+          done
+      - run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      - run: cargo test --locked --all-features
+
   docs:
     runs-on: ubuntu-latest
     steps:
