@@ -39,8 +39,10 @@ schema version and holding exactly this build's schema objects, `index::vet`, th
 workspace opens), `engine::status_generations` its text (the node's
 current and held ids, and the store's current id with a short timeout, which never changes the
 exit code), and `Engine::open_node` what `export --generations` opens. An index that cannot be
-read in a generation names the generation and `meada snapshot pull` (`msg::Fix`), not `meada
-index`. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` first, then
+read in a generation names the generation and its fix (`msg::Fix`), not `meada index`: a
+publish from this build for another schema version, else removing `<local_dir>/<id>` before
+`meada snapshot pull` (a pull of the generation already current changes nothing) or a new
+generation. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` first, then
 reads each index through `index::export`, adds the contracts each `meada.toml` declares
 (`ContractKind::declare`), derives **links** from both, and renders.
 Nothing outside the index's directory (`.meada/`, or `index_dir` in server mode) is written.

@@ -71,7 +71,11 @@ impl Engine {
     /// --listen --generations` answers from the generation its request was routed by.
     #[cfg(feature = "snapshot")]
     pub(crate) fn open_held(held: &crate::snapshot::serve::Held, repo: &str) -> Result<Self> {
-        let fix = Fix::Generation(&held.id);
+        let dir = held.dir.display().to_string();
+        let fix = Fix::Generation {
+            id: &held.id,
+            dir: &dir,
+        };
         Self::read(held.listed.clone().workspace(repo)?, fix)
     }
 
@@ -1182,7 +1186,11 @@ pub fn served_generation(manifest: &Path) -> Result<(PathBuf, Vec<String>)> {
     let (_, local) = crate::snapshot::serve::node(manifest)?;
     repo::isolate(&local);
     let held = crate::snapshot::serve::held(&local)?;
-    let fix = Fix::Generation(&held.id);
+    let dir = held.dir.display().to_string();
+    let fix = Fix::Generation {
+        id: &held.id,
+        dir: &dir,
+    };
     let problems: Vec<String> = (held.listed.entries.iter())
         .filter_map(|l| {
             let r = l.repository.as_ref().ok()?;

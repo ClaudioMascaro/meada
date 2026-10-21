@@ -2084,7 +2084,10 @@ mod tests {
     #[cfg(feature = "snapshot")]
     #[test]
     fn an_index_not_in_rollback_journal_mode_is_refused_before_it_is_opened() {
-        let fix = Fix::Generation("0123456789abcdef");
+        let fix = Fix::Generation {
+            id: "0123456789abcdef",
+            dir: "generations/0123456789abcdef",
+        };
         let index = crafted("wal", "PRAGMA journal_mode = WAL;");
         let e = super::vet(&index, REPO, fix).unwrap_err().to_string();
         assert!(e.starts_with(&format!("{REPO}: index.db: ")), "{e}");
@@ -2099,7 +2102,10 @@ mod tests {
     #[cfg(feature = "snapshot")]
     #[test]
     fn an_index_with_a_schema_object_this_build_does_not_create_is_refused() {
-        let fix = Fix::Generation("0123456789abcdef");
+        let fix = Fix::Generation {
+            id: "0123456789abcdef",
+            dir: "generations/0123456789abcdef",
+        };
         assert!(super::vet(&crafted("clean", ""), REPO, fix).is_ok());
         let cases = [
             (

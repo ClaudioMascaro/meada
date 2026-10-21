@@ -211,7 +211,8 @@ async fn fetch(
         let extracted = extract(&tar, &dest, &mut budget);
         extracted.map_err(|why| format!("{}: {why}", entry.bundle))?;
         fs::remove_file(&tar).map_err(&at)?;
-        let fix = crate::msg::Fix::Generation(id);
+        let held = partial.with_file_name(id).display().to_string();
+        let fix = crate::msg::Fix::Generation { id, dir: &held };
         crate::index::vet(&dest.join("index.db"), &entry.identity, fix)
             .map_err(|e| e.to_string())?;
         settle(&dest.join("mirror"), entry).map_err(|why| format!("{}: {why}", entry.identity))?;

@@ -19,9 +19,10 @@ pub fn init(lang: Option<&str>) {
 pub enum Fix<'a> {
     /// `meada index --workspace <manifest>`.
     Index(&'a str),
-    /// A node's generation (`--generations`, feature `snapshot`) that only a publish from this
-    /// build and a pull replace.
-    Generation(&'a str),
+    /// A node's generation `id` (`--generations`, feature `snapshot`), held in `dir`
+    /// (`<local_dir>/<id>`): a pull of the generation already current changes nothing, so the
+    /// fix removes `dir` before the pull, or publishes another generation.
+    Generation { id: &'a str, dir: &'a str },
 }
 
 pub enum Msg<'a> {
@@ -472,9 +473,15 @@ impl Msg<'_> {
                     format!("{repo}: not indexed; run meada index --workspace {manifest}"),
                     format!("{repo}: não indexado; rode meada index --workspace {manifest}"),
                 ),
-                Fix::Generation(id) => pick(
-                    format!("{repo}: no index in generation {id}; run meada snapshot pull"),
-                    format!("{repo}: sem índice na geração {id}; rode meada snapshot pull"),
+                Fix::Generation { id, dir } => pick(
+                    format!(
+                        "{repo}: no index in generation {id}; remove {dir} and run meada snapshot \
+                         pull again, or publish a new generation"
+                    ),
+                    format!(
+                        "{repo}: sem índice na geração {id}; remova {dir} e rode meada snapshot \
+                         pull de novo, ou publique uma nova geração"
+                    ),
                 ),
             },
             Msg::IndexOtherVersion { repo, fix } => match fix {
@@ -488,7 +495,7 @@ impl Msg<'_> {
                          {manifest}"
                     ),
                 ),
-                Fix::Generation(id) => pick(
+                Fix::Generation { id, .. } => pick(
                     format!(
                         "{repo}: indexed by another version in generation {id}; publish a \
                          generation from this build, then run meada snapshot pull"
@@ -510,14 +517,16 @@ impl Msg<'_> {
                          --workspace {manifest}"
                     ),
                 ),
-                Fix::Generation(id) => pick(
+                Fix::Generation { id, dir } => pick(
                     format!(
                         "{repo}: its index in generation {id} holds an interrupted commit; \
-                         publish a new generation, then run meada snapshot pull"
+                         remove {dir} and run meada snapshot pull again, or publish a new \
+                         generation"
                     ),
                     format!(
                         "{repo}: seu índice na geração {id} guarda um commit interrompido; \
-                         publique uma nova geração e rode meada snapshot pull"
+                         remova {dir} e rode meada snapshot pull de novo, ou publique uma nova \
+                         geração"
                     ),
                 ),
             },

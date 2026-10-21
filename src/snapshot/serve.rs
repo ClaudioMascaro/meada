@@ -227,6 +227,20 @@ mod tests {
         assert!(e.contains("meada snapshot pull"), "{e}");
     }
 
+    /// A pull of the generation already current changes nothing: the fix of a missing index
+    /// removes the generation's directory first, or publishes another one.
+    #[test]
+    fn a_missing_index_names_the_generation_directory_to_remove() {
+        let local = scratch("missing");
+        generation(&local, A, &[("a.ts", "export function alpha() {}\n")]);
+        point(&local, A);
+        fs::remove_file(local.join(A).join(BUNDLE).join("index.db")).unwrap();
+        let held = held(&local).unwrap();
+        let e = Engine::open_held(&held, REPO).err().unwrap().to_string();
+        let dir = local.join(A).display().to_string();
+        assert!(e.contains(&format!("generation {A}; remove {dir} and run meada snapshot pull again, or publish a new generation")), "{e}");
+    }
+
     #[test]
     fn an_oversized_mirror_config_fails_the_generation_naming_the_file() {
         for name in ["meada.toml", "meada.decisions.toml"] {
