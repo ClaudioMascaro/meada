@@ -13,7 +13,6 @@ use super::{
 use crate::package::read_manifest;
 use crate::{Result, parent, qualify};
 
-pub(crate) mod messages;
 pub mod pyproject;
 
 /// How many definitions may nest in one file. Names are qualified by the definitions around
