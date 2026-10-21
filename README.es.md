@@ -310,6 +310,27 @@ que falla en cualquier paso deja el puntero y las generaciones guardadas como es
     <id de bundle>/mirror/    # el checkout, .git incluido
 ```
 
+Para servir lo que el nodo recibió, `meada mcp --listen <dirección> --workspace <manifiesto>
+--generations`. El manifiesto del nodo aporta solo las secciones de módulo (`[snapshot]`); los
+repositorios son los que registró la generación actual, con los espejos e índices dentro de
+`<local_dir>/<id de generación>/`. Cada llamada lee `<local_dir>/current` y abre el motor sobre
+la generación que nombra: una llamada ya abierta termina en la generación en que empezó, la
+siguiente ve la nueva, y `meada snapshot pull --every` cambia la generación sin reiniciar el
+servidor (un repositorio nuevo en una generación nueva recibe su endpoint al instante). No se
+escribe nada por llamada, los índices se abren solo para lectura y el servidor no abre ninguna
+conexión con el store. Los nodos nunca ejecutan `meada index`: el job indexa y el nodo solo
+recibe. Sin generación actual, o con un índice que no está en la versión de esquema de este
+binario, el servidor se niega a arrancar y nombra `meada snapshot pull` o el repositorio y la
+generación.
+
+`meada status --workspace <manifiesto> --generations` es la sonda de disponibilidad del nodo.
+Imprime el id de la generación actual, los ids guardados y una línea
+`store: reachable (current <id>)` o `store: unreachable (<motivo>)`. El código de salida
+depende solo del estado local: 1 sin una generación actual servible (los problemas van a
+stderr), 0 en caso contrario, con el store alcanzable o no, de modo que un store caído no saca
+al nodo de la rotación. `meada export --workspace <manifiesto> --repo <identidad> --generations`
+exporta del mismo modo.
+
 ## Decisiones
 
 Un enlace ambiguo (varios proveedores sirven la ruta) o una URL dinámica (la llamada arma la URL

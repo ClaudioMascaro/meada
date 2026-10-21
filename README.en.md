@@ -298,6 +298,25 @@ leaves the pointer and the held generations as they were.
     <bundle id>/mirror/       # the checkout, .git included
 ```
 
+To serve what the node received, `meada mcp --listen <address> --workspace <manifest>
+--generations`. The node's manifest contributes only its module sections (`[snapshot]`); the
+repositories are the ones the current generation recorded, with mirrors and indexes inside
+`<local_dir>/<generation id>/`. Each call reads `<local_dir>/current` and opens the engine over
+the generation it names: a call already open finishes on the generation it started on, the next
+one sees the new one, and `meada snapshot pull --every` swaps the generation without restarting
+the server (a repository new in a new generation gets its endpoint at once). Nothing is written
+per call, the indexes open read-only, and the server opens no connection to the store. Nodes
+never run `meada index`: the job indexes and the node only receives. With no current
+generation, or an index that is not at this binary's schema version, the server refuses to start
+and names `meada snapshot pull` or the repository and the generation.
+
+`meada status --workspace <manifest> --generations` is the node's readiness probe. It prints the
+current generation id, the held ids and a line `store: reachable (current <id>)` or
+`store: unreachable (<reason>)`. The exit code depends only on local state: 1 without a
+servable current generation (the problems go to stderr), 0 otherwise, the store reachable or
+not, so a stopped store does not take the node out of rotation. `meada export --workspace
+<manifest> --repo <identity> --generations` exports the same way.
+
 ## Decisions
 
 An ambiguous link (several providers serve the route) or a dynamic URL (the call builds its URL

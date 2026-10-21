@@ -43,6 +43,18 @@ All notable changes to Meada are recorded here. The format follows
   <fence>`) by rename, keeping the current and the previous generation. Meada's `git` calls on
   pulled mirrors read no system or global configuration. One pull runs at a time per
   `local_dir`; `--every <seconds>` repeats it. A failed pull changes nothing.
+- Server mode, serving generations (ADR 0012, feature `snapshot`): `meada mcp --listen <addr>
+  --workspace <manifest> --generations` serves the generation `<local_dir>/current` names; each
+  call reads the pointer file and opens the engine over that generation's mirrors and indexes
+  (read-only, nothing written per call), so a call open before a swap finishes on its
+  generation and the next one sees the new. The node's manifest contributes only its module
+  sections, nodes never run `meada index`, and the server refuses to start without a servable
+  current generation (naming `meada snapshot pull`, or the repository and generation of an
+  index at another schema version). `meada status --workspace <manifest> --generations` prints
+  the current id, the held ids and `store: reachable` or `store: unreachable (<reason>)`, and
+  exits 1 only without a servable current generation, whatever the store; `meada export
+  --workspace <manifest> --repo <identity> --generations` exports from it. The flag is absent
+  from the default build.
 - npm installer (spec #32): cargo-dist builds and publishes an npm package named `meada` with each
   release, at the crate's version, so `npx meada mcp` launches the MCP server and `npx meada
   <command>` runs any command; the release configuration is planned as a dry run on pull requests.

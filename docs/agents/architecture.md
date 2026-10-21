@@ -19,7 +19,21 @@ manifest opens every index read-only on one connection (`index::open_read`: noth
 one read transaction held until the engine drops, so an answer sees each index as one commit left
 it and a commit waits for the answer, both up to a busy timeout) and its `refresh()` does
 nothing, so only `meada index --workspace` writes; `open_manifest` is also what `meada export --workspace --repo`
-opens. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` first, then
+opens. With the snapshot module (feature `snapshot`, `--generations`), `Engine::open_generation`
+builds the workspace from the generation `<local_dir>/current` names instead
+(`snapshot::serve::held` reads the pointer file and the generation document, and
+`Manifest::of_generation` turns it into the same `Manifest`: per entry the mirror at
+`<generation id>/<bundle id>/mirror`, the index beside it, the mirror's own `meada.toml` whole or
+else the blocks the document recorded; no `git` runs, the pull checked each mirror) and opens it
+read-only as `open_manifest` does, one engine per call, so a swap between two calls changes the
+generation and one during a call does not. The node's manifest contributes only its module
+sections. `engine::served_generation` is its start check and the predicate `status
+--generations` exits on (current generation present, every mirror rechecked, every index at the
+schema version, the whole workspace opens), `engine::status_generations` its text (the node's
+current and held ids, and the store's current id with a short timeout, which never changes the
+exit code), and `Engine::open_node` what `export --generations` opens. An index that cannot be
+read in a generation names the generation and `meada snapshot pull` (`msg::Fix`), not `meada
+index`. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` first, then
 reads each index through `index::export`, adds the contracts each `meada.toml` declares
 (`ContractKind::declare`), derives **links** from both, and renders.
 Nothing outside the index's directory (`.meada/`, or `index_dir` in server mode) is written.
@@ -68,7 +82,9 @@ one for the area a change touches.
   two transports: stdio, about the client's first `file://` root or the server's cwd without
   roots, and in server mode streamable HTTP (`meada mcp --listen`, stateless, JSON responses on
   a hyper listener), one endpoint per repository of the manifest at `/<identity>`, a 404
-  listing the identities served elsewhere (it answers before the `Origin` check, which refuses
+  listing the identities served elsewhere (with `--generations`, `listen_generations` makes
+  the endpoint per request from the current generation's identities, so a pull that adds a
+  repository needs no restart, and a node with no readable generation answers 503; it answers before the `Origin` check, which refuses
   any request carrying one with 403; no `Host` check). `listen` runs every start check (`engine::served`, the predicate `status --workspace` exits on) before it binds, so an open port means indexes present (the probe counts an index locked by a commit in progress as ready, after a 50 ms wait), then installs the SIGINT and SIGTERM
   handlers before it prints the address, then on a signal drops the listener and lets each
   connection finish its answer in flight (`graceful_shutdown`), for at most `DRAIN` (25 s; the
@@ -153,6 +169,11 @@ one for the area a change touches.
   `current`, and every id-named directory but the new current and the one just replaced is
   deleted. A failure removes the partial directory and leaves the pointer and every held
   generation as they were.
+  `snapshot/serve.rs` is what serving reads from a node (`--generations`): `node` (the
+  manifest's `[snapshot]` section and `local_dir`), `held` (the current generation: the
+  pointer file through `pull::current`, then `generation.json`, bounded and checked as the
+  generation's own), `ids` (the generations held) and `reach` (the store's current id within
+  two seconds, for the probe). It only reads; the pull is the only writer of `local_dir`.
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
