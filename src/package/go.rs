@@ -5,20 +5,28 @@
 //!
 //! An entry keeps where its module comes from in `Entry::via`, as Cargo's does: `path
 //! <go.mod>` for a `replace` to a local directory (folded lexically from the manifest's
-//! directory: a path of the repository, or one that starts with `../` when it leaves it, which
-//! `Ecosystem::reaches` matches against the workspace repositories' roots), `outside` for a
-//! `replace` by anything else (a module, an absolute path), which leaves the module out of the
-//! workspace, and nothing otherwise. Ranges are never checked, and neither `go.sum` nor the
-//! module proxy is read.
+//! directory: a path of the repository, or one that starts with `../` when it leaves it),
+//! `outside` for a `replace` by anything else (a module, an absolute path), which leaves the
+//! module out of the workspace, and nothing otherwise. Ranges are never checked, and neither
+//! `go.sum` nor the module proxy is read.
+//!
+//! Each rule answers one question of `Ecosystem`:
+//! - `names_package`: any valid contract name may name a module (a module path needs no dot).
+//! - `entries`: the entry of the owning `go.mod` with the longest module path the import starts
+//!   with, the rest of the import as the subpath.
+//! - `reaches`: a local `replace` is a path source, the rule Cargo's `path` follows (`sourced`).
+//! - `resolve`: the one package directory the subpath names in the module, test files and the
+//!   files of a nested module left out, through the provider view's directory table.
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use super::cargo::{relative, sourced};
 use super::{
-    Ecosystem, Entry, MAX_BYTES, Manifest, Provided, Providers, Resolved, Summary, directory,
-    owner, valid_name,
+    Ecosystem, Entry, How, MAX_BYTES, Manifest, Provided, Providers, Resolved, Summary, directory,
+    inside, owner, valid_name,
 };
+use crate::contract::Level;
 use crate::index::Export;
 use crate::lang::go::modfile;
 
@@ -145,7 +153,10 @@ impl Ecosystem for Go {
         sourced(via, from, to)
     }
 
-    /// The one package directory the subpath names in the module (`Provided::package`).
+    /// The symbol `chain` names in the Go package at `subpath` (`.` for the module's root, else
+    /// `./<directory>`) of the module at `manifest`: the exported name of the one source file of
+    /// that directory (a test file or one of a nested module is none) that defines it. `exact`
+    /// when found; none when the directory lacks or the name is not exported there.
     fn resolve(
         &self,
         at: &Provided,
@@ -155,7 +166,35 @@ impl Ecosystem for Go {
         (_, chain): (&str, &str),
         known: &dyn Fn(&str) -> bool,
     ) -> Option<Resolved> {
-        at.package(repository, manifest, subpath, chain, known)
+        let base = directory(&manifest.path);
+        let dir = match subpath.strip_prefix("./") {
+            Some(rest) => inside(base, rest)?,
+            None if base == "." => String::new(),
+            None => base.to_string(),
+        };
+        let by_dir = at.go_dirs.get_or_init(|| {
+            let mut by_dir: HashMap<&str, Vec<&str>> = HashMap::new();
+            for &f in at.files.iter().filter(|f| f.ends_with(".go")) {
+                if !f.ends_with("_test.go") {
+                    by_dir
+                        .entry(f.rsplit_once('/').map_or("", |(d, _)| d))
+                        .or_default()
+                        .push(f);
+                }
+            }
+            by_dir
+        });
+        let mut ids: Vec<String> = (by_dir.get(dir.as_str()).into_iter().flatten())
+            .filter(|f| at.owned_source(manifest, f))
+            .filter_map(|f| at.reach(repository, f, chain, known))
+            .collect();
+        ids.sort();
+        ids.dedup();
+        (ids.len() == 1).then_some(Resolved {
+            how: How::ModulePath,
+            level: Level::Exact,
+            targets: ids,
+        })
     }
 }
 
@@ -243,6 +282,135 @@ mod tests {
         );
         assert_eq!(modfile::inside("example.com/a", "example.com/a"), Some(""));
         assert_eq!(modfile::inside("example.com/ab", "example.com/a"), None);
+    }
+
+    fn manifest(path: &str, src: &str) -> Manifest {
+        Manifest {
+            path: path.into(),
+            summary: read(path, src.as_bytes()),
+        }
+    }
+
+    /// A repository with these manifests and Go files, each exporting the name of its stem,
+    /// capitalised (`upper.go` exports `Upper`).
+    fn repository(name: &str, manifests: Vec<Manifest>, files: &[&str]) -> Export {
+        let stem = |f: &str| {
+            let stem = f.rsplit('/').next().unwrap().trim_end_matches(".go");
+            stem[..1].to_uppercase() + &stem[1..]
+        };
+        Export {
+            repository: name.into(),
+            files: (files.iter())
+                .map(|f| crate::index::File {
+                    path: f.to_string(),
+                    hash: String::new(),
+                })
+                .collect(),
+            exported: (files.iter())
+                .map(|f| crate::resolve::Exported {
+                    path: f.to_string(),
+                    name: Some(stem(f)),
+                    file: Some(f.to_string()),
+                    target: Some(stem(f)),
+                })
+                .collect(),
+            manifests,
+            ..Export::default()
+        }
+    }
+
+    #[test]
+    fn the_longest_module_path_the_import_starts_with_wins_and_the_rest_is_the_subpath() {
+        let consumer = repository(
+            "c",
+            vec![manifest(
+                "go.mod",
+                "module example.com/app\nrequire (\n\texample.com/a v1.0.0\n\texample.com/a/b v1.0.0\n)\n",
+            )],
+            &["main.go"],
+        );
+        let exports = [consumer];
+        let providers = Providers::new(&exports);
+        let entry = |specifier: &str| {
+            let found = Go.entries(&exports, &providers, (0, "main.go"), specifier);
+            (found.into_iter())
+                .map(|(e, subpath)| (e.name.clone(), subpath))
+                .collect::<Vec<_>>()
+        };
+        let one = |name: &str, subpath: &str| vec![(name.to_string(), subpath.to_string())];
+        assert_eq!(
+            entry("example.com/a/b/c/d"),
+            one("example.com/a/b", "./c/d")
+        );
+        assert_eq!(entry("example.com/a/b"), one("example.com/a/b", "."));
+        assert_eq!(entry("example.com/a/x"), one("example.com/a", "./x"));
+        assert_eq!(entry("example.com/ab"), []);
+        assert_eq!(entry("fmt"), []);
+    }
+
+    #[test]
+    fn a_package_directory_leaves_out_test_files_and_the_files_of_a_nested_module() {
+        let provider = repository(
+            "p",
+            vec![
+                manifest("go.mod", "module example.com/lib\n"),
+                manifest("sub/go.mod", "module example.com/lib/sub\n"),
+            ],
+            &[
+                "text/upper.go",
+                "text/upper_test.go",
+                "text/deep/lower.go",
+                "sub/nested.go",
+            ],
+        );
+        let at = Provided::new(&provider);
+        let known = |_: &str| true;
+        let resolve = |manifest: usize, subpath: &str, chain: &str| {
+            let entry = Entry::default();
+            let r = Go.resolve(
+                &at,
+                "p",
+                &provider.manifests[manifest],
+                (&entry, subpath),
+                ("", chain),
+                &known,
+            )?;
+            Some((r.targets, r.level))
+        };
+        let exact = |id: &str| Some((vec![id.to_string()], Level::Exact));
+        // The one directory the subpath names: not the directories under it, not the tests.
+        assert_eq!(
+            resolve(0, "./text", "Upper"),
+            exact("p::text/upper.go::Upper")
+        );
+        assert_eq!(resolve(0, "./text", "Lower"), None);
+        assert_eq!(
+            resolve(0, "./text/deep", "Lower"),
+            exact("p::text/deep/lower.go::Lower")
+        );
+        assert_eq!(resolve(0, "./text", "Upper_test"), None);
+        // The nested module's file belongs to the nested module alone.
+        assert_eq!(resolve(0, "./sub", "Nested"), None);
+        assert_eq!(resolve(1, ".", "Nested"), exact("p::sub/nested.go::Nested"));
+        assert_eq!(resolve(0, ".", "Upper"), None);
+    }
+
+    #[test]
+    fn a_local_replace_is_a_path_source_that_reaches_the_directory_it_names_and_nothing_else() {
+        let s = read(
+            "app/go.mod",
+            b"require example.com/lib v1.0.0\nreplace example.com/lib => ../lib\n",
+        );
+        let via = s.dependencies[0].via.as_deref();
+        assert_eq!(via, Some("path lib/go.mod"));
+        let at = |id| (id, Path::new(if id == "a" { "/w/a" } else { "/w/b" }));
+        let source = (via, None);
+        assert!(Go.reaches(source, at("a"), (at("a"), "lib/go.mod")));
+        assert!(!Go.reaches(source, at("a"), (at("a"), "go.mod")));
+        assert!(!Go.reaches(source, at("a"), (at("a"), "other/go.mod")));
+        assert!(!Go.reaches(source, at("a"), (at("b"), "lib/go.mod")));
+        // A module no `replace` moves is every repository's.
+        assert!(Go.reaches((None, None), at("a"), (at("b"), "go.mod")));
     }
 
     #[test]
