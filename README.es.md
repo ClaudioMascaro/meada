@@ -180,7 +180,9 @@ Un espejo es un checkout con árbol de trabajo; un clon bare no tiene qué index
   `host:puerto`, `:puerto` o `puerto`; el host es una IP o `localhost`, nunca resuelto, y el
   valor por defecto es el loopback. La primera línea de stderr es
   `listening on http://<host>:<puerto>`. SIGINT o SIGTERM detienen el servidor: deja de aceptar
-  conexiones, termina las respuestas en curso y sale con código 0.
+  conexiones, termina las respuestas en curso y sale con código 0. La espera tiene un límite fijo de 25
+  segundos, por debajo de los 30 s de gracia por defecto de Kubernetes: pasado el límite, las
+  conexiones restantes se descartan y la salida sigue siendo 0.
 - Cada repositorio es un endpoint, `http://<host>:<puerto>/<identidad>` (por ejemplo
   `http://meada.internal:7333/github.com/acme/web`); el cliente configura una URL por
   repositorio en que trabaja. Cualquier otra ruta responde 404 con las identidades servidas.

@@ -173,7 +173,9 @@ os blocos do manifesto são ignorados (o `meada status` os nomeia). Um espelho �
 - `meada mcp --listen <endereço> --workspace <manifesto>` serve. O endereço é `host:porta`,
   `:porta` ou `porta`; o host é um IP ou `localhost`, nunca resolvido, e o padrão é o loopback.
   A primeira linha do stderr é `listening on http://<host>:<porta>`. SIGINT ou SIGTERM param o
-  servidor: ele deixa de aceitar conexões, termina as respostas em andamento e sai com código 0.
+  servidor: ele deixa de aceitar conexões, termina as respostas em andamento e sai com código 0. A espera tem limite fixo de 25 segundos,
+  abaixo dos 30 s de carência padrão do Kubernetes: passado o limite, as conexões restantes são
+  descartadas e a saída continua sendo 0.
 - Cada repositório é um endpoint, `http://<host>:<porta>/<identidade>` (por exemplo
   `http://meada.internal:7333/github.com/acme/web`); o cliente configura uma URL por repositório
   em que trabalha. Qualquer outro caminho responde 404 com a lista das identidades servidas.

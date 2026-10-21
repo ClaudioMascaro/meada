@@ -96,7 +96,19 @@ fn main() -> ExitCode {
             // The MCP surface is English whatever `LANG` says (ADR 0008).
             msg::init(None);
             match (listen, workspace) {
-                (Some(listen), Some(manifest)) => meada::mcp::listen(&listen, &manifest),
+                (Some(listen), Some(manifest)) => {
+                    // A knob for tests, not documented: the drain bound in milliseconds.
+                    let drain = std::env::var("MEADA_DRAIN_MS")
+                        .ok()
+                        .and_then(|ms| ms.parse().ok())
+                        .map(std::time::Duration::from_millis);
+                    match drain {
+                        Some(bound) => meada::mcp::with_drain_bound(bound, || {
+                            meada::mcp::listen(&listen, &manifest)
+                        }),
+                        None => meada::mcp::listen(&listen, &manifest),
+                    }
+                }
                 _ => meada::mcp::serve(),
             }
         }

@@ -71,9 +71,10 @@ one for the area a change touches.
   listing the identities served elsewhere (it answers before the `Origin` check, which refuses
   any request carrying one with 403; no `Host` check). `listen` runs every start check (`engine::served`, the predicate `status --workspace` exits on) before it binds, so an open port means indexes present (the probe counts an index locked by a commit in progress as ready, after a 50 ms wait), then installs the SIGINT and SIGTERM
   handlers before it prints the address, then on a signal drops the listener and lets each
-  connection finish its answer in flight (`graceful_shutdown`) before it returns, so the process
-  exits 0; the rmcp `cancellation_token` is left alone, since cancelling it ends calls in
-  flight (a bounded drain is ticket #268). `main.rs`: clap.
+  connection finish its answer in flight (`graceful_shutdown`), for at most `DRAIN` (25 s; the
+  hidden `with_drain_bound` shortens it, `main.rs` reads `MEADA_DRAIN_MS` for it), then cancels
+  rmcp's `cancellation_token` (earlier it would end calls in flight with an error), drops what
+  is left and exits 0 without waiting for the runtime's threads. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
@@ -783,6 +784,9 @@ one for the area a change touches.
 
 ## Known ceilings
 
+- `mcp.rs`: the stop signal drains for at most `DRAIN` (25 seconds, no flag, under Kubernetes'
+  30-second default grace period); past it the connections left are dropped, an answer still
+  waiting on an index lock included, and the exit is 0.
 - `engine.rs`: one connection attaches every peer, so a workspace reads at most 10 peers
   (`MAX_PEERS`, SQLite's attach limit). `search` scans every symbol.
 - `index.rs`: every contract is extracted again and every call resolved again on any change

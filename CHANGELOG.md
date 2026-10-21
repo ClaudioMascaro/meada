@@ -14,7 +14,7 @@ All notable changes to Meada are recorded here. The format follows
   manifest's `index_dir` and is refreshed by command (`meada index --workspace`, run by the
   operator's fetch job or webhook), never by the server, which only reads; `meada status
   --workspace` and `meada export --workspace --repo` read the same manifest. SIGINT and SIGTERM
-  stop the server after the answers in flight. Meada authenticates nobody: a reverse proxy admits
+  stop the server after the answers in flight, within 25 seconds. Meada authenticates nobody: a reverse proxy admits
   the clients.
 - npm installer (spec #32): cargo-dist builds and publishes an npm package named `meada` with each
   release, at the crate's version, so `npx meada mcp` launches the MCP server and `npx meada

@@ -7,8 +7,10 @@ use crate::common;
 
 use std::fs;
 use std::io::{BufRead, BufReader};
+use std::net::TcpStream;
 use std::path::Path;
 use std::process::{Child, ChildStderr, Command, Stdio};
+use std::time::{Duration, Instant};
 
 use crate::manifest::{
     MANIFEST, ReadOnly, assert_nothing_else_written, chain_manifest, contents, run, run_export,
@@ -38,7 +40,13 @@ struct Server {
 
 impl Server {
     fn start(dir: &Path, listen: &str) -> Self {
+        Self::start_with(dir, listen, &[])
+    }
+
+    /// `start` with more environment variables.
+    fn start_with(dir: &Path, listen: &str, env: &[(&str, &str)]) -> Self {
         let mut child = Command::new(env!("CARGO_BIN_EXE_meada"))
+            .envs(env.iter().copied())
             .current_dir(dir)
             .args(["mcp", "--listen", listen, "--workspace", MANIFEST])
             .stdout(Stdio::null())
@@ -71,6 +79,38 @@ impl Drop for Server {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
+}
+
+/// SIGTERM to `server`.
+#[cfg(unix)]
+fn terminate(server: &Server) {
+    let kill = Command::new("kill")
+        .args(["-TERM", &server.child.id().to_string()])
+        .status()
+        .unwrap();
+    assert!(kill.success());
+}
+
+/// The exit code of `server` if it exits within `wait`.
+#[cfg(unix)]
+fn exit_within(server: &mut Server, wait: Duration) -> Option<Option<i32>> {
+    let start = Instant::now();
+    while start.elapsed() < wait {
+        if let Some(status) = server.child.try_wait().unwrap() {
+            return Some(status.code());
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    None
+}
+
+/// `WEB`'s index held under a commit in progress until dropped: a call to the server waits
+/// for it (the busy timeout is 10 seconds), so it stays in flight as long as the test wants.
+#[cfg(unix)]
+fn commit_in_progress(dir: &Path) -> rusqlite::Connection {
+    let db = rusqlite::Connection::open(dir.join("indexes").join(WEB).join("index.db")).unwrap();
+    db.execute_batch("BEGIN EXCLUSIVE").unwrap();
+    db
 }
 
 /// `name` called with `arguments`.
@@ -490,4 +530,69 @@ fn exits_zero_on_sigterm_right_after_the_listening_line() {
         assert!(kill.success());
         assert_eq!(server.child.wait().unwrap().code(), Some(0));
     }
+}
+
+/// An answer in flight when SIGTERM arrives is finished and received: the listener closes at
+/// once, the process outlives the signal until the answer is sent, and then exits 0.
+#[cfg(unix)]
+#[tokio::test]
+async fn an_answer_in_flight_when_sigterm_arrives_is_received() {
+    let dir = chain_manifest("server_drain_in_flight");
+    assert!(run(&dir, "index").2);
+    let mut server = Server::start(&dir, "127.0.0.1:0");
+    let client = server.client(&format!("/{WEB}")).await;
+    let commit = commit_in_progress(&dir);
+    let answer = tokio::spawn(async move {
+        client
+            .call_tool(call("trace", serde_json::json!({"from": "dashboard"})))
+            .await
+    });
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    terminate(&server);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    // Still draining, and no longer accepting.
+    assert_eq!(server.child.try_wait().unwrap(), None);
+    let address = server.url.trim_start_matches("http://");
+    assert!(TcpStream::connect(address).is_err());
+    commit.execute_batch("ROLLBACK").unwrap();
+    let result = answer.await.unwrap().unwrap();
+    assert!(!text(&result).is_empty());
+    assert_eq!(
+        exit_within(&mut server, Duration::from_secs(5)),
+        Some(Some(0))
+    );
+}
+
+/// Past the drain bound what is left is dropped and the exit is still 0: a connection that sent
+/// part of a request and went quiet does not hold the exit, nor does an answer still waiting.
+#[cfg(unix)]
+#[tokio::test]
+async fn the_drain_bound_drops_an_idle_connection_and_an_answer_still_waiting() {
+    use std::io::Write;
+    let dir = chain_manifest("server_drain_bound");
+    assert!(run(&dir, "index").2);
+    let mut server = Server::start_with(&dir, "127.0.0.1:0", &[("MEADA_DRAIN_MS", "1000")]);
+    let mut idle = TcpStream::connect(server.url.trim_start_matches("http://")).unwrap();
+    idle.write_all(b"POST /x HTTP/1.1\r\nHost: x\r\nContent-Le")
+        .unwrap();
+    let client = server.client(&format!("/{WEB}")).await;
+    let _commit = commit_in_progress(&dir);
+    let answer = tokio::spawn(async move {
+        client
+            .call_tool(call("trace", serde_json::json!({"from": "dashboard"})))
+            .await
+    });
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let start = Instant::now();
+    terminate(&server);
+    assert_eq!(
+        exit_within(&mut server, Duration::from_secs(5)),
+        Some(Some(0))
+    );
+    assert!(
+        start.elapsed() >= Duration::from_millis(900),
+        "{:?}",
+        start.elapsed()
+    );
+    assert!(answer.await.unwrap().is_err());
 }
