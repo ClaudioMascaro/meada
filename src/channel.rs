@@ -13,12 +13,13 @@ use crate::contract::{ContractKind, Found, Level, Link, Related, Role, Site};
 use crate::document;
 use crate::entry::EntryKind;
 use crate::index::{self, Binding, Consumer, Export, Indexed, Provider, Publish};
-use crate::lang::{go, python, rust, ts};
+use crate::lang::{go, python, ts};
 use crate::resolve::Code;
 use crate::shape::Shape;
 use crate::workspace::Repository;
 
 pub(crate) mod message;
+mod rust;
 use message::{Handler, Message, Side};
 
 pub struct Channel;
@@ -181,7 +182,7 @@ impl ContractKind for Channel {
         let messages: Vec<Message> = [
             ts::messages::messages(code),
             python::messages::messages(code),
-            rust::messages::messages(code),
+            rust::messages(code),
             go::messages::messages(code),
         ]
         .into_iter()

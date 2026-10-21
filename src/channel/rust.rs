@@ -1,5 +1,5 @@
-//! The message libraries of the Rust pack (spec #30): rdkafka, lapin, aws-sdk-sqs, async-nats
-//! and the redis crate. A form is a method called on a client that traces back to the library's
+//! The channel kind's Rust forms (spec #30): the message libraries rdkafka, lapin, aws-sdk-sqs,
+//! async-nats and the redis crate. A form is a method called on a client that traces back to the library's
 //! constructor (`Code::origins` with `Follow::Values`, the constructor named by the file's `use`
 //! declarations), so a `send` or a `publish` on anything else is no producer. The constructor is
 //! named by `Code::outside` without the path flag, as the forms always read it: a name whose head
@@ -10,7 +10,7 @@
 //! Every client of these crates is polled or streamed, so the function that holds the call
 //! naming the topic or the queue handles what it receives.
 
-use crate::channel::message::{
+use super::message::{
     Message, bind, channel_name as name, consume, produce, publish, queue_name, topics,
 };
 use crate::lang::{Call, Value};
@@ -131,7 +131,7 @@ fn passes(origin: &str, method: &str) -> bool {
         .any(|l| l.made(origin) && (l.passes.contains(&method) || UNWRAPS.contains(&method)))
 }
 
-pub(crate) fn messages(code: &Code) -> Vec<Message> {
+pub(super) fn messages(code: &Code) -> Vec<Message> {
     if !code.pack().extensions().contains(&"rs") {
         return Vec::new();
     }
@@ -361,5 +361,60 @@ fn keys(args: &[Value], _: &Keywords) -> Option<Vec<Option<String>>> {
         Value::List(items) => items.iter().map(name).collect(),
         Value::Ref(_) => None,
         _ => Some(vec![None]),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::channel::message::{Handler, Side};
+    use crate::lang::LanguagePack;
+    use crate::lang::rust::Rust;
+    use crate::resolve::Resolver;
+    use std::collections::BTreeMap;
+
+    /// The messages of the Rust file `src` as lines: broker, name (`?` when unresolved), role
+    /// and handler.
+    fn lines(src: &str) -> Vec<String> {
+        let facts = Rust.parse("x.rs", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("x.rs", &facts)]);
+        let modules = Rust.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &Rust);
+        let code = Code::new(&resolver, &files, &Rust);
+        messages(&code)
+            .into_iter()
+            .map(|m| {
+                let name = m.name.as_deref().unwrap_or("?");
+                let role = match m.role {
+                    Side::Producer => "producer".to_string(),
+                    Side::Consumer(Handler::Def { path, name }) => {
+                        format!("consumer {path}::{name}")
+                    }
+                    Side::Consumer(Handler::Inline { path, def }) => {
+                        format!("consumer inline {path}::{def}")
+                    }
+                    _ => "other".to_string(),
+                };
+                format!("{} {name} {role}", m.broker)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_client_of_a_library_is_a_producer_or_a_consumer_by_its_method() {
+        let src = "use async_nats::connect;\n\
+            async fn produce() {\n    let c = connect(\"u\").await.unwrap();\n    c.publish(\"orders.created\", b.into()).await.unwrap();\n}\n\
+            async fn consume() {\n    let c = connect(\"u\").await.unwrap();\n    c.subscribe(\"orders.created\").await.unwrap();\n    c.subscribe(std::env::var(\"T\").unwrap()).await.unwrap();\n    tokio::spawn(async move {\n        c.subscribe(\"inline\").await.unwrap();\n    });\n}\n\
+            fn other(c: Other) {\n    c.publish(\"nope\", b.into());\n}\n";
+        // A subscribe inside a closure is handled by the function that holds the closure.
+        assert_eq!(
+            lines(src),
+            [
+                "nats orders.created producer",
+                "nats orders.created consumer x.rs::consume",
+                "nats ? consumer x.rs::consume",
+                "nats inline consumer x.rs::consume",
+            ]
+        );
     }
 }
