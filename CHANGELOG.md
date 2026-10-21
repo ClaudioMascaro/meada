@@ -8,6 +8,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- npm installer (spec #32): cargo-dist builds and publishes an npm package named `meada` with each
+  release, at the crate's version, so `npx meada mcp` launches the MCP server and `npx meada
+  <command>` runs any command; the release configuration is planned as a dry run on pull requests.
 - Go language pack (spec #25): `.go` files with no Go toolchain. Functions, methods named
   `Type.Method` (pointer and value receivers alike), structs, interfaces and other named types,
   and interface methods (`Interface.Method`); a function literal is no definition, its calls
