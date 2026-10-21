@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn a_relative_path_folds_against_its_directory() {
-        assert_eq!(relative(".", "core"), Some("core".into()));
+        assert_eq!(relative("", "core"), Some("core".into()));
         assert_eq!(relative("app/web", "../core"), Some("app/core".into()));
         assert_eq!(relative("app", "./x/./y"), Some("app/x/y".into()));
         assert_eq!(relative("app", "."), Some("app".into()));
@@ -170,7 +170,7 @@ mod tests {
     #[test]
     fn a_path_that_leaves_the_repository_keeps_its_dotdot_segments() {
         assert_eq!(relative("app", "../../x"), Some("../x".into()));
-        assert_eq!(relative(".", "../x"), Some("../x".into()));
+        assert_eq!(relative("", "../x"), Some("../x".into()));
     }
 
     #[test]
