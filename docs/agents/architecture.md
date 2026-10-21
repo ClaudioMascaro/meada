@@ -915,7 +915,7 @@ one for the area a change touches.
   node-redis client made as `await createClient().connect()` is not traced (the `connect` chain
   has no binding); a BullMQ processor given as a file path is not followed (the function that
   makes the `Worker` handles).
-- `lang/python/messages.rs`: a client is traced to its constructor by `Code::origins` (a name its
+- `channel/python.rs`: a client is traced to its constructor by `Code::origins` (a name its
   scope binds once, an attribute assigned a call once, a parameter every exact caller passes, a
   value a function returns, or a call written in place: `boto3.client("sqs").send_message(...)`,
   `pika.BlockingConnection(p).channel().basic_publish(...)`), with one level of `channel()` or
