@@ -1039,6 +1039,13 @@ pub fn status(dir: &Path) -> Result<String> {
 pub fn status_workspace(manifest: &Path) -> Result<String> {
     let listed = Manifest::read(manifest)?;
     let missing = listed.missing();
+    // Informational: the exit code of the probe depends on local state only.
+    #[cfg(feature = "valkey")]
+    let valkey = (listed.valkey.as_ref())
+        .map(|config| crate::valkey::status_line(config) + "\n")
+        .unwrap_or_default();
+    #[cfg(not(feature = "valkey"))]
+    let valkey = String::new();
     let ignored: String = (listed.entries.iter())
         .flat_map(|l| l.ignored.iter().map(|block| (block, &l.repo)))
         .map(|(block, repo)| Msg::IgnoredBlock { block, repo }.text() + "\n")
@@ -1073,7 +1080,7 @@ pub fn status_workspace(manifest: &Path) -> Result<String> {
         let line = format!("{repo} ({path}) {state}");
         (repo, line)
     });
-    Ok(status_lines(heads, report, &missing) + &ignored)
+    Ok(status_lines(heads, report, &missing) + &ignored + &valkey)
 }
 
 /// `meada index --workspace` (ADR 0011): refreshes every repository the manifest at `manifest`

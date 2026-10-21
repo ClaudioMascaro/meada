@@ -21,6 +21,7 @@ mod items;
 mod lang;
 mod literals;
 pub mod mcp;
+mod modules;
 pub mod msg;
 mod package;
 mod render;
@@ -29,6 +30,8 @@ mod resolve;
 mod resource;
 mod shape;
 mod trace;
+#[cfg(feature = "valkey")]
+mod valkey;
 mod workspace;
 mod zod;
 

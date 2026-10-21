@@ -16,6 +16,13 @@ All notable changes to Meada are recorded here. The format follows
   --workspace` and `meada export --workspace --repo` read the same manifest. SIGINT and SIGTERM
   stop the server after the answers in flight. Meada authenticates nobody: a reverse proxy admits
   the clients.
+- Server mode, cloud modules (ADR 0012): the manifest's module sections are tied to cargo
+  features that are off by default, so a section in a build without its feature is an error
+  naming the file, the line, the section and the feature. The first module is the shared Valkey
+  connection (internal feature `valkey`, section `[valkey]`: TLS outside loopback, an AUTH/RBAC
+  user, the password only from an environment variable or a file, standalone or cluster, every
+  key under `key_prefix`); `meada status --workspace` says whether Valkey is reachable and its
+  exit code does not depend on it. The release binaries stay the default build.
 - npm installer (spec #32): cargo-dist builds and publishes an npm package named `meada` with each
   release, at the crate's version, so `npx meada mcp` launches the MCP server and `npx meada
   <command>` runs any command; the release configuration is planned as a dry run on pull requests.

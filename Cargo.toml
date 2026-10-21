@@ -20,6 +20,13 @@ hyper-util = { version = "0.1.21", features = ["tokio"] }
 ignore = "0.4.33"
 nodejs-semver = "7"
 percent-encoding = "2.3.2"
+# The Valkey client of the cloud modules (ADR 0012), only behind the internal `valkey` feature.
+# Default features off: no native-tls, only rustls.
+redis = { version = "=1.7.1", optional = true, default-features = false, features = [
+    "tokio-rustls-comp",
+    "cluster-async",
+    "connection-manager",
+] }
 rmcp = { version = "3.5.1", features = [
     "server",
     "macros",
@@ -40,6 +47,11 @@ tree-sitter-rust = "0.24.2"
 tree-sitter-typescript = "0.23.2"
 ureq = { version = "3.4.2", default-features = false, features = ["rustls"] }
 yaml-rust2 = { version = "0.13.0", default-features = false }
+
+# Cloud modules (ADR 0012), all off by default: a build without a feature carries none of its
+# crates. `valkey` is internal, enabled through the modules that need it.
+[features]
+valkey = ["dep:redis"]
 
 # `cargo test` runs the example's own tests too.
 [[example]]

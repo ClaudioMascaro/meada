@@ -233,10 +233,40 @@ fn read_own<T: DeserializeOwned>(root: &Path, name: &str) -> Result<Option<T>> {
 pub(crate) fn parse<T: DeserializeOwned>(file: &Path, src: &str, name: &str) -> Result<T> {
     toml::from_str(src).map_err(|e| {
         let at = e.span().map_or(0, |s| s.start);
-        let line = src[..at.min(src.len())].matches('\n').count() + 1;
+        let line = line_of(src, at);
         let what = describe(src, at, e.message(), name);
         format!("{}:{line}: {what}", file.display()).into()
     })
+}
+
+/// The 1-based line of the byte offset `at` in `src`.
+pub(crate) fn line_of(src: &str, at: usize) -> usize {
+    src[..at.min(src.len())].matches('\n').count() + 1
+}
+
+/// An error about the dotted `key` of `src`, the content of `file`, as `parse` words one: the
+/// file, the line of the key (of the file when the key is absent), the key and the message.
+#[cfg(feature = "valkey")]
+pub(crate) fn error_at(
+    file: &Path,
+    src: &str,
+    key: &str,
+    message: &str,
+) -> Box<dyn std::error::Error> {
+    let mut keys = Vec::new();
+    if let Ok(table) = DeTable::parse(src) {
+        flatten(table.get_ref(), "", &mut keys);
+    }
+    let at = keys
+        .iter()
+        .find(|(name, _, _)| name == key)
+        .map_or(0, |(_, span, _)| span.start);
+    format!(
+        "{}:{}: `{key}`: {message}",
+        file.display(),
+        line_of(src, at)
+    )
+    .into()
 }
 
 /// The error message with the dotted key it is about.
