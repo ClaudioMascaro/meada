@@ -1,10 +1,18 @@
 use crate::common;
 
+use std::{
+    sync::atomic::{AtomicUsize, Ordering},
+    time::Duration,
+};
+
 use common::fixture_repo;
 use rmcp::{
     ClientHandler, ServiceExt,
-    model::{CallToolRequestParams, ClientCapabilities, ClientConfig, ErrorData, Implementation},
-    service::{RequestContext, RoleClient},
+    model::{
+        CallToolRequestParams, CallToolResult, ClientCapabilities, ClientConfig, ErrorData,
+        Implementation,
+    },
+    service::{RequestContext, RoleClient, RunningService},
     transport::{ConfigureCommandExt, TokioChildProcess},
 };
 
@@ -113,6 +121,123 @@ async fn answers_about_the_clients_first_root_not_its_cwd() {
     client.cancel().await.unwrap();
 }
 
+/// A client that stops answering `roots/list` (#282) must not hang the call: the server waits
+/// 5 s, then returns a tool error that names `roots/list` (no root was ever sent, and the
+/// server's own directory could be another checkout), with one line on stderr.
+#[tokio::test]
+async fn a_silent_client_gets_a_tool_error_naming_roots_list() {
+    let cwd = fixture_repo(
+        "mcp_roots_silent",
+        "ts-basic",
+        Some("https://example.com/acme/cwd.git"),
+    );
+    let (client, mut stderr) = stops_client(&cwd, String::new(), 0).await;
+
+    let answer = trace_sum(&client).await;
+    assert_eq!(answer.is_error, Some(true), "{answer:?}");
+    let text = &answer
+        .content
+        .first()
+        .and_then(|c| c.as_text())
+        .unwrap()
+        .text;
+    assert!(text.contains("roots/list"), "{text}");
+    client.cancel().await.unwrap();
+    let stderr = read_all(&mut stderr).await;
+    assert!(
+        stderr.lines().count() == 1 && stderr.contains("roots/list"),
+        "{stderr:?}"
+    );
+}
+
+/// A client that answers `roots/list` once and then goes quiet (#282) keeps its last root: the
+/// call that times out answers about it, not about the server's cwd, with one line on stderr.
+#[tokio::test]
+async fn a_client_that_goes_quiet_keeps_its_last_root() {
+    let cwd = fixture_repo(
+        "mcp_roots_once_cwd",
+        "ts-basic",
+        Some("https://example.com/acme/cwd.git"),
+    );
+    let root = fixture_repo(
+        "mcp roots once root",
+        "ts-basic",
+        Some("https://example.com/acme/root.git"),
+    );
+    let uri = format!("file://{}", root.display().to_string().replace(' ', "%20"));
+    let (client, mut stderr) = stops_client(&cwd, uri, 1).await;
+
+    for _ in 0..2 {
+        let answer = trace_sum(&client).await;
+        let text = &answer
+            .content
+            .first()
+            .and_then(|c| c.as_text())
+            .unwrap()
+            .text;
+        assert!(
+            text.starts_with("example.com/acme/root src/math.ts:5 sum\n"),
+            "{text}"
+        );
+    }
+    client.cancel().await.unwrap();
+    let stderr = read_all(&mut stderr).await;
+    assert!(
+        stderr.lines().count() == 1 && stderr.contains("roots/list"),
+        "{stderr:?}"
+    );
+}
+
+/// Serves `meada mcp` in `cwd` to a [`Stops`] client, keeping the server's stderr.
+async fn stops_client(
+    cwd: &std::path::Path,
+    root: String,
+    answers: usize,
+) -> (
+    RunningService<RoleClient, Stops>,
+    tokio::process::ChildStderr,
+) {
+    let (transport, stderr) = TokioChildProcess::builder(
+        tokio::process::Command::new(env!("CARGO_BIN_EXE_meada")).configure(|c| {
+            c.arg("mcp").current_dir(cwd);
+        }),
+    )
+    .stderr(std::process::Stdio::piped())
+    .spawn()
+    .unwrap();
+    let stops = Stops {
+        root,
+        answers: AtomicUsize::new(answers),
+    };
+    (stops.serve(transport).await.unwrap(), stderr.unwrap())
+}
+
+/// `trace` from `sum`, down. The server waits 5 s for `roots/list`; the 15 s of slack on top
+/// make a hang fail the test instead of stalling it.
+async fn trace_sum(client: &RunningService<RoleClient, Stops>) -> CallToolResult {
+    let params = CallToolRequestParams::new("trace").with_arguments(
+        serde_json::json!({"from": "sum", "direction": "down"})
+            .as_object()
+            .unwrap()
+            .clone(),
+    );
+    tokio::time::timeout(Duration::from_secs(5 + 15), client.call_tool(params))
+        .await
+        .expect("the call hung")
+        .unwrap()
+}
+
+/// The server's stderr up to its exit; a server that never closes it fails the test.
+async fn read_all(stderr: &mut tokio::process::ChildStderr) -> String {
+    let mut out = String::new();
+    let read = tokio::io::AsyncReadExt::read_to_string(stderr, &mut out);
+    tokio::time::timeout(Duration::from_secs(15), read)
+        .await
+        .expect("the server kept stderr open")
+        .unwrap();
+    out
+}
+
 /// A client that declares the roots capability and answers `roots/list` with one `file://` root.
 struct Roots(String);
 
@@ -133,5 +258,38 @@ impl ClientHandler for Roots {
         _: RequestContext<RoleClient>,
     ) -> Result<ListRootsResult, ErrorData> {
         Ok(ListRootsResult::new(vec![Root::new(self.0.clone())]))
+    }
+}
+
+/// A client that declares the roots capability, answers `roots/list` with `root` while it has
+/// `answers` left, then never answers again.
+struct Stops {
+    root: String,
+    answers: AtomicUsize,
+}
+
+#[expect(
+    deprecated,
+    reason = "roots are deprecated by SEP-2577; the server still follows them (#282)"
+)]
+impl ClientHandler for Stops {
+    fn get_info(&self) -> ClientConfig {
+        ClientConfig::new(
+            ClientCapabilities::builder().enable_roots().build(),
+            Implementation::from_build_env(),
+        )
+    }
+
+    async fn list_roots(
+        &self,
+        _: RequestContext<RoleClient>,
+    ) -> Result<ListRootsResult, ErrorData> {
+        let left = self
+            .answers
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1));
+        if left.is_err() {
+            std::future::pending::<()>().await;
+        }
+        Ok(ListRootsResult::new(vec![Root::new(self.root.clone())]))
     }
 }

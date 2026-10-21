@@ -2,13 +2,23 @@
 //! write is the index refresh every query does first. Stdout is the protocol channel, so
 //! anything else goes to stderr.
 
-use std::path::PathBuf;
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use percent_encoding::percent_decode_str;
+#[expect(
+    deprecated,
+    reason = "roots are deprecated by SEP-2577 and still what Claude Code sends (see `root_dir`)"
+)]
+use rmcp::model::ListRootsRequest;
 use rmcp::{
-    RoleServer, ServerHandler, ServiceExt,
+    RoleServer, ServerHandler, ServiceError, ServiceExt,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    service::RequestContext,
+    model::{ClientResult, ServerRequest},
+    service::{PeerRequestOptions, RequestContext},
     tool, tool_handler, tool_router,
 };
 use schemars::JsonSchema;
@@ -53,41 +63,83 @@ struct TraceArgs {
     budget: Option<u32>,
 }
 
+/// How long a call waits for the client's `roots/list` answer: generous for a busy client, far
+/// below the point where a client gives up on the call itself (#282).
+const ROOTS_TIMEOUT: Duration = Duration::from_secs(5);
+
 #[derive(Clone)]
 struct Meada {
     tool_router: ToolRouter<Self>,
+    /// The last root this connection's client sent. Clones share it.
+    last_root: Arc<Mutex<Option<PathBuf>>>,
 }
 
 /// Opens the client's first root, else the current directory, and runs `ask`, which refreshes
-/// the index.
+/// the index. A client that does not answer `roots/list` in time gets its last root, or a tool
+/// error when it sent none.
 async fn answer(
     ctx: RequestContext<RoleServer>,
+    last_root: &Mutex<Option<PathBuf>>,
     ask: impl FnOnce(&Engine) -> crate::Result<String>,
 ) -> Result<String, String> {
-    let dir = root_dir(&ctx).await;
+    let dir = root_dir(&ctx, last_root).await?;
     Engine::open(&dir)
         .and_then(|engine| ask(&engine))
         .map_err(|e| e.to_string())
 }
 
 /// The directory to answer about: the client's first `file://` root, or the server's current
-/// directory. Asked on every call, so `roots/list_changed` needs no cache to invalidate.
+/// directory. Asked on every call, so `roots/list_changed` needs no cache to invalidate. When
+/// the client declares roots but does not answer within [`ROOTS_TIMEOUT`], the last root it
+/// sent is used, with one line on stderr; without one, the call fails: the server's directory
+/// may be another checkout than the client's session.
 #[expect(
     deprecated,
     reason = "roots are deprecated by SEP-2577 and still what Claude Code sends; the cwd fallback keeps the server working once clients drop them"
 )]
-async fn root_dir(ctx: &RequestContext<RoleServer>) -> PathBuf {
+async fn root_dir(
+    ctx: &RequestContext<RoleServer>,
+    last_root: &Mutex<Option<PathBuf>>,
+) -> Result<PathBuf, String> {
     let cwd = || PathBuf::from(".");
     if ctx.client_capabilities().is_none_or(|c| c.roots.is_none()) {
-        return cwd();
+        return Ok(cwd());
     }
-    match ctx.peer.list_roots().await {
-        Ok(result) => result
-            .roots
-            .iter()
-            .find_map(|r| file_path(&r.uri))
-            .unwrap_or_else(cwd),
-        Err(_) => cwd(),
+    let request = ServerRequest::ListRootsRequest(ListRootsRequest {
+        method: Default::default(),
+        extensions: Default::default(),
+    });
+    let sent = ctx
+        .peer
+        .send_request_with_option(request, PeerRequestOptions::with_timeout(ROOTS_TIMEOUT))
+        .await;
+    let response = match sent {
+        Ok(handle) => handle.await_response().await,
+        Err(e) => Err(e),
+    };
+    match response {
+        Ok(ClientResult::ListRootsResult(result)) => {
+            let root = result.roots.iter().find_map(|r| file_path(&r.uri));
+            *last_root.lock().unwrap() = root.clone();
+            Ok(root.unwrap_or_else(cwd))
+        }
+        Err(ServiceError::Timeout { .. }) => {
+            let secs = ROOTS_TIMEOUT.as_secs();
+            // Copied out, so a blocked stderr cannot hold the lock other calls wait on.
+            let last = last_root.lock().unwrap().clone();
+            let Some(root) = last else {
+                eprintln!("meada: the client did not answer roots/list within {secs} s");
+                return Err(format!(
+                    "the client did not answer roots/list within {secs} s and sent no root before"
+                ));
+            };
+            eprintln!(
+                "meada: the client did not answer roots/list within {secs} s, using the last root it sent: {}",
+                root.display()
+            );
+            Ok(root)
+        }
+        _ => Ok(cwd()),
     }
 }
 
@@ -105,6 +157,7 @@ impl Meada {
     fn new() -> Self {
         Self {
             tool_router: Self::tool_router(),
+            last_root: Arc::default(),
         }
     }
 
@@ -116,7 +169,7 @@ impl Meada {
         Parameters(args): Parameters<SearchArgs>,
         ctx: RequestContext<RoleServer>,
     ) -> Result<String, String> {
-        answer(ctx, |engine| {
+        answer(ctx, &self.last_root, |engine| {
             let budget = args.budget.map(|b| b as usize);
             engine.search(&args.query, args.kind.as_deref(), budget)
         })
@@ -131,7 +184,7 @@ impl Meada {
         Parameters(args): Parameters<ContextArgs>,
         ctx: RequestContext<RoleServer>,
     ) -> Result<String, String> {
-        answer(ctx, |engine| {
+        answer(ctx, &self.last_root, |engine| {
             engine.context(&args.symbol, args.budget.map(|b| b as usize))
         })
         .await
@@ -158,7 +211,7 @@ impl Meada {
             Some("up") => Direction::Up,
             Some(other) => return Err(format!("`direction` takes `down` or `up`, not `{other}`")),
         };
-        answer(ctx, |engine| {
+        answer(ctx, &self.last_root, |engine| {
             engine.trace(start, direction, args.budget.map(|b| b as usize))
         })
         .await

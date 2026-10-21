@@ -90,8 +90,10 @@ inglés.
 
 `meada mcp` habla MCP por stdio. Responde sobre la primera raíz (`roots`) que el cliente envía,
 en Claude Code la carpeta de la sesión; sin raíces, sobre la carpeta en la que se inició, que
-entonces debe estar dentro del repositorio. En la configuración de tu agente (por ejemplo el
-`.mcp.json` de Claude Code), con `npx`:
+entonces debe estar dentro del repositorio. Si el cliente no responde a `roots/list` en 5 s, la
+llamada usa la última raíz que envió en esa conexión, o devuelve un error que lo dice; nunca
+recurre a la carpeta del servidor (que, en una sesión en un worktree, sería otro checkout). En la
+configuración de tu agente (por ejemplo el `.mcp.json` de Claude Code), con `npx`:
 
 ```json
 {
