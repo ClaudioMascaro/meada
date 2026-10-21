@@ -1101,7 +1101,7 @@ pub fn index_workspace(manifest: &Path) -> Result<Vec<String>> {
 /// servable: its mirror is a checkout of the identity listed and its index opens read-only at
 /// the current schema version. Otherwise every problem, one per line, each index problem naming
 /// `meada index --workspace`. It only reads.
-pub(crate) fn served(manifest: &Path) -> Result<Manifest> {
+pub fn served(manifest: &Path) -> Result<Manifest> {
     let listed = Manifest::read(manifest)?;
     let shown = manifest.display().to_string();
     let problems: Vec<String> = (listed.entries.iter())
@@ -1119,6 +1119,26 @@ pub(crate) fn served(manifest: &Path) -> Result<Manifest> {
     let first = (listed.entries.first()).ok_or_else(|| format!("{shown}: no repository listed"))?;
     Engine::open_listed(&listed, &first.repo, manifest)?;
     Ok(listed)
+}
+
+/// How long the readiness probe waits for a commit in progress: a writer must not stall it.
+pub const PROBE_BUSY: std::time::Duration = std::time::Duration::from_millis(50);
+
+/// Whether a node can serve, for `status --workspace` (exit 0 or 1): `served` passes, or it fails
+/// only because an index is locked by a commit in progress (the file exists and the running
+/// server answers once the lock clears). Run it under `with_busy_timeout(PROBE_BUSY, ..)`.
+pub fn ready(manifest: &Path) -> bool {
+    if served(manifest).is_ok() {
+        return true;
+    }
+    let Ok(listed) = Manifest::read(manifest) else {
+        return false;
+    };
+    let states: Vec<_> = (listed.entries.iter())
+        .map(|l| l.repository.as_ref().map(|r| index::state(&r.index)))
+        .collect();
+    (states.iter()).any(|s| matches!(s, Ok(State::Locked)))
+        && (states.iter()).all(|s| matches!(s, Ok(State::Indexed { .. } | State::Locked)))
 }
 
 /// An index state as `status` shows it, `other` for an index of another schema.

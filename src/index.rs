@@ -159,8 +159,8 @@ thread_local! {
 }
 
 /// Runs `f` with this thread's read-only opens waiting at most `timeout` for a commit in
-/// progress, instead of 10 seconds. Test-only, as [`with_reversed_walk`]: no command, option or
-/// setting reaches it.
+/// progress, instead of 10 seconds. No option or setting reaches it: tests, and the readiness
+/// probe of `status --workspace`.
 #[doc(hidden)]
 pub fn with_busy_timeout<T>(timeout: Duration, f: impl FnOnce() -> T) -> T {
     struct Restore(Duration);

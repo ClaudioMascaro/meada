@@ -90,6 +90,7 @@ fn main() -> ExitCode {
         .get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
     let here = Path::new(".");
+    let mut unready = false;
     let result = match cli.command {
         Command::Mcp { listen, workspace } => {
             // The MCP surface is English whatever `LANG` says (ADR 0008).
@@ -99,11 +100,17 @@ fn main() -> ExitCode {
                 _ => meada::mcp::serve(),
             }
         }
-        Command::Status { workspace } => match workspace {
-            Some(manifest) => engine::status_workspace(&manifest),
-            None => engine::status(here),
+        Command::Status {
+            workspace: Some(manifest),
+        } => meada::with_busy_timeout(engine::PROBE_BUSY, || {
+            engine::status_workspace(&manifest).map(|status| {
+                print!("{status}");
+                unready = !engine::ready(&manifest);
+            })
+        }),
+        Command::Status { workspace: None } => {
+            engine::status(here).map(|status| print!("{status}"))
         }
-        .map(|status| print!("{status}")),
         // Every repository's problem on its own line; the others are refreshed all the same.
         Command::Index {
             workspace: Some(manifest),
@@ -152,6 +159,8 @@ fn main() -> ExitCode {
         }),
     };
     match result {
+        // A readiness probe (ADR 0011); returning, not exiting, flushes the status text.
+        Ok(()) if unready => ExitCode::FAILURE,
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("meada: {e}");
