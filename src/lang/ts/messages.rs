@@ -77,7 +77,7 @@ fn factory<'a>(
 type Read<'a> = &'a dyn Fn(&[Value]) -> Option<Vec<Option<String>>>;
 
 pub(crate) fn messages(code: &Code) -> Vec<Message> {
-    if !code.pack().extensions().contains(&"ts") {
+    if !code.pack().extensions().contains(&"js") {
         return Vec::new();
     }
     let mut out = Vec::new();

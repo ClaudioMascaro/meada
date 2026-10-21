@@ -1,10 +1,11 @@
 //! Channels (spec #20): the queues and topics of a broker, identified by
 //! `channel::<broker>::<name>`. This kind owns the forms of the message libraries of each
 //! language (a reader per pack under `lang`, each answering for its own pack only, as the HTTP
-//! kind's readers do) and turns the calls they find into contracts and links every consumer of a channel to every producer of it, in any repository of the workspace,
-//! its own included. Producers are the provider side: messages go from the producing call to
-//! the consumer's handler. A RabbitMQ publish to a named exchange is no channel's side by
-//! itself: the bindings of the workspace route it to queues (`Routes`).
+//! kind's readers do) and turns the calls they find into contracts and links every consumer of
+//! a channel to every producer of it, in any repository of the workspace, its own included.
+//! Producers are the provider side: messages go from the producing call to the consumer's
+//! handler. A RabbitMQ publish to a named exchange is no channel's side by itself: the
+//! bindings of the workspace route it to queues (`Routes`).
 
 use std::collections::{BTreeMap, HashMap};
 
