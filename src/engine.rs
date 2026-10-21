@@ -83,13 +83,13 @@ impl Engine {
     /// (`Repository::index`).
     fn over(workspace: Workspace) -> Result<Self> {
         fits(&workspace)?;
-        // Opening creates a missing index, or recreates one of another schema, before it is
+        // Opening builds a missing index, or rebuilds one of another schema, before it is
         // attached.
         for peer in &workspace.repos[1..] {
-            index::open(&peer.index, &peer.root)?;
+            index::open(&peer.index, &peer.root, &peer.identity, &peer.config.serve)?;
         }
         let here = &workspace.repos[0];
-        let db = index::open(&here.index, &here.root)?;
+        let db = index::open(&here.index, &here.root, &here.identity, &here.config.serve)?;
         for (n, peer) in workspace.repos.iter().enumerate().skip(1) {
             let path = peer.index.to_str().ok_or("index path is not UTF-8")?;
             db.execute(&format!("ATTACH DATABASE ?1 AS peer{n}"), [path])?;
@@ -113,7 +113,7 @@ impl Engine {
             return Ok(());
         }
         for peer in &self.workspace.repos[1..] {
-            let db = index::open(&peer.index, &peer.root)?;
+            let db = index::open(&peer.index, &peer.root, &peer.identity, &peer.config.serve)?;
             index::refresh(&db, &peer.root, &peer.identity, &peer.config.serve)?;
         }
         let here = &self.workspace.repos[0];
@@ -727,7 +727,7 @@ impl Engine {
         if text.is_none() && retry {
             // The file changed without its mtime or size showing it: hash it again.
             index::forget(
-                &index::open(&repo.index, &repo.root)?,
+                &index::open(&repo.index, &repo.root, &repo.identity, &repo.config.serve)?,
                 &symbol_found.span.path,
             )?;
             self.refresh()?;
@@ -1083,7 +1083,7 @@ pub fn status_workspace(manifest: &Path) -> Result<String> {
 pub fn index_workspace(manifest: &Path) -> Result<Vec<String>> {
     let listed = Manifest::read(manifest)?;
     let refresh = |r: &Repository| {
-        let db = index::open(&r.index, &r.root)?;
+        let db = index::open(&r.index, &r.root, &r.identity, &r.config.serve)?;
         index::refresh(&db, &r.root, &r.identity, &r.config.serve)
     };
     Ok((listed.entries.iter())

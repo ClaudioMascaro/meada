@@ -65,7 +65,10 @@ one for the area a change touches.
   `index.rs`: the SQLite schema, the freshness pipeline in `refresh`, and
   `export`; `open` and `state` take the index's path, `<root>/.meada/index.db` locally (`path`,
   with a `.gitignore` of `*`) or `<index_dir>/<identity>/index.db` in server mode (no
-  `.gitignore`). `lang/`: the
+  `.gitignore`). A rebuild (a missing index, or one of another schema) is a rename under the
+  rebuild lock: `open` builds the whole new index in `index.db.new.<pid>` while it holds
+  `index.db.lock` and renames it over `index.db`, so a reader sees the old index or the new
+  one, never a missing or empty file; `refresh` stays one transaction in place. `lang/`: the
   language adapter and the TS/JS, Python, Rust and Go packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`: `Code::origins`, the one origin question, with three evidence policies
   (`Values`, `Constants` for the TypeScript forms, `Declarations` for Go's typed clients and
@@ -625,7 +628,7 @@ one for the area a change touches.
   (`the_stored_format_matches_its_golden`) fails on any change to them until `MEADA_BLESS=1`
   rewrites the golden, which changes the version; no number is kept by hand, so two branches
   that change the format conflict only in the golden. An index with another version, or an
-  unreadable one, is deleted and rebuilt, and `status` says so. One whose stored facts do not
+  unreadable one, is rebuilt beside it and renamed over it, and `status` says so. One whose stored facts do not
   parse is rebuilt by the first refresh that reads them (when a file changed), which `status`
   cannot tell.
 - The index holds no source text and no values, apart from the literal URL path fragments and the

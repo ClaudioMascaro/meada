@@ -61,6 +61,10 @@ pub enum Msg<'a> {
         index: &'a str,
         timeout: std::time::Duration,
     },
+    IndexNotReplaced {
+        index: &'a str,
+        error: &'a str,
+    },
     MissingPeer {
         repo: &'a str,
         named_by: &'a str,
@@ -340,6 +344,16 @@ impl Msg<'_> {
                 format!(
                     "{repo}: o índice `{index}` ficou travado por um commit em andamento por \
                      mais de {timeout:?}"
+                ),
+            ),
+            Msg::IndexNotReplaced { index, error } => pick(
+                format!(
+                    "the index `{index}` could not be replaced by its rebuild ({error}); it is \
+                     left as it was"
+                ),
+                format!(
+                    "o índice `{index}` não pôde ser substituído pela reconstrução ({error}); \
+                     ficou como estava"
                 ),
             ),
             Msg::IndexInMirror { index, mirror } => pick(
