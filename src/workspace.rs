@@ -53,6 +53,9 @@ impl Repository {
             return Err(Msg::NoMirror(&shown).text());
         }
         if !repo::is_checkout(&self.root) {
+            if repo::refused_as_dubious(&self.root) {
+                return Err(Msg::DubiousOwner(&shown).text());
+            }
             return Err(Msg::NotACheckout(&shown).text());
         }
         let found = repo::identity(&self.root);
@@ -417,6 +420,9 @@ fn mirror(
         return Err(Msg::NoMirror(&shown).text());
     }
     if !repo::is_checkout(path) {
+        if repo::refused_as_dubious(path) {
+            return Err(Msg::DubiousOwner(&shown).text());
+        }
         return Err(Msg::NotACheckout(&shown).text());
     }
     let root = path.canonicalize().map_err(|e| format!("{shown}: {e}"))?;

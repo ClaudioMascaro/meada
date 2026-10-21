@@ -178,6 +178,22 @@ fn command(dir: &Path) -> Command {
     git
 }
 
+/// Whether `git` in the trusted mirror `dir` still refuses it for its owner: before git 2.38 it
+/// ignores `safe.directory` given on the command line.
+pub fn refused_as_dubious(dir: &Path) -> bool {
+    let trusted = dir
+        .canonicalize()
+        .is_ok_and(|real| (TRUSTED.lock().unwrap_or_else(|e| e.into_inner())).contains(&real));
+    trusted
+        && (command(dir).args(["rev-parse", "--show-toplevel"]).output())
+            .is_ok_and(|out| is_dubious(&String::from_utf8_lossy(&out.stderr)))
+}
+
+/// Whether `stderr` is git's refusal of a directory another user owns.
+fn is_dubious(stderr: &str) -> bool {
+    stderr.contains("dubious ownership")
+}
+
 /// `git` in `dir`, its standard output, or its error output as the error.
 fn run(dir: &Path, args: &[&str]) -> Result<String> {
     let out = command(dir).args(args).output()?;
@@ -199,7 +215,15 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{command, normalize_remote, relative, trust};
+    use super::{command, is_dubious, normalize_remote, relative, trust};
+
+    #[test]
+    fn git_refusal_of_another_owner_is_recognized() {
+        let stderr = "fatal: detected dubious ownership in repository at '/srv/web'\n\
+                      To add an exception for this directory, call:\n";
+        assert!(is_dubious(stderr));
+        assert!(!is_dubious("fatal: not a git repository\n"));
+    }
 
     #[test]
     fn only_a_trusted_mirror_gets_safe_directory() {

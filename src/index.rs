@@ -2049,20 +2049,32 @@ mod tests {
     #[test]
     fn a_read_only_open_over_an_interrupted_commit_on_a_read_only_mount_names_the_fix() {
         use std::os::unix::fs::PermissionsExt;
+        /// The index's directory read-only (`0555`, its files `0444`) until dropped, even on a
+        /// panic, so the temp dir can be removed.
+        struct Mount(PathBuf);
+        impl Mount {
+            fn set(&self, dir: u32, file: u32) {
+                for name in ["index.db", "index.db-journal"] {
+                    let file = fs::Permissions::from_mode(file);
+                    let _ = fs::set_permissions(self.0.join(name), file);
+                }
+                let _ = fs::set_permissions(&self.0, fs::Permissions::from_mode(dir));
+            }
+        }
+        impl Drop for Mount {
+            fn drop(&mut self) {
+                self.set(0o755, 0o644);
+            }
+        }
+
         let (dir, _) = index_dir("hot_mount");
         let index = interrupted(&dir, "copy");
         let folder = index.parent().unwrap().to_path_buf();
-        let chmod = |mode| {
-            for entry in fs::read_dir(&folder).unwrap() {
-                let file = fs::Permissions::from_mode(mode & 0o666);
-                fs::set_permissions(entry.unwrap().path(), file).unwrap();
-            }
-            fs::set_permissions(&folder, fs::Permissions::from_mode(mode)).unwrap();
-        };
-        chmod(0o555);
+        let mount = Mount(folder.clone());
+        mount.set(0o555, 0o444);
         if fs::File::create(folder.join("probe")).is_ok() {
             eprintln!("skipped: permissions do not bind this user (root)");
-            chmod(0o755);
+            drop(mount);
             let _ = fs::remove_dir_all(&dir);
             return;
         }
@@ -2070,7 +2082,7 @@ mod tests {
         let error = read(&index).err().map(|e| e.to_string());
         let left = fs::read_dir(&folder).unwrap().count();
 
-        chmod(0o755);
+        drop(mount);
         assert_eq!(
             error.as_deref(),
             Some(

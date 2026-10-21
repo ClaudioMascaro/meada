@@ -32,12 +32,18 @@ would also skip the shared lock that makes a commit in progress wait for readers
 a commit, and it would ignore a hot journal, serving a half-written file; it is safe only for
 files that never change in place. A plain read-only open takes a shared `fcntl` lock, which works
 on a read-only mount (the test locks directories `0555` and files `0444`) and keeps the busy
-timeout and the interrupted error working. `immutable=1` would be worth it only on a filesystem
-that refuses locks; none was met, and #265's rename-in keeps either choice safe from a refresh
-in place, which only one writer per index could break. For a mirror another user owns, `git`
-refuses it (`safe.directory`); `repo::command` is the one place Meada runs `git`, and it adds
-`-c safe.directory=<mirror>` for the paths `Manifest::read` registered with `repo::trust`: the
-manifest's mirrors only, in server mode only, never `*`.
+timeout and the interrupted error working. `meada index --workspace` refreshes an index of the
+current schema in place, in one transaction (only a rebuild renames), so a server reading with
+`immutable=1` while it runs would take no shared lock and not see the hot journal, and could
+serve half-written pages. `immutable` would be safe only for an index that arrives whole and is
+never refreshed in place on that node; that is why the plain read-only open stays.
+For a mirror another user owns, `git` refuses it (`safe.directory`); `repo::command` is the one
+place Meada runs `git`, and it adds `-c safe.directory=<mirror>` for the paths `Manifest::read`
+registered with `repo::trust`: the manifest's mirrors only, in server mode only, never `*`. Git
+honours `safe.directory` from the command line only from 2.38 (Ubuntu 22.04's 2.34 and RHEL 8's
+2.31 ignore it on purpose), so a mirror owned by another user needs git 2.38 or later, or
+`safe.directory` in the system configuration; on an older git the start check fails closed with
+an error naming the mirror and that minimum (`Msg::DubiousOwner`).
 Server mode reads the **workspace manifest**, and each mirror's `meada.toml` and
 `meada.decisions.toml`, once at start (`engine::served`, which refuses to start unless every
 repository can be served), so a change to those files needs a restart, while a code change in a

@@ -572,6 +572,35 @@ fn a_mirror_owned_by_another_user_is_trusted_in_server_mode() {
     assert_eq!((code, stderr.as_str()), (Some(0), ""));
     let (code, stderr) = owned(&dir, &["export", "--workspace", MANIFEST, "--repo", WEB]);
     assert_eq!((code, stderr.as_str()), (Some(0), ""));
+
+    // The start checks of `mcp --listen` pass too: it reaches its listening line.
+    let mut server = Command::new(env!("CARGO_BIN_EXE_meada"))
+        .current_dir(&dir)
+        .args(["mcp", "--listen", "127.0.0.1:0", "--workspace", MANIFEST])
+        .env("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("meada runs");
+    let mut line = String::new();
+    let stderr = server.stderr.take().unwrap();
+    std::io::BufRead::read_line(&mut std::io::BufReader::new(stderr), &mut line).unwrap();
+    let _ = server.kill();
+    let _ = server.wait();
+    assert!(line.starts_with("listening on "), "{line:?}");
+
+    // Locally nothing changes: in the same mirror, git's refusal stands, so the checkout is
+    // taken for a directory outside git and Meada names it `local/<directory>`.
+    let local = Command::new(env!("CARGO_BIN_EXE_meada"))
+        .current_dir(&mirror)
+        .arg("status")
+        .env("LANG", "en_US.UTF-8")
+        .env("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
+        .output()
+        .expect("meada runs");
+    let shown = String::from_utf8_lossy(&local.stdout);
+    assert!(shown.contains("local/chain-web"), "{shown}");
+    assert!(!shown.contains(WEB), "{shown}");
 }
 
 const WEB: &str = "example.com/chain/web";
