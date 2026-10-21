@@ -412,7 +412,7 @@ mod tests {
     use crate::lang::ts::TsJs;
     use crate::resolve::Resolver;
 
-    /// The messages of the TypeScript file `src` as lines: broker, name (`?` when unresolved),
+    /// The messages of the TypeScript file `src` as lines: broker, name (or `unresolved`),
     /// role and handler.
     fn lines(src: &str) -> Vec<String> {
         let facts = TsJs.parse("x.ts", src.as_bytes()).unwrap();
@@ -423,7 +423,7 @@ mod tests {
         messages(&code)
             .into_iter()
             .map(|m| {
-                let name = m.name.as_deref().unwrap_or("?");
+                let name = m.name.as_deref().unwrap_or("unresolved");
                 let role = match m.role {
                     Side::Producer => "producer".to_string(),
                     Side::Consumer(Handler::Def { path, name }) => {
@@ -441,20 +441,31 @@ mod tests {
 
     #[test]
     fn a_kafkajs_client_is_a_producer_or_a_consumer_by_its_method() {
-        let src = "import { Kafka } from 'kafkajs';\n\
-            const kafka = new Kafka({ brokers: [] });\n\
-            const producer = kafka.producer();\n\
-            const consumer = kafka.consumer({ groupId: 'g' });\n\
-            async function produce() {\n  await producer.send({ topic: 'orders.created', messages: [] });\n}\n\
-            async function consume(topic: string) {\n  await consumer.subscribe({ topic: 'orders.created' });\n  await consumer.subscribe({ topic });\n  await consumer.run({ eachMessage: async () => {} });\n}\n\
-            function other(p: Other) {\n  p.send({ topic: 'nope' });\n}\n";
-        // The `run` handler is the inline arrow (named by its offset) that handles both channels.
+        let src = r#"import { Kafka } from 'kafkajs';
+const kafka = new Kafka({ brokers: [] });
+const producer = kafka.producer();
+const consumer = kafka.consumer({ groupId: 'g' });
+async function produce() {
+  await producer.send({ topic: 'orders.created', messages: [] });
+}
+async function consume(topic: string) {
+  await consumer.subscribe({ topic: 'orders.created' });
+  await consumer.subscribe({ topic });
+  await consumer.run({ eachMessage: async () => {} });
+}
+function other(p: Other) {
+  p.send({ topic: 'nope' });
+}
+"#;
+        // The `run` handler is the inline arrow, named by its offset: both subscriptions point
+        // at it.
+        let at = src.find("async () =>").unwrap();
         assert_eq!(
             lines(src),
             [
-                "kafka orders.created producer",
-                "kafka orders.created consumer inline x.ts::consume.@428",
-                "kafka ? consumer inline x.ts::consume.@428",
+                "kafka orders.created producer".to_string(),
+                format!("kafka orders.created consumer inline x.ts::consume.@{at}"),
+                format!("kafka unresolved consumer inline x.ts::consume.@{at}"),
             ]
         );
     }
