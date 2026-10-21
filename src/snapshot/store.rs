@@ -281,6 +281,47 @@ impl Store {
             .ok_or_else(bad)
     }
 
+    /// The object at `key` written to `out` as it streams, checked against `expected` (the size
+    /// and hash a generation document records): a missing, longer, shorter or other object is an
+    /// error naming it, and nothing past `expected.size` bytes is written.
+    pub async fn download(
+        &self,
+        key: &str,
+        expected: &Stored,
+        out: &mut impl std::io::Write,
+    ) -> Result<(), String> {
+        use futures::StreamExt;
+        let bad = || Msg::SnapshotObjectBad(key).text();
+        let got = match self
+            .s3
+            .get_opts(&Self::key(key)?, GetOptions::default())
+            .await
+        {
+            Ok(got) => got,
+            Err(object_store::Error::NotFound { .. }) => return Err(bad()),
+            Err(e) => return Err(self.scrub(e)),
+        };
+        if got.meta.size != expected.size {
+            return Err(bad());
+        }
+        let mut stream = got.into_stream();
+        let (mut hash, mut size) = (blake3::Hasher::new(), 0u64);
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| self.scrub(e))?;
+            size += chunk.len() as u64;
+            if size > expected.size {
+                return Err(bad());
+            }
+            hash.update(&chunk);
+            out.write_all(&chunk).map_err(|e| format!("{key}: {e}"))?;
+        }
+        let found = Stored {
+            size,
+            blake3: hash.finalize().to_hex().to_string(),
+        };
+        (found == *expected).then_some(()).ok_or_else(bad)
+    }
+
     /// Stores `bytes` at `key` with their size and hash.
     pub async fn put(&self, key: &str, bytes: Vec<u8>) -> Result<(), String> {
         let options = PutOptions {

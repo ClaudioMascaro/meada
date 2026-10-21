@@ -284,6 +284,32 @@ con el token de `AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`; `instance` usa el serv
 de la instancia (IMDSv2, solo por IPv4, `http://169.254.169.254`), y solo cuando la sección lo indica. Las
 credenciales quedan solo en memoria, y ningún secreto aparece en un error.
 
+En cada nodo, `meada snapshot pull --workspace <manifiesto>` lee el puntero `current` del store
+y, cuando nombra una generación que el nodo no tiene, descarga sus bundles en `local_dir`,
+comprueba el tamaño y el hash BLAKE3 de cada uno contra el documento, los extrae y cambia el
+puntero del nodo por rename. La única línea en stdout es el id de la generación actual.
+`--every <segundos>` repite el pull (y solo imprime cuando el puntero cambia); un segundo pull en
+el mismo `local_dir` sale con 0 avisando que ya hay uno en curso. El nodo guarda la generación
+actual y la anterior y borra las más antiguas.
+
+Todo lo que viene del store se trata como entrada hostil: ids e identidades se comprueban antes
+de volverse rutas; el pull rechaza en el archivo una ruta absoluta, un `..`, un enlace que sale
+del repositorio, una entrada escrita a través de un enlace simbólico y dispositivos o FIFOs, con
+techos de bytes y de entradas por generación. El `.git/config` extraído se reemplaza por uno
+mínimo que Meada escribe (solo `[core]` y el `origin` de la identidad), `.git/hooks` se borra, y
+el `git` de Meada corre en esos espejos sin la configuración del sistema ni la global. Un pull
+que falla en cualquier paso deja el puntero y las generaciones guardadas como estaban.
+
+```
+<local_dir>/
+  current                     # "<id de generación> <fence>", fence 0 sin el bloqueo de refresh
+  pull.lock
+  <id de generación>/
+    generation.json           # el documento, como está guardado
+    <id de bundle>/index.db
+    <id de bundle>/mirror/    # el checkout, .git incluido
+```
+
 ## Decisiones
 
 Un enlace ambiguo (varios proveedores sirven la ruta) o una URL dinámica (la llamada arma la URL

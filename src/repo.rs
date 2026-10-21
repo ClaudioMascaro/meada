@@ -179,11 +179,34 @@ pub fn trust(path: &Path) {
     }
 }
 
+/// The directories holding mirrors pulled from a store (`meada snapshot pull`, ADR 0012):
+/// hostile input, read with no system or global git configuration.
+static ISOLATED: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+
+/// Every `git` call Meada makes in a directory under `dir` runs with `GIT_CONFIG_NOSYSTEM=1`
+/// and no global configuration, so only the repository's own configuration (the minimal one
+/// the pull wrote) applies.
+pub fn isolate(dir: &Path) {
+    if let Ok(real) = dir.canonicalize() {
+        let mut isolated = ISOLATED.lock().unwrap_or_else(|e| e.into_inner());
+        if !isolated.contains(&real) {
+            isolated.push(real);
+        }
+    }
+}
+
 /// `git` in `dir`: the one place every call goes through, so the one place `safe.directory`
-/// is added.
+/// and the isolation of pulled mirrors are added.
 fn command(dir: &Path) -> Command {
     let mut git = Command::new("git");
     let real = dir.canonicalize().ok();
+    let isolated = ISOLATED.lock().unwrap_or_else(|e| e.into_inner());
+    if (real.as_ref()).is_some_and(|real| isolated.iter().any(|d| real.starts_with(d))) {
+        let null = if cfg!(windows) { "NUL" } else { "/dev/null" };
+        git.env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", null);
+    }
+    drop(isolated);
     let trusted = TRUSTED.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(real) = real.filter(|real| trusted.contains(real)) {
         let mut option = std::ffi::OsString::from("safe.directory=");
@@ -231,7 +254,7 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{command, is_dubious, normalize_remote, relative, trust};
+    use super::{command, is_dubious, isolate, normalize_remote, relative, trust};
 
     #[test]
     fn git_refusal_of_another_owner_is_recognized() {
@@ -259,6 +282,35 @@ mod tests {
         let option = format!("safe.directory={}", real.display());
         assert_eq!(args(&listed)[..2], ["-c".to_string(), option]);
         assert_eq!(args(&other)[0], "-C");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn git_under_an_isolated_directory_reads_no_system_or_global_configuration() {
+        let dir = std::env::temp_dir().join(format!("meada-isolate-{}", std::process::id()));
+        let (pulled, other) = (dir.join("pulled"), dir.join("other"));
+        std::fs::create_dir_all(pulled.join("mirror")).unwrap();
+        std::fs::create_dir_all(&other).unwrap();
+        let envs = |dir: &std::path::Path| -> Vec<(String, String)> {
+            let git = command(dir);
+            let mut envs: Vec<_> = (git.get_envs())
+                .map(|(k, v)| {
+                    let v = v.map(|v| v.to_string_lossy().into_owned());
+                    (k.to_string_lossy().into_owned(), v.unwrap_or_default())
+                })
+                .collect();
+            envs.sort();
+            envs
+        };
+        assert!(envs(&other).is_empty());
+        isolate(&pulled);
+        let null = if cfg!(windows) { "NUL" } else { "/dev/null" };
+        let expected = [
+            ("GIT_CONFIG_GLOBAL".to_string(), null.to_string()),
+            ("GIT_CONFIG_NOSYSTEM".to_string(), "1".to_string()),
+        ];
+        assert_eq!(envs(&pulled.join("mirror")), expected);
+        assert!(envs(&other).is_empty());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

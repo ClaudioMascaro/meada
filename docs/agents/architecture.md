@@ -94,8 +94,8 @@ one for the area a change touches.
   reachable` or `valkey: unreachable (<reason>)` after waiting at most `REACH_TIMEOUT`; the
   line is informational and never changes the probe's exit code. With a `ca_file` the client
   trusts that file alone, not the system roots as well (redis-rs replaces them).
-- `snapshot.rs`, `snapshot/store.rs` (feature `snapshot`; the only places `object_store`,
-  `reqwest` as a client of Meada's own and `tar` are used): the snapshot store. `File` is the
+- `snapshot.rs`, `snapshot/store.rs`, `snapshot/pull.rs` (feature `snapshot`; the only places
+  `object_store`, `reqwest` as a client of Meada's own and `tar` are used): the snapshot store. `File` is the
   `[snapshot]` section and `File::validate` its `Config` (an `https` endpoint, or `http` on
   loopback, with no user or path, and `path_style` for an `http`, IP or `localhost` one;
   `region`, `bucket` and `prefix` shapes; one credential source,
@@ -118,6 +118,32 @@ one for the area a change touches.
   secret files are read through `config::read_bounded`, as `valkey.rs` reads its own. Each
   bundle keeps its `open_read` connection, the read transaction its freshness check ran in,
   until its upload ends. Every object carries `meada-size` and `meada-blake3` metadata.
+  `snapshot/pull.rs` is `meada snapshot pull` (`pull`, once; `main.rs` loops for `--every`),
+  which treats everything it reads from the store as hostile. Under `local_dir`: `current`
+  (the node pointer file, one line `<generation id> <fence>\n`, fence `0` from the store's
+  pointer; `pull::current` reads it and checks the id), `pull.lock` (an advisory lock taken with
+  `try_lock`: a second pull returns `Pulled::Running`), and per held generation `<generation
+  id>/` with `generation.json` (the document as stored) and per repository `<bundle
+  id>/index.db` and `<bundle id>/mirror/`; a pull in progress writes only `<generation
+  id>.partial/` and `current.new`. Steps: the store's `current` must be an id and a newline
+  (`store_pointer`); `checked` refuses a document before any path is built from it (its
+  generation id, `workspace::identity_problem` per identity plus no duplicate and no character
+  a git remote URL cannot hold, each bundle key `repos/<identity>/<bundle id>.tar` under the
+  prefix, hash and `HEAD` shapes, the size sum, the generation id derived again); per bundle,
+  `Store::download` streams it to a file checked against the document's size and hash, and
+  `extract` checks every entry itself (no `unpack`: `index.db` first, then only `mirror/`; only
+  normal components; regular files created `create_new`, `0644` or `0755`; directories made
+  without following a link; symbolic links only to relative targets that fold inside the
+  mirror, and after the last entry none through another link; hard links only to an earlier
+  regular file of the mirror; any other type refused); `settle` replaces `.git/config` with
+  `[core]` and the identity's `origin`, removes `hooks`, `commondir` and
+  `objects/info/alternates`, and checks the checkout, identity, `HEAD` and a clean `git
+  status`. `repo::isolate(local_dir)` makes every `git` call under it run with
+  `GIT_CONFIG_NOSYSTEM=1` and `GIT_CONFIG_GLOBAL` set to the null device. Then the partial
+  directory is renamed to `<generation id>/`, `current.new` is written, synced and renamed over
+  `current`, and every id-named directory but the new current and the one just replaced is
+  deleted. A failure removes the partial directory and leaves the pointer and every held
+  generation as they were.
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
@@ -828,6 +854,14 @@ one for the area a change touches.
 
 ## Known ceilings
 
+- `snapshot/pull.rs`: a generation's bundles hold at most `GENERATION_BYTES_MAX` (256 GiB)
+  together, as the document records their sizes (checked before any download) and as the
+  regular files extracted from them add up; at most `GENERATION_ENTRIES_MAX` (4,000,000) archive
+  entries together; and each GNU long name or link, or pax header, at most
+  `HEADER_EXTENSION_MAX` (64 KiB), which a scan of the headers checks before the tar crate,
+  which reads them into memory whole, sees the archive. Past any of them the pull fails and
+  changes nothing. A symbolic link whose target goes through another symbolic link is refused
+  even when both stay inside the mirror. A sparse file is refused.
 - `mcp.rs`: the stop signal drains for at most `DRAIN` (25 seconds, no flag, under Kubernetes'
   30-second default grace period); past it the connections left are dropped, an answer still
   waiting on an index lock included, and the exit is 0.

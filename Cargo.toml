@@ -16,6 +16,9 @@ exclude = [".github/", "AGENTS.md", "CLAUDE.md", "dist-workspace.toml"]
 async-trait = { version = "=0.1.92", optional = true }
 blake3 = "1.8.7"
 clap = { version = "4.6.7", features = ["derive"] }
+# A bundle's download as a stream (`meada snapshot pull`), only behind `snapshot`. rmcp already
+# brings it into the default build, so it is no canary of the module.
+futures = { version = "0.3.34", optional = true, default-features = false, features = ["std"] }
 # The listener under rmcp's streamable HTTP server, which is a service with none (server mode).
 http-body-util = "0.1.3"
 hyper = { version = "1.9.0", features = ["server", "http1"] }
@@ -62,7 +65,7 @@ yaml-rust2 = { version = "0.13.0", default-features = false }
 # crates. `valkey` is internal, enabled through the modules that need it.
 [features]
 valkey = ["dep:redis"]
-snapshot = ["dep:object_store", "dep:reqwest", "dep:tar", "dep:async-trait"]
+snapshot = ["dep:object_store", "dep:reqwest", "dep:tar", "dep:async-trait", "dep:futures"]
 
 # `cargo test` runs the example's own tests too.
 [[example]]

@@ -276,6 +276,31 @@ variáveis ou dos arquivos que a seção nomeia (nunca do manifesto); `web-ident
 (IMDSv2, só por IPv4, `http://169.254.169.254`) e só quando escrito na seção. As credenciais ficam só em
 memória, e nenhum segredo aparece num erro.
 
+Em cada nó, `meada snapshot pull --workspace <manifesto>` lê o ponteiro `current` do store e,
+quando ele nomeia uma geração que o nó ainda não tem, baixa os bundles para `local_dir`, confere
+o tamanho e o hash BLAKE3 de cada um contra o documento, extrai e troca o ponteiro do nó por
+rename. A única linha em stdout é o id da geração atual. `--every <segundos>` repete o pull (e só
+imprime quando o ponteiro muda); um segundo pull no mesmo `local_dir` sai com 0 avisando que já
+há um em andamento. O nó guarda a geração atual e a anterior e apaga as mais antigas.
+
+Tudo o que vem do store é tratado como entrada hostil: ids e identidades são conferidos antes de
+virar caminho; o pull recusa no arquivo um caminho absoluto, um `..`, um link que sai do
+repositório, uma entrada gravada através de um link simbólico e dispositivos ou FIFOs, com tetos
+de bytes e de entradas por geração. O `.git/config` extraído é trocado por um mínimo que o Meada
+escreve (só `[core]` e o `origin` da identidade), `.git/hooks` é apagado, e o `git` do Meada
+roda nesses espelhos sem a configuração do sistema nem a global. Um pull que falha em qualquer
+passo deixa o ponteiro e as gerações guardadas como estavam.
+
+```
+<local_dir>/
+  current                     # "<id da geração> <fence>", fence 0 sem a trava de refresh
+  pull.lock
+  <id da geração>/
+    generation.json           # o documento, como guardado no store
+    <id do bundle>/index.db
+    <id do bundle>/mirror/    # o checkout, .git incluído
+```
+
 ## Decisões
 
 Uma ligação ambígua (vários provedores servem a rota) ou uma URL dinâmica (a chamada monta a
