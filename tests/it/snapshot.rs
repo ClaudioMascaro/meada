@@ -44,6 +44,7 @@ fn block_on<T>(future: impl std::future::Future<Output = T>) -> T {
 
 /// A client of `bucket` as the tests see the store, the bucket created.
 fn bucket(endpoint: &str, bucket: &str) -> AmazonS3 {
+    crate::common::crypto_provider();
     let s3 = AmazonS3Builder::new()
         .with_endpoint(endpoint)
         .with_region("us-east-1")

@@ -110,7 +110,12 @@ one for the area a change touches.
   The tar is `index.db`, then the mirror under `mirror/` in path order, symbolic links as links.
   `store::Store` is the client `meada snapshot pull` (#273) reuses: object_store's S3 client
   over `Guard`, a reqwest client with no redirect and no proxy that refuses any origin but the
-  bucket's and the chosen credential source's (STS in `region`, the Pod Identity agent, IMDSv2);
+  bucket's and the chosen credential source's (STS in `region`, the Pod Identity agent, IMDSv2),
+  whose TLS is `store::tls` (rustls with ring and the system's roots, handed to a reqwest built
+  with `rustls-no-provider`; object_store signs with ring too). Ring is the only rustls provider
+  in any build (ureq brings it, and redis reads it as the process default): a second one, as
+  object_store's `aws` feature would add with aws-lc-rs, makes rustls panic on the first TLS
+  connection of a build with both modules;
   credentials come only from that source (static ones built from the variables or files, the
   others through object_store's providers given exactly those inputs, IMDSv2 over IPv4 only),
   stay in memory and are scrubbed from every error: the static secret is replaced, and an S3

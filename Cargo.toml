@@ -26,8 +26,14 @@ hyper-util = { version = "0.1.21", features = ["tokio"] }
 ignore = "0.4.33"
 nodejs-semver = "7"
 # The snapshot store's S3 client (ADR 0012), only behind `snapshot`: no default features (no
-# local file store), the `aws` client over rustls.
-object_store = { version = "=0.14.2", optional = true, default-features = false, features = ["aws"] }
+# local file store), the `aws` client with ring for its signatures. `aws` itself would bring
+# aws-lc-rs, a second rustls provider beside ring, and rustls then panics on the first TLS
+# connection of a build with every module.
+object_store = { version = "=0.14.2", optional = true, default-features = false, features = [
+    "aws-base",
+    "reqwest",
+    "ring",
+] }
 percent-encoding = "2.3.2"
 # The Valkey client of the cloud modules (ADR 0012), only behind the internal `valkey` feature.
 # Default features off: no native-tls, only rustls.
@@ -36,14 +42,25 @@ redis = { version = "=1.7.1", optional = true, default-features = false, feature
     "cluster-async",
     "connection-manager",
 ] }
-# The HTTP client under object_store, built by the snapshot module itself: no redirect, no proxy.
-reqwest = { version = "=0.13.5", optional = true, default-features = false }
+# The HTTP client under object_store, built by the snapshot module itself: no redirect, no proxy,
+# and rustls with no provider of its own: the module hands it a ring configuration.
+reqwest = { version = "=0.13.5", optional = true, default-features = false, features = [
+    "rustls-no-provider",
+] }
 rmcp = { version = "3.5.1", features = [
     "server",
     "macros",
     "transport-io",
     "transport-streamable-http-server",
 ] }
+# The snapshot store's TLS configuration, only behind `snapshot`: ring, the one rustls provider
+# of every build (ureq and redis use it too), and the system's roots.
+rustls = { version = "0.23.46", optional = true, default-features = false, features = [
+    "ring",
+    "std",
+    "tls12",
+] }
+rustls-platform-verifier = { version = "0.7.1", optional = true }
 rusqlite = { version = "0.40.2", features = ["bundled"] }
 schemars = "1.2.3"
 serde = { version = "1.0.229", features = ["derive"] }
@@ -65,7 +82,15 @@ yaml-rust2 = { version = "0.13.0", default-features = false }
 # crates. `valkey` is internal, enabled through the modules that need it.
 [features]
 valkey = ["dep:redis"]
-snapshot = ["dep:object_store", "dep:reqwest", "dep:tar", "dep:async-trait", "dep:futures"]
+snapshot = [
+    "dep:object_store",
+    "dep:reqwest",
+    "dep:tar",
+    "dep:async-trait",
+    "dep:futures",
+    "dep:rustls",
+    "dep:rustls-platform-verifier",
+]
 
 # `cargo test` runs the example's own tests too.
 [[example]]

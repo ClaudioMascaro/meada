@@ -232,6 +232,15 @@ pub fn written(repo: &Path) -> Option<String> {
     fs::read_to_string(repo.join("meada.decisions.toml")).ok()
 }
 
+/// The process's rustls provider for the HTTP clients the tests build (rmcp's, object_store's).
+/// With the `snapshot` feature reqwest carries rustls with no provider of its own, since Meada
+/// hands its store client ring itself (`Cargo.toml`); a client built elsewhere reads the
+/// process default, so the tests install the same one. Without the feature, nothing.
+pub fn crypto_provider() {
+    #[cfg(feature = "snapshot")]
+    let _ = rustls::crypto::ring::default_provider().install_default();
+}
+
 /// Runs `git` in `dir`, isolated from the user's and the system's git configuration, with a
 /// fixed author and date so commits are the same on every machine.
 pub fn git(dir: &Path, args: &[&str]) -> String {

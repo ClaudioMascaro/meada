@@ -207,6 +207,7 @@ impl Store {
             }
         }
         let client = reqwest::Client::builder()
+            .use_preconfigured_tls(tls()?)
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
             .connect_timeout(Duration::from_secs(10))
@@ -377,6 +378,21 @@ impl Upload<'_> {
     }
 }
 
+/// The store client's TLS: rustls with ring, the one provider every build carries (no process
+/// default is read or installed), certificates checked against the system's roots, HTTP/2 or
+/// HTTP/1.1 offered.
+fn tls() -> Result<rustls::ClientConfig, String> {
+    use rustls_platform_verifier::BuilderVerifierExt;
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let mut config = (rustls::ClientConfig::builder_with_provider(provider))
+        .with_safe_default_protocol_versions()
+        .and_then(|builder| builder.with_platform_verifier())
+        .map_err(|e| e.to_string())?
+        .with_no_client_auth();
+    config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
+    Ok(config)
+}
+
 /// `uri` when it names the Pod Identity agent, at one of its two addresses, over `http` (the
 /// only way the platform serves it).
 fn pod_agent(uri: &str) -> Option<Url> {
@@ -475,6 +491,44 @@ mod tests {
             "a <StringToSign/>"
         );
         assert_eq!(without_echoes("plain"), "plain");
+    }
+
+    /// A TLS handshake with a loopback port that closes every connection fails with an error.
+    /// In a build with every module, two rustls providers made a TLS connection panic instead
+    /// (one provider, ring, now).
+    #[test]
+    fn a_tls_handshake_that_fails_is_an_error_and_no_panic() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                drop(stream);
+            }
+        });
+        let dir = std::env::temp_dir().join(format!("meada-store-tls-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("key"), "k\n").unwrap();
+        std::fs::write(dir.join("secret"), "s\n").unwrap();
+        let config = Config {
+            endpoint: format!("https://127.0.0.1:{port}"),
+            region: "us-east-1".into(),
+            bucket: "meada-tls".into(),
+            prefix: String::new(),
+            path_style: true,
+            credentials: Credentials::Static {
+                key_id: Secret::File(dir.join("key")),
+                secret: Secret::File(dir.join("secret")),
+                token: Secret::Env("MEADA_TEST_TLS_NO_TOKEN".into()),
+            },
+            local_dir: None,
+        };
+        let store = Store::connect(&config).unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        assert!(runtime.block_on(store.get("current", 64)).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
