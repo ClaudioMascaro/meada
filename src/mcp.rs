@@ -261,8 +261,11 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
     let served: Vec<String> = listed.entries.iter().map(|l| l.repo.clone()).collect();
     tokio::runtime::Runtime::new()?.block_on(async {
         let listener = tokio::net::TcpListener::bind(address).await?;
+        // Before the address is printed: a signal sent on reading it is never lost.
+        let mut stop = std::pin::pin!(stop_signal()?);
         eprintln!("listening on http://{}", listener.local_addr()?);
-        // Cancelling its `cancellation_token` ends the calls in flight: the stop on a signal.
+        // Not cancelled on a signal: cancelling `cancellation_token` would end the calls in
+        // flight, and the stop lets them finish (a bound on the wait is ticket #268).
         let config = StreamableHttpServerConfig::default()
             .with_legacy_session_mode(false)
             .with_json_response(true)
@@ -289,8 +292,14 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
             .map(|identity| format!("{identity}\n"))
             .collect();
         let routes = Arc::new((endpoints, listing));
+        let (stopping, _) = tokio::sync::watch::channel(());
+        let mut connections = tokio::task::JoinSet::new();
         loop {
-            let stream = match listener.accept().await {
+            let accepted = tokio::select! {
+                accepted = listener.accept() => accepted,
+                () = &mut stop => break,
+            };
+            let stream = match accepted {
                 Ok((stream, _)) => stream,
                 // Out of descriptors, say: the server goes on, once a few connections closed.
                 Err(e) => {
@@ -300,19 +309,50 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
                 }
             };
             let routes = routes.clone();
-            tokio::spawn(async move {
+            let mut stopping = stopping.subscribe();
+            connections.spawn(async move {
                 let service = service_fn(move |request| {
                     let routes = routes.clone();
                     async move { Ok::<_, Infallible>(route(&routes.0, &routes.1, request).await) }
                 });
                 // A connection that breaks ends only itself; the timer is what makes hyper's
                 // header read timeout close one that sends nothing.
-                let _ = (http1::Builder::new())
+                let connection = (http1::Builder::new())
                     .timer(TokioTimer::new())
-                    .serve_connection(TokioIo::new(stream), service)
-                    .await;
+                    .serve_connection(TokioIo::new(stream), service);
+                let mut connection = std::pin::pin!(connection);
+                // On the stop, the answer in flight finishes and the connection then closes.
+                tokio::select! {
+                    _ = connection.as_mut() => return,
+                    _ = stopping.changed() => connection.as_mut().graceful_shutdown(),
+                }
+                let _ = connection.await;
             });
         }
+        // Stop accepting, then let the answers in flight finish.
+        drop(listener);
+        drop(stopping);
+        while connections.join_next().await.is_some() {}
+        Ok(())
+    })
+}
+
+/// Resolves on SIGINT or SIGTERM (Ctrl-C alone off Unix). The handlers are installed on the
+/// call, so a signal sent once the address is printed is never lost.
+#[cfg(unix)]
+fn stop_signal() -> crate::Result<impl std::future::Future<Output = ()>> {
+    use tokio::signal::unix::{SignalKind, signal};
+    let mut term = signal(SignalKind::terminate())?;
+    let mut int = signal(SignalKind::interrupt())?;
+    Ok(async move {
+        tokio::select! { _ = int.recv() => {}, _ = term.recv() => {} }
+    })
+}
+
+#[cfg(not(unix))]
+fn stop_signal() -> crate::Result<impl std::future::Future<Output = ()>> {
+    Ok(async {
+        let _ = tokio::signal::ctrl_c().await;
     })
 }
 

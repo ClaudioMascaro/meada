@@ -23,6 +23,12 @@ opens. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` fi
 reads each index through `index::export`, adds the contracts each `meada.toml` declares
 (`ContractKind::declare`), derives **links** from both, and renders.
 Nothing outside the index's directory (`.meada/`, or `index_dir` in server mode) is written.
+Server mode reads the **workspace manifest**, and each mirror's `meada.toml` and
+`meada.decisions.toml`, once at start (`engine::served`, which refuses to start unless every
+repository can be served), so a change to those files needs a restart, while a code change in a
+mirror needs only `meada index --workspace`. It refuses `trace` with `changes: uncommitted`, and
+`context` prints `index behind the mirror: run meada index --workspace` for a span whose file
+changed since indexing.
 Everything the engine returns is sorted: the same files give byte-identical output.
 
 ## Modules (`src/`)
@@ -41,7 +47,12 @@ one for the area a change touches.
   two transports: stdio, about the client's first `file://` root or the server's cwd without
   roots, and in server mode streamable HTTP (`meada mcp --listen`, stateless, JSON responses on
   a hyper listener), one endpoint per repository of the manifest at `/<identity>`, a 404
-  listing the identities served elsewhere. `main.rs`: clap.
+  listing the identities served elsewhere (it answers before the `Origin` check, which refuses
+  any request carrying one with 403; no `Host` check). `listen` installs the SIGINT and SIGTERM
+  handlers before it prints the address, then on a signal drops the listener and lets each
+  connection finish its answer in flight (`graceful_shutdown`) before it returns, so the process
+  exits 0; the rmcp `cancellation_token` is left alone, since cancelling it ends calls in
+  flight (a bounded drain is ticket #268). `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
@@ -597,6 +608,9 @@ one for the area a change touches.
 
 ## Invariants the code relies on
 
+- Server mode writes nothing: the engine opens every index read-only, `refresh()` does nothing,
+  and the HTTP listener opens no outbound connection. Only `meada index --workspace` writes, and
+  only under `index_dir`.
 - Determinism: all export lists are sorted, hashes are BLAKE3, no clock or random value reaches
   an answer. A refreshed index must equal a cold index of the same files (`tests/it/freshness.rs`),
   communities and processes included: `refresh` recomputes both at its end from the stored calls
