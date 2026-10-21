@@ -19,7 +19,7 @@
 
 use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet};
-use std::path::{Component, Path, PathBuf};
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -231,29 +231,6 @@ fn serialize_name<S: serde::Serializer>(
     s: S,
 ) -> Result<S::Ok, S::Error> {
     s.serialize_str(ecosystem.name())
-}
-
-/// Whether a Cargo or Go entry of source `via` may reach the provider whose manifest is
-/// `provider` in the repository `to`, from a manifest of `from` (each repository by identity and
-/// root): a `path` entry only the package at that path, a `git` one only the repository of that
-/// remote; an entry with no source every provider. A path that leaves its repository (`../`) is
-/// matched against the provider's location by the two roots, folded lexically: nothing is read.
-fn sourced(
-    via: Option<&str>,
-    from: (&str, &Path),
-    ((to, to_root), provider): ((&str, &Path), &str),
-) -> bool {
-    let Some(via) = via else {
-        return true;
-    };
-    match via.split_once(' ') {
-        Some(("path", manifest)) if manifest.starts_with("../") => {
-            folded(&from.1.join(manifest)) == folded(&to_root.join(provider))
-        }
-        Some(("path", manifest)) => from.0 == to && provider == manifest,
-        Some(("git", identity)) => to == identity,
-        _ => false,
-    }
 }
 
 /// Whether the file at `path` is one the manifests table holds: a manifest of an ecosystem or
@@ -673,22 +650,6 @@ fn valid_name(name: &str) -> bool {
 /// The site of the manifest at `path` of `repository`.
 fn site(repository: &str, path: &str) -> String {
     format!("{repository}::{path}")
-}
-
-/// `path` with its `.` and `..` folded without touching the file system, so a symlink never
-/// changes where it lands.
-fn folded(path: &Path) -> PathBuf {
-    let mut out = PathBuf::new();
-    for part in path.components() {
-        match part {
-            Component::CurDir => {}
-            Component::ParentDir => {
-                out.pop();
-            }
-            part => out.push(part),
-        }
-    }
-    out
 }
 
 /// The directory of the manifest at `path`: `.` for one at the root.
@@ -2012,6 +1973,7 @@ impl ContractKind for Packages {
 mod tests {
     use super::*;
     use crate::index::Span;
+    use std::path::PathBuf;
 
     #[test]
     fn an_ambiguous_package_link_is_no_call_for_a_person() {
