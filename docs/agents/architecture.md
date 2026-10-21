@@ -25,7 +25,8 @@ one for the area a change touches.
   items, derived in one place. `trace.rs`: the `Graph`, the walk, the chain footer and the
   process walk (`Graph::process`, the step list `trace` renders and the export carries).
   `entry.rs`: entry points (spec #31), found when an index is written.
-  `drift_view.rs`: how `context`, `search` and `status` show `Link::drift`.
+  `drift_view.rs`: how `context`, `search` and `status` show `Link::drift`; it reads no kind (the
+  stored links, the exports' consumer shapes, the calls and the seam's `parts`).
   `render.rs`: token budget and line helpers. `mcp.rs`: three read-only tools over the client's
   first `file://` root, or the server's cwd without roots. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
@@ -177,9 +178,12 @@ one for the area a change touches.
 
 - New **contract kind**: implement `ContractKind` (`contract.rs`) and add it to `KINDS`, at the
   end: the order of the list is the order of the steps and of the output. Nothing in
-  `engine.rs`, `items.rs`, `decisions.rs`, `trace.rs` or `entry.rs` names a kind, and a kind's
-  rule stays in its own file. Three questions are required: `prefix`, `extract` (reads `Code`,
-  never the syntax tree, and returns `Found` with a `Site`: `Def`, `Inline`, `File`, `Call`) and
+  `engine.rs`, `items.rs`, `decisions.rs`, `trace.rs`, `entry.rs` or the extraction loop of
+  `index.rs` names a kind, and a kind's rule stays in its own file. Three questions are
+  required: `prefix`, `extract` (receives `Code`, never the syntax tree, and `Indexed`, what the
+  index read of the repository besides: the manifests and tsconfigs, the exported rows and the
+  files of every pack, which a kind reads when its contracts depend on what the manifests say;
+  it returns `Found` with a `Site`: `Def`, `Inline`, `File`, `Call`) and
   `link` (receives the whole workspace's providers and exports). The others have a default
   body, and a kind overrides only what it answers differently:
 
@@ -192,7 +196,7 @@ one for the area a change touches.
   | `unresolved`, `label`, `parts` | whether an identifier is an unresolved side, how it is labelled, the parts `search` ranks |
   | `place` | where a site sits when it is neither a symbol nor a call (packages: manifest and field) |
   | `search_word`, `own_search` | the word of `search`'s `kind` and, for an own renderer, its hits |
-  | `sides`, `view`, `related_sides` | the role words, the carried word and drift consumers of `context` on a contract, and the sides that reach it by another name |
+  | `sides`, `view`, `related_sides` | the role words and the carried word of `context` on a contract, and the sides that reach it by another name; a contract listed by its providers alone is followed by the linked consumers that read fields, with their drift (the engine's rule: `View::follows_drift`) |
   | `at_call`, `context_sections` | the lines a call adds to a symbol's `contracts:`, and the sections `context` adds after the callees (packages: `consumers:`) |
   | `starts` | the providers a `trace` start text names |
   | `status` | the lines `meada status` prints |
@@ -208,9 +212,9 @@ one for the area a change touches.
   its doors need a stored name, stored fields on the export, provider and consumer rows, and a
   reader in `document` when it reads provider documents. The coding standard sends any other
   hook in the engine to review.
-  One deliberate exception stays outside the kinds: `drift_view.rs` is HTTP's drift view (it
-  reads `http::route` and `Link::drift`, and the engine and `context` call it by name); moving
-  it under the HTTP kind is out of scope for spec #205.
+  The index writer still names the package module for the stored format alone: the manifest and
+  tsconfig rows it reads and writes, the export types, and the ecosystem seam's `programs` and
+  `inherit`, which stay with the engine (spec #205).
 - A **builder** language (spec #30 #129: a call whose method returns its receiver, such as
   `Router::new().route(..)`): the pack sets `LanguagePack::fluent` and gives each call its
   `Call::receiver` (a value emitted from the syntax, not stored in the index, like `args`).
@@ -412,17 +416,18 @@ one for the area a change touches.
   (`Row::link`), the export and every other reader of links see the same value;
   `drift_view.rs` renders it for `context` (a route's consumers that read fields, with their
   drift), `search` (kind `drift`) and `status` (a count per repository): it computes no drift
-  of its own, reading `Link::drift`, the exports' consumer shapes (which consumers read fields)
-  and their calls (where each consumer is).
+  of its own and reads no kind: it reads `Link::drift`, the exports' consumer shapes (which
+  consumers read fields), their calls (where each consumer is) and the seam's `parts` (the part
+  of a contract `search` ranks against).
 - **Shapes through package imports** (issue #175): a source reading a name that `Code::imported`
   says comes from outside the repository records a `shape::Import` on the shape (its path, the
   importing file, the specifier and name, and the `Want` view: `zod`, `infer`, `literals`,
   `type`, or `opens` for a provider typed with a package type, which takes that type's index
   signatures alone) instead of opening it or dropping it. A repository keeps, beside its
   contracts, the shapes of the module-level constants and types the files of its packages'
-  public surface export (`package::surface`: the entries of each named manifest, as an import
-  resolves them, and what their `exports` rows lead to; `package::exported_shapes`, a step
-  `index::refresh` runs after the kinds' `extract`, as
+  public surface export (`surface`: the entries of each named manifest, as an import
+  resolves them, and what their `exports` rows lead to; `exported_shapes`, a step the package
+  kind's `extract` runs after its imports, from `Indexed`, as
   `Role::Shape` rows; each source reads its own: `Types::exported`, `Zod::exported`,
   `Literals::exported`). The workspace step `package::shapes`, after `import` in the package
   kind's `workspace_step` (which `Engine::exports` runs), resolves each import as a call through it resolves (the ecosystem's
@@ -1008,7 +1013,7 @@ one for the area a change touches.
   wrapper returns one thing (the response, the body or one path below it) from the function
   holding its call; whether the body was awaited is not checked (no marker).
 - Shape readers (`zod.rs`, `declared.rs`, `literals.rs`): each per-file budget below is one
-  `shape::Budget` per extraction (`Http::extract`, `package::exported_shapes`), shared by every
+  `shape::Budget` per extraction (`Http::extract`, `exported_shapes`), shared by every
   reader of that extraction, so a file spends each at most once per extraction.
 - `zod.rs`: reading the schemas of a file's handlers charges every schema expression examined
   to `ZOD_BUDGET` (2^14, over all the handlers of the file, and the `z.infer` schemas its
@@ -1081,7 +1086,7 @@ one for the area a change touches.
   nothing on a consumer. So is an import that resolves nowhere, `ambiguous`, to several names,
   or in two providers to different shapes, and a name no reader keeps a shape for (a call, a
   union type). Only a module-level constant or type a file of a package's public surface
-  (`package::surface`) exports itself keeps a shape (a re-export reaches it through the
+  (`surface`) exports itself keeps a shape (a re-export reaches it through the
   `exports` rows): the files the entries of each named manifest (the bare name and each
   `exports` subpath without a `*`, as an import resolves them) lead to through the `exports`
   rows. Those are re-read, their files parsed again, on every refresh that extracts, so the
