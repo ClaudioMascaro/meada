@@ -29,10 +29,11 @@ amended for it (2 and 4) and one was added (6).
    machine" is the operator's boundary: the HTTP server returns span text to the clients the
    operator admits, the stdio server is unchanged.) (Amended 2026-10-21; ADR 0012: an opt-in
    cloud module connects only to endpoints the operator configured inside the operator's
-   boundary, with credentials the operator supplies from the environment or a file. The default
-   build and local use still need no account and no key, no module needs an account with Meada
-   or with a vendor the operator did not choose, and a generation published to the operator's
-   store stays within that boundary.)
+   boundary, with credentials the operator supplies from the environment or a file, or from the
+   cloud host's credential endpoints ADR 0012 lists as exceptions when the operator names one.
+   The default build and local use still need no account and no key, no module needs an account
+   with Meada or with a vendor the operator did not choose, and a generation published to the
+   operator's store stays within that boundary.)
 3. Meada writes only inside its own index directory. Changes to the user's files (agent
    instructions, editor configuration, hooks) happen only through an explicit command the user
    runs. (Amended 2026-10-21; ADR 0012: with a cloud module, Meada's own index also covers the

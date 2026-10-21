@@ -92,26 +92,39 @@ A **cloud module** is a cargo feature, off by default, plus one section of
 
 - A module connects only to the endpoints the operator configured, inside the operator's
   boundary: the store's `endpoint`, the Valkey `url`, the OIDC `issuer` and the `jwks_uri` its
-  metadata names. No client follows a redirect to another host.
-- One recorded exception in the store's credential chain: with web identity credentials (IRSA,
-  EKS Pod Identity; `credentials = "web-identity"`), the store module also calls STS in the
-  configured `region`. The operator chose that endpoint by choosing those credentials. Instance
-  metadata credentials (`credentials = "instance"`) are used only when a section sets them; no
-  other source of credentials is read.
+  metadata names, plus the credential endpoint of the source `credentials` names (below). No
+  client follows a redirect to another host.
+- The store's credentials come from one source, the one `credentials` names; no other is read.
+  Besides `static` (keys from the environment or files, below), three sources reach an endpoint
+  the operator chose by choosing them, each a recorded exception:
+  - `web-identity` (IRSA): the token file and role in `AWS_WEB_IDENTITY_TOKEN_FILE` and
+    `AWS_ROLE_ARN`, exchanged with STS in the configured `region` over `https`.
+  - `pod-identity` (EKS Pod Identity): the container credentials endpoint in
+    `AWS_CONTAINER_CREDENTIALS_FULL_URI`, called with the token read from
+    `AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`. The URL must name the Pod Identity agent
+    (`http://169.254.170.23` or `http://[fd00:ec2::23]`); any other is an error.
+  - `instance` (the cloud host's instance metadata service, IMDSv2): `http://169.254.169.254`
+    or `http://[fd00:ec2::254]`, used only when a section sets it.
 - TLS is required for every endpoint whose host is not loopback (`localhost`, `127.0.0.0/8`,
-  `::1`): `https` and `rediss`. A plain `http` or `redis` URL to any other host is an error.
-  Certificates verify against the system roots, plus an optional `ca_file` the section names.
+  `::1`): `https` and `rediss`. A plain `http` or `redis` URL to any other host is an error. The
+  only exceptions are the Pod Identity agent and the instance metadata service above, at those
+  addresses, which the platform serves only over `http` on a link-local address inside the host;
+  no other link-local or `http` endpoint is allowed. Certificates verify against the system
+  roots, plus an optional `ca_file` the section names.
 - Secrets come only from environment variables or files a section names, through `*_env` and
   `*_file` keys (at most one of each pair, each with a documented default such as
-  `AWS_SECRET_ACCESS_KEY`). They never come from the manifest's text: a password inside a URL is
-  refused. No secret, and no URL carrying one, appears on stderr or in an error.
+  `AWS_SECRET_ACCESS_KEY`), with the credential sources above as the only exceptions: STS, the
+  Pod Identity agent and the instance metadata service hand out short-lived credentials, which
+  Meada keeps in memory only. Secrets never come from the manifest's text: a password inside a
+  URL is refused. No secret, and no URL carrying one, appears on stderr or in an error.
 - `meada index` opens no connection, whatever the build and the manifest.
 
 ### Valkey
 
 - The server is ElastiCache for Valkey (7.2 and later) or a self-hosted Valkey of the same
   versions, reached with an AUTH/RBAC user and a password first. Cluster mode is supported.
-- Every key goes through one function that adds the manifest's `key_prefix`. The keys one script
+- Every key goes through one function that adds the manifest's `key_prefix`, which may not
+  contain `{` or `}`, so no prefix can change the hash tag below. The keys one script
   reads or writes together (the pointer, the retained list, the lock and the fence) share the
   hash tag `{<key_prefix>}`, so they land on one slot in cluster mode. Session keys need no tag.
 - Valkey holds pointers, a lock and session state, never an index. Nodes learn a new generation
@@ -133,6 +146,15 @@ A **cloud module** is a cargo feature, off by default, plus one section of
   `meada index --workspace`. It checks, reading only, that every index equals its mirror and
   every mirror is clean, refuses otherwise naming `meada index --workspace`, uploads the bundles
   and the document, and writes the pointer last. It writes nothing on the machine it runs on.
+- An id names inputs, not bytes: two pods publishing the same commits build tar files that
+  differ (mtimes, SQLite pages) under the same bundle id. So each bundle is uploaded with its
+  size and BLAKE3 hash as object metadata, and the generation document records the stored
+  object's size and hash, read back from that metadata, never the local file's. A bundle id
+  already stored is not uploaded again; the document takes that object's metadata. A generation
+  document, once stored, is never rewritten: a publish whose generation id exists uploads
+  nothing, checks that the document and every bundle it lists are stored with the recorded size
+  and hash, and only moves the pointer to it when it is not already current. Two publishers at
+  once are kept apart by the operator's scheduler or by the refresh lock.
 - Nodes pull: `meada snapshot pull` treats everything it reads from the store as hostile input
   (ids, identities, archives, the mirrors' git configuration), verifies sizes and hashes against
   the document, extracts into its `local_dir`, and swaps the node's pointer file by rename, so a
@@ -146,6 +168,13 @@ A **cloud module** is a cargo feature, off by default, plus one section of
   current and previous generations. With it, Valkey holds the current generation and a retained
   list that every node mirrors, so the fleet holds one set; with the refresh lock, each pointer
   write carries a fence, and neither the Valkey pointer nor a node's ever moves to a lower one.
+- Meada never lowers `{<key_prefix>}:fence`. A Valkey flush or a failover that loses it makes
+  the next fences lower than the ones recorded, and the fleet stops moving: the pointer script
+  refuses them, or nodes refuse to swap. The operator recovers by setting
+  `{<key_prefix>}:fence` at or above the highest fence recorded (in Valkey or in any node's
+  pointer file), or by deleting a node's pointer file, after which that node takes the current
+  generation whatever its fence. A refused publish names the fence key and that recovery, and
+  `meada status` on a node names a node fence above Valkey's as the stuck case.
 - A workflow run pins a generation in the path: `/<identity>@<generation>`, the generation being
   what follows the last `@`. Pins are served with the generation pointer, which guarantees every
   node holds the retained set. `/<identity>` keeps serving the current generation. A generation
@@ -219,6 +248,8 @@ last of the tail, to be closed if no such client needs it by then.
   a fenced write needs a compare-and-set that S3-compatible stores do not all offer.
 - **Valkey pub/sub to announce a generation.** At most once: a node that was disconnected
   misses it.
+- **A bundle id from the tar's bytes.** Two pods at the same commits would name one bundle twice,
+  so ids would stop being deterministic and every re-run would upload again.
 - **A merged workspace bundle.** Breaks invariant 5 for no gain, since links derive at query
   time.
 - **The pin in a header or a tool parameter.** ADR 0011's reasons for the repository hold for
@@ -256,5 +287,9 @@ last of the tail, to be closed if no such client needs it by then.
   (#278).
 - New crates enter only behind a feature, and CI checks the default build for them. The gate of
   a change under a feature runs clippy and the tests with it.
-- The operator owns the store, Valkey and the OIDC provider, and their availability affects
-  publishing and pulling only: a node keeps serving what it holds.
+- The operator owns the store, Valkey and the OIDC provider. The store's and Valkey's
+  availability affects publishing and pulling: a node keeps serving what it holds. Two answers
+  depend on a service: with the session-store module, a Valkey error during a session load
+  answers 503 to that legacy session; with the OIDC module, a provider unreachable at start
+  refuses the start, and a key rotation reaches Meada only while the provider's JWKS can be
+  read.

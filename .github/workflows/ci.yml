@@ -58,6 +58,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Default build carries no module crate
+        # bash with pipefail, so a failing `cargo tree` fails the step.
+        shell: bash
         run: |
           # Each module ticket adds the crates its feature brings, space-separated.
           forbidden=""

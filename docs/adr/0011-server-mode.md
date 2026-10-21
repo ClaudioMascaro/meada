@@ -30,7 +30,8 @@ design points the slices need.
 1. **Server mode lives in the binary, behind a flag.** `meada mcp --listen <addr>` serves the
    same three tools over MCP streamable HTTP (rmcp's `transport-streamable-http-server`),
    bound to the loopback interface by default. Authentication belongs to the operator's reverse
-   proxy in this phase.
+   proxy in this phase. (Amended 2026-10-21; ADR 0012: the proxy stays the default, and the
+   opt-in OIDC module is the alternative inside Meada.)
 2. **A workspace manifest, read in server mode only.** A versioned file in an ops repository
    lists the repositories (remote identity and local path), plus the `[serve]` and
    `[[resource]]` declarations of those with no `meada.toml`. A repository's own `meada.toml`
@@ -153,7 +154,9 @@ before: the stdio server, discovery and freshness on demand are unchanged.
 ### Refresh by command
 
 - In server mode the server only reads. It opens indexes read-only, stats nothing per call and
-  writes nothing, not even a refresh.
+  writes nothing, not even a refresh. (Amended 2026-10-21; ADR 0012: with the session-store
+  module the server also writes MCP session state to Valkey, under its key prefix; it still
+  never writes an index or a file.)
 - The operator refreshes: after a mirror moves, the operator's fetch job or a webhook runs
   `meada index --workspace <path>`, which refreshes every repository of the manifest the way a
   local refresh does (a stat per file, a hash of the changed ones). Meada still never clones or
