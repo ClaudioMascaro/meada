@@ -72,9 +72,11 @@ modules updates it.
   drift computed of its own: `entries` takes every link with a `Link::drift` or, but for an
   ambiguous one, whose consumer has a shape in the exports, and finds its consumer call by
   scanning every repository's calls (Known ceilings); `consumers`, `matches` and `counts`
-  render. `context` on an HTTP route appends, after the providers, one
+  render. `search` kind `drift` ranks against the route path the seam's `parts` gives (its
+  second part). `context` on a contract its kind lists by its providers alone (`View::consumer`
+  is `None`, as an HTTP route) appends, after the providers, one
   `<repository> consumer <path>:<line> <caller>` per linked consumer that read fields of the
-  response (ambiguous links apart), sorted by repository, file and numeric line, with `drift:
+  carried shape (ambiguous links apart), sorted by repository, file and numeric line, with `drift:
   missing <path> (<level>), ...` and `not checked: <path> under <open path>, ...` lines when it
   has any. The provider's shape lines name the source: `<file> (document)`, `(zod)` or
   `(literals)` (`Source::at`). `search` kind `drift`

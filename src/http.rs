@@ -116,7 +116,7 @@ fn fragments(parts: &[Part]) -> Vec<String> {
 }
 
 /// The method and path of an HTTP contract identifier: `("GET", "/users/{}")`.
-pub fn route(contract: &str) -> Option<(&str, &str)> {
+fn route(contract: &str) -> Option<(&str, &str)> {
     contract.strip_prefix("http::")?.split_once("::")
 }
 
@@ -473,13 +473,12 @@ impl ContractKind for Http {
     }
 
     /// A route is listed by its providers alone: its consumers are calls. Its shape is a
-    /// `response`, and the consumers that read fields follow (drift).
+    /// `response`.
     fn view(&self, contract: &str) -> Option<View> {
         route(contract).map(|_| View {
             provider: "provider",
             consumer: None,
             carried: "response",
-            drift: true,
         })
     }
 
@@ -755,8 +754,8 @@ mod tests {
         assert_eq!(Http.search_word(), Search::Filter("route"));
     }
 
-    /// `context` on a route lists its providers, calls its shape `response` and follows the
-    /// linked consumers that read fields; a contract that is no route has no such view.
+    /// `context` on a route lists its providers and calls its shape `response`; a contract that
+    /// is no route has no such view.
     #[test]
     fn a_route_is_viewed_by_its_providers_with_a_response_and_drift_and_a_non_route_not_at_all() {
         let view = Http.view("http::GET::/users/{}").unwrap();
@@ -764,7 +763,6 @@ mod tests {
             provider: "provider",
             consumer: None,
             carried: "response",
-            drift: true,
         };
         assert_eq!(view, expected);
         assert_eq!(Http.view("http::orders"), None);
