@@ -3,16 +3,17 @@
 //! (`session.get(url)`); its HTTP method is its name or, for `request(method, url)`, its first
 //! argument. The client's `base_url=` is joined by the root's `based`, a wrapper is read at each
 //! of its call sites (`Code::expand`), and the URL and method are read by the root's `fetch`.
-//! The rows of `LIBRARIES` also list reqwest and ureq (spec #30), so the Rust pack's clients are
-//! read by the same rules (the Rust pack gives the receiver's value, so a receiver that is a
-//! call is read there). The receiver's client is found with `Code::origins` (`Follow::Values`:
-//! assignments, `with`, `self` attributes, arguments and return values), and a constructor is
-//! named by `Code::outside` read as a name (`by_path` false, also for the Rust rows), not by the
+//! The rows of `LIBRARIES` also list reqwest and ureq (spec #30), whose constructors are the Rust
+//! HTTP module's (`rust/frameworks.rs`), so the Rust clients are read by the same rules (the
+//! Rust pack gives the receiver's value, so a receiver that is a call is read there). The
+//! receiver's client is found with `Code::origins` (`Follow::Values`: assignments, `with`,
+//! `self` attributes, arguments and return values), and a constructor is named by
+//! `Code::outside` read as a name (`by_path` false, also for the Rust rows), not by the
 //! `outside` an origin carries, which a Rust path call reads as a path.
 
+use super::super::rust::frameworks::{self, REQWEST_CLIENTS, UREQ_AGENTS};
 use super::super::{HTTP_METHODS, based, consumer, fetch};
 use crate::contract::Found;
-use crate::lang::rust::frameworks::{REQWEST_CLIENTS, UREQ_AGENTS};
 use crate::lang::{Facts, Imported, Part, Value};
 use crate::resolve::{Code, Expand, Expanded, Follow, Of, Origin};
 
@@ -138,7 +139,7 @@ pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
                             &call.scope,
                             Of::Value(value),
                             Follow::Values {
-                                passes: crate::lang::rust::passes,
+                                passes: frameworks::passes_on,
                             },
                         ),
                         None if receiver.starts_with('(') => continue,
@@ -147,7 +148,7 @@ pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
                             &call.scope,
                             Of::Name(receiver),
                             Follow::Values {
-                                passes: crate::lang::rust::passes,
+                                passes: frameworks::passes_on,
                             },
                         ),
                     };

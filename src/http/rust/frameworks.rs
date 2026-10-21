@@ -1,8 +1,10 @@
-//! The web frameworks and HTTP clients the Rust pack knows (spec #30), one entry per object, as
-//! `messages.rs` lists the brokers: what makes the object outside the repository (the name the
-//! `use` declarations give the call) and the methods that hand that same object back. The value
-//! flow reads the methods through the pack's `passes` table, which its readers hand the question; the HTTP kind (`http/rust/axum.rs` for
-//! axum, `http/rust.rs` for actix-web and Rocket) reads what a constructor makes through `made`.
+//! The web frameworks and HTTP clients the HTTP kind reads in Rust (spec #30), one entry per
+//! object, as `lang/rust/messages.rs` lists the brokers: what makes the object outside the
+//! repository (the name the `use` declarations give the call) and the methods that hand that
+//! same object back. The HTTP kind owns the table: its readers (`axum.rs` for axum, `../rust.rs`
+//! for actix-web and Rocket, `../python/clients.rs` for reqwest and ureq) read what a
+//! constructor makes through `made` and hand the value flow `passes_on`, the question's table of
+//! what passes the object on.
 
 /// What an object of a framework or a client library is.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -52,12 +54,6 @@ pub(crate) const UREQ_AGENTS: &[&str] = &[
     "ureq.Agent.new_with_defaults",
     "ureq.Agent.new_with_config",
     "ureq.AgentBuilder.new",
-];
-
-/// The HTTP methods the `Method` constants of the HTTP crates name, which an actix-web
-/// `web::method(Method::X)` may be given.
-pub(crate) const VERBS: &[&str] = &[
-    "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "CONNECT", "TRACE",
 ];
 
 // ponytail: a setter not listed ends the chain, so what it is called on is not read; add it here.
@@ -229,20 +225,30 @@ pub(crate) fn passes(made: Made) -> &'static [&'static str] {
     all.find(|f| f.made == made).map_or(&[], |f| f.passes)
 }
 
+/// Whether `method`, called on what the outside constructor `origin` (`axum.Router.new`) made,
+/// hands back that same object: what the readers of the HTTP kind ask the value flow with. A
+/// method not listed (`headers()` of a response, `json()`, a method of a trait the repository
+/// defines) makes a different value.
+pub(crate) fn passes_on(origin: &str, method: &str) -> bool {
+    made(origin).is_some_and(|m| passes(m).contains(&method))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lang::rust::passes as union;
 
     #[test]
     fn what_a_constructor_makes_passes_the_methods_of_that_object_alone() {
         assert_eq!(made("actix_web.App.default"), Some(Made::App));
-        assert!(union("actix_web.App.default", "service"));
-        assert!(!union("actix_web.App.default", "guard"));
+        assert!(passes(Made::App).contains(&"service"));
+        assert!(passes_on("actix_web.App.default", "service"));
+        assert!(!passes_on("actix_web.App.default", "guard"));
         // A name of the crate that constructs nothing passes nothing.
         assert_eq!(made("actix_web.App.into_service"), None);
-        assert!(!union("actix_web.App.into_service", "service"));
-        assert!(union("reqwest.blocking.Client.builder", "timeout"));
-        assert!(!union("reqwest.get", "timeout"));
+        assert!(!passes_on("actix_web.App.into_service", "service"));
+        assert!(passes_on("reqwest.blocking.Client.builder", "timeout"));
+        assert!(!passes_on("reqwest.get", "timeout"));
+        // A broker's constructor is none of this table's.
+        assert!(!passes_on("rdkafka.ClientConfig.new", "set"));
     }
 }

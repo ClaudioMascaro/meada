@@ -17,8 +17,12 @@
 //! A handler is a node of its own: one a call names (as an argument, `routes![..]` included)
 //! is served only where a mount Meada reads puts it, and nowhere when it reads none. One no call
 //! names is served at its own path, with no prefix.
+//!
+//! The frameworks and clients are this module's table (`frameworks`). The one constant a kind
+//! reads from the Rust pack is `VERBS`, the verbs its parse-time fold of `Method::GET` knows.
 
 mod axum;
+pub(super) mod frameworks;
 
 use std::cell::{Cell, OnceCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -28,9 +32,10 @@ use super::{
     provider,
 };
 use crate::contract::{Found, Site};
-use crate::lang::rust::frameworks::{self, Made, VERBS};
+use crate::lang::rust::VERBS;
 use crate::lang::{Call, Class, Value};
 use crate::resolve::{Code, Follow, Of, Outside, scope_of};
+use frameworks::Made;
 
 /// How many values the expansions of `items` (constants, the functions a call answers) may add,
 /// over every call of the repository; past it a list is read no further.
@@ -229,7 +234,7 @@ impl<'c, 'a> Web<'c, 'a> {
             scope,
             Of::Value(value),
             Follow::Values {
-                passes: crate::lang::rust::passes,
+                passes: frameworks::passes_on,
             },
         );
         let mut out: Vec<Place> = (origins.into_iter())
@@ -523,7 +528,7 @@ impl<'c, 'a> Web<'c, 'a> {
                 scope,
                 Of::Value(arg),
                 Follow::Values {
-                    passes: crate::lang::rust::passes,
+                    passes: frameworks::passes_on,
                 },
             ) {
                 let made = origin.outside.as_ref().and_then(made_of);
