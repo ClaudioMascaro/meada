@@ -6,7 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use serde::Deserialize;
 
@@ -185,12 +185,12 @@ impl Manifest {
         let parsed: ManifestFile = config::parse(file, &src, "meada.workspace.toml")?;
         let Some(index_dir) = parsed.index_dir else {
             let missing = Msg::KeyMissing("index_dir").text();
-            return Err(format!("{}:1: {missing}", file.display()).into());
+            return Err(format!("{}: {missing}", file.display()).into());
         };
         let base = file.parent().unwrap_or(Path::new(""));
         let index_dir = base.join(index_dir);
         let mut seen = HashSet::new();
-        let entries = (parsed.repositories.into_iter())
+        let mut entries: Vec<Listed> = (parsed.repositories.into_iter())
             .map(|e| {
                 let twice = !seen.insert(e.repo.clone());
                 let repository = mirror(&index_dir, &base.join(&e.path), &e.repo, twice);
@@ -201,6 +201,29 @@ impl Manifest {
                 }
             })
             .collect();
+        // No index lands inside a listed directory: mirrors may be read-only mounts.
+        let roots: Vec<(PathBuf, String)> = (entries.iter())
+            .filter_map(|l| {
+                let path = base.join(&l.path);
+                Some((path.canonicalize().ok()?, path.display().to_string()))
+            })
+            .collect();
+        for listed in &mut entries {
+            let Ok(repo) = &listed.repository else {
+                continue;
+            };
+            let dir = repo.index.parent().unwrap_or(&repo.index);
+            let at = resolved(dir);
+            let Some((_, mirror)) = roots.iter().find(|(root, _)| at.starts_with(root)) else {
+                continue;
+            };
+            let index = dir.display().to_string();
+            listed.repository = Err(Msg::IndexInMirror {
+                index: &index,
+                mirror,
+            }
+            .text());
+        }
         Ok(Self { entries })
     }
 
@@ -246,6 +269,36 @@ impl Manifest {
         repos.insert(0, named);
         Ok(Workspace { repos, missing })
     }
+}
+
+/// Where `path` is, even before it exists: its deepest existing ancestor canonicalized, the
+/// components that do not exist yet folded onto it (they hold no symbolic link).
+fn resolved(path: &Path) -> PathBuf {
+    let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
+    let mut rest = Vec::new();
+    let mut at = absolute.as_path();
+    let real = loop {
+        if let Ok(real) = at.canonicalize() {
+            break real;
+        }
+        match (at.parent(), at.components().next_back()) {
+            (Some(parent), Some(last)) => {
+                rest.push(last);
+                at = parent;
+            }
+            _ => break PathBuf::new(),
+        }
+    };
+    rest.into_iter().rev().fold(real, |mut path, part| {
+        match part {
+            Component::ParentDir => {
+                path.pop();
+            }
+            Component::CurDir => {}
+            part => path.push(part),
+        }
+        path
+    })
 }
 
 /// The repository a manifest entry lists as `repo` at `path`, its index under `index_dir`, or

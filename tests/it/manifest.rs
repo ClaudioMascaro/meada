@@ -6,9 +6,10 @@ use crate::common;
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use crate::freshness::edit_chain;
-use common::{age, assert_golden, chain, fixture_repo, git, meada};
+use common::{age, assert_golden, chain, fixture_repo, git};
 use meada::engine::Engine;
 
 const CHAIN: [(&str, &str); 4] = [
@@ -50,16 +51,24 @@ fn write_manifest(dir: &Path, toml: &str) -> PathBuf {
     manifest
 }
 
-/// `meada <command> --workspace ops/meada.workspace.toml`, run in `dir`.
+/// `meada <command> --workspace ops/meada.workspace.toml`, run in `dir` in English: stdout and
+/// stderr with `dir` replaced by `<repo>`, and whether it succeeded.
 fn run(dir: &Path, command: &str) -> (String, String, bool) {
-    meada(
-        dir,
-        &[command, "--workspace", "ops/meada.workspace.toml"],
-        "",
-        |c| {
-            c.env("LANG", "en_US.UTF-8");
-        },
-    )
+    let (stdout, stderr, code) = run_code(dir, command);
+    (stdout, stderr, code == Some(0))
+}
+
+/// `run` with the exit code.
+fn run_code(dir: &Path, command: &str) -> (String, String, Option<i32>) {
+    let out = Command::new(env!("CARGO_BIN_EXE_meada"))
+        .current_dir(dir)
+        .args([command, "--workspace", "ops/meada.workspace.toml"])
+        .env("LANG", "en_US.UTF-8")
+        .output()
+        .expect("meada runs");
+    let text =
+        |bytes: &[u8]| String::from_utf8_lossy(bytes).replace(dir.to_str().unwrap(), "<repo>");
+    (text(&out.stdout), text(&out.stderr), out.status.code())
 }
 
 /// Every file under `dir`, relative to it, sorted.
@@ -206,9 +215,9 @@ fn each_unservable_entry_is_refused_and_the_others_are_still_indexed() {
     .concat();
     write_manifest(&dir, &toml);
 
-    let (stdout, stderr, ok) = run(&dir, "index");
+    let (stdout, stderr, code) = run_code(&dir, "index");
 
-    assert!(!ok);
+    assert_eq!(code, Some(1));
     assert_eq!(stdout, "");
     assert_eq!(
         stderr,
@@ -242,6 +251,26 @@ fn each_unservable_entry_is_refused_and_the_others_are_still_indexed() {
         "{status}"
     );
     assert_nothing_else_written(&dir, &served);
+
+    // An `index_dir` inside a mirror would put every index there.
+    let toml = [
+        "index_dir = \"../chain-web/./x/..\"\n".to_string(),
+        entry("example.com/chain/web", "../chain-web"),
+        entry("example.com/chain/catalog", "../chain-catalog"),
+    ]
+    .concat();
+    write_manifest(&dir, &toml);
+    let (_, stderr, code) = run_code(&dir, "index");
+    assert_eq!(code, Some(1));
+    assert_eq!(
+        stderr,
+        "meada: example.com/chain/web: its index directory \
+         `ops/../chain-web/./x/../example.com/chain/web` would be inside the mirror `ops/../chain-web`\n\
+         meada: example.com/chain/catalog: its index directory \
+         `ops/../chain-web/./x/../example.com/chain/catalog` would be inside the mirror `ops/../chain-web`\n"
+    );
+    assert!(!dir.join("chain-web/example.com").exists());
+    assert!(!dir.join("chain-web/x").exists());
 }
 
 #[test]
@@ -259,7 +288,7 @@ fn manifest_errors_name_the_file_the_line_and_the_key() {
         ),
         (
             "[[repository]]\nrepo = \"example.com/chain/web\"\npath = \"../chain-web\"\n",
-            "meada: ops/meada.workspace.toml:1: `index_dir` is missing\n",
+            "meada: ops/meada.workspace.toml: `index_dir` is missing\n",
         ),
         (
             "index_dir = \"../indexes\"\n\n[[repository]]\npath = \"../chain-web\"\n",

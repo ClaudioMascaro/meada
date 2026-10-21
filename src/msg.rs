@@ -29,6 +29,10 @@ pub enum Msg<'a> {
         repo: &'a str,
     },
     NotListed(&'a str),
+    IndexInMirror {
+        index: &'a str,
+        mirror: &'a str,
+    },
     WorkspaceHelp,
     MissingPeer {
         repo: &'a str,
@@ -249,6 +253,10 @@ impl Msg<'_> {
             Msg::NotListed(repo) => pick(
                 format!("`{repo}` is not listed in the workspace manifest"),
                 format!("`{repo}` não está listado no manifesto do workspace"),
+            ),
+            Msg::IndexInMirror { index, mirror } => pick(
+                format!("its index directory `{index}` would be inside the mirror `{mirror}`"),
+                format!("seu diretório de índice `{index}` ficaria dentro do espelho `{mirror}`"),
             ),
             Msg::WorkspaceHelp => pick(
                 "Server mode: every repository the workspace manifest at this path lists".into(),
