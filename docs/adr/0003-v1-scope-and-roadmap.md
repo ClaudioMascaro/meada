@@ -21,7 +21,9 @@ this ADR records it with its order and its acceptance numbers.
   deciders (ADRs 0005 and 0006).
 - Shape drift between consumer and provider (ADR 0009).
 - Languages: TypeScript and JavaScript first, then Python, Go, Java, Kotlin, C#, Swift and Rust
-  (ADR 0007).
+  (ADR 0007). (Amended 2026-10-21: 1.0 ships TypeScript and JavaScript, Python, Go and
+  Rust; Java, Kotlin, C# and Swift move to Release 2 and arrive as 1.x minors, which the
+  stability rule of Spec R1 allows, since a language pack is an additive change.)
 - Communities and processes, computed deterministically.
 - The MCP surface of ADR 0008, distribution and community practice of ADR 0010.
 
@@ -31,7 +33,8 @@ this ADR records it with its order and its acceptance numbers.
   number promises no content.
 - 1.0 is the semver stability promise: MCP tool names and shapes, CLI flags and the config
   format. It is tagged only when the whole v1 scope exists and the acceptance numbers below are
-  met.
+  met. (Amended 2026-10-21: the 1.0 scope is the v1 scope without the four Release 2
+  packs.)
 - The announced launch happens when every differentiator exists for TypeScript and JavaScript,
   which is the end of track A. Earlier releases are public but quiet.
 
@@ -87,7 +90,9 @@ Acceptance:
 ## Considered options
 
 - **1.0 freezes the API and languages arrive in 1.x.** Semver allows additive minors, so this
-  would work. The maintainer chose a feature-complete 1.0 instead.
+  would work. The maintainer chose a feature-complete 1.0 instead. (Amended 2026-10-21: adopted
+  for Java, Kotlin, C# and Swift, so that the release rites and the npm installer wait on no
+  pack; TypeScript and JavaScript, Python, Go and Rust stay in 1.0.)
 - **One sequential queue of milestones.** Slower, and no parallelism between differentiators and
   languages.
 - **Breadth-first languages.** The differentiators would arrive late.

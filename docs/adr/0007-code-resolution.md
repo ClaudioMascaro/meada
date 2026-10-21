@@ -20,7 +20,8 @@ pack.
   v0.1 trunk ships the adapter interface and a conformance suite that runs every pack over the
   fixtures (ADR 0003). A pack is done when it passes the suite.
 - v0.1 ships the TypeScript and JavaScript pack (`.ts`, `.tsx`, `.js`, `.mjs`, `.cjs`). Track B
-  adds Python, Go, Java, Kotlin, C#, Swift and Rust, one spec each.
+  adds Python, Go, Java, Kotlin, C#, Swift and Rust, one spec each. (Amended 2026-10-21:
+  Python, Go and Rust are in 1.0; Java, Kotlin, C# and Swift follow as 1.x minors, ADR 0003.)
 
 ## Considered options
 
