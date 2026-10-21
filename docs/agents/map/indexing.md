@@ -25,7 +25,7 @@ modules updates it.
 - `entry.rs`: entry points (spec #31): `find(&Local)` reads what `refresh` has at its end (the
   symbols, the targets of every call, the `exports` rows, the providers and consumers the code gives, the
   `Facts::programs` the packs set, and the console scripts of the `manifests` rows through
-  `package::python_programs`, and `Layout::programs`, Rust's binary roots) and
+  the package seam's `programs`, and `Layout::programs`, Rust's binary roots) and
   returns the repository's `EntryPoint`s (identity, `EntryKind`, label, `site`), which
   `refresh` rewrites into `entry_points` and `export` loads into `Export::entry_points`.
   It imports no kind module: which side of a contract is a door, of which `EntryKind`, and how it
@@ -93,7 +93,7 @@ modules updates it.
   `Cargo.toml` through the `**/Cargo.toml` config name, receiver keyword `Self`, see below) and
   `lang/go.rs` (`.go`, reads every `go.mod` through `**/go.mod`, see below).
   `refresh` reads a `**/<name>` config at any depth from the walk, in path order, and any
-  config through `read_config` (up to one byte past `package::MAX_BYTES`, no symbolic link,
+  config through `read_config` (up to one byte past `lang::MAX_BYTES`, no symbolic link,
   as a manifest is); it groups the
   parsed files by pack, asks each pack once for its `layout(configs, parsed files)`, keeps the
   files `Layout::members` names (default: all; a left-out file keeps its `files` row and facts
@@ -223,7 +223,7 @@ modules updates it.
   `pyproject.toml` declares (setuptools `package-dir` and `packages.find.where`, Poetry
   `packages.from`, read by `lang/python/pyproject.rs` through the PyPI manifest reader, so an
   unreadable file declares nothing), or `src` when none is declared (`pyproject::source_roots`,
-  which `package::python_roots` shares); a package comes before a module of the same name.
+  which the PyPI adapter shares); a package comes before a module of the same name.
   An `if __name__ == "__main__":` block at the top level (either operand order, either quote,
   nothing else) yields the definition `__main__`, spanning the `if` and its body (an `else` is
   not part of it), owns the calls in that body, and is named in `Facts::programs`.

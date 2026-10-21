@@ -58,7 +58,9 @@ const PREFIX: &str = "package::";
 /// A package ecosystem: the manifests it reads, the contract its packages provide, and the rules
 /// its imports and dependency entries follow. Every question but the first six has a default
 /// body; an adapter answers differently only where its ecosystem does. An npm and a PyPI package
-/// of one name are two contracts. A new ecosystem implements this and appends to `ECOSYSTEMS`.
+/// of one name are two contracts. A new ecosystem implements this and appends to `ECOSYSTEMS`:
+/// the order of the list fixes the order `of` and `of_contract` search in and the order `inherit`
+/// runs in.
 trait Ecosystem {
     /// Its name, as the contract identifier and the export spell it.
     fn name(&self) -> &'static str;
@@ -207,7 +209,7 @@ trait Ecosystem {
     fn inherit(&self, _manifests: &mut [Manifest]) {}
 }
 
-/// Every ecosystem, in the order `of` and `of_contract` search.
+/// Every ecosystem, in the order `of` and `of_contract` search and `inherit` runs.
 const ECOSYSTEMS: &[&dyn Ecosystem] = &[&Npm, &Pypi, &Cargo, &Go];
 
 /// The ecosystem of the manifest at `path`, by its file name (`Ecosystem::is_manifest`); `None`
@@ -332,7 +334,7 @@ pub struct Summary {
     /// Cargo only: `[lib] name` when it differs from what a path writes for the package's name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lib_name: Option<String>,
-    /// Cargo only: `version.workspace = true`, until `cargo::inherit` fills `version`.
+    /// Cargo only: `version.workspace = true`, until the seam's `inherit` fills `version`.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub inherits_version: bool,
     /// Cargo only: the `[workspace.package] version` a member may inherit.
@@ -355,7 +357,7 @@ pub struct Entry {
     /// for a version.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub via: Option<String>,
-    /// Cargo only: `workspace = true`, until `cargo::inherit` fills the entry.
+    /// Cargo only: `workspace = true`, until the seam's `inherit` fills the entry.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub inherits: bool,
 }
