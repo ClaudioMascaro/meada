@@ -760,47 +760,10 @@ fn ways(manifest: &Manifest, subpath: &str) -> Vec<(How, Vec<String>)> {
         .collect()
 }
 
-/// The source roots of the PyPI package at `manifest`, as the Python pack reads a repository's:
-/// its directory, then the roots its `pyproject.toml` declares, or its `src` when none is.
-fn python_roots(manifest: &Manifest) -> Vec<String> {
-    let base = match directory(&manifest.path) {
-        "." => "",
-        dir => dir,
-    };
-    python::pyproject::source_roots(base, &manifest.summary.roots)
-}
-
-/// The program entry points the console scripts of the PyPI manifests name, as the file of the
-/// script's module (the one an import of it from the package finds, `python_roots`) and the
-/// function. A script whose module is no file of the package names nothing. Sorted, without
-/// repeats.
+/// The program entry points the console scripts of the PyPI manifests name (`pypi::programs`),
+/// for the index writer.
 pub fn python_programs(manifests: &[Manifest], files: &[&str]) -> Vec<(String, String)> {
-    let mut found = Vec::new();
-    for manifest in manifests {
-        // A script belongs to the package of a manifest that bounds one.
-        let file_name = manifest.path.rsplit('/').next().unwrap_or_default();
-        if !(Pypi.is_manifest(file_name) && Pypi.owns(manifest)) {
-            continue;
-        }
-        let roots = python_roots(manifest);
-        for (module, function) in &manifest.summary.scripts {
-            let name = module.replace('.', "/");
-            // The first candidate that exists and is this package's, as `Provided::module`
-            // finds it: a file of a nested package is not.
-            let owned = |f: &String| {
-                files.contains(&f.as_str())
-                    && owner(manifests, f, &Pypi)
-                        .is_some_and(|m| directory(&m.path) == directory(&manifest.path))
-            };
-            let file = (roots.iter())
-                .flat_map(|root| python::files(root, &name))
-                .find(owned);
-            found.extend(file.map(|f| (f, function.clone())));
-        }
-    }
-    found.sort();
-    found.dedup();
-    found
+    pypi::programs(manifests, files)
 }
 
 /// `path`, relative to the package directory `dir`, as a path of the repository; `None` when
@@ -934,16 +897,6 @@ impl<'e> Provided<'e> {
         (entries.iter())
             .flat_map(|e| sources(e, &out_dir, &root_dir))
             .find(|s| self.owned_source(manifest, s))
-    }
-
-    /// The file of the Python module `specifier` (dotted, `a.b`) of the PyPI package at
-    /// `manifest`: `a/b/__init__.py` or `a/b.py` under the first of its source roots
-    /// (`python_roots`) that holds one the package owns (`owned_source`).
-    fn module(&self, manifest: &Manifest, specifier: &str) -> Option<String> {
-        let name = specifier.replace('.', "/");
-        (python_roots(manifest).iter())
-            .flat_map(|root| python::files(root, &name))
-            .find(|f| self.owned_source(manifest, f))
     }
 
     /// Whether `path` is a source file the provider indexes (`source`) whose nearest manifest
@@ -1290,72 +1243,6 @@ fn resolutions<'e>(
     };
     let at = |m: usize| provided[m].get_or_init(|| Provided::new(&exports[m]));
     ecosystem.resolutions(exports, providers, &at, from, (specifier, chain), &known)
-}
-
-/// `resolutions` for a Python import: the import names a module, not a distribution, so each
-/// distribution a PyPI manifest of a directory holding the file depends on (PyPI's `entries`, `holding`: every
-/// `pyproject.toml` and `requirements*.txt` above it, the nearest first, whose entry gives the
-/// range) is a candidate when a provider of it exposes the import's top-level module under
-/// its source roots. The import is `exact` (`import module name`) when that module is the
-/// distribution's name with `-` turned into `_`, `inferred` (`import top-level module`) when it
-/// is only one of the provider's top-level modules, and `ambiguous` when several distributions
-/// expose it. The module the import names is then found under the same roots
-/// (`Provided::module`) and `chain` followed from it.
-fn pypi_resolutions<'e>(
-    ecosystem: &dyn Ecosystem,
-    exports: &'e [Export],
-    providers: &Providers,
-    at: &dyn Fn(usize) -> &'e Provided<'e>,
-    from: (usize, &str),
-    (specifier, chain): (&str, &str),
-    known: &dyn Fn(&Provided<'e>, &str) -> bool,
-) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
-    let top = specifier.split('.').next().unwrap_or_default();
-    if top.is_empty() {
-        return Vec::new();
-    }
-    let mut out = Vec::new();
-    for (entry, _) in ecosystem.entries(exports, providers, from, specifier) {
-        let (mut exposed, mut resolved) = (false, Vec::new());
-        for &(m, i) in providers.of(ecosystem.name(), &entry.name) {
-            let (at, manifest) = (at(m), &exports[m].manifests[i]);
-            if at.module(manifest, top).is_none() {
-                continue;
-            }
-            exposed = true;
-            let (how, level) = match pypi::import_name(&entry.name) == top {
-                true => (How::ModuleName, Level::Exact),
-                false => (How::TopLevel, Level::Inferred),
-            };
-            let known = |id: &str| known(at, id);
-            let target = (at.module(manifest, specifier))
-                .and_then(|file| at.reach(&exports[m].repository, &file, chain, &known));
-            if let Some(target) = target {
-                let targets = vec![target];
-                resolved.push((
-                    m,
-                    manifest,
-                    at,
-                    Resolved {
-                        how,
-                        level,
-                        targets,
-                    },
-                ));
-            }
-        }
-        if exposed {
-            out.push((entry, resolved));
-        }
-    }
-    if out.len() > 1 {
-        for (_, resolved) in &mut out {
-            for r in resolved {
-                r.3.level = Level::Ambiguous;
-            }
-        }
-    }
-    out
 }
 
 /// The files of a repository an import of one of its packages can reach (issue #175), so the
@@ -2048,86 +1935,6 @@ mod tests {
         (s.dependencies.iter())
             .map(|e| (e.field.as_str(), e.name.as_str(), e.range.as_deref()))
             .collect()
-    }
-
-    #[test]
-    fn a_console_script_names_the_function_of_the_file_its_module_is() {
-        let pypi = |path: &str, scripts: &[(&str, &str)], roots: &[&str]| Manifest {
-            path: path.to_string(),
-            summary: Summary {
-                scripts: (scripts.iter())
-                    .map(|(m, f)| (m.to_string(), f.to_string()))
-                    .collect(),
-                roots: roots.iter().map(|r| r.to_string()).collect(),
-                ..Summary::default()
-            },
-        };
-        let all = [
-            pypi(
-                "pyproject.toml",
-                &[("app.cli", "main"), ("tool", "run")],
-                &[],
-            ),
-            pypi(
-                "lib/pyproject.toml",
-                &[("pkg", "start"), ("none", "x")],
-                &["src"],
-            ),
-            pypi(
-                "outer/pyproject.toml",
-                &[("inner", "go"), ("pkg.cli", "main")],
-                &[],
-            ),
-            pypi("outer/inner/pyproject.toml", &[], &[]),
-        ];
-        let files = [
-            "app/cli.py",
-            "tool/__init__.py",
-            "tool.py",
-            "lib/src/pkg/__init__.py",
-            "outer/inner.py",
-            "outer/pkg.py",
-            "outer/inner/pkg/cli.py",
-        ];
-
-        let found = python_programs(&all, &files);
-
-        // `tool/__init__.py` over `tool.py`, as an import finds it; the `src` root of `lib`;
-        // `none` has no file; `outer`'s `inner.py` is its own, and `pkg/cli.py` is not in
-        // `outer`'s reach.
-        assert_eq!(
-            found,
-            [
-                ("app/cli.py".to_string(), "main".to_string()),
-                ("lib/src/pkg/__init__.py".to_string(), "start".to_string()),
-                ("outer/inner.py".to_string(), "go".to_string()),
-                ("tool/__init__.py".to_string(), "run".to_string()),
-            ]
-        );
-    }
-
-    #[test]
-    fn a_console_script_skips_a_candidate_another_package_owns() {
-        let pypi = |path: &str, scripts: &[(&str, &str)]| Manifest {
-            path: path.to_string(),
-            summary: Summary {
-                scripts: (scripts.iter())
-                    .map(|(m, f)| (m.to_string(), f.to_string()))
-                    .collect(),
-                ..Summary::default()
-            },
-        };
-        let all = [
-            pypi("pyproject.toml", &[("inner.mod", "go")]),
-            pypi("inner/pyproject.toml", &[]),
-        ];
-        // `inner/mod.py` comes first among the roots but belongs to the nested package.
-        let files = ["inner/mod.py", "src/inner/mod.py"];
-
-        assert_eq!(
-            python_programs(&all, &files),
-            [("src/inner/mod.py".to_string(), "go".to_string())]
-        );
     }
 
     #[test]
