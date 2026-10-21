@@ -10,7 +10,7 @@ use serde::Serialize;
 use crate::channel::Channel;
 use crate::entry::EntryKind;
 use crate::http::Http;
-use crate::index::{Consumer, Export, Provider};
+use crate::index::{Consumer, Export, Indexed, Provider};
 use crate::package::Packages;
 use crate::resolve::Code;
 use crate::resource::Resource;
@@ -237,8 +237,10 @@ pub trait ContractKind {
     fn prefix(&self) -> &'static str;
 
     /// The contracts one language pack's files provide and consume, read from the pack's
-    /// facts and the values `code` evaluates.
-    fn extract(&self, code: &Code) -> Vec<Found>;
+    /// facts and the values `code` evaluates. `indexed` is what the index read of the
+    /// repository besides: a kind reads it when its contracts depend on what the manifests
+    /// say, the others ignore it.
+    fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found>;
 
     /// Which entry point kind a `role` side of `contract` makes. It is a function of the
     /// contract alone, since entry points are stored when the index is written: changing an

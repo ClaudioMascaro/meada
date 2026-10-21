@@ -9,7 +9,7 @@ use std::collections::HashSet;
 
 use crate::config;
 use crate::contract::{ContractKind, Found, Level, Link};
-use crate::index::{Consumer, Export, Provider};
+use crate::index::{Consumer, Export, Indexed, Provider};
 use crate::msg::Msg;
 use crate::resolve::Code;
 use crate::workspace::Repository;
@@ -85,7 +85,7 @@ impl ContractKind for Resource {
         Some(("writer", "reader"))
     }
 
-    fn extract(&self, _code: &Code) -> Vec<Found> {
+    fn extract(&self, _code: &Code, _: &Indexed) -> Vec<Found> {
         Vec::new()
     }
 
