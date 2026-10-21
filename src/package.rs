@@ -1527,8 +1527,10 @@ impl ContractKind for Packages {
     }
 
     /// Every call through a binding imported from a bare specifier, as an `Import`: which of
-    /// them name a package of the workspace is known at query time only (`import`). The
-    /// manifests are read apart from the packs.
+    /// them name a package of the workspace is known at query time only (`import`). After the
+    /// imports it builds the public `surface` from `indexed` (the manifests, tsconfigs, exported
+    /// rows and files) and, when the surface is not empty, appends the `exported_shapes` of the
+    /// pack's `Code`.
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
         let mut found = Vec::new();
         // A file of no ecosystem imports no package.
