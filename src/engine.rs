@@ -1215,14 +1215,27 @@ pub fn served_generation(manifest: &Path) -> Result<(PathBuf, Vec<String>)> {
 }
 
 /// `status` for a node that serves generations (feature `snapshot`): the id of its current
-/// generation, the ids it holds and whether the store answers, with the id the store holds. The
-/// store is informational: whether the node can serve is `served_generation`, local state only.
+/// generation, the ids it holds and whether the store answers, with the id the store holds (with
+/// `[generations]`, the id Valkey holds, once the store holds its document). The store and
+/// Valkey are informational: whether the node can serve is `served_generation`, local state only.
 #[cfg(feature = "snapshot")]
 pub fn status_generations(manifest: &Path) -> Result<String> {
     use crate::snapshot::{pull, serve};
     let (config, local) = serve::node(manifest)?;
     let current = pull::current(&local).ok().flatten().map(|(id, _)| id);
-    let store = match serve::reach(&config) {
+    // With `[generations]` the current id is Valkey's, and the store holds no `current`.
+    #[cfg(feature = "generation-pointer")]
+    let reached = match Manifest::read(manifest)? {
+        Manifest {
+            generations: Some(_),
+            valkey: Some(valkey),
+            ..
+        } => serve::reach_pointer(&config, &valkey),
+        _ => serve::reach(&config),
+    };
+    #[cfg(not(feature = "generation-pointer"))]
+    let reached = serve::reach(&config);
+    let store = match reached {
         Ok(id) => Msg::SnapshotStoreReachable(&id).text(),
         Err(reason) => Msg::SnapshotStoreUnreachable(&reason).text(),
     };

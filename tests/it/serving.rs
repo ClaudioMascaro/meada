@@ -23,7 +23,7 @@ const WEB: &str = "example.com/chain/web";
 const CATALOG: &str = "example.com/chain/catalog";
 
 /// `meada mcp --listen 127.0.0.1:0 --workspace <manifest> --generations`, in `dir`.
-fn serve(dir: &Path, manifest: &str) -> Server {
+pub(crate) fn serve(dir: &Path, manifest: &str) -> Server {
     let args = [
         "--listen",
         "127.0.0.1:0",
@@ -36,7 +36,7 @@ fn serve(dir: &Path, manifest: &str) -> Server {
 
 /// `meada status --workspace <manifest> --generations` in `dir`, with the store's key id: stdout,
 /// stderr and the exit code.
-fn probe(dir: &Path, manifest: &str) -> (String, String, Option<i32>) {
+pub(crate) fn probe(dir: &Path, manifest: &str) -> (String, String, Option<i32>) {
     let out = Command::new(env!("CARGO_BIN_EXE_meada"))
         .current_dir(dir)
         .args(["status", "--workspace", manifest, "--generations"])

@@ -91,7 +91,13 @@ enum SnapshotCommand {
 fn pull(manifest: &Path, every: Option<u64>) -> ! {
     use meada::snapshot::pull::Pulled;
     loop {
-        match meada::snapshot::pull::pull(manifest) {
+        let pulled = meada::snapshot::pull::pull(manifest).map(|(pulled, warnings)| {
+            for line in warnings.iter().flat_map(|w| w.lines()) {
+                eprintln!("meada: {line}");
+            }
+            pulled
+        });
+        match pulled {
             Ok(Pulled::Swapped(id)) => println!("{id}"),
             Ok(Pulled::Current(id)) if every.is_none() => println!("{id}"),
             Ok(Pulled::Current(_)) => {}

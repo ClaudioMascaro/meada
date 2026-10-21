@@ -20,7 +20,7 @@ use percent_encoding::percent_decode_str;
 use rmcp::{
     RoleServer, ServerHandler, ServiceExt,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{Implementation, ServerCapabilities, ServerConfig},
+    model::{CallToolResult, ContentBlock, Implementation, ServerCapabilities, ServerConfig},
     service::RequestContext,
     tool, tool_handler, tool_router,
     transport::streamable_http_server::{
@@ -31,6 +31,8 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 
 use crate::engine::{self, Direction, Engine, Start};
+#[cfg(feature = "snapshot")]
+use crate::msg::Msg;
 use crate::workspace::Manifest;
 
 #[derive(Deserialize, JsonSchema)]
@@ -88,13 +90,15 @@ enum Source {
         manifest: Arc<Path>,
         identity: Arc<str>,
     },
-    /// The generation `<local_dir>/current` named when the request was routed, `identity` first
-    /// (server mode with `--generations`, feature `snapshot`): as `Served`, with the
-    /// repositories the generation recorded.
+    /// The generation `<local_dir>/current` named when the request was routed, or the one its
+    /// path pinned, `identity` first (server mode with `--generations`, feature `snapshot`): as
+    /// `Served`, with the repositories the generation recorded. With `named` (the node has
+    /// `[generations]`), each result names the generation in its `_meta`.
     #[cfg(feature = "snapshot")]
     Generation {
         held: Arc<crate::snapshot::serve::Held>,
         identity: Arc<str>,
+        named: bool,
     },
 }
 
@@ -106,7 +110,7 @@ impl Meada {
         &self,
         ctx: RequestContext<RoleServer>,
         ask: impl FnOnce(&Engine) -> crate::Result<String>,
-    ) -> Result<String, String> {
+    ) -> CallToolResult {
         let open = match &self.source {
             Source::Roots => {
                 let dir = root_dir(&ctx).await;
@@ -118,14 +122,38 @@ impl Meada {
                 identity,
             } => tokio::task::block_in_place(|| Engine::open_listed(listed, identity, manifest)),
             #[cfg(feature = "snapshot")]
-            Source::Generation { held, identity } => {
+            Source::Generation { held, identity, .. } => {
                 tokio::task::block_in_place(|| Engine::open_held(held, identity))
             }
         };
-        tokio::task::block_in_place(|| open.and_then(|engine| ask(&engine)))
-            .map_err(|e| e.to_string())
+        let answer = tokio::task::block_in_place(|| open.and_then(|engine| ask(&engine)));
+        self.result(answer.map_err(|e| e.to_string()))
+    }
+
+    /// `answer` as the tool's result, an error as a tool error. A `named` generation's result
+    /// carries it in `_meta` (`meada/generation`); the text stays what the tool answers.
+    fn result(&self, answer: Result<String, String>) -> CallToolResult {
+        #[cfg_attr(not(feature = "snapshot"), allow(unused_mut))]
+        let mut result = match answer {
+            Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
+            Err(text) => CallToolResult::error(vec![ContentBlock::text(text)]),
+        };
+        #[cfg(feature = "snapshot")]
+        if let Source::Generation {
+            held, named: true, ..
+        } = &self.source
+        {
+            let mut meta = rmcp::model::MetaObject::new();
+            meta.insert(GENERATION_META.into(), held.id.clone().into());
+            result.meta = Some(meta);
+        }
+        result
     }
 }
+
+/// The `_meta` key of a result that names its generation.
+#[cfg(feature = "snapshot")]
+const GENERATION_META: &str = "meada/generation";
 
 /// The directory to answer about: the client's first `file://` root, or the server's current
 /// directory. Asked on every call, so `roots/list_changed` needs no cache to invalidate.
@@ -173,7 +201,7 @@ impl Meada {
         &self,
         Parameters(args): Parameters<SearchArgs>,
         ctx: RequestContext<RoleServer>,
-    ) -> Result<String, String> {
+    ) -> CallToolResult {
         self.answer(ctx, |engine| {
             let budget = args.budget.map(|b| b as usize);
             engine.search(&args.query, args.kind.as_deref(), budget)
@@ -188,7 +216,7 @@ impl Meada {
         &self,
         Parameters(args): Parameters<ContextArgs>,
         ctx: RequestContext<RoleServer>,
-    ) -> Result<String, String> {
+    ) -> CallToolResult {
         self.answer(ctx, |engine| {
             engine.context(&args.symbol, args.budget.map(|b| b as usize))
         })
@@ -202,17 +230,18 @@ impl Meada {
         &self,
         Parameters(args): Parameters<TraceArgs>,
         ctx: RequestContext<RoleServer>,
-    ) -> Result<String, String> {
+    ) -> CallToolResult {
+        let refuse = |why: String| self.result(Err(why));
         let start = match (args.from.as_deref(), args.changes.as_deref()) {
             (Some(from), None) => Start::From(from),
             (None, Some("uncommitted")) => Start::Uncommitted,
             (None, Some(other)) => {
-                return Err(format!("`changes` takes `uncommitted`, not `{other}`"));
+                return refuse(format!("`changes` takes `uncommitted`, not `{other}`"));
             }
-            _ => return Err("pass either `from` or `changes: uncommitted`".into()),
+            _ => return refuse("pass either `from` or `changes: uncommitted`".into()),
         };
         if matches!(start, Start::Uncommitted) && !matches!(self.source, Source::Roots) {
-            return Err(
+            return refuse(
                 "server mode has no working tree to diff: run Meada locally for \
                         `changes: uncommitted`"
                     .into(),
@@ -221,7 +250,9 @@ impl Meada {
         let direction = match args.direction.as_deref() {
             None | Some("down") => Direction::Down,
             Some("up") => Direction::Up,
-            Some(other) => return Err(format!("`direction` takes `down` or `up`, not `{other}`")),
+            Some(other) => {
+                return refuse(format!("`direction` takes `down` or `up`, not `{other}`"));
+            }
         };
         self.answer(ctx, |engine| {
             engine.trace(start, direction, args.budget.map(|b| b as usize))
@@ -292,11 +323,14 @@ enum Routes {
         listing: String,
     },
     /// One per repository of the generation current when the request arrives, made then: a
-    /// pull that adds a repository needs no restart.
+    /// pull that adds a repository needs no restart. With `pins` (the node has `[generations]`,
+    /// feature `generation-pointer`), `/<identity>@<generation>` serves a held generation and
+    /// every answer names its generation.
     #[cfg(feature = "snapshot")]
     Generation {
         current: crate::snapshot::serve::Current,
         config: StreamableHttpServerConfig,
+        pins: bool,
     },
 }
 
@@ -350,9 +384,14 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
 pub fn listen_generations(listen: &str, manifest: &Path) -> crate::Result<()> {
     let address = address(listen)?;
     let (local_dir, _) = engine::served_generation(manifest)?;
+    #[cfg(feature = "generation-pointer")]
+    let pins = Manifest::read(manifest)?.generations.is_some();
+    #[cfg(not(feature = "generation-pointer"))]
+    let pins = false;
     run(address, move |config| Routes::Generation {
         current: crate::snapshot::serve::Current::new(local_dir),
         config: config.clone(),
+        pins,
     })
 }
 
@@ -476,7 +515,10 @@ impl Stop {
 
 /// The endpoint `request`'s path names (`/<identity>`, percent-decoded, a trailing slash
 /// tolerated) answers it; any other path, the root included, is a 404 listing the identities
-/// served, one per line.
+/// served, one per line. With pins, `/<identity>@<generation>` (the generation what follows the
+/// last `@`, when it is an id) answers from that generation if the node holds it, and is a 404
+/// naming it, the current one and the held ones if not; every answer then carries its
+/// generation in `Meada-Generation`.
 async fn route(
     routes: &Routes,
     request: Request<Incoming>,
@@ -498,22 +540,57 @@ async fn route(
             None => plain(StatusCode::NOT_FOUND, listing.clone()),
         },
         #[cfg(feature = "snapshot")]
-        Routes::Generation { current, config } => {
-            let held = tokio::task::block_in_place(|| current.get().map_err(|e| e.to_string()));
-            match held {
-                Ok(held) if held.listed.entries.iter().any(|l| l.repo == identity) => {
+        Routes::Generation {
+            current,
+            config,
+            pins,
+        } => {
+            let pin =
+                (identity.rsplit_once('@')).filter(|(_, id)| *pins && crate::snapshot::is_id(id));
+            let (identity, held) = tokio::task::block_in_place(|| match pin {
+                Some((identity, id)) => (identity, current.pinned(id)),
+                None => (identity, current.get().map(Some)),
+            });
+            let named = |mut response: Response<_>, id: &str| {
+                if *pins && let Ok(value) = header::HeaderValue::from_str(id) {
+                    response.headers_mut().insert(GENERATION_HEADER, value);
+                }
+                response
+            };
+            match held.map_err(|e| e.to_string()) {
+                Ok(Some(held)) if held.listed.entries.iter().any(|l| l.repo == identity) => {
+                    let id = held.id.clone();
                     let source = Source::Generation {
                         held,
                         identity: identity.into(),
+                        named: *pins,
                     };
-                    endpoint(source, config).handle(request).await
+                    named(endpoint(source, config).handle(request).await, &id)
                 }
-                Ok(held) => plain(
-                    StatusCode::NOT_FOUND,
-                    (held.listed.entries.iter())
+                Ok(Some(held)) => {
+                    let listing = (held.listed.entries.iter())
                         .map(|l| format!("{}\n", l.repo))
-                        .collect(),
-                ),
+                        .collect();
+                    named(plain(StatusCode::NOT_FOUND, listing), &held.id)
+                }
+                // A pin of a generation the node does not hold.
+                Ok(None) => {
+                    let local = current.local();
+                    let now = crate::snapshot::pull::current(local).ok().flatten();
+                    let now = now.map(|(id, _)| id);
+                    let id = pin.map_or("", |(_, id)| id);
+                    let body = format!(
+                        "{}\n{}\n{}\n",
+                        Msg::GenerationNotHeld(id).text(),
+                        Msg::SnapshotStatusCurrent(now.as_deref()).text(),
+                        Msg::SnapshotStatusHeld(&crate::snapshot::serve::ids(local)).text(),
+                    );
+                    let response = plain(StatusCode::NOT_FOUND, body);
+                    match &now {
+                        Some(now) => named(response, now),
+                        None => response,
+                    }
+                }
                 // The body is fixed: the request may come from anyone, before the `Origin`
                 // check, and the problem names local paths.
                 Err(problem) => {
@@ -528,6 +605,10 @@ async fn route(
 /// The body of the 503 a node answers while it holds no servable generation.
 #[cfg(feature = "snapshot")]
 const UNSERVABLE: &str = "no servable generation\n";
+
+/// The response header naming the generation of an answer (with pins).
+#[cfg(feature = "snapshot")]
+const GENERATION_HEADER: &str = "meada-generation";
 
 /// The address `--listen` names: `host:port`, `:port` or `port`, the host an IP address or
 /// `localhost`; without one, the loopback interface. No name is resolved.

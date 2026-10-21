@@ -65,6 +65,23 @@ All notable changes to Meada are recorded here. The format follows
   exits 1 only without a servable current generation, whatever the store; `meada export
   --workspace <manifest> --repo <identity> --generations` exports from it. The flag is absent
   from the default build.
+- Server mode, generation pointer and pins (ADR 0012, feature `generation-pointer`, section
+  `[generations]` with `keep`, at least 2; it needs `[snapshot]` and `[valkey]`): `meada
+  snapshot publish` ends by writing the current generation and the retained ones to Valkey in
+  one script (`{<key_prefix>}:current`, a hash `{id, fence}`, and `{<key_prefix>}:retained`, a
+  list of `<id>:<fence>` newest first, each id once, trimmed to `keep`; fence `0` without the
+  refresh lock) instead of the store's `current`, and `meada snapshot pull` reads them there:
+  every id and fence is checked before the node changes (a malformed entry, a missing pointer or
+  an empty list is an error naming the key), the current generation is downloaded and swapped in
+  first, then every retained one the node lacks (one that fails is a warning naming it, which
+  blocks nothing and the next pull retries), the others are deleted but for the current one and
+  the one just replaced, and the node's pointer file carries the fence read with the id. `meada
+  status --generations` reads the current id from Valkey and checks the store holds its
+  document. `meada mcp --listen --generations`
+  then serves `/<identity>@<generation>` from a held generation, a 404 naming the requested,
+  the current and the held generations otherwise, and `/<identity>` keeps serving the current
+  one. Every answer names its generation in a `Meada-Generation` header and every tool result
+  in `_meta` (`meada/generation`); tools, schemas and text output are unchanged.
 - npm installer (spec #32): cargo-dist builds and publishes an npm package named `meada` with each
   release, at the crate's version, so `npx meada mcp` launches the MCP server and `npx meada
   <command>` runs any command; the release configuration is planned as a dry run on pull requests.

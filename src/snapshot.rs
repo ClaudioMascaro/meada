@@ -6,9 +6,12 @@
 //!
 //! Store layout under `prefix`: `repos/<identity>/<bundle id>.tar` (an uncompressed tar of
 //! `index.db`, then the mirror under `mirror/`, `.git` included), `generations/<generation
-//! id>.json` (the `Document`) and `current` (the current generation id and a newline). Every
-//! object carries its size and BLAKE3 hash as metadata (`store::Stored`).
+//! id>.json` (the `Document`) and `current` (the current generation id and a newline; with
+//! `[generations]` the pointer lives in Valkey instead, `generations`). Every object carries its
+//! size and BLAKE3 hash as metadata (`store::Stored`).
 
+#[cfg(feature = "generation-pointer")]
+pub mod generations;
 pub mod pull;
 pub mod serve;
 pub mod store;
@@ -249,6 +252,13 @@ pub fn is_id(text: &str) -> bool {
     text.len() == 16 && text.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
 }
 
+/// A fence written as decimal digits, as a pointer file or Valkey holds it: nothing but ASCII
+/// digits, at least one, within a `u64`.
+pub fn fence(text: &str) -> Option<u64> {
+    let digits = !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit());
+    digits.then(|| text.parse().ok()).flatten()
+}
+
 /// The bundle id of one repository: its identity, its `HEAD` commit, the schema version, the
 /// binary version and its entry blocks (`blocks`, canonical JSON). The same inputs give the
 /// same id on any machine. No input holds a newline: the identity and the commit are single
@@ -350,9 +360,10 @@ struct Bundle {
 }
 
 /// `meada snapshot publish --workspace <manifest>`: the generation id, once the generation is
-/// stored and `current` names it. It refuses, listing every repository, any index that differs
-/// from its mirror (`index::fresh`), is missing or is of another schema, and any mirror that is
-/// not clean; a failure before the last write leaves `current` as it was.
+/// stored and the pointer names it (the store's `current`, or Valkey's with `[generations]`).
+/// It refuses, listing every repository, any index that differs from its mirror
+/// (`index::fresh`), is missing or is of another schema, and any mirror that is not clean; a
+/// failure before the last write leaves the pointer as it was.
 pub fn publish(manifest: &Path) -> Result<String> {
     let listed = Manifest::read(manifest)?;
     let shown = manifest.display().to_string();
@@ -437,7 +448,11 @@ pub fn publish(manifest: &Path) -> Result<String> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
-    let stored = runtime.block_on(store_generation(&config, &generation, bundles));
+    let pointer = Pointer {
+        #[cfg(feature = "generation-pointer")]
+        generations: (listed.generations.clone()).zip(listed.valkey.clone()),
+    };
+    let stored = runtime.block_on(store_generation(&config, &generation, bundles, pointer));
     runtime.shutdown_background();
     stored?;
     Ok(generation)
@@ -449,13 +464,27 @@ pub(crate) fn bundle_of(key: &str) -> &str {
     name.strip_suffix(".tar").unwrap_or(name)
 }
 
-/// Stores the generation `generation` of `bundles`, then points `current` at it.
+/// Where `publish` writes the pointer: the store's `current`, or with `[generations]` the keys
+/// of the generation pointer in Valkey (`generations::point`).
+struct Pointer {
+    #[cfg(feature = "generation-pointer")]
+    generations: Option<(generations::Config, crate::valkey::Config)>,
+}
+
+/// Stores the generation `generation` of `bundles`, then points `pointer` at it.
 async fn store_generation(
     config: &Config,
     generation: &str,
     bundles: Vec<Bundle>,
+    #[cfg_attr(not(feature = "generation-pointer"), allow(unused_variables))] pointer: Pointer,
 ) -> std::result::Result<(), String> {
     let store = Store::connect(config)?;
+    // Before any upload: a Valkey that cannot be reached costs no transfer.
+    #[cfg(feature = "generation-pointer")]
+    let valkey = match &pointer.generations {
+        Some((_, valkey)) => Some(crate::valkey::Valkey::connect(valkey).await?),
+        None => None,
+    };
     let document = config.key(&format!("generations/{generation}.json"));
     match store.get(&document, DOCUMENT_MAX).await? {
         Some(bytes) => verify(&store, &document, &bytes, generation, &bundles).await?,
@@ -487,6 +516,11 @@ async fn store_generation(
             text.push(b'\n');
             store.put(&document, text).await?;
         }
+    }
+    #[cfg(feature = "generation-pointer")]
+    if let (Some((section, config)), Some(valkey)) = (&pointer.generations, &valkey) {
+        let keep = section.keep;
+        return generations::point(valkey, config, keep, generation, None, 0).await;
     }
     let current = config.key("current");
     let pointer = format!("{generation}\n").into_bytes();

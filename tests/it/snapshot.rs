@@ -98,7 +98,7 @@ pub(crate) fn section(endpoint: &str, bucket: &str) -> String {
     )
 }
 
-fn append_section(dir: &Path, section: &str) {
+pub(crate) fn append_section(dir: &Path, section: &str) {
     let manifest = dir.join(MANIFEST);
     let toml = fs::read_to_string(&manifest).unwrap() + section;
     fs::write(&manifest, toml).unwrap();
@@ -119,7 +119,7 @@ pub(crate) fn publish(dir: &Path, manifest: &str) -> (String, String, Option<i32
 }
 
 /// Every object under `prefix`, by key.
-fn objects(s3: &AmazonS3, prefix: &str) -> Vec<ObjectMeta> {
+pub(crate) fn objects(s3: &AmazonS3, prefix: &str) -> Vec<ObjectMeta> {
     block_on(async {
         let mut all = Vec::new();
         let mut pending = vec![Key::from(prefix)];
@@ -672,6 +672,31 @@ fn pull_takes_the_published_generation_and_keeps_the_previous_one() {
     assert_eq!(line.as_deref(), Ok(third.as_str()));
     let both = vec![second.clone(), third.clone()];
     assert_eq!(held(&local), (names(both), format!("{third} 0\n")));
+
+    // The pointer names a generation whose directory is gone: `--every` fetches it again and
+    // prints its id, as for any generation it swaps in.
+    fs::remove_dir_all(local.join(&third)).unwrap();
+    let mut every = pull_command(&dir, &manifest, &["--every", "1"])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let mut stdout = std::io::BufReader::new(every.stdout.take().unwrap());
+    let mut line = String::new();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        use std::io::BufRead;
+        let _ = stdout.read_line(&mut line);
+        let _ = tx.send(line);
+    });
+    let line = rx.recv_timeout(Duration::from_secs(60));
+    let _ = every.kill();
+    let _ = every.wait();
+    assert_eq!(line.as_deref().map(str::trim), Ok(third.as_str()));
+    // The pointer named the generation fetched again, so that is the one it replaced: the
+    // second one goes.
+    let one = vec![third.clone()];
+    assert_eq!(held(&local), (names(one), format!("{third} 0\n")));
 }
 
 /// Puts `bytes` at `key` with the metadata Meada stores every object with.

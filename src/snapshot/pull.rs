@@ -4,6 +4,14 @@
 //! the mirrors' git configuration. A failure at any step leaves the pointer file and every held
 //! generation as they were, and removes the `.partial` directory.
 //!
+//! Without `[generations]` the store's `current` names the generation, and a node keeps it and
+//! the one it replaced. With it (feature `generation-pointer`), Valkey names the current
+//! generation and the retained ones (`generations::read`, every entry checked before the node
+//! changes): the node holds every retained generation and deletes the others, never the current
+//! one or the one it just replaced, and its pointer file carries the fence read with the id. The
+//! current generation is fetched and swapped in first; a retained one that fails after it is a
+//! warning, retried by the next pull, and blocks nothing.
+//!
 //! Layout under `local_dir`: `current` (the node pointer file, one line `<generation id>
 //! <fence>`), `pull.lock` (one pull at a time), and per held generation `<generation id>/`, with
 //! `generation.json` (its document as stored) and per repository `<bundle id>/index.db` and
@@ -65,15 +73,15 @@ pub fn current(local_dir: &Path) -> std::result::Result<Option<(String, u64)>, S
     let (id, fence) = (text.strip_suffix('\n'))
         .and_then(|line| line.split_once(' '))
         .ok_or_else(bad)?;
-    let digits = !fence.is_empty() && fence.bytes().all(|b| b.is_ascii_digit());
-    match (is_id(id), digits.then(|| fence.parse().ok()).flatten()) {
+    match (is_id(id), super::fence(fence)) {
         (true, Some(fence)) => Ok(Some((id.to_string(), fence))),
         _ => Err(bad()),
     }
 }
 
-/// `meada snapshot pull --workspace <manifest>`, once.
-pub fn pull(manifest: &Path) -> Result<Pulled> {
+/// `meada snapshot pull --workspace <manifest>`, once: what it did and one warning per retained
+/// generation it could not pull (the next pull retries it).
+pub fn pull(manifest: &Path) -> Result<(Pulled, Vec<String>)> {
     let listed = Manifest::read(manifest)?;
     let shown = manifest.display().to_string();
     let Some(config) = listed.snapshot else {
@@ -81,6 +89,10 @@ pub fn pull(manifest: &Path) -> Result<Pulled> {
     };
     let Some(local) = config.local_dir.clone() else {
         return Err(Msg::SnapshotNoLocalDir(&shown).text().into());
+    };
+    let source = Source {
+        #[cfg(feature = "generation-pointer")]
+        generations: (listed.generations).zip(listed.valkey),
     };
     let at = io_at(&local);
     fs::create_dir_all(&local).map_err(&at)?;
@@ -90,54 +102,121 @@ pub fn pull(manifest: &Path) -> Result<Pulled> {
         .map_err(&at)?;
     match lock.try_lock() {
         Ok(()) => {}
-        Err(fs::TryLockError::WouldBlock) => return Ok(Pulled::Running(local)),
+        Err(fs::TryLockError::WouldBlock) => return Ok((Pulled::Running(local), Vec::new())),
         Err(fs::TryLockError::Error(e)) => return Err(at(e).into()),
     }
     repo::isolate(&local);
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
-    let pulled = runtime.block_on(pull_locked(&config, &local));
+    let pulled = runtime.block_on(pull_locked(&config, &local, source));
     runtime.shutdown_background();
     Ok(pulled?)
 }
 
-/// The pull under the lock.
-async fn pull_locked(config: &Config, local: &Path) -> std::result::Result<Pulled, String> {
-    let previous = current(local)?.map(|(id, _)| id);
+/// Where a pull learns the current generation: the store's `current`, or with `[generations]`
+/// the generation pointer in Valkey.
+struct Source {
+    #[cfg(feature = "generation-pointer")]
+    generations: Option<(super::generations::Config, crate::valkey::Config)>,
+}
+
+/// What the node should hold: the current generation, its fence and, with `[generations]`, the
+/// retained ones (newest first); `None` without it.
+type Wanted = (String, u64, Option<Vec<String>>);
+
+impl Source {
+    async fn wanted(&self, store: &Store, config: &Config) -> std::result::Result<Wanted, String> {
+        #[cfg(feature = "generation-pointer")]
+        if let Some((section, valkey)) = &self.generations {
+            let connection = crate::valkey::Valkey::connect(valkey).await?;
+            let read = super::generations::read(&connection, valkey, section.keep).await?;
+            return Ok((read.id, read.fence, Some(read.retained)));
+        }
+        let key = config.key("current");
+        let bytes = store.get(&key, CURRENT_MAX).await?;
+        let bytes = bytes.ok_or_else(|| Msg::SnapshotNoCurrent(&key).text())?;
+        // The store's pointer carries no fence.
+        Ok((store_pointer(&key, &bytes)?, 0, None))
+    }
+}
+
+/// The pull under the lock. Everything it reads is checked before the node changes.
+async fn pull_locked(
+    config: &Config,
+    local: &Path,
+    source: Source,
+) -> std::result::Result<(Pulled, Vec<String>), String> {
+    let previous = current(local)?;
+    let previous_id = previous.as_ref().map(|(id, _)| id.clone());
     let store = Store::connect(config)?;
-    let key = config.key("current");
-    let bytes = store.get(&key, CURRENT_MAX).await?;
-    let id = store_pointer(
-        &key,
-        &bytes.ok_or_else(|| Msg::SnapshotNoCurrent(&key).text())?,
-    )?;
-    let dir = local.join(&id);
-    let held = fs::symlink_metadata(&dir).is_ok_and(|m| m.is_dir());
-    if held && previous.as_deref() == Some(id.as_str()) {
-        return Ok(Pulled::Current(id));
+    let (id, fence, retained) = source.wanted(&store, config).await?;
+    let held = |id: &str| fs::symlink_metadata(local.join(id)).is_ok_and(|m| m.is_dir());
+    if retained.is_none() && held(&id) && previous_id.as_deref() == Some(id.as_str()) {
+        return Ok((Pulled::Current(id), Vec::new()));
+    }
+    // The current generation first, then the retained ones it lacks, each once.
+    let mut wanted = vec![id.clone()];
+    for retained in retained.iter().flatten() {
+        if !wanted.contains(retained) {
+            wanted.push(retained.clone());
+        }
     }
     // What a pull that crashed left.
     clear(local, |name| {
         name.strip_suffix(".partial").is_some_and(is_id)
     });
-    // A generation held is one a pull verified: only the pointer moves back to it.
-    if !held {
-        let partial = local.join(format!("{id}.partial"));
-        let fetched = match fetch(&store, config, &id, &partial).await {
-            Ok(()) => fs::rename(&partial, &dir).map_err(io_at(&dir)),
-            Err(e) => Err(e),
-        };
-        if let Err(e) = fetched {
-            let _ = fs::remove_dir_all(&partial);
-            return Err(e);
+    // A generation held is one a pull verified: only the pointer moves back to it. The current
+    // generation is fetched and swapped in before any retained one, so none of them blocks it.
+    let fetched = !held(&id);
+    if fetched {
+        take(&store, config, local, &id).await?;
+    }
+    let moved = fetched || previous != Some((id.clone(), fence));
+    if moved {
+        swap(local, &id, fence)?;
+    }
+    // A retained generation that fails is left for the next pull.
+    let mut warnings = Vec::new();
+    for want in wanted[1..].iter().filter(|want| !held(want)) {
+        if let Err(why) = take(&store, config, local, want).await {
+            warnings.push(
+                Msg::SnapshotRetainedSkipped {
+                    id: want,
+                    why: &why,
+                }
+                .text(),
+            );
         }
     }
-    swap(local, &id)?;
+    // Never the current generation, a retained one or the one it just replaced.
     clear(local, |name| {
-        is_id(name) && name != id && Some(name) != previous.as_deref()
+        is_id(name) && !wanted.iter().any(|w| w == name) && Some(name) != previous_id.as_deref()
     });
-    Ok(Pulled::Swapped(id))
+    let pulled = match moved {
+        true => Pulled::Swapped(id),
+        false => Pulled::Current(id),
+    };
+    Ok((pulled, warnings))
+}
+
+/// The generation `id` fetched into `<id>.partial` and renamed to `<id>`; on a failure the
+/// partial directory is removed.
+async fn take(
+    store: &Store,
+    config: &Config,
+    local: &Path,
+    id: &str,
+) -> std::result::Result<(), String> {
+    let (partial, dir) = (local.join(format!("{id}.partial")), local.join(id));
+    let fetched = match fetch(store, config, id, &partial).await {
+        Ok(()) => fs::rename(&partial, &dir).map_err(io_at(&dir)),
+        Err(e) => Err(e),
+    };
+    if fetched.is_err() {
+        let _ = fs::remove_dir_all(&partial);
+    }
+    fetched
 }
 
 /// The id the store's `current` holds: the id and a newline, nothing else.
@@ -160,13 +239,12 @@ fn clear(local: &Path, doomed: impl Fn(&str) -> bool) {
     }
 }
 
-/// `current.new` written with `<id> 0` and renamed over the pointer file: fence `0`, since the
-/// store's pointer carries none.
-fn swap(local: &Path, id: &str) -> std::result::Result<(), String> {
+/// `current.new` written with `<id> <fence>` and renamed over the pointer file.
+fn swap(local: &Path, id: &str, fence: u64) -> std::result::Result<(), String> {
     let new = local.join("current.new");
     let at = io_at(&new);
     let mut file = File::create(&new).map_err(&at)?;
-    (file.write_all(format!("{id} 0\n").as_bytes()))
+    (file.write_all(format!("{id} {fence}\n").as_bytes()))
         .and_then(|()| file.sync_all())
         .map_err(&at)?;
     fs::rename(&new, local.join(POINTER)).map_err(at)

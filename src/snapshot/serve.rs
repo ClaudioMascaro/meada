@@ -5,6 +5,7 @@
 //! Everything here only reads: a call reads the pointer file and the generation document, and
 //! the node's `meada snapshot pull` is what moves the pointer.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -33,10 +34,11 @@ pub struct Held {
 /// directory never changes once the pull renamed it into place, so a call reads only the
 /// pointer file, and its document and the mirrors' configuration only when the pointer names
 /// another generation. Only the last one read is kept; a call still answering from an earlier
-/// one holds its own `Arc`.
+/// one holds its own `Arc`. Pinned generations (`pinned`) are kept apart, one per held id.
 pub struct Current {
     local: PathBuf,
     last: Mutex<Option<Arc<Held>>>,
+    pins: Mutex<HashMap<String, Arc<Held>>>,
 }
 
 impl Current {
@@ -44,7 +46,35 @@ impl Current {
         Self {
             local,
             last: Mutex::new(None),
+            pins: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// The node's `local_dir`.
+    pub fn local(&self) -> &Path {
+        &self.local
+    }
+
+    /// The generation `id` (an id, as `is_id` checks it) if the node holds it, `None` if not:
+    /// read once while it is held, as `get` reads the current one. A call reads the names
+    /// under `local_dir` and drops each pin the node no longer holds, so what is kept is bounded
+    /// by what the node holds.
+    pub fn pinned(&self, id: &str) -> Result<Option<Arc<Held>>> {
+        let held = ids(&self.local);
+        let mut pins = self.pins.lock().unwrap_or_else(|e| e.into_inner());
+        pins.retain(|pin, _| held.contains(pin));
+        if !held.iter().any(|h| h == id) {
+            return Ok(None);
+        }
+        if let Some(held) = pins.get(id) {
+            return Ok(Some(held.clone()));
+        }
+        let Some(held) = unless_gone(&self.local, id, load(&self.local, id.to_string()))? else {
+            return Ok(None);
+        };
+        let held = Arc::new(held);
+        pins.insert(id.to_string(), held.clone());
+        Ok(Some(held))
     }
 
     /// The generation the pointer file names now, as `held` reads it.
@@ -74,6 +104,16 @@ pub fn node(manifest: &Path) -> Result<(Config, PathBuf)> {
 /// stored it. Without a pointer the node holds nothing to serve: the error names the pull.
 pub fn held(local: &Path) -> Result<Held> {
     load(local, pointer(local)?)
+}
+
+/// `loaded`, the generation `id` of `local` as `load` read it, or `None` when it failed because
+/// its directory is gone: a pull deleted it between the listing and the read, so it is no longer
+/// held.
+fn unless_gone(local: &Path, id: &str, loaded: Result<Held>) -> Result<Option<Held>> {
+    match loaded {
+        Err(_) if fs::symlink_metadata(local.join(id)).is_err() => Ok(None),
+        loaded => loaded.map(Some),
+    }
 }
 
 /// The id `<local_dir>/current` names; without one, an error naming the pull.
@@ -118,11 +158,7 @@ pub fn ids(local: &Path) -> Vec<String> {
 /// The generation id the store's `current` holds, or why the store did not say within
 /// `REACH_TIMEOUT`.
 pub fn reach(config: &Config) -> std::result::Result<String, String> {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| e.to_string())?;
-    let ask = async {
+    within(async {
         let store = Store::connect(config)?;
         let key = config.key("current");
         let bytes = store.get(&key, CURRENT_MAX).await?;
@@ -130,7 +166,40 @@ pub fn reach(config: &Config) -> std::result::Result<String, String> {
             &key,
             &bytes.ok_or_else(|| Msg::SnapshotNoCurrent(&key).text())?,
         )
-    };
+    })
+}
+
+/// With `[generations]`: the current generation id Valkey holds, once the store answers that it
+/// holds its document, or why Valkey or the store did not say within `REACH_TIMEOUT`, the reason
+/// prefixed with which one.
+#[cfg(feature = "generation-pointer")]
+pub fn reach_pointer(
+    config: &Config,
+    valkey: &crate::valkey::Config,
+) -> std::result::Result<String, String> {
+    within(async {
+        let read = async {
+            let connection = crate::valkey::Valkey::connect(valkey).await?;
+            super::generations::current(&connection, valkey).await
+        };
+        let (id, _) = read.await.map_err(|e| format!("valkey: {e}"))?;
+        let key = config.key(&format!("generations/{id}.json"));
+        let stored = async { Store::connect(config)?.stored(&key).await };
+        match stored.await.map_err(|e| format!("store: {e}"))? {
+            Some(_) => Ok(id),
+            None => Err(format!("store: {}", Msg::SnapshotNoCurrent(&key).text())),
+        }
+    })
+}
+
+/// `ask` on a runtime of its own, or a timeout after `REACH_TIMEOUT`.
+fn within(
+    ask: impl Future<Output = std::result::Result<String, String>>,
+) -> std::result::Result<String, String> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| e.to_string())?;
     let answer = runtime.block_on(async { tokio::time::timeout(REACH_TIMEOUT, ask).await });
     // Dropping the runtime would wait for a blocking thread still in a DNS lookup.
     runtime.shutdown_background();
@@ -225,6 +294,55 @@ mod tests {
         fs::remove_file(local.join(pull::POINTER)).unwrap();
         let e = current.get().err().unwrap().to_string();
         assert!(e.contains("meada snapshot pull"), "{e}");
+    }
+
+    #[test]
+    fn a_pin_answers_from_its_generation_whatever_the_pointer_names() {
+        let local = scratch("pinned");
+        generation(&local, A, &[("a.ts", "export function alpha() {}\n")]);
+        generation(&local, B, &[("a.ts", "export function beta() {}\n")]);
+        point(&local, B);
+        let current = Current::new(local.clone());
+        let pinned = current.pinned(A).unwrap().unwrap();
+        assert_eq!(pinned.id, A);
+        let engine = Engine::open_held(&pinned, REPO).unwrap();
+        assert!(engine.search("alpha", None, None).unwrap().contains("a.ts"));
+        assert_eq!(current.get().unwrap().id, B);
+        assert!(current.pinned("00000000000000cc").unwrap().is_none());
+    }
+
+    /// A pin is read once while held, and let go of once the node no longer holds it: what the
+    /// server keeps is bounded by what the node holds.
+    #[test]
+    fn a_pin_is_read_once_and_dropped_once_its_generation_is_gone() {
+        let local = scratch("pin-once");
+        generation(&local, A, &[("a.ts", "export function alpha() {}\n")]);
+        generation(&local, B, &[("a.ts", "export function beta() {}\n")]);
+        point(&local, B);
+        let current = Current::new(local.clone());
+        let first = current.pinned(A).unwrap().unwrap();
+        fs::remove_file(local.join(A).join(pull::DOCUMENT)).unwrap();
+        assert!(Arc::ptr_eq(&first, &current.pinned(A).unwrap().unwrap()));
+        fs::remove_dir_all(local.join(A)).unwrap();
+        assert!(current.pinned(A).unwrap().is_none());
+        assert_eq!(Arc::strong_count(&first), 1);
+        // A held generation whose document no longer reads is an error, not a 404.
+        fs::remove_file(local.join(B).join(pull::DOCUMENT)).unwrap();
+        assert!(current.pinned(B).is_err());
+    }
+
+    /// A pin whose read fails because a pull deleted its directory after the listing is a
+    /// generation no longer held (the 404), not an unservable node (the 503).
+    #[test]
+    fn a_pin_deleted_between_the_listing_and_the_read_is_no_longer_held() {
+        let local = scratch("pin-gone");
+        generation(&local, A, &[("a.ts", "export function alpha() {}\n")]);
+        let failed = || load(&local, B.to_string());
+        assert!(unless_gone(&local, B, failed()).unwrap().is_none());
+        fs::create_dir(local.join(B)).unwrap();
+        assert!(unless_gone(&local, B, failed()).is_err());
+        let loaded = unless_gone(&local, A, load(&local, A.to_string())).unwrap();
+        assert_eq!(loaded.unwrap().id, A);
     }
 
     /// A held generation is as hostile as the store it came from: a document that does not

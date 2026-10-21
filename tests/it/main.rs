@@ -19,6 +19,7 @@ mod documents;
 mod drift;
 mod freshness;
 mod gateway;
+mod generations;
 mod gopkg;
 mod hostile;
 mod index;
