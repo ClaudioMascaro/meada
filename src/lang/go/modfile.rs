@@ -76,8 +76,8 @@ struct Module {
 
 impl Modules {
     /// From the `go.mod` files as `(path, contents)`. One past `lang::MAX_BYTES` is invalid,
-    /// as `package::go::read` takes it: the index reads a config only up to one byte past that
-    /// size, so its last line may be cut.
+    /// as `Go::read` (`package::go`) takes it: the index reads a config only up to one byte past
+    /// that size, so its last line may be cut.
     pub fn new(configs: &[(&str, &[u8])]) -> Self {
         let modules = (configs.iter())
             .filter(|(path, _)| path.rsplit('/').next() == Some("go.mod"))
