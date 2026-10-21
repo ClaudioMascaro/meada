@@ -83,7 +83,7 @@ modules updates it.
   subcommunity) and aggregation (nodes numbered by smallest member), until an iteration moves
   and merges nothing, with no cap. `export` loads the rows as `Export::communities`.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
-  `config_files`, `modules`, `messages`, `receiver`: a keyword naming the enclosing class's
+  `config_files`, `modules`, `receiver`: a keyword naming the enclosing class's
   instance, `this` for TS/JS, none for Python, `base_receiver`: a keyword naming its base, whose
   members are not resolved, `super` for TS/JS, none for Python, whose `super()` is a call, and
   `globals`: names bound everywhere that contract kinds read through `Code::binds_everywhere`,
@@ -128,12 +128,12 @@ modules updates it.
   parameter may set it) and `literal(parts)` are shared by kinds and packs. An anonymous function
   written as a property of an options object passed as an argument (`run({ eachMessage: () =>
   {} })`, or an object method there) is a `Kind::Inline` definition and a `Value::Function`,
-  like a function argument. `messages(code) -> Vec<Message>` (default: none) is the **producer
-  and consumer output** (spec #20): `Message {broker, name: Option<String>, path, call, role}`,
-  `role` `Producer` or `Consumer(Handler)`, `Handler::Def {path, name}` (a definition; a name
+  like a function argument. A message reader `messages(code) -> Vec<Message>` (the channel kind calls it, not the pack; types in
+  `channel/message.rs`) is the **producer and consumer output** (spec #20): `Message {broker, name: Option<String>, path, call, role}`,
+  `role` (`Side`) `Producer` or `Consumer(Handler)`, `Handler::Def {path, name}` (a definition; a name
   that folds to nothing is the top level, so a pack passes a call's `scope` for "the enclosing
-  function") or `Handler::Inline {path, def}`; `Role::Publish {exchange}` (a publish to a named
-  exchange, `name` the routing key) and `Role::Binding {exchange, pattern}` (`name` the queue)
+  function") or `Handler::Inline {path, def}`; `Side::Publish {exchange}` (a publish to a named
+  exchange, `name` the routing key) and `Side::Binding {exchange, pattern}` (`name` the queue)
   are the RabbitMQ roles that are neither a plain producer nor a consumer. `name` is `None`
   when it cannot be evaluated (an unresolved side). The pack reads facts through `Code` (values, `Code::origins`,
   `Code::outside`, `Code::expand`) and reports; the channel kind turns the output into contracts. TS/JS library
@@ -201,8 +201,8 @@ modules updates it.
   queue is the last URL segment); async-nats `publish`, `subscribe`, `queue_subscribe`; redis
   `xadd` and the keys of `xread_options`, only with a `group` option. A polling or stream
   client's handler is the function that holds the call. The shared evaluation (`produce`,
-  `consume`, `topic`, `topics`, `publication`, `queue_name`) lives in `lang/mod.rs`, used by
-  the three packs. A `let mut` bound once keeps its call as `Facts::mutable`, read by
+  `consume`, `topic`, `topics`, `publication`, `queue_name`) lives in `channel/message.rs`, used by
+  the four readers. A `let mut` bound once keeps its call as `Facts::mutable`, read by
   `Code::mutable`, so a redis connection held by one is traced.
 - `lang/python.rs` yields `Kind::Method` for a function directly in a class body, keeps the first of
   two definitions of one name, spans a decorated definition with its decorators, and exports

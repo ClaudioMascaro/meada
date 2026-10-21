@@ -7,14 +7,13 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
-    LanguagePack, Message, Modules, Param, Part, Receiver, Star, TYPE_DEPTH, Value, children,
-    literal, named, text,
+    LanguagePack, Modules, Param, Part, Receiver, Star, TYPE_DEPTH, Value, children, literal,
+    named, text,
 };
 use crate::package::read_manifest;
-use crate::resolve::Code;
 use crate::{Result, parent, qualify};
 
-mod messages;
+pub(crate) mod messages;
 pub mod pyproject;
 
 /// How many definitions may nest in one file. Names are qualified by the definitions around
@@ -361,10 +360,6 @@ impl LanguagePack for Python {
 
     fn config_files(&self) -> &'static [&'static str] {
         &["pyproject.toml"]
-    }
-
-    fn messages(&self, code: &Code) -> Vec<Message> {
-        messages::messages(code)
     }
 
     fn stars_bind(&self) -> bool {

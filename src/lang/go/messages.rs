@@ -12,10 +12,11 @@
 
 use super::modfile::unversioned;
 use super::package_call;
-use crate::lang::{
-    Call, Handler, Message, Value, bind, channel_name as name, consume, produce, property, publish,
-    queue_name, topic, topics,
+use crate::channel::message::{
+    Handler, Message, bind, channel_name as name, consume, produce, publish, queue_name, topic,
+    topics,
 };
+use crate::lang::{Call, Value, property};
 use crate::resolve::{Code, Follow, Keywords, Of};
 
 #[derive(Clone, Copy, PartialEq)]
@@ -167,7 +168,10 @@ const METHODS: &[&str] = &[
     "NewReader",
 ];
 
-pub(super) fn messages(code: &Code) -> Vec<Message> {
+pub(crate) fn messages(code: &Code) -> Vec<Message> {
+    if !code.pack().extensions().contains(&"go") {
+        return Vec::new();
+    }
     let mut out = Vec::new();
     for (&path, facts) in code.files() {
         for (n, stored) in facts.calls.iter().enumerate() {

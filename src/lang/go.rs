@@ -11,7 +11,7 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Layout,
-    Message, Modules, Param, Receiver, Value, children, named, text,
+    Modules, Param, Receiver, Value, children, named, text,
 };
 use crate::resolve::Code;
 use crate::{Result, parent, qualify};
@@ -31,7 +31,7 @@ pub(crate) fn package_call<'a>(
 }
 
 mod build;
-mod messages;
+pub(crate) mod messages;
 pub mod modfile;
 mod values;
 use values::Keep;
@@ -62,10 +62,6 @@ impl LanguagePack for Go {
 
     fn config_files(&self) -> &'static [&'static str] {
         &["**/go.mod"]
-    }
-
-    fn messages(&self, code: &crate::resolve::Code) -> Vec<Message> {
-        messages::messages(code)
     }
 
     fn modules(

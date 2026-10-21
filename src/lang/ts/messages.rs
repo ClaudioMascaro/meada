@@ -8,10 +8,10 @@
 
 use std::collections::BTreeMap;
 
-use crate::lang::{
-    Handler, Message, Role, Value, bind, channel_name as name, literal, property, publish,
-    queue_name,
+use crate::channel::message::{
+    Handler, Message, Side, bind, channel_name as name, publish, queue_name,
 };
+use crate::lang::{Value, literal, property};
 use crate::resolve::{Code, Expand, Expanded, Follow, Form, Of};
 
 const KAFKAJS: &str = "kafkajs";
@@ -76,7 +76,10 @@ fn factory<'a>(
 /// What a form reads of a call's arguments: the channel names, see `names`.
 type Read<'a> = &'a dyn Fn(&[Value]) -> Option<Vec<Option<String>>>;
 
-pub(super) fn messages(code: &Code) -> Vec<Message> {
+pub(crate) fn messages(code: &Code) -> Vec<Message> {
+    if !code.pack().extensions().contains(&"js") {
+        return Vec::new();
+    }
     let mut out = Vec::new();
     // kafkajs subscriptions, each with the consumer binding it is made on.
     let mut subscriptions = Vec::new();
@@ -127,7 +130,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                             name,
                             path: site.into(),
                             call: at,
-                            role: Role::Consumer(handler.clone()),
+                            role: Side::Consumer(handler.clone()),
                         })
                     },
                 )
@@ -240,7 +243,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 name,
                 path: site.into(),
                 call: at,
-                role: Role::Consumer(handler.clone()),
+                role: Side::Consumer(handler.clone()),
             }));
         }
     }
@@ -261,7 +264,7 @@ fn producers(broker: &'static str, found: Vec<Expanded<Vec<Option<String>>>>) ->
                     name,
                     path: site.into(),
                     call: at,
-                    role: Role::Producer,
+                    role: Side::Producer,
                 })
             },
         )

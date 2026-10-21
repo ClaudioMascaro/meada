@@ -4,10 +4,11 @@
 //! producer. The constructor is named by `Code::imported`, the head of its callee, not by the
 //! `outside` an origin carries, which reads the whole name.
 
-use crate::lang::{
-    Call, Handler, Message, Value, bind, channel_name as name, consume, literal, produce, publish,
-    queue_name, topic, topics,
+use crate::channel::message::{
+    Handler, Message, bind, channel_name as name, consume, produce, publish, queue_name, topic,
+    topics,
 };
+use crate::lang::{Call, Value, literal};
 use crate::resolve::{Code, Follow, Keywords, Of};
 
 const CONFLUENT_PRODUCER: &str = "confluent_kafka.Producer";
@@ -69,7 +70,10 @@ struct Maker<'a> {
     call: &'a Call,
 }
 
-pub(super) fn messages(code: &Code) -> Vec<Message> {
+pub(crate) fn messages(code: &Code) -> Vec<Message> {
+    if !code.pack().extensions().contains(&"py") {
+        return Vec::new();
+    }
     let mut out = Vec::new();
     for (&path, facts) in code.files() {
         let kafka = facts.imports.iter().any(|i| i.source == "kafka");
