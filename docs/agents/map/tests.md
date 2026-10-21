@@ -47,7 +47,10 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   every repository's communities and processes, and the chain's export byte-identical under
   `meada::with_reversed_walk`), `items` (open items and their `search` goldens, fixtures
   `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`), `mcp`
-  (the binary over stdio), `resources` (resource `search`, `context`, `trace` start and `status`
+  (the binary over stdio), `server` (`meada mcp --listen` as a child process over the chain's
+  mirrors, through rmcp's streamable HTTP client and plain HTTP requests: the stdio tools and
+  `trace` byte for byte, the 404 listing, the `uncommitted` refusal, the behind line before and
+  after `meada index`, two stateless servers answering alternate calls, the refused start), `resources` (resource `search`, `context`, `trace` start and `status`
   over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
   fixture: kafkajs forms, fan-out, same-repository links, an unrelated `send`; amqplib queues,
   publishes through a binding of another repository, the empty exchange, queues named like the

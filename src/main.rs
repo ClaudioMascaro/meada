@@ -30,7 +30,12 @@ enum Command {
         #[arg(long, requires = "workspace")]
         repo: Option<String>,
     },
-    Mcp,
+    Mcp {
+        #[arg(long, requires = "workspace")]
+        listen: Option<String>,
+        #[arg(long, requires = "listen")]
+        workspace: Option<PathBuf>,
+    },
     Decide {
         #[arg(long)]
         item: Option<String>,
@@ -65,7 +70,11 @@ fn main() -> ExitCode {
                 .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
                 .mut_arg("repo", |a| a.help(Msg::RepoHelp.text()))
         })
-        .mut_subcommand("mcp", |c| c.about(Msg::Mcp.text()))
+        .mut_subcommand("mcp", |c| {
+            (c.about(Msg::Mcp.text()))
+                .mut_arg("listen", |a| a.help(Msg::ListenHelp.text()))
+                .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
+        })
         .mut_subcommand("decide", |c| {
             c.about(Msg::Decide.text())
                 .mut_arg("item", |a| a.help(Msg::DecideItemHelp.text()))
@@ -82,10 +91,13 @@ fn main() -> ExitCode {
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
     let here = Path::new(".");
     let result = match cli.command {
-        Command::Mcp => {
+        Command::Mcp { listen, workspace } => {
             // The MCP surface is English whatever `LANG` says (ADR 0008).
             msg::init(None);
-            meada::mcp::serve()
+            match (listen, workspace) {
+                (Some(listen), Some(manifest)) => meada::mcp::listen(&listen, &manifest),
+                _ => meada::mcp::serve(),
+            }
         }
         Command::Status { workspace } => match workspace {
             Some(manifest) => engine::status_workspace(&manifest),

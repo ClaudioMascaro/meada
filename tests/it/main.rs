@@ -31,6 +31,7 @@ mod pypi;
 mod query;
 mod resources;
 mod self_index;
+mod server;
 mod stale;
 mod trace;
 mod urls;
