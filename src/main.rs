@@ -162,7 +162,19 @@ fn main() -> ExitCode {
         #[cfg(feature = "snapshot")]
         Command::Snapshot {
             command: SnapshotCommand::Publish { workspace },
-        } => meada::snapshot::publish(&workspace).map(|generation| println!("{generation}")),
+        } => match meada::snapshot::publish(&workspace) {
+            Ok(generation) => {
+                println!("{generation}");
+                Ok(())
+            }
+            // Every repository's problem on its own line, as `index --workspace` reports them.
+            Err(e) => {
+                for line in e.to_string().lines() {
+                    eprintln!("meada: {line}");
+                }
+                std::process::exit(1);
+            }
+        },
         Command::Export {
             workspace: Some(manifest),
             repo: Some(repo),

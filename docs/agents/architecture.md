@@ -97,7 +97,8 @@ one for the area a change touches.
 - `snapshot.rs`, `snapshot/store.rs` (feature `snapshot`; the only places `object_store`,
   `reqwest` as a client of Meada's own and `tar` are used): the snapshot store. `File` is the
   `[snapshot]` section and `File::validate` its `Config` (an `https` endpoint, or `http` on
-  loopback, with no user or path; `region`, `bucket` and `prefix` shapes; one credential source,
+  loopback, with no user or path, and `path_style` for an `http`, IP or `localhost` one;
+  `region`, `bucket` and `prefix` shapes; one credential source,
   the static keys only with `static`, at most one of each `*_env`/`*_file` pair). `bundle_id`
   and `generation_id` are the ids of ADR 0012 (`is_id` their shape); `entry_blocks` gives each
   manifest entry's blocks as canonical JSON (`Listed::blocks`). `publish` is `meada snapshot
@@ -111,8 +112,12 @@ one for the area a change touches.
   over `Guard`, a reqwest client with no redirect and no proxy that refuses any origin but the
   bucket's and the chosen credential source's (STS in `region`, the Pod Identity agent, IMDSv2);
   credentials come only from that source (static ones built from the variables or files, the
-  others through object_store's providers given exactly those inputs), stay in memory and are
-  scrubbed from every error. Every object carries `meada-size` and `meada-blake3` metadata.
+  others through object_store's providers given exactly those inputs, IMDSv2 over IPv4 only),
+  stay in memory and are scrubbed from every error: the static secret is replaced, and an S3
+  error body loses its `CanonicalRequest`, `StringToSign` and their `*Bytes` echoes. The
+  secret files are read through `config::read_bounded`, as `valkey.rs` reads its own. Each
+  bundle keeps its `open_read` connection, the read transaction its freshness check ran in,
+  until its upload ends. Every object carries `meada-size` and `meada-blake3` metadata.
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.

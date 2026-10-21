@@ -1,10 +1,10 @@
 //! The snapshot store's client (ADR 0012): an S3-compatible bucket reached only at the endpoint
 //! the `[snapshot]` section names, and at the one credential endpoint its `credentials` source
 //! chose. Every request goes through `Guard`, which refuses any other origin and follows no
-//! redirect. Credentials are read from that one source only, kept in memory, and scrubbed from
-//! every error. `meada snapshot publish` writes through it; `meada snapshot pull` (#273) reads.
+//! redirect. Credentials are read from that one source only and kept in memory; every error
+//! loses the echo of the signed request and the static secrets (`Store::scrub`). `meada snapshot
+//! publish` writes through it; `meada snapshot pull` (#273) reads.
 
-use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -227,9 +227,10 @@ impl Store {
         Ok(store)
     }
 
-    /// `text` with no secret in it.
+    /// `text` with no secret in it: no echo of the signed request (`without_echoes`), whatever
+    /// the credential source, and no static secret key or session token.
     pub fn scrub(&self, text: impl ToString) -> String {
-        let mut text = text.to_string();
+        let mut text = without_echoes(&text.to_string());
         for secret in self.secrets.iter().filter(|s| !s.is_empty()) {
             text = text.replace(secret.as_str(), "***");
         }
@@ -367,26 +368,36 @@ fn secret_value(secret: &Secret) -> Result<Option<String>, String> {
     }
 }
 
-/// The content of the regular file `path`, at most `SECRET_MAX` bytes, without the editor's
-/// trailing newline. A FIFO or a directory is refused before it is opened.
+/// The content of the regular file `path` (`config::read_bounded`, at most `SECRET_MAX`
+/// bytes), without the editor's trailing newline.
 fn read_secret(path: &Path) -> Result<String, String> {
-    let problem = |e: std::io::Error| format!("{}: {}", path.display(), e.kind());
-    if !std::fs::metadata(path).map_err(problem)?.is_file() {
-        return Err(format!("{}: not a regular file", path.display()));
-    }
-    let mut bytes = Vec::new();
-    let file = std::fs::File::open(path).map_err(problem)?;
-    file.take(SECRET_MAX + 1)
-        .read_to_end(&mut bytes)
-        .map_err(problem)?;
-    if bytes.len() as u64 > SECRET_MAX {
-        return Err(format!(
-            "{}: larger than {SECRET_MAX} bytes",
-            path.display()
-        ));
-    }
+    let bytes = crate::config::read_bounded(path, SECRET_MAX)?;
     let text = String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", path.display()))?;
     Ok(text.trim_end_matches(['\n', '\r']).to_string())
+}
+
+/// The elements of an S3 error body that echo the signed request: with a session token from
+/// any credential source, `x-amz-security-token` is in them.
+const ECHOES: [&str; 4] = [
+    "CanonicalRequest",
+    "CanonicalRequestBytes",
+    "StringToSign",
+    "StringToSignBytes",
+];
+
+/// `text` without the `ECHOES` elements: each `<Name>...</Name>` becomes `<Name/>`. An element
+/// left open drops the rest of the text.
+fn without_echoes(text: &str) -> String {
+    let mut text = text.to_string();
+    for name in ECHOES {
+        let (open, close) = (format!("<{name}>"), format!("</{name}>"));
+        while let Some(start) = text.find(&open) {
+            let end =
+                (text[start..].find(&close)).map_or(text.len(), |at| start + at + close.len());
+            text.replace_range(start..end, &format!("<{name}/>"));
+        }
+    }
+    text
 }
 
 #[cfg(test)]
@@ -402,6 +413,27 @@ mod tests {
         let mut bad = stored.attributes();
         bad.insert(Attribute::Metadata(HASH.into()), "../x".into());
         assert_eq!(Stored::read(&bad, 6), None);
+    }
+
+    #[test]
+    fn an_error_body_loses_the_echo_of_the_signed_request() {
+        let body = "403 Forbidden: <?xml version=\"1.0\"?><Error><Code>SignatureDoesNotMatch</Code>\
+                    <StringToSign>AWS4-HMAC-SHA256\n20261021T000000Z</StringToSign>\
+                    <StringToSignBytes>41 57 53</StringToSignBytes>\
+                    <CanonicalRequest>GET\n/b/k\n\nx-amz-security-token:FwoGZXIvYXdzEJr-session\n\
+                    </CanonicalRequest><CanonicalRequestBytes>47 45 54</CanonicalRequestBytes>\
+                    <RequestId>1</RequestId></Error>";
+        assert_eq!(
+            without_echoes(body),
+            "403 Forbidden: <?xml version=\"1.0\"?><Error><Code>SignatureDoesNotMatch</Code>\
+             <StringToSign/><StringToSignBytes/><CanonicalRequest/><CanonicalRequestBytes/>\
+             <RequestId>1</RequestId></Error>"
+        );
+        assert_eq!(
+            without_echoes("a <StringToSign>secret"),
+            "a <StringToSign/>"
+        );
+        assert_eq!(without_echoes("plain"), "plain");
     }
 
     #[test]

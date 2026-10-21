@@ -104,7 +104,10 @@ pub type Problem = (&'static str, String);
 impl File {
     /// The section checked; relative paths are relative to `base`, the manifest's directory.
     pub fn validate(self, base: &Path) -> std::result::Result<Config, Problem> {
-        endpoint(&self.endpoint).map_err(|m| ("snapshot.endpoint", m))?;
+        let virtual_host = endpoint(&self.endpoint).map_err(|m| ("snapshot.endpoint", m))?;
+        if !self.path_style && !virtual_host {
+            return Err(("snapshot.path_style", Msg::SnapshotPathStyle.text()));
+        }
         let lower = |c: char| c.is_ascii_lowercase() || c.is_ascii_digit();
         if self.region.is_empty() || !self.region.chars().all(|c| lower(c) || c == '-') {
             return Err(("snapshot.region", Msg::SnapshotRegion.text()));
@@ -193,8 +196,11 @@ impl File {
 }
 
 /// Why `url` is no store endpoint: an `https` URL, or `http` when the host is loopback
-/// (`localhost`, `127.0.0.0/8`, `::1`), with no user, password, path, query or fragment.
-fn endpoint(url: &str) -> std::result::Result<(), String> {
+/// (`localhost`, `127.0.0.0/8`, `::1`), with no user, password, path, query or fragment. When it
+/// is one, whether a bucket can go in front of its host (virtual-hosted style): an `https`
+/// endpoint named by a domain other than `localhost`. `<bucket>.localhost` may go to DNS, an IP
+/// takes no subdomain, and a plain `http` endpoint is loopback, so path style.
+fn endpoint(url: &str) -> std::result::Result<bool, String> {
     let Ok(parsed) = reqwest::Url::parse(url) else {
         return Err(Msg::SnapshotEndpointInvalid.text());
     };
@@ -211,9 +217,10 @@ fn endpoint(url: &str) -> std::result::Result<(), String> {
         || ip
             .parse::<std::net::IpAddr>()
             .is_ok_and(|ip| ip.is_loopback());
+    let named = host != "localhost" && ip.parse::<std::net::IpAddr>().is_err();
     match parsed.scheme() {
-        "https" => Ok(()),
-        "http" if loopback => Ok(()),
+        "https" => Ok(named),
+        "http" if loopback => Ok(false),
         "http" => Err(Msg::SnapshotEndpointPlain.text()),
         _ => Err(Msg::SnapshotEndpointInvalid.text()),
     }
@@ -334,6 +341,10 @@ struct Bundle {
     blocks: serde_json::Value,
     mirror: PathBuf,
     index: PathBuf,
+    /// The index opened by `index::open_read`, its read transaction held until the bundle is
+    /// uploaded: a `meada index` commit waits for it (up to its busy timeout), so both passes
+    /// over the tar read the index the freshness check read.
+    _read: rusqlite::Connection,
 }
 
 /// `meada snapshot publish --workspace <manifest>`: the generation id, once the generation is
@@ -357,33 +368,29 @@ pub fn publish(manifest: &Path) -> Result<String> {
             }
         };
         let repo_id = r.identity.as_str();
-        let checked = (|| -> Result<Option<String>> {
+        let checked = (|| -> Result<std::result::Result<rusqlite::Connection, String>> {
             let db = index::open_read(&[(&r.index, repo_id)], &shown)?;
             if !index::fresh(&db, &r.root, repo_id, &r.config.serve)? {
                 let manifest = shown.as_str();
-                return Ok(Some(
-                    Msg::SnapshotBehind {
-                        repo: repo_id,
-                        manifest,
-                    }
-                    .text(),
-                ));
+                return Ok(Err(Msg::SnapshotBehind {
+                    repo: repo_id,
+                    manifest,
+                }
+                .text()));
             }
             if !repo::unclean(&r.root)?.is_empty() {
                 let mirror = r.root.display().to_string();
-                return Ok(Some(
-                    Msg::SnapshotDirty {
-                        repo: repo_id,
-                        mirror: &mirror,
-                    }
-                    .text(),
-                ));
+                return Ok(Err(Msg::SnapshotDirty {
+                    repo: repo_id,
+                    mirror: &mirror,
+                }
+                .text()));
             }
-            Ok(None)
+            Ok(Ok(db))
         })();
-        match checked {
-            Ok(None) => {}
-            Ok(Some(problem)) => {
+        let read = match checked {
+            Ok(Ok(db)) => db,
+            Ok(Err(problem)) => {
                 problems.push(problem);
                 continue;
             }
@@ -396,7 +403,7 @@ pub fn publish(manifest: &Path) -> Result<String> {
                 });
                 continue;
             }
-        }
+        };
         let head = match repo::head(&r.root) {
             Ok(head) => head,
             Err(e) => {
@@ -414,8 +421,10 @@ pub fn publish(manifest: &Path) -> Result<String> {
             blocks: entry.blocks.clone(),
             mirror: r.root.clone(),
             index: r.index.clone(),
+            _read: read,
         });
     }
+    // One problem per line; the CLI prefixes each.
     if !problems.is_empty() {
         return Err(problems.join("\n").into());
     }
@@ -752,7 +761,22 @@ mod tests {
             "127.9.9.9:9000",
             "[::1]:9000",
         ] {
-            assert!(section(&with(&format!("http://{host}"))).is_ok(), "{host}");
+            let plain = with(&format!("http://{host}"));
+            let (found, _) = section(&plain).unwrap_err();
+            assert_eq!(found, "snapshot.path_style", "{host}");
+            assert!(
+                section(&format!("{plain}path_style = true\n")).is_ok(),
+                "{host}"
+            );
+        }
+        // The bucket cannot go in front of an IP or `localhost` either.
+        for endpoint in [
+            "https://10.0.0.1",
+            "https://[::1]:9000",
+            "https://localhost",
+        ] {
+            let (found, _) = section(&with(endpoint)).unwrap_err();
+            assert_eq!(found, "snapshot.path_style", "{endpoint}");
         }
         assert!(section(&with("https://s3.example.internal:8443/")).is_ok());
     }

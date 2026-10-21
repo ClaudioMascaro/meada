@@ -324,14 +324,14 @@ fn publish_refuses_an_index_behind_its_mirror_a_dirty_mirror_and_a_missing_index
          --workspace ops/meada.workspace.toml"
     );
     assert!(
-        lines[1].starts_with("example.com/chain/catalog: the mirror ")
+        lines[1].starts_with("meada: example.com/chain/catalog: the mirror ")
             && lines[1]
                 .ends_with(" is not clean: git status lists changed, untracked or ignored files"),
         "{stderr}"
     );
     assert_eq!(
         lines[2],
-        "example.com/chain/worker: not indexed; run meada index --workspace ops/meada.workspace.toml"
+        "meada: example.com/chain/worker: not indexed; run meada index --workspace ops/meada.workspace.toml"
     );
     // Nothing reached the store.
     assert!(objects(&s3, "prod/meada").is_empty());
@@ -425,7 +425,16 @@ fn snapshot_section_errors_name_the_file_the_line_and_the_key() {
     let dir = chain_manifest("snapshot_section_errors");
     let manifest = fs::read_to_string(dir.join(MANIFEST)).unwrap();
     let at = "meada: ops/meada.workspace.toml";
+    // An absent key is reported at its table's line.
+    let table = format!(
+        ":{}: `snapshot.path_style`",
+        manifest.matches('\n').count() + 2
+    );
     for (body, expected) in [
+        (
+            "endpoint = \"https://10.0.0.1\"\nregion = \"us-east-1\"\nbucket = \"b-1\"\n",
+            table.as_str(),
+        ),
         (
             "endpoint = \"http://s3.example.internal\"\nregion = \"us-east-1\"\nbucket = \"b-1\"\n",
             "`snapshot.endpoint`: must be an https:// URL: TLS is required unless the host is loopback",

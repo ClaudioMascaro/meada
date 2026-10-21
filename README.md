@@ -273,7 +273,7 @@ variáveis ou dos arquivos que a seção nomeia (nunca do manifesto); `web-ident
 `pod-identity` (EKS Pod Identity) chama o agente em `AWS_CONTAINER_CREDENTIALS_FULL_URI`, só
 `http://169.254.170.23` ou `http://[fd00:ec2::23]`, com o token de
 `AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`; `instance` usa o serviço de metadados da instância
-(IMDSv2, `http://169.254.169.254`) e só quando escrito na seção. As credenciais ficam só em
+(IMDSv2, só por IPv4, `http://169.254.169.254`) e só quando escrito na seção. As credenciais ficam só em
 memória, e nenhum segredo aparece num erro.
 
 ## Decisões

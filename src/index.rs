@@ -2493,4 +2493,45 @@ mod tests {
         }
         let _ = fs::remove_dir_all(&dir);
     }
+
+    /// The same for the documents of a `[serve]` table: one found by name or listed in
+    /// `serve.documents`, edited, added or removed, is a difference.
+    #[cfg(feature = "snapshot")]
+    #[test]
+    fn fresh_sees_an_edited_added_or_removed_document() {
+        use super::{fresh, refresh};
+        let (dir, index) = index_dir("fresh_documents");
+        let root = checkout(&dir);
+        let spec = |title: &str| format!("openapi: 3.0.0\ninfo:\n  title: {title}\npaths: {{}}\n");
+        fs::write(root.join("openapi.yaml"), spec("web")).unwrap();
+        fs::create_dir_all(root.join("docs")).unwrap();
+        let serve = Serve {
+            declared: true,
+            documents: vec!["docs/api.yaml".into()],
+            ..Serve::default()
+        };
+        let index_now = || {
+            let db = open(&index, &root, REPO, &serve).unwrap();
+            refresh(&db, &root, REPO, &serve).unwrap();
+        };
+        let is_fresh = || fresh(&read(&index).unwrap(), &root, REPO, &serve).unwrap();
+        index_now();
+        assert!(is_fresh());
+        let edits: [(&str, Option<String>); 4] = [
+            ("openapi.yaml", Some(spec("site"))),
+            ("docs/api.yaml", Some(spec("api"))),
+            ("docs/api.yaml", None),
+            ("openapi.yaml", None),
+        ];
+        for (file, content) in edits {
+            match &content {
+                Some(content) => fs::write(root.join(file), content).unwrap(),
+                None => fs::remove_file(root.join(file)).unwrap(),
+            }
+            assert!(!is_fresh(), "{file} {content:?}");
+            index_now();
+            assert!(is_fresh(), "{file} {content:?} indexed");
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
 }

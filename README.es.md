@@ -281,7 +281,7 @@ secreto de las variables o los archivos que nombra la sección (nunca del manifi
 con STS en la `region`, por https; `pod-identity` (EKS Pod Identity) llama al agente en
 `AWS_CONTAINER_CREDENTIALS_FULL_URI`, solo `http://169.254.170.23` o `http://[fd00:ec2::23]`,
 con el token de `AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`; `instance` usa el servicio de metadatos
-de la instancia (IMDSv2, `http://169.254.169.254`), y solo cuando la sección lo indica. Las
+de la instancia (IMDSv2, solo por IPv4, `http://169.254.169.254`), y solo cuando la sección lo indica. Las
 credenciales quedan solo en memoria, y ningún secreto aparece en un error.
 
 ## Decisiones

@@ -4,7 +4,6 @@
 //! password comes only from the environment variable or the file the section names; it
 //! appears in no error and on no stderr line.
 
-use std::io::Read;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -144,27 +143,11 @@ impl Config {
     }
 }
 
-/// The content of the regular file `path`, at most `max` bytes. It reads on a blocking thread,
-/// so a slow mount stalls no timeout, and refuses what is not a regular file (a FIFO would
-/// block the open for ever).
+/// `config::read_bounded` on a blocking thread, so a slow mount stalls no timeout.
 async fn read_file(path: &Path, max: u64) -> Result<Vec<u8>, String> {
     let path = path.to_path_buf();
     let shown = path.display().to_string();
-    let read = move || -> Result<Vec<u8>, String> {
-        let problem = |e: std::io::Error| format!("{}: {}", path.display(), e.kind());
-        if !std::fs::metadata(&path).map_err(problem)?.is_file() {
-            return Err(format!("{}: not a regular file", path.display()));
-        }
-        let mut bytes = Vec::new();
-        let file = std::fs::File::open(&path).map_err(problem)?;
-        file.take(max + 1)
-            .read_to_end(&mut bytes)
-            .map_err(problem)?;
-        match bytes.len() as u64 > max {
-            true => Err(format!("{}: larger than {max} bytes", path.display())),
-            false => Ok(bytes),
-        }
-    };
+    let read = move || crate::config::read_bounded(&path, max);
     tokio::task::spawn_blocking(read)
         .await
         .unwrap_or(Err(shown))

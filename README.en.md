@@ -270,7 +270,7 @@ secret from the variables or files the section names (never from the manifest); 
 `region`, over https; `pod-identity` (EKS Pod Identity) calls the agent in
 `AWS_CONTAINER_CREDENTIALS_FULL_URI`, only `http://169.254.170.23` or `http://[fd00:ec2::23]`,
 with the token in `AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`; `instance` uses the instance
-metadata service (IMDSv2, `http://169.254.169.254`), and only when the section says so.
+metadata service (IMDSv2 over IPv4 only, `http://169.254.169.254`), and only when the section says so.
 Credentials stay in memory, and no secret appears in an error.
 
 ## Decisions

@@ -204,6 +204,8 @@ pub enum Msg<'a> {
     #[cfg(feature = "snapshot")]
     SnapshotEndpointPlain,
     #[cfg(feature = "snapshot")]
+    SnapshotPathStyle,
+    #[cfg(feature = "snapshot")]
     SnapshotRegion,
     #[cfg(feature = "snapshot")]
     SnapshotBucket,
@@ -671,6 +673,15 @@ impl Msg<'_> {
             Msg::SnapshotEndpointPlain => pick(
                 "must be an https:// URL: TLS is required unless the host is loopback".into(),
                 "deve ser uma URL https://: TLS é obrigatório, salvo em loopback".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotPathStyle => pick(
+                "must be true for an http://, IP or localhost endpoint: the bucket cannot go in \
+                 front of that host"
+                    .into(),
+                "deve ser true para um endpoint http://, IP ou localhost: o bucket não pode ir à \
+                 frente desse host"
+                    .into(),
             ),
             #[cfg(feature = "snapshot")]
             Msg::SnapshotRegion => pick(
