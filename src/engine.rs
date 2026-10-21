@@ -641,8 +641,9 @@ impl Engine {
     fn context_fresh(&self, symbol: &str, budget: Option<usize>, retry: bool) -> Result<String> {
         let exports = self.exports()?;
         let repos = &self.workspace.repos;
-        // A contract listed by its sides, as `search` prints it; a route by its providers, which
-        // the linked consumers that read fields follow (`View`).
+        // A contract listed by its sides, as `search` prints it. One its kind lists by its
+        // providers alone (its consumers are calls) is followed by the linked consumers that
+        // read fields of the carried shape, with their drift, placed at their call (`View`).
         let contract = contract::typed(symbol);
         if let Some(kind) = contract::kind_of(contract)
             && let Some(view) = kind.view(contract)
