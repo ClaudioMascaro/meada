@@ -2,8 +2,7 @@
 //! value `http::drift` sets on `Link::drift` and computes no drift of its own; to place each
 //! consumer it reads the exports' consumer shapes and finds the consumer's call.
 
-use crate::contract::{Hit, Level, Link};
-use crate::http;
+use crate::contract::{self, Hit, Level, Link};
 use crate::index::Export;
 use crate::render::{Files, label, rank};
 use crate::shape::{Drift, shown};
@@ -105,7 +104,9 @@ pub(crate) fn consumers(repos: &[Repository], entries: &[Entry], contract: &str)
 pub(crate) fn matches(repos: &[Repository], entries: &[Entry], needle: &str) -> Vec<Hit> {
     let mut hits = Vec::new();
     for e in entries {
-        let route = http::route(&e.link.contract).map_or("", |(_, path)| path);
+        // The part `search` ranks a route against: its path alone, pinned by the HTTP test
+        // `a_route_ranks_against_its_path_alone`.
+        let route = contract::parts(&e.link.contract).1.unwrap_or("");
         for (path, level) in e.drift.iter().flat_map(|d| &d.missing) {
             let names = [route.to_lowercase(), path.to_lowercase()];
             let Some(r) = names.iter().filter_map(|n| rank(n, needle)).min() else {

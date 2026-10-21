@@ -172,7 +172,10 @@ impl Search {
     }
 }
 
-/// How `context` lists a contract of a kind.
+/// How `context` lists a contract of a kind. A contract its kind lists by its providers alone
+/// (`consumer` is `None`: its consumers are calls that `trace` and the `contracts:` of their
+/// symbols show) is followed by the linked consumers that read fields of the carried shape, with
+/// their drift, placed at their call; a contract listed by two named sides is not (`follows_drift`).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct View {
     /// The word for a provider side: `writer`, `producer`, `provider`.
@@ -182,8 +185,13 @@ pub struct View {
     pub consumer: Option<&'static str>,
     /// What a side's shape carries: `response` for a route, `payload` for the rest.
     pub carried: &'static str,
-    /// Whether the linked consumers that read fields follow the sides (the drift view).
-    pub drift: bool,
+}
+
+impl View {
+    /// Whether the linked consumers that read fields follow the providers (the drift view).
+    pub fn follows_drift(&self) -> bool {
+        self.consumer.is_none()
+    }
 }
 
 /// A side that reaches a contract through another name, for `context` to list after the sides
@@ -318,7 +326,6 @@ pub trait ContractKind {
             provider,
             consumer: Some(consumer),
             carried: "payload",
-            drift: false,
         })
     }
 
@@ -630,8 +637,8 @@ mod tests {
         assert!(searched("http").is_none());
     }
 
-    /// A kind with two named sides is viewed by both, their shape a `payload`, with no drift;
-    /// a kind with no sides has no view.
+    /// A kind with two named sides is viewed by both, their shape a `payload`; a kind with no
+    /// sides has no view.
     #[test]
     fn a_kind_with_sides_is_viewed_by_both_and_one_without_has_no_view() {
         let channel = Channel.view("channel::kafka::orders.created").unwrap();
@@ -639,7 +646,6 @@ mod tests {
             provider: "producer",
             consumer: Some("consumer"),
             carried: "payload",
-            drift: false,
         };
         assert_eq!(channel, expected);
         let resource = Resource.view("resource::postgres::orders").unwrap();
