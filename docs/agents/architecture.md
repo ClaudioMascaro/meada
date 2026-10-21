@@ -15,9 +15,10 @@ connection as `peer<n>`. Locally the index is the checkout's own `.meada/index.d
 then manifest order, nothing discovered) and each index lives at
 `<index_dir>/<identity>/index.db`; `engine::index_workspace` and `engine::status_workspace`
 are `meada index --workspace` and `meada status --workspace`. An engine opened from a
-manifest opens every index read-only (`index::open_read`, `index::attach_read`: nothing created,
-a commit in progress waited for up to a busy timeout) and its `refresh()` does nothing, so only
-`meada index --workspace` writes; `open_manifest` is also what `meada export --workspace --repo`
+manifest opens every index read-only on one connection (`index::open_read`: nothing created,
+one read transaction held until the engine drops, so an answer sees each index as one commit left
+it and a commit waits for the answer, both up to a busy timeout) and its `refresh()` does
+nothing, so only `meada index --workspace` writes; `open_manifest` is also what `meada export --workspace --repo`
 opens. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` first, then
 reads each index through `index::export`, adds the contracts each `meada.toml` declares
 (`ContractKind::declare`), derives **links** from both, and renders.

@@ -273,6 +273,8 @@ impl Manifest {
                 continue;
             };
             let index = dir.display().to_string();
+            // Not served, so nothing of it is ignored either.
+            listed.ignored.clear();
             listed.repository = Err(Msg::IndexInMirror {
                 index: &index,
                 mirror,

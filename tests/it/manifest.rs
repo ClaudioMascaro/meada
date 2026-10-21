@@ -298,10 +298,14 @@ fn each_unservable_entry_is_refused_and_the_others_are_still_indexed() {
     let toml = [
         "index_dir = \"../chain-web/./x/..\"\n".to_string(),
         entry("example.com/chain/web", "../chain-web"),
+        // Overridden by the web mirror's own `meada.toml`, but the web is not served at all.
+        "\n[repository.serve]\nprefix = \"/edge\"\n".to_string(),
         entry("example.com/chain/catalog", "../chain-catalog"),
     ]
     .concat();
     write_manifest(&dir, &toml);
+    let (status, _, _) = run(&dir, "status");
+    assert!(!status.contains("manifest block ignored"), "{status}");
     let (_, stderr, code) = run_code(&dir, "index");
     assert_eq!(code, Some(1));
     assert_eq!(

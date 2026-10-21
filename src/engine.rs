@@ -9,7 +9,7 @@ use rusqlite::Connection;
 use crate::contract::{self, ContractKind, Hit, KINDS, Level, Link, Role, Search, View};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
 use crate::entry::{self, EntryPoint};
-use crate::index::{Export, State, Symbol};
+use crate::index::{Export, State, Symbol, schema};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::Msg;
 use crate::render::{
@@ -44,8 +44,10 @@ impl Engine {
     /// Opens the workspace the manifest at `manifest` lists (server mode, ADR 0011), `repo`
     /// first, for one answer: every index lives under the manifest's `index_dir`, keyed by
     /// identity, and is opened read-only. Nothing is stat'ed, refreshed, created or written;
-    /// only `meada index --workspace` writes. A missing index, one of another schema, or one a
-    /// commit in progress locks past the busy timeout is an error naming the repository.
+    /// only `meada index --workspace` writes. One read transaction lasts as long as the engine,
+    /// so open one per answer: it reads each index as one commit left it, and a commit waits
+    /// for it. A missing or unreadable index, or one a commit in progress locks past the busy
+    /// timeout, is an error naming the repository (`index::open_read`).
     pub fn open_manifest(manifest: &Path, repo: &str) -> Result<Self> {
         Self::read(Manifest::read(manifest)?.workspace(repo)?, manifest)
     }
@@ -54,11 +56,11 @@ impl Engine {
     fn read(workspace: Workspace, manifest: &Path) -> Result<Self> {
         fits(&workspace)?;
         let manifest = manifest.display().to_string();
+        let repos: Vec<(&Path, &str)> = (workspace.repos.iter())
+            .map(|r| (r.index.as_path(), r.identity.as_str()))
+            .collect();
+        let db = index::open_read(&repos, &manifest)?;
         let here = &workspace.repos[0];
-        let db = index::open_read(&here.index, &here.identity, &manifest)?;
-        for (n, peer) in workspace.repos.iter().enumerate().skip(1) {
-            index::attach_read(&db, &schema(n), &peer.index, &peer.identity, &manifest)?;
-        }
         Ok(Self {
             db,
             root: here.root.clone(),
@@ -1089,6 +1091,7 @@ fn state_text(state: State, other: Msg) -> String {
     match state {
         State::Missing => Msg::NotIndexed.text(),
         State::OtherSchema => other.text(),
+        State::Locked => Msg::StateLocked.text(),
         State::Indexed { files } => Msg::Indexed(files).text(),
     }
 }
@@ -1147,15 +1150,6 @@ fn fits(workspace: &Workspace) -> Result<()> {
         .into());
     }
     Ok(())
-}
-
-/// The schema a workspace repository's index is attached as.
-fn schema(n: usize) -> String {
-    if n == 0 {
-        "main".into()
-    } else {
-        format!("peer{n}")
-    }
 }
 
 /// `to` as a path from `from`, with `/` separators: `.`, `../api`.

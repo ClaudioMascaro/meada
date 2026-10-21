@@ -50,6 +50,11 @@ pub enum Msg<'a> {
         repo: &'a str,
         manifest: &'a str,
     },
+    StateLocked,
+    IndexInterrupted {
+        repo: &'a str,
+        manifest: &'a str,
+    },
     IndexLocked {
         repo: &'a str,
         index: &'a str,
@@ -299,6 +304,20 @@ impl Msg<'_> {
                 format!(
                     "{repo}: indexado por outra versão; rode meada index --workspace {manifest}"
                 ),
+            ),
+            Msg::IndexInterrupted { repo, manifest } => pick(
+                format!(
+                    "{repo}: its index holds an interrupted commit; run meada index --workspace \
+                     {manifest}"
+                ),
+                format!(
+                    "{repo}: seu índice guarda um commit interrompido; rode meada index \
+                     --workspace {manifest}"
+                ),
+            ),
+            Msg::StateLocked => pick(
+                "locked by a commit in progress past the busy timeout".into(),
+                "travado por um commit em andamento além do tempo de espera".into(),
             ),
             Msg::IndexLocked {
                 repo,
