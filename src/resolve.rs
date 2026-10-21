@@ -2108,12 +2108,10 @@ struct Fold<'a> {
 // the limit have no origin.
 pub const FLUENT_CHAIN: usize = 1024;
 
-/// Where a builder chain stops (`Code::chain_tail`): the call, whether a step above it was
-/// found only by a name match, and how many steps lead to it.
+/// Where a builder chain stops (`Code::chain_tail`): the call and how many steps lead to it.
 #[derive(Clone, Copy)]
 struct Tail {
     stop: usize,
-    matched: bool,
     depth: usize,
 }
 
@@ -2128,16 +2126,40 @@ enum Flow<'a> {
 /// What `Code::origins` carries along: `frames` bind the parameters of the functions whose
 /// return values are being followed, innermost last; `busy` is what is being followed, met
 /// again only through a cycle; `out` holds the origins found, each with its routes.
-#[derive(Default)]
 struct Trail<'a> {
     frames: Vec<Frame<'a>>,
     busy: Vec<Flow<'a>>,
     out: BTreeMap<(&'a str, usize), BTreeSet<Route<'a>>>,
     /// The methods of the builder chains being followed, outermost first, which the library
-    /// they start at must pass through (`LanguagePack::passes`).
+    /// they start at must pass through (`Follow::Values::passes`).
     steps: Vec<&'a str>,
     /// The constant the asked name or value refers to, while the walk is inside it.
     held: Option<(&'a str, &'a str)>,
+    /// What the question says the library passes on: the outside name of a constructor and a
+    /// method name.
+    passes: Passes,
+}
+
+impl<'a> Trail<'a> {
+    fn new(passes: Passes) -> Self {
+        Self {
+            frames: Vec::new(),
+            busy: Vec::new(),
+            out: BTreeMap::new(),
+            steps: Vec::new(),
+            held: None,
+            passes,
+        }
+    }
+}
+
+/// Whether a method, called on what the outside constructor named by the first argument
+/// (`axum.Router.new`) made, hands back that same object (`Follow::Values`).
+pub type Passes = fn(origin: &str, method: &str) -> bool;
+
+/// The table of a reader whose pack is not fluent: it never answers, and the walk never asks.
+pub fn passes_nothing(_origin: &str, _method: &str) -> bool {
+    false
 }
 
 /// A struct field (`Code::field`): the file and the type that declare it, and its name.
@@ -2203,14 +2225,14 @@ pub enum Of<'a> {
 
 /// The evidence `Code::origins` accepts, which picks the walk. Each walk is its own, reads its
 /// own facts and charges what it reads.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum Follow {
     /// The value flow: constants and imports, the arguments exact callers pass to parameters,
     /// what functions of the repository return, list items, a class attribute assigned once,
     /// and in a fluent pack a builder chain down its receivers, kept only through methods the
-    /// library passes on (`LanguagePack::passes`). Charged to `EVAL_BUDGET`, at most
-    /// `EVAL_DEPTH` deep.
-    Values,
+    /// reader's table `passes` on (`Passes`; a pack that is not fluent never consults it).
+    /// Charged to `EVAL_BUDGET`, at most `EVAL_DEPTH` deep.
+    Values { passes: Passes },
     /// `const` bindings alone, through `new`, calls and the heads of callees, at most
     /// `EVAL_DEPTH` constants deep: a parameter or a return value has no origin.
     Constants,
@@ -2327,8 +2349,8 @@ impl<'a> Code<'a> {
         follow: Follow,
     ) -> Vec<Origin<'a>> {
         match follow {
-            Follow::Values => {
-                let mut trail = Trail::default();
+            Follow::Values { passes } => {
+                let mut trail = Trail::new(passes);
                 match of {
                     Of::Name(name) => self.flow_name(path, scope, name, &mut trail),
                     Of::Value(value) => self.flow(path, scope, value, &mut trail),
@@ -2903,21 +2925,20 @@ impl<'a> Code<'a> {
                 };
                 // A builder chain (`Router::new().route(..).nest(..)`) is the value it started
                 // from, down to the call that starts it or that a function of the repository
-                // answers. A step only a name match found must start at an outside constructor,
-                // whose method it is then (a method of the library wins over a name).
-                let tail = match self.pack.fluent() {
+                // answers. The filter below judges the origins this chain found by the methods
+                // it went through, and those alone.
+                let fluent = self.pack.fluent();
+                let tail = match fluent {
                     true => self.chain_tail(path, index),
                     false => Some(Tail {
                         stop: index,
-                        matched: false,
                         depth: 0,
                     }),
                 };
-                let Some(Tail { stop, matched, .. }) = tail else {
+                let Some(Tail { stop, .. }) = tail else {
                     return;
                 };
-                let fluent = self.pack.fluent();
-                let kept = (matched || fluent).then(|| std::mem::take(&mut trail.out));
+                let kept = fluent.then(|| std::mem::take(&mut trail.out));
                 let mark = trail.steps.len();
                 if fluent {
                     self.chain_steps(path, index, &mut trail.steps);
@@ -2925,29 +2946,23 @@ impl<'a> Code<'a> {
                 self.flow_from(path, stop, trail);
                 if fluent {
                     // The methods the chain went through hand back the object they were called
-                    // on only for the library the chain starts at (`LanguagePack::passes`): a
-                    // value derived from a client (`resp.headers()`) is not a client.
-                    // An origin filtered out goes with every route this chain found to it.
+                    // on only for the library the chain starts at (the question's `passes`):
+                    // a value derived from a client (`resp.headers()`) is not a client. An
+                    // origin with no outside name, one a repository function or a name match
+                    // answered, does not survive a step above it. An origin filtered out goes
+                    // with every route this chain found to it.
                     let steps = trail.steps.split_off(mark);
                     trail.out.retain(|&(p, n), _| {
                         let call = &self.resolver.files[p].calls[n];
                         match self.outside(p, &call.scope, &call.callee, call.by_path) {
-                            Some(o) => steps.iter().all(|m| self.pack.passes(&o.spelled, m)),
+                            Some(o) => steps.iter().all(|m| (trail.passes)(&o.spelled, m)),
                             None => steps.is_empty(),
                         }
                     });
                 }
                 if let Some(mut kept) = kept {
-                    let outside = !matched
-                        || (trail.out.keys()).all(|&(p, n)| {
-                            let call = &self.resolver.files[p].calls[n];
-                            self.outside(p, &call.scope, &call.callee, call.by_path)
-                                .is_some()
-                        });
-                    if outside {
-                        for (origin, routes) in std::mem::take(&mut trail.out) {
-                            kept.entry(origin).or_default().extend(routes);
-                        }
+                    for (origin, routes) in std::mem::take(&mut trail.out) {
+                        kept.entry(origin).or_default().extend(routes);
                     }
                     trail.out = kept;
                 }
@@ -3050,7 +3065,7 @@ impl<'a> Code<'a> {
     /// call. Each call is walked once, whatever the chain.
     fn chain_tail(&self, path: &'a str, index: usize) -> Option<Tail> {
         let calls = &self.resolver.files[path].calls;
-        let mut walked: Vec<(usize, bool)> = Vec::new();
+        let mut walked: Vec<usize> = Vec::new();
         let mut at = index;
         let mut tail = loop {
             if let Some(&known) = self.chains.borrow().get(&(path, at)) {
@@ -3061,24 +3076,19 @@ impl<'a> Code<'a> {
                 matches!(&resolution, Resolution::Exact(t) if !self.resolver.is_class(*t));
             match (self.receiver(path, at), answered) {
                 (Some(Value::Call(next)), false) => {
-                    walked.push((at, !matches!(resolution, Resolution::Unresolved)));
+                    walked.push(at);
                     match call_at(calls, &next.range) {
                         Some(next) => at = next,
                         None => break None,
                     }
                 }
                 _ => {
-                    break Some(Tail {
-                        stop: at,
-                        matched: false,
-                        depth: 0,
-                    });
+                    break Some(Tail { stop: at, depth: 0 });
                 }
             }
         };
-        for &(step, matched) in walked.iter().rev() {
+        for &step in walked.iter().rev() {
             tail = tail.filter(|t| t.depth < FLUENT_CHAIN).map(|t| Tail {
-                matched: t.matched || matched,
                 depth: t.depth + 1,
                 ..t
             });
@@ -4307,7 +4317,14 @@ mod tests {
             assert_eq!(code.type_params("a.py", name), ["T"]);
             assert!(code.param_defaults_to("a.py", name, "x", "d"));
             assert_eq!(code.returned("a.py", i).len(), 1);
-            let found = code.origins("a.py", "", Of::Value(&invoked[i]), Follow::Values);
+            let found = code.origins(
+                "a.py",
+                "",
+                Of::Value(&invoked[i]),
+                Follow::Values {
+                    passes: passes_nothing,
+                },
+            );
             assert!(found.is_empty());
         }
         // Each function was looked up among the file's definitions one by one, for its return
@@ -4345,8 +4362,15 @@ mod tests {
             assert!(code.constant_type("a.py", name).is_none());
             assert!(code.declared_type("a.py", "", name).is_none());
             assert!(
-                code.origins("a.py", "", Of::Name(name), Follow::Values)
-                    .is_empty()
+                code.origins(
+                    "a.py",
+                    "",
+                    Of::Name(name),
+                    Follow::Values {
+                        passes: passes_nothing
+                    },
+                )
+                .is_empty()
             );
         }
         // Each constant was looked up among the file's constants one by one, for its value, its
@@ -5019,7 +5043,14 @@ mod tests {
         let resolver = Resolver::new(&files, modules, &Python);
         let code = Code::new(&resolver, &files, &Python);
         (code
-            .origins("a.py", "", Of::Name("p"), Follow::Values)
+            .origins(
+                "a.py",
+                "",
+                Of::Name("p"),
+                Follow::Values {
+                    passes: passes_nothing,
+                },
+            )
             .into_iter())
         .map(|o| facts.calls[o.call.unwrap().1].callee.clone())
         .collect()
@@ -5535,7 +5566,12 @@ mod tests {
     ) -> Vec<String> {
         over(pack, sources, |code| {
             let path = code.files().get_key_value(path).unwrap().0;
-            let found = code.origins(path, scope, Of::Name(name), Follow::Values);
+            let found = code.origins(
+                path,
+                scope,
+                Of::Name(name),
+                Follow::Values { passes: UNION },
+            );
             origin_lines(code, sources, found, Shown::Nothing)
         })
     }
@@ -5550,7 +5586,12 @@ mod tests {
     ) -> Vec<String> {
         over(pack, sources, |code| {
             let path = code.files().get_key_value(path).unwrap().0;
-            let found = code.origins(path, scope, Of::Name(name), Follow::Values);
+            let found = code.origins(
+                path,
+                scope,
+                Of::Name(name),
+                Follow::Values { passes: UNION },
+            );
             origin_lines(code, sources, found, Shown::All)
         })
     }
@@ -5563,20 +5604,34 @@ mod tests {
         (call.scope.as_str(), &call.args[0])
     }
 
-    /// The `Values` origins of the value written as the argument of `probe(..)` in `path`, as
-    /// `origin_lines` shows them.
+    /// The table the Rust readers pass the question: the frameworks and the brokers together.
+    const UNION: Passes = crate::lang::rust::passes;
+
+    /// The `Values` origins of the value written as the argument of `probe(..)` in `path`, asked
+    /// with the table `passes`, as `origin_lines` shows them.
+    fn probe_passing(
+        pack: &'static dyn LanguagePack,
+        sources: &[(&'static str, &str)],
+        path: &'static str,
+        shown: Shown,
+        passes: Passes,
+    ) -> Vec<String> {
+        over(pack, sources, |code| {
+            let path = code.files().get_key_value(path).unwrap().0;
+            let (scope, value) = probed(code, path);
+            let found = code.origins(path, scope, Of::Value(value), Follow::Values { passes });
+            origin_lines(code, sources, found, shown)
+        })
+    }
+
+    /// `probe_passing` with the Rust readers' table.
     fn probe_lines(
         pack: &'static dyn LanguagePack,
         sources: &[(&'static str, &str)],
         path: &'static str,
         shown: Shown,
     ) -> Vec<String> {
-        over(pack, sources, |code| {
-            let path = code.files().get_key_value(path).unwrap().0;
-            let (scope, value) = probed(code, path);
-            let found = code.origins(path, scope, Of::Value(value), Follow::Values);
-            origin_lines(code, sources, found, shown)
-        })
+        probe_passing(pack, sources, path, shown, UNION)
     }
 
     /// What the value written as the argument of `probe(..)` in `path` may hold.
@@ -5943,6 +5998,27 @@ mod tests {
     }
 
     // Values in a fluent pack (Rust builders).
+
+    #[test]
+    fn two_tables_over_one_file_each_keep_only_their_own_chains() {
+        // One function returns an axum chain or an actix-web one. Each question carries one
+        // library's table, test-local, and keeps only that library's chain.
+        fn axum_table(origin: &str, method: &str) -> bool {
+            origin.starts_with("axum.") && method == "layer"
+        }
+        fn actix_table(origin: &str, method: &str) -> bool {
+            origin.starts_with("actix_web.") && method == "service"
+        }
+        let src = "use axum::Router;\nuse actix_web::App;\n\
+                   fn make(f: bool) -> Router {\n    \
+                   if f { return Router::new().layer(l); }\n    App::new().service(s)\n}\n\
+                   fn main() {\n    probe(make(true));\n}\n";
+        let sources = [("main.rs", src)];
+        let asked = |passes| probe_passing(rust(), &sources, "main.rs", Shown::Nothing, passes);
+        assert_eq!(asked(axum_table), ["main.rs Router.new = axum.Router.new"]);
+        assert_eq!(asked(actix_table), ["main.rs App.new = actix_web.App.new"]);
+        assert_eq!(asked(passes_nothing), Vec::<String>::new());
+    }
 
     /// A `main.rs` with `defs` at the top and `body` in `main`, which ends by probing `r`.
     fn axum_main(defs: &str, body: &str) -> String {

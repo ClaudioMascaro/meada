@@ -351,9 +351,14 @@ impl<'c, 'a> Go<'c, 'a> {
     /// reached through the exact callers that pass the parameter on (`users(r)`) and the names
     /// that hold it (`sub := r`).
     fn places(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Vec<Place<'a>> {
-        let origins = self
-            .code
-            .origins(path, scope, Of::Value(value), Follow::Values);
+        let origins = self.code.origins(
+            path,
+            scope,
+            Of::Value(value),
+            Follow::Values {
+                passes: crate::resolve::passes_nothing,
+            },
+        );
         let mut places: Vec<Place> = origins
             .into_iter()
             .filter_map(|o| o.call)

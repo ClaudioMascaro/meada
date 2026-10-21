@@ -185,14 +185,14 @@ modules updates it.
   it). `lang::channel_name` and `lang::queue_name` evaluate a channel name and an SQS queue URL
   for both packs.
 - `lang/rust/frameworks.rs` (`FRAMEWORKS`): per object of axum, actix-web, Rocket, reqwest and
-  ureq, the outside names of its constructors and the methods that hand it back; `RustPack::passes`
+  ureq, the outside names of its constructors and the methods that hand it back; `lang::rust::passes`
   reads it (else `messages::passes`) and the HTTP kind asks it what a constructor makes
   (`frameworks::made`). `VERBS` (the `Method` constants) lives there too.
 - Rust message forms live in `lang/rust/messages.rs`, beside the TS and Python ones and without
   a parallel path into `channel.rs`. The `LIBRARIES` table names each crate's constructors
   (suffix-matched on `Code::outside`, without the path flag, over the constructor the
   `Follow::Values` origin reached) and the methods that hand back the same object
-  (`passes`, which `RustPack::passes` falls through to, so `flow` follows `set`, `create_channel`,
+  (`passes`, which `lang::rust::passes` falls through to, so `flow` follows `set`, `create_channel`,
   `connect` and the like). Forms: rdkafka `send` of a `FutureRecord::to(topic)` or
   `BaseRecord::to(topic)` (the record is found from the argument, down its chain) and
   `subscribe(&[topics])`, on a client from `ClientConfig::new()`; lapin `basic_publish`,

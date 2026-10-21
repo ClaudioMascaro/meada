@@ -55,6 +55,17 @@ const PATH_DEPTH: usize = 256;
 
 const MAIN: &str = "main";
 
+/// Whether `method`, called on what the outside constructor `origin` (`axum.Router.new`) made,
+/// hands back that same object: the web framework table and the broker table together, which
+/// the readers of Rust ask the value flow with. A method not listed (`headers()` of a response,
+/// `json()`, a method of a trait the repository defines) makes a different value.
+pub(crate) fn passes(origin: &str, method: &str) -> bool {
+    match frameworks::made(origin) {
+        Some(made) => frameworks::passes(made).contains(&method),
+        None => messages::passes(origin, method),
+    }
+}
+
 /// The attributes that register the function they sit on as a route, in actix-web and Rocket:
 /// `#[get("/x")]` and its kin, and actix-web's `#[route("/x", method = "GET")]`. The pack emits
 /// them as calls that decorate the function (`Call::decorates`); any other attribute is not a
@@ -112,13 +123,6 @@ impl LanguagePack for Rust {
 
     fn strict(&self) -> bool {
         true
-    }
-
-    fn passes(&self, origin: &str, method: &str) -> bool {
-        match frameworks::made(origin) {
-            Some(made) => frameworks::passes(made).contains(&method),
-            None => messages::passes(origin, method),
-        }
     }
 
     fn modules(

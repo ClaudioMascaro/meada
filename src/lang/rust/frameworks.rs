@@ -1,7 +1,7 @@
 //! The web frameworks and HTTP clients the Rust pack knows (spec #30), one entry per object, as
 //! `messages.rs` lists the brokers: what makes the object outside the repository (the name the
 //! `use` declarations give the call) and the methods that hand that same object back. The value
-//! flow reads the methods through `LanguagePack::passes`; the HTTP kind (`http/rust/axum.rs` for
+//! flow reads the methods through the pack's `passes` table, which its readers hand the question; the HTTP kind (`http/rust/axum.rs` for
 //! axum, `http/rust.rs` for actix-web and Rocket) reads what a constructor makes through `made`.
 
 /// What an object of a framework or a client library is.
@@ -232,18 +232,17 @@ pub(crate) fn passes(made: Made) -> &'static [&'static str] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lang::LanguagePack;
-    use crate::lang::rust::Rust;
+    use crate::lang::rust::passes as union;
 
     #[test]
     fn what_a_constructor_makes_passes_the_methods_of_that_object_alone() {
         assert_eq!(made("actix_web.App.default"), Some(Made::App));
-        assert!(Rust.passes("actix_web.App.default", "service"));
-        assert!(!Rust.passes("actix_web.App.default", "guard"));
+        assert!(union("actix_web.App.default", "service"));
+        assert!(!union("actix_web.App.default", "guard"));
         // A name of the crate that constructs nothing passes nothing.
         assert_eq!(made("actix_web.App.into_service"), None);
-        assert!(!Rust.passes("actix_web.App.into_service", "service"));
-        assert!(Rust.passes("reqwest.blocking.Client.builder", "timeout"));
-        assert!(!Rust.passes("reqwest.get", "timeout"));
+        assert!(!union("actix_web.App.into_service", "service"));
+        assert!(union("reqwest.blocking.Client.builder", "timeout"));
+        assert!(!union("reqwest.get", "timeout"));
     }
 }
