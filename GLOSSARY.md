@@ -22,8 +22,9 @@ _Avoid_: snippet, line range
 
 **Language pack**:
 What Meada knows about one language: the file extensions it handles and the tree-sitter
-queries that read what one file defines, imports, exports and calls, and the producer and
-consumer calls of the message libraries it knows. It never touches the index. A pack is done when it passes the conformance suite over its fixture.
+queries that read what one file defines, imports, exports and calls. It holds syntax and value
+evaluation only: no table of libraries and no form of one (those belong to the contract kinds).
+It never touches the index. A pack is done when it passes the conformance suite over its fixture.
 _Avoid_: plugin, parser, grammar
 
 **Language adapter**:
@@ -90,6 +91,8 @@ _Avoid_: interface, integration
 
 **Contract kind**:
 A category of contract with its own matching rules, such as HTTP route, channel or package.
+A kind owns the library forms it reads in each language (the web frameworks and clients of HTTP,
+the broker clients of channels), one module per language.
 _Avoid_: contract type, protocol
 
 **Package ecosystem**:

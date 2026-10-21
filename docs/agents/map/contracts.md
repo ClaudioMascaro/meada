@@ -128,7 +128,7 @@ modules updates it.
   object is nothing. Rust clients (spec #30 #131) are the same code with two more `LIBRARIES`
   entries: `reqwest` (modules `reqwest` and `reqwest.blocking`; clients `Client::new`,
   `Client::builder()`, `ClientBuilder::new` and the `blocking` equivalents, a builder chain
-  followed to its constructor by `fluent`, and every method on the way listed by `passes` (the table the reader hands the question):
+  followed to its constructor by `fluent`, and every method on the way listed by `passes_on` (the table of `http/rust/frameworks.rs`, which the reader hands the question):
   any other method on an outside value ends the chain) and `ureq` (module functions; clients `agent()`,
   `Agent::new*`, `AgentBuilder::new`). The receiver of a chain (`Client::new().get(..)`,
   `builder.build()?.get(..)`) is `Call::receiver`, read by `Code::origins` with `Follow::Values`. The method
@@ -170,7 +170,7 @@ modules updates it.
   the side: the `site` is the bare repository identity (no `::`), the **repository-level** side.
   `report` gives the status lines per repository: each unmatched `via`, the fallback to repository
   level, and a resource with no link in the workspace (unlinked). `channel.rs` (spec #20):
-  `extract` calls the four readers (`lang/{ts,python,rust,go}/messages.rs`), each answering for its own pack only (`code.pack().extensions()`), in that order; the message types and broker helpers live in `channel/message.rs`; a producer is a provider at its call site, a
+  `extract` calls the four readers (`channel/{ts,python,rust,go}.rs`), each answering for its own pack only (`code.pack().extensions()`), in that order; the message types and broker helpers live in `channel/message.rs`; a producer is a provider at its call site, a
   consumer a consumer at its handler (an inline handler is named `<broker> <names in order>`,
   such as `kafka orders.created`). `contract(broker, name)` is `channel::<broker>::<name>`, or
   `channel::<broker>` for an unresolved side (`channel::parse`, `Channel::unresolved`, and the seam's `shown`, which
