@@ -11,6 +11,9 @@ categories = ["development-tools", "command-line-utilities"]
 exclude = [".github/", "AGENTS.md", "CLAUDE.md", "dist-workspace.toml"]
 
 [dependencies]
+# The transport guard of the snapshot store (ADR 0012), only behind `snapshot`: object_store's
+# `HttpService` is an `async_trait`.
+async-trait = { version = "=0.1.92", optional = true }
 blake3 = "1.8.7"
 clap = { version = "4.6.7", features = ["derive"] }
 # The listener under rmcp's streamable HTTP server, which is a service with none (server mode).
@@ -19,6 +22,9 @@ hyper = { version = "1.9.0", features = ["server", "http1"] }
 hyper-util = { version = "0.1.21", features = ["tokio"] }
 ignore = "0.4.33"
 nodejs-semver = "7"
+# The snapshot store's S3 client (ADR 0012), only behind `snapshot`: no default features (no
+# local file store), the `aws` client over rustls.
+object_store = { version = "=0.14.2", optional = true, default-features = false, features = ["aws"] }
 percent-encoding = "2.3.2"
 # The Valkey client of the cloud modules (ADR 0012), only behind the internal `valkey` feature.
 # Default features off: no native-tls, only rustls.
@@ -27,6 +33,8 @@ redis = { version = "=1.7.1", optional = true, default-features = false, feature
     "cluster-async",
     "connection-manager",
 ] }
+# The HTTP client under object_store, built by the snapshot module itself: no redirect, no proxy.
+reqwest = { version = "=0.13.5", optional = true, default-features = false }
 rmcp = { version = "3.5.1", features = [
     "server",
     "macros",
@@ -37,6 +45,8 @@ rusqlite = { version = "0.40.2", features = ["bundled"] }
 schemars = "1.2.3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
+# The snapshot store's bundles (ADR 0012), only behind `snapshot`: no extended attributes.
+tar = { version = "=0.4.45", optional = true, default-features = false }
 toml = "1.1.8"
 tokio = { version = "1.53.3", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 tree-sitter = "0.27.1"
@@ -52,6 +62,7 @@ yaml-rust2 = { version = "0.13.0", default-features = false }
 # crates. `valkey` is internal, enabled through the modules that need it.
 [features]
 valkey = ["dep:redis"]
+snapshot = ["dep:object_store", "dep:reqwest", "dep:tar", "dep:async-trait"]
 
 # `cargo test` runs the example's own tests too.
 [[example]]

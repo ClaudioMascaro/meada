@@ -245,8 +245,9 @@ pub(crate) fn line_of(src: &str, at: usize) -> usize {
 }
 
 /// An error about the dotted `key` of `src`, the content of `file`, as `parse` words one: the
-/// file, the line of the key (of the file when the key is absent), the key and the message.
-#[cfg(feature = "valkey")]
+/// file, the line of the key (of its table when the key is absent, its default being the
+/// problem; of the file when neither is there), the key and the message.
+#[cfg(any(feature = "valkey", feature = "snapshot"))]
 pub(crate) fn error_at(
     file: &Path,
     src: &str,
@@ -257,16 +258,40 @@ pub(crate) fn error_at(
     if let Ok(table) = DeTable::parse(src) {
         flatten(table.get_ref(), "", &mut keys);
     }
-    let at = keys
-        .iter()
-        .find(|(name, _, _)| name == key)
-        .map_or(0, |(_, span, _)| span.start);
+    let start = |key: &str| {
+        let found = keys.iter().find(|(name, _, _)| name == key);
+        found.map(|(_, span, _)| span.start)
+    };
+    let at = start(key)
+        .or_else(|| start(crate::parent(key)))
+        .unwrap_or(0);
     format!(
         "{}:{}: `{key}`: {message}",
         file.display(),
         line_of(src, at)
     )
     .into()
+}
+
+/// The content of the regular file `path` a cloud module's section names (a secret, a CA), at
+/// most `max` bytes. What is not a regular file is refused before it is opened: a FIFO would
+/// block the open for ever.
+#[cfg(any(feature = "valkey", feature = "snapshot"))]
+pub(crate) fn read_bounded(path: &Path, max: u64) -> std::result::Result<Vec<u8>, String> {
+    use std::io::Read;
+    let problem = |e: std::io::Error| format!("{}: {}", path.display(), e.kind());
+    if !fs::metadata(path).map_err(problem)?.is_file() {
+        return Err(format!("{}: not a regular file", path.display()));
+    }
+    let mut bytes = Vec::new();
+    let file = fs::File::open(path).map_err(problem)?;
+    file.take(max + 1)
+        .read_to_end(&mut bytes)
+        .map_err(problem)?;
+    match bytes.len() as u64 > max {
+        true => Err(format!("{}: larger than {max} bytes", path.display())),
+        false => Ok(bytes),
+    }
 }
 
 /// The error message with the dotted key it is about.

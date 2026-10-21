@@ -233,7 +233,45 @@ to one writer per index.
 
 ### Cloud modules
 
-Opt-in modules, off by default; each is documented below when it lands.
+Opt-in modules, off by default; each is documented below when it lands. A module is a cargo
+feature plus one section of `meada.workspace.toml`; the release binaries are the default build,
+with none, and a section in a build without its feature is an error naming the feature.
+
+**Snapshot** (feature `snapshot`, `cargo install meada --features snapshot`). One job indexes
+and publishes; nodes receive the result whole, instead of each indexing its own mirrors. After
+`meada index --workspace`, which stays offline, the job runs
+`meada snapshot publish --workspace <manifest>`. It checks, reading only, that every index equals
+its mirror and every mirror is clean (`git status` lists nothing, not even an ignored file), and
+refuses listing each repository and the `meada index --workspace` command that fixes it. Then it
+uploads a generation: one bundle per repository (a tar of the mirror, `.git` included, and its
+`index.db`), a document listing them with their size and BLAKE3 hash, and the `current` pointer
+last. Its only stdout line is the generation id. A bundle or a generation already stored is not
+uploaded again, and nothing is written on the machine that publishes.
+
+```toml
+[snapshot]
+endpoint = "https://s3.us-east-1.amazonaws.com"   # any S3-compatible endpoint
+region = "us-east-1"
+bucket = "example-meada"
+prefix = "prod"                                    # optional
+path_style = false                                 # true for most self-hosted stores
+credentials = "static"                             # or "web-identity", "pod-identity", "instance"
+access_key_id_env = "AWS_ACCESS_KEY_ID"            # defaults shown; or the *_file keys
+secret_access_key_env = "AWS_SECRET_ACCESS_KEY"
+session_token_env = "AWS_SESSION_TOKEN"            # optional
+local_dir = "/var/lib/meada/generations"           # for pulling and serving generations
+```
+
+Publishing connects only to the `endpoint`, over TLS outside loopback, and to the credential
+endpoint of the chosen source; no request follows a redirect or goes through a proxy.
+Credentials come from one source, the one `credentials` names: `static` reads the key and the
+secret from the variables or files the section names (never from the manifest); `web-identity`
+(IRSA) reads `AWS_WEB_IDENTITY_TOKEN_FILE` and `AWS_ROLE_ARN` and exchanges the token with STS in
+`region`, over https; `pod-identity` (EKS Pod Identity) calls the agent in
+`AWS_CONTAINER_CREDENTIALS_FULL_URI`, only `http://169.254.170.23` or `http://[fd00:ec2::23]`,
+with the token in `AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`; `instance` uses the instance
+metadata service (IMDSv2 over IPv4 only, `http://169.254.169.254`), and only when the section says so.
+Credentials stay in memory, and no secret appears in an error.
 
 ## Decisions
 

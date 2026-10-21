@@ -32,6 +32,7 @@ mod query;
 mod resources;
 mod self_index;
 mod server;
+mod snapshot;
 mod stale;
 mod trace;
 mod urls;

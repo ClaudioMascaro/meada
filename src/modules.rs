@@ -23,12 +23,12 @@ pub const MODULES: [Module; 6] = [
         feature: "valkey",
         built: cfg!(feature = "valkey"),
     },
-    // The sections below belong to modules not built yet: no build has their feature.
     Module {
         section: "snapshot",
         feature: "snapshot",
-        built: false,
+        built: cfg!(feature = "snapshot"),
     },
+    // The sections below belong to modules not built yet: no build has their feature.
     Module {
         section: "generations",
         feature: "generation-pointer",
@@ -78,6 +78,7 @@ mod tests {
 
     use super::*;
 
+    #[cfg(not(feature = "snapshot"))]
     #[test]
     fn a_section_whose_feature_is_missing_names_the_line_the_section_and_the_feature() {
         let src = "index_dir = \"i\"\n\n[snapshot]\nbucket = \"b\"\n";

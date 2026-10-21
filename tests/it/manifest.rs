@@ -101,7 +101,7 @@ pub(crate) fn run_export(dir: &Path, repo: &str) -> (String, String, Option<i32>
 }
 
 /// `meada <args>` in `dir`, as `run_code`.
-fn run_args(dir: &Path, args: &[&str]) -> (String, String, Option<i32>) {
+pub(crate) fn run_args(dir: &Path, args: &[&str]) -> (String, String, Option<i32>) {
     let out = Command::new(env!("CARGO_BIN_EXE_meada"))
         .current_dir(dir)
         .args(args)
@@ -402,6 +402,27 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
             assert!(!ok && stdout.is_empty(), "{command}: {toml}");
             assert_eq!(stderr, expected, "{command}: {toml}");
         }
+    }
+}
+
+/// `[snapshot]` in a build without the `snapshot` feature (ADR 0012): the error naming it.
+#[cfg(not(feature = "snapshot"))]
+#[test]
+fn a_snapshot_section_without_its_feature_is_an_error_naming_the_feature() {
+    let dir = mirrors("manifest_snapshot_section");
+    write_manifest(
+        &dir,
+        "index_dir = \"../indexes\"\n\n[snapshot]\nendpoint = \"https://s3.example.com\"\n",
+    );
+    for command in ["index", "status"] {
+        let (stdout, stderr, ok) = run(&dir, command);
+        assert!(!ok && stdout.is_empty(), "{command}");
+        assert_eq!(
+            stderr,
+            "meada: ops/meada.workspace.toml:3: [snapshot] needs a Meada built with the snapshot \
+             feature\n",
+            "{command}"
+        );
     }
 }
 

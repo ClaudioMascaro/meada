@@ -178,6 +178,9 @@ pub struct Manifest {
     /// The `[valkey]` section, when the build has the module.
     #[cfg(feature = "valkey")]
     pub valkey: Option<crate::valkey::Config>,
+    /// The `[snapshot]` section, when the build has the module.
+    #[cfg(feature = "snapshot")]
+    pub snapshot: Option<crate::snapshot::Config>,
 }
 
 /// One `[[repository]]` of a manifest.
@@ -193,6 +196,10 @@ pub struct Listed {
     /// names them: `[repository.serve]`, `[[repository.resource]] <kind> <id>`,
     /// `[[repository.peer]] <repo>`.
     pub ignored: Vec<String>,
+    /// The entry's `serve`, `resource` and `peer` blocks as written, canonical
+    /// (`snapshot::blocks`): what a bundle id hashes, and what a generation records.
+    #[cfg(feature = "snapshot")]
+    pub blocks: serde_json::Value,
 }
 
 #[derive(Deserialize)]
@@ -204,6 +211,8 @@ struct ManifestFile {
     repositories: Vec<EntryFile>,
     #[cfg(feature = "valkey")]
     valkey: Option<crate::valkey::File>,
+    #[cfg(feature = "snapshot")]
+    snapshot: Option<crate::snapshot::File>,
 }
 
 /// A `[[repository]]`: `serve` and `resource` take the shapes of `meada.toml`'s, `peer` that
@@ -272,6 +281,12 @@ impl Manifest {
         #[cfg(feature = "valkey")]
         let valkey = (parsed.valkey.map(|v| v.validate(base)).transpose())
             .map_err(|(key, problem)| config::error_at(file, &src, key, &problem))?;
+        #[cfg(feature = "snapshot")]
+        let snapshot = (parsed.snapshot.map(|s| s.validate(base)).transpose())
+            .map_err(|(key, problem)| config::error_at(file, &src, key, &problem))?;
+        // Each entry's blocks as written, in manifest order: the typed read checked them.
+        #[cfg(feature = "snapshot")]
+        let mut written = crate::snapshot::entry_blocks(&src).into_iter();
         let index_dir = base.join(index_dir);
         // Before any `git` call: a mirror another user owns is read all the same (ADR 0011).
         (parsed.repositories.iter()).for_each(|e| repo::trust(&base.join(&e.path)));
@@ -291,6 +306,8 @@ impl Manifest {
                     path,
                     repository,
                     ignored,
+                    #[cfg(feature = "snapshot")]
+                    blocks: written.next().unwrap_or_default(),
                 }
             })
             .collect();
@@ -323,6 +340,8 @@ impl Manifest {
             entries,
             #[cfg(feature = "valkey")]
             valkey,
+            #[cfg(feature = "snapshot")]
+            snapshot,
         })
     }
 

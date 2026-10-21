@@ -30,7 +30,7 @@ use crate::trace::Process;
 /// unit test `the_stored_format_matches_its_golden`): re-blessing it after a change to `SCHEMA`,
 /// to the facts a pack stores or to a document's or a manifest's stored `summary` changes the
 /// version, and an index with another version is rebuilt beside it and renamed over it.
-fn schema_version() -> i32 {
+pub(crate) fn schema_version() -> i32 {
     let hash = blake3::hash(include_bytes!("../tests/golden/schema.txt"));
     let [a, b, c, d, ..] = *hash.as_bytes();
     // A new SQLite file starts at `user_version` 0, which an odd version never equals.
@@ -481,21 +481,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             None
         }
     };
-    let stored: HashMap<String, Stored> = tx
-        .prepare("SELECT path, hash, mtime, size, resolved, setting FROM files")?
-        .query_map([], |r| {
-            Ok((
-                r.get(0)?,
-                Stored {
-                    hash: r.get(1)?,
-                    mtime: r.get(2)?,
-                    size: r.get(3)?,
-                    resolved: r.get(4)?,
-                    setting: r.get(5)?,
-                },
-            ))
-        })?
-        .collect::<rusqlite::Result<_>>()?;
+    let stored = stored_files(&tx)?;
 
     let all = walk(root);
     refresh_stamped(
@@ -518,45 +504,14 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         },
     )?;
     // The packages decide which files keep the shapes of what they export (issue #175).
-    let manifest_rows: Vec<(String, String)> = tx
-        .prepare("SELECT path, summary FROM manifests ORDER BY path")?
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
-        .collect::<rusqlite::Result<_>>()?;
-    let walked: Vec<(&String, &PathBuf, usize)> = (all.iter())
-        .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
-        .collect();
-    let packs: BTreeMap<&str, usize> = walked.iter().map(|(p, _, k)| (p.as_str(), *k)).collect();
-    // Config files, read on every refresh (`read_config`): they are few and small. A `**/` name
-    // takes every file of that name the walk found, in path order.
-    let mut configs: BTreeMap<usize, Vec<(&str, Vec<u8>)>> =
-        packs.values().map(|&pack| (pack, Vec::new())).collect();
-    let mut digest = blake3::Hasher::new();
-    for (&pack, found) in &mut configs {
-        for &name in lang::pack(pack).config_files() {
-            let paths: BTreeSet<&str> = match name.strip_prefix("**/") {
-                Some(file) => (all.iter())
-                    .map(|(path, _)| path.as_str())
-                    .filter(|path| path.rsplit('/').next() == Some(file))
-                    .collect(),
-                None => BTreeSet::from([name]),
-            };
-            for path in paths {
-                if let Some(src) = read_config(root, path) {
-                    digest.update(format!("{pack}\0{path}\0{}\0", src.len()).as_bytes());
-                    digest.update(&src);
-                    found.push((path, src));
-                }
-            }
-        }
-    }
-    // What the configs make of each file's facts (`LanguagePack::settings`): a file parsed
-    // under another setting is parsed again, whatever its content.
-    let settings: BTreeMap<usize, _> = (configs.iter())
-        .map(|(&pack, found)| {
-            let found: Vec<(&str, &[u8])> = found.iter().map(|(n, c)| (*n, c.as_slice())).collect();
-            (pack, lang::pack(pack).settings(&found))
-        })
-        .collect();
+    let manifest_rows = manifest_rows(&tx)?;
+    let Packs {
+        walked,
+        packs,
+        configs,
+        digest,
+        settings,
+    } = packs_of(root, &all);
     let mut changed = Vec::new();
     for &(path, abs, pack) in &walked {
         let setting = settings[&pack](path);
@@ -595,10 +550,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     // so it extracts again. Folding them in also forces that on an index of this version written
     // before the `shape` rows and constant `exports` targets existed (issue #175), which the
     // schema golden does not cover.
-    for (path, summary) in &manifest_rows {
-        digest.update(format!("{path}\0{summary}\0").as_bytes());
-    }
-    let digest = digest.finalize().to_hex().to_string();
+    let digest = configs_digest(digest, &manifest_rows);
     if changed.is_empty() && deleted.is_empty() && known_configs.as_deref() == Some(&digest) {
         tx.commit()?;
         return Ok(());
@@ -895,6 +847,190 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     )?;
     tx.commit()?;
     Ok(())
+}
+
+/// The `files` rows, by path.
+fn stored_files(db: &Connection) -> Result<HashMap<String, Stored>> {
+    let rows = db
+        .prepare("SELECT path, hash, mtime, size, resolved, setting FROM files")?
+        .query_map([], |r| {
+            Ok((
+                r.get(0)?,
+                Stored {
+                    hash: r.get(1)?,
+                    mtime: r.get(2)?,
+                    size: r.get(3)?,
+                    resolved: r.get(4)?,
+                    setting: r.get(5)?,
+                },
+            ))
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
+}
+
+/// The `manifests` rows (path and summary), by path.
+fn manifest_rows(db: &Connection) -> Result<Vec<(String, String)>> {
+    let rows = db
+        .prepare("SELECT path, summary FROM manifests ORDER BY path")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
+}
+
+/// The files of a walk a language pack handles, and what the packs' config files make of them.
+struct Packs<'a> {
+    /// Each file a pack handles: path, absolute path and pack.
+    walked: Vec<(&'a String, &'a PathBuf, usize)>,
+    /// The pack of each of them, by path.
+    packs: BTreeMap<&'a str, usize>,
+    /// The config files read, per pack: path and content.
+    configs: BTreeMap<usize, Vec<(&'a str, Vec<u8>)>>,
+    /// The BLAKE3 of the config files read, before `configs_digest` folds the manifests in.
+    digest: blake3::Hasher,
+    /// What the configs make of each file's facts (`LanguagePack::settings`), per pack: a file
+    /// parsed under another setting is parsed again, whatever its content.
+    settings: BTreeMap<usize, Setting>,
+}
+
+/// What `LanguagePack::settings` makes of a file's facts, by path.
+type Setting = Box<dyn Fn(&str) -> String>;
+
+/// The packs of the files `walk` found under `root`, their config files read (`read_config`)
+/// on every call: they are few and small. A `**/` name takes every file of that name the walk
+/// found, in path order.
+fn packs_of<'a>(root: &Path, all: &'a [(String, PathBuf)]) -> Packs<'a> {
+    let walked: Vec<(&String, &PathBuf, usize)> = (all.iter())
+        .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
+        .collect();
+    let packs: BTreeMap<&str, usize> = walked.iter().map(|(p, _, k)| (p.as_str(), *k)).collect();
+    let mut configs: BTreeMap<usize, Vec<(&str, Vec<u8>)>> =
+        packs.values().map(|&pack| (pack, Vec::new())).collect();
+    let mut digest = blake3::Hasher::new();
+    for (&pack, found) in &mut configs {
+        for &name in lang::pack(pack).config_files() {
+            let paths: BTreeSet<&str> = match name.strip_prefix("**/") {
+                Some(file) => (all.iter())
+                    .map(|(path, _)| path.as_str())
+                    .filter(|path| path.rsplit('/').next() == Some(file))
+                    .collect(),
+                None => BTreeSet::from([name]),
+            };
+            for path in paths {
+                if let Some(src) = read_config(root, path) {
+                    digest.update(format!("{pack}\0{path}\0{}\0", src.len()).as_bytes());
+                    digest.update(&src);
+                    found.push((path, src));
+                }
+            }
+        }
+    }
+    let settings = (configs.iter())
+        .map(|(&pack, found)| {
+            let found: Vec<(&str, &[u8])> = found.iter().map(|(n, c)| (*n, c.as_slice())).collect();
+            (pack, lang::pack(pack).settings(&found))
+        })
+        .collect();
+    Packs {
+        walked,
+        packs,
+        configs,
+        digest,
+        settings,
+    }
+}
+
+/// `meta.configs`: the config files' digest with the stored manifests folded in.
+fn configs_digest(mut digest: blake3::Hasher, manifest_rows: &[(String, String)]) -> String {
+    for (path, summary) in manifest_rows {
+        digest.update(format!("{path}\0{summary}\0").as_bytes());
+    }
+    digest.finalize().to_hex().to_string()
+}
+
+/// Whether `refresh` would find nothing to change in the index `db` holds for the checkout at
+/// `root` (repository `identity`, documents per `serve`), checked as it checks, reading only:
+/// the same walk, then each stamped file's stat, and its hash when the stat moved. A file whose
+/// stat moved but whose content did not (one a refresh would only stamp again, such as a file
+/// indexed within `RACY` of its last write) is no difference. `meada snapshot publish`
+/// (ADR 0012) runs it on an index opened with `open_read`.
+#[cfg(feature = "snapshot")]
+pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Result<bool> {
+    let now = SystemTime::now();
+    let meta = (db.query_row("SELECT identity, configs FROM meta", [], |r| {
+        Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+    }))
+    .optional()?;
+    let Some((_, configs)) = meta.filter(|(known, _)| known == identity) else {
+        return Ok(false);
+    };
+    // The same stamp a refresh trusts: a trusted mtime and the size, or else the hash.
+    let same = |hash: &str,
+                mtime: Option<i64>,
+                size: i64,
+                abs: &Path,
+                read: &dyn Fn(&Path) -> std::io::Result<Vec<u8>>| {
+        let Ok((now_size, now_mtime, _)) = stat(abs, now) else {
+            return false;
+        };
+        if mtime.is_some() && mtime == now_mtime && size == now_size {
+            return true;
+        }
+        read(abs).is_ok_and(|src| blake3::hash(&src).to_hex().as_str() == hash)
+    };
+    let all = walk(root);
+    let tables = [
+        (
+            "documents",
+            documents_found(root, &all, serve),
+            document::MAX_BYTES,
+        ),
+        ("manifests", manifests_found(&all), lang::MAX_BYTES),
+    ];
+    for (table, found, max) in tables {
+        let read = |abs: &Path| read_up_to(abs, max);
+        let stored: HashMap<String, Stamp> = db
+            .prepare(&format!("SELECT path, hash, mtime, size FROM {table}"))?
+            .query_map([], |r| {
+                let (hash, mtime, size) = (r.get(1)?, r.get(2)?, r.get(3)?);
+                Ok((r.get(0)?, Stamp { hash, mtime, size }))
+            })?
+            .collect::<rusqlite::Result<_>>()?;
+        let mut seen = 0;
+        for (path, abs) in &found {
+            match stored.get(path) {
+                Some(k) if same(&k.hash, k.mtime, k.size, abs, &read) => seen += 1,
+                Some(_) => return Ok(false),
+                // A file a refresh cannot stat or read gets no row either.
+                None if stat(abs, now).is_err() || read(abs).is_err() => {}
+                None => return Ok(false),
+            }
+        }
+        if seen != stored.len() {
+            return Ok(false);
+        }
+    }
+    let stored = stored_files(db)?;
+    let Packs {
+        walked,
+        packs,
+        digest,
+        settings,
+        ..
+    } = packs_of(root, &all);
+    let read = |abs: &Path| fs::read(abs);
+    for &(path, abs, pack) in &walked {
+        let Some(k) = stored.get(path) else {
+            return Ok(false);
+        };
+        if k.setting != settings[&pack](path) || !same(&k.hash, k.mtime, k.size, abs, &read) {
+            return Ok(false);
+        }
+    }
+    if stored.keys().any(|p| !packs.contains_key(p.as_str())) {
+        return Ok(false);
+    }
+    Ok(configs_digest(digest, &manifest_rows(db)?) == configs)
 }
 
 /// Rewrites the `communities` rows from the stored calls at `exact` or `inferred` between two
@@ -2280,5 +2416,122 @@ mod tests {
              changes the schema version\n--- actual ---\n{actual}",
             golden.display()
         );
+    }
+
+    /// Each file under `dir` with its bytes and mtime, sorted.
+    #[cfg(feature = "snapshot")]
+    fn tree(dir: &Path) -> Vec<(PathBuf, Vec<u8>, std::time::SystemTime)> {
+        let mut all = Vec::new();
+        let mut dirs = vec![dir.to_path_buf()];
+        while let Some(at) = dirs.pop() {
+            for entry in fs::read_dir(&at).unwrap() {
+                let path = entry.unwrap().path();
+                let meta = fs::symlink_metadata(&path).unwrap();
+                match meta.is_dir() {
+                    true => dirs.push(path),
+                    false => all.push((
+                        path.clone(),
+                        fs::read(&path).unwrap(),
+                        meta.modified().unwrap(),
+                    )),
+                }
+            }
+        }
+        all.sort();
+        all
+    }
+
+    /// The freshness check of `meada snapshot publish` (ADR 0012): it sees what a refresh would
+    /// change (an edited, added or removed file, an edited manifest, another identity) and
+    /// nothing else, and writes nothing.
+    #[cfg(feature = "snapshot")]
+    #[test]
+    fn fresh_sees_what_a_refresh_would_change_and_writes_nothing() {
+        use super::{fresh, refresh};
+        let (dir, index) = index_dir("fresh");
+        let root = checkout(&dir);
+        fs::write(root.join("package.json"), "{\"name\": \"web\"}\n").unwrap();
+        let serve = Serve::default();
+        let index_now = || {
+            let db = open(&index, &root, REPO, &serve).unwrap();
+            refresh(&db, &root, REPO, &serve).unwrap();
+        };
+        let is_fresh = |identity: &str| {
+            let db = read(&index).unwrap();
+            fresh(&db, &root, identity, &serve).unwrap()
+        };
+        // Just written, so every mtime is too recent to trust: the hashes answer.
+        index_now();
+        let before = tree(&dir);
+        assert!(is_fresh(REPO));
+        assert!(!is_fresh("example.com/acme/other"));
+        assert_eq!(tree(&dir), before, "fresh wrote nothing");
+
+        // A touched file of the same content is no difference.
+        let later = std::time::SystemTime::now() + Duration::from_secs(5);
+        let a = fs::File::options()
+            .write(true)
+            .open(root.join("a.ts"))
+            .unwrap();
+        a.set_modified(later).unwrap();
+        assert!(is_fresh(REPO));
+
+        let edits: [(&str, Option<&str>); 4] = [
+            ("a.ts", Some("export function b() {}\n")),
+            ("b.ts", Some("export const c = 1;\n")),
+            ("b.ts", None),
+            ("package.json", Some("{\"name\": \"site\"}\n")),
+        ];
+        for (file, content) in edits {
+            match content {
+                Some(content) => fs::write(root.join(file), content).unwrap(),
+                None => fs::remove_file(root.join(file)).unwrap(),
+            }
+            assert!(!is_fresh(REPO), "{file} {content:?}");
+            index_now();
+            assert!(is_fresh(REPO), "{file} {content:?} indexed");
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The same for the documents of a `[serve]` table: one found by name or listed in
+    /// `serve.documents`, edited, added or removed, is a difference.
+    #[cfg(feature = "snapshot")]
+    #[test]
+    fn fresh_sees_an_edited_added_or_removed_document() {
+        use super::{fresh, refresh};
+        let (dir, index) = index_dir("fresh_documents");
+        let root = checkout(&dir);
+        let spec = |title: &str| format!("openapi: 3.0.0\ninfo:\n  title: {title}\npaths: {{}}\n");
+        fs::write(root.join("openapi.yaml"), spec("web")).unwrap();
+        fs::create_dir_all(root.join("docs")).unwrap();
+        let serve = Serve {
+            declared: true,
+            documents: vec!["docs/api.yaml".into()],
+            ..Serve::default()
+        };
+        let index_now = || {
+            let db = open(&index, &root, REPO, &serve).unwrap();
+            refresh(&db, &root, REPO, &serve).unwrap();
+        };
+        let is_fresh = || fresh(&read(&index).unwrap(), &root, REPO, &serve).unwrap();
+        index_now();
+        assert!(is_fresh());
+        let edits: [(&str, Option<String>); 4] = [
+            ("openapi.yaml", Some(spec("site"))),
+            ("docs/api.yaml", Some(spec("api"))),
+            ("docs/api.yaml", None),
+            ("openapi.yaml", None),
+        ];
+        for (file, content) in edits {
+            match &content {
+                Some(content) => fs::write(root.join(file), content).unwrap(),
+                None => fs::remove_file(root.join(file)).unwrap(),
+            }
+            assert!(!is_fresh(), "{file} {content:?}");
+            index_now();
+            assert!(is_fresh(), "{file} {content:?} indexed");
+        }
+        let _ = fs::remove_dir_all(&dir);
     }
 }

@@ -94,6 +94,30 @@ one for the area a change touches.
   reachable` or `valkey: unreachable (<reason>)` after waiting at most `REACH_TIMEOUT`; the
   line is informational and never changes the probe's exit code. With a `ca_file` the client
   trusts that file alone, not the system roots as well (redis-rs replaces them).
+- `snapshot.rs`, `snapshot/store.rs` (feature `snapshot`; the only places `object_store`,
+  `reqwest` as a client of Meada's own and `tar` are used): the snapshot store. `File` is the
+  `[snapshot]` section and `File::validate` its `Config` (an `https` endpoint, or `http` on
+  loopback, with no user or path, and `path_style` for an `http`, IP or `localhost` one;
+  `region`, `bucket` and `prefix` shapes; one credential source,
+  the static keys only with `static`, at most one of each `*_env`/`*_file` pair). `bundle_id`
+  and `generation_id` are the ids of ADR 0012 (`is_id` their shape); `entry_blocks` gives each
+  manifest entry's blocks as canonical JSON (`Listed::blocks`). `publish` is `meada snapshot
+  publish`: per repository `index::open_read` plus `index::fresh`, `repo::unclean` and
+  `repo::head`, every problem listed; then `store_generation` uploads the missing bundles (a
+  first pass measures the tar's size and hash, a second streams it as a multipart upload with
+  them as metadata, aborted if they differ), reads each back from metadata, writes the document
+  and `current` last; an existing document is verified instead (`verify`) and never rewritten.
+  The tar is `index.db`, then the mirror under `mirror/` in path order, symbolic links as links.
+  `store::Store` is the client `meada snapshot pull` (#273) reuses: object_store's S3 client
+  over `Guard`, a reqwest client with no redirect and no proxy that refuses any origin but the
+  bucket's and the chosen credential source's (STS in `region`, the Pod Identity agent, IMDSv2);
+  credentials come only from that source (static ones built from the variables or files, the
+  others through object_store's providers given exactly those inputs, IMDSv2 over IPv4 only),
+  stay in memory and are scrubbed from every error: the static secret is replaced, and an S3
+  error body loses its `CanonicalRequest`, `StringToSign` and their `*Bytes` echoes. The
+  secret files are read through `config::read_bounded`, as `valkey.rs` reads its own. Each
+  bundle keeps its `open_read` connection, the read transaction its freshness check ran in,
+  until its upload ends. Every object carries `meada-size` and `meada-blake3` metadata.
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
@@ -102,7 +126,9 @@ one for the area a change touches.
   `[[repository.peer]]` reuse `config.rs`'s shapes (the peer without `path`) and are the
   configuration of a mirror with no `meada.toml`. A mirror's own `meada.toml` wins whole: the
   entry's blocks are ignored, not merged, and `Listed::ignored` names them for `status`.
-  `index.rs`: the SQLite schema, the freshness pipeline in `refresh`, and
+  `index.rs`: the SQLite schema, the freshness pipeline in `refresh` (with `fresh`, its
+  read-only twin for `meada snapshot publish`: the same walk, `packs_of` and stamps, and a file
+  whose stat moved but whose hash did not is no difference), and
   `export`; `open` and `state` take the index's path, `<root>/.meada/index.db` locally (`path`,
   with a `.gitignore` of `*`) or `<index_dir>/<identity>/index.db` in server mode (no
   `.gitignore`). A rebuild (a missing index, or one of another schema) is a rename under the

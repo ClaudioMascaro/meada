@@ -52,6 +52,21 @@ enum Command {
         #[arg(long, requires = "decider", allow_negative_numbers = true)]
         min_p: Option<f64>,
     },
+    #[cfg(feature = "snapshot")]
+    Snapshot {
+        #[command(subcommand)]
+        command: SnapshotCommand,
+    },
+}
+
+/// `meada snapshot` (ADR 0012, feature `snapshot`).
+#[cfg(feature = "snapshot")]
+#[derive(Subcommand)]
+enum SnapshotCommand {
+    Publish {
+        #[arg(long)]
+        workspace: PathBuf,
+    },
 }
 
 /// `meada mcp --listen`. In debug builds `MEADA_DRAIN_MS` shortens the drain bound (a knob for
@@ -100,8 +115,15 @@ fn main() -> ExitCode {
                     a.help(Msg::DecideShowRequestHelp.text())
                 })
                 .mut_arg("min_p", |a| a.help(Msg::DecideMinPHelp.text()))
+        });
+    #[cfg(feature = "snapshot")]
+    let matches = matches.mut_subcommand("snapshot", |c| {
+        (c.about(Msg::Snapshot.text())).mut_subcommand("publish", |c| {
+            (c.about(Msg::SnapshotPublish.text()))
+                .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
         })
-        .get_matches();
+    });
+    let matches = matches.get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
     let here = Path::new(".");
     let mut unready = false;
@@ -136,6 +158,23 @@ fn main() -> ExitCode {
                 std::process::exit(1);
             }
         }),
+        // The generation id is the only line on stdout.
+        #[cfg(feature = "snapshot")]
+        Command::Snapshot {
+            command: SnapshotCommand::Publish { workspace },
+        } => match meada::snapshot::publish(&workspace) {
+            Ok(generation) => {
+                println!("{generation}");
+                Ok(())
+            }
+            // Every repository's problem on its own line, as `index --workspace` reports them.
+            Err(e) => {
+                for line in e.to_string().lines() {
+                    eprintln!("meada: {line}");
+                }
+                std::process::exit(1);
+            }
+        },
         Command::Export {
             workspace: Some(manifest),
             repo: Some(repo),

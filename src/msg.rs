@@ -197,6 +197,50 @@ pub enum Msg<'a> {
     ValkeyReachable,
     #[cfg(feature = "valkey")]
     ValkeyUnreachable(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotEndpointInvalid,
+    #[cfg(feature = "snapshot")]
+    SnapshotEndpointUser,
+    #[cfg(feature = "snapshot")]
+    SnapshotEndpointPlain,
+    #[cfg(feature = "snapshot")]
+    SnapshotPathStyle,
+    #[cfg(feature = "snapshot")]
+    SnapshotRegion,
+    #[cfg(feature = "snapshot")]
+    SnapshotBucket,
+    #[cfg(feature = "snapshot")]
+    SnapshotPrefix,
+    #[cfg(feature = "snapshot")]
+    SnapshotBoth(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotStaticOnly,
+    #[cfg(feature = "snapshot")]
+    SnapshotEnvUnset(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotNoSection(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotBehind {
+        repo: &'a str,
+        manifest: &'a str,
+    },
+    #[cfg(feature = "snapshot")]
+    SnapshotDirty {
+        repo: &'a str,
+        mirror: &'a str,
+    },
+    #[cfg(feature = "snapshot")]
+    SnapshotPodUrl,
+    #[cfg(feature = "snapshot")]
+    SnapshotRefused(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotObjectBad(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotChanged(&'a str),
+    #[cfg(feature = "snapshot")]
+    Snapshot,
+    #[cfg(feature = "snapshot")]
+    SnapshotPublish,
     About,
     Index,
     Status,
@@ -614,6 +658,126 @@ impl Msg<'_> {
             Msg::ValkeyUnreachable(reason) => pick(
                 format!("valkey: unreachable ({reason})"),
                 format!("valkey: inalcançável ({reason})"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEndpointInvalid => pick(
+                "is not an http:// or https:// URL with a host and nothing after it".into(),
+                "não é uma URL http:// ou https:// com um host e nada depois dele".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEndpointUser => pick(
+                "carries a user or a password: credentials come from the credential keys".into(),
+                "traz um usuário ou uma senha: as credenciais vêm das chaves de credencial".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEndpointPlain => pick(
+                "must be an https:// URL: TLS is required unless the host is loopback".into(),
+                "deve ser uma URL https://: TLS é obrigatório, salvo em loopback".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotPathStyle => pick(
+                "must be true for an http://, IP or localhost endpoint: the bucket cannot go in \
+                 front of that host"
+                    .into(),
+                "deve ser true para um endpoint http://, IP ou localhost: o bucket não pode ir à \
+                 frente desse host"
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotRegion => pick(
+                "must be lowercase letters, digits and `-`".into(),
+                "deve ter só letras minúsculas, dígitos e `-`".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotBucket => pick(
+                "must be 3 to 63 lowercase letters, digits, `.` and `-`, starting and ending with \
+                 a letter or a digit"
+                    .into(),
+                "deve ter de 3 a 63 letras minúsculas, dígitos, `.` e `-`, começando e \
+                 terminando com letra ou dígito"
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotPrefix => pick(
+                "must be `/`-separated segments, none of them empty, `.` or `..`".into(),
+                "deve ter segmentos separados por `/`, nenhum vazio, `.` ou `..`".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotBoth(other) => pick(
+                format!("is set together with {other}: use one of the two"),
+                format!("está junto de {other}: use um dos dois"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotStaticOnly => pick(
+                "is read only with credentials = \"static\"".into(),
+                "só é lida com credentials = \"static\"".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEnvUnset(var) => pick(
+                format!("the variable {var} is not set"),
+                format!("a variável {var} não está definida"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotNoSection(manifest) => pick(
+                format!("{manifest} has no [snapshot] section"),
+                format!("{manifest} não tem a seção [snapshot]"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotBehind { repo, manifest } => pick(
+                format!(
+                    "{repo}: its index differs from the mirror; run meada index --workspace \
+                     {manifest}"
+                ),
+                format!(
+                    "{repo}: seu índice difere do espelho; rode meada index --workspace {manifest}"
+                ),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotDirty { repo, mirror } => pick(
+                format!(
+                    "{repo}: the mirror {mirror} is not clean: git status lists changed, \
+                     untracked or ignored files"
+                ),
+                format!(
+                    "{repo}: o espelho {mirror} não está limpo: git status lista arquivos \
+                     alterados, não rastreados ou ignorados"
+                ),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotPodUrl => pick(
+                "AWS_CONTAINER_CREDENTIALS_FULL_URI must name the Pod Identity agent, \
+                 http://169.254.170.23 or http://[fd00:ec2::23]"
+                    .into(),
+                "AWS_CONTAINER_CREDENTIALS_FULL_URI deve apontar para o agente do Pod Identity, \
+                 http://169.254.170.23 ou http://[fd00:ec2::23]"
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotRefused(origin) => pick(
+                format!("refused a request to {origin}: not a configured endpoint"),
+                format!("recusada uma requisição a {origin}: não é um endpoint configurado"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotObjectBad(key) => pick(
+                format!("{key}: not stored with the size and hash it records"),
+                format!("{key}: não está guardado com o tamanho e o hash que registra"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotChanged(repo) => pick(
+                format!("{repo}: the mirror or its index changed while it was published"),
+                format!("{repo}: o espelho ou seu índice mudou durante a publicação"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::Snapshot => pick(
+                "Server mode: the snapshot store of generations (ADR 0012).".into(),
+                "Modo servidor: o armazenamento de gerações (ADR 0012).".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotPublish => pick(
+                "Upload the workspace as a generation, once every index equals its mirror."
+                    .into(),
+                "Envia o workspace como uma geração, quando cada índice equivale ao seu espelho."
+                    .into(),
             ),
             Msg::About => pick(
                 "LLM-free code graph for agents and people".into(),
