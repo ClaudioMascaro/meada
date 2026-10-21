@@ -2043,6 +2043,58 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    /// The same on a read-only mount: the directory and files cannot be written, and the open
+    /// still names the interrupted commit, not a missing file or a permission error.
+    #[cfg(unix)]
+    #[test]
+    fn a_read_only_open_over_an_interrupted_commit_on_a_read_only_mount_names_the_fix() {
+        use std::os::unix::fs::PermissionsExt;
+        /// The index's directory read-only (`0555`, its files `0444`) until dropped, even on a
+        /// panic, so the temp dir can be removed.
+        struct Mount(PathBuf);
+        impl Mount {
+            fn set(&self, dir: u32, file: u32) {
+                for name in ["index.db", "index.db-journal"] {
+                    let file = fs::Permissions::from_mode(file);
+                    let _ = fs::set_permissions(self.0.join(name), file);
+                }
+                let _ = fs::set_permissions(&self.0, fs::Permissions::from_mode(dir));
+            }
+        }
+        impl Drop for Mount {
+            fn drop(&mut self) {
+                self.set(0o755, 0o644);
+            }
+        }
+
+        let (dir, _) = index_dir("hot_mount");
+        let index = interrupted(&dir, "copy");
+        let folder = index.parent().unwrap().to_path_buf();
+        let mount = Mount(folder.clone());
+        mount.set(0o555, 0o444);
+        if fs::File::create(folder.join("probe")).is_ok() {
+            eprintln!("skipped: permissions do not bind this user (root)");
+            drop(mount);
+            let _ = fs::remove_dir_all(&dir);
+            return;
+        }
+
+        let error = read(&index).err().map(|e| e.to_string());
+        let left = fs::read_dir(&folder).unwrap().count();
+
+        drop(mount);
+        assert_eq!(
+            error.as_deref(),
+            Some(
+                "example.com/acme/web: its index holds an interrupted commit; run meada index \
+                 --workspace ops/meada.workspace.toml"
+            )
+        );
+        // `source/`, the index and its journal: nothing was added.
+        assert_eq!(left, 3);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     /// The writable open rolls back the hot journal of an index of the current schema and keeps
     /// that index: no rebuild, so no rebuild lock either.
     #[test]

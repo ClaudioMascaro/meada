@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
 
 use crate::Result;
 
@@ -147,9 +148,55 @@ pub fn uncommitted(root: &Path) -> Result<Vec<(String, Change)>> {
     Ok(changes)
 }
 
+/// The mirrors a server-mode manifest lists, which `git` may read although another user owns
+/// them (ADR 0011). Empty locally: nothing there is trusted.
+static TRUSTED: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+
+/// Trusts the mirror at `path` for the `git` calls Meada makes in it: they pass
+/// `-c safe.directory=<path>`. Only for a path the manifest lists, never `*`.
+pub fn trust(path: &Path) {
+    if let Ok(real) = path.canonicalize() {
+        let mut trusted = TRUSTED.lock().unwrap_or_else(|e| e.into_inner());
+        if !trusted.contains(&real) {
+            trusted.push(real);
+        }
+    }
+}
+
+/// `git` in `dir`: the one place every call goes through, so the one place `safe.directory`
+/// is added.
+fn command(dir: &Path) -> Command {
+    let mut git = Command::new("git");
+    let real = dir.canonicalize().ok();
+    let trusted = TRUSTED.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(real) = real.filter(|real| trusted.contains(real)) {
+        let mut option = std::ffi::OsString::from("safe.directory=");
+        option.push(real);
+        git.arg("-c").arg(option);
+    }
+    git.arg("-C").arg(dir);
+    git
+}
+
+/// Whether `git` in the trusted mirror `dir` still refuses it for its owner: before git 2.38 it
+/// ignores `safe.directory` given on the command line.
+pub fn refused_as_dubious(dir: &Path) -> bool {
+    let trusted = dir
+        .canonicalize()
+        .is_ok_and(|real| (TRUSTED.lock().unwrap_or_else(|e| e.into_inner())).contains(&real));
+    trusted
+        && (command(dir).args(["rev-parse", "--show-toplevel"]).output())
+            .is_ok_and(|out| is_dubious(&String::from_utf8_lossy(&out.stderr)))
+}
+
+/// Whether `stderr` is git's refusal of a directory another user owns.
+fn is_dubious(stderr: &str) -> bool {
+    stderr.contains("dubious ownership")
+}
+
 /// `git` in `dir`, its standard output, or its error output as the error.
 fn run(dir: &Path, args: &[&str]) -> Result<String> {
-    let out = Command::new("git").arg("-C").arg(dir).args(args).output()?;
+    let out = command(dir).args(args).output()?;
     if !out.status.success() {
         return Err(format!(
             "git {}: {}",
@@ -168,7 +215,36 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{normalize_remote, relative};
+    use super::{command, is_dubious, normalize_remote, relative, trust};
+
+    #[test]
+    fn git_refusal_of_another_owner_is_recognized() {
+        let stderr = "fatal: detected dubious ownership in repository at '/srv/web'\n\
+                      To add an exception for this directory, call:\n";
+        assert!(is_dubious(stderr));
+        assert!(!is_dubious("fatal: not a git repository\n"));
+    }
+
+    #[test]
+    fn only_a_trusted_mirror_gets_safe_directory() {
+        let dir = std::env::temp_dir().join(format!("meada-trust-{}", std::process::id()));
+        let (listed, other) = (dir.join("listed"), dir.join("other"));
+        std::fs::create_dir_all(&listed).unwrap();
+        std::fs::create_dir_all(&other).unwrap();
+        let args = |dir: &std::path::Path| -> Vec<String> {
+            let git = command(dir);
+            (git.get_args())
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect()
+        };
+        assert_eq!(args(&listed)[0], "-C");
+        trust(&listed);
+        let real = listed.canonicalize().unwrap();
+        let option = format!("safe.directory={}", real.display());
+        assert_eq!(args(&listed)[..2], ["-c".to_string(), option]);
+        assert_eq!(args(&other)[0], "-C");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn a_relative_path_folds_against_its_directory() {
