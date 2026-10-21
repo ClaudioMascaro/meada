@@ -167,7 +167,7 @@ async fn read_file(path: &Path, max: u64) -> Result<Vec<u8>, String> {
     };
     tokio::task::spawn_blocking(read)
         .await
-        .unwrap_or_else(|_| Err(shown))
+        .unwrap_or(Err(shown))
 }
 
 enum Conn {
