@@ -1214,6 +1214,7 @@ mod tests {
                 identity: "r".into(),
                 config: Config::default(),
                 decisions: Decisions::default(),
+                index: "".into(),
             }],
             missing: Vec::new(),
         };

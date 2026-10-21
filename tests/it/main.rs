@@ -23,6 +23,7 @@ mod gopkg;
 mod hostile;
 mod index;
 mod items;
+mod manifest;
 mod mcp;
 mod packages;
 mod processes;

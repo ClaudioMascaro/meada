@@ -1,15 +1,19 @@
 //! The workspace: the repositories one query can see. It holds the repository where Meada
 //! runs, its peers through their `meada.toml` files (transitively), and the sibling clones
 //! whose own `meada.toml` names a repository already in it. Discovery reads only local files.
+//! In server mode (ADR 0011) the workspace is instead every repository a workspace manifest
+//! (`meada.workspace.toml`) lists, and nothing is discovered.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use serde::Deserialize;
 
 use crate::config::{self, Config};
 use crate::decisions::{self, Decisions};
 use crate::msg::Msg;
-use crate::{Result, repo};
+use crate::{Result, index, repo};
 
 pub struct Workspace {
     /// The repository where Meada runs first, then the others in discovery order.
@@ -23,6 +27,22 @@ pub struct Repository {
     pub identity: String,
     pub config: Config,
     pub decisions: Decisions,
+    /// Where its index lives: `<root>/.meada/index.db` locally, `<index_dir>/<identity>/index.db`
+    /// in server mode. The one answer every open of an index asks for.
+    pub index: PathBuf,
+}
+
+impl Repository {
+    /// The repository checked out at `root`, read locally, its index in its own `.meada/`.
+    fn local(root: PathBuf, identity: String) -> Result<Self> {
+        Ok(Self {
+            config: config::load(&root)?,
+            decisions: decisions::load(&root)?,
+            index: index::path(&root),
+            root,
+            identity,
+        })
+    }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -50,12 +70,7 @@ impl Workspace {
         let start = repo::root(dir)?;
         let mut found = Finder::default();
         let identity = found.identity(&start);
-        let mut repos = vec![Repository {
-            config: config::load(&start)?,
-            decisions: decisions::load(&start)?,
-            root: start,
-            identity,
-        }];
+        let mut repos = vec![Repository::local(start, identity)?];
         let mut missing = Vec::new();
         let mut next = 0;
         loop {
@@ -73,12 +88,7 @@ impl Workspace {
                     }
                     let from = repos[next].root.clone();
                     match found.peer(&from, &identity, hint.as_deref()) {
-                        Some(root) => repos.push(Repository {
-                            config: config::load(&root)?,
-                            decisions: decisions::load(&root)?,
-                            root,
-                            identity,
-                        }),
+                        Some(root) => repos.push(Repository::local(root, identity)?),
                         None => missing.push(Missing {
                             repo: identity,
                             named_by: repos[next].identity.clone(),
@@ -114,6 +124,7 @@ impl Workspace {
                             continue;
                         }
                         repos.push(Repository {
+                            index: index::path(&sibling),
                             root: sibling,
                             identity,
                             config,
@@ -132,6 +143,152 @@ impl Workspace {
         missing.dedup();
         Ok(Self { repos, missing })
     }
+}
+
+/// A workspace manifest (`meada.workspace.toml`, ADR 0011), read only from the path
+/// `--workspace` gives: every `[[repository]]` in manifest order.
+pub struct Manifest {
+    pub entries: Vec<Listed>,
+}
+
+/// One `[[repository]]` of a manifest.
+pub struct Listed {
+    /// The identity it names.
+    pub repo: String,
+    /// Its `path`, as the manifest writes it.
+    pub path: String,
+    /// The repository at that path, or why it cannot be served.
+    pub repository: std::result::Result<Repository, String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ManifestFile {
+    // Required, but checked by `read`: serde would name it after the last table of the file.
+    index_dir: Option<String>,
+    #[serde(default, rename = "repository")]
+    repositories: Vec<EntryFile>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EntryFile {
+    repo: String,
+    path: String,
+}
+
+impl Manifest {
+    /// The manifest at `file`; `index_dir` and each `path` are absolute or relative to its
+    /// directory. A parse error names the file, the line and the key, as `meada.toml`'s do.
+    pub fn read(file: &Path) -> Result<Self> {
+        let src = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
+        let parsed: ManifestFile = config::parse(file, &src, "meada.workspace.toml")?;
+        let Some(index_dir) = parsed.index_dir else {
+            let missing = Msg::KeyMissing("index_dir").text();
+            return Err(format!("{}:1: {missing}", file.display()).into());
+        };
+        let base = file.parent().unwrap_or(Path::new(""));
+        let index_dir = base.join(index_dir);
+        let mut seen = HashSet::new();
+        let entries = (parsed.repositories.into_iter())
+            .map(|e| {
+                let twice = !seen.insert(e.repo.clone());
+                let repository = mirror(&index_dir, &base.join(&e.path), &e.repo, twice);
+                Listed {
+                    repo: e.repo,
+                    path: e.path,
+                    repository,
+                }
+            })
+            .collect();
+        Ok(Self { entries })
+    }
+
+    /// The peers a servable repository's `meada.toml` names that the manifest does not list,
+    /// sorted: server mode looks for nothing by path hint or sibling clone.
+    pub fn missing(&self) -> Vec<Missing> {
+        let listed: HashSet<&str> = self.entries.iter().map(|l| l.repo.as_str()).collect();
+        let mut missing: Vec<Missing> = (self.entries.iter())
+            .filter_map(|l| l.repository.as_ref().ok())
+            .flat_map(|r| {
+                (r.config.peers.iter())
+                    .filter(|p| !listed.contains(p.repo.as_str()))
+                    .map(|p| Missing {
+                        repo: p.repo.clone(),
+                        named_by: r.identity.clone(),
+                    })
+            })
+            .collect();
+        missing.sort();
+        missing.dedup();
+        missing
+    }
+
+    /// The workspace of a query about `first`: every listed repository, `first` first, then
+    /// manifest order. Refused while any entry cannot be served, naming each problem.
+    pub fn workspace(self, first: &str) -> Result<Workspace> {
+        let missing = self.missing();
+        let mut repos = Vec::new();
+        let mut problems = Vec::new();
+        for listed in self.entries {
+            match listed.repository {
+                Ok(repo) => repos.push(repo),
+                Err(problem) => problems.push(format!("{}: {problem}", listed.repo)),
+            }
+        }
+        if !problems.is_empty() {
+            return Err(problems.join("\n").into());
+        }
+        let Some(at) = repos.iter().position(|r| r.identity == first) else {
+            return Err(Msg::NotListed(first).text().into());
+        };
+        let named = repos.remove(at);
+        repos.insert(0, named);
+        Ok(Workspace { repos, missing })
+    }
+}
+
+/// The repository a manifest entry lists as `repo` at `path`, its index under `index_dir`, or
+/// why it cannot be served. `twice` when an earlier entry names the same identity.
+fn mirror(
+    index_dir: &Path,
+    path: &Path,
+    repo: &str,
+    twice: bool,
+) -> std::result::Result<Repository, String> {
+    // Before any path is built from it: segments that would leave `index_dir`.
+    if repo.split('/').any(|s| matches!(s, "" | "." | "..")) {
+        return Err(Msg::UnsafeIdentity.text());
+    }
+    if repo.starts_with("local/") {
+        return Err(Msg::LocalIdentity.text());
+    }
+    if twice {
+        return Err(Msg::ListedTwice.text());
+    }
+    let shown = path.display().to_string();
+    if !path.exists() {
+        return Err(Msg::NoMirror(&shown).text());
+    }
+    if !repo::is_checkout(path) {
+        return Err(Msg::NotACheckout(&shown).text());
+    }
+    let root = path.canonicalize().map_err(|e| format!("{shown}: {e}"))?;
+    let found = repo::identity(&root);
+    if found != repo {
+        return Err(Msg::IdentityMismatch {
+            found: &found,
+            repo,
+        }
+        .text());
+    }
+    Ok(Repository {
+        config: config::load(&root).map_err(|e| e.to_string())?,
+        decisions: decisions::load(&root).map_err(|e| e.to_string())?,
+        index: index_dir.join(repo).join("index.db"),
+        root,
+        identity: found,
+    })
 }
 
 /// Repository identities and sibling listings, each read from disk once.

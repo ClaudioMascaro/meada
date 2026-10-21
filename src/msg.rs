@@ -18,6 +18,18 @@ pub enum Msg<'a> {
     NotIndexed,
     OtherVersion,
     Indexed(i64),
+    OtherVersionWorkspace,
+    UnsafeIdentity,
+    LocalIdentity,
+    ListedTwice,
+    NoMirror(&'a str),
+    NotACheckout(&'a str),
+    IdentityMismatch {
+        found: &'a str,
+        repo: &'a str,
+    },
+    NotListed(&'a str),
+    WorkspaceHelp,
     MissingPeer {
         repo: &'a str,
         named_by: &'a str,
@@ -207,6 +219,41 @@ impl Msg<'_> {
             Msg::Indexed(n) => pick(
                 format!("indexed, {n} files"),
                 format!("indexado, {n} arquivos"),
+            ),
+            Msg::OtherVersionWorkspace => pick(
+                "indexed by another version; rebuilt by meada index --workspace".into(),
+                "indexado por outra versão; reconstruído por meada index --workspace".into(),
+            ),
+            Msg::UnsafeIdentity => pick(
+                "not a repository identity: a segment is empty, `.` or `..`".into(),
+                "não é uma identidade de repositório: um segmento está vazio ou é `.` ou `..`"
+                    .into(),
+            ),
+            Msg::LocalIdentity => pick(
+                "a local identity: server mode serves repositories by their remote".into(),
+                "uma identidade local: o modo servidor serve repositórios pelo remoto".into(),
+            ),
+            Msg::ListedTwice => pick("listed twice".into(), "listado duas vezes".into()),
+            Msg::NoMirror(path) => pick(
+                format!("`{path}` does not exist"),
+                format!("`{path}` não existe"),
+            ),
+            Msg::NotACheckout(path) => pick(
+                format!("`{path}` is not the root of a checkout with a working tree"),
+                format!("`{path}` não é a raiz de um checkout com árvore de trabalho"),
+            ),
+            Msg::IdentityMismatch { found, repo } => pick(
+                format!("the mirror's remote is `{found}`, not `{repo}`"),
+                format!("o remoto do espelho é `{found}`, não `{repo}`"),
+            ),
+            Msg::NotListed(repo) => pick(
+                format!("`{repo}` is not listed in the workspace manifest"),
+                format!("`{repo}` não está listado no manifesto do workspace"),
+            ),
+            Msg::WorkspaceHelp => pick(
+                "Server mode: every repository the workspace manifest at this path lists".into(),
+                "Modo servidor: todo repositório que o manifesto do workspace neste caminho lista"
+                    .into(),
             ),
             Msg::MissingPeer { repo, named_by } => pick(
                 format!("missing peer: {repo}, named by {named_by}"),

@@ -1,5 +1,6 @@
-//! The index: one SQLite file in `<repo>/.meada/`, holding spans and identities but no
-//! source text (ADR 0004).
+//! The index: one SQLite file per repository, holding spans and identities but no source text
+//! (ADR 0004). Locally it lives in the checkout's own `.meada/`; in server mode, at
+//! `<index_dir>/<identity>/index.db` (ADR 0011). `workspace::Repository::index` says which.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
@@ -109,7 +110,7 @@ CREATE TABLE communities (name TEXT NOT NULL, member TEXT NOT NULL);
 /// its mtime is not trusted on the next refresh and the file is hashed again.
 const RACY: Duration = Duration::from_secs(2);
 
-/// Where the index of the repository at `root` lives.
+/// Where the index of the checkout at `root` lives locally, inside its own `.meada/`.
 pub fn path(root: &Path) -> PathBuf {
     root.join(".meada/index.db")
 }
@@ -121,12 +122,12 @@ pub enum State {
     Indexed { files: i64 },
 }
 
-pub fn state(root: &Path) -> State {
-    let path = path(root);
+/// The state of the index at `path`.
+pub fn state(path: &Path) -> State {
     if !path.is_file() {
         return State::Missing;
     }
-    let Ok(db) = Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+    let Ok(db) = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
     else {
         return State::OtherSchema;
     };
@@ -142,14 +143,18 @@ pub fn state(root: &Path) -> State {
     }
 }
 
-/// Opens `<root>/.meada/index.db`, creating `.meada/` with a `.gitignore` of `*`.
-pub fn open(root: &Path) -> Result<Connection> {
-    let dir = root.join(".meada");
-    fs::create_dir_all(&dir)?;
-    fs::write(dir.join(".gitignore"), "*\n")?;
-    let path = path(root);
-    let db = Connection::open(&path)?;
-    // An unreadable file counts as a mismatch: `.meada/` is Meada's own directory.
+/// Opens the index at `index` of the checkout at `root`, creating its directory, and a missing
+/// index or one of another schema. The checkout's own `.meada/` gets a `.gitignore` of `*`;
+/// an index elsewhere (server mode's `index_dir`) is outside any checkout and gets none.
+pub fn open(index: &Path, root: &Path) -> Result<Connection> {
+    let dir = index.parent().ok_or("index path has no directory")?;
+    fs::create_dir_all(dir)?;
+    if index == path(root) {
+        fs::write(dir.join(".gitignore"), "*\n")?;
+    }
+    let path = index;
+    let db = Connection::open(path)?;
+    // An unreadable file counts as a mismatch: the index's directory is Meada's own.
     let version = db
         .query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
         .ok();
@@ -157,8 +162,8 @@ pub fn open(root: &Path) -> Result<Connection> {
         return Ok(db);
     }
     drop(db);
-    let _ = fs::remove_file(&path);
-    let db = Connection::open(&path)?;
+    let _ = fs::remove_file(path);
+    let db = Connection::open(path)?;
     db.execute_batch(SCHEMA)?;
     db.pragma_update(None, "user_version", schema_version())?;
     Ok(db)

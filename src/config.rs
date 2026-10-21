@@ -210,15 +210,20 @@ pub fn load(root: &Path) -> Result<Config> {
 /// names the file, the line and the key; `meada.decisions.toml` is read the same way.
 pub(crate) fn read<T: DeserializeOwned + Default>(root: &Path, name: &str) -> Result<T> {
     let file = root.join(name);
-    let src = match fs::read_to_string(&file) {
-        Ok(src) => src,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(T::default()),
-        Err(e) => return Err(format!("{}: {e}", file.display()).into()),
-    };
-    toml::from_str(&src).map_err(|e| {
+    match fs::read_to_string(&file) {
+        Ok(src) => parse(&file, &src, name),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(T::default()),
+        Err(e) => Err(format!("{}: {e}", file.display()).into()),
+    }
+}
+
+/// `src`, the content of `file`, parsed as `T`; an error names the file, the line and the key,
+/// `name` being the kind of file the key belongs to (`meada.toml`, `meada.workspace.toml`).
+pub(crate) fn parse<T: DeserializeOwned>(file: &Path, src: &str, name: &str) -> Result<T> {
+    toml::from_str(src).map_err(|e| {
         let at = e.span().map_or(0, |s| s.start);
         let line = src[..at.min(src.len())].matches('\n').count() + 1;
-        let what = describe(&src, at, e.message(), name);
+        let what = describe(src, at, e.message(), name);
         format!("{}:{line}: {what}", file.display()).into()
     })
 }
