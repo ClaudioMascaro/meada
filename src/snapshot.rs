@@ -360,9 +360,10 @@ struct Bundle {
 }
 
 /// `meada snapshot publish --workspace <manifest>`: the generation id, once the generation is
-/// stored and `current` names it. It refuses, listing every repository, any index that differs
-/// from its mirror (`index::fresh`), is missing or is of another schema, and any mirror that is
-/// not clean; a failure before the last write leaves `current` as it was.
+/// stored and the pointer names it (the store's `current`, or Valkey's with `[generations]`).
+/// It refuses, listing every repository, any index that differs from its mirror
+/// (`index::fresh`), is missing or is of another schema, and any mirror that is not clean; a
+/// failure before the last write leaves the pointer as it was.
 pub fn publish(manifest: &Path) -> Result<String> {
     let listed = Manifest::read(manifest)?;
     let shown = manifest.display().to_string();
