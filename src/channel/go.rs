@@ -1,11 +1,12 @@
-//! The channel kind's Go forms: the message libraries of the Go pack (spec #25): segmentio/kafka-go,
-//! confluent-kafka-go, sarama, amqp091-go, aws-sdk-go-v2's SQS, nats.go and go-redis. A form is a method called on a value
-//! that the source says the library made (`Code::origins` with `Follow::Declarations`: written as
-//! its type, or made by its constructor, through the methods that hand the object on, such as
-//! `Connection.Channel`; the constructor is spelled from the origin's outside name and steps), so a
-//! `Publish` or a `Send` on anything else is no producer. A function of the library is a callee
-//! that `Code::outside` names with the package itself as its head. The names are folded like URLs
-//! (`Code::expand`), struct fields of composite literals included.
+//! The channel kind's Go forms: the message libraries of the Go pack (spec #25),
+//! segmentio/kafka-go, confluent-kafka-go, sarama, amqp091-go, aws-sdk-go-v2's SQS, nats.go and
+//! go-redis. A form is a method called on a value that the source says the library made
+//! (`Code::origins` with `Follow::Declarations`: written as its type, or made by its constructor,
+//! through the methods that hand the object on, such as `Connection.Channel`; the constructor is
+//! spelled from the origin's outside name and steps), so a `Publish` or a `Send` on anything else
+//! is no producer. A function of the library is a callee that `Code::outside` names with the
+//! package itself as its head. The names are folded like URLs (`Code::expand`), struct fields of
+//! composite literals included.
 //!
 //! A client that calls back (`Subscribe(subject, handler)`) has the callback as its handler; a
 //! polling one, the function that holds the call naming the topic or the queue.
