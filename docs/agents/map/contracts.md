@@ -12,8 +12,8 @@ modules updates it.
   consumer) or when `unresolved` says so of the identifier (an unresolved side). The seam's free
   functions (`kind_of`, `unresolved`, `shown`, `typed`, `label`, `parts`, `place`, `serves`,
   `entry`, `searched`) are what the rest of the crate calls. A kind's helpers are private to its
-  file; the few that stay `pub` are named under their kind (`http::route`, `contract` and
-  `normalize_path` for the drift view, the config and the documents; `channel::contract` for
+  file; the few that stay `pub` are named under their kind (`http::contract`,
+  `normalize_path` and `PARAM` for the config and the documents; `channel::contract` for
   the documents; the `package` readers the index writer calls). `KINDS`, `Level`, `Link`, `Names`, `Role`. A `Found` carries its `role` (`Provider`,
   `Consumer`, `Binding`, `Publish` or `Import`),
   stored in `contracts.role`; the site does not imply it (a channel producer is a `Site::Call`, a channel
@@ -294,7 +294,7 @@ modules updates it.
   exported, files)` is the public surface, the entry files of each named manifest's bare name
   and `exports` subpaths without a `*` (`Provided::entry`, the part of `resolve` that follows
   the ways in) and every file their `exports` rows name, in turn; `exported_shapes(code,
-  surface)` (run by `index::refresh`) gives, for the files of the surface, a `Role::Shape` row (`site`
+  surface)` (run by the package kind's `extract`) gives, for the files of the surface, a `Role::Shape` row (`site`
   the file, `method` the name, `via` the `shape::Want`) for each module-level constant or type
   a file exports: `Types::exported` for an interface or alias (`type`), `Zod::exported` for a
   schema (`zod` and `infer`), else `Literals::exported` for an object or array literal

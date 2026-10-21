@@ -209,6 +209,20 @@ struct Rows {
     calls: Vec<Resolved>,
 }
 
+/// What `refresh` read of the repository apart from the pack's facts, for
+/// `ContractKind::extract`, built once per refresh before the fixpoint: a kind whose contracts
+/// depend on what the manifests say reads it.
+pub struct Indexed<'a> {
+    /// The manifests, as `read_manifests` returns them (the Cargo inheritance applied).
+    pub manifests: &'a [Manifest],
+    /// The `tsconfig.json` files read, as the manifest reading step returns them.
+    pub tsconfigs: &'a [Config],
+    /// What the files of every pack export (the `exports` table).
+    pub exported: &'a [Exported],
+    /// The files of every pack, as kept.
+    pub files: &'a [&'a str],
+}
+
 /// Brings the index up to date with the files a language pack handles under `root`: tracked
 /// and untracked, minus what `.gitignore` excludes. Only files whose mtime or size differ
 /// from the index are hashed, and only those whose hash differs are parsed. Every file's
@@ -447,10 +461,12 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     }
     let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
     let files: Vec<&str> = all.keys().copied().collect();
-    // The files an import of one of the repository's packages reaches: only they keep shapes.
-    let surface = {
-        let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
-        package::surface(&manifests, &tsconfigs, &exported, &files)
+    let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
+    let indexed = Indexed {
+        manifests: &manifests,
+        tsconfigs: &tsconfigs,
+        exported: &exported,
+        files: &files,
     };
 
     // Contracts, from every file. Values are not kept in the index, so the files whose
@@ -469,10 +485,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         for (&pack, resolver) in &resolvers {
             let code = Code::new(resolver, &full, lang::pack(pack));
             for kind in contract::KINDS {
-                found.extend(kind.extract(&code));
-            }
-            if !surface.is_empty() {
-                found.extend(package::exported_shapes(&code, &surface));
+                found.extend(kind.extract(&code, &indexed));
             }
             misses.extend(code.misses().into_iter().map(String::from));
         }

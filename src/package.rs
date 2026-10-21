@@ -31,7 +31,7 @@ use serde_json::Value;
 
 use crate::contract::{ContractKind, Found, Hit, Level, Link, Role, Search, Site};
 use crate::entry;
-use crate::index::{self, CallSite, Consumer, Export, Provider};
+use crate::index::{self, CallSite, Consumer, Export, Indexed, Provider};
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
 use crate::lang::{MAX_BYTES, python};
 use crate::literals::Literals;
@@ -1214,7 +1214,7 @@ fn resolutions<'e>(
 /// file (`Provided::entry`, as an import resolves it) of the bare name and of each subpath its
 /// `exports` lists without a `*`, then every file the `exports` rows of those name, a definition's,
 /// a constant's or a re-exported one's, in turn.
-pub fn surface(
+fn surface(
     manifests: &[Manifest],
     configs: &[Config],
     exported: &[Exported],
@@ -1269,7 +1269,7 @@ pub fn surface(
 /// `z.infer` paths of a zod schema (`Want::Zod` and `Want::Infer`, `zod.rs`), or else the fields
 /// of an object or array literal (`Want::Literals`, `literals.rs`). Each source's rules stay in
 /// its own module; a name none of them reads keeps nothing.
-pub fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
+fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
     // One reader of each source, the types and zod schemas through `literals`: each budget per
     // file once.
     let mut literals = Literals::default();
@@ -1527,9 +1527,11 @@ impl ContractKind for Packages {
     }
 
     /// Every call through a binding imported from a bare specifier, as an `Import`: which of
-    /// them name a package of the workspace is known at query time only (`import`). The
-    /// manifests are read apart from the packs.
-    fn extract(&self, code: &Code) -> Vec<Found> {
+    /// them name a package of the workspace is known at query time only (`import`). After the
+    /// imports it builds the public `surface` from `indexed` (the manifests, tsconfigs, exported
+    /// rows and files) and, when the surface is not empty, appends the `exported_shapes` of the
+    /// pack's `Code`.
+    fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
         let mut found = Vec::new();
         // A file of no ecosystem imports no package.
         let files = (code.files().iter())
@@ -1556,6 +1558,16 @@ impl ContractKind for Packages {
                     shape: None,
                 });
             }
+        }
+        // The files an import of one of the repository's packages reaches: only they keep shapes.
+        let surface = surface(
+            indexed.manifests,
+            indexed.tsconfigs,
+            indexed.exported,
+            indexed.files,
+        );
+        if !surface.is_empty() {
+            found.extend(exported_shapes(code, &surface));
         }
         found
     }
@@ -1952,6 +1964,54 @@ mod tests {
             "sub/b.ts",
         ];
         assert_eq!(got, expected);
+    }
+
+    /// The package kind's `extract` over an in-memory TypeScript repository: the import rows,
+    /// then the shape of a constant a named package's entry file exports, none for a file
+    /// outside the surface, and the import rows alone when no manifest names a package.
+    #[test]
+    fn extract_adds_the_shapes_of_the_surface_after_the_imports() {
+        use crate::lang::{LanguagePack, ts::TsJs};
+        use crate::resolve::Resolver;
+        use std::collections::BTreeMap;
+
+        let sources = [
+            ("app.ts", "import { go } from 'lib';\ngo();\n"),
+            ("pkg/src/index.ts", "export const Limits = { max: 3 };\n"),
+            ("pkg/src/hidden.ts", "export const Secret = { key: 1 };\n"),
+        ];
+        let facts: Vec<_> = (sources.iter())
+            .map(|(path, src)| TsJs.parse(path, src.as_bytes()).unwrap())
+            .collect();
+        let files: BTreeMap<&str, &_> = (sources.iter().map(|(p, _)| *p)).zip(&facts).collect();
+        let resolver = Resolver::new(&files, TsJs.modules(&[], &files).unwrap(), &TsJs);
+        let code = Code::new(&resolver, &files, crate::lang::pack(0));
+        let exported = resolver.exported();
+        let names: Vec<&str> = files.keys().copied().collect();
+        let answer = |manifests: &[Manifest]| {
+            let indexed = Indexed {
+                manifests,
+                tsconfigs: &[],
+                exported: &exported,
+                files: &names,
+            };
+            let found = Packages.extract(&code, &indexed);
+            let mut rows: Vec<_> = (found.iter())
+                .map(|f| (f.role == Role::Shape, f.method.clone().unwrap_or_default()))
+                .collect();
+            rows.sort();
+            rows
+        };
+        let named = [manifest(
+            "pkg/package.json",
+            r#"{"name": "p", "main": "src/index.ts"}"#,
+        )];
+        let import = (false, "go".to_string());
+        assert_eq!(
+            answer(&named),
+            [import.clone(), (true, "Limits".to_string())]
+        );
+        assert_eq!(answer(&[]), [import]);
     }
 
     #[test]

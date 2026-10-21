@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use crate::config::gateway_path;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Search, Site, View, shown};
 use crate::entry::EntryKind;
-use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
+use crate::index::{self, Consumer, Export as IndexExport, Gateway, Indexed, Provider};
 use crate::lang::{Depends, Part, Value, literal, property};
 use crate::literals::Literals;
 use crate::resolve::Code;
@@ -116,7 +116,7 @@ fn fragments(parts: &[Part]) -> Vec<String> {
 }
 
 /// The method and path of an HTTP contract identifier: `("GET", "/users/{}")`.
-pub fn route(contract: &str) -> Option<(&str, &str)> {
+fn route(contract: &str) -> Option<(&str, &str)> {
     contract.strip_prefix("http::")?.split_once("::")
 }
 
@@ -473,17 +473,16 @@ impl ContractKind for Http {
     }
 
     /// A route is listed by its providers alone: its consumers are calls. Its shape is a
-    /// `response`, and the consumers that read fields follow (drift).
+    /// `response`.
     fn view(&self, contract: &str) -> Option<View> {
         route(contract).map(|_| View {
             provider: "provider",
             consumer: None,
             carried: "response",
-            drift: true,
         })
     }
 
-    fn extract(&self, code: &Code) -> Vec<Found> {
+    fn extract(&self, code: &Code, _: &Indexed) -> Vec<Found> {
         let mut found = Vec::new();
         // One reader of each shape source for the whole extraction: each budget per file once.
         let mut literals = Literals::default();
@@ -755,16 +754,15 @@ mod tests {
         assert_eq!(Http.search_word(), Search::Filter("route"));
     }
 
-    /// `context` on a route lists its providers, calls its shape `response` and follows the
-    /// linked consumers that read fields; a contract that is no route has no such view.
+    /// `context` on a route lists its providers and calls its shape `response`; a contract that
+    /// is no route has no such view.
     #[test]
-    fn a_route_is_viewed_by_its_providers_with_a_response_and_drift_and_a_non_route_not_at_all() {
+    fn a_route_is_viewed_by_its_providers_with_a_response_and_a_non_route_not_at_all() {
         let view = Http.view("http::GET::/users/{}").unwrap();
         let expected = View {
             provider: "provider",
             consumer: None,
             carried: "response",
-            drift: true,
         };
         assert_eq!(view, expected);
         assert_eq!(Http.view("http::orders"), None);
