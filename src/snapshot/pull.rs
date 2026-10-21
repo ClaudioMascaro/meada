@@ -777,7 +777,10 @@ mod tests {
         for key in [
             "prod/repos/example.com/acme/web/111111111111111.tar",
             "prod/repos/example.com/acme/web/1111111111111111A.tar",
+            "prod/repos/example.com/acme/web/AAAAAAAAAAAAAAAA.tar",
+            "prod/repos/example.com/acme/web/.tar",
             "prod/repos/example.com/acme/web/../../../x/1111111111111111.tar",
+            "prod/repos/example.com/acme/web/11111111/11111111.tar",
             "prod/repos/example.com/acme/web/1111111111111111",
             "prod/repos/example.com/acme/api/1111111111111111.tar",
             "other/repos/example.com/acme/web/1111111111111111.tar",
