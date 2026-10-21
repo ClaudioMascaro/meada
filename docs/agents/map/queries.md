@@ -162,12 +162,23 @@ modules updates it.
   classes named render`), plus the markers `REPOSITORY_LEVEL` and `DOCUMENTED_ONLY`. Display
   only.
 - `mcp.rs`: three tools (`search`, `context`, `trace`) over rmcp, each a thin call to `Engine`
-  that reopens it per call (so it refreshes) on the client's first `file://` root (`roots/list`,
-  asked per call when the client declared the capability), or on the cwd without one. Stdout is
-  the protocol: log to stderr. No tool writes.
+  that reopens it per call. `Meada::source` says where: over stdio (`serve`), on the client's
+  first `file://` root (`roots/list`, asked per call when the client declared the capability),
+  or on the cwd without one, refreshing; in server mode (`listen`), `Engine::open_listed` with
+  the endpoint's identity first, read-only, with no request to the client. `listen` checks every
+  repository first and keeps the manifest it read (`engine::served`); a call checks again only
+  the named repository's mirror (`Repository::recheck`), and the indexes as it opens them.
+  It binds a hyper HTTP/1 listener and routes `/<identity>` (percent-decoded, a trailing slash
+  tolerated) to that repository's rmcp `StreamableHttpService`: stateless (no
+  session), JSON responses, no `Host` check (a reverse proxy forwards its own name) and any
+  `Origin` refused (a browser, as on a DNS rebinding page); other paths get a `text/plain` 404
+  with one identity per line. `trace` from `uncommitted` is refused there, and `context` on a
+  span whose file moved says `index behind the mirror: run meada index --workspace` instead of
+  refreshing. Stdout is the protocol over stdio: log to stderr. No tool writes.
 - `main.rs`: clap, with `index`, `status`, `export`, `mcp`, `decide` (`--item`, `--dry-run`,
   `--list`, `--prune`, the last excluding the first three; `--decider`, and `--show-request`,
-  and `--min-p`, which require `--decider`). `search`, `context` and `trace`
+  and `--min-p`, which require `--decider`; `mcp --listen` and `--workspace`, which require
+  each other). `search`, `context` and `trace`
   are reachable through MCP and the library, not the CLI.
 - `msg.rs`: the CLI message catalog (pt-BR and English, one arm per `Msg`). Only `main.rs` calls
   `msg::init`; `meada mcp` forces English, so the MCP surface and library tests are English.

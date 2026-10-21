@@ -52,6 +52,15 @@ impl Engine {
         Self::read(Manifest::read(manifest)?.workspace(repo)?, manifest)
     }
 
+    /// `open_manifest` over `listed`, the manifest at `manifest` as `served` read it when the
+    /// server started: only `repo`'s mirror is checked again (`Repository::recheck`), and every
+    /// index is opened as `open_manifest` opens it. A call of `meada mcp --listen`.
+    pub(crate) fn open_listed(listed: &Manifest, repo: &str, manifest: &Path) -> Result<Self> {
+        let workspace = listed.clone().workspace(repo)?;
+        (workspace.repos[0].recheck()).map_err(|problem| format!("{repo}: {problem}"))?;
+        Self::read(workspace, manifest)
+    }
+
     /// Opens every index of `workspace`, listed by the manifest at `manifest`, read-only.
     fn read(workspace: Workspace, manifest: &Path) -> Result<Self> {
         fits(&workspace)?;
@@ -745,11 +754,13 @@ impl Engine {
         let community = format!("community: {community}");
         // Without the span text there is no span: the note is a line of the tail, kept in its
         // output position and ahead of the callers, so the cut never rewrites it.
-        let unavailable = text.is_none().then(|| {
-            format!(
+        // In server mode nothing refreshes, so the file moved ahead of the index (ADR 0011).
+        let unavailable = text.is_none().then(|| match self.read_only {
+            true => "index behind the mirror: run meada index --workspace".to_string(),
+            false => format!(
                 "(span text unavailable: {} changed since indexing)",
                 symbol_found.span.path
-            )
+            ),
         });
         let span = text.map(|(_, span)| span).unwrap_or_default();
         let mut tail = Vec::from_iter(unavailable);
@@ -1084,6 +1095,30 @@ pub fn index_workspace(manifest: &Path) -> Result<Vec<String>> {
             Some(format!("{}: {problem}", l.repo))
         })
         .collect())
+}
+
+/// The manifest at `manifest` as `meada mcp --listen` serves it, once every repository is
+/// servable: its mirror is a checkout of the identity listed and its index opens read-only at
+/// the current schema version. Otherwise every problem, one per line, each index problem naming
+/// `meada index --workspace`. It only reads.
+pub(crate) fn served(manifest: &Path) -> Result<Manifest> {
+    let listed = Manifest::read(manifest)?;
+    let shown = manifest.display().to_string();
+    let problems: Vec<String> = (listed.entries.iter())
+        .filter_map(|l| match &l.repository {
+            Ok(r) => (index::open_read(&[(&r.index, &r.identity)], &shown))
+                .err()
+                .map(|e| e.to_string()),
+            Err(problem) => Some(format!("{}: {problem}", l.repo)),
+        })
+        .collect();
+    if !problems.is_empty() {
+        return Err(problems.join("\n").into());
+    }
+    // The whole workspace opens too: what a call opens, whichever repository it names.
+    let first = (listed.entries.first()).ok_or_else(|| format!("{shown}: no repository listed"))?;
+    Engine::open_listed(&listed, &first.repo, manifest)?;
+    Ok(listed)
 }
 
 /// An index state as `status` shows it, `other` for an index of another schema.

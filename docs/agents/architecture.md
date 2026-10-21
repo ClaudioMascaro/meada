@@ -37,8 +37,11 @@ one for the area a change touches.
   `entry.rs`: entry points (spec #31), found when an index is written.
   `drift_view.rs`: how `context`, `search` and `status` show `Link::drift`; it reads no kind (the
   stored links, the exports' consumer shapes, the calls and the seam's `parts`).
-  `render.rs`: token budget and line helpers. `mcp.rs`: three read-only tools over the client's
-  first `file://` root, or the server's cwd without roots. `main.rs`: clap.
+  `render.rs`: token budget and line helpers. `mcp.rs`: three read-only tools, one definition over
+  two transports: stdio, about the client's first `file://` root or the server's cwd without
+  roots, and in server mode streamable HTTP (`meada mcp --listen`, stateless, JSON responses on
+  a hyper listener), one endpoint per repository of the manifest at `/<identity>`, a 404
+  listing the identities served elsewhere. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
@@ -585,8 +588,10 @@ one for the area a change touches.
   `src/bin/`. TS/JS declares none.
 - New **config key**: add the field to `Config`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
-- New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/it/mcp.rs`: the tool list
-  (descriptions plus parameter schemas) must stay within 1,000 tokens.
+- New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/it/mcp.rs` and
+  `tests/it/server.rs`: the tool list (descriptions plus parameter schemas) must stay within
+  1,000 tokens. A tool is added once for both transports: the `#[tool_router]` of `Meada` serves
+  stdio and every HTTP endpoint.
 - New **CLI text**: a `Msg` variant with both languages; command descriptions are set at runtime
   in `main.rs` from `Msg`.
 

@@ -37,6 +37,7 @@ pub enum Msg<'a> {
         mirror: &'a str,
     },
     WorkspaceHelp,
+    ListenHelp,
     RepoHelp,
     IgnoredBlock {
         block: &'a str,
@@ -279,6 +280,14 @@ impl Msg<'_> {
             Msg::NotListed { repo, served } => pick(
                 format!("`{repo}` is not listed in the workspace manifest; it serves {served}"),
                 format!("`{repo}` não está listado no manifesto do workspace; ele serve {served}"),
+            ),
+            Msg::ListenHelp => pick(
+                "Server mode: serve over MCP streamable HTTP at host:port, :port or port \
+                 (loopback without a host), with --workspace"
+                    .into(),
+                "Modo servidor: serve por MCP streamable HTTP em host:porta, :porta ou porta \
+                 (loopback sem host), com --workspace"
+                    .into(),
             ),
             Msg::RepoHelp => pick(
                 "Server mode: the identity of the repository to export".into(),

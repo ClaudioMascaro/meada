@@ -14,7 +14,7 @@ use common::without_processes;
 use common::{age, assert_golden, chain, decisions, documented_chain, fixture_repo, git};
 use meada::engine::Engine;
 
-const CHAIN: [(&str, &str); 4] = [
+pub(crate) const CHAIN: [(&str, &str); 4] = [
     ("example.com/chain/web", "chain-web"),
     ("example.com/chain/gateway", "chain-gateway"),
     ("example.com/chain/catalog", "chain-catalog"),
@@ -23,7 +23,7 @@ const CHAIN: [(&str, &str); 4] = [
 
 /// The chain's four mirrors in `<case>/`, listed by `<case>/ops/meada.workspace.toml` with
 /// paths relative to it and `index_dir = "../indexes"`. Returns the case directory.
-fn chain_manifest(case: &str) -> PathBuf {
+pub(crate) fn chain_manifest(case: &str) -> PathBuf {
     let dir = mirrors(case);
     list(&dir, &CHAIN, false);
     dir
@@ -82,7 +82,7 @@ fn write_manifest(dir: &Path, toml: &str) -> PathBuf {
 
 /// `meada <command> --workspace ops/meada.workspace.toml`, run in `dir` in English: stdout and
 /// stderr with `dir` replaced by `<repo>`, and whether it succeeded.
-fn run(dir: &Path, command: &str) -> (String, String, bool) {
+pub(crate) fn run(dir: &Path, command: &str) -> (String, String, bool) {
     let (stdout, stderr, code) = run_code(dir, command);
     (stdout, stderr, code == Some(0))
 }
@@ -93,7 +93,7 @@ fn run_code(dir: &Path, command: &str) -> (String, String, Option<i32>) {
 }
 
 /// The manifest every test writes, relative to its case directory.
-const MANIFEST: &str = "ops/meada.workspace.toml";
+pub(crate) const MANIFEST: &str = "ops/meada.workspace.toml";
 
 /// `meada export --workspace ops/meada.workspace.toml --repo <repo>`, as `run_code`.
 fn export(dir: &Path, repo: &str) -> (String, String, Option<i32>) {
@@ -134,7 +134,7 @@ fn files(dir: &Path) -> Vec<String> {
 
 /// After a command: the only files under `<dir>/indexes` are each listed repository's
 /// `index.db` and SQLite's companions, and no mirror has a `.meada/`.
-fn assert_nothing_else_written(dir: &Path, indexed: &[&str]) {
+pub(crate) fn assert_nothing_else_written(dir: &Path, indexed: &[&str]) {
     let written = files(&dir.join("indexes"));
     for file in &written {
         let (repo, name) = file.rsplit_once('/').unwrap();
@@ -446,7 +446,7 @@ fn a_chain_refreshed_by_index_workspace_exports_what_a_cold_one_does() {
 }
 
 /// The bytes of every file under `dir`, by path relative to it.
-fn contents(dir: &Path) -> Vec<(String, Vec<u8>)> {
+pub(crate) fn contents(dir: &Path) -> Vec<(String, Vec<u8>)> {
     (files(dir).into_iter())
         .map(|f| (f.clone(), fs::read(dir.join(&f)).unwrap()))
         .collect()

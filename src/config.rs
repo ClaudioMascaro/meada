@@ -14,7 +14,7 @@ use toml::de::{DeTable, DeValue};
 use crate::msg::Msg;
 use crate::{Result, qualify};
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default, rename = "peer")]
@@ -25,7 +25,7 @@ pub struct Config {
     pub resources: Vec<Resource>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Peer {
     /// The peer's repository identity.
@@ -37,7 +37,7 @@ pub struct Peer {
     pub base_url_env: Vec<String>,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Serve {
     #[serde(default)]
@@ -142,7 +142,7 @@ fn gateway_key<'de, D: serde::Deserializer<'de>>(
 }
 
 /// A shared thing the repository reads or writes, such as a database table or a bucket.
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Resource {
     /// A lowercase identifier with no meaning to Meada: `postgres`, `s3-bucket`.
