@@ -235,23 +235,25 @@ one for the area a change touches.
   its fence. `engine::status_generations` adds a `fence: stuck: ...` line (`Msg::FenceStuck`)
   when the node's fence is above the one `reach_pointer` read, with no effect on the exit code.
   `snapshot/lock.rs` (feature `refresh-lock`, which implies `generation-pointer`; crate `nix`,
-  Unix only) is the refresh lock, section `[refresh_lock]` (`ttl_seconds`, default 300, at
+  Unix only, a `compile_error!` elsewhere) is the refresh lock, section `[refresh_lock]` (`ttl_seconds`, default 300, at
   least 10; `Manifest::read` refuses it without `[generations]`). Keys under the same hash tag:
   `{<key_prefix>}:lock` and `{<key_prefix>}:fence`, which Meada only `INCR`s. `run` is `meada
   snapshot lock`: `SET lock <token> NX PX <ttl>` (a token of 16 bytes of `/dev/urandom` in hex;
-  a lock already held is `Msg::LockHeld`, nothing run), `INCR fence` (a result that is not a
+  a lock already held is `Msg::LockHeld`, nothing run; a `SET` that errs releases the token
+  anyway, since the server may have taken it), `INCR fence` (a result that is not a
   positive `u64` is `Msg::LockBadFence`), then the child, spawned on the main thread in a
   process group of its own (`process_group(0)`) with `MEADA_REFRESH_LOCK` and
   `MEADA_REFRESH_FENCE`; on Linux its `pre_exec` arms `PR_SET_PDEATHSIG` (SIGTERM) and refuses
   to run if `lock` already died, the crate's one `unsafe`. A thread waits for the child; the
   `select!` loop renews every `ttl/3` (`RENEW`, compare-and-extend, each try bounded by the next
-  deadline), counts a renewal from the instant before it was sent, and calls the lock lost when
-  a renewal finds another token or none succeeded for a whole TTL. Lost, or a SIGTERM or SIGINT
-  to `lock`: SIGTERM to the group, SIGKILL after `KILL_GRACE` (10 s). Once the child exits, the
-  group gets SIGKILL (no orphan), `RELEASE` (compare-and-delete) runs within `RELEASE_TIMEOUT`,
+  deadline and polled as a branch of its own, so no signal or exit waits for Valkey), counts a renewal from the instant before it was sent, and calls the lock lost when
+  a renewal finds another token or none succeeded for a whole TTL. Lost, or a SIGTERM, SIGINT,
+  SIGHUP or SIGQUIT to `lock`: SIGTERM to the group, SIGKILL after `KILL_GRACE` (10 s). Once the child exits, the
+  group gets SIGKILL (nothing is left in it; a grandchild that calls `setsid` escapes), `RELEASE` (compare-and-delete) runs within `RELEASE_TIMEOUT`,
   and `run` returns the child's code (128 plus the signal) or `Msg::LockLost`. `from_env` is
   `publish`'s side: with `[refresh_lock]` it needs both variables (`Msg::LockEnv`), `holds` (`GET
-  lock` equals the token) runs before each bundle upload and before the document's, and the
+  lock` equals the token) runs before each bundle upload and before the document's (a token
+  with no `[generations]` is an error, never a pass), and the
   token and fence go to `point`.
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).

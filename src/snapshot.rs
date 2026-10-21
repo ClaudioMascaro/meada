@@ -14,6 +14,8 @@
 pub mod generations;
 #[cfg(feature = "refresh-lock")]
 pub mod lock;
+#[cfg(all(feature = "refresh-lock", not(unix)))]
+compile_error!("the refresh-lock feature is Unix only");
 pub mod pull;
 pub mod serve;
 pub mod store;
@@ -506,7 +508,13 @@ async fn store_generation(
         (Some(held), Some(valkey), Some((_, config))) => {
             lock::holds(valkey, config, &held.token).await
         }
-        _ => Ok(()),
+        (None, ..) => Ok(()),
+        // `Manifest::read` refuses `[refresh_lock]` without `[generations]`: never fail open.
+        (Some(_), ..) => Err(Msg::NeedsSections {
+            section: "refresh_lock",
+            needed: &["generations"],
+        }
+        .text()),
     };
     let document = config.key(&format!("generations/{generation}.json"));
     match store.get(&document, DOCUMENT_MAX).await? {

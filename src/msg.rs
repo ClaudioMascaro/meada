@@ -1209,12 +1209,14 @@ impl Msg<'_> {
                 format!(
                     "{current}: generation {id} has fence {fence}, below fence {held} in \
                      {pointer}: not swapped; set {fence_key} at or above {held} and publish \
-                     again, or delete {pointer}"
+                     again, or delete {pointer} (with [refresh_lock] turned off every fence is \
+                     0, so only deleting it helps)"
                 ),
                 format!(
                     "{current}: a geração {id} tem fence {fence}, abaixo do fence {held} em \
                      {pointer}: não trocada; defina {fence_key} igual ou acima de {held} e \
-                     publique de novo, ou apague {pointer}"
+                     publique de novo, ou apague {pointer} (com [refresh_lock] desligado todo \
+                     fence é 0, e só apagá-lo resolve)"
                 ),
             ),
             #[cfg(feature = "generation-pointer")]

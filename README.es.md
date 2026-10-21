@@ -372,7 +372,7 @@ siguientes en ella. Las herramientas, los parámetros y el texto de las respuest
 proxy inverso reenvía `Meada-Generation` en las respuestas. Una llamada fijada aún abierta en
 una generación que la retención de un pull borra puede fallar a mitad de camino.
 
-**Candado de refresh** (feature `refresh-lock`, que incluye `generation-pointer`;
+**Candado de refresh** (feature `refresh-lock`, que incluye `generation-pointer`, solo Unix;
 `cargo install meada --features refresh-lock`). Con la sección `[refresh_lock]`, que exige
 `[generations]`, todo el refresh corre bajo un candado en Valkey, y cada adquisición recibe un
 fence, de modo que un job superpuesto o trabado nunca reemplaza una generación nueva por una más
@@ -397,9 +397,9 @@ meada snapshot lock --workspace ops/meada.workspace.toml -- \
 hijo (128 más la señal cuando una señal lo terminó). Un candado ya tomado sale con 1 nombrando la
 clave, sin correr nada. Cuando una renovación encuentra otro token, o ninguna tuvo éxito durante
 un TTL entero, el candado está perdido: el grupo de procesos del hijo recibe SIGTERM (y SIGKILL
-10 s después si sigue vivo), y `lock` sale con 1 diciendo que lo perdió. Un SIGTERM o SIGINT a
-`lock` llega al grupo del mismo modo; cuando el hijo termina, lo que quedó en su grupo recibe
-SIGKILL, y en Linux el hijo recibe SIGTERM si `lock` muere antes. La indexación sigue sin red:
+10 s después si sigue vivo), y `lock` sale con 1 diciendo que lo perdió. Un SIGTERM, SIGINT, SIGHUP o
+SIGQUIT a `lock` llega al grupo del mismo modo; cuando el hijo termina, lo que quedó en su grupo
+de procesos recibe SIGKILL (un nieto que llama a `setsid` sale del grupo y escapa), y en Linux el hijo recibe SIGTERM si `lock` muere antes. La indexación sigue sin red:
 el `meada index` del hijo no abre ninguna conexión.
 
 Con `[refresh_lock]`, `meada snapshot publish` exige las dos variables, y antes de cada envío
@@ -414,7 +414,9 @@ nodo con fence mayor sale con 1 sin cambiar, y `meada status --generations` en e
 una línea `fence: stuck: ...` con los dos fences (su código de salida no cambia). Para salir de
 ahí, defina `{<key_prefix>}:fence` igual o por encima del mayor fence registrado (en Valkey o en
 el `<local_dir>/current` de algún nodo), o borre el `<local_dir>/current` del nodo, que entonces
-toma la generación actual.
+toma la generación actual. Apagar `[refresh_lock]` después de que los nodos registraron fences
+por encima de 0 también detiene la flota, ya que sin el candado todo fence es 0: borre el
+`<local_dir>/current` de cada nodo.
 
 ## Decisiones
 

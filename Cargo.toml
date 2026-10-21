@@ -24,9 +24,6 @@ http-body-util = "0.1.3"
 hyper = { version = "1.9.0", features = ["server", "http1"] }
 hyper-util = { version = "0.1.21", features = ["tokio"] }
 ignore = "0.4.33"
-# The refresh lock's child supervision (`meada snapshot lock`), only behind `refresh-lock`: a
-# signal to the child's process group and, on Linux, the signal the child gets when `lock` dies.
-nix = { version = "=0.31.3", optional = true, default-features = false, features = ["signal"] }
 nodejs-semver = "7"
 # The snapshot store's S3 client (ADR 0012), only behind `snapshot`: no default features (no
 # local file store), the `aws` client with ring for its signatures. `aws` itself would bring
@@ -80,6 +77,12 @@ tree-sitter-rust = "0.24.2"
 tree-sitter-typescript = "0.23.2"
 ureq = { version = "3.4.2", default-features = false, features = ["rustls"] }
 yaml-rust2 = { version = "0.13.0", default-features = false }
+
+# The refresh lock's child supervision (`meada snapshot lock`), only behind `refresh-lock` and
+# Unix only: a signal to the child's process group and, on Linux, the signal the child gets when
+# `lock` dies.
+[target.'cfg(unix)'.dependencies]
+nix = { version = "=0.31.3", optional = true, default-features = false, features = ["signal"] }
 
 # Cloud modules (ADR 0012), all off by default: a build without a feature carries none of its
 # crates. `valkey` is internal, enabled through the modules that need it.

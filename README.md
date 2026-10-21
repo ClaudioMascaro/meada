@@ -360,7 +360,7 @@ parâmetros e o texto das respostas não mudam. O proxy reverso repassa `Meada-G
 respostas. Uma chamada fixada ainda aberta numa geração que a retenção de um pull apaga pode
 falhar no meio.
 
-**Trava de refresh** (feature `refresh-lock`, que inclui `generation-pointer`;
+**Trava de refresh** (feature `refresh-lock`, que inclui `generation-pointer`, só Unix;
 `cargo install meada --features refresh-lock`). Com a seção `[refresh_lock]`, que exige
 `[generations]`, o refresh inteiro roda sob uma trava no Valkey, e cada aquisição ganha um
 fence, de modo que um job sobreposto ou travado nunca troca uma geração nova por uma mais
@@ -385,9 +385,10 @@ estender) e liberada no fim (comparar e apagar); o código de saída é o do fil
 sinal quando um sinal o encerrou). Uma trava já tomada sai com 1 nomeando a chave, sem rodar
 nada. Quando uma renovação acha outro token, ou nenhuma deu certo por um TTL inteiro, a trava
 está perdida: o grupo de processos do filho recebe SIGTERM (e SIGKILL 10 s depois, se ainda
-estiver vivo), e `lock` sai com 1 dizendo que a perdeu. Um SIGTERM ou SIGINT em `lock` chega ao
-grupo do mesmo jeito; quando o filho termina, o que sobrou no grupo recebe SIGKILL, e no Linux o
-filho recebe SIGTERM se `lock` morrer antes. A indexação continua sem rede: o `meada index` do
+estiver vivo), e `lock` sai com 1 dizendo que a perdeu. Um SIGTERM, SIGINT, SIGHUP ou SIGQUIT em `lock`
+chega ao grupo do mesmo jeito; quando o filho termina, o que sobrou no grupo de processos recebe
+SIGKILL (um neto que chama `setsid` sai do grupo e escapa), e no Linux o filho recebe SIGTERM se
+`lock` morrer antes. A indexação continua sem rede: o `meada index` do
 filho não abre conexão alguma.
 
 Com `[refresh_lock]`, `meada snapshot publish` exige as duas variáveis, e antes de cada envio
@@ -398,10 +399,12 @@ que o do seu arquivo de ponteiro; sem o arquivo, tomam a atual seja qual for o f
 nunca baixa nem apaga `{<key_prefix>}:fence`. Se um flush ou um failover do Valkey o perder, os
 fences seguintes ficam menores que os registrados e a frota para: o publish recusado sai com 1
 nomeando `{<key_prefix>}:fence`, o pull de um nó com fence maior sai com 1 sem trocar, e
-`meada status --generations` nesse nó imprime uma linha `fence: stuck: ...` com os dois fences
+`meada status --generations` nesse nó imprime uma linha `fence: travado: ...` (`fence: stuck: ...` fora do português) com os dois fences
 (o código de saída não muda). Para sair disso, defina `{<key_prefix>}:fence` igual ou acima do
 maior fence registrado (no Valkey ou no `<local_dir>/current` de algum nó), ou apague o
-`<local_dir>/current` do nó, que então toma a geração atual.
+`<local_dir>/current` do nó, que então toma a geração atual. Desligar `[refresh_lock]` depois
+que os nós gravaram fences acima de 0 também trava a frota, já que sem a trava todo fence é 0:
+apague o `<local_dir>/current` de cada nó.
 
 ## Decisões
 

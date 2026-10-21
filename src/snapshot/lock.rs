@@ -13,14 +13,17 @@
 //! Supervision: the child runs in a process group of its own, with the token and the fence in
 //! `MEADA_REFRESH_LOCK` and `MEADA_REFRESH_FENCE`. When a renewal finds another token, or none
 //! succeeded for a whole TTL, the lock is lost: the group gets SIGTERM, then SIGKILL after
-//! `KILL_GRACE`, and `lock` exits 1. A SIGTERM or SIGINT to `lock` is passed to the group the
-//! same way. Once the child exits, whatever it left in its group gets SIGKILL, so no orphan
-//! outlives `lock`; on Linux the child also gets SIGTERM if `lock` dies first.
+//! `KILL_GRACE`, and `lock` exits 1. A SIGTERM, SIGINT, SIGHUP or SIGQUIT to `lock` is passed to
+//! the group the same way. Once the child exits, whatever it left in its group gets SIGKILL, so
+//! nothing is left in its process group (a grandchild that calls `setsid` leaves it, and
+//! escapes); on Linux the child also gets SIGTERM if `lock` dies first. Unix only.
 
 use std::ffi::OsString;
+use std::future::Future;
 use std::io::Read;
 use std::os::unix::process::{CommandExt, ExitStatusExt};
 use std::path::Path;
+use std::pin::Pin;
 use std::process::Command;
 use std::time::Duration;
 
@@ -168,9 +171,11 @@ async fn supervise(
 ) -> Result<i32, String> {
     // Before the child exists: a signal to `lock` from now on reaches its group.
     let listen = |kind| signal(kind).map_err(|e| e.to_string());
-    let (mut term, mut int) = (
+    let (mut term, mut int, mut hup, mut quit) = (
         listen(SignalKind::terminate())?,
         listen(SignalKind::interrupt())?,
+        listen(SignalKind::hangup())?,
+        listen(SignalKind::quit())?,
     );
     let valkey = Valkey::connect(config).await?;
     let (lock, fence_key) = keys(config);
@@ -184,10 +189,14 @@ async fn supervise(
         .arg("PX")
         .arg(ms)
         .clone();
-    let taken: Option<String> = valkey
-        .query(&set)
-        .await
-        .map_err(|e| format!("{lock}: {e}"))?;
+    let taken: Option<String> = match valkey.query(&set).await {
+        Ok(taken) => taken,
+        // The server may have taken the lock and the answer been lost: release ours, if it is.
+        Err(e) => {
+            release(&valkey, &lock, &token).await;
+            return Err(format!("{lock}: {e}"));
+        }
+    };
     if taken.is_none() {
         return Err(Msg::LockHeld(&lock).text());
     }
@@ -221,33 +230,60 @@ async fn supervise(
             *kill_at = Some(Instant::now() + KILL_GRACE);
         }
     };
+    // The renewal in flight, polled as a branch of its own, so a signal, the child's exit or
+    // the SIGKILL timer never waits for Valkey: when it was sent, and the answer.
+    // The command outlives the future that borrows it: declared first, dropped last.
+    let renew = cmd("EVAL")
+        .arg(RENEW)
+        .arg(1)
+        .arg(&lock)
+        .arg(&token)
+        .arg(ms)
+        .clone();
+    let (shared, renew) = (&valkey, &renew);
+    type Renewal<'a> = Pin<Box<dyn Future<Output = (Instant, Option<i64>)> + 'a>>;
+    let mut renewing: Option<Renewal> = None;
     let status = loop {
         let deadline = renewed + ttl;
         tokio::select! {
             status = &mut exited => break status,
             _ = term.recv() => stop(&mut kill_at),
             _ = int.recv() => stop(&mut kill_at),
+            _ = hup.recv() => stop(&mut kill_at),
+            _ = quit.recv() => stop(&mut kill_at),
             _ = sleep_until(kill_at.unwrap_or(deadline)), if kill_at.is_some() => {
                 let _ = killpg(group, Signal::SIGKILL);
                 kill_at = Some(Instant::now() + KILL_GRACE);
             }
             _ = sleep_until(deadline), if !lost => {
                 lost = true;
+                renewing = None;
                 stop(&mut kill_at);
             }
-            _ = sleep_until(next), if !lost => {
+            _ = sleep_until(next), if !lost && renewing.is_none() => {
                 let sent = Instant::now();
-                let renew = cmd("EVAL").arg(RENEW).arg(1).arg(&lock).arg(&token).arg(ms).clone();
                 // A renewal that stalls past the deadline is one that did not succeed.
-                let answer = timeout_at(deadline.min(sent + period), valkey.query::<i64>(&renew));
-                match answer.await {
-                    Ok(Ok(1)) => renewed = sent,
-                    Ok(Ok(_)) => {
+                let bound = deadline.min(sent + period);
+                renewing = Some(Box::pin(async move {
+                    let answer = timeout_at(bound, shared.query::<i64>(renew)).await;
+                    (sent, answer.ok().and_then(Result::ok))
+                }));
+            }
+            (sent, answer) = async {
+                match renewing.as_mut() {
+                    Some(renewal) => renewal.await,
+                    None => std::future::pending().await,
+                }
+            }, if renewing.is_some() => {
+                renewing = None;
+                match answer {
+                    Some(1) => renewed = sent,
+                    Some(_) => {
                         lost = true;
                         stop(&mut kill_at);
                     }
                     // Failed or stalled: the deadline decides.
-                    _ => {}
+                    None => {}
                 }
                 next = sent + period;
             }

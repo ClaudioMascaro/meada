@@ -50,15 +50,44 @@ fn text(out: &Output) -> (String, String, Option<i32>) {
     (text(&out.stdout), text(&out.stderr), out.status.code())
 }
 
+/// A running `meada snapshot lock`, killed and reaped if a failed assertion drops it (its child
+/// gets SIGTERM on Linux when it dies).
+struct Running(Option<Child>);
+
+impl Running {
+    fn id(&self) -> u32 {
+        self.0.as_ref().expect("running").id()
+    }
+
+    /// Stdout, stderr and the exit code, once it exits.
+    fn wait(mut self) -> (String, String, Option<i32>) {
+        let child = self.0.take().expect("running");
+        text(&child.wait_with_output().unwrap())
+    }
+}
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        if let Some(mut child) = self.0.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
 /// `meada snapshot lock --workspace <manifest> -- sh -c <script>`, started.
-fn lock(dir: &Path, manifest: &str, script: &str) -> Child {
-    meada(dir, &["snapshot", "lock", "--workspace", manifest, "--"])
+fn lock(dir: &Path, manifest: &str, script: &str) -> Running {
+    let child = meada(dir, &["snapshot", "lock", "--workspace", manifest, "--"])
         .args(["sh", "-c", script])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("meada runs")
+        .expect("meada runs");
+    Running(Some(child))
 }
+
+/// A script fragment: a `sleep 60` in the background, its pid in `ops/sleeper` once whole.
+const SLEEPER: &str = "sleep 60 & echo $! > ops/sleeper.new && mv ops/sleeper.new ops/sleeper";
 
 /// `meada snapshot publish` as a job holding `token` at `fence` would run it.
 fn publish_as(dir: &Path, token: &str, fence: u64) -> (String, String, Option<i32>) {
@@ -105,7 +134,7 @@ fn two_lock_runs_at_once_one_runs_and_one_exits_1() {
     let first = lock(dir, MANIFEST, script);
     wait_for(&dir.join("ops/env"));
     let second = lock(dir, MANIFEST, "touch ops/ran");
-    let (stdout, stderr, code) = text(&second.wait_with_output().unwrap());
+    let (stdout, stderr, code) = second.wait();
     let key = format!("{{{}}}:lock", prefix(fleet.case));
     assert_eq!((code, stdout.as_str()), (Some(1), ""), "{stderr}");
     assert_eq!(
@@ -115,7 +144,7 @@ fn two_lock_runs_at_once_one_runs_and_one_exits_1() {
     assert!(!dir.join("ops/ran").exists());
 
     fs::write(dir.join("ops/go"), "").unwrap();
-    let (stdout, stderr, code) = text(&first.wait_with_output().unwrap());
+    let (stdout, stderr, code) = first.wait();
     assert_eq!(code, Some(0), "{stderr}");
     let env = fs::read_to_string(dir.join("ops/env")).unwrap();
     let (token, fence) = env.trim().split_once(' ').unwrap();
@@ -136,7 +165,7 @@ fn two_lock_runs_at_once_one_runs_and_one_exits_1() {
         MANIFEST,
         "echo $MEADA_REFRESH_FENCE > ops/fence; exit 3",
     );
-    assert_eq!(again.wait_with_output().unwrap().status.code(), Some(3));
+    assert_eq!(again.wait().2, Some(3));
     assert_eq!(fs::read_to_string(dir.join("ops/fence")).unwrap(), "2\n");
 }
 
@@ -225,13 +254,15 @@ fn a_child_outliving_the_ttl_with_renewal_blocked_is_terminated() {
     let proxied = toml.replace(&fleet.valkey, &format!("redis://127.0.0.1:{port}"));
     assert_ne!(proxied, toml);
     fs::write(dir.join("ops/lock.toml"), proxied).unwrap();
-    let script = "sleep 60 & echo $! > ops/sleeper; touch ops/started; wait; \
-                  exec \"$MEADA\" snapshot publish --workspace ops/meada.workspace.toml";
+    let script = format!(
+        "echo \"$MEADA_REFRESH_LOCK $MEADA_REFRESH_FENCE\" > ops/env; {SLEEPER}; wait; \
+         exec \"$MEADA\" snapshot publish --workspace ops/meada.workspace.toml"
+    );
     let start = Instant::now();
-    let child = lock(dir, "ops/lock.toml", script);
-    wait_for(&dir.join("ops/started"));
+    let child = lock(dir, "ops/lock.toml", &script);
+    wait_for(&dir.join("ops/sleeper"));
     blocked.store(true, Ordering::SeqCst);
-    let (stdout, stderr, code) = text(&child.wait_with_output().unwrap());
+    let (stdout, stderr, code) = child.wait();
     assert_eq!((code, stdout.as_str()), (Some(1), ""), "{stderr}");
     let lost =
         format!("meada: {lock_key}: the refresh lock was lost: the command was terminated\n");
@@ -244,6 +275,42 @@ fn a_child_outliving_the_ttl_with_renewal_blocked_is_terminated() {
     let sleeper = fs::read_to_string(dir.join("ops/sleeper")).unwrap();
     assert!(gone(sleeper.trim()), "the child's group outlived lock");
     assert_eq!(current(&fleet), (g1.trim().to_string(), "1".to_string()));
+    // The publish the stalled job would have run, with its token and fence: the lock expired,
+    // so it uploads nothing and the pointer stays.
+    let env = fs::read_to_string(dir.join("ops/env")).unwrap();
+    let (token, fence) = env.trim().split_once(' ').unwrap();
+    let (stdout, stderr, code) = publish_as(dir, token, fence.parse().unwrap());
+    assert_eq!((code, stdout.as_str()), (Some(1), ""), "{stderr}");
+    let not_held = format!("meada: {lock_key}: the refresh lock no longer holds this job's token");
+    assert!(stderr.starts_with(&not_held), "{stderr}");
+    assert_eq!(current(&fleet), (g1.trim().to_string(), "1".to_string()));
+}
+
+/// A child that ignores SIGTERM, when the lock is lost, gets SIGKILL `KILL_GRACE` (10 s) later
+/// with its whole group, and `lock` exits 1.
+#[test]
+fn a_child_that_ignores_sigterm_is_killed_after_the_grace() {
+    let Some(fleet) = fleet("lock_grace") else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let child = lock(dir, MANIFEST, &format!("trap '' TERM; {SLEEPER}; wait"));
+    wait_for(&dir.join("ops/sleeper"));
+    let lock_key = format!("{{{}}}:lock", prefix(fleet.case));
+    let mut valkey = admin(&fleet.valkey);
+    send(&mut valkey, &["SET", &lock_key, TOKEN]);
+    let taken = Instant::now();
+    let (stdout, stderr, code) = child.wait();
+    assert_eq!((code, stdout.as_str()), (Some(1), ""), "{stderr}");
+    assert!(stderr.contains("the refresh lock was lost"), "{stderr}");
+    assert!(
+        taken.elapsed() >= Duration::from_secs(10),
+        "{:?}",
+        taken.elapsed()
+    );
+    let sleeper = fs::read_to_string(dir.join("ops/sleeper")).unwrap();
+    assert!(gone(sleeper.trim()), "the child's group outlived lock");
+    send(&mut valkey, &["DEL", &lock_key]);
 }
 
 /// A renewal that finds another token in the lock (another job took it after it expired) loses
@@ -259,11 +326,12 @@ fn a_renewal_that_finds_another_token_terminates_the_child() {
     let lock_key = format!("{{{}}}:lock", prefix(fleet.case));
     let mut valkey = admin(&fleet.valkey);
     send(&mut valkey, &["SET", &lock_key, TOKEN]);
-    let (stdout, stderr, code) = text(&child.wait_with_output().unwrap());
+    let (stdout, stderr, code) = child.wait();
     assert_eq!((code, stdout.as_str()), (Some(1), ""), "{stderr}");
     assert!(stderr.contains("the refresh lock was lost"), "{stderr}");
     let held: Option<String> = redis::cmd("GET").arg(&lock_key).query(&mut valkey).unwrap();
     assert_eq!(held.as_deref(), Some(TOKEN));
+    send(&mut valkey, &["DEL", &lock_key]);
 }
 
 /// A SIGTERM to `lock` reaches the child's whole group; `lock` waits for it, releases the lock
@@ -274,11 +342,11 @@ fn a_sigterm_to_lock_reaches_the_child_and_releases_the_lock() {
         return;
     };
     let dir = &fleet.dir;
-    let child = lock(dir, MANIFEST, "sleep 60 & echo $! > ops/sleeper; wait");
+    let child = lock(dir, MANIFEST, &format!("{SLEEPER}; wait"));
     wait_for(&dir.join("ops/sleeper"));
     let pid = nix::unistd::Pid::from_raw(child.id() as i32);
     nix::sys::signal::kill(pid, nix::sys::signal::Signal::SIGTERM).unwrap();
-    let (_, stderr, code) = text(&child.wait_with_output().unwrap());
+    let (_, stderr, code) = child.wait();
     assert_eq!(code, Some(128 + 15), "{stderr}");
     let sleeper = fs::read_to_string(dir.join("ops/sleeper")).unwrap();
     assert!(gone(sleeper.trim()), "the child's group outlived lock");
@@ -299,13 +367,21 @@ fn a_publish_with_a_stale_fence_is_refused_while_a_newer_one_succeeds() {
     };
     let dir = &fleet.dir;
     let s3 = bucket(&fleet.endpoint, &fleet.bucket);
-    let out = meada(dir, &["snapshot", "publish", "--workspace", MANIFEST]).output();
-    let (stdout, stderr, code) = text(&out.unwrap());
-    assert_eq!((code, stdout.as_str()), (Some(1), ""), "{stderr}");
-    assert!(
-        stderr.contains("needs MEADA_REFRESH_LOCK and MEADA_REFRESH_FENCE"),
-        "{stderr}"
-    );
+    // Neither variable, only the token, only the fence.
+    let only: [&[(&str, &str)]; 3] = [
+        &[],
+        &[("MEADA_REFRESH_LOCK", TOKEN)],
+        &[("MEADA_REFRESH_FENCE", "7")],
+    ];
+    for vars in only {
+        let mut publish = meada(dir, &["snapshot", "publish", "--workspace", MANIFEST]);
+        let (stdout, stderr, code) = text(&publish.envs(vars.iter().copied()).output().unwrap());
+        assert_eq!((code, stdout.as_str()), (Some(1), ""), "{vars:?}: {stderr}");
+        assert!(
+            stderr.contains("needs MEADA_REFRESH_LOCK and MEADA_REFRESH_FENCE"),
+            "{vars:?}: {stderr}"
+        );
+    }
     assert!(objects(&s3, "prod/meada").is_empty());
 
     let p = prefix(fleet.case);
@@ -341,6 +417,7 @@ fn a_publish_with_a_stale_fence_is_refused_while_a_newer_one_succeeds() {
     assert_eq!(code, Some(0), "{stderr}");
     assert_ne!(g2.trim(), g1);
     assert_eq!(current(&fleet), (g2.trim().to_string(), "6".to_string()));
+    send(&mut valkey, &["DEL", &lock_key]);
 }
 
 /// After `DEL {<prefix>}:fence {<prefix>}:current` the next `lock` publishes at fence 1, but a
@@ -372,7 +449,7 @@ fn a_lost_fence_stops_a_node_until_its_pointer_file_goes() {
     send(&mut valkey, &["DEL", &fence_key, &current_key]);
     next_commit(dir, "chain-web", "after_flush");
     let script = "exec \"$MEADA\" snapshot publish --workspace ops/meada.workspace.toml";
-    let (g2, stderr, code) = text(&lock(dir, MANIFEST, script).wait_with_output().unwrap());
+    let (g2, stderr, code) = lock(dir, MANIFEST, script).wait();
     assert_eq!(code, Some(0), "{stderr}");
     let g2 = g2.trim().to_string();
     assert_eq!(current(&fleet), (g2.clone(), "1".to_string()));
