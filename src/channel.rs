@@ -654,4 +654,47 @@ mod tests {
             );
         }
     }
+
+    /// An inline handler is named after its broker kind and the channels it consumes, in the
+    /// order the pack found them.
+    #[test]
+    fn an_inline_handler_is_named_after_its_channels_in_the_order_found() {
+        use crate::contract::Site;
+        use crate::index::Indexed;
+        use crate::lang::{LanguagePack, ts::TsJs};
+        use crate::resolve::{Code, Resolver};
+        use std::collections::BTreeMap;
+
+        let src = r#"import { Kafka } from "kafkajs";
+const kafka = new Kafka({ brokers: ["k:9092"] });
+const consumer = kafka.consumer({ groupId: "g" });
+export async function listen() {
+  await consumer.subscribe({ topics: ["orders.created", "billing.invoices"] });
+  await consumer.run({ eachMessage: async () => {} });
+}
+"#;
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("a.ts", &facts)]);
+        let modules = TsJs.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &TsJs);
+        let code = Code::new(&resolver, &files, &TsJs);
+        let indexed = Indexed {
+            manifests: &[],
+            tsconfigs: &[],
+            exported: &[],
+            files: &["a.ts"],
+        };
+        let sites: Vec<_> = Channel
+            .extract(&code, &indexed)
+            .into_iter()
+            .map(|f| match f.site {
+                Site::Inline { name, .. } => name,
+                _ => panic!("a consumer of an inline handler"),
+            })
+            .collect();
+        assert_eq!(
+            sites, ["kafka orders.created billing.invoices"; 2],
+            "one site per topic, both named alike"
+        );
+    }
 }
