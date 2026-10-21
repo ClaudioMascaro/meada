@@ -69,6 +69,7 @@ impl Server {
 
     /// An MCP client of the endpoint at `path`.
     async fn client(&self, path: &str) -> RunningService<RoleClient, ()> {
+        crate::common::crypto_provider();
         let transport = StreamableHttpClientTransport::from_uri(format!("{}{path}", self.url));
         ().serve(transport).await.unwrap()
     }

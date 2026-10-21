@@ -33,6 +33,16 @@ All notable changes to Meada are recorded here. The format follows
   source (`static` keys from variables or files, `web-identity`, `pod-identity` or `instance`),
   TLS is required outside loopback, and no request follows a redirect. `meada index` stays
   offline.
+- Server mode, snapshot store pull (ADR 0012, feature `snapshot`): `meada snapshot pull
+  --workspace <manifest>` fetches the store's current generation into the section's
+  `local_dir`, checks every bundle's size and BLAKE3 hash against the generation document,
+  extracts it as hostile input (ids and identities checked before they become paths; no
+  absolute path, `..`, escaping link, write through a symbolic link or special file; byte and
+  entry ceilings), replaces each mirror's `.git/config` with a minimal one and removes its
+  `.git/hooks`, and swaps the node's pointer file (`<local_dir>/current`, `<generation id>
+  <fence>`) by rename, keeping the current and the previous generation. Meada's `git` calls on
+  pulled mirrors read no system or global configuration. One pull runs at a time per
+  `local_dir`; `--every <seconds>` repeats it. A failed pull changes nothing.
 - npm installer (spec #32): cargo-dist builds and publishes an npm package named `meada` with each
   release, at the crate's version, so `npx meada mcp` launches the MCP server and `npx meada
   <command>` runs any command; the release configuration is planned as a dry run on pull requests.

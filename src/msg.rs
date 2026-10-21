@@ -241,6 +241,49 @@ pub enum Msg<'a> {
     Snapshot,
     #[cfg(feature = "snapshot")]
     SnapshotPublish,
+    #[cfg(feature = "snapshot")]
+    SnapshotPull,
+    #[cfg(feature = "snapshot")]
+    SnapshotEvery,
+    #[cfg(feature = "snapshot")]
+    SnapshotNoLocalDir(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotPulling(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotNoCurrent(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotBadId(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotBadBundleKey(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotPointerBad(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotNotDocument(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotIdentityChars,
+    #[cfg(feature = "snapshot")]
+    SnapshotBytesCeiling(u64),
+    #[cfg(feature = "snapshot")]
+    SnapshotEntriesCeiling(u64),
+    #[cfg(feature = "snapshot")]
+    SnapshotEntryHeader(u64),
+    #[cfg(feature = "snapshot")]
+    SnapshotEntryPath,
+    #[cfg(feature = "snapshot")]
+    SnapshotEntryNested,
+    #[cfg(feature = "snapshot")]
+    SnapshotEntryLink,
+    #[cfg(feature = "snapshot")]
+    SnapshotEntryThrough,
+    #[cfg(feature = "snapshot")]
+    SnapshotEntrySpecial,
+    #[cfg(feature = "snapshot")]
+    SnapshotNoGit,
+    #[cfg(feature = "snapshot")]
+    SnapshotHead {
+        found: &'a str,
+        head: &'a str,
+    },
     About,
     Index,
     Status,
@@ -778,6 +821,132 @@ impl Msg<'_> {
                     .into(),
                 "Envia o workspace como uma geração, quando cada índice equivale ao seu espelho."
                     .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotPull => pick(
+                "Fetch the store's current generation into local_dir, verify it and make it the \
+                 node's current one."
+                    .into(),
+                "Baixa a geração atual do store em local_dir, verifica-a e a torna a atual do nó."
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEvery => pick(
+                "Pull again every this many seconds.".into(),
+                "Repete o pull a cada tantos segundos.".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotNoLocalDir(manifest) => pick(
+                format!("{manifest}: `snapshot.local_dir` is not set: the pull writes there"),
+                format!("{manifest}: `snapshot.local_dir` não está definido: o pull grava lá"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotPulling(dir) => pick(
+                format!("a pull is running in {dir}"),
+                format!("um pull está em andamento em {dir}"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotNoCurrent(key) => pick(
+                format!("{key}: not found: no generation is published there"),
+                format!("{key}: não encontrado: nenhuma geração foi publicada lá"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotBadId(key) => pick(
+                format!("{key}: does not hold an id of 16 lowercase hex characters"),
+                format!("{key}: não contém um id de 16 caracteres hexadecimais minúsculos"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotBadBundleKey(key) => pick(
+                format!(
+                    "the bundle key `{key}` is not repos/<identity>/<id>.tar under the prefix, \
+                     with an id of 16 lowercase hex characters"
+                ),
+                format!(
+                    "a chave de bundle `{key}` não é repos/<identidade>/<id>.tar sob o prefixo, \
+                     com um id de 16 caracteres hexadecimais minúsculos"
+                ),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotPointerBad(path) => pick(
+                format!(
+                    "{path}: not `<generation id> <fence>`; delete it to take the store's \
+                     current generation"
+                ),
+                format!(
+                    "{path}: não é `<id da geração> <fence>`; apague-o para receber a geração \
+                     atual do store"
+                ),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotNotDocument(key) => pick(
+                format!("{key}: not the generation document of its id"),
+                format!("{key}: não é o documento de geração do seu id"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotIdentityChars => pick(
+                "not a repository identity: it holds whitespace, a quote, a backslash or a \
+                 control character"
+                    .into(),
+                "não é uma identidade de repositório: contém espaço, aspas, barra invertida ou \
+                 caractere de controle"
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotBytesCeiling(max) => pick(
+                format!("past the ceiling of {max} bytes per generation"),
+                format!("acima do teto de {max} bytes por geração"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEntriesCeiling(max) => pick(
+                format!("past the ceiling of {max} archive entries per generation"),
+                format!("acima do teto de {max} entradas de arquivo por geração"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEntryHeader(max) => pick(
+                format!("a long name or a pax header past the ceiling of {max} bytes"),
+                format!("um nome longo ou um cabeçalho pax acima do teto de {max} bytes"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEntryNested => pick(
+                "a nested repository: a `.git` below the mirror's own, or under its `.git/modules`"
+                    .into(),
+                "um repositório aninhado: um `.git` abaixo do próprio do espelho, ou sob o seu \
+                 `.git/modules`"
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEntryPath => pick(
+                "an absolute path, a `.` or `..` component, or a path other than index.db first \
+                 and the mirror under mirror/"
+                    .into(),
+                "um caminho absoluto, um componente `.` ou `..`, ou um caminho que não é \
+                 index.db primeiro e o espelho sob mirror/"
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEntryLink => pick(
+                "a link whose target leaves the repository directory".into(),
+                "um link cujo alvo sai do diretório do repositório".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEntryThrough => pick(
+                "written through a symbolic link or over an earlier entry".into(),
+                "gravada através de um link simbólico ou sobre uma entrada anterior".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEntrySpecial => pick(
+                "a device, a FIFO or another special file".into(),
+                "um dispositivo, um FIFO ou outro arquivo especial".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotNoGit => pick(
+                "the mirror has no .git directory".into(),
+                "o espelho não tem um diretório .git".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotHead { found, head } => pick(
+                format!("the mirror's HEAD is {found}, not the document's {head}"),
+                format!("o HEAD do espelho é {found}, não o {head} do documento"),
             ),
             Msg::About => pick(
                 "LLM-free code graph for agents and people".into(),

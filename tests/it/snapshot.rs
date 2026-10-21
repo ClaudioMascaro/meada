@@ -1,5 +1,6 @@
-//! The snapshot store's publish (ADR 0012, spec #259, feature `snapshot`): `meada snapshot
-//! publish --workspace` over the chain's mirrors, against the local S3-compatible server
+//! The snapshot store (ADR 0012, spec #259, feature `snapshot`): `meada snapshot publish
+//! --workspace` over the chain's mirrors and `meada snapshot pull --workspace` on a node's
+//! manifest elsewhere, against the local S3-compatible server
 //! `MEADA_TEST_S3_ENDPOINT` names (path style). Without it the store tests print why and skip;
 //! with `MEADA_TEST_SERVICES_REQUIRED=1` they fail.
 #![cfg(feature = "snapshot")]
@@ -13,7 +14,9 @@ use std::time::{Duration, SystemTime};
 use object_store::aws::{AmazonS3, AmazonS3Builder};
 use object_store::path::Path as Key;
 use object_store::signer::Signer;
-use object_store::{Attribute, GetOptions, ObjectMeta, ObjectStore, ObjectStoreExt};
+use object_store::{
+    Attribute, Attributes, GetOptions, ObjectMeta, ObjectStore, ObjectStoreExt, PutOptions,
+};
 
 use crate::common::git;
 use crate::manifest::{CHAIN, MANIFEST, chain_manifest, run};
@@ -41,6 +44,7 @@ fn block_on<T>(future: impl std::future::Future<Output = T>) -> T {
 
 /// A client of `bucket` as the tests see the store, the bucket created.
 fn bucket(endpoint: &str, bucket: &str) -> AmazonS3 {
+    crate::common::crypto_provider();
     let s3 = AmazonS3Builder::new()
         .with_endpoint(endpoint)
         .with_region("us-east-1")
@@ -459,5 +463,567 @@ fn snapshot_section_errors_name_the_file_the_line_and_the_key() {
             stderr.starts_with(at) && stderr.contains(expected),
             "{stderr}"
         );
+    }
+}
+
+// The pull.
+
+/// A node's manifest, `<dir>/node/meada.workspace.toml`, listing no repository: its
+/// `[snapshot]` section names the same store, and `local_dir = "generations"`. Returns the
+/// manifest, relative to `dir`, and the local directory.
+fn node(dir: &Path, endpoint: &str, bucket: &str) -> (String, PathBuf) {
+    let node = dir.join("node");
+    let _ = fs::remove_dir_all(&node);
+    fs::create_dir_all(&node).unwrap();
+    fs::write(node.join("s3-secret"), format!("{SECRET}\n")).unwrap();
+    let toml = format!(
+        "index_dir = \"indexes\"\n{}local_dir = \"generations\"\n",
+        section(endpoint, bucket)
+    );
+    fs::write(node.join("meada.workspace.toml"), toml).unwrap();
+    ("node/meada.workspace.toml".into(), node.join("generations"))
+}
+
+/// `meada snapshot pull --workspace <manifest> <more>` in `dir`, as `publish`.
+fn pull(dir: &Path, manifest: &str, more: &[&str]) -> (String, String, Option<i32>) {
+    let out = pull_command(dir, manifest, more)
+        .output()
+        .expect("meada runs");
+    let text = |bytes: &[u8]| String::from_utf8_lossy(bytes).into_owned();
+    (text(&out.stdout), text(&out.stderr), out.status.code())
+}
+
+fn pull_command(dir: &Path, manifest: &str, more: &[&str]) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_meada"));
+    command
+        .current_dir(dir)
+        .args(["snapshot", "pull", "--workspace", manifest])
+        .args(more)
+        .env("LANG", "en_US.UTF-8")
+        .env("MEADA_TEST_S3_KEY", KEY_ID)
+        .env_remove("MEADA_TEST_S3_TOKEN");
+    command
+}
+
+/// What `local_dir` holds: each name, sorted, and the pointer file.
+fn held(local: &Path) -> (Vec<String>, String) {
+    let mut names: Vec<String> = (fs::read_dir(local).unwrap())
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    let pointer = fs::read_to_string(local.join("current")).unwrap_or_default();
+    (names, pointer)
+}
+
+/// The files of the mirror at `dir`, bytes included, but for the git configuration and hooks
+/// a pull replaces and removes.
+fn mirror_files(dir: &Path) -> Vec<(String, Vec<u8>)> {
+    (crate::manifest::contents(dir).into_iter())
+        .filter(|(path, _)| path != ".git/config" && !path.starts_with(".git/hooks/"))
+        .collect()
+}
+
+/// A commit in `repo` and `meada index --workspace`, so the next publish is a new generation.
+fn next_commit(dir: &Path, repo: &str, line: &str) {
+    let file = dir.join(repo).join("src/status.ts");
+    let src = fs::read_to_string(&file).unwrap();
+    fs::write(&file, format!("{src}\nexport const {line} = 1;\n")).unwrap();
+    git(&dir.join(repo), &["commit", "-q", "-am", line]);
+    assert!(run(dir, "index").2, "index");
+}
+
+#[test]
+fn pull_takes_the_published_generation_and_keeps_the_previous_one() {
+    let Some(endpoint) = service() else { return };
+    let name = bucket_name("snapshot-pull");
+    bucket(&endpoint, &name);
+    let dir = store_manifest("snapshot_pull", &endpoint, &name, SECRET);
+    let (generation, stderr, code) = publish(&dir, MANIFEST);
+    assert_eq!(code, Some(0), "{stderr}");
+    let (manifest, local) = node(&dir, &endpoint, &name);
+
+    // Published, then pulled in another directory: the same mirrors and indexes.
+    let (stdout, stderr, code) = pull(&dir, &manifest, &[]);
+    assert_eq!(
+        (stdout.as_str(), code),
+        (generation.as_str(), Some(0)),
+        "{stderr}"
+    );
+    let first = generation.trim().to_string();
+    // The generations held, the pointer file and the lock.
+    let names = |mut ids: Vec<String>| {
+        ids.extend(["current".to_string(), "pull.lock".to_string()]);
+        ids.sort();
+        ids
+    };
+    assert_eq!(
+        held(&local),
+        (names(vec![first.clone()]), format!("{first} 0\n"))
+    );
+    let at = local.join(&first);
+    let document: serde_json::Value =
+        serde_json::from_slice(&fs::read(at.join("generation.json")).unwrap()).unwrap();
+    let repositories = document["repositories"].as_array().unwrap();
+    assert_eq!(repositories.len(), CHAIN.len());
+    for ((identity, path), entry) in CHAIN.iter().zip(repositories) {
+        assert_eq!(entry["identity"], *identity);
+        let bundle = entry["bundle"].as_str().unwrap();
+        let bundle = bundle
+            .rsplit('/')
+            .next()
+            .unwrap()
+            .strip_suffix(".tar")
+            .unwrap();
+        let pulled = at.join(bundle);
+        let index = dir.join("indexes").join(identity).join("index.db");
+        assert_eq!(
+            fs::read(pulled.join("index.db")).unwrap(),
+            fs::read(index).unwrap(),
+            "{identity}"
+        );
+        let mirror = pulled.join("mirror");
+        assert_eq!(
+            mirror_files(&mirror),
+            mirror_files(&dir.join(path)),
+            "{identity}"
+        );
+        assert_eq!(
+            fs::read_to_string(mirror.join(".git/config")).unwrap(),
+            format!(
+                "[core]\n\trepositoryformatversion = 0\n\tbare = false\n\
+                 [remote \"origin\"]\n\turl = https://{identity}\n"
+            )
+        );
+        assert!(!mirror.join(".git/hooks").exists(), "{identity}");
+    }
+
+    // Already current: the same id, nothing moves.
+    let before = held(&local);
+    let (again, stderr, code) = pull(&dir, &manifest, &[]);
+    assert_eq!(
+        (again.as_str(), code),
+        (generation.as_str(), Some(0)),
+        "{stderr}"
+    );
+    assert_eq!(held(&local), before);
+
+    // One pull at a time: a second one, while the lock is held, exits 0 saying so.
+    let lock = fs::File::open(local.join("pull.lock")).unwrap();
+    lock.lock().unwrap();
+    let (stdout, stderr, code) = pull(&dir, &manifest, &[]);
+    assert_eq!((stdout.as_str(), code), ("", Some(0)));
+    assert!(stderr.contains("a pull is running in "), "{stderr}");
+    drop(lock);
+
+    // A second generation: the first is kept as the previous one.
+    next_commit(&dir, "chain-web", "second");
+    let (second, stderr, code) = publish(&dir, MANIFEST);
+    assert_eq!(code, Some(0), "{stderr}");
+    let second = second.trim().to_string();
+    let (stdout, stderr, code) = pull(&dir, &manifest, &[]);
+    assert_eq!(
+        (stdout.trim(), code),
+        (second.as_str(), Some(0)),
+        "{stderr}"
+    );
+    let both = vec![first.clone(), second.clone()];
+    assert_eq!(held(&local), (names(both), format!("{second} 0\n")));
+
+    // `--every` repeats the pull: a third generation published while it runs is pulled, and
+    // the first one, older than the previous, is deleted.
+    let mut every = pull_command(&dir, &manifest, &["--every", "1"])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let stdout = every.stdout.take().unwrap();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        use std::io::BufRead;
+        for line in std::io::BufReader::new(stdout).lines() {
+            let _ = tx.send(line.unwrap());
+        }
+    });
+    next_commit(&dir, "chain-web", "third");
+    let (third, stderr, code) = publish(&dir, MANIFEST);
+    assert_eq!(code, Some(0), "{stderr}");
+    let third = third.trim().to_string();
+    let line = rx.recv_timeout(Duration::from_secs(60));
+    let _ = every.kill();
+    let _ = every.wait();
+    // Nothing was printed while the second generation stayed current.
+    assert_eq!(line.as_deref(), Ok(third.as_str()));
+    let both = vec![second.clone(), third.clone()];
+    assert_eq!(held(&local), (names(both), format!("{third} 0\n")));
+}
+
+/// Puts `bytes` at `key` with the metadata Meada stores every object with.
+fn put_stored(s3: &AmazonS3, key: &str, bytes: &[u8]) {
+    let mut attributes = Attributes::new();
+    let size = bytes.len().to_string();
+    let hash = blake3::hash(bytes).to_hex().to_string();
+    attributes.insert(Attribute::Metadata("meada-size".into()), size.into());
+    attributes.insert(Attribute::Metadata("meada-blake3".into()), hash.into());
+    let options = PutOptions {
+        attributes,
+        ..PutOptions::default()
+    };
+    block_on(s3.put_opts(&Key::from(key), bytes.to_vec().into(), options)).unwrap();
+}
+
+/// A generation of one repository made by hand: the bundle `tar` stored under `identity`, a
+/// document recording `recorded` (or the bundle's own size and hash) and `head`, and the store's
+/// pointer moved to it. Returns its id.
+fn stage(
+    s3: &AmazonS3,
+    identity: &str,
+    head: &str,
+    tar: &[u8],
+    recorded: Option<(u64, String)>,
+) -> String {
+    let bundle = blake3::hash(tar).to_hex()[..16].to_string();
+    let key = format!("prod/meada/repos/{identity}/{bundle}.tar");
+    put_stored(s3, &key, tar);
+    let (size, hash) =
+        recorded.unwrap_or_else(|| (tar.len() as u64, blake3::hash(tar).to_hex().to_string()));
+    let generation = meada::snapshot::generation_id(&[(identity, &bundle)]);
+    let document = serde_json::json!({"generation": generation, "repositories": [{
+        "identity": identity, "head": head, "bundle": key, "blocks": {},
+        "size": size, "blake3": hash}]});
+    let document = serde_json::to_vec(&document).unwrap();
+    put_stored(
+        s3,
+        &format!("prod/meada/generations/{generation}.json"),
+        &document,
+    );
+    put_stored(
+        s3,
+        "prod/meada/current",
+        format!("{generation}\n").as_bytes(),
+    );
+    generation
+}
+
+/// A bundle: `index.db`, the mirror at `mirror` (symbolic links as links), then `extra` entries
+/// written raw, path and link name as given.
+fn bundle_of(index: &Path, mirror: &Path, extra: &[(&[u8], tar::EntryType, &[u8])]) -> Vec<u8> {
+    let mut tar = tar::Builder::new(Vec::new());
+    tar.follow_symlinks(false);
+    tar.append_path_with_name(index, "index.db").unwrap();
+    tar.append_dir_all("mirror", mirror).unwrap();
+    for (path, kind, link) in extra {
+        let mut header = tar::Header::new_gnu();
+        header.as_old_mut().name[..path.len()].copy_from_slice(path);
+        header.as_old_mut().linkname[..link.len()].copy_from_slice(link);
+        header.set_entry_type(*kind);
+        let data: &[u8] = if *kind == tar::EntryType::Regular {
+            b"x"
+        } else {
+            b""
+        };
+        header.set_size(data.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        tar.append(&header, data).unwrap();
+    }
+    tar.into_inner().unwrap()
+}
+
+#[test]
+fn a_corrupted_or_hostile_generation_fails_the_pull_and_leaves_the_previous_one() {
+    let Some(endpoint) = service() else { return };
+    let name = bucket_name("snapshot-hostile");
+    let s3 = bucket(&endpoint, &name);
+    let dir = store_manifest("snapshot_hostile", &endpoint, &name, SECRET);
+    let (_, stderr, code) = publish(&dir, MANIFEST);
+    assert_eq!(code, Some(0), "{stderr}");
+    let (manifest, local) = node(&dir, &endpoint, &name);
+    let (_, stderr, code) = pull(&dir, &manifest, &[]);
+    assert_eq!(code, Some(0), "{stderr}");
+    let before = held(&local);
+
+    let (identity, path) = CHAIN[0];
+    let (mirror, index) = (
+        dir.join(path),
+        dir.join("indexes").join(identity).join("index.db"),
+    );
+    let head = git(&mirror, &["rev-parse", "HEAD"]).trim().to_string();
+    let valid = bundle_of(&index, &mirror, &[]);
+    let escaped = dir.join("escaped");
+    let _ = fs::remove_file(&escaped);
+    let link = tar::EntryType::Symlink;
+    let file = tar::EntryType::Regular;
+    type Stage<'a> = Box<dyn Fn() -> String + 'a>;
+    let cases: Vec<(&str, Stage, &str)> = vec![
+        (
+            "a corrupted bundle",
+            Box::new(|| {
+                let hash = blake3::hash(b"another bundle").to_hex().to_string();
+                stage(
+                    &s3,
+                    identity,
+                    &head,
+                    &valid,
+                    Some((valid.len() as u64, hash)),
+                )
+            }),
+            "not stored with the size and hash it records",
+        ),
+        (
+            "a truncated bundle",
+            Box::new(|| {
+                let hash = blake3::hash(&valid).to_hex().to_string();
+                stage(
+                    &s3,
+                    identity,
+                    &head,
+                    &valid[..valid.len() - 512],
+                    Some((valid.len() as u64, hash)),
+                )
+            }),
+            "not stored with the size and hash it records",
+        ),
+        (
+            "a traversal entry",
+            Box::new(|| {
+                let tar = bundle_of(&index, &mirror, &[(b"mirror/../../../escaped", file, b"")]);
+                stage(&s3, identity, &head, &tar, None)
+            }),
+            "`..` component",
+        ),
+        (
+            "an escaping link",
+            Box::new(|| {
+                let tar = bundle_of(
+                    &index,
+                    &mirror,
+                    &[(b"mirror/out", link, b"../../../../escaped")],
+                );
+                stage(&s3, identity, &head, &tar, None)
+            }),
+            "leaves the repository directory",
+        ),
+        (
+            "a hostile id",
+            Box::new(|| {
+                put_stored(&s3, "prod/meada/current", b"../../../../escaped\n");
+                String::new()
+            }),
+            "prod/meada/current: does not hold an id",
+        ),
+        (
+            "a hostile identity",
+            Box::new(|| stage(&s3, "example.com/../../escaped", &head, &valid, None)),
+            "not a repository identity",
+        ),
+    ];
+    for (case, staged, expected) in cases {
+        staged();
+        let (stdout, stderr, code) = pull(&dir, &manifest, &[]);
+        assert_eq!((stdout.as_str(), code), ("", Some(1)), "{case}: {stderr}");
+        assert!(stderr.contains(expected), "{case}: {stderr}");
+        assert_eq!(held(&local), before, "{case}");
+        assert!(!escaped.exists(), "{case}");
+    }
+
+    // A store that cannot be reached changes nothing either.
+    let toml = fs::read_to_string(dir.join(&manifest)).unwrap();
+    let toml = toml.replace(&endpoint, "http://127.0.0.1:1");
+    fs::write(dir.join("node/unreachable.toml"), toml).unwrap();
+    let (_, _, code) = pull(&dir, "node/unreachable.toml", &[]);
+    assert_eq!(code, Some(1));
+    assert_eq!(held(&local), before);
+}
+
+/// A bundle whose `.git/config` sets `core.fsmonitor` and `core.hooksPath`, and whose
+/// `.git/hooks` holds hooks: the pull replaces the one and removes the other, so neither the
+/// pull's `git` calls nor a later `git status` in the pulled mirror runs anything.
+#[cfg(unix)]
+#[test]
+fn a_pulled_mirror_runs_nothing_its_bundle_configured() {
+    use std::os::unix::fs::PermissionsExt;
+    let Some(endpoint) = service() else { return };
+    let name = bucket_name("snapshot-config");
+    let s3 = bucket(&endpoint, &name);
+    let dir = store_manifest("snapshot_config", &endpoint, &name, SECRET);
+    let (identity, path) = CHAIN[0];
+    let index = dir.join("indexes").join(identity).join("index.db");
+
+    // The hostile mirror: a copy of the web mirror whose git runs `ran` when it can.
+    let ran = dir.join("ran");
+    let script = dir.join("hook.sh");
+    fs::write(
+        &script,
+        format!("#!/bin/sh\necho \"$0\" >> {}\n", ran.display()),
+    )
+    .unwrap();
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+    let hostile = dir.join("hostile");
+    let _ = fs::remove_dir_all(&hostile);
+    assert!(
+        Command::new("cp")
+            .args(["-a"])
+            .arg(dir.join(path))
+            .arg(&hostile)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let hooks = hostile.join(".git/hooks");
+    fs::create_dir_all(&hooks).unwrap();
+    for hook in ["post-checkout", "pre-commit", "fsmonitor-watchman"] {
+        fs::copy(&script, hooks.join(hook)).unwrap();
+    }
+    let config = hostile.join(".git/config");
+    let text = fs::read_to_string(&config).unwrap();
+    let fsmonitor = format!(
+        "[core]\n\tfsmonitor = {}\n\thooksPath = {}\n",
+        script.display(),
+        hooks.display()
+    );
+    fs::write(&config, format!("{text}{fsmonitor}")).unwrap();
+    // The configuration does run the script where it stays.
+    let status = |at: &Path| {
+        Command::new("git")
+            .current_dir(at)
+            .args(["status", "--porcelain"])
+            .output()
+            .unwrap()
+    };
+    status(&hostile);
+    assert!(ran.exists(), "the hostile configuration runs the script");
+    fs::remove_file(&ran).unwrap();
+
+    let head = git(&hostile, &["rev-parse", "HEAD"]).trim().to_string();
+    let generation = stage(
+        &s3,
+        identity,
+        &head,
+        &bundle_of(&index, &hostile, &[]),
+        None,
+    );
+    let (manifest, local) = node(&dir, &endpoint, &name);
+    let (stdout, stderr, code) = pull(&dir, &manifest, &[]);
+    assert_eq!(
+        (stdout.trim(), code),
+        (generation.as_str(), Some(0)),
+        "{stderr}"
+    );
+    assert!(!ran.exists(), "the pull ran the script");
+    let document: serde_json::Value =
+        serde_json::from_slice(&fs::read(local.join(&generation).join("generation.json")).unwrap())
+            .unwrap();
+    let bundle = document["repositories"][0]["bundle"].as_str().unwrap();
+    let bundle = bundle
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .strip_suffix(".tar")
+        .unwrap();
+    let pulled = local.join(&generation).join(bundle).join("mirror");
+    assert!(!pulled.join(".git/hooks").exists());
+    let out = status(&pulled);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        !ran.exists(),
+        "git status in the pulled mirror ran the script"
+    );
+}
+
+/// A bundle carrying a nested repository behind a gitlink, its configuration running a script
+/// through `core.fsmonitor`: as a `.git` directory in the submodule, or as a gitfile pointing
+/// into `.git/modules`. `git status` in the mirror descends into it and runs the script, so the
+/// pull refuses the entry, runs nothing and keeps the previous generation.
+#[cfg(unix)]
+#[test]
+fn a_nested_repository_fails_the_pull_and_runs_nothing() {
+    use std::os::unix::fs::PermissionsExt;
+    let Some(endpoint) = service() else { return };
+    let name = bucket_name("snapshot-nested");
+    let s3 = bucket(&endpoint, &name);
+    let dir = store_manifest("snapshot_nested", &endpoint, &name, SECRET);
+    let (_, stderr, code) = publish(&dir, MANIFEST);
+    assert_eq!(code, Some(0), "{stderr}");
+    let (manifest, local) = node(&dir, &endpoint, &name);
+    let (_, stderr, code) = pull(&dir, &manifest, &[]);
+    assert_eq!(code, Some(0), "{stderr}");
+    let before = held(&local);
+
+    let (identity, path) = CHAIN[0];
+    let index = dir.join("indexes").join(identity).join("index.db");
+    let ran = dir.join("ran");
+    let script = dir.join("hook.sh");
+    let text = format!("#!/bin/sh\necho \"$0\" >> {}\n", ran.display());
+    fs::write(&script, text).unwrap();
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+    let fsmonitor = format!("[core]\n\tfsmonitor = {}\n", script.display());
+
+    for layout in ["directory", "gitfile"] {
+        // The web mirror with `sub`, a repository of its own, committed as a gitlink.
+        let hostile = dir.join(format!("hostile-{layout}"));
+        let _ = fs::remove_dir_all(&hostile);
+        let mut copy = Command::new("cp");
+        copy.arg("-a").arg(dir.join(path)).arg(&hostile);
+        assert!(copy.status().unwrap().success());
+        let sub = hostile.join("sub");
+        fs::create_dir_all(&sub).unwrap();
+        git(&sub, &["-c", "init.defaultBranch=main", "init", "-q"]);
+        fs::write(sub.join("a.txt"), "a\n").unwrap();
+        git(&sub, &["add", "a.txt"]);
+        git(&sub, &["commit", "-q", "-m", "sub"]);
+        git(&hostile, &["add", "sub"]);
+        git(&hostile, &["commit", "-q", "-m", "gitlink"]);
+        let config = match layout {
+            "directory" => sub.join(".git/config"),
+            _ => {
+                let modules = hostile.join(".git/modules");
+                fs::create_dir_all(&modules).unwrap();
+                fs::rename(sub.join(".git"), modules.join("sub")).unwrap();
+                fs::write(sub.join(".git"), "gitdir: ../.git/modules/sub\n").unwrap();
+                let config = modules.join("sub/config");
+                let file = config.to_str().unwrap();
+                git(
+                    &hostile,
+                    &["config", "-f", file, "core.worktree", "../../../sub"],
+                );
+                config
+            }
+        };
+        let text = fs::read_to_string(&config).unwrap();
+        fs::write(&config, format!("{text}{fsmonitor}")).unwrap();
+        // Where it stays, `git status` in the mirror runs the submodule's script.
+        let out = Command::new("git")
+            .current_dir(&hostile)
+            .args(["status", "--porcelain"])
+            .output()
+            .unwrap();
+        let err = String::from_utf8_lossy(&out.stderr);
+        assert!(out.status.success(), "{layout}: {err}");
+        assert!(
+            ran.exists(),
+            "{layout}: the nested configuration runs the script"
+        );
+        fs::remove_file(&ran).unwrap();
+
+        let head = git(&hostile, &["rev-parse", "HEAD"]).trim().to_string();
+        stage(
+            &s3,
+            identity,
+            &head,
+            &bundle_of(&index, &hostile, &[]),
+            None,
+        );
+        let (stdout, stderr, code) = pull(&dir, &manifest, &[]);
+        assert_eq!((stdout.as_str(), code), ("", Some(1)), "{layout}: {stderr}");
+        assert!(
+            stderr.contains("entry `mirror/") && stderr.contains("nested repository"),
+            "{layout}: {stderr}"
+        );
+        assert!(!ran.exists(), "{layout}: the pull ran the script");
+        assert_eq!(held(&local), before, "{layout}");
     }
 }

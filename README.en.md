@@ -273,6 +273,31 @@ with the token in `AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`; `instance` uses the 
 metadata service (IMDSv2 over IPv4 only, `http://169.254.169.254`), and only when the section says so.
 Credentials stay in memory, and no secret appears in an error.
 
+On each node, `meada snapshot pull --workspace <manifest>` reads the store's `current` pointer
+and, when it names a generation the node lacks, downloads its bundles into `local_dir`, checks
+each one's size and BLAKE3 hash against the document, extracts them and swaps the node's pointer
+by rename. The only line on stdout is the current generation id. `--every <seconds>` repeats the
+pull (printing only when the pointer moves); a second pull on the same `local_dir` exits 0 saying
+one is running. The node keeps the current and the previous generation and deletes older ones.
+
+Everything read from the store is treated as hostile input: ids and identities are checked before
+they become paths; the pull refuses an archive entry with an absolute path or a `..`, a link that
+leaves its repository, an entry written through a symbolic link, and devices or FIFOs, with byte
+and entry ceilings per generation. The extracted `.git/config` is replaced by a minimal one Meada
+writes (only `[core]` and the identity's `origin`), `.git/hooks` is removed, and Meada's `git`
+runs in those mirrors without the system or global configuration. A pull that fails at any step
+leaves the pointer and the held generations as they were.
+
+```
+<local_dir>/
+  current                     # "<generation id> <fence>", fence 0 without the refresh lock
+  pull.lock
+  <generation id>/
+    generation.json           # the document, as stored
+    <bundle id>/index.db
+    <bundle id>/mirror/       # the checkout, .git included
+```
+
 ## Decisions
 
 An ambiguous link (several providers serve the route) or a dynamic URL (the call builds its URL

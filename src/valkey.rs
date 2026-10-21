@@ -389,6 +389,21 @@ mod tests {
         client.get_multiplexed_async_connection().await.unwrap()
     }
 
+    /// A TLS handshake with a port that closes every connection fails with an error. In a build
+    /// with every module, two rustls providers made it panic instead (one provider, ring, now).
+    #[tokio::test(flavor = "current_thread")]
+    async fn a_tls_handshake_that_fails_is_an_error_and_no_panic() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                drop(stream);
+            }
+        });
+        let config = section(&format!("url = \"rediss://127.0.0.1:{port}\"")).unwrap();
+        assert!(Valkey::connect(&config).await.is_err());
+    }
+
     #[tokio::test(flavor = "current_thread")]
     async fn ping_and_a_value_go_through_the_prefix() {
         let Some(url) = service() else { return };

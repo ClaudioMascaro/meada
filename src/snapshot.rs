@@ -2,13 +2,14 @@
 //! ids of bundles and generations, and `meada snapshot publish`, which uploads the workspace as
 //! a generation once every index equals its mirror and every mirror is clean. Publishing reads
 //! the mirrors and the indexes and writes nothing on the machine it runs on; indexing stays
-//! offline. The store client (`store`) is the one `meada snapshot pull` (#273) reuses.
+//! offline. The store client (`store`) is the one `meada snapshot pull` (`pull`) reuses.
 //!
 //! Store layout under `prefix`: `repos/<identity>/<bundle id>.tar` (an uncompressed tar of
 //! `index.db`, then the mirror under `mirror/`, `.git` included), `generations/<generation
 //! id>.json` (the `Document`) and `current` (the current generation id and a newline). Every
 //! object carries its size and BLAKE3 hash as metadata (`store::Stored`).
 
+pub mod pull;
 pub mod store;
 
 use std::io::{self, Write};
@@ -378,7 +379,7 @@ pub fn publish(manifest: &Path) -> Result<String> {
                 }
                 .text()));
             }
-            if !repo::unclean(&r.root)?.is_empty() {
+            if !repo::unclean(&r.root, true)?.is_empty() {
                 let mirror = r.root.display().to_string();
                 return Ok(Err(Msg::SnapshotDirty {
                     repo: repo_id,

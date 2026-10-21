@@ -207,6 +207,7 @@ impl Store {
             }
         }
         let client = reqwest::Client::builder()
+            .use_preconfigured_tls(tls()?)
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
             .connect_timeout(Duration::from_secs(10))
@@ -281,6 +282,47 @@ impl Store {
             .ok_or_else(bad)
     }
 
+    /// The object at `key` written to `out` as it streams, checked against `expected` (the size
+    /// and hash a generation document records): a missing, longer, shorter or other object is an
+    /// error naming it, and nothing past `expected.size` bytes is written.
+    pub async fn download(
+        &self,
+        key: &str,
+        expected: &Stored,
+        out: &mut impl std::io::Write,
+    ) -> Result<(), String> {
+        use futures::StreamExt;
+        let bad = || Msg::SnapshotObjectBad(key).text();
+        let got = match self
+            .s3
+            .get_opts(&Self::key(key)?, GetOptions::default())
+            .await
+        {
+            Ok(got) => got,
+            Err(object_store::Error::NotFound { .. }) => return Err(bad()),
+            Err(e) => return Err(self.scrub(e)),
+        };
+        if got.meta.size != expected.size {
+            return Err(bad());
+        }
+        let mut stream = got.into_stream();
+        let (mut hash, mut size) = (blake3::Hasher::new(), 0u64);
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| self.scrub(e))?;
+            size += chunk.len() as u64;
+            if size > expected.size {
+                return Err(bad());
+            }
+            hash.update(&chunk);
+            out.write_all(&chunk).map_err(|e| format!("{key}: {e}"))?;
+        }
+        let found = Stored {
+            size,
+            blake3: hash.finalize().to_hex().to_string(),
+        };
+        (found == *expected).then_some(()).ok_or_else(bad)
+    }
+
     /// Stores `bytes` at `key` with their size and hash.
     pub async fn put(&self, key: &str, bytes: Vec<u8>) -> Result<(), String> {
         let options = PutOptions {
@@ -334,6 +376,21 @@ impl Upload<'_> {
     pub async fn abort(self) {
         let _ = self.writer.abort().await;
     }
+}
+
+/// The store client's TLS: rustls with ring, the one provider every build carries (no process
+/// default is read or installed), certificates checked against the system's roots, HTTP/2 or
+/// HTTP/1.1 offered.
+fn tls() -> Result<rustls::ClientConfig, String> {
+    use rustls_platform_verifier::BuilderVerifierExt;
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let mut config = (rustls::ClientConfig::builder_with_provider(provider))
+        .with_safe_default_protocol_versions()
+        .and_then(|builder| builder.with_platform_verifier())
+        .map_err(|e| e.to_string())?
+        .with_no_client_auth();
+    config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
+    Ok(config)
 }
 
 /// `uri` when it names the Pod Identity agent, at one of its two addresses, over `http` (the
@@ -434,6 +491,44 @@ mod tests {
             "a <StringToSign/>"
         );
         assert_eq!(without_echoes("plain"), "plain");
+    }
+
+    /// A TLS handshake with a loopback port that closes every connection fails with an error.
+    /// In a build with every module, two rustls providers made a TLS connection panic instead
+    /// (one provider, ring, now).
+    #[test]
+    fn a_tls_handshake_that_fails_is_an_error_and_no_panic() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                drop(stream);
+            }
+        });
+        let dir = std::env::temp_dir().join(format!("meada-store-tls-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("key"), "k\n").unwrap();
+        std::fs::write(dir.join("secret"), "s\n").unwrap();
+        let config = Config {
+            endpoint: format!("https://127.0.0.1:{port}"),
+            region: "us-east-1".into(),
+            bucket: "meada-tls".into(),
+            prefix: String::new(),
+            path_style: true,
+            credentials: Credentials::Static {
+                key_id: Secret::File(dir.join("key")),
+                secret: Secret::File(dir.join("secret")),
+                token: Secret::Env("MEADA_TEST_TLS_NO_TOKEN".into()),
+            },
+            local_dir: None,
+        };
+        let store = Store::connect(&config).unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        assert!(runtime.block_on(store.get("current", 64)).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

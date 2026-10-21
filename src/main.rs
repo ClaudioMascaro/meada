@@ -67,6 +67,45 @@ enum SnapshotCommand {
         #[arg(long)]
         workspace: PathBuf,
     },
+    Pull {
+        #[arg(long)]
+        workspace: PathBuf,
+        #[arg(long, value_name = "SECONDS", value_parser = clap::value_parser!(u64).range(1..))]
+        every: Option<u64>,
+    },
+}
+
+/// `meada snapshot pull`: the generation id on stdout when the pointer file moved, or once
+/// when it already named the store's current one; a pull already running is no failure. With
+/// `every`, again and again: a failed round is reported and the next one runs.
+#[cfg(feature = "snapshot")]
+fn pull(manifest: &Path, every: Option<u64>) -> ! {
+    use meada::snapshot::pull::Pulled;
+    loop {
+        match meada::snapshot::pull::pull(manifest) {
+            Ok(Pulled::Swapped(id)) => println!("{id}"),
+            Ok(Pulled::Current(id)) if every.is_none() => println!("{id}"),
+            Ok(Pulled::Current(_)) => {}
+            Ok(Pulled::Running(dir)) => {
+                eprintln!(
+                    "meada: {}",
+                    Msg::SnapshotPulling(&dir.display().to_string()).text()
+                )
+            }
+            Err(e) => {
+                for line in e.to_string().lines() {
+                    eprintln!("meada: {line}");
+                }
+                if every.is_none() {
+                    std::process::exit(1);
+                }
+            }
+        }
+        let Some(seconds) = every else {
+            std::process::exit(0);
+        };
+        std::thread::sleep(std::time::Duration::from_secs(seconds));
+    }
 }
 
 /// `meada mcp --listen`. In debug builds `MEADA_DRAIN_MS` shortens the drain bound (a knob for
@@ -118,10 +157,16 @@ fn main() -> ExitCode {
         });
     #[cfg(feature = "snapshot")]
     let matches = matches.mut_subcommand("snapshot", |c| {
-        (c.about(Msg::Snapshot.text())).mut_subcommand("publish", |c| {
-            (c.about(Msg::SnapshotPublish.text()))
-                .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
-        })
+        (c.about(Msg::Snapshot.text()))
+            .mut_subcommand("publish", |c| {
+                (c.about(Msg::SnapshotPublish.text()))
+                    .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
+            })
+            .mut_subcommand("pull", |c| {
+                (c.about(Msg::SnapshotPull.text()))
+                    .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
+                    .mut_arg("every", |a| a.help(Msg::SnapshotEvery.text()))
+            })
     });
     let matches = matches.get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
@@ -175,6 +220,10 @@ fn main() -> ExitCode {
                 std::process::exit(1);
             }
         },
+        #[cfg(feature = "snapshot")]
+        Command::Snapshot {
+            command: SnapshotCommand::Pull { workspace, every },
+        } => pull(&workspace, every),
         Command::Export {
             workspace: Some(manifest),
             repo: Some(repo),

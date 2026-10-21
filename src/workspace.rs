@@ -426,6 +426,20 @@ fn resolved(path: &Path) -> PathBuf {
     })
 }
 
+/// Why `repo` cannot be the identity of a served repository, checked before any path is built
+/// from it: a segment that would leave the directory it is joined to (empty, `.` or `..`), or a
+/// `local/` identity. A manifest entry and a generation document (`meada snapshot pull`) share
+/// it; each also refuses an identity listed twice.
+pub(crate) fn identity_problem(repo: &str) -> Option<String> {
+    if repo.split('/').any(|s| matches!(s, "" | "." | "..")) {
+        return Some(Msg::UnsafeIdentity.text());
+    }
+    if repo.starts_with("local/") {
+        return Some(Msg::LocalIdentity.text());
+    }
+    None
+}
+
 /// The repository a manifest entry lists as `repo` at `path`, its index under `index_dir`, or
 /// why it cannot be served. `twice` when an earlier entry names the same identity. Its
 /// configuration is its own `meada.toml`, whole, or the entry's blocks (`listed`) when it has
@@ -437,12 +451,8 @@ fn mirror(
     twice: bool,
     listed: Config,
 ) -> std::result::Result<(Repository, bool), String> {
-    // Before any path is built from it: segments that would leave `index_dir`.
-    if repo.split('/').any(|s| matches!(s, "" | "." | "..")) {
-        return Err(Msg::UnsafeIdentity.text());
-    }
-    if repo.starts_with("local/") {
-        return Err(Msg::LocalIdentity.text());
+    if let Some(problem) = identity_problem(repo) {
+        return Err(problem);
     }
     if twice {
         return Err(Msg::ListedTwice.text());
