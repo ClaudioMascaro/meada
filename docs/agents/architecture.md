@@ -907,7 +907,7 @@ one for the area a change touches.
 - `resolve.rs` (`Code::origins` with `Follow::Constants`): only `const` bindings with a plain name are followed; a client
   held by `let`, a class field, `this.x`, a destructuring or a parameter, or chained without a
   binding (`new Kafka().producer().send`), is not recognized (no marker).
-- `lang/ts/messages.rs`: a kafkajs handler passed through a wrapper's parameter is not followed
+- `channel/ts.rs`: a kafkajs handler passed through a wrapper's parameter is not followed
   (the function that subscribes handles); only the first `run` on a consumer binding counts. An
   amqplib `bindQueue` whose queue, exchange or pattern is not a literal is dropped.
   A BullMQ `Queue` is named by its own `new Queue(name)` binding: `new Queue(name).add(...)` with

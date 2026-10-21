@@ -1,16 +1,14 @@
-//! The message libraries of the TypeScript and JavaScript pack (spec #20). A form is a method
-//! called on a client whose origin is the library's own factory, imported from the library's
-//! package: a `send` on anything else is no producer. The origin is the one question,
-//! `Code::origins` with `Follow::Constants`: only `const` bindings are followed, so a client
-//! passed in as a parameter or returned by a function has none (certain or absent). `factory`
-//! rebuilds the spelling each form table matches (`new Kafka().producer()`) from the origin's
-//! form, outside name and steps.
+//! The channel kind's TypeScript and JavaScript forms (spec #20): the message libraries of the
+//! pack. A form is a method called on a client whose origin is the library's own factory,
+//! imported from the library's package: a `send` on anything else is no producer. The origin is
+//! the one question, `Code::origins` with `Follow::Constants`: only `const` bindings are
+//! followed, so a client passed in as a parameter or returned by a function has none (certain or
+//! absent). `factory` rebuilds the spelling each form table matches (`new Kafka().producer()`)
+//! from the origin's form, outside name and steps.
 
 use std::collections::BTreeMap;
 
-use crate::channel::message::{
-    Handler, Message, Side, bind, channel_name as name, publish, queue_name,
-};
+use super::message::{Handler, Message, Side, bind, channel_name as name, publish, queue_name};
 use crate::lang::{Value, literal, property};
 use crate::resolve::{Code, Expand, Expanded, Follow, Form, Of};
 
@@ -76,7 +74,7 @@ fn factory<'a>(
 /// What a form reads of a call's arguments: the channel names, see `names`.
 type Read<'a> = &'a dyn Fn(&[Value]) -> Option<Vec<Option<String>>>;
 
-pub(crate) fn messages(code: &Code) -> Vec<Message> {
+pub(super) fn messages(code: &Code) -> Vec<Message> {
     if !code.pack().extensions().contains(&"js") {
         return Vec::new();
     }
@@ -405,4 +403,59 @@ fn keys(args: &[Value]) -> Option<Vec<Option<String>>> {
 /// depends on a parameter, `Some(None)` when it is not a literal string.
 fn arg_name(args: &[Value], at: usize) -> Option<Option<String>> {
     args.get(at).map_or(Some(None), name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::LanguagePack;
+    use crate::lang::ts::TsJs;
+    use crate::resolve::Resolver;
+
+    /// The messages of the TypeScript file `src` as lines: broker, name (`?` when unresolved),
+    /// role and handler.
+    fn lines(src: &str) -> Vec<String> {
+        let facts = TsJs.parse("x.ts", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("x.ts", &facts)]);
+        let modules = TsJs.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &TsJs);
+        let code = Code::new(&resolver, &files, &TsJs);
+        messages(&code)
+            .into_iter()
+            .map(|m| {
+                let name = m.name.as_deref().unwrap_or("?");
+                let role = match m.role {
+                    Side::Producer => "producer".to_string(),
+                    Side::Consumer(Handler::Def { path, name }) => {
+                        format!("consumer {path}::{name}")
+                    }
+                    Side::Consumer(Handler::Inline { path, def }) => {
+                        format!("consumer inline {path}::{def}")
+                    }
+                    _ => "other".to_string(),
+                };
+                format!("{} {name} {role}", m.broker)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_kafkajs_client_is_a_producer_or_a_consumer_by_its_method() {
+        let src = "import { Kafka } from 'kafkajs';\n\
+            const kafka = new Kafka({ brokers: [] });\n\
+            const producer = kafka.producer();\n\
+            const consumer = kafka.consumer({ groupId: 'g' });\n\
+            async function produce() {\n  await producer.send({ topic: 'orders.created', messages: [] });\n}\n\
+            async function consume(topic: string) {\n  await consumer.subscribe({ topic: 'orders.created' });\n  await consumer.subscribe({ topic });\n  await consumer.run({ eachMessage: async () => {} });\n}\n\
+            function other(p: Other) {\n  p.send({ topic: 'nope' });\n}\n";
+        // The `run` handler is the inline arrow (named by its offset) that handles both channels.
+        assert_eq!(
+            lines(src),
+            [
+                "kafka orders.created producer",
+                "kafka orders.created consumer inline x.ts::consume.@428",
+                "kafka ? consumer inline x.ts::consume.@428",
+            ]
+        );
+    }
 }
