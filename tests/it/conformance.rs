@@ -6176,7 +6176,7 @@ fn rust_rdkafka_clients_are_channel_producers_and_consumers() {
     assert_eq!((producers, consumers), (vec![], vec![]));
 }
 
-/// A builder chain is read to 64 calls (`CHAIN` in `lang/rust/messages.rs`): a record or an SQS
+/// A builder chain is read to 64 calls (`CHAIN` in `channel/rust.rs`): a record or an SQS
 /// request with more setters than that is no producer, and one with fewer is.
 #[test]
 fn rust_builder_chains_past_the_bound_are_not_read() {

@@ -928,7 +928,7 @@ one for the area a change touches.
   (`on_message_callback=handler`, `cb=self.on_job`); a lambda or anything else leaves the
   function that subscribes. The streams of an `xreadgroup` are read from a dict literal (or a
   constant folded to one); a dict built otherwise is an unresolved stream.
-- `lang/rust/messages.rs`: a client is recognized when its receiver traces back to the library's
+- `channel/rust.rs`: a client is recognized when its receiver traces back to the library's
   constructor (`Code::origins` with `Follow::Values`, then `Code::outside`, one constructor per `LIBRARIES`
   entry); a client held in a struct field, passed as `&mut con` to a parameter, or rebound by
   assignment is not followed. `lapin` `set_delegate` closures are not followed (the function

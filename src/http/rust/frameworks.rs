@@ -1,5 +1,5 @@
 //! The web frameworks and HTTP clients the HTTP kind reads in Rust (spec #30), one entry per
-//! object, as `lang/rust/messages.rs` lists the brokers: what makes the object outside the
+//! object, as `channel/rust.rs` lists the brokers: what makes the object outside the
 //! repository (the name the `use` declarations give the call) and the methods that hand that
 //! same object back. The HTTP kind owns the table: its readers (`axum.rs` for axum, `../rust.rs`
 //! for actix-web and Rocket, `../python/clients.rs` for reqwest and ureq) read what a
