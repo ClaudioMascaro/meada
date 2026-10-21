@@ -317,6 +317,41 @@ servable current generation (the problems go to stderr), 0 otherwise, the store 
 not, so a stopped store does not take the node out of rotation. `meada export --workspace
 <manifest> --repo <identity> --generations` exports the same way.
 
+**Generation pointer and pins** (feature `generation-pointer`, which includes `snapshot`;
+`cargo install meada --features generation-pointer`). With the `[generations]` section, which
+needs `[snapshot]` and `[valkey]`, the current generation's pointer moves from the store to
+Valkey, and the whole fleet holds the same set of generations.
+
+```toml
+[valkey]
+url = "rediss://meada@cache.example.internal:6379"   # TLS outside loopback
+password_file = "/run/secrets/valkey"                 # or password_env
+key_prefix = "meada:prod"                             # default "meada"
+
+[generations]
+keep = 3                                              # generations retained fleet-wide, at least 2
+```
+
+`meada snapshot publish` ends by writing, in one script, `{<key_prefix>}:current` (a hash
+`{id, fence}`) and `{<key_prefix>}:retained` (a list of `<id>:<fence>`, newest first, each id
+once, trimmed to `keep`), and no longer writes the store's `current`; the fence is `0` without
+the refresh lock. Each `meada snapshot pull` reads both from Valkey and checks every id (16
+lowercase hex characters) and every fence (decimal) before it changes the node; it then
+downloads every retained generation the node lacks and deletes the ones that left the list,
+never the current one or the one it just replaced. The node's pointer file carries the fence
+read with the id. A malformed entry, a missing pointer or an empty list stops the pull with an
+error naming the key, and the node stays as it was. Use the same `keep` on the job and the
+nodes.
+
+A workflow run pins the commits it started on in the path: `/<identity>@<generation>`, the
+generation being what follows the last `@`, serves that held generation on any node while it
+is retained, and `/<identity>` keeps serving the current one. A generation the node does not
+hold answers 404 `text/plain`, naming the requested generation, the current one and the held
+ones. Every HTTP answer names its generation in the `Meada-Generation` header (a 404 names the
+current one) and every tool result in its `_meta`, `{"meada/generation": "<id>"}`: the run reads
+the generation of its first answer and pins the next ones to it. Tools, parameters and the text
+of the answers do not change. The reverse proxy forwards `Meada-Generation` in answers.
+
 ## Decisions
 
 An ambiguous link (several providers serve the route) or a dynamic URL (the call builds its URL

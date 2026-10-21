@@ -94,7 +94,16 @@ one for the area a change touches.
   listing the identities served elsewhere (with `--generations`, `listen_generations` makes
   the endpoint per request from the current generation's identities, so a pull that adds a
   repository needs no restart, and a node with no readable generation answers 503 with the fixed body `no servable generation`, the problem on stderr; it answers before the `Origin` check, which refuses
-  any request carrying one with 403; no `Host` check). `listen` runs every start check (`engine::served`, the predicate `status --workspace` exits on) before it binds, so an open port means indexes present (the probe counts an index locked by a commit in progress as ready, after a 50 ms wait), then installs the SIGINT and SIGTERM
+  any request carrying one with 403; no `Host` check). With `[generations]` on the node
+  (`Routes::Generation { pins: true }`) the routing rule is: the decoded path, a trailing slash
+  stripped, is `/<identity>@<generation>` when what follows its last `@` is an id
+  (`snapshot::is_id`); that generation is served from `<local_dir>/<generation>/`
+  (`Current::pinned`) when the node holds it, and is a 404 (`text/plain`: the requested
+  generation, `current: <id>` and `held: <ids>`) when it does not; any other path routes as
+  without pins, against the current generation. Every answer then carries `Meada-Generation:
+  <id>` (the generation it was routed by; a 404 the current one or the held pin, a 503 none),
+  and every `CallToolResult` `_meta` `{"meada/generation": "<id>"}` (`Meada::result`, tool
+  errors included); tool names, schemas and text do not change. `listen` runs every start check (`engine::served`, the predicate `status --workspace` exits on) before it binds, so an open port means indexes present (the probe counts an index locked by a commit in progress as ready, after a 50 ms wait), then installs the SIGINT and SIGTERM
   handlers before it prints the address, then on a signal drops the listener and lets each
   connection finish its answer in flight (`graceful_shutdown`), for at most `DRAIN` (25 s; the
   hidden `with_drain_bound` shortens it, `main.rs` reads `MEADA_DRAIN_MS` for it in debug builds only, a second signal ends the wait), then cancels
@@ -151,7 +160,8 @@ one for the area a change touches.
   `snapshot/pull.rs` is `meada snapshot pull` (`pull`, once; `main.rs` loops for `--every`),
   which treats everything it reads from the store as hostile. Under `local_dir`: `current`
   (the node pointer file, one line `<generation id> <fence>\n`, fence `0` from the store's
-  pointer; `pull::current` reads it and checks the id), `pull.lock` (an advisory lock taken with
+  pointer and the fence read with the id from Valkey with `[generations]`; `pull::current`
+  reads it and checks the id and the fence), `pull.lock` (an advisory lock taken with
   `try_lock`: a second pull returns `Pulled::Running`), and per held generation `<generation
   id>/` with `generation.json` (the document as stored) and per repository `<bundle
   id>/index.db` and `<bundle id>/mirror/`; a pull in progress writes only `<generation
@@ -187,8 +197,26 @@ one for the area a change touches.
   manifest's `[snapshot]` section and `local_dir`), `held` (the current generation: the
   pointer file through `pull::current`, then `generation.json`, bounded and checked as the
   generation's own), `Current` (the last generation `held` read, kept while the pointer names
-  it), `ids` (the generations held) and `reach` (the store's current id within
-  two seconds, for the probe). It only reads; the pull is the only writer of `local_dir`.
+  it; `Current::pinned` keeps one `Held` per pinned id, read once while held and dropped once
+  `ids` no longer lists it, so what it keeps is bounded by what the node holds), `ids` (the
+  generations held) and `reach` (the store's current id within two seconds, for the probe). It
+  only reads; the pull is the only writer of `local_dir`.
+  `snapshot/generations.rs` (feature `generation-pointer`, which implies `snapshot` and
+  `valkey`; no crate of its own) is the generation pointer, section `[generations]` (`keep`,
+  default 3, at least 2; `Manifest::read` refuses it without `[snapshot]` and `[valkey]` through
+  `modules::needs`). It owns the Valkey keys, both under the `[valkey]` prefix's hash tag:
+  `{<key_prefix>}:current`, a hash `{id, fence}`, and `{<key_prefix>}:retained`, a list of
+  `<id>:<fence>` newest first, each id once, trimmed to `keep`. `point` runs the one script that
+  writes both (`EVAL`; KEYS current and retained, ARGV id, fence, keep and the refresh lock's
+  token, empty without one): it removes every entry of the id, pushes `<id>:<fence>`, trims and
+  sets the hash. `publish` connects to Valkey before any upload and calls `point` last, with
+  fence `0` and no token, instead of writing the store's `current`; #276's lock and fence check
+  go in that script. `read` is the pull's side: `HMGET current id fence` and `LRANGE retained 0
+  keep-1`, every id checked by `is_id` and every fence by `snapshot::fence` before anything
+  else; a missing pointer, an empty list or a malformed entry is an error naming the key. With
+  it, `pull_locked` (through `Source::wanted`) fetches the current generation and every
+  retained one the node lacks, then swaps the pointer file to `<id> <fence>` as read, then
+  deletes every held id outside the current, the retained and the one just replaced.
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
