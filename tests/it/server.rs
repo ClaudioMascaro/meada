@@ -146,7 +146,7 @@ pub(crate) fn text(result: &CallToolResult) -> &str {
 
 /// The tool list as the budget counts it: one token per four bytes of description and
 /// parameter schema (ADR 0008).
-fn tokens(tools: &[Tool]) -> usize {
+pub(crate) fn tokens(tools: &[Tool]) -> usize {
     let bytes: usize = (tools.iter())
         .map(|t| {
             t.description.as_deref().unwrap_or("").len()

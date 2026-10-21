@@ -23,7 +23,7 @@ const WEB: &str = "example.com/chain/web";
 const CATALOG: &str = "example.com/chain/catalog";
 
 /// `meada mcp --listen 127.0.0.1:0 --workspace <manifest> --generations`, in `dir`.
-fn serve(dir: &Path, manifest: &str) -> Server {
+pub(crate) fn serve(dir: &Path, manifest: &str) -> Server {
     let args = [
         "--listen",
         "127.0.0.1:0",

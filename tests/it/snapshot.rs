@@ -98,7 +98,7 @@ pub(crate) fn section(endpoint: &str, bucket: &str) -> String {
     )
 }
 
-fn append_section(dir: &Path, section: &str) {
+pub(crate) fn append_section(dir: &Path, section: &str) {
     let manifest = dir.join(MANIFEST);
     let toml = fs::read_to_string(&manifest).unwrap() + section;
     fs::write(&manifest, toml).unwrap();
@@ -119,7 +119,7 @@ pub(crate) fn publish(dir: &Path, manifest: &str) -> (String, String, Option<i32
 }
 
 /// Every object under `prefix`, by key.
-fn objects(s3: &AmazonS3, prefix: &str) -> Vec<ObjectMeta> {
+pub(crate) fn objects(s3: &AmazonS3, prefix: &str) -> Vec<ObjectMeta> {
     block_on(async {
         let mut all = Vec::new();
         let mut pending = vec![Key::from(prefix)];
