@@ -322,8 +322,9 @@ one for the area a change touches.
     and Go share `sourced` (a `path` by the folded location, a `git` by the remote's identity).
   - `owns`: every manifest of the ecosystem bounds the files under it; PyPI only a
     `pyproject.toml`, Cargo only a manifest with a `[package]`.
-  - `ways` and `resolve`: Node's rule (`exports`, else `types`, `module` and `main`, then the
-    candidates among the files the manifest owns); Cargo follows the crate's library root alone
+  - `ways` and `resolve`: Node's rule (`exports`, else `types`, `module` and `main`, else the
+    subpath as a path, or `index.<ext>` for the bare name when none of the three exists, `exact`;
+    then the candidates among the files the manifest owns); Cargo follows the crate's library root alone
     (`How::CrateName`, no candidates, and the library-head check of an entry that does not
     rename its crate); Go looks in the one directory the subpath names (`How::ModulePath`).
   - `resolutions`: the single-entry loop (the entries, each provider the entry `reaches`,
@@ -1024,7 +1025,7 @@ one for the area a change touches.
   read as the schema's shape (no marker).
 - `lang/mod.rs`: `MAX_BYTES` (1 MiB, beside the packs that read their configs by it) bounds every
   manifest and pack config the package readers and the packs take; a larger file reads as empty,
-  but is read whole first, as code and documents are.
+  and the index reads it up to one byte past the limit (`read_up_to`).
 - Declared types (spec #23, `declared.rs`, `lang/ts/types.rs`): a type is read to at most
   `TYPE_DEPTH` (32) levels, both when it is written (`lang/mod.rs`, the nesting of an object or
   array type) and when a consumer's cast, type argument or annotation is followed through

@@ -85,6 +85,7 @@ in the same change:
   `search` doc string, a variant of `entry::EntryKind`, a reader in `document`) is named under
   "Seams and what extends them".
 - A package ecosystem's rule lives in its own module under `package/`, behind the `Ecosystem`
-  trait in `package.rs`. The shared package steps and the index writer ask the trait and the
-  seam's free functions (`of`, `of_source`, `programs`, `inherit`) and name no ecosystem; an arm
-  for one ecosystem added to the shared code is a finding.
+  trait in `package.rs`. The shared package steps ask the trait; the index writer asks the
+  seam's free functions (`programs`, `inherit`, `is_manifest`, `read_manifest`) and imports no
+  ecosystem module. Neither names an ecosystem; an arm for one added to the shared code is a
+  finding.
