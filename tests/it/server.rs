@@ -165,7 +165,7 @@ fn agent() -> ureq::Agent {
 }
 
 /// `GET url`: status, `Content-Type` and body.
-fn get(url: &str) -> (u16, String, String) {
+pub(crate) fn get(url: &str) -> (u16, String, String) {
     let mut response = agent().get(url).call().unwrap();
     let kind = response.headers()["content-type"]
         .to_str()

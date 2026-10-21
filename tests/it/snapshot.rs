@@ -540,7 +540,11 @@ fn mirror_files(dir: &Path) -> Vec<(String, Vec<u8>)> {
 pub(crate) fn next_commit(dir: &Path, repo: &str, line: &str) {
     let file = dir.join(repo).join("src/status.ts");
     let src = fs::read_to_string(&file).unwrap();
-    fs::write(&file, format!("{src}\nexport const {line} = 1;\n")).unwrap();
+    fs::write(
+        &file,
+        format!("{src}\nexport function {line}() {{\n  return 1;\n}}\n"),
+    )
+    .unwrap();
     git(&dir.join(repo), &["commit", "-q", "-am", line]);
     assert!(run(dir, "index").2, "index");
 }
