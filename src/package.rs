@@ -8,6 +8,11 @@
 //! turns the entries that name one into consumers. Meada reads no lockfile and queries no
 //! registry: a dependency on anything outside the workspace adds nothing.
 //!
+//! This file holds what the ecosystems share: the `Ecosystem` trait with its defaults (Node's
+//! rule for the ways in, the candidates and the provider view), the list `ECOSYSTEMS`, the
+//! summary types and the workspace steps. Each ecosystem's own rules live in its module under
+//! `package/` (`npm`, `pypi`, `cargo`, `go`).
+//!
 //! Imports cross too: `extract` stores every call through a binding imported from a bare
 //! specifier, and `import`, a workspace step after `consume`, resolves those whose package the
 //! workspace provides into the provider's symbol, through its entry fields and what its files
@@ -42,7 +47,7 @@ mod pypi;
 
 use cargo::Cargo;
 use go::Go;
-use npm::Npm;
+use npm::{MAX_REEXPORTS, Npm, exported};
 use pypi::Pypi;
 
 pub struct Packages;
@@ -253,75 +258,6 @@ const MAX_NAME: usize = 214;
 /// and the stored summary and the export stay proportional to what is read.
 // ponytail: a flat 1 MiB; a streaming reader that keeps only the dependency tables lifts it.
 pub(crate) const MAX_BYTES: usize = 1 << 20;
-
-/// The dependency fields of a manifest that `read` collects.
-const FIELDS: [&str; 4] = [
-    "dependencies",
-    "devDependencies",
-    "peerDependencies",
-    "optionalDependencies",
-];
-
-/// The prefix of an npm range that keeps a dependency inside its own repository.
-const WORKSPACE: &str = "workspace:";
-
-/// The conditions of an `exports` target Meada reads, in order: at each level the first one
-/// present is taken, and no other is followed.
-const CONDITIONS: [&str; 4] = ["types", "import", "default", "require"];
-
-/// The longest chain of `export *` a lookup in a provider follows; a name further down is not
-/// found.
-// ponytail: real packages re-export a few levels deep; this bounds the walk over a hostile one.
-const MAX_REEXPORTS: usize = 64;
-
-/// The deepest an `exports` target nests conditions; deeper, the subpath has no target.
-// ponytail: real maps nest two or three levels; this bounds the walk over a hostile one.
-const MAX_CONDITIONS: usize = 32;
-
-/// The target the `exports` field of a manifest gives `subpath` (`.` for the bare name, else
-/// `./<rest>`), as written, `*` replaced: exact keys first, then the pattern with one `*` whose
-/// prefix is the longest. A string, or an object without subpath keys, is the target of `.`. A
-/// `null` target, an array of fallbacks, a key or a target with two `*`, keys that mix subpaths
-/// and conditions, or none of `CONDITIONS` present give no target.
-fn exported(exports: &Value, subpath: &str) -> Option<String> {
-    let map = match exports {
-        Value::Object(map) if map.keys().any(|k| k.starts_with('.')) => map,
-        _ => return (subpath == ".").then(|| target(exports, None, 0))?,
-    };
-    if !map.keys().all(|k| k.starts_with('.')) {
-        return None;
-    }
-    if let Some(value) = map.get(subpath) {
-        return target(value, None, 0);
-    }
-    let (_, star, value) = (map.iter())
-        .filter_map(|(key, value)| {
-            let (prefix, suffix) = key.split_once('*')?;
-            let star = subpath.strip_prefix(prefix)?.strip_suffix(suffix)?;
-            (!suffix.contains('*') && !star.is_empty()).then_some((
-                (prefix.len(), key.len()),
-                star,
-                value,
-            ))
-        })
-        .max_by_key(|(rank, _, _)| *rank)?;
-    target(value, Some(star), 0)
-}
-
-/// The path a target of `exports` names, through its conditions (see `exported`).
-fn target(value: &Value, star: Option<&str>, depth: usize) -> Option<String> {
-    match value {
-        // One `*` at most, as in a key: the expansion stays the size of the subpath.
-        Value::String(t) if t.matches('*').nth(1).is_none() => {
-            Some(star.map_or_else(|| t.clone(), |s| t.replace('*', s)))
-        }
-        Value::Object(conditions) if depth < MAX_CONDITIONS => {
-            let taken = CONDITIONS.iter().find_map(|c| conditions.get(*c))?;
-            target(taken, star, depth + 1)
-        }
-        _ => None,
-    }
-}
 
 /// What Meada read from one `package.json`. Nothing else of the file is kept.
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
@@ -591,52 +527,6 @@ pub fn is_tsconfig(path: &str) -> bool {
     path.rsplit('/').next() == Some("tsconfig.json")
 }
 
-/// Reads a `package.json` from its bytes. Hostile input: a file too large, not JSON, nested
-/// past `serde_json`'s depth limit or not an object reads as empty; a field of another type
-/// counts as absent; a name that breaks npm's rules makes no provider.
-pub fn read(src: &[u8]) -> Summary {
-    if src.len() > MAX_BYTES {
-        return Summary::default();
-    }
-    let Ok(Value::Object(root)) = serde_json::from_slice(src) else {
-        return Summary::default();
-    };
-    let text = |v: Option<&Value>| match v {
-        Some(Value::String(s)) if !s.is_empty() => Some(s.clone()),
-        _ => None,
-    };
-    let mut dependencies = Vec::new();
-    for field in FIELDS {
-        let Some(Value::Object(table)) = root.get(field) else {
-            continue;
-        };
-        for (name, range) in table {
-            if valid_name(name) {
-                dependencies.push(Entry {
-                    field: field.to_string(),
-                    name: name.clone(),
-                    range: text(Some(range)),
-                    ..Entry::default()
-                });
-            }
-        }
-    }
-    dependencies.sort_by(|a, b| (&a.field, &a.name).cmp(&(&b.field, &b.name)));
-    Summary {
-        name: text(root.get("name")).filter(|n| valid_name(n)),
-        version: text(root.get("version")),
-        dependencies,
-        exports: root.get("exports").filter(|v| !v.is_null()).cloned(),
-        types: text(root.get("types")),
-        module: text(root.get("module")),
-        main: text(root.get("main")),
-        roots: Vec::new(),
-        scripts: Vec::new(),
-        workspace: Vec::new(),
-        ..Summary::default()
-    }
-}
-
 /// Whether `name` can be a package name: not empty, at most `MAX_NAME` bytes, and no
 /// control character, whitespace or `:` (which would break the `::` of a contract identifier).
 fn valid_name(name: &str) -> bool {
@@ -655,19 +545,6 @@ fn site(repository: &str, path: &str) -> String {
 /// The directory of the manifest at `path`: `.` for one at the root.
 fn directory(path: &str) -> &str {
     path.rsplit_once('/').map_or(".", |(dir, _)| dir)
-}
-
-/// The package a bare specifier names and the subpath inside it: `@a/b/c` is `@a/b` and
-/// `./c`, `x` is `x` and `.`. `None` for a relative or absolute specifier, or a name npm does not
-/// accept (`node:fs` among them).
-fn split(specifier: &str) -> Option<(&str, String)> {
-    if specifier.starts_with(['.', '/']) {
-        return None;
-    }
-    let segments = if specifier.starts_with('@') { 2 } else { 1 };
-    let end = (specifier.match_indices('/').nth(segments - 1)).map_or(specifier.len(), |(i, _)| i);
-    let (name, rest) = specifier.split_at(end);
-    (valid_name(name) && (segments == 1 || name.contains('/'))).then(|| (name, format!(".{rest}")))
 }
 
 /// Every manifest of `ecosystem` whose directory holds `path`, the deepest directory first and
@@ -1412,11 +1289,6 @@ fn consume(exports: &mut [Export], providers: &Providers) {
     }
 }
 
-/// The longest range checked, in bytes; a longer one is `range unchecked`. The crate sets no
-/// limit of its own on a range, and a real one is a few dozen bytes.
-// ponytail: a flat 256 (the crate's own limit for versions); a measured need lifts it.
-const MAX_RANGE: usize = 256;
-
 /// What checking a dependency range against the provider's version found, when it is not a
 /// plain accept.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1435,49 +1307,6 @@ impl Flag {
             Flag::Unchecked => "range unchecked",
         }
     }
-}
-
-/// Whether the dependency `range` accepts the provider's `version`, by npm's semantics: `None`
-/// when it does, else the `Flag`. A missing range or version, a `workspace:`, `file:`, `link:`
-/// or `npm:` range, a git or URL source (anything holding `:` or `/`), a tag such as `latest`
-/// and a range past `MAX_RANGE` are `Unchecked`. The crate lets garbage through in a range of
-/// several tokens (`foo 1.2.3` parses as `1.2.3`), so each token must also look like a
-/// comparator.
-fn flag(range: Option<&str>, version: Option<&str>) -> Option<Flag> {
-    let (Some(range), Some(version)) = (range, version) else {
-        return Some(Flag::Unchecked);
-    };
-    let parsed = (range.len() <= MAX_RANGE && comparators(range))
-        .then(|| nodejs_semver::Range::parse(range).ok())
-        .flatten()
-        .zip(nodejs_semver::Version::parse(version).ok());
-    match parsed {
-        None => Some(Flag::Unchecked),
-        Some((range, version)) if range.satisfies(&version) => None,
-        Some(_) => Some(Flag::Mismatch),
-    }
-}
-
-/// Whether every token of `range` looks like part of an npm range: `||` separates sets of at
-/// least one token, `-` joins a hyphen range, and a comparator is an optional operator then a
-/// version body that begins with a digit, or is a wildcard (`x`, `X`, `*`) alone or followed by
-/// `.` (so no `:` or `/` gets through, nor `xyz`).
-fn comparators(range: &str) -> bool {
-    range.split("||").all(|set| {
-        let mut tokens = set.split_whitespace().peekable();
-        tokens.peek().is_some()
-            && tokens.all(|t| {
-                let body = t.trim_start_matches(['^', '~', '<', '>', '=', 'v']);
-                t == "-"
-                    || body.is_empty()
-                    || ((body.starts_with(|c: char| c.is_ascii_digit())
-                        || matches!(body, "x" | "X" | "*")
-                        || body.starts_with(['x', 'X', '*']) && body[1..].starts_with('.'))
-                        && body
-                            .chars()
-                            .all(|c| c.is_ascii_alphanumeric() || ".+-*".contains(c)))
-            })
-    })
 }
 
 /// What a dependency `range` on the package `contract` says of the provider's `version`, by
@@ -1931,12 +1760,6 @@ mod tests {
         );
     }
 
-    fn entries(s: &Summary) -> Vec<(&str, &str, Option<&str>)> {
-        (s.dependencies.iter())
-            .map(|e| (e.field.as_str(), e.name.as_str(), e.range.as_deref()))
-            .collect()
-    }
-
     #[test]
     fn a_package_site_shows_its_manifest_and_field() {
         let repo = "example.com/a";
@@ -1961,152 +1784,6 @@ mod tests {
     }
 
     #[test]
-    fn a_manifest_reads_its_name_version_and_dependency_entries() {
-        let src = br#"{"name": "@a/b", "version": "1.0.0",
-            "devDependencies": {"z": "^1"}, "dependencies": {"y": "~2", "x": "*"}}"#;
-        let s = read(src);
-        assert_eq!(s.name.as_deref(), Some("@a/b"));
-        assert_eq!(s.version.as_deref(), Some("1.0.0"));
-        assert_eq!(
-            entries(&s),
-            [
-                ("dependencies", "x", Some("*")),
-                ("dependencies", "y", Some("~2")),
-                ("devDependencies", "z", Some("^1")),
-            ]
-        );
-    }
-
-    #[test]
-    fn a_field_of_another_type_counts_as_absent() {
-        let s = read(
-            br#"{"name": 3, "version": ["1"], "dependencies": {"a": true, "b": null, "c": ""},
-                "devDependencies": ["a"], "peerDependencies": "a"}"#,
-        );
-        assert_eq!((&s.name, &s.version), (&None, &None));
-        assert_eq!(
-            entries(&s),
-            [
-                ("dependencies", "a", None),
-                ("dependencies", "b", None),
-                ("dependencies", "c", None),
-            ]
-        );
-    }
-
-    #[test]
-    fn a_name_that_breaks_the_rules_makes_no_provider() {
-        let long = "a".repeat(MAX_NAME + 1);
-        for name in [long.as_str(), "", "a b", "a\nb", "a\u{7}b", "a::b", "a\tb"] {
-            let src = format!(r#"{{"name": {}}}"#, serde_json::to_string(name).unwrap());
-            assert_eq!(read(src.as_bytes()).name, None, "{name:?}");
-        }
-        let longest = "a".repeat(MAX_NAME);
-        let src = format!(r#"{{"name": "{longest}"}}"#);
-        assert_eq!(read(src.as_bytes()).name.as_deref(), Some(longest.as_str()));
-    }
-
-    #[test]
-    fn a_dependency_with_an_invalid_name_is_left_out() {
-        let s = read(br#"{"dependencies": {"a b": "1", "ok": "1"}}"#);
-        assert_eq!(entries(&s), [("dependencies", "ok", Some("1"))]);
-    }
-
-    #[test]
-    fn a_file_too_large_or_not_an_object_reads_as_empty() {
-        let pad = " ".repeat(MAX_BYTES);
-        let big = format!(r#"{{"name": "a"{pad}}}"#);
-        assert_eq!(read(big.as_bytes()), Summary::default());
-        for src in ["", "not json", "[1]", "\"a\"", "null"] {
-            assert_eq!(read(src.as_bytes()), Summary::default(), "{src}");
-        }
-        let at_limit = format!(r#"{{"name": "a"{}}}"#, " ".repeat(MAX_BYTES - 13));
-        assert_eq!(at_limit.len(), MAX_BYTES);
-        assert_eq!(read(at_limit.as_bytes()).name.as_deref(), Some("a"));
-    }
-
-    #[test]
-    fn deeply_nested_input_reads_as_empty() {
-        let n = 10_000;
-        let src = format!(
-            r#"{{"name": "a", "x": {}{}}}"#,
-            "[".repeat(n),
-            "]".repeat(n)
-        );
-        assert_eq!(read(src.as_bytes()), Summary::default());
-    }
-
-    const MISMATCH: Option<Flag> = Some(Flag::Mismatch);
-    const UNCHECKED: Option<Flag> = Some(Flag::Unchecked);
-
-    #[test]
-    fn npm_ranges_are_checked_against_the_local_version() {
-        let table = [
-            ("^1.0.0", "1.2.0", None),
-            ("^1.0.0", "2.0.0", MISMATCH),
-            ("^0.2.3", "0.2.9", None),
-            ("^0.2.3", "0.3.0", MISMATCH),
-            ("~1.1.0", "1.1.9", None),
-            ("~1.1.0", "1.2.0", MISMATCH),
-            ("1.x", "1.9.0", None),
-            ("1.x", "2.0.0", MISMATCH),
-            ("*", "7.0.0", None),
-            ("1.2.0 - 1.4.0", "1.3.0", None),
-            ("1.2.0 - 1.4.0", "1.5.0", MISMATCH),
-            ("^1.0.0 || ^3.0.0", "3.1.0", None),
-            ("^1.0.0 || ^3.0.0", "2.0.0", MISMATCH),
-            (">=1.0.0 <2.0.0", "1.5.0", None),
-            (">=1.0.0 <2.0.0", "2.0.0", MISMATCH),
-            ("1.2.0", "1.2.0", None),
-            ("1.2.0", "1.2.1", MISMATCH),
-            // A prerelease matches only a comparator on the same major.minor.patch.
-            ("^1.0.0", "1.2.0-beta.1", MISMATCH),
-            ("^1.2.0-beta.0", "1.2.0-beta.1", None),
-            ("^1.2.0-beta.0", "1.3.0-beta.1", MISMATCH),
-        ];
-        for (range, version, want) in table {
-            assert_eq!(
-                flag(Some(range), Some(version)),
-                want,
-                "{range} / {version}"
-            );
-        }
-    }
-
-    #[test]
-    fn a_range_that_cannot_be_checked_is_unchecked() {
-        let ranges = [
-            "workspace:*",
-            "workspace:^1.0.0",
-            "file:../shared",
-            "link:../shared",
-            "npm:other@^1.0.0",
-            "git+https://example.com/a.git",
-            "github:user/repo",
-            "user/repo",
-            "https://example.com/a.tgz",
-            "latest",
-            "next",
-            "foo 1.2.3",
-            "xyz 1.2.3",
-            "x-foo",
-            "1.2.3 foo",
-            "^1.0.0 || bar",
-            "",
-        ];
-        for range in ranges {
-            assert_eq!(flag(Some(range), Some("1.2.0")), UNCHECKED, "{range:?}");
-        }
-        assert_eq!(flag(None, Some("1.2.0")), UNCHECKED);
-        assert_eq!(flag(Some("^1.0.0"), None), UNCHECKED);
-        // A local version that is not a version cannot be compared either.
-        assert_eq!(flag(Some("^1.0.0"), Some("not-a-version")), UNCHECKED);
-        let long = "^1.0.0 || ".repeat(MAX_RANGE);
-        assert!(long.len() > MAX_RANGE);
-        assert_eq!(flag(Some(&long), Some("1.2.0")), UNCHECKED);
-    }
-
-    #[test]
     fn the_reason_ends_with_the_flag() {
         let said = |range, version| reason("package::npm::a", range, version);
         assert_eq!(
@@ -2127,92 +1804,10 @@ mod tests {
         );
     }
 
-    #[test]
-    fn the_exports_map_gives_each_subpath_its_target() {
-        let map = serde_json::json!({
-            ".": {"types": "./src/index.ts", "require": "./dist/index.cjs"},
-            "./format": "./src/format.ts",
-            "./conditions": {"node": "./node.ts", "import": "./import.ts", "default": "./d.ts"},
-            "./nested": {"default": {"require": "./r.ts", "import": "./i.ts"}},
-            "./required": {"require": "./required.ts"},
-            "./none": {"node": "./node.ts"},
-            "./utils/*": {"import": "./src/utils/*.ts"},
-            "./utils/special/*": "./src/special/*.js",
-            "./utils/blocked/*": null,
-            "./blocked": null,
-            "./typed": {"types": null, "default": "./typed.ts"},
-            "./fallbacks": ["./a.ts", "./b.ts"],
-            "./many/*/x/*": "./many.ts",
-            "./two/*": "./src/*/*.ts",
-        });
-        let cases: [(&str, Option<&str>); 18] = [
-            // The first of `types`, `import`, `default`, `require` present is taken.
-            (".", Some("./src/index.ts")),
-            ("./format", Some("./src/format.ts")),
-            ("./conditions", Some("./import.ts")),
-            ("./nested", Some("./i.ts")),
-            ("./required", Some("./required.ts")),
-            // Other conditions are not followed.
-            ("./none", None),
-            // Exact keys first, then the pattern with the longest prefix; `*` is replaced.
-            ("./utils/slug", Some("./src/utils/slug.ts")),
-            ("./utils/a/b", Some("./src/utils/a/b.ts")),
-            ("./utils/special/x", Some("./src/special/x.js")),
-            ("./utils/", None),
-            // A `null` target blocks the subpath, even under a condition taken.
-            ("./utils/blocked/x", None),
-            ("./blocked", None),
-            ("./typed", None),
-            // Fallback arrays and keys with two `*` are not read.
-            ("./fallbacks", None),
-            ("./many/a/x/b", None),
-            // A target with two `*` is not read either.
-            ("./two/x", None),
-            ("./missing", None),
-            ("./format/more", None),
-        ];
-        for (subpath, expected) in cases {
-            assert_eq!(exported(&map, subpath).as_deref(), expected, "{subpath}");
-        }
-        // A string or an object of conditions is the target of `.` alone; keys that mix
-        // subpaths and conditions make no target.
-        let sugar = serde_json::json!("./main.ts");
-        assert_eq!(exported(&sugar, ".").as_deref(), Some("./main.ts"));
-        assert_eq!(exported(&sugar, "./x"), None);
-        let conditions = serde_json::json!({"import": "./i.ts", "require": "./r.ts"});
-        assert_eq!(exported(&conditions, ".").as_deref(), Some("./i.ts"));
-        let mixed = serde_json::json!({".": "./a.ts", "import": "./b.ts"});
-        assert_eq!(exported(&mixed, "."), None);
-    }
-
-    #[test]
-    fn a_target_of_many_stars_is_not_expanded() {
-        let stars = format!("./{}.ts", "*".repeat(1 << 20));
-        let map = serde_json::json!({ "./h/*": stars, ".": stars });
-        assert_eq!(exported(&map, &format!("./h/{}", "x".repeat(64))), None);
-        assert_eq!(exported(&map, "."), None);
-    }
-
-    #[test]
-    fn conditions_nested_past_the_limit_give_no_target() {
-        let nest = |n: usize| {
-            let mut v = serde_json::json!("./deep.ts");
-            for _ in 0..n {
-                v = serde_json::json!({ "default": v });
-            }
-            v
-        };
-        assert_eq!(
-            exported(&nest(MAX_CONDITIONS), ".").as_deref(),
-            Some("./deep.ts")
-        );
-        assert_eq!(exported(&nest(MAX_CONDITIONS + 1), "."), None);
-    }
-
     fn manifest(path: &str, json: &str) -> Manifest {
         Manifest {
             path: path.to_string(),
-            summary: read(json.as_bytes()),
+            summary: read_manifest(path, json.as_bytes()),
         }
     }
 
@@ -2330,17 +1925,6 @@ mod tests {
         // At the repository root the package directory is the root.
         let root = manifest("package.json", r#"{"main": "./index.ts"}"#);
         assert_eq!(ways(&root, "."), [(How::Main, vec!["index.ts".into()])]);
-    }
-
-    #[test]
-    fn a_specifier_splits_into_its_package_and_subpath() {
-        assert_eq!(split("x"), Some(("x", ".".into())));
-        assert_eq!(split("x/a/b"), Some(("x", "./a/b".into())));
-        assert_eq!(split("@a/b"), Some(("@a/b", ".".into())));
-        assert_eq!(split("@a/b/c"), Some(("@a/b", "./c".into())));
-        for none in ["./x", "../x", "/x", "node:fs", "@a", "a b"] {
-            assert_eq!(split(none), None, "{none}");
-        }
     }
 
     #[test]

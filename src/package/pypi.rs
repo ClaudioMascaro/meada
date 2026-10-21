@@ -15,7 +15,7 @@ use std::collections::HashSet;
 
 use super::{
     Ecosystem, Entry, How, MAX_BYTES, MAX_NAME, Manifest, Provided, Providers, Resolution,
-    Resolved, Summary, directory, holding, owner, split,
+    Resolved, Summary, directory, holding, npm::split, owner,
 };
 use crate::contract::Level;
 use crate::index::Export;
