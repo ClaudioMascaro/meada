@@ -40,6 +40,26 @@ pub fn normalize_remote(url: &str) -> String {
     format!("{host}/{path}").trim_matches('/').to_lowercase()
 }
 
+/// `rel` joined to the directory `dir`, `.` and `..` folded without touching the file system: a
+/// path of the repository, or one that starts with `..` segments when it leaves it. `None` when
+/// `rel` is absolute.
+pub fn relative(dir: &str, rel: &str) -> Option<String> {
+    if rel.starts_with('/') || rel.contains('\\') {
+        return None;
+    }
+    let mut parts: Vec<&str> = dir.split('/').filter(|p| !p.is_empty()).collect();
+    for part in rel.split('/') {
+        match part {
+            "" | "." => {}
+            ".." if parts.last().is_some_and(|p| *p != "..") => {
+                parts.pop();
+            }
+            part => parts.push(part),
+        }
+    }
+    Some(parts.join("/"))
+}
+
 /// What a path of the working tree changed against `HEAD`.
 pub enum Change {
     /// Inclusive 1-based line ranges of the file as it is now; a deletion touches the line
@@ -136,7 +156,28 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_remote;
+    use super::{normalize_remote, relative};
+
+    #[test]
+    fn a_relative_path_folds_against_its_directory() {
+        assert_eq!(relative("", "core"), Some("core".into()));
+        assert_eq!(relative("app/web", "../core"), Some("app/core".into()));
+        assert_eq!(relative("app", "./x/./y"), Some("app/x/y".into()));
+        assert_eq!(relative("app", "."), Some("app".into()));
+        assert_eq!(relative("app", ".."), Some("".into()));
+    }
+
+    #[test]
+    fn a_path_that_leaves_the_repository_keeps_its_dotdot_segments() {
+        assert_eq!(relative("app", "../../x"), Some("../x".into()));
+        assert_eq!(relative("", "../x"), Some("../x".into()));
+    }
+
+    #[test]
+    fn an_absolute_or_backslashed_path_folds_to_nothing() {
+        assert_eq!(relative("app", "/etc"), None);
+        assert_eq!(relative("app", "a\\b"), None);
+    }
 
     #[test]
     fn remote_forms_of_one_repository_are_equal() {

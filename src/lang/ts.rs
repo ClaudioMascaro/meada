@@ -1098,7 +1098,7 @@ mod tests {
         let valid = r#"{"compilerOptions": {"paths": {"@/*": ["src/*"]}}}"#;
         let (aliased, relative) = resolve(valid.as_bytes());
         assert!(aliased.contains(&"src/b.ts".to_string()), "{aliased:?}");
-        let padded = format!("{valid}{}", " ".repeat(crate::package::MAX_BYTES));
+        let padded = format!("{valid}{}", " ".repeat(crate::lang::MAX_BYTES));
         let deep = "[".repeat(100_000);
         for config in [
             padded.as_bytes(),

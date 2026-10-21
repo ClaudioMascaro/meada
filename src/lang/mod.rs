@@ -678,6 +678,13 @@ pub enum Step {
 // or aliases, or a type nested thousands of levels, from costing the stack.
 pub const TYPE_DEPTH: usize = 32;
 
+/// The largest manifest or pack config read (`package.json`, `pyproject.toml`,
+/// `requirements*.txt`, `Cargo.toml`, `go.mod`, `tsconfig.json`); a larger one counts as empty.
+/// Real manifests are a few kilobytes, and the stored summary and the export stay proportional
+/// to what is read.
+// ponytail: a flat 1 MiB; a streaming reader that keeps only the dependency tables lifts it.
+pub(crate) const MAX_BYTES: usize = 1 << 20;
+
 /// A type as written (spec #23), as far as drift reads it: the fields it lists. A form that
 /// lists none is `Unknown`.
 #[derive(Clone, Debug, PartialEq, Eq)]

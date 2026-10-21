@@ -21,7 +21,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use super::cargo::{relative, sourced};
+use super::cargo::sourced;
 use super::{
     Ecosystem, Entry, How, MAX_BYTES, Manifest, Provided, Providers, Resolved, Summary, directory,
     inside, owner, valid_name,
@@ -29,6 +29,7 @@ use super::{
 use crate::contract::Level;
 use crate::index::Export;
 use crate::lang::go::modfile;
+use crate::repo::relative;
 
 /// The field a `require` entry is kept under.
 const REQUIRE: &str = "require";

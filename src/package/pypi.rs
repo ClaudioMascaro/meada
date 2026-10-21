@@ -196,7 +196,7 @@ fn module(at: &Provided, manifest: &Manifest, specifier: &str) -> Option<String>
 /// The program entry points the console scripts of the PyPI manifests name, as the file of the
 /// script's module (the one an import of it from the package finds, `roots`) and the function. A
 /// script whose module is no file of the package names nothing. Sorted, without repeats.
-pub fn programs(manifests: &[Manifest], files: &[&str]) -> Vec<(String, String)> {
+fn programs(manifests: &[Manifest], files: &[&str]) -> Vec<(String, String)> {
     let mut found = Vec::new();
     for manifest in manifests {
         // A script belongs to the package of a manifest that bounds one.
@@ -231,6 +231,10 @@ pub struct Pypi;
 impl Ecosystem for Pypi {
     fn name(&self) -> &'static str {
         "pypi"
+    }
+
+    fn programs(&self, manifests: &[Manifest], files: &[&str]) -> Vec<(String, String)> {
+        programs(manifests, files)
     }
 
     fn is_manifest(&self, file_name: &str) -> bool {
