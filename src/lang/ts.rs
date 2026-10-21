@@ -11,7 +11,6 @@ use super::{
 };
 use crate::{Result, package, qualify};
 
-pub(crate) mod messages;
 mod types;
 mod uses;
 
