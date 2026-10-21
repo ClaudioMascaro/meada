@@ -632,3 +632,27 @@ fn status_exits_zero_only_when_every_repository_can_be_served() {
     assert!(some.contains("example.com/chain/gateway (../chain-gateway) not indexed\n"));
     assert!(some.contains("example.com/chain/web (../chain-web) indexed, "));
 }
+
+/// A commit in progress on one index does not stall the probe, nor fail it: the index is there
+/// and the server answers once the lock clears. The text still names the locked state.
+#[test]
+fn status_probe_answers_fast_and_ready_while_a_writer_holds_an_index() {
+    let dir = chain_manifest("manifest_status_locked");
+    assert!(run(&dir, "index").2);
+    let writer =
+        rusqlite::Connection::open(dir.join("indexes/example.com/chain/web/index.db")).unwrap();
+    writer
+        .execute_batch("BEGIN EXCLUSIVE; INSERT INTO communities VALUES ('c', 'm');")
+        .unwrap();
+    let start = std::time::Instant::now();
+    let (status, stderr, ok) = run(&dir, "status");
+    let took = start.elapsed();
+    eprintln!("probe took {took:?}");
+    assert!(ok && stderr.is_empty(), "{stderr}");
+    assert!(took < std::time::Duration::from_millis(700), "{took:?}");
+    assert!(
+        status.contains("example.com/chain/web (../chain-web) locked by a commit in progress"),
+        "{status}"
+    );
+    writer.execute_batch("ROLLBACK").unwrap();
+}
