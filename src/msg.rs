@@ -315,6 +315,21 @@ pub enum Msg<'a> {
     SnapshotStoreReachable(&'a str),
     #[cfg(feature = "snapshot")]
     SnapshotStoreUnreachable(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    NeedsSections {
+        section: &'a str,
+        needed: &'a [&'a str],
+    },
+    #[cfg(feature = "generation-pointer")]
+    GenerationsKeep(i64),
+    #[cfg(feature = "generation-pointer")]
+    GenerationsBadPointer(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    GenerationsBadEntry(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    GenerationsEmpty(&'a str),
+    #[cfg(feature = "snapshot")]
+    GenerationNotHeld(&'a str),
     #[cfg(feature = "snapshot")]
     GenerationsHelp,
     About,
@@ -1067,6 +1082,51 @@ impl Msg<'_> {
             Msg::SnapshotStoreUnreachable(reason) => pick(
                 format!("store: unreachable ({reason})"),
                 format!("store: inalcançável ({reason})"),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::NeedsSections { section, needed } => {
+                let needed: Vec<String> = needed.iter().map(|s| format!("[{s}]")).collect();
+                pick(
+                    format!("[{section}] needs {}", needed.join(" and ")),
+                    format!("[{section}] exige {}", needed.join(" e ")),
+                )
+            }
+            #[cfg(feature = "generation-pointer")]
+            Msg::GenerationsKeep(min) => pick(
+                format!("must be at least {min}"),
+                format!("deve ser pelo menos {min}"),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::GenerationsBadPointer(key) => pick(
+                format!(
+                    "{key}: not a hash of `id`, a generation id of 16 lowercase hex characters, \
+                     and `fence`, a decimal fence"
+                ),
+                format!(
+                    "{key}: não é um hash de `id`, um id de geração de 16 caracteres hexadecimais \
+                     minúsculos, e `fence`, um fence decimal"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::GenerationsBadEntry(key) => pick(
+                format!(
+                    "{key}: an entry is not `<generation id>:<fence>`, an id of 16 lowercase hex \
+                     characters and a decimal fence"
+                ),
+                format!(
+                    "{key}: uma entrada não é `<id da geração>:<fence>`, um id de 16 caracteres \
+                     hexadecimais minúsculos e um fence decimal"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::GenerationsEmpty(key) => pick(
+                format!("{key}: empty: no generation is retained there"),
+                format!("{key}: vazia: nenhuma geração está retida lá"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::GenerationNotHeld(id) => pick(
+                format!("generation {id} is not held here"),
+                format!("a geração {id} não está retida aqui"),
             ),
             #[cfg(feature = "snapshot")]
             Msg::GenerationsHelp => pick(

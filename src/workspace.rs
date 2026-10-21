@@ -181,6 +181,10 @@ pub struct Manifest {
     /// The `[snapshot]` section, when the build has the module.
     #[cfg(feature = "snapshot")]
     pub snapshot: Option<crate::snapshot::Config>,
+    /// The `[generations]` section, when the build has the module; `read` checks that
+    /// `[snapshot]` and `[valkey]` are there too.
+    #[cfg(feature = "generation-pointer")]
+    pub generations: Option<crate::snapshot::generations::Config>,
 }
 
 /// One `[[repository]]` of a manifest.
@@ -213,6 +217,8 @@ struct ManifestFile {
     valkey: Option<crate::valkey::File>,
     #[cfg(feature = "snapshot")]
     snapshot: Option<crate::snapshot::File>,
+    #[cfg(feature = "generation-pointer")]
+    generations: Option<crate::snapshot::generations::File>,
 }
 
 /// A `[[repository]]`: `serve` and `resource` take the shapes of `meada.toml`'s, `peer` that
@@ -284,6 +290,18 @@ impl Manifest {
         #[cfg(feature = "snapshot")]
         let snapshot = (parsed.snapshot.map(|s| s.validate(base)).transpose())
             .map_err(|(key, problem)| config::error_at(file, &src, key, &problem))?;
+        #[cfg(feature = "generation-pointer")]
+        let generations = (parsed.generations.map(|g| g.validate()).transpose())
+            .map_err(|(key, problem)| config::error_at(file, &src, key, &problem))?;
+        #[cfg(feature = "generation-pointer")]
+        if generations.is_some() {
+            let missing = [
+                ("snapshot", snapshot.is_none()),
+                ("valkey", valkey.is_none()),
+            ];
+            let missing: Vec<&str> = (missing.iter()).filter(|m| m.1).map(|m| m.0).collect();
+            modules::needs(file, &src, "generations", &missing)?;
+        }
         // Each entry's blocks as written, in manifest order: the typed read checked them.
         #[cfg(feature = "snapshot")]
         let mut written = crate::snapshot::entry_blocks(&src).into_iter();
@@ -342,6 +360,8 @@ impl Manifest {
             valkey,
             #[cfg(feature = "snapshot")]
             snapshot,
+            #[cfg(feature = "generation-pointer")]
+            generations,
         })
     }
 
@@ -404,6 +424,8 @@ impl Manifest {
             #[cfg(feature = "valkey")]
             valkey: None,
             snapshot: None,
+            #[cfg(feature = "generation-pointer")]
+            generations: None,
         })
     }
 

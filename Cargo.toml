@@ -91,6 +91,8 @@ snapshot = [
     "dep:rustls",
     "dep:rustls-platform-verifier",
 ]
+# The current and retained generations in Valkey, and pins (`[generations]`). No crate of its own.
+generation-pointer = ["snapshot", "valkey"]
 
 # `cargo test` runs the example's own tests too.
 [[example]]

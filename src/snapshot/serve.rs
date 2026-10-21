@@ -5,6 +5,7 @@
 //! Everything here only reads: a call reads the pointer file and the generation document, and
 //! the node's `meada snapshot pull` is what moves the pointer.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -33,10 +34,11 @@ pub struct Held {
 /// directory never changes once the pull renamed it into place, so a call reads only the
 /// pointer file, and its document and the mirrors' configuration only when the pointer names
 /// another generation. Only the last one read is kept; a call still answering from an earlier
-/// one holds its own `Arc`.
+/// one holds its own `Arc`. Pinned generations (`pinned`) are kept apart, one per held id.
 pub struct Current {
     local: PathBuf,
     last: Mutex<Option<Arc<Held>>>,
+    pins: Mutex<HashMap<String, Arc<Held>>>,
 }
 
 impl Current {
@@ -44,7 +46,32 @@ impl Current {
         Self {
             local,
             last: Mutex::new(None),
+            pins: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// The node's `local_dir`.
+    pub fn local(&self) -> &Path {
+        &self.local
+    }
+
+    /// The generation `id` (an id, as `is_id` checks it) if the node holds it, `None` if not:
+    /// read once while it is held, as `get` reads the current one. A call reads the names
+    /// under `local_dir` and drops each pin the node no longer holds, so what is kept is bounded
+    /// by what the node holds.
+    pub fn pinned(&self, id: &str) -> Result<Option<Arc<Held>>> {
+        let held = ids(&self.local);
+        let mut pins = self.pins.lock().unwrap_or_else(|e| e.into_inner());
+        pins.retain(|pin, _| held.contains(pin));
+        if !held.iter().any(|h| h == id) {
+            return Ok(None);
+        }
+        if let Some(held) = pins.get(id) {
+            return Ok(Some(held.clone()));
+        }
+        let held = Arc::new(load(&self.local, id.to_string())?);
+        pins.insert(id.to_string(), held.clone());
+        Ok(Some(held))
     }
 
     /// The generation the pointer file names now, as `held` reads it.
@@ -225,6 +252,41 @@ mod tests {
         fs::remove_file(local.join(pull::POINTER)).unwrap();
         let e = current.get().err().unwrap().to_string();
         assert!(e.contains("meada snapshot pull"), "{e}");
+    }
+
+    #[test]
+    fn a_pin_answers_from_its_generation_whatever_the_pointer_names() {
+        let local = scratch("pinned");
+        generation(&local, A, &[("a.ts", "export function alpha() {}\n")]);
+        generation(&local, B, &[("a.ts", "export function beta() {}\n")]);
+        point(&local, B);
+        let current = Current::new(local.clone());
+        let pinned = current.pinned(A).unwrap().unwrap();
+        assert_eq!(pinned.id, A);
+        let engine = Engine::open_held(&pinned, REPO).unwrap();
+        assert!(engine.search("alpha", None, None).unwrap().contains("a.ts"));
+        assert_eq!(current.get().unwrap().id, B);
+        assert!(current.pinned("00000000000000cc").unwrap().is_none());
+    }
+
+    /// A pin is read once while held, and let go of once the node no longer holds it: what the
+    /// server keeps is bounded by what the node holds.
+    #[test]
+    fn a_pin_is_read_once_and_dropped_once_its_generation_is_gone() {
+        let local = scratch("pin-once");
+        generation(&local, A, &[("a.ts", "export function alpha() {}\n")]);
+        generation(&local, B, &[("a.ts", "export function beta() {}\n")]);
+        point(&local, B);
+        let current = Current::new(local.clone());
+        let first = current.pinned(A).unwrap().unwrap();
+        fs::remove_file(local.join(A).join(pull::DOCUMENT)).unwrap();
+        assert!(Arc::ptr_eq(&first, &current.pinned(A).unwrap().unwrap()));
+        fs::remove_dir_all(local.join(A)).unwrap();
+        assert!(current.pinned(A).unwrap().is_none());
+        assert_eq!(Arc::strong_count(&first), 1);
+        // A held generation whose document no longer reads is an error, not a 404.
+        fs::remove_file(local.join(B).join(pull::DOCUMENT)).unwrap();
+        assert!(current.pinned(B).is_err());
     }
 
     /// A held generation is as hostile as the store it came from: a document that does not

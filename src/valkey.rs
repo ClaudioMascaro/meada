@@ -254,7 +254,7 @@ pub fn status_line(config: &Config) -> String {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::path::Path;
 
     use super::*;
@@ -360,7 +360,7 @@ mod tests {
 
     /// The local Valkey the tests name, or `None` (with the reason printed) when the variable is
     /// unset; `MEADA_TEST_SERVICES_REQUIRED=1` turns that into a failure.
-    fn service() -> Option<String> {
+    pub(crate) fn service() -> Option<String> {
         let url = std::env::var("MEADA_TEST_VALKEY_URL").ok();
         if url.is_none() {
             let required = std::env::var("MEADA_TEST_SERVICES_REQUIRED").is_ok_and(|v| v == "1");

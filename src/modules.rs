@@ -28,12 +28,12 @@ pub const MODULES: [Module; 6] = [
         feature: "snapshot",
         built: cfg!(feature = "snapshot"),
     },
-    // The sections below belong to modules not built yet: no build has their feature.
     Module {
         section: "generations",
         feature: "generation-pointer",
-        built: false,
+        built: cfg!(feature = "generation-pointer"),
     },
+    // The sections below belong to modules not built yet: no build has their feature.
     Module {
         section: "refresh_lock",
         feature: "refresh-lock",
@@ -68,6 +68,29 @@ pub fn check(file: &Path, src: &str) -> Result<()> {
     };
     let (section, feature) = (module.section, module.feature);
     let what = Msg::NeedsFeature { section, feature }.text();
+    let line = crate::config::line_of(src, at);
+    Err(format!("{}:{line}: {what}", file.display()).into())
+}
+
+/// The error for `section` of `src`, the content of `file`, when the sections it needs that
+/// `missing` names are not there: `[section] needs [missing...]`, at the section's line.
+#[cfg(feature = "generation-pointer")]
+pub fn needs(file: &Path, src: &str, section: &str, missing: &[&str]) -> Result<()> {
+    if missing.is_empty() {
+        return Ok(());
+    }
+    let at = (DeTable::parse(src).ok())
+        .and_then(|table| {
+            let table = table.get_ref();
+            let key = table.keys().find(|key| key.get_ref().as_ref() == section)?;
+            Some(key.span().start)
+        })
+        .unwrap_or(0);
+    let what = Msg::NeedsSections {
+        section,
+        needed: missing,
+    }
+    .text();
     let line = crate::config::line_of(src, at);
     Err(format!("{}:{line}: {what}", file.display()).into())
 }
