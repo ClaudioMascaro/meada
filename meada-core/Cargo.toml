@@ -1,0 +1,30 @@
+[package]
+name = "meada-core"
+version.workspace = true
+edition.workspace = true
+description = "The deterministic core of Meada: the workspace manifest's schema and checks, and the ids, for the CLI and the browser"
+license.workspace = true
+repository.workspace = true
+keywords = ["code-graph", "meada", "wasm"]
+categories = ["development-tools"]
+
+# A library: cargo-dist builds and releases the `meada` binary alone (ADR 0010).
+[package.metadata.dist]
+dist = false
+
+# `cdylib` for wasm-pack's bundle, `rlib` for the binary.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# No rusqlite, tree-sitter, async runtime, filesystem, process or network code: this crate builds
+# for `wasm32-unknown-unknown` (ADR 0014).
+[dependencies]
+blake3 = "1.8.7"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+toml = "1.1.8"
+# The browser's bindings, only behind the feature of the same name, which the binary never enables.
+wasm-bindgen = { version = "0.2.129", optional = true }
+
+[features]
+wasm-bindgen = ["dep:wasm-bindgen"]

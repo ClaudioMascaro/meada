@@ -8,6 +8,9 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
+#[cfg(feature = "snapshot")]
+pub(crate) use meada_core::manifest::identity_problem;
+use meada_core::manifest::{EntryFile, entry_problems};
 use serde::Deserialize;
 
 use crate::config::{self, Config};
@@ -235,54 +238,17 @@ struct ManifestFile {
     github_apps: Vec<crate::github_app::File>,
 }
 
-/// A `[[repository]]`: `serve` and `resource` take the shapes of `meada.toml`'s, `peer` that
-/// of its `[[peer]]` without `path` (the manifest locates every repository).
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct EntryFile {
-    repo: String,
-    path: String,
-    #[serde(default, deserialize_with = "config::declared")]
-    serve: config::Serve,
-    #[serde(default, rename = "resource")]
-    resources: Vec<config::Resource>,
-    #[serde(default, rename = "peer")]
-    peers: Vec<EntryPeer>,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct EntryPeer {
-    repo: String,
-    #[serde(default)]
-    base_url_env: Vec<String>,
-}
-
-impl EntryFile {
-    /// Its blocks, as `Listed::ignored` names them.
-    fn blocks(&self) -> Vec<String> {
-        let serve = self
-            .serve
-            .declared
-            .then(|| "[repository.serve]".to_string());
-        let resources =
-            (self.resources.iter()).map(|r| format!("[[repository.resource]] {} {}", r.kind, r.id));
-        let peers = (self.peers.iter()).map(|p| format!("[[repository.peer]] {}", p.repo));
-        serve.into_iter().chain(resources).chain(peers).collect()
-    }
-
-    /// Its blocks as the configuration of a mirror with no `meada.toml`.
-    fn config(self) -> Config {
-        let peers = self.peers.into_iter().map(|p| config::Peer {
-            repo: p.repo,
-            path: None,
-            base_url_env: p.base_url_env,
-        });
-        Config {
-            peers: peers.collect(),
-            serve: self.serve,
-            resources: self.resources,
-        }
+/// An entry's blocks as the configuration of a mirror with no `meada.toml`.
+fn config_of(entry: EntryFile) -> Config {
+    let peers = entry.peers.into_iter().map(|p| config::Peer {
+        repo: p.repo,
+        path: None,
+        base_url_env: p.base_url_env,
+    });
+    Config {
+        peers: peers.collect(),
+        serve: entry.serve,
+        resources: entry.resources,
     }
 }
 
@@ -331,13 +297,12 @@ impl Manifest {
         let index_dir = base.join(index_dir);
         // Before any `git` call: a mirror another user owns is read all the same (ADR 0011).
         (parsed.repositories.iter()).for_each(|e| repo::trust(&base.join(&e.path)));
-        let mut seen = HashSet::new();
-        let mut entries: Vec<Listed> = (parsed.repositories.into_iter())
-            .map(|e| {
-                let twice = !seen.insert(e.repo.clone());
+        let problems = entry_problems(parsed.repositories.iter().map(|e| e.repo.as_str()));
+        let mut entries: Vec<Listed> = (parsed.repositories.into_iter().zip(problems))
+            .map(|(e, problem)| {
                 let (repo, path, blocks) = (e.repo.clone(), e.path.clone(), e.blocks());
                 let (repository, ignored) =
-                    match mirror(&index_dir, &base.join(&path), &repo, twice, e.config()) {
+                    match mirror(&index_dir, &base.join(&path), &repo, problem, config_of(e)) {
                         Ok((repository, true)) => (Ok(repository), blocks),
                         Ok((repository, false)) => (Ok(repository), Vec::new()),
                         Err(problem) => (Err(problem), Vec::new()),
@@ -449,7 +414,7 @@ impl Manifest {
             let own = config::read_own_up_to(&root, "meada.toml", max);
             let (config, ignored) = match own.map_err(|e| bad(e.to_string()))? {
                 Some(own) => (own, blocks),
-                None => (file.config(), Vec::new()),
+                None => (config_of(file), Vec::new()),
             };
             entries.push(Listed {
                 repo: repo.to_string(),
@@ -566,36 +531,19 @@ fn resolved(path: &Path) -> PathBuf {
     })
 }
 
-/// Why `repo` cannot be the identity of a served repository, checked before any path is built
-/// from it: a segment that would leave the directory it is joined to (empty, `.` or `..`), or a
-/// `local/` identity. A manifest entry and a generation document (`meada snapshot pull`) share
-/// it; each also refuses an identity listed twice.
-pub(crate) fn identity_problem(repo: &str) -> Option<String> {
-    if repo.split('/').any(|s| matches!(s, "" | "." | "..")) {
-        return Some(Msg::UnsafeIdentity.text());
-    }
-    if repo.starts_with("local/") {
-        return Some(Msg::LocalIdentity.text());
-    }
-    None
-}
-
 /// The repository a manifest entry lists as `repo` at `path`, its index under `index_dir`, or
-/// why it cannot be served. `twice` when an earlier entry names the same identity. Its
-/// configuration is its own `meada.toml`, whole, or the entry's blocks (`listed`) when it has
-/// none; the flag says it has one.
+/// why it cannot be served: first the `problem` its identity alone decides (`entry_problems`),
+/// then the mirror's. Its configuration is its own `meada.toml`, whole, or the entry's blocks
+/// (`listed`) when it has none; the flag says it has one.
 fn mirror(
     index_dir: &Path,
     path: &Path,
     repo: &str,
-    twice: bool,
+    problem: Option<String>,
     listed: Config,
 ) -> std::result::Result<(Repository, bool), String> {
-    if let Some(problem) = identity_problem(repo) {
+    if let Some(problem) = problem {
         return Err(problem);
-    }
-    if twice {
-        return Err(Msg::ListedTwice.text());
     }
     let shown = path.display().to_string();
     if !path.exists() {
