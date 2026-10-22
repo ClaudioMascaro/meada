@@ -453,18 +453,13 @@ pub fn publish(manifest: &Path) -> Result<String> {
         .map(|b| (b.identity.as_str(), bundle_of(&b.key)))
         .collect();
     let generation = generation_id(&ids);
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?;
     let pointer = Pointer {
         #[cfg(feature = "generation-pointer")]
         generations: (listed.generations.clone()).zip(listed.valkey.clone()),
         #[cfg(feature = "refresh-lock")]
         held,
     };
-    let stored = runtime.block_on(store_generation(&config, &generation, bundles, pointer));
-    runtime.shutdown_background();
-    stored?;
+    crate::modules::block_on(store_generation(&config, &generation, bundles, pointer))??;
     Ok(generation)
 }
 

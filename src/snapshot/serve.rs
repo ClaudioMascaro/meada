@@ -17,8 +17,9 @@ use crate::msg::Msg;
 use crate::workspace::Manifest;
 use crate::{Result, config};
 
-/// How long the status probe waits for the store before it calls it unreachable.
-const REACH_TIMEOUT: Duration = Duration::from_secs(2);
+/// How long the status probe waits for the current generation's id (from the store, or from
+/// Valkey and then the store) before it calls the service unreachable.
+const CURRENT_ID_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// A generation a node holds, as its document records it.
 pub struct Held {
@@ -156,9 +157,9 @@ pub fn ids(local: &Path) -> Vec<String> {
 }
 
 /// The generation id the store's `current` holds, or why the store did not say within
-/// `REACH_TIMEOUT`.
+/// `CURRENT_ID_TIMEOUT`.
 pub fn reach(config: &Config) -> std::result::Result<String, String> {
-    within(async {
+    let ask = async {
         let store = Store::connect(config)?;
         let key = config.key("current");
         let bytes = store.get(&key, CURRENT_MAX).await?;
@@ -166,18 +167,19 @@ pub fn reach(config: &Config) -> std::result::Result<String, String> {
             &key,
             &bytes.ok_or_else(|| Msg::SnapshotNoCurrent(&key).text())?,
         )
-    })
+    };
+    crate::modules::within(CURRENT_ID_TIMEOUT, ask, Msg::SnapshotTimeout)
 }
 
 /// With `[generations]`: the current generation id Valkey holds and its fence, once the store
 /// answers that it holds its document, or why Valkey or the store did not say within
-/// `REACH_TIMEOUT`, the reason prefixed with which one.
+/// `CURRENT_ID_TIMEOUT`, the reason prefixed with which one.
 #[cfg(feature = "generation-pointer")]
 pub fn reach_pointer(
     config: &Config,
     valkey: &crate::valkey::Config,
 ) -> std::result::Result<(String, u64), String> {
-    within(async {
+    let ask = async {
         let read = async {
             let connection = crate::valkey::Valkey::connect(valkey).await?;
             super::generations::current(&connection, valkey).await
@@ -189,21 +191,8 @@ pub fn reach_pointer(
             Some(_) => Ok((id, fence)),
             None => Err(format!("store: {}", Msg::SnapshotNoCurrent(&key).text())),
         }
-    })
-}
-
-/// `ask` on a runtime of its own, or a timeout after `REACH_TIMEOUT`.
-fn within<T>(
-    ask: impl Future<Output = std::result::Result<T, String>>,
-) -> std::result::Result<T, String> {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| e.to_string())?;
-    let answer = runtime.block_on(async { tokio::time::timeout(REACH_TIMEOUT, ask).await });
-    // Dropping the runtime would wait for a blocking thread still in a DNS lookup.
-    runtime.shutdown_background();
-    answer.unwrap_or_else(|_| Err(Msg::SnapshotTimeout(REACH_TIMEOUT.as_millis() as u64).text()))
+    };
+    crate::modules::within(CURRENT_ID_TIMEOUT, ask, Msg::SnapshotTimeout)
 }
 
 #[cfg(test)]

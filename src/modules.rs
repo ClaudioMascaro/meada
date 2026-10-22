@@ -123,6 +123,33 @@ pub fn at_least(
     }
 }
 
+/// `run` to its end on a current-thread runtime of its own, then shut down without waiting:
+/// dropping it would wait for a blocking thread still in a DNS lookup or a file read, for as long
+/// as the resolver or the mount takes.
+#[cfg(any(feature = "valkey", feature = "snapshot"))]
+pub fn block_on<T>(run: impl Future<Output = T>) -> std::io::Result<T> {
+    let runtime = (tokio::runtime::Builder::new_current_thread())
+        .enable_all()
+        .build()?;
+    let out = runtime.block_on(run);
+    runtime.shutdown_background();
+    Ok(out)
+}
+
+/// `ask`'s answer within `bound`, else the `timeout` message of `bound` in milliseconds: what a
+/// `meada status` line waits for a service.
+#[cfg(any(feature = "valkey", feature = "snapshot"))]
+pub fn within<T>(
+    bound: std::time::Duration,
+    ask: impl Future<Output = std::result::Result<T, String>>,
+    timeout: fn(u64) -> Msg<'static>,
+) -> std::result::Result<T, String> {
+    // The timer is made on the runtime: one made before it would find no reactor.
+    let answer = block_on(async { tokio::time::timeout(bound, ask).await });
+    let answer = answer.map_err(|e| e.to_string())?;
+    answer.unwrap_or_else(|_| Err(timeout(bound.as_millis() as u64).text()))
+}
+
 /// Whether `host`, as a URL names it (an IPv6 address with or without its brackets), is
 /// loopback: `localhost`, `127.0.0.0/8` or `::1`. A name that only starts like one, and an
 /// IPv4-mapped address, are not.

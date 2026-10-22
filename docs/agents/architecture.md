@@ -134,7 +134,7 @@ one for the area a change touches.
   connects. Every key goes through `Config::key(name, tagged)`: `<key_prefix>:<name>`, or
   `{<key_prefix>}:<name>` for the keys one script touches together (pointer, lock, fence). An
   error from the client has the password scrubbed. `status --workspace` prints `valkey:
-  reachable` or `valkey: unreachable (<reason>)` after waiting at most `REACH_TIMEOUT`; the
+  reachable` or `valkey: unreachable (<reason>)` after waiting at most `PING_TIMEOUT`; the
   line is informational and never changes the probe's exit code. With a `ca_file` the client
   trusts that file alone, not the system roots as well (redis-rs replaces them).
 - `oidc.rs` (feature `oidc`; the only place `jsonwebtoken` is used, with RustCrypto as its

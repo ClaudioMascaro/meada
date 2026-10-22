@@ -149,12 +149,9 @@ pub fn run(manifest: &Path, command: &[OsString]) -> crate::Result<i32> {
     let (Some(section), Some(valkey)) = (listed.refresh_lock, listed.valkey) else {
         return Err(Msg::LockNoSection(&shown).text().into());
     };
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?;
-    let code = runtime.block_on(supervise(&section, &valkey, command));
-    runtime.shutdown_background();
-    Ok(code?)
+    Ok(crate::modules::block_on(supervise(
+        &section, &valkey, command,
+    ))??)
 }
 
 /// The TTL in milliseconds, as `PX` and `PEXPIRE` take it.

@@ -17,8 +17,9 @@ use serde::Deserialize;
 
 use crate::msg::Msg;
 
-/// How long `meada status` waits for Valkey to answer: a dead one must not stall the probe.
-pub const REACH_TIMEOUT: Duration = Duration::from_millis(800);
+/// How long `meada status` waits for Valkey to answer its ping: a dead one must not stall the
+/// probe.
+const PING_TIMEOUT: Duration = Duration::from_millis(800);
 /// A connection attempt, and an answer, of the shared client.
 const NETWORK_TIMEOUT: Duration = Duration::from_secs(2);
 // ponytail: the most `password_file` may hold; past it the connection fails, naming the file.
@@ -225,18 +226,10 @@ fn scrub(text: &str, secret: Option<&str>) -> String {
     }
 }
 
-/// Whether Valkey answers within `REACH_TIMEOUT`, or why not.
+/// Whether Valkey answers within `PING_TIMEOUT`, or why not.
 pub fn reach(config: &Config) -> Result<(), String> {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| e.to_string())?;
     let ping = async { Valkey::connect(config).await?.ping().await };
-    let answer = runtime.block_on(async { tokio::time::timeout(REACH_TIMEOUT, ping).await });
-    // Dropping the runtime would wait for a blocking thread still in a DNS lookup or a file
-    // read, for as long as the resolver or the mount takes.
-    runtime.shutdown_background();
-    answer.unwrap_or_else(|_| Err(Msg::ValkeyTimeout(REACH_TIMEOUT.as_millis() as u64).text()))
+    crate::modules::within(PING_TIMEOUT, ping, Msg::ValkeyTimeout)
 }
 
 /// The `valkey:` line `meada status --workspace` prints.

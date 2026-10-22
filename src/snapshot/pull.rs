@@ -109,12 +109,9 @@ pub fn pull(manifest: &Path) -> Result<(Pulled, Vec<String>)> {
         Err(fs::TryLockError::Error(e)) => return Err(at(e).into()),
     }
     repo::isolate(&local);
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?;
-    let pulled = runtime.block_on(pull_locked(&config, &local, source));
-    runtime.shutdown_background();
-    Ok(pulled?)
+    Ok(crate::modules::block_on(pull_locked(
+        &config, &local, source,
+    ))??)
 }
 
 /// Where a pull learns the current generation: the store's `current`, or with `[generations]`
