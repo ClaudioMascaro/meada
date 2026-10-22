@@ -164,7 +164,7 @@ fn a_node_whose_companion_writes_heartbeats_answers_the_same() {
 fn answer_the_goldens(dir: &Path, first: &str, nodes: &[(String, PathBuf)]) {
     for (manifest, local) in nodes {
         let before = contents(local);
-        let server = serve(&dir, manifest);
+        let server = serve(dir, manifest);
         // No path names a repository but the ones the generation recorded.
         let listing: String = CHAIN.iter().map(|(repo, _)| format!("{repo}\n")).collect();
         let (status, _, body) = get(&server.url);
@@ -191,11 +191,11 @@ fn answer_the_goldens(dir: &Path, first: &str, nodes: &[(String, PathBuf)]) {
                 repo,
                 "--generations",
             ];
-            let (export, stderr, code) = run_args(&dir, &args);
+            let (export, stderr, code) = run_args(dir, &args);
             assert_eq!((code, stderr.as_str()), (Some(0), ""), "{manifest} {repo}");
             assert_golden(&format!("{path}.export.json"), &export);
         }
-        let (status, stderr, code) = probe(&dir, manifest);
+        let (status, stderr, code) = probe(dir, manifest);
         assert_eq!((code, stderr.as_str()), (Some(0), ""), "{status}");
         assert!(
             status.starts_with(&format!("current: {first}\n")),
