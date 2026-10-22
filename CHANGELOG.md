@@ -399,6 +399,9 @@ All notable changes to Meada are recorded here. The format follows
 - `meada mcp` no longer waits forever on a client that stops answering `roots/list`: after 5 s a
   call answers about the last root that client sent, with one line on stderr, or returns a tool
   error naming `roots/list` when it sent none (#282).
+- `meada mcp` treats a `roots/list` that fails (an error answer, a closed transport, an
+  unexpected response) as one that times out: the last root with one stderr line naming the
+  error, or a tool error; it no longer answers silently about its own directory (#285).
 - A root `tsconfig.json` (or `jsconfig.json`) that is not valid JSON, or is larger than 1 MiB,
   no longer stops indexing: it declares no `paths`, as a `pyproject.toml` that cannot be read
   declares no source roots. A root config that is a symbolic link is not read, as the walk

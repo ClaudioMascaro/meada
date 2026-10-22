@@ -158,12 +158,18 @@ impl Secret {
     }
 }
 
-/// The regular file `path` (`config::read_bounded`, at most `max` bytes) as UTF-8, without the
-/// editor's trailing newline. An error names the file, never what it holds.
+/// The regular file `path` (`config::read_bounded`, at most `max` bytes) as UTF-8. An error
+/// names the file, never what it holds.
+#[cfg(any(feature = "valkey", feature = "snapshot"))]
+pub fn read_utf8(path: &Path, max: u64) -> std::result::Result<String, String> {
+    let bytes = crate::config::read_bounded(path, max)?;
+    String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", path.display()))
+}
+
+/// The secret file `path`: `read_utf8` without the editor's trailing newline.
 #[cfg(any(feature = "valkey", feature = "snapshot"))]
 pub fn read_secret(path: &Path, max: u64) -> std::result::Result<String, String> {
-    let bytes = crate::config::read_bounded(path, max)?;
-    let text = String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", path.display()))?;
+    let text = read_utf8(path, max)?;
     Ok(text.trim_end_matches(['\n', '\r']).to_string())
 }
 

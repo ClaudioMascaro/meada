@@ -21,7 +21,7 @@ use object_store::{
 use reqwest::Url;
 
 use super::{Config, Credentials};
-use crate::modules::{Secret, read_secret};
+use crate::modules::{Secret, read_utf8};
 use crate::msg::Msg;
 
 /// The object metadata every object Meada stores carries: its size and BLAKE3 hash.
@@ -181,7 +181,7 @@ impl Store {
             }
             Credentials::WebIdentity => {
                 let token_file = env("AWS_WEB_IDENTITY_TOKEN_FILE")?;
-                read_secret(Path::new(&token_file), SECRET_MAX)?;
+                read_utf8(Path::new(&token_file), SECRET_MAX)?;
                 let sts = format!("https://sts.{}.amazonaws.com", config.region);
                 allowed.extend(Url::parse(&sts).ok().as_ref().and_then(Origin::of));
                 builder = builder
@@ -194,7 +194,7 @@ impl Store {
                 let agent = pod_agent(&uri).ok_or_else(|| Msg::SnapshotPodUrl.text())?;
                 allowed.extend(Origin::of(&agent));
                 let token_file = env("AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE")?;
-                read_secret(Path::new(&token_file), SECRET_MAX)?;
+                read_utf8(Path::new(&token_file), SECRET_MAX)?;
                 builder = builder
                     .with_config(AmazonS3ConfigKey::ContainerCredentialsFullUri, uri)
                     .with_config(
@@ -546,7 +546,7 @@ mod tests {
         let (small, big) = (dir.join("small"), dir.join("big"));
         std::fs::write(&small, "s3cret\n").unwrap();
         std::fs::write(&big, vec![b'x'; SECRET_MAX as usize + 1]).unwrap();
-        let read = |path: &std::path::Path| read_secret(path, SECRET_MAX);
+        let read = |path: &std::path::Path| crate::modules::read_secret(path, SECRET_MAX);
         assert_eq!(read(&small).unwrap(), "s3cret");
         assert!(read(&big).unwrap_err().ends_with("bytes"));
         assert!(read(&dir).unwrap_err().ends_with("not a regular file"));
