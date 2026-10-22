@@ -75,8 +75,8 @@ struct Meada {
 }
 
 /// Opens the client's first root, else the current directory, and runs `ask`, which refreshes
-/// the index. A client that does not answer `roots/list` in time gets its last root, or a tool
-/// error when it sent none.
+/// the index. A client that fails `roots/list` or does not answer in time gets its last root, or
+/// a tool error when it sent none.
 async fn answer(
     ctx: RequestContext<RoleServer>,
     last_root: &Mutex<Option<PathBuf>>,
@@ -90,9 +90,11 @@ async fn answer(
 
 /// The directory to answer about: the client's first `file://` root, or the server's current
 /// directory. Asked on every call, so `roots/list_changed` needs no cache to invalidate. When
-/// the client declares roots but does not answer within [`ROOTS_TIMEOUT`], the last root it
-/// sent is used, with one line on stderr; without one, the call fails: the server's directory
-/// may be another checkout than the client's session.
+/// the client declares roots but fails `roots/list` (an error answer, a closed transport, an
+/// unexpected response) or does not answer within [`ROOTS_TIMEOUT`], the last root it sent is
+/// used, with one line on stderr; without one, the call fails: the server's directory may be
+/// another checkout than the client's session. An answer with no local root means the server's
+/// directory, as without the capability (#285).
 #[expect(
     deprecated,
     reason = "roots are deprecated by SEP-2577 and still what Claude Code sends; the cwd fallback keeps the server working once clients drop them"
@@ -117,30 +119,32 @@ async fn root_dir(
         Ok(handle) => handle.await_response().await,
         Err(e) => Err(e),
     };
-    match response {
+    let why = match response {
         Ok(ClientResult::ListRootsResult(result)) => {
             let root = result.roots.iter().find_map(|r| file_path(&r.uri));
             *last_root.lock().unwrap() = root.clone();
-            Ok(root.unwrap_or_else(cwd))
+            return Ok(root.unwrap_or_else(cwd));
         }
         Err(ServiceError::Timeout { .. }) => {
-            let secs = ROOTS_TIMEOUT.as_secs();
-            // Copied out, so a blocked stderr cannot hold the lock other calls wait on.
-            let last = last_root.lock().unwrap().clone();
-            let Some(root) = last else {
-                eprintln!("meada: the client did not answer roots/list within {secs} s");
-                return Err(format!(
-                    "the client did not answer roots/list within {secs} s and sent no root before"
-                ));
-            };
-            eprintln!(
-                "meada: the client did not answer roots/list within {secs} s, using the last root it sent: {}",
-                root.display()
-            );
-            Ok(root)
+            format!(
+                "did not answer roots/list within {} s",
+                ROOTS_TIMEOUT.as_secs()
+            )
         }
-        _ => Ok(cwd()),
-    }
+        Err(e) => format!("failed roots/list: {e}"),
+        Ok(_) => format!("failed roots/list: {}", ServiceError::UnexpectedResponse),
+    };
+    // Copied out, so a blocked stderr cannot hold the lock other calls wait on.
+    let last = last_root.lock().unwrap().clone();
+    let Some(root) = last else {
+        eprintln!("meada: the client {why}");
+        return Err(format!("the client {why} and sent no root before"));
+    };
+    eprintln!(
+        "meada: the client {why}, using the last root it sent: {}",
+        root.display()
+    );
+    Ok(root)
 }
 
 /// The absolute path of a `file://` URI, percent-decoded; `None` for any other scheme and for

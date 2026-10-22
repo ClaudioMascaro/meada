@@ -131,7 +131,7 @@ async fn a_silent_client_gets_a_tool_error_naming_roots_list() {
         "ts-basic",
         Some("https://example.com/acme/cwd.git"),
     );
-    let (client, mut stderr) = stops_client(&cwd, String::new(), 0).await;
+    let (client, mut stderr) = stops_client(&cwd, String::new(), 0, false).await;
 
     let answer = trace_sum(&client).await;
     assert_eq!(answer.is_error, Some(true), "{answer:?}");
@@ -165,7 +165,7 @@ async fn a_client_that_goes_quiet_keeps_its_last_root() {
         Some("https://example.com/acme/root.git"),
     );
     let uri = format!("file://{}", root.display().to_string().replace(' ', "%20"));
-    let (client, mut stderr) = stops_client(&cwd, uri, 1).await;
+    let (client, mut stderr) = stops_client(&cwd, uri, 1, false).await;
 
     for _ in 0..2 {
         let answer = trace_sum(&client).await;
@@ -188,11 +188,111 @@ async fn a_client_that_goes_quiet_keeps_its_last_root() {
     );
 }
 
+/// A client that fails `roots/list` with a JSON-RPC error (#285) is handled like one that goes
+/// quiet: with no root sent before, the call returns a tool error naming `roots/list`, with one
+/// line on stderr.
+#[tokio::test]
+async fn a_failing_client_gets_a_tool_error_naming_roots_list() {
+    let cwd = fixture_repo(
+        "mcp_roots_fails",
+        "ts-basic",
+        Some("https://example.com/acme/cwd.git"),
+    );
+    let (client, mut stderr) = stops_client(&cwd, String::new(), 0, true).await;
+
+    let answer = trace_sum(&client).await;
+    assert_eq!(answer.is_error, Some(true), "{answer:?}");
+    let text = &answer
+        .content
+        .first()
+        .and_then(|c| c.as_text())
+        .unwrap()
+        .text;
+    assert!(text.contains("roots/list"), "{text}");
+    client.cancel().await.unwrap();
+    let stderr = read_all(&mut stderr).await;
+    assert!(
+        stderr.lines().count() == 1 && stderr.contains("roots/list"),
+        "{stderr:?}"
+    );
+}
+
+/// A client that answers `roots/list` once and then fails it (#285) keeps its last root: the
+/// failing call answers about it, not about the server's cwd, with one line on stderr.
+#[tokio::test]
+async fn a_client_that_fails_keeps_its_last_root() {
+    let cwd = fixture_repo(
+        "mcp_roots_fails_cwd",
+        "ts-basic",
+        Some("https://example.com/acme/cwd.git"),
+    );
+    let root = fixture_repo(
+        "mcp roots fails root",
+        "ts-basic",
+        Some("https://example.com/acme/root.git"),
+    );
+    let uri = format!("file://{}", root.display().to_string().replace(' ', "%20"));
+    let (client, mut stderr) = stops_client(&cwd, uri, 1, true).await;
+
+    for _ in 0..2 {
+        let answer = trace_sum(&client).await;
+        let text = &answer
+            .content
+            .first()
+            .and_then(|c| c.as_text())
+            .unwrap()
+            .text;
+        assert!(
+            text.starts_with("example.com/acme/root src/math.ts:5 sum\n"),
+            "{text}"
+        );
+    }
+    client.cancel().await.unwrap();
+    let stderr = read_all(&mut stderr).await;
+    assert!(
+        stderr.lines().count() == 1 && stderr.contains("roots/list"),
+        "{stderr:?}"
+    );
+}
+
+/// A client that declares roots but answers `roots/list` with an empty list (#285) is a
+/// successful answer with no local root: it means the server's directory, as without the
+/// capability, not an error.
+#[tokio::test]
+async fn an_empty_root_list_means_the_servers_directory() {
+    let cwd = fixture_repo(
+        "mcp_roots_empty",
+        "ts-basic",
+        Some("https://example.com/acme/cwd.git"),
+    );
+    let transport = TokioChildProcess::new(
+        tokio::process::Command::new(env!("CARGO_BIN_EXE_meada")).configure(|c| {
+            c.arg("mcp").current_dir(&cwd);
+        }),
+    )
+    .unwrap();
+    let client = NoRoots.serve(transport).await.unwrap();
+
+    let answer = trace_sum(&client).await;
+    let text = &answer
+        .content
+        .first()
+        .and_then(|c| c.as_text())
+        .unwrap()
+        .text;
+    assert!(
+        text.starts_with("example.com/acme/cwd src/math.ts:5 sum\n"),
+        "{text}"
+    );
+    client.cancel().await.unwrap();
+}
+
 /// Serves `meada mcp` in `cwd` to a [`Stops`] client, keeping the server's stderr.
 async fn stops_client(
     cwd: &std::path::Path,
     root: String,
     answers: usize,
+    fails: bool,
 ) -> (
     RunningService<RoleClient, Stops>,
     tokio::process::ChildStderr,
@@ -208,13 +308,14 @@ async fn stops_client(
     let stops = Stops {
         root,
         answers: AtomicUsize::new(answers),
+        fails,
     };
     (stops.serve(transport).await.unwrap(), stderr.unwrap())
 }
 
 /// `trace` from `sum`, down. The server waits 5 s for `roots/list`; the 15 s of slack on top
 /// make a hang fail the test instead of stalling it.
-async fn trace_sum(client: &RunningService<RoleClient, Stops>) -> CallToolResult {
+async fn trace_sum<H: ClientHandler>(client: &RunningService<RoleClient, H>) -> CallToolResult {
     let params = CallToolRequestParams::new("trace").with_arguments(
         serde_json::json!({"from": "sum", "direction": "down"})
             .as_object()
@@ -261,11 +362,29 @@ impl ClientHandler for Roots {
     }
 }
 
+/// A client that declares the roots capability and answers `roots/list` with an empty list, the
+/// default of rmcp's `list_roots`.
+struct NoRoots;
+
+#[expect(
+    deprecated,
+    reason = "roots are deprecated by SEP-2577; the server still follows them (#285)"
+)]
+impl ClientHandler for NoRoots {
+    fn get_info(&self) -> ClientConfig {
+        ClientConfig::new(
+            ClientCapabilities::builder().enable_roots().build(),
+            Implementation::from_build_env(),
+        )
+    }
+}
+
 /// A client that declares the roots capability, answers `roots/list` with `root` while it has
-/// `answers` left, then never answers again.
+/// `answers` left, then never answers again, or, with `fails`, answers with an error.
 struct Stops {
     root: String,
     answers: AtomicUsize,
+    fails: bool,
 }
 
 #[expect(
@@ -288,6 +407,9 @@ impl ClientHandler for Stops {
             .answers
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1));
         if left.is_err() {
+            if self.fails {
+                return Err(ErrorData::internal_error("roots unavailable", None));
+            }
             std::future::pending::<()>().await;
         }
         Ok(ListRootsResult::new(vec![Root::new(self.root.clone())]))

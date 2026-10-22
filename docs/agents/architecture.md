@@ -28,8 +28,9 @@ one for the area a change touches.
   `drift_view.rs`: how `context`, `search` and `status` show `Link::drift`; it reads no kind (the
   stored links, the exports' consumer shapes, the calls and the seam's `parts`).
   `render.rs`: token budget and line helpers. `mcp.rs`: three read-only tools over the client's
-  first `file://` root, or the server's cwd without roots; a client that does not answer
-  `roots/list` within `ROOTS_TIMEOUT` (5 s) gets the last root it sent, else a tool error.
+  first `file://` root, or the server's cwd without roots (also for an answer with no local root);
+  a client that fails or does not answer `roots/list` within `ROOTS_TIMEOUT` (5 s) gets the last
+  root it sent, else a tool error.
   `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and

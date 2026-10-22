@@ -84,10 +84,11 @@ linha de comando seguem o `LANG` (português ou inglês); as do MCP são sempre 
 
 `meada mcp` fala MCP por stdio. Ele responde sobre a primeira raiz (`roots`) que o cliente
 informa, no Claude Code a pasta da sessão; sem raízes, sobre a pasta em que foi iniciado, que
-então precisa estar dentro do repositório. Se o cliente não responder ao `roots/list` em 5 s, a
-chamada usa a última raiz que ele enviou nessa conexão, ou devolve um erro dizendo isso; nunca
-cai na pasta do servidor (que, numa sessão em um worktree, seria outro checkout). Na configuração
-do seu agente (por exemplo o `.mcp.json` do Claude Code), com `npx`:
+então precisa estar dentro do repositório. Se o cliente falhar ou não responder ao `roots/list`
+em 5 s, a chamada usa a última raiz que ele enviou nessa conexão, ou devolve um erro dizendo
+isso; nunca cai na pasta do servidor por isso (que, numa sessão em um worktree, seria outro
+checkout). Uma resposta sem raiz local vale como sem raízes (a pasta do servidor). Na
+configuração do seu agente (por exemplo o `.mcp.json` do Claude Code), com `npx`:
 
 ```json
 {
