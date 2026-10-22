@@ -79,6 +79,86 @@ struct TraceArgs {
     budget: Option<u32>,
 }
 
+impl SearchArgs {
+    fn ask(&self, engine: &Engine) -> crate::Result<String> {
+        let budget = self.budget.map(|b| b as usize);
+        engine.search(&self.query, self.kind.as_deref(), budget)
+    }
+}
+
+impl ContextArgs {
+    fn ask(&self, engine: &Engine) -> crate::Result<String> {
+        engine.context(&self.symbol, self.budget.map(|b| b as usize))
+    }
+}
+
+impl TraceArgs {
+    /// Where the trace starts and which way it goes, or the tool's refusal; `served`: server
+    /// mode, which has no working tree to diff.
+    fn checked(&self, served: bool) -> Result<(Start<'_>, Direction), String> {
+        let start = match (self.from.as_deref(), self.changes.as_deref()) {
+            (Some(from), None) => Start::From(from),
+            (None, Some("uncommitted")) => Start::Uncommitted,
+            (None, Some(other)) => {
+                return Err(format!("`changes` takes `uncommitted`, not `{other}`"));
+            }
+            _ => return Err("pass either `from` or `changes: uncommitted`".into()),
+        };
+        if matches!(start, Start::Uncommitted) && served {
+            return Err(
+                "server mode has no working tree to diff: run Meada locally for \
+                        `changes: uncommitted`"
+                    .into(),
+            );
+        }
+        let direction = match self.direction.as_deref() {
+            None | Some("down") => Direction::Down,
+            Some("up") => Direction::Up,
+            Some(other) => {
+                return Err(format!("`direction` takes `down` or `up`, not `{other}`"));
+            }
+        };
+        Ok((start, direction))
+    }
+
+    /// The trace `checked` let through.
+    fn ask(&self, engine: &Engine, served: bool) -> crate::Result<String> {
+        let (start, direction) = self.checked(served)?;
+        engine.trace(start, direction, self.budget.map(|b| b as usize))
+    }
+}
+
+/// A tool's call, its arguments checked, waiting for the engine it answers from.
+#[cfg(feature = "ui")]
+pub(crate) type Ask = Box<dyn FnOnce(&Engine) -> crate::Result<String>>;
+
+/// A call of the tool `tool` with `arguments`, as a node's MCP surface takes and answers it, in
+/// server mode (the console's playground, #305): `Err(None)` when no tool has that name or the
+/// arguments are not the tool's, `Err(Some(text))` when the tool refuses them with the text of a
+/// node's tool error. Nothing opens before the arguments pass.
+#[cfg(feature = "ui")]
+pub(crate) fn served_call(tool: &str, arguments: serde_json::Value) -> Result<Ask, Option<String>> {
+    fn parsed<T: serde::de::DeserializeOwned>(v: serde_json::Value) -> Result<T, Option<String>> {
+        serde_json::from_value(v).map_err(|_| None)
+    }
+    Ok(match tool {
+        "search" => {
+            let args: SearchArgs = parsed(arguments)?;
+            Box::new(move |engine| args.ask(engine))
+        }
+        "context" => {
+            let args: ContextArgs = parsed(arguments)?;
+            Box::new(move |engine| args.ask(engine))
+        }
+        "trace" => {
+            let args: TraceArgs = parsed(arguments)?;
+            args.checked(true).map_err(Some)?;
+            Box::new(move |engine| args.ask(engine, true))
+        }
+        _ => return Err(None),
+    })
+}
+
 /// How long a call waits for the client's `roots/list` answer: generous for a busy client, far
 /// below the point where a client gives up on the call itself (#282).
 const ROOTS_TIMEOUT: Duration = Duration::from_secs(5);
@@ -268,11 +348,7 @@ impl Meada {
         Parameters(args): Parameters<SearchArgs>,
         ctx: RequestContext<RoleServer>,
     ) -> CallToolResult {
-        self.answer(ctx, |engine| {
-            let budget = args.budget.map(|b| b as usize);
-            engine.search(&args.query, args.kind.as_deref(), budget)
-        })
-        .await
+        self.answer(ctx, |engine| args.ask(engine)).await
     }
 
     #[tool(
@@ -283,10 +359,7 @@ impl Meada {
         Parameters(args): Parameters<ContextArgs>,
         ctx: RequestContext<RoleServer>,
     ) -> CallToolResult {
-        self.answer(ctx, |engine| {
-            engine.context(&args.symbol, args.budget.map(|b| b as usize))
-        })
-        .await
+        self.answer(ctx, |engine| args.ask(engine)).await
     }
 
     #[tool(
@@ -297,33 +370,11 @@ impl Meada {
         Parameters(args): Parameters<TraceArgs>,
         ctx: RequestContext<RoleServer>,
     ) -> CallToolResult {
-        let refuse = |why: String| self.result(Err(why));
-        let start = match (args.from.as_deref(), args.changes.as_deref()) {
-            (Some(from), None) => Start::From(from),
-            (None, Some("uncommitted")) => Start::Uncommitted,
-            (None, Some(other)) => {
-                return refuse(format!("`changes` takes `uncommitted`, not `{other}`"));
-            }
-            _ => return refuse("pass either `from` or `changes: uncommitted`".into()),
-        };
-        if matches!(start, Start::Uncommitted) && !matches!(self.source, Source::Roots { .. }) {
-            return refuse(
-                "server mode has no working tree to diff: run Meada locally for \
-                        `changes: uncommitted`"
-                    .into(),
-            );
+        let served = !matches!(self.source, Source::Roots { .. });
+        if let Err(why) = args.checked(served) {
+            return self.result(Err(why));
         }
-        let direction = match args.direction.as_deref() {
-            None | Some("down") => Direction::Down,
-            Some("up") => Direction::Up,
-            Some(other) => {
-                return refuse(format!("`direction` takes `down` or `up`, not `{other}`"));
-            }
-        };
-        self.answer(ctx, |engine| {
-            engine.trace(start, direction, args.budget.map(|b| b as usize))
-        })
-        .await
+        self.answer(ctx, |engine| args.ask(engine, served)).await
     }
 }
 

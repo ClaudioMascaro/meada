@@ -273,6 +273,24 @@ one for the area a change touches.
   console reads, `CHECK_MAX`) and answers each check's outcome and the identities, of the
   manifest's entries, that both the token's grant and the session's admit; the token lives
   only for that request, and a body that does not parse is a fixed 400, never serde's text.
+  The playground and the exports (#305) answer in process from what the console holds
+  (`Holds`), never from a node: with `[snapshot]`, the generations its own `meada snapshot pull`
+  (an init pull and a `pull --every` companion on a `local_dir` of its own) keeps, read per
+  request as `--generations` serving reads them (`serve::Current`, `Engine::open_held`), the one
+  `<local_dir>/current` names by default; without it, the bootstrap manifest's `[[repository]]`
+  entries as read at start, each index under `index_dir`, as `meada mcp --listen --workspace`
+  opens them (`Engine::open_listed`). `POST query` reads `{"repository", "generation", "tool",
+  "arguments"}` (`QUERY_MAX`), the arguments as the MCP tool takes them and checked by the
+  tools' own code (`mcp::served_call`, so `trace` with `changes: uncommitted` is refused with
+  the node's text), and answers `{"text", "generation"}` (`generation` null without
+  `[snapshot]`); `GET repositories/<identity>/export?generation=<id>` answers the bytes
+  `meada export` prints, the identity being everything between `repositories/` and the last
+  `/export`. Both open one engine per request whose workspace holds only what `Session::reads`
+  admits (peers outside the grant dropped before the answer is built); a repository outside
+  the grant is the 404 of one not served, a generation not held a 404 naming the held ones, and
+  nothing servable yet (no pull, no index) a 503 naming `meada snapshot pull` or `meada index
+  --workspace`, every other view answering, and the next request after the pull or the index
+  answering with no restart. A tool error is a 422 with the node's text.
   Every other path is a file of `[ui] dir`: percent-decoded, a 404 for a
   `..`, `.` or empty segment, a NUL or a backslash, a resolved path (symbolic links followed)
   outside the canonical `[ui] dir`, or an extension outside the fixed table (`content_type`); a
@@ -1340,7 +1358,10 @@ one for the area a change touches.
   waiting on an index lock included, and the exit is 0.
 - `ui.rs`: `meada-ui.json` is read up to `VERSION_MAX` (4 KiB); a larger file counts as front
   end files built for another version, and the console refuses to start. A token check's body
-  is read up to `CHECK_MAX` (16 KiB); past it the answer is a 413. The token check lists the
+  is read up to `CHECK_MAX` (16 KiB), and a playground query's up to `QUERY_MAX` (16 KiB); past
+  either the answer is a 413. Without `[snapshot]` the playground and the exports serve the
+  `[[repository]]` entries as read at start (a mirror missing then stays unservable until a
+  restart, as on a node). The token check lists the
   identities of the bootstrap manifest's `[[repository]]` entries only: with `[workspace]
   source = "store"` it lists none until the read routes (#304) bring the current version.
 - `snapshot/versions.rs`: a workspace version document holds at most `VERSION_MAX` (4 MiB);

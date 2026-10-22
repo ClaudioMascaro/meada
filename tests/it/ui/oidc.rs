@@ -26,10 +26,18 @@ const SUBJECT: &str = "alice-7c1e";
 fn head(issuer: &str) -> String {
     format!(
         "\n[[repository]]\nrepo = \"{WEB}\"\npath = \"../web\"\n\n[[repository]]\nrepo = \
-         \"{GATEWAY}\"\npath = \"../gateway\"\n\n[oidc]\nissuer = \"{issuer}\"\npublic_url = \
-         \"{NODES}\"\nidentities_claim = \"meada_repositories\"\ngroups_claim = \"groups\"\n\
-         scopes = [\"{SCOPE}\"]\n\n[oidc.groups]\n\"team-web\" = [\"{WEB}\"]\n\"team-gw\" = \
-         [\"{GATEWAY}\"]\n\"team-all\" = [\"*\"]\n"
+         \"{GATEWAY}\"\npath = \"../gateway\"\n{}",
+        oidc(issuer)
+    )
+}
+
+/// The `[oidc]` of `head`.
+fn oidc(issuer: &str) -> String {
+    format!(
+        "\n[oidc]\nissuer = \"{issuer}\"\npublic_url = \"{NODES}\"\nidentities_claim = \
+         \"meada_repositories\"\ngroups_claim = \"groups\"\nscopes = [\"{SCOPE}\"]\n\n\
+         [oidc.groups]\n\"team-web\" = [\"{WEB}\"]\n\"team-gw\" = [\"{GATEWAY}\"]\n\"team-all\" = \
+         [\"*\"]\n"
     )
 }
 
@@ -454,6 +462,73 @@ fn a_viewer_s_grant_bounds_every_view() {
     assert_eq!(errors(&gateway), whole);
 
     assert_leaks_nothing(&console.stderr(), &[&web, &gateway, &all]);
+}
+
+/// The playground and the exports (#305) bounded by the viewer's grant, as a node bounds a call
+/// (#290): a `*` grant answers the chain goldens; a grant of `WEB` alone answers about `WEB` with
+/// every peer outside the grant dropped before the answer is built, and a repository outside it
+/// is the 404 of one the console does not serve.
+#[test]
+fn a_viewer_s_grant_bounds_the_playground_and_the_exports() {
+    use super::playground::{
+        CATALOG, answer_the_goldens, body, chain_console, query, refusal,
+        refuses_what_it_does_not_answer,
+    };
+    let (signing, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let base = issuer.base.clone();
+    let dir = chain_console("ui_oidc_playground", &oidc(&base), &ui_oidc());
+    assert!(crate::manifest::run(&dir, "index").2, "index");
+    let console = start(&dir, "127.0.0.1:0");
+    let es256 = |claims: &Value| sign(&signing, "k1", Algorithm::ES256, claims);
+    let web = es256(&claims(&base, &[WEB]));
+    let all = es256(&edited(&base, |c| c["meada_repositories"] = json!(["*"])));
+
+    let whole = bearer(&all);
+    let whole = [("Authorization", whole.as_str())];
+    answer_the_goldens(&console, None, None, &whole);
+    refuses_what_it_does_not_answer(&console, &whole);
+
+    let viewer = bearer(&web);
+    let viewer = [("Authorization", viewer.as_str())];
+    let trace = query(
+        &console,
+        &body(WEB, "trace", r#"{"from": "dashboard"}"#),
+        &viewer,
+    );
+    assert_eq!(trace.status, 200, "{}", trace.body);
+    let text = trace.json()["text"].as_str().unwrap().to_string();
+    assert!(
+        text.starts_with(&format!("{WEB} src/dashboard.ts:4 dashboard\n")),
+        "{text}"
+    );
+    assert!(!text.contains(GATEWAY) && !text.contains(CATALOG), "{text}");
+    let route = format!("/api/v1/repositories/{WEB}/export");
+    let export = send(&console, "GET", &route, &viewer);
+    assert_eq!(export.status, 200);
+    let links = export.json()["links"].as_array().unwrap().clone();
+    for link in &links {
+        for side in ["consumer", "provider"] {
+            let side = link[side].as_str().unwrap();
+            assert!(side.starts_with(&format!("{WEB}::")), "{link}");
+        }
+    }
+    for outside in [GATEWAY, CATALOG] {
+        let not_served = (
+            404,
+            "not_found".to_string(),
+            format!("`{outside}` is not a repository this console serves"),
+        );
+        let asked = body(outside, "search", r#"{"query": "lib"}"#);
+        assert_eq!(refusal(&query(&console, &asked, &viewer)), not_served);
+        let route = format!("/api/v1/repositories/{outside}/export");
+        assert_eq!(refusal(&send(&console, "GET", &route, &viewer)), not_served);
+    }
+    let asked = body(WEB, "search", r#"{"query": "lib"}"#);
+    assert_eq!(query(&console, &asked, &[]).status, 401);
+    assert_eq!(get(&console, &route).status, 401);
+
+    assert_leaks_nothing(&console.stderr(), &[&web, &all]);
 }
 
 /// Without `[oidc]`, the admission routes are not there.

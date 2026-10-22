@@ -11,6 +11,10 @@
 //! static files and `config`, which the browser needs to log in. Every admitted subject is a
 //! viewer, and the token's grant bounds every view (`Session::reads`, #290): a repository outside
 //! it is absent, while state that belongs to no repository is shown whole.
+//!
+//! The playground (`POST query`) and the exports (`GET repositories/<identity>/export`) answer
+//! in process from what the console holds (`Holds`), through the engine and the tools' own code,
+//! as a node and `meada export` answer; the console never calls a node.
 
 use std::convert::Infallible;
 use std::fs;
@@ -26,14 +30,16 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::Result;
+use crate::engine::Engine;
 use crate::modules::{self, Problem, Shape};
 use crate::msg::Msg;
 use crate::workspace::Manifest;
 
 type Answer = Response<BoxBody<Bytes, Infallible>>;
 
-/// A request's body as the console read it: empty except for the token check's, or the status
-/// refusing it (413 past `CHECK_MAX`, 400 when it could not be read).
+/// A request's body as the console read it: empty except for the token check's and the
+/// playground's, or the status refusing it (413 past its route's cap, 400 when it could not be
+/// read).
 type Body = std::result::Result<Bytes, StatusCode>;
 
 /// The version the front end's files must be built for.
@@ -46,11 +52,18 @@ const VERSION_FILE: &str = "meada-ui.json";
 // ponytail: the most bytes of `meada-ui.json`; past it the file counts as another version.
 const VERSION_MAX: u64 = 4096;
 
-/// The path of the token check, the one route whose body the console reads.
+/// The path of the token check, a route whose body the console reads.
 const CHECK: &str = "/api/v1/admission/check";
 
 /// The most bytes of a token check's body: a JWT in `{"token": ...}` with room to spare.
 const CHECK_MAX: usize = 16 << 10;
+
+/// The path of the playground, the other route whose body the console reads.
+const QUERY: &str = "/api/v1/query";
+
+/// The most bytes of a playground query's body: an identity, a generation id and a tool's few
+/// short arguments, with room to spare.
+const QUERY_MAX: usize = 16 << 10;
 
 /// The fixed bodies of the 403s.
 const HOST_REFUSED: &str = "Forbidden: Host header is not allowed\n";
@@ -158,6 +171,21 @@ struct Console {
     /// The nodes' OIDC module, with `[oidc]`: the console's admission.
     #[cfg(feature = "oidc")]
     oidc: Option<Arc<crate::oidc::Oidc>>,
+    /// What the playground and the exports answer from.
+    holds: Holds,
+}
+
+/// What the console answers the playground and the exports from, read per request, so that what
+/// an index or a pull lands after the start answers with no restart.
+enum Holds {
+    /// Without `[snapshot]`: the repositories the bootstrap manifest lists, as read at start,
+    /// each index under `index_dir`, as `meada mcp --listen --workspace` serves them.
+    Listed(Box<Manifest>),
+    /// With `[snapshot]`: the generations its own pull keeps in `local_dir`, the one
+    /// `<local_dir>/current` names by default, as `--generations` serving reads them; without
+    /// `local_dir`, the error naming it.
+    #[cfg(feature = "snapshot")]
+    Generations(std::result::Result<crate::snapshot::serve::Current, String>),
 }
 
 /// Who asks: the admitted subject (none behind the proxy), always a viewer for now (operators
@@ -213,13 +241,19 @@ pub fn listen(listen: &str, manifest: &Path) -> Result<()> {
     })
 }
 
-/// The body of a POST to the token check, at most `CHECK_MAX` bytes; any other request's is
-/// left unread. It lives only for its request: nothing stores, prints or forwards it.
+/// The body of a POST to the token check (at most `CHECK_MAX` bytes) or to the playground (at
+/// most `QUERY_MAX`); any other request's is left unread. It lives only for its request:
+/// nothing stores, prints or forwards it.
 async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
-    if parts.method != Method::POST || parts.uri.path() != CHECK {
+    let max = match parts.uri.path() {
+        CHECK => CHECK_MAX,
+        QUERY => QUERY_MAX,
+        _ => return Ok(Bytes::new()),
+    };
+    if parts.method != Method::POST {
         return Ok(Bytes::new());
     }
-    match Limited::new(body, CHECK_MAX).collect().await {
+    match Limited::new(body, max).collect().await {
         Ok(collected) => Ok(collected.to_bytes()),
         Err(e) if e.is::<http_body_util::LengthLimitError>() => Err(StatusCode::PAYLOAD_TOO_LARGE),
         Err(_) => Err(StatusCode::BAD_REQUEST),
@@ -229,7 +263,7 @@ async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
 impl Console {
     fn start(file: &Path) -> Result<Self> {
         let read = Manifest::read(file)?;
-        let Some(ui) = read.ui else {
+        let Some(ui) = read.ui.clone() else {
             return Err(format!("{}: {}", file.display(), Msg::UiNoSection.text()).into());
         };
         let src = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
@@ -278,6 +312,16 @@ impl Console {
             return Err(lines.join("\n").into());
         };
         let table: toml::Table = toml::from_str(&src)?;
+        #[cfg(feature = "snapshot")]
+        let holds = match &read.snapshot {
+            Some(snapshot) => Holds::Generations(match &snapshot.local_dir {
+                Some(local) => Ok(crate::snapshot::serve::Current::new(local.clone())),
+                None => Err(Msg::SnapshotNoLocalDir(&file.display().to_string()).text()),
+            }),
+            None => Holds::Listed(Box::new(read.clone())),
+        };
+        #[cfg(not(feature = "snapshot"))]
+        let holds = Holds::Listed(Box::new(read.clone()));
         Ok(Self {
             file: file.to_path_buf(),
             ui,
@@ -288,6 +332,7 @@ impl Console {
             csp: header::HeaderValue::from_str(&csp(issuer))?,
             #[cfg(feature = "oidc")]
             oidc,
+            holds,
         })
     }
 
@@ -383,6 +428,16 @@ impl Console {
     fn api(&self, request: &Request<Body>, route: &str, session: &Session) -> Answer {
         let method = request.method();
         let read = matches!(*method, Method::GET | Method::HEAD);
+        // An identity holds slashes: everything between `repositories/` and the last `/export`.
+        if read
+            && let Some(identity) =
+                (route.strip_prefix("repositories/")).and_then(|rest| rest.strip_suffix("/export"))
+        {
+            return self.export(identity, request.uri().query(), session);
+        }
+        if route == "query" && *method == Method::POST {
+            return self.query(request.body(), session);
+        }
         let document = match route {
             "config" if read => Some(self.config()),
             "session" if read => Some(json!({"subject": session.subject, "role": "viewer"})),
@@ -507,6 +562,150 @@ impl Console {
             StatusCode::OK,
             &json!({"checks": checks, "identities": identities}),
         )
+    }
+
+    /// The playground: `{"repository", "generation", "tool", "arguments"}`, the tool `search`,
+    /// `context` or `trace` with its arguments as the MCP tool takes them, answered by the
+    /// tool's own code at the generation named (the current one when null or absent) as
+    /// `{"text", "generation"}`, `generation` null without `[snapshot]`. A body that is not such
+    /// a query is a fixed 400, never serde's text; the tool's refusal of its arguments (`trace`
+    /// with `changes: uncommitted`) a 400 with the node's text, and a tool error a 422 with it.
+    fn query(&self, body: &Body, session: &Session) -> Answer {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Query {
+            repository: String,
+            #[serde(default)]
+            generation: Option<String>,
+            tool: String,
+            arguments: Value,
+        }
+        let bad = |message: &str| error(StatusCode::BAD_REQUEST, "bad_request", message);
+        let body = match body {
+            Ok(body) => body,
+            Err(StatusCode::PAYLOAD_TOO_LARGE) => {
+                let message = Msg::UiTooLarge(QUERY_MAX).text();
+                return error(StatusCode::PAYLOAD_TOO_LARGE, "too_large", &message);
+            }
+            Err(_) => return bad(&Msg::UiQueryBody.text()),
+        };
+        let Ok(query) = serde_json::from_slice::<Query>(body) else {
+            return bad(&Msg::UiQueryBody.text());
+        };
+        let ask = match crate::mcp::served_call(&query.tool, query.arguments) {
+            Ok(ask) => ask,
+            Err(None) => return bad(&Msg::UiQueryBody.text()),
+            Err(Some(refused)) => return bad(&refused),
+        };
+        let (engine, generation) =
+            match self.open(&query.repository, query.generation.as_deref(), session) {
+                Ok(opened) => opened,
+                Err(refused) => return *refused,
+            };
+        match ask(&engine) {
+            Ok(text) => json_answer(
+                StatusCode::OK,
+                &json!({"text": text, "generation": generation}),
+            ),
+            Err(e) => error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "tool_error",
+                &e.to_string(),
+            ),
+        }
+    }
+
+    /// The canonical export of `identity` (percent-encoded as the path carries it) at the
+    /// generation `?generation=<id>` names, the current one without it: the bytes `meada export`
+    /// prints.
+    fn export(&self, identity: &str, query: Option<&str>, session: &Session) -> Answer {
+        let identity = percent_decode_str(identity).decode_utf8_lossy();
+        let generation = (query.into_iter().flat_map(|q| q.split('&')))
+            .find_map(|pair| pair.strip_prefix("generation="))
+            .map(|id| percent_decode_str(id).decode_utf8_lossy());
+        let engine = match self.open(&identity, generation.as_deref(), session) {
+            Ok((engine, _)) => engine,
+            Err(refused) => return *refused,
+        };
+        match engine.export() {
+            Ok(export) => Response::builder()
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::CACHE_CONTROL, "no-store")
+                .body(Full::from(export).boxed())
+                .expect("a valid response"),
+            Err(e) => error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+                &e.to_string(),
+            ),
+        }
+    }
+
+    /// The engine answering about `repository` for `session`, read only, at `generation` (the
+    /// current one when `None`), and that generation's id (none without `[snapshot]`). Its
+    /// workspace holds only the repositories the session reads, as a node's call does (#290). A
+    /// repository the session may not read is the 404 of one the console does not serve; a
+    /// generation it does not hold, a 404 naming the held ones; nothing servable yet (no pull,
+    /// no index), a 503 whose message names `meada snapshot pull` or `meada index --workspace`.
+    fn open(
+        &self,
+        repository: &str,
+        generation: Option<&str>,
+        session: &Session,
+    ) -> std::result::Result<(Engine, Option<String>), Box<Answer>> {
+        let unknown = || {
+            let message = Msg::UiNoRepository(repository).text();
+            Box::new(error(StatusCode::NOT_FOUND, "not_found", &message))
+        };
+        let unavailable = |message: String| {
+            Box::new(error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+                &message,
+            ))
+        };
+        let not_held = |id: &str, held: &[String]| {
+            let message = Msg::UiNotHeld { id, held }.text();
+            Box::new(error(StatusCode::NOT_FOUND, "not_found", &message))
+        };
+        let reads = |identity: &str| session.reads(identity);
+        if !session.reads(repository) {
+            return Err(unknown());
+        }
+        match &self.holds {
+            Holds::Listed(listed) => {
+                if let Some(id) = generation {
+                    return Err(not_held(id, &[]));
+                }
+                if !listed.entries.iter().any(|l| l.repo == repository) {
+                    return Err(unknown());
+                }
+                Engine::open_listed(listed, repository, &self.file, &reads)
+                    .map(|engine| (engine, None))
+                    .map_err(|e| unavailable(e.to_string()))
+            }
+            #[cfg(feature = "snapshot")]
+            Holds::Generations(current) => {
+                let current = current.as_ref().map_err(|e| unavailable(e.clone()))?;
+                let local = current.local();
+                crate::repo::isolate(local);
+                let held = match generation {
+                    None => current.get(),
+                    Some(id) => match current.pinned(id) {
+                        Ok(Some(held)) => Ok(held),
+                        Ok(None) => return Err(not_held(id, &crate::snapshot::serve::ids(local))),
+                        Err(e) => Err(e),
+                    },
+                };
+                let held = held.map_err(|e| unavailable(e.to_string()))?;
+                if !held.listed.entries.iter().any(|l| l.repo == repository) {
+                    return Err(unknown());
+                }
+                Engine::open_held(&held, repository, &reads)
+                    .map(|engine| (engine, Some(held.id.clone())))
+                    .map_err(|e| unavailable(e.to_string()))
+            }
+        }
     }
 
     /// The file of `[ui] dir` that `path` names: percent-decoded, a 404 for a `..`, `.` or empty

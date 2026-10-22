@@ -19,6 +19,9 @@ use crate::server::Server;
 #[cfg(feature = "oidc")]
 mod oidc;
 
+/// The playground and the exports over the chain fixture, from `index_dir` or a pulled generation.
+pub(super) mod playground;
+
 /// The console's own origin in every bootstrap manifest here.
 const PUBLIC: &str = "http://localhost:7999";
 
@@ -40,6 +43,19 @@ const OUTSIDE: &str = "outside-the-ui-dir-4f1c";
 pub(super) fn console_dir(case: &str, version: Option<&str>, head: &str, ui: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(case);
     let _ = fs::remove_dir_all(&dir);
+    let files = front_end(&dir, version);
+    fs::write(dir.join("outside.txt"), OUTSIDE).unwrap();
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(dir.join("outside.txt"), files.join("leak.txt")).unwrap();
+        std::os::unix::fs::symlink(&dir, files.join("up")).unwrap();
+    }
+    write_manifest(&dir, head, ui);
+    dir
+}
+
+/// `<dir>/ui/`, a few files of a front end built for `version` (none without one). Returns it.
+pub(super) fn front_end(dir: &Path, version: Option<&str>) -> PathBuf {
     let files = dir.join("ui");
     fs::create_dir_all(files.join("assets")).unwrap();
     fs::write(files.join("index.html"), INDEX).unwrap();
@@ -51,14 +67,7 @@ pub(super) fn console_dir(case: &str, version: Option<&str>, head: &str, ui: &st
         let built = json!({ "version": version }).to_string();
         fs::write(files.join("meada-ui.json"), built).unwrap();
     }
-    fs::write(dir.join("outside.txt"), OUTSIDE).unwrap();
-    #[cfg(unix)]
-    {
-        std::os::unix::fs::symlink(dir.join("outside.txt"), files.join("leak.txt")).unwrap();
-        std::os::unix::fs::symlink(&dir, files.join("up")).unwrap();
-    }
-    write_manifest(&dir, head, ui);
-    dir
+    files
 }
 
 pub(super) fn write_manifest(dir: &Path, head: &str, ui: &str) {
