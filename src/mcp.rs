@@ -505,6 +505,12 @@ fn endpoint(source: Source, config: &StreamableHttpServerConfig) -> Endpoint {
 /// is left and returns.
 pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
     let address = address(listen)?;
+    // A managed workspace's nodes serve generations (ADR 0014).
+    #[cfg(feature = "generation-pointer")]
+    if Manifest::read(manifest)?.store {
+        let shown = manifest.display().to_string();
+        return Err(Msg::WorkspaceStoreRefused(&shown).text().into());
+    }
     let listed = Arc::new(engine::served(manifest)?);
     let gate = Gate::new(&listed)?;
     let served: Vec<String> = listed.entries.iter().map(|l| l.repo.clone()).collect();

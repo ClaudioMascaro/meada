@@ -107,6 +107,16 @@ enum WorkspaceCommand {
         #[arg(long)]
         workspace: PathBuf,
     },
+    #[cfg(feature = "refresh-lock")]
+    Apply {
+        version: String,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Pull {
+        #[arg(long)]
+        workspace: PathBuf,
+    },
 }
 
 /// `meada workspace`: the answer on stdout (an id, the listing, the entries), notes on stderr;
@@ -149,6 +159,22 @@ fn workspace(command: WorkspaceCommand) -> ! {
         WorkspaceCommand::Show { version, workspace } => {
             versions::show(&workspace, version.as_deref())
         }
+        #[cfg(feature = "refresh-lock")]
+        WorkspaceCommand::Apply { version, workspace } => {
+            let author = versions::cli_author();
+            versions::apply(&workspace, &version, &author).map(|state| format!("{state}\n"))
+        }
+        // The id on stdout either way; that nothing changed on stderr.
+        WorkspaceCommand::Pull { workspace } => versions::pull(&workspace).map(|pulled| {
+            let id = match pulled {
+                versions::Pulled::Swapped(id) => id,
+                versions::Pulled::Current(id) => {
+                    notes.push(Msg::WorkspaceAlreadyCurrent(&id).text());
+                    id
+                }
+            };
+            format!("{id}\n")
+        }),
     };
     for line in notes.iter().flat_map(|n| n.lines()) {
         eprintln!("meada: {line}");
@@ -469,6 +495,17 @@ fn main() -> ExitCode {
                     .mut_arg("version", |a| a.help(Msg::WorkspaceShowVersion.text()))
                     .mut_arg("workspace", bootstrap)
             })
+            .mut_subcommand("pull", |c| {
+                (c.about(Msg::WorkspacePull.text())).mut_arg("workspace", bootstrap)
+            })
+    });
+    #[cfg(feature = "refresh-lock")]
+    let matches = matches.mut_subcommand("workspace", |c| {
+        c.mut_subcommand("apply", |c| {
+            (c.about(Msg::WorkspaceApply.text()))
+                .mut_arg("version", |a| a.help(Msg::WorkspaceApplyVersion.text()))
+                .mut_arg("workspace", |a| a.help(Msg::WorkspaceBootstrapHelp.text()))
+        })
     });
     #[cfg(feature = "snapshot")]
     let matches = ["status", "export", "mcp"]

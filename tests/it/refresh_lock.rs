@@ -993,3 +993,133 @@ fn retain_and_drop_change_only_the_retained_list_and_the_kept_set() {
     assert_eq!(kept(&fleet), std::slice::from_ref(&g2));
     assert!(released(&fleet));
 }
+
+// `meada workspace apply` (#302): the workspace pointer moved under the refresh lock.
+
+/// `meada workspace apply <id>` on the fleet's manifest: stdout, stderr and the exit code.
+fn apply(dir: &Path, id: &str) -> (String, String, Option<i32>) {
+    let args = ["workspace", "apply", id, "--workspace", MANIFEST];
+    run_in(dir, "en_US.UTF-8", &args)
+}
+
+/// `{<prefix>}:workspace`'s id and fence.
+fn workspace_hash(fleet: &Fleet) -> Vec<Option<String>> {
+    let hmget = redis::cmd("HMGET")
+        .arg(crate::generations::workspace_pointer(fleet.case))
+        .arg("id")
+        .arg("fence")
+        .clone();
+    hmget.query(&mut admin(&fleet.valkey)).unwrap()
+}
+
+/// `apply` after `import` moves `{<prefix>}:workspace` to the version with a fence above the
+/// previous one and prints `<id> <fence>`; applying the older version again rolls it back with
+/// a new fence. Each leaves neither the lock nor the holder.
+#[test]
+fn apply_moves_the_workspace_pointer_and_rolls_back_with_a_new_fence() {
+    let Some(fleet) = fleet("ws_apply") else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let (v1, _) = crate::generations::import(dir, MANIFEST, "one", "alice");
+    let fewer = "[[repository]]\nrepo = \"example.com/chain/web\"\npath = \"../chain-web\"\n";
+    fs::write(dir.join("ops/fewer.toml"), fewer).unwrap();
+    let (v2, _) = crate::generations::import(dir, "ops/fewer.toml", "two", "bob");
+    let mut last = 0u64;
+    for id in [&v1, &v2, &v1] {
+        let (stdout, stderr, code) = apply(dir, id);
+        assert_eq!((code, stderr.as_str()), (Some(0), ""), "{id}");
+        let (shown, fence) = stdout.trim().split_once(' ').unwrap();
+        let fence: u64 = fence.parse().unwrap();
+        assert_eq!(shown, id.as_str());
+        assert!(fence > last, "{fence} {last}");
+        let expected = vec![Some(id.clone()), Some(fence.to_string())];
+        assert_eq!(workspace_hash(&fleet), expected);
+        assert!(released(&fleet));
+        last = fence;
+    }
+}
+
+/// `apply` is refused, leaving the pointer as it was: for a version the store does not hold,
+/// naming its key; while a job holds the lock, naming the holder; and with
+/// `{<prefix>}:fence` lowered, by the fence. `fence recover` counts the workspace pointer's
+/// fence, so the next `apply` succeeds.
+#[test]
+fn apply_is_refused_for_an_unknown_version_a_held_lock_and_a_lowered_fence() {
+    let Some(fleet) = fleet("ws_apply_refused") else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let (v1, _) = crate::generations::import(dir, MANIFEST, "one", "alice");
+    for _ in 0..3 {
+        assert_eq!(apply(dir, &v1).2, Some(0));
+    }
+    let applied = vec![Some(v1.clone()), Some("3".to_string())];
+    assert_eq!(workspace_hash(&fleet), applied);
+
+    let zero = "0000000000000000";
+    let (stdout, stderr, code) = apply(dir, zero);
+    assert_eq!((stdout.as_str(), code), ("", Some(1)));
+    let version = crate::generations::version_key(zero);
+    let missing = format!("meada: {version}: no such workspace version in the store\n");
+    assert_eq!(stderr, missing);
+    assert_eq!(workspace_hash(&fleet), applied);
+
+    let child = lock(dir, MANIFEST, "touch ops/started; exec sleep 60");
+    wait_for(&dir.join("ops/started"));
+    let held = held_by(&fleet, child.id());
+    let (stdout, stderr, code) = apply(dir, &v1);
+    assert_eq!((stdout.as_str(), code, stderr), ("", Some(1), held));
+    assert_eq!(workspace_hash(&fleet), applied);
+    let pid = nix::unistd::Pid::from_raw(child.id() as i32);
+    nix::sys::signal::kill(pid, nix::sys::signal::Signal::SIGTERM).unwrap();
+    child.wait();
+    assert!(released(&fleet));
+
+    let mut valkey = admin(&fleet.valkey);
+    send(&mut valkey, &["DEL", &key(&fleet, "fence")]);
+    let (stdout, stderr, code) = apply(dir, &v1);
+    assert_eq!((stdout.as_str(), code), ("", Some(1)), "{stderr}");
+    let pointer = crate::generations::workspace_pointer(fleet.case);
+    assert!(
+        stderr.starts_with(&format!("meada: {pointer}: refused fence 1, not above")),
+        "{stderr}"
+    );
+    assert!(stderr.contains("meada snapshot fence recover"), "{stderr}");
+    assert_eq!(workspace_hash(&fleet), applied);
+    assert!(released(&fleet));
+
+    let recover = ["snapshot", "fence", "recover", "--workspace", MANIFEST];
+    let (stdout, stderr, code) = run_in(dir, "en_US.UTF-8", &recover);
+    assert_eq!(
+        (code, stdout.as_str(), stderr.as_str()),
+        (Some(0), "3\n", "")
+    );
+    let (stdout, stderr, code) = apply(dir, &v1);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    assert_eq!(stdout, format!("{v1} 4\n"));
+}
+
+/// A malformed version id is refused before any connection: the store and Valkey the manifest
+/// names are a port this test holds and never sees a connection on.
+#[test]
+fn apply_refuses_a_malformed_id_before_any_connection() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let dir = chain_manifest("ws_apply_malformed");
+    fs::write(dir.join("ops/s3-secret"), "x\n").unwrap();
+    let sections = format!(
+        "{}\n[valkey]\nurl = \"redis://127.0.0.1:{port}\"\n\n[generations]\n\n[refresh_lock]\n",
+        crate::snapshot::section(&format!("http://127.0.0.1:{port}"), "offline")
+    );
+    append_section(&dir, &sections);
+    let (stdout, stderr, code) = apply(&dir, "../x");
+    assert_eq!((stdout.as_str(), code), ("", Some(1)));
+    assert_eq!(
+        stderr,
+        "meada: ../x: not a workspace version id of 16 lowercase hex characters\n"
+    );
+    listener.set_nonblocking(true).unwrap();
+    let accepted = listener.accept().map(drop).map_err(|e| e.kind());
+    assert_eq!(accepted, Err(std::io::ErrorKind::WouldBlock));
+}

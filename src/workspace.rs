@@ -178,6 +178,8 @@ impl Workspace {
 #[derive(Clone)]
 pub struct Manifest {
     pub entries: Vec<Listed>,
+    /// Where every index lives (a pulled generation's directory for `of_generation`).
+    pub index_dir: PathBuf,
     /// The `[valkey]` section, when the build has the module.
     #[cfg(feature = "valkey")]
     pub valkey: Option<crate::valkey::Config>,
@@ -199,9 +201,12 @@ pub struct Manifest {
     #[cfg(feature = "ui")]
     pub ui: Option<crate::ui::Config>,
     /// `[workspace] source = "store"` (ADR 0014): the repositories come from the current
-    /// workspace version, and `entries` is empty.
+    /// workspace version: `entries` is empty, or with `read_listed` the pulled version's.
     #[cfg(feature = "generation-pointer")]
     pub store: bool,
+    /// With `read_listed` and `source = "store"`, the id of the pulled version read.
+    #[cfg(feature = "generation-pointer")]
+    pub version: Option<String>,
 }
 
 /// One `[[repository]]` of a manifest.
@@ -284,9 +289,16 @@ impl Manifest {
     /// The manifest at `file`; `index_dir` and each `path` are absolute or relative to its
     /// directory. A parse error names the file, the line and the key, as `meada.toml`'s do.
     pub fn read(file: &Path) -> Result<Self> {
+        Self::read_from(file, false)
+    }
+
+    /// `read`, and with `pulled` and `source = "store"` the entries of the workspace version
+    /// pulled under `<index_dir>/workspace/` (`versions::pulled`), read from disk.
+    fn read_from(file: &Path, pulled: bool) -> Result<Self> {
         let src = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
         modules::check(file, &src)?;
-        let parsed: ManifestFile = config::parse(file, &src, "meada.workspace.toml")?;
+        #[cfg_attr(not(feature = "generation-pointer"), allow(unused_mut))]
+        let mut parsed: ManifestFile = config::parse(file, &src, "meada.workspace.toml")?;
         let Some(index_dir) = parsed.index_dir else {
             let missing = Msg::KeyMissing("index_dir").text();
             return Err(format!("{}: {missing}", file.display()).into());
@@ -340,10 +352,34 @@ impl Manifest {
                 return Err(config::error_at(file, &src, "repository", &beside));
             }
         }
+        let index_dir = base.join(index_dir);
+        #[cfg(feature = "snapshot")]
+        #[cfg_attr(not(feature = "generation-pointer"), allow(unused_mut))]
+        let mut entries_src = src;
+        #[cfg(feature = "generation-pointer")]
+        let mut version = None;
+        #[cfg(feature = "generation-pointer")]
+        if store && pulled {
+            let dir = index_dir.join(crate::snapshot::versions::DIR);
+            let not_pulled = || {
+                let (manifest, dir) = (file.display().to_string(), dir.display().to_string());
+                Msg::WorkspaceNotPulled {
+                    manifest: &manifest,
+                    dir: &dir,
+                }
+                .text()
+            };
+            let (id, repositories, text) =
+                crate::snapshot::versions::pulled(&dir)?.ok_or_else(not_pulled)?;
+            parsed.repositories = repositories;
+            entries_src = text;
+            version = Some(id);
+        }
+        #[cfg(not(feature = "generation-pointer"))]
+        let _ = pulled;
         // Each entry's blocks as written, in manifest order: the typed read checked them.
         #[cfg(feature = "snapshot")]
-        let mut written = crate::snapshot::entry_blocks(&src).into_iter();
-        let index_dir = base.join(index_dir);
+        let mut written = crate::snapshot::entry_blocks(&entries_src).into_iter();
         // Before any `git` call: a mirror another user owns is read all the same (ADR 0011).
         (parsed.repositories.iter()).for_each(|e| repo::trust(&base.join(&e.path)));
         let problems = entry_problems(parsed.repositories.iter().map(|e| e.repo.as_str()));
@@ -393,6 +429,7 @@ impl Manifest {
         }
         Ok(Self {
             entries,
+            index_dir,
             #[cfg(feature = "valkey")]
             valkey,
             #[cfg(feature = "snapshot")]
@@ -407,19 +444,17 @@ impl Manifest {
             ui,
             #[cfg(feature = "generation-pointer")]
             store,
+            #[cfg(feature = "generation-pointer")]
+            version,
         })
     }
 
-    /// `read` for a command that reads the file's `[[repository]]` entries: a manifest whose
-    /// repositories come from the store (`[workspace] source = "store"`) is refused, naming it.
+    /// `read` for a command that reads the repositories (`index`, `status`, `export` and
+    /// `snapshot publish`): with `[workspace] source = "store"` they are the workspace version
+    /// `meada workspace pull` left under `<index_dir>/workspace/`, read once from disk, their
+    /// paths relative to `file`'s directory; without one it is refused, naming the pull.
     pub fn read_listed(file: &Path) -> Result<Self> {
-        let read = Self::read(file)?;
-        #[cfg(feature = "generation-pointer")]
-        if read.store {
-            let shown = file.display().to_string();
-            return Err(Msg::WorkspaceStoreRefused(&shown).text().into());
-        }
-        Ok(read)
+        Self::read_from(file, true)
     }
 
     /// The `[valkey]` section and the `[[github_app]]` blocks of the manifest at `file`,
@@ -498,6 +533,7 @@ impl Manifest {
         }
         Ok(Self {
             entries,
+            index_dir: dir.to_path_buf(),
             #[cfg(feature = "valkey")]
             valkey: None,
             snapshot: None,
@@ -511,6 +547,8 @@ impl Manifest {
             ui: None,
             #[cfg(feature = "generation-pointer")]
             store: false,
+            #[cfg(feature = "generation-pointer")]
+            version: None,
         })
     }
 

@@ -758,7 +758,7 @@ pub(crate) fn meada_in(dir: &Path, lang: &str, args: &[&str]) -> (String, String
 }
 
 /// `meada workspace <args> --workspace ops/meada.workspace.toml` in `dir`, in English.
-fn workspace(dir: &Path, args: &[&str]) -> (String, String, Option<i32>) {
+pub(crate) fn workspace(dir: &Path, args: &[&str]) -> (String, String, Option<i32>) {
     let args: Vec<&str> = (["workspace"].into_iter())
         .chain(args.iter().copied())
         .chain(["--workspace", MANIFEST])
@@ -768,7 +768,7 @@ fn workspace(dir: &Path, args: &[&str]) -> (String, String, Option<i32>) {
 
 /// `meada workspace import <file> --message <message> --author <author>`: the id it printed and
 /// stderr.
-fn import(dir: &Path, file: &str, message: &str, author: &str) -> (String, String) {
+pub(crate) fn import(dir: &Path, file: &str, message: &str, author: &str) -> (String, String) {
     let args = ["import", file, "--message", message, "--author", author];
     let (stdout, stderr, code) = workspace(dir, &args);
     assert_eq!(code, Some(0), "{stderr}");
@@ -776,12 +776,12 @@ fn import(dir: &Path, file: &str, message: &str, author: &str) -> (String, Strin
 }
 
 /// The store key of the workspace version `id` in a fleet's store.
-fn version_key(id: &str) -> String {
+pub(crate) fn version_key(id: &str) -> String {
     format!("prod/meada/workspaces/{id}.json")
 }
 
 /// `{<prefix>}:workspace` of `case`.
-fn workspace_pointer(case: &str) -> String {
+pub(crate) fn workspace_pointer(case: &str) -> String {
     format!("{{{}}}:workspace", prefix(case))
 }
 
@@ -1039,11 +1039,12 @@ fn show_prints_the_entries_import_reads_back() {
     assert_eq!(current, shown);
 }
 
-/// With `[workspace] source = "store"` (until `meada workspace pull`), the commands that read
-/// `[[repository]]` entries refuse naming `[workspace] source`, and a node's `--generations`
-/// commands serve as before.
+/// With `[workspace] source = "store"` and no version pulled, `index`, `status`, `export` and
+/// `snapshot publish` refuse naming `meada workspace pull`, `mcp --listen` without
+/// `--generations` refuses naming `--generations`, and a node's `--generations` commands serve
+/// as before.
 #[test]
-fn a_store_source_is_refused_where_entries_are_read_and_nodes_serve_as_before() {
+fn a_store_source_without_a_pulled_version_is_refused_and_nodes_serve_as_before() {
     let Some(fleet) = Fleet::new("workspace_store_source", 3) else {
         return;
     };
@@ -1056,17 +1057,21 @@ fn a_store_source_is_refused_where_entries_are_read_and_nodes_serve_as_before() 
     let bootstrap =
         format!("index_dir = \"../indexes\"\n{sections}\n[workspace]\nsource = \"store\"\n");
     fs::write(dir.join("ops/bootstrap.toml"), bootstrap).unwrap();
-    let refused = "meada: ops/bootstrap.toml: [workspace] source = \"store\": this command reads \
-                   [[repository]] entries, which only source = \"file\" lists\n";
+    let not_pulled = "meada: ops/bootstrap.toml: [workspace] source = \"store\": no workspace \
+                      version pulled in ops/../indexes/workspace: run `meada workspace pull` \
+                      first\n";
+    let generations = "meada: ops/bootstrap.toml: [workspace] source = \"store\": a managed \
+                       workspace's nodes serve generations: run meada mcp --listen with \
+                       --generations\n";
     let bootstrap = ["--workspace", "ops/bootstrap.toml"];
-    let commands: [&[&str]; 5] = [
-        &["index"],
-        &["status"],
-        &["export", "--repo", WEB],
-        &["snapshot", "publish"],
-        &["mcp", "--listen", "127.0.0.1:0"],
+    let commands: [(&[&str], &str); 5] = [
+        (&["index"], not_pulled),
+        (&["status"], not_pulled),
+        (&["export", "--repo", WEB], not_pulled),
+        (&["snapshot", "publish"], not_pulled),
+        (&["mcp", "--listen", "127.0.0.1:0"], generations),
     ];
-    for command in commands {
+    for (command, refused) in commands {
         let args = [command, &bootstrap].concat();
         let (stdout, stderr, code) = meada_in(dir, "en_US.UTF-8", &args);
         assert_eq!((stdout.as_str(), code), ("", Some(1)), "{args:?}: {stderr}");
@@ -1503,4 +1508,357 @@ fn the_host_name_in_lowercase_names_a_node_by_default() {
     let beat = wait_beat(&mut valkey, fleet.case, &host, |_| true);
     companion.stop();
     assert_eq!(beat["name"], host.as_str());
+}
+
+// Workspace versions on the machine (#302): `meada workspace pull` and the commands that read
+// the pulled version.
+
+/// The bootstrap manifest the store-source tests write beside the fleet's.
+const BOOTSTRAP: &str = "ops/bootstrap.toml";
+
+/// `ops/bootstrap.toml` in `dir`: the fleet manifest's sections, `[workspace] source = "store"`
+/// and `index_dir`.
+fn store_bootstrap(dir: &Path, index_dir: &str) {
+    let manifest = fs::read_to_string(dir.join(MANIFEST)).unwrap();
+    let sections = &manifest[manifest.find("\n[snapshot]").unwrap()..];
+    let bootstrap =
+        format!("index_dir = \"{index_dir}\"\n{sections}\n[workspace]\nsource = \"store\"\n");
+    fs::write(dir.join(BOOTSTRAP), bootstrap).unwrap();
+}
+
+/// `meada <args> --workspace ops/bootstrap.toml` in `dir`, in English.
+fn on_bootstrap(dir: &Path, args: &[&str]) -> (String, String, Option<i32>) {
+    let args = [args, &["--workspace", BOOTSTRAP]].concat();
+    meada_in(dir, "en_US.UTF-8", &args)
+}
+
+/// Every file in `<dir>/indexes/workspace/` with its bytes, sorted by name; none when the
+/// directory does not exist.
+fn pulled_files(dir: &Path) -> Vec<(String, Vec<u8>)> {
+    let Ok(read) = fs::read_dir(dir.join("indexes/workspace")) else {
+        return Vec::new();
+    };
+    let mut files: Vec<(String, Vec<u8>)> = read
+        .map(|e| {
+            let e = e.unwrap();
+            let name = e.file_name().to_string_lossy().into_owned();
+            (name, fs::read(e.path()).unwrap())
+        })
+        .collect();
+    files.sort();
+    files
+}
+
+/// `meada workspace pull` refuses with no current version; then it writes the document as
+/// stored and the current file, says a second run is current and changes nothing, swaps after
+/// the pointer moves, keeps only the current version and the one it replaced, and refuses a
+/// pointer whose fence is not above the current file's, naming both and changing nothing.
+#[test]
+fn workspace_pull_swaps_the_current_file_and_never_lowers_its_fence() {
+    let Some(fleet) = Fleet::new("workspace_pull", 3) else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let key = workspace_pointer(fleet.case);
+    let (stdout, stderr, code) = workspace(dir, &["pull"]);
+    assert_eq!((stdout.as_str(), code), ("", Some(1)));
+    assert_eq!(
+        stderr,
+        format!(
+            "meada: {key}: no workspace version is current: apply one with `meada workspace \
+             apply`\n"
+        )
+    );
+    assert!(pulled_files(dir).is_empty());
+
+    let s3 = bucket(&fleet.endpoint, &fleet.bucket);
+    let document = |id: &str| {
+        let stored = crate::snapshot::get(&s3, &version_key(id));
+        (format!("{id}.json"), stored)
+    };
+    let current = |id: &str, fence: u64| {
+        let line = format!("{id} {fence}\n").into_bytes();
+        ("current".to_string(), line)
+    };
+    let expected = |mut files: Vec<(String, Vec<u8>)>| {
+        files.push(("pull.lock".to_string(), Vec::new()));
+        files.sort();
+        files
+    };
+    let mut valkey = admin(&fleet.valkey);
+    let (v1, _) = import(dir, MANIFEST, "one", "alice");
+    send(&mut valkey, &["HSET", &key, "id", &v1, "fence", "1"]);
+    let (stdout, stderr, code) = workspace(dir, &["pull"]);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    assert_eq!(stdout, format!("{v1}\n"));
+    let one = expected(vec![document(&v1), current(&v1, 1)]);
+    assert_eq!(pulled_files(dir), one);
+
+    let (stdout, stderr, code) = workspace(dir, &["pull"]);
+    assert_eq!((code, stdout), (Some(0), format!("{v1}\n")));
+    assert_eq!(
+        stderr,
+        format!("meada: {v1}: already the current workspace version: nothing changed\n")
+    );
+    assert_eq!(pulled_files(dir), one);
+
+    let fewer = "[[repository]]\nrepo = \"example.com/chain/web\"\npath = \"../chain-web\"\n";
+    fs::write(dir.join("ops/fewer.toml"), fewer).unwrap();
+    let (v2, _) = import(dir, "ops/fewer.toml", "two", "bob");
+    send(&mut valkey, &["HSET", &key, "id", &v2, "fence", "2"]);
+    let (stdout, stderr, code) = workspace(dir, &["pull"]);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    assert_eq!(stdout, format!("{v2}\n"));
+    let two = expected(vec![document(&v1), document(&v2), current(&v2, 2)]);
+    assert_eq!(pulled_files(dir), two);
+
+    let gateway = "[[repository]]\nrepo = \"example.com/chain/gateway\"\n\
+                   path = \"../chain-gateway\"\n";
+    fs::write(dir.join("ops/gateway.toml"), gateway).unwrap();
+    let (v3, _) = import(dir, "ops/gateway.toml", "three", "bob");
+    send(&mut valkey, &["HSET", &key, "id", &v3, "fence", "3"]);
+    let (stdout, stderr, code) = workspace(dir, &["pull"]);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    assert_eq!(stdout, format!("{v3}\n"));
+    let three = expected(vec![document(&v2), document(&v3), current(&v3, 3)]);
+    assert_eq!(pulled_files(dir), three);
+
+    for fence in ["2", "3"] {
+        send(&mut valkey, &["HSET", &key, "id", &v1, "fence", fence]);
+        let (stdout, stderr, code) = workspace(dir, &["pull"]);
+        assert_eq!((stdout.as_str(), code), ("", Some(1)), "{stderr}");
+        let file = "ops/../indexes/workspace/current";
+        let fence_key = format!("{{{}}}:fence", prefix(fleet.case));
+        assert_eq!(
+            stderr,
+            format!(
+                "meada: {key}: workspace version {v1} has fence {fence}, not above fence 3 in \
+                 {file}: not swapped; raise {fence_key} with meada snapshot fence recover \
+                 --at-least 3 and apply again, or delete {file}\n"
+            )
+        );
+        assert_eq!(pulled_files(dir), three);
+    }
+}
+
+/// Everything `meada workspace pull` reads is hostile: a malformed pointer id or fence, a
+/// document of another id, one whose id does not derive from its entries, an oversized one and
+/// one with invalid entries are each refused naming the key, leaving `<index_dir>/workspace/`
+/// as it was.
+#[test]
+fn workspace_pull_refuses_hostile_input_and_changes_nothing() {
+    let Some(fleet) = Fleet::new("workspace_pull_hostile", 3) else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let key = workspace_pointer(fleet.case);
+    let mut valkey = admin(&fleet.valkey);
+    let (v1, _) = import(dir, MANIFEST, "one", "alice");
+    send(&mut valkey, &["HSET", &key, "id", &v1, "fence", "1"]);
+    assert_eq!(workspace(dir, &["pull"]).2, Some(0));
+    let before = pulled_files(dir);
+
+    let s3 = bucket(&fleet.endpoint, &fleet.bucket);
+    let stored = crate::snapshot::get(&s3, &version_key(&v1));
+    let document: serde_json::Value = serde_json::from_slice(&stored).unwrap();
+    let with_id = |id: &str, repositories: serde_json::Value| {
+        let mut forged = document.clone();
+        forged["id"] = id.into();
+        forged["repositories"] = repositories;
+        serde_json::to_vec_pretty(&forged).unwrap()
+    };
+    let other = "000000000000000b";
+    crate::snapshot::put_stored(&s3, &version_key(other), &stored);
+    let underived = "000000000000000c";
+    let entries = document["repositories"].clone();
+    let underived_document = with_id(underived, entries);
+    crate::snapshot::put_stored(&s3, &version_key(underived), &underived_document);
+    let oversized = "000000000000000d";
+    let spaces = vec![b' '; (4 << 20) + 1];
+    crate::snapshot::put_stored(&s3, &version_key(oversized), &spaces);
+    let invalid = "000000000000000e";
+    let local = serde_json::json!([{"repo": "local/web", "path": "w"}]);
+    crate::snapshot::put_stored(&s3, &version_key(invalid), &with_id(invalid, local));
+
+    let bad_pointer = format!(
+        "meada: {key}: not a hash of `id`, a workspace version id of 16 lowercase hex \
+         characters, and `fence`, a decimal fence\n"
+    );
+    let not_version = |id: &str| {
+        format!(
+            "meada: {}: malformed: not the workspace version document of its id\n",
+            version_key(id)
+        )
+    };
+    let too_big = format!(
+        "meada: {}: not stored with the size and hash it records\n",
+        version_key(oversized)
+    );
+    let cases = [
+        ("../escape", "5", bad_pointer.clone()),
+        (v1.as_str(), "5x", bad_pointer),
+        (other, "5", not_version(other)),
+        (underived, "5", not_version(underived)),
+        (oversized, "5", too_big),
+        (invalid, "5", not_version(invalid)),
+    ];
+    for (id, fence, expected) in cases {
+        send(&mut valkey, &["HSET", &key, "id", id, "fence", fence]);
+        let (stdout, stderr, code) = workspace(dir, &["pull"]);
+        assert_eq!(
+            (stdout.as_str(), code),
+            ("", Some(1)),
+            "{id} {fence}: {stderr}"
+        );
+        assert_eq!(stderr, expected, "{id} {fence}");
+        assert_eq!(pulled_files(dir), before, "{id} {fence}");
+    }
+}
+
+/// The chain's entries as a workspace version pulled into `dir` (`<index_dir>/workspace/`), as
+/// `meada workspace pull` leaves it at fence 1.
+fn write_pulled(dir: &Path) {
+    let blocks = serde_json::json!({});
+    let entries: Vec<(&str, String)> = (crate::manifest::CHAIN.iter())
+        .map(|(repo, path)| (*repo, format!("../{path}")))
+        .collect();
+    let hashed: Vec<(&str, &str, &serde_json::Value)> = (entries.iter())
+        .map(|(repo, path)| (*repo, path.as_str(), &blocks))
+        .collect();
+    let id = meada_core::ids::workspace_version_id(&hashed);
+    let repositories: Vec<serde_json::Value> = (entries.iter())
+        .map(|(repo, path)| serde_json::json!({"repo": repo, "path": path}))
+        .collect();
+    let document = serde_json::json!({
+        "id": id, "author": "alice", "time": "2026-10-22T00:00:00Z", "message": "chain",
+        "repositories": repositories,
+    });
+    fs::create_dir_all(dir).unwrap();
+    fs::write(dir.join(format!("{id}.json")), document.to_string()).unwrap();
+    fs::write(dir.join("current"), format!("{id} 1\n")).unwrap();
+}
+
+/// `meada index --workspace` over a pulled version, its `[snapshot]` and `[valkey]` ports held
+/// by this test, indexes the chain and opens no connection; `export` then gives the chain's
+/// export goldens, still with no connection.
+#[test]
+fn index_over_a_pulled_version_opens_no_connection() {
+    let store = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let valkey = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let dir = chain_manifest("workspace_index_offline");
+    fs::write(dir.join("ops/s3-secret"), "x\n").unwrap();
+    let port = |l: &std::net::TcpListener| l.local_addr().unwrap().port();
+    let bootstrap = format!(
+        "index_dir = \"../store-indexes\"\n{}\n[valkey]\nurl = \"redis://127.0.0.1:{}\"\n\n\
+         [generations]\nkeep = 3\n\n[workspace]\nsource = \"store\"\n",
+        crate::snapshot::section(&format!("http://127.0.0.1:{}", port(&store)), "offline"),
+        port(&valkey)
+    );
+    fs::write(dir.join(BOOTSTRAP), bootstrap).unwrap();
+    let _ = fs::remove_dir_all(dir.join("store-indexes"));
+    write_pulled(&dir.join("store-indexes/workspace"));
+    let (stdout, stderr, code) = on_bootstrap(&dir, &["index"]);
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("", "", Some(0)));
+    for (repo, path) in crate::manifest::CHAIN {
+        let (export, stderr, code) = on_bootstrap(&dir, &["export", "--repo", repo]);
+        assert_eq!(code, Some(0), "{stderr}");
+        assert_golden(&format!("{path}.export.json"), &export);
+    }
+    for listener in [store, valkey] {
+        listener.set_nonblocking(true).unwrap();
+        let accepted = listener.accept().map(drop).map_err(|e| e.kind());
+        assert_eq!(accepted, Err(std::io::ErrorKind::WouldBlock));
+    }
+}
+
+/// The job's commands over a stored, applied and pulled version of the chain: `index` then
+/// `export` give the export goldens and `status` the same report as the same entries in a file;
+/// `publish` records the version in the generation document with the ids a file's publish
+/// gives, a stored document is never rewritten (not by a file's publish, nor after another
+/// version), a file's publish records none, and a node pulls and serves a generation that
+/// records one but refuses one whose field is not a version id.
+#[test]
+fn the_job_s_commands_read_the_pulled_version_and_publish_records_it() {
+    let Some(fleet) = Fleet::new("workspace_job", 3) else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let key = workspace_pointer(fleet.case);
+    let mut valkey = admin(&fleet.valkey);
+    store_bootstrap(dir, "../store-indexes");
+    let (v1, _) = import(dir, MANIFEST, "chain", "alice");
+    send(&mut valkey, &["HSET", &key, "id", &v1, "fence", "1"]);
+    let (stdout, stderr, code) = on_bootstrap(dir, &["workspace", "pull"]);
+    assert_eq!(
+        (stdout, stderr.as_str(), code),
+        (format!("{v1}\n"), "", Some(0))
+    );
+    let (stdout, stderr, code) = on_bootstrap(dir, &["index"]);
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("", "", Some(0)));
+    for (repo, path) in crate::manifest::CHAIN {
+        let (export, stderr, code) = on_bootstrap(dir, &["export", "--repo", repo]);
+        assert_eq!(code, Some(0), "{stderr}");
+        assert_golden(&format!("{path}.export.json"), &export);
+    }
+    let (from_store, stderr, code) = on_bootstrap(dir, &["status"]);
+    assert_eq!(code, Some(0), "{stderr}");
+    let status = ["status", "--workspace", MANIFEST];
+    let (from_file, _, _) = meada_in(dir, "en_US.UTF-8", &status);
+    assert_eq!(from_store, from_file);
+
+    let s3 = bucket(&fleet.endpoint, &fleet.bucket);
+    let generation_key = |id: &str| format!("prod/meada/generations/{id}.json");
+    let document = |id: &str| crate::snapshot::get(&s3, &generation_key(id));
+    let field = |bytes: &[u8]| {
+        let document: serde_json::Value = serde_json::from_slice(bytes).unwrap();
+        document.get("workspace").cloned()
+    };
+    let (g1, stderr, code) = on_bootstrap(dir, &["snapshot", "publish"]);
+    assert_eq!(code, Some(0), "{stderr}");
+    let g1 = g1.trim().to_string();
+    let first = document(&g1);
+    assert_eq!(field(&first), Some(v1.clone().into()));
+
+    // A node pulls and serves it; a fresh one refuses it once its field is no version id.
+    let (node, _) = fleet.node("node");
+    assert_eq!(fleet.pull(&node), g1);
+    let (stdout, stderr, code) = probe(dir, &node);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""), "{stdout}");
+    let mut forged: serde_json::Value = serde_json::from_slice(&first).unwrap();
+    forged["workspace"] = "../x".into();
+    let forged = serde_json::to_vec_pretty(&forged).unwrap();
+    crate::snapshot::put_stored(&s3, &generation_key(&g1), &forged);
+    let (other, _) = fleet.node("other");
+    let (stdout, stderr, code) = pull(dir, &other, &[]);
+    assert_eq!((stdout.as_str(), code), ("", Some(1)), "{stderr}");
+    assert_eq!(
+        stderr,
+        format!(
+            "meada: {}: `workspace` ../x: not a workspace version id of 16 lowercase hex \
+             characters\n",
+            generation_key(&g1)
+        )
+    );
+    crate::snapshot::put_stored(&s3, &generation_key(&g1), &first);
+
+    // The same bundles from the file: the same generation, its document as first stored.
+    assert_eq!(fleet.publish(), g1);
+    assert_eq!(document(&g1), first);
+    // Another version of the same entries (reversed): the same generation, still unchanged.
+    let reversed: String = (crate::manifest::CHAIN.iter().rev())
+        .map(|(repo, path)| format!("[[repository]]\nrepo = \"{repo}\"\npath = \"../{path}\"\n"))
+        .collect();
+    fs::write(dir.join("ops/reversed.toml"), reversed).unwrap();
+    let (v2, _) = import(dir, "ops/reversed.toml", "reversed", "bob");
+    assert_ne!(v2, v1);
+    send(&mut valkey, &["HSET", &key, "id", &v2, "fence", "2"]);
+    assert_eq!(on_bootstrap(dir, &["workspace", "pull"]).2, Some(0));
+    let (g, stderr, code) = on_bootstrap(dir, &["snapshot", "publish"]);
+    assert_eq!((g.trim(), code), (g1.as_str(), Some(0)), "{stderr}");
+    assert_eq!(document(&g1), first);
+    // A file's new generation records no version.
+    next_commit(dir, "chain-web", "file_only");
+    let g2 = fleet.publish();
+    assert_ne!(g2, g1);
+    assert_eq!(field(&document(&g2)), None);
 }
