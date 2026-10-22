@@ -49,7 +49,9 @@ the spec fixes the details the slices build.
   to any request carrying `Origin`.
 - The console connects only to what its bootstrap manifest configures, under ADR 0012's rules:
   the snapshot store, Valkey, and with `[oidc]` the issuer and its `jwks_uri`. It never calls a
-  node or GitHub, and discovers nothing.
+  node or GitHub, and discovers nothing. (Amended 2026-10-22; #319: ADR 0016 adds Postgres,
+  with `[postgres]`, for the audit, the permissions set, the directory and overage; the console
+  still never calls GitHub or the identity provider's API.)
 - With `[snapshot]` the console is deployed like a node, with an init `meada snapshot pull` and a
   `meada snapshot pull --every` companion on a `local_dir` of its own, and answers the query
   playground and the graph views from the generations it holds, in process, through the
@@ -93,7 +95,11 @@ the spec fixes the details the slices build.
   passes, in order, a `Host` check against `[ui] public_url` (or the bound loopback address), an
   `Origin` check against the console's own origin (a write without `Origin` is refused too),
   admission and routing. The refusals are 403 with fixed text, which closes cross-site requests
-  and DNS rebinding.
+  and DNS rebinding. (Amended 2026-10-22; #319: with `[directory]`, ADR 0016 adds a third
+  prefix, `/scim/v2/`, the inbound SCIM endpoint the identity provider pushes to, behind its own
+  admission: the `Host` check, a refusal of any request carrying `Origin`, then its own bearer
+  credential compared in constant time. OIDC admission never applies there, no console token is
+  accepted there, and the SCIM token is accepted nowhere else.)
 - The console sets and reads no cookie and sends no `Access-Control-*` header, so the same-origin
   rule is its whole CSRF surface.
 - Static files are served only from `[ui] dir`: no listing, no `..` or empty segment, no symbolic
@@ -139,7 +145,9 @@ the spec fixes the details the slices build.
 - With `[oidc]`, the console validates a bearer JWT with the nodes' module and its own audience.
   A subject in an `operator_groups` group, or whose `operator_claim` is `true`, is an operator;
   every other admitted subject is a viewer. Operators are managed in the identity provider, not
-  in Meada.
+  in Meada. (Amended 2026-10-22; #294: ADR 0015 adds the team operator, a subject one of whose
+  groups owns an entry of the current workspace version that its grant reads, who may change
+  that group's entries and nothing else; this ADR's operator is the global operator.)
 - A viewer reads every view and writes nothing. A write from a viewer, and any write while
   `operations` is off, is a 403; the front end hides what the role cannot do, but the API is what
   refuses.
@@ -148,7 +156,10 @@ the spec fixes the details the slices build.
   graph views read only granted repositories, and the operational views list no identity outside
   the grant. State that belongs to no repository (heartbeats, the pointer, the fence, the lock
   holder, the issuer's metadata, the manifest's sections) is shown whole. An operator sees the
-  whole fleet.
+  whole fleet. (Amended 2026-10-22; #319: ADR 0016 makes the grant the union of the claims
+  grant and, with `[oidc.github]`, the GitHub grant; the session reports `login`, `github_host`
+  and `github_grant`, and the token check reports the `sources` of each identity. With
+  `[directory]`, a subject the identity provider deactivated is refused as `deprovisioned`.)
 - The browser logs in with the authorization code flow and PKCE against the operator's issuer,
   as the public client `[ui] client_id`, keeps the token in memory only and sends it as a bearer
   header. Meada issues no token, registers no client and forwards none.
@@ -156,7 +167,11 @@ the spec fixes the details the slices build.
   only for that request: it is never written to stderr, Valkey, the store or a URL, and never
   sent to the issuer or any other host.
 - Every write leaves one stderr line, `ui: <subject> <action> <arguments>: <outcome>`, with no
-  token or part of one.
+  token or part of one. (Amended 2026-10-22; #319: with `[postgres]`, ADR 0016 also records
+  every write, and every refusal, as an audit record inserted in Postgres before the write and
+  completed after it; a write whose record cannot be stored is refused, 503 `audit_unavailable`.
+  `GET /api/v1/audit` and an audit page show the records to the global operator, newest first.
+  The stderr line is unchanged.)
 
 ### Operations as CLI subcommands
 
@@ -219,7 +234,10 @@ the spec fixes the details the slices build.
   connection, whatever the build and the manifest. The job's refresh becomes `meada workspace
   pull`, the fetch of the mirrors `meada workspace show` lists, `meada index --workspace` and
   `meada snapshot publish`, under `meada snapshot lock`, so `apply` cannot run between the pull
-  and the publish and the whole refresh sees one version.
+  and the publish and the whole refresh sees one version. (Amended 2026-10-22; #319: with
+  `[oidc.github]`, ADR 0016 inserts `meada github-app roles` after the pull, and the fetch reads
+  `meada workspace show --pulled`, which leaves out the additions the role check excluded; a
+  refresh that stops on `roles` publishes nothing.)
 - `meada snapshot publish` records the version id in the generation document's new optional
   `workspace` field. Generation and bundle ids do not change, a stored document is never
   rewritten, and older binaries ignore the field.
@@ -234,6 +252,8 @@ the spec fixes the details the slices build.
   repositories, fleet, store, admission with the token check, credentials, the playground, and
   the graph views (communities, contracts, cross-repository links, shape drift as ADR 0009
   defines it, decisions). A view whose module or section is off says which one it needs.
+  (Amended 2026-10-22; #319: ADR 0016 adds the audit page, for the global operator, and the
+  owner picker and the excluded and owner-missing marks in the workspace views.)
 - The workspace editor validates and diffs with `meada-core`, so its errors are the server's
   text; a save still validates on the server. The graph views fetch a repository's export once
   and derive every view in the browser.
@@ -304,7 +324,9 @@ the spec fixes the details the slices build.
   so the console shows the lock and the last publish.
 - **Several workspaces per fleet.** Needs roles per workspace, a switcher and one key prefix per
   workspace; left to #294. A deployment has one bootstrap manifest, one key prefix and one
-  current version.
+  current version. (Amended 2026-10-22; #294: ADR 0015 keeps one workspace per deployment, with
+  several workspaces per fleet and multi-tenant isolation out of scope, and lets teams own the
+  entries of the one workspace instead.)
 
 ## Consequences
 
@@ -334,7 +356,10 @@ the spec fixes the details the slices build.
   generations.
 - ADR 0008 is unchanged: the nodes' endpoints, tools, descriptions and answers do not move. ADR
   0010 is unchanged: the release binaries are the default build. ADR 0013's module stays the
-  job's: the console reads its state in Valkey and never calls GitHub.
+  job's: the console reads its state in Valkey and never calls GitHub. (Amended 2026-10-22;
+  #319: still so with ADR 0016: the job's `meada github-app roles` writes the permissions set
+  and the console reads it from Postgres; the console calls neither GitHub nor the identity
+  provider's API, which pushes to it over SCIM.)
 - Everything is additive under Spec R1's stability rule (a feature, subcommands, keys, Valkey
   keys, a document field): the console is a minor change. Without `ui`, nothing changes; without
   `[workspace]`, the manifest in the ops repository works as today.

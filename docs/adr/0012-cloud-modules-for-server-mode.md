@@ -79,7 +79,11 @@ that is no node and adds nothing to `meada mcp --listen`; `cloud` enables it. AD
 `meada workspace` to `generation-pointer`, and `meada snapshot pointer` and `meada snapshot
 fence recover` to `refresh-lock`. `[workspace]` is read in every build, and its `source =
 "store"` needs the `generation-pointer` feature and the `[snapshot]` and `[generations]`
-sections.)
+sections.) (Amended 2026-10-22; #319: ADR 0016 adds two rows: `postgres`, section
+`[postgres]`, needing no other section, adding `meada postgres migrate`; and `directory`,
+implying `postgres`, section `[directory]`, needing `[postgres]` and `[oidc]`, adding the SCIM
+endpoint of the console. `cloud` enables both. The `github-app` module of ADR 0013 gains `meada
+github-app roles`, which also needs `postgres`.)
 
 - `valkey` is internal: it is enabled through the modules that need it, and `[valkey]` alone
   only makes `meada status` report the connection.
@@ -104,10 +108,15 @@ sections.)
   (Amended 2026-10-22; #289: ADR 0013 adds each `[[github_app]]` block's `api`, the GitHub REST
   endpoint that lists installations and mints their tokens. On GitHub Enterprise Cloud and
   github.com it lies outside the operator's boundary, which is accepted because the job's
-  fetches already go to that host.) No client follows a redirect to another host, with one
-  exception: a Valkey cluster client follows the cluster's `MOVED` and `ASK` to the nodes the
-  cluster announces, always over TLS (the section requires a `rediss` seed when `cluster` is
-  on).
+  fetches already go to that host.) (Amended 2026-10-22; #319: ADR 0016 adds the Postgres
+  endpoint `[postgres]` names through `url_env` or `url_file`, inside the operator's boundary,
+  which the console, the nodes that read a GitHub grant or an overage lookup, the job's `meada
+  github-app roles` and the CLI twins that write connect to; and, on each `[[github_app]]`
+  block's `api`, the collaborators listing of `meada github-app roles`, beside the job's other
+  calls. The SCIM directory is inbound, on the console's listener.) No client follows a
+  redirect to another host, with one exception: a Valkey cluster client follows the cluster's
+  `MOVED` and `ASK` to the nodes the cluster announces, always over TLS (the section requires a
+  `rediss` seed when `cluster` is on).
 - The store's credentials come from one source, the one `credentials` names; no other is read.
   Besides `static` (keys from the environment or files, below), three sources reach an endpoint
   the operator chose by choosing them, each a recorded exception:
@@ -124,7 +133,10 @@ sections.)
   only exceptions are the Pod Identity agent and the instance metadata service above, at those
   addresses, which the platform serves only over `http` on a link-local address inside the host;
   no other link-local or `http` endpoint is allowed. Certificates verify against the system
-  roots, or only against the `ca_file` when the section names one.
+  roots, or only against the `ca_file` when the section names one. (Amended 2026-10-22; #319:
+  ADR 0016's Postgres URL carries no scheme that chooses TLS and no query parameter, so
+  `sslmode` cannot weaken it: a host outside loopback always connects over TLS with the host
+  name verified, and plain TCP is allowed on loopback only.)
 - Secrets come only from environment variables or files a section names, through `*_env` and
   `*_file` keys (at most one of each pair, each with a documented default such as
   `AWS_SECRET_ACCESS_KEY`), with the credential sources above as the only exceptions: STS, the
@@ -164,6 +176,9 @@ sections.)
   `meada index --workspace`. It checks, reading only, that every index equals its mirror and
   every mirror is clean, refuses otherwise naming `meada index --workspace`, uploads the bundles
   and the document, and writes the pointer last. It writes nothing on the machine it runs on.
+  (Amended 2026-10-22; #319: with `[oidc.github]`, ADR 0016 puts `meada github-app roles`
+  between `meada workspace pull` and the fetch, and the publish treats the additions it excluded
+  as absent from the workspace; a refresh that stops on `roles` publishes nothing.)
 - An id names inputs, not bytes: two pods publishing the same commits build tar files that
   differ (mtimes, SQLite pages) under the same bundle id. So each bundle is uploaded with its
   size and BLAKE3 hash as object metadata, and the generation document records the stored
@@ -250,6 +265,10 @@ to the client, so it keeps no channel back to it.
   grants nothing. The mapping lives with the operator, not in a repository's `[[repository]]`
   entry, and the grant is computed once, at admission. An identity the server does not serve
   grants nothing: there is no start check, since a node's manifest lists no repositories.
+  (Amended 2026-10-22; #319: ADR 0016 keeps that rule for the claims grant and adds GitHub
+  roles as a second source, the GitHub grant provider `[oidc.github]`, unioned with it: a token
+  also reads what its GitHub login holds an accepted role on, in the newest permissions set the
+  job wrote. `[oidc]` becomes the identity provider, typed, with every key unchanged.)
 - No token passthrough: Meada never forwards a token, issues none, registers no client and is no
   authorization server. No stderr line or error carries a token or any part of it.
 - The issuer's metadata and JWKS are read at start, before the listener binds, through the HTTP
