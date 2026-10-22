@@ -50,8 +50,8 @@ _Avoid_: hosted mode, cloud, daemon
 
 **Cloud module**:
 An opt-in part of server mode for a deployment on several nodes: a cargo feature, off by
-default, plus one section of the workspace manifest (the snapshot store, the generation
-pointer, the refresh lock, OIDC). A build without the feature carries none of its crates, and with no section a build behaves as the default one (ADR 0012).
+default, plus one section of the bootstrap manifest (the snapshot store, the generation
+pointer, the refresh lock, OIDC, the console). A build without the feature carries none of its crates, and with no section a build behaves as the default one (ADR 0012).
 _Avoid_: plugin, extension, cloud mode
 
 **Generation**:
@@ -79,7 +79,7 @@ a newer generation; without the lock every fence is `0`.
 _Avoid_: epoch, version, fencing number
 
 **GitHub App**:
-A `[[github_app]]` block of the workspace manifest: the git host it serves, its REST `api`, its
+A `[[github_app]]` block of the bootstrap manifest: the git host it serves, its REST `api`, its
 App id and its private key. With the module, Meada answers the indexing job's git credential
 requests with tokens of the App's installations (ADR 0013).
 _Avoid_: connection, integration, bot
@@ -89,6 +89,37 @@ A GitHub App installed on an owner (a user or an organisation), GitHub's own ter
 each App's installations from the GitHub API, keeps them in Valkey, and mints an installation
 token for the one it picks for a repository of that owner.
 _Avoid_: connection, account, tenant
+
+**Node**:
+One process serving the tools in server mode, with the companion that pulls its generations
+when it serves them. Nodes only read; the console is not one.
+_Avoid_: pod, replica, instance, server
+
+**Heartbeat**:
+What a node's pull companion leaves in Valkey after each round: its name, the generation and
+fence it serves, the generations it holds, whether it is ready, its version and the time. It
+expires soon after the node stops writing it, so a dead node drops out of the fleet on its own.
+The console sees the fleet only through heartbeats; it never calls a node.
+_Avoid_: status, ping, health check
+
+**Console**:
+The management console of server mode: a process of its own, beside the nodes and behind its own
+admission, that shows people in a browser the fleet, the snapshot store, admission, the
+workspace and the graph, and carries out an operator's changes through the same code as the
+CLI's commands. It holds generations as a node does, but it is no node and no MCP server
+(ADR 0014).
+_Avoid_: dashboard, admin panel, UI
+
+**Operator**:
+Whoever runs a server mode deployment and owns its boundary, its admission, its services and
+its job. In the console, operator is also the one role that may write, held by the admitted
+people the identity provider marks with the group or claim the console names.
+_Avoid_: admin, superuser, owner
+
+**Viewer**:
+A person the console admits who is not an operator: reads every view, within what a node would
+answer their token, and writes nothing.
+_Avoid_: reader, guest, read-only user
 
 ### Across repositories
 
@@ -103,12 +134,27 @@ already in it. Each keeps its own index.
 _Avoid_: group, monorepo, organization
 
 **Workspace manifest**:
-The versioned `meada.workspace.toml` in an operator's ops repository that lists, for server
-mode, the repositories of the workspace (remote identity and local path), the index directory,
+What lists, for server mode, the repositories of the workspace (remote identity and local path)
 and the `[serve]`, `[[resource]]` and `[[peer]]` (`repo` and `base_url_env`, no `path`) of
-repositories with no `meada.toml`. A repository's own `meada.toml` wins over it whole. It is
-never read locally.
+repositories with no `meada.toml`. By default it is part of the bootstrap manifest, the
+versioned `meada.workspace.toml` in an operator's ops repository; when the workspace is kept in
+the snapshot store, it is the current workspace version. A repository's own `meada.toml` wins
+over it whole. It is never read locally.
 _Avoid_: group config, central repository, global configuration
+
+**Bootstrap manifest**:
+The file a server mode command is given with `--workspace`: the index directory, the sections of
+the cloud modules and of the console, and either the repositories themselves or the choice to
+take them from the current workspace version. It holds no secret, and the console never edits
+it.
+_Avoid_: config file, settings, deployment manifest
+
+**Workspace version**:
+One immutable list of the workspace's repositories and their blocks, kept in the snapshot store
+with its author, time and message and named by a 16-hex id derived from the entries alone, so
+the same list gets the same id anywhere. One version is current at a time; applying an older one
+is the rollback, and each generation records the version that produced it.
+_Avoid_: revision, snapshot, manifest version
 
 **Provider**:
 The side of a contract that serves or defines it, such as the code handling a route or the

@@ -35,7 +35,8 @@ design points the slices need.
 2. **A workspace manifest, read in server mode only.** A versioned file in an ops repository
    lists the repositories (remote identity and local path), plus the `[serve]` and
    `[[resource]]` declarations of those with no `meada.toml`. A repository's own `meada.toml`
-   wins.
+   wins. (Amended 2026-10-22; #293: the file stays the default, and ADR 0014's managed
+   workspace, in the snapshot store, is the alternative. See "The workspace manifest".)
 3. **The knowledge-base feed is a documented use of `meada export`.** Chunking by symbol,
    community and contract happens downstream; embeddings stay outside Meada (ADR 0002,
    invariant 1). A format of its own waits until the export proves insufficient.
@@ -93,7 +94,15 @@ before: the stdio server, discovery and freshness on demand are unchanged.
 
 - The file is `meada.workspace.toml`. It lives in an ops repository, versioned and reviewed in
   PRs, and Meada reads it only from the path `--workspace` gives. It is never discovered by
-  walking up from a directory or by looking at sibling clones.
+  walking up from a directory or by looking at sibling clones. (Amended 2026-10-22; #293: ADR
+  0014 calls the file `--workspace` names the bootstrap manifest. With `[workspace] source =
+  "file"`, the default and what a file without `[workspace]` means, it carries the
+  `[[repository]]` entries below and nothing changes. With `source = "store"` it carries
+  `index_dir` and the module sections only, and the entries come from the current workspace
+  version, an immutable document in the snapshot store moved by `meada workspace apply`. That
+  managed workspace needs the `[snapshot]` and `[generations]` sections, and a file with both
+  `[[repository]]` and `source = "store"` is an error naming both. One workspace per
+  deployment.)
 - Its schema:
 
   ```toml
@@ -164,7 +173,10 @@ before: the stdio server, discovery and freshness on demand are unchanged.
 - The operator refreshes: after a mirror moves, the operator's fetch job or a webhook runs
   `meada index --workspace <path>`, which refreshes every repository of the manifest the way a
   local refresh does (a stat per file, a hash of the changed ones). Meada still never clones or
-  fetches (ADR 0002, invariant 4).
+  fetches (ADR 0002, invariant 4). (Amended 2026-10-22; #293: with ADR 0014's managed
+  workspace the job first runs `meada workspace pull`, which writes the current workspace
+  version under `index_dir`, and `meada index --workspace` reads it from disk, opening no
+  connection.)
 - Each repository's refresh is one SQLite transaction (`index::refresh`), so a query sees either
   the last committed state of an index or the new one, never a half-written index. A query that
   meets a commit in progress waits for it rather than failing. A workspace commits repository

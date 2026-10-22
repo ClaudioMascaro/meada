@@ -71,7 +71,15 @@ A **cloud module** is a cargo feature, off by default, plus one section of
 | `generation-pointer` | `snapshot`, `valkey` | `[generations]` | `[snapshot]`, `[valkey]` | the current and retained generations in Valkey, pins |
 | `refresh-lock` | `generation-pointer` | `[refresh_lock]` | `[generations]` | `meada snapshot lock`, fences |
 | `oidc` | | `[oidc]` | | Meada as an OAuth resource server |
+| `ui` | | `[ui]` | | `meada ui`, the management console (ADR 0014) |
 | `cloud` | all of the above | | | |
+
+(Amended 2026-10-22; #293: the `ui` row is ADR 0014's management console, a process of its own
+that is no node and adds nothing to `meada mcp --listen`; `cloud` enables it. ADR 0014 also adds
+`meada workspace` to `generation-pointer`, and `meada snapshot pointer` and `meada snapshot
+fence recover` to `refresh-lock`. `[workspace]` is read in every build, and its `source =
+"store"` needs the `generation-pointer` feature and the `[snapshot]` and `[generations]`
+sections.)
 
 - `valkey` is internal: it is enabled through the modules that need it, and `[valkey]` alone
   only makes `meada status` report the connection.
@@ -135,6 +143,10 @@ A **cloud module** is a cargo feature, off by default, plus one section of
   hash tag `{<key_prefix>}`, so they land on one slot in cluster mode.
 - Valkey holds pointers and a lock, never an index. Nodes learn a new generation
   by polling (`meada snapshot pull --every`), never by pub/sub, which is at most once.
+  (Amended 2026-10-22; #293: with ADR 0014, Valkey also holds the nodes' heartbeats
+  (`:node:<name>` and the set `:nodes`), the lock's holder (`:holder`), the generations kept by
+  hand (`:kept`) and the current workspace version's pointer (`:workspace`), all under the hash
+  tag `{<key_prefix>}`; still never an index, and nodes still learn by polling.)
 
 ### Generations
 
@@ -164,10 +176,18 @@ A **cloud module** is a cargo feature, off by default, plus one section of
 - Nodes pull: `meada snapshot pull` treats everything it reads from the store as hostile input
   (ids, identities, archives, the mirrors' git configuration), verifies sizes and hashes against
   the document, extracts into its `local_dir`, and swaps the node's pointer file by rename, so a
-  call in flight finishes on the generation it started on.
+  call in flight finishes on the generation it started on. (Amended 2026-10-22; #293: with
+  `[generations]`, every round of `meada snapshot pull --every` ends by writing the node's
+  heartbeat into Valkey under its name, from the new optional key `[snapshot] node_name`, the
+  host name by default, as ADR 0014 decides. A heartbeat that cannot be written is a warning
+  and changes no outcome, exit code or readiness.)
 - With the snapshot module, nodes never run `meada index`. `--generations` serves the
   generation the node's pointer file names, read per call, with the repositories and blocks the
-  generation recorded; the node's manifest contributes its module sections. Readiness depends
+  generation recorded; the node's manifest contributes its module sections. (Amended 2026-10-22;
+  #293: with ADR 0014's managed workspace, the repositories and blocks a job indexes come from a
+  workspace version, an immutable document stored under `workspaces/` beside the generations,
+  named current by a fenced Valkey pointer. The generation document records the version that
+  produced it in an optional `workspace` field; generation and bundle ids do not change.) Readiness depends
   only on what the node holds: a store or Valkey that cannot be reached changes no exit code and
   stops no answer.
 - Without the generation pointer, the store holds the current pointer and a node keeps its
@@ -180,10 +200,17 @@ A **cloud module** is a cargo feature, off by default, plus one section of
   `{<key_prefix>}:fence` at or above the highest fence recorded (in Valkey or in any node's
   pointer file), or by deleting a node's pointer file, after which that node takes the current
   generation whatever its fence. A refused publish names the fence key and that recovery, and
-  `meada status` on a node names a node fence above Valkey's as the stuck case.
+  `meada status` on a node names a node fence above Valkey's as the stuck case. (Amended
+  2026-10-22; #293: `meada snapshot fence recover` raises the fence to the highest one recorded
+  in the pointer, the retained set and every live heartbeat, or to a floor the operator gives,
+  never lowering it, and `meada snapshot pointer set` moves the pointer back to a retained
+  generation, both under the refresh lock, as ADR 0014 decides.)
 - A workflow run pins a generation in the path: `/<identity>@<generation>`, the generation being
   what follows the last `@`. Pins are served with the generation pointer, which guarantees every
-  node holds the retained set. `/<identity>` keeps serving the current generation. A generation
+  node holds the retained set. (Amended 2026-10-22; #293: an operator keeps a generation in the
+  retained set, outside the `keep` trim, with `meada snapshot pointer retain` until `meada
+  snapshot pointer drop`, so a long workflow's pin is not evicted; "pin" keeps meaning the
+  client's path, ADR 0014.) `/<identity>` keeps serving the current generation. A generation
   the node does not hold answers 404, naming the requested generation, the current one and the
   held ones. Each answer in `--generations` mode names its generation in a `Meada-Generation`
   header and in the result's `_meta` (`meada/generation`). Tools, parameters, descriptions and
