@@ -4,7 +4,6 @@
 //! password comes only from the environment variable or the file the section names; it
 //! appears in no error and on no stderr line.
 
-use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -72,7 +71,7 @@ impl File {
             return Err((url, Msg::ValkeyUrlPassword.text()));
         }
         match info.addr() {
-            ConnectionAddr::Tcp(host, _) if !loopback(host) => {
+            ConnectionAddr::Tcp(host, _) if !crate::modules::loopback(host) => {
                 return Err((url, Msg::ValkeyUrlPlain.text()));
             }
             ConnectionAddr::TcpTls { insecure: true, .. } => {
@@ -107,11 +106,6 @@ impl File {
             ca_file: self.ca_file.map(|f| base.join(f)),
         })
     }
-}
-
-/// `localhost`, `127.0.0.0/8` and `::1`.
-fn loopback(host: &str) -> bool {
-    host == "localhost" || host.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback())
 }
 
 impl Config {

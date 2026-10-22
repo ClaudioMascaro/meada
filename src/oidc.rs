@@ -185,12 +185,9 @@ fn reachable(url: &str, shape: Shape) -> bool {
     if shape == Shape::Bare && !matches!(uri.path(), "" | "/") {
         return false;
     }
-    let host = host.trim_start_matches('[').trim_end_matches(']');
-    let loopback =
-        host == "localhost" || (host.parse::<std::net::IpAddr>()).is_ok_and(|ip| ip.is_loopback());
     match uri.scheme_str() {
         Some("https") => true,
-        Some("http") => loopback,
+        Some("http") => crate::modules::loopback(host),
         _ => false,
     }
 }

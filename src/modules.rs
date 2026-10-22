@@ -66,6 +66,18 @@ pub fn check(file: &Path, src: &str) -> Result<()> {
     Err(format!("{}:{line}: {what}", file.display()).into())
 }
 
+/// Whether `host`, as a URL names it (an IPv6 address with or without its brackets), is
+/// loopback: `localhost`, `127.0.0.0/8` or `::1`. A name that only starts like one, and an
+/// IPv4-mapped address, are not.
+#[cfg(any(feature = "valkey", feature = "snapshot", feature = "oidc"))]
+pub fn loopback(host: &str) -> bool {
+    let ip = (host.strip_prefix('[').and_then(|h| h.strip_suffix(']'))).unwrap_or(host);
+    host == "localhost"
+        || ip
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
+}
+
 /// The error for `section` of `src`, the content of `file`, when the sections it needs that
 /// `missing` names are not there: `[section] needs [missing...]`, at the section's line.
 #[cfg(feature = "generation-pointer")]
@@ -131,6 +143,21 @@ mod tests {
             err,
             "m.toml:3: [oidc] needs a Meada built with the oidc feature"
         );
+    }
+
+    #[cfg(any(feature = "valkey", feature = "snapshot", feature = "oidc"))]
+    #[test]
+    fn loopback_is_localhost_127_slash_8_or_1_and_nothing_that_looks_like_them() {
+        for host in ["localhost", "127.0.0.1", "127.9.9.9", "::1", "[::1]"] {
+            assert!(loopback(host), "{host}");
+        }
+        let names = ["localhost.evil.com", "127.0.0.1.nip.io", "LOCALHOST.evil"];
+        for host in names
+            .into_iter()
+            .chain(["[::ffff:127.0.0.1]", "[[::1]]", "10.0.0.1", ""])
+        {
+            assert!(!loopback(host), "{host}");
+        }
     }
 
     #[test]

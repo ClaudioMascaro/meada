@@ -225,14 +225,10 @@ fn endpoint(url: &str) -> std::result::Result<bool, String> {
     }
     let host = parsed.host_str().unwrap_or_default();
     let ip = host.trim_start_matches('[').trim_end_matches(']');
-    let loopback = host == "localhost"
-        || ip
-            .parse::<std::net::IpAddr>()
-            .is_ok_and(|ip| ip.is_loopback());
     let named = host != "localhost" && ip.parse::<std::net::IpAddr>().is_err();
     match parsed.scheme() {
         "https" => Ok(named),
-        "http" if loopback => Ok(false),
+        "http" if crate::modules::loopback(host) => Ok(false),
         "http" => Err(Msg::SnapshotEndpointPlain.text()),
         _ => Err(Msg::SnapshotEndpointInvalid.text()),
     }
