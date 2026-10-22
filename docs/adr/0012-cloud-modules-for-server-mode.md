@@ -99,6 +99,8 @@ github-app roles`, which also needs `postgres`.)
   change.
 - A build without a feature carries none of its crates, as `cargo tree -e normal` of the default
   build shows. The release binaries stay the default build (ADR 0010).
+  (Amended 2026-10-22; #279: the `-cloud` OCI image is the release artifact built with every
+  module; the default image and cargo-dist's binary artifacts stay the default build.)
 
 ### Outbound connections
 

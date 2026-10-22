@@ -11,7 +11,7 @@ agents, and people too, query that map over MCP. No step of indexing uses an LLM
 
 ## Installation
 
-Pick one of four ways.
+Pick one of five ways.
 
 - **Cargo**: `cargo install meada`.
 - **Prebuilt binary**: download the file for your system from the
@@ -21,6 +21,15 @@ Pick one of four ways.
   `curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ClaudioMascaro/meada/releases/latest/download/meada-installer.sh | sh`.
 - **npm**: `npx meada <command>` downloads the prebuilt binary for your platform and runs it,
   with nothing to install first.
+- **Container**: `ghcr.io/claudiomascaro/meada:<version>` for the default build, or
+  `<version>-cloud` with every cloud module, both for Linux amd64 and arm64. `latest` and
+  `latest-cloud` follow the latest stable release; prereleases get version tags only.
+  The Debian bookworm-slim base (git and CA certificates) is refreshed only with a Meada release.
+  The image runs without root and defines no command: pass the arguments explicitly, for
+  example `docker run --rm ghcr.io/claudiomascaro/meada:latest --version`. To serve, mount
+  the manifest, mirrors and indexes, and pass
+  `mcp --listen 0.0.0.0:7333 --workspace /etc/meada/meada.workspace.toml`, following
+  [Server mode](#server-mode) and its admission configuration.
 
 ## Configuration
 
