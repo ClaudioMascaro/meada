@@ -101,9 +101,9 @@ yaml-rust2 = { version = "0.13.0", default-features = false }
 
 # The refresh lock's child supervision (`meada snapshot lock`), only behind `refresh-lock` and
 # Unix only: a signal to the child's process group and, on Linux, the signal the child gets when
-# `lock` dies.
+# `lock` dies; the host name and the login the lock's holder names.
 [target.'cfg(unix)'.dependencies]
-nix = { version = "=0.31.3", optional = true, default-features = false, features = ["signal"] }
+nix = { version = "=0.31.3", optional = true, default-features = false, features = ["signal", "hostname", "user"] }
 
 # Cloud modules (ADR 0012), all off by default: a build without a feature carries none of its
 # crates. `valkey` is internal, enabled through the modules that need it.

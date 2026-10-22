@@ -354,8 +354,49 @@ pub enum Msg<'a> {
     /// The lock no longer holds a publish's token.
     #[cfg(feature = "generation-pointer")]
     LockNotHeld(&'a str),
+    /// The lock already held, and its holder's host, pid, start time and what holds it (`None`
+    /// for a lock with no holder).
     #[cfg(feature = "refresh-lock")]
-    LockHeld(&'a str),
+    LockHeld {
+        key: &'a str,
+        holder: Option<[&'a str; 4]>,
+    },
+    /// `pointer set` of a generation outside the retained list `key`.
+    #[cfg(feature = "refresh-lock")]
+    PointerNotRetained {
+        id: &'a str,
+        key: &'a str,
+    },
+    /// A generation id on the command line that is not one.
+    #[cfg(feature = "refresh-lock")]
+    BadGenerationArg(&'a str),
+    /// `--at-least` that is not a decimal fence.
+    #[cfg(feature = "refresh-lock")]
+    BadFenceArg(&'a str),
+    /// What `fence recover` read and could not count: the problem, named.
+    #[cfg(feature = "refresh-lock")]
+    FenceNotCounted(&'a str),
+    /// A heartbeat key whose value is no heartbeat.
+    #[cfg(feature = "refresh-lock")]
+    HeartbeatBad(&'a str),
+    /// A member of the node set (`key`) that is not a node name, shown escaped.
+    #[cfg(feature = "refresh-lock")]
+    NodeNameBad {
+        key: &'a str,
+        name: &'a str,
+    },
+    #[cfg(feature = "refresh-lock")]
+    SnapshotPointer,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotPointerSet,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotPointerGeneration,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotFence,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotFenceRecover,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotFenceAtLeast,
     #[cfg(feature = "refresh-lock")]
     LockLost(&'a str),
     #[cfg(feature = "refresh-lock")]
@@ -1258,16 +1299,16 @@ impl Msg<'_> {
             } => pick(
                 format!(
                     "{current}: refused fence {fence}, not above the fence it holds: \
-                     {fence_key} was lowered or lost; set {fence_key} at or above the highest \
-                     fence recorded (in {current} or in a node's <local_dir>/current), or delete \
-                     a node's <local_dir>/current so it takes the current generation whatever \
-                     its fence"
+                     {fence_key} was lowered or lost; raise it with meada snapshot fence recover \
+                     (--at-least for a fence read in a node's <local_dir>/current), or delete a \
+                     node's <local_dir>/current so it takes the current generation whatever its \
+                     fence"
                 ),
                 format!(
                     "{current}: recusado o fence {fence}, não maior que o que ele guarda: \
-                     {fence_key} foi rebaixado ou perdido; defina {fence_key} igual ou acima do \
-                     maior fence registrado (em {current} ou no <local_dir>/current de um nó), \
-                     ou apague o <local_dir>/current de um nó para que ele tome a geração atual \
+                     {fence_key} foi rebaixado ou perdido; eleve-o com meada snapshot fence \
+                     recover (--at-least para um fence lido no <local_dir>/current de um nó), ou \
+                     apague o <local_dir>/current de um nó para que ele tome a geração atual \
                      seja qual for o fence"
                 ),
             ),
@@ -1282,15 +1323,15 @@ impl Msg<'_> {
             } => pick(
                 format!(
                     "{current}: generation {id} has fence {fence}, below fence {held} in \
-                     {pointer}: not swapped; set {fence_key} at or above {held} and publish \
-                     again, or delete {pointer} (with [refresh_lock] turned off every fence is \
-                     0, so only deleting it helps)"
+                     {pointer}: not swapped; raise {fence_key} with meada snapshot fence recover \
+                     --at-least {held} and publish again, or delete {pointer} (with \
+                     [refresh_lock] turned off every fence is 0, so only deleting it helps)"
                 ),
                 format!(
                     "{current}: a geração {id} tem fence {fence}, abaixo do fence {held} em \
-                     {pointer}: não trocada; defina {fence_key} igual ou acima de {held} e \
-                     publique de novo, ou apague {pointer} (com [refresh_lock] desligado todo \
-                     fence é 0, e só apagá-lo resolve)"
+                     {pointer}: não trocada; eleve {fence_key} com meada snapshot fence recover \
+                     --at-least {held} e publique de novo, ou apague {pointer} (com \
+                     [refresh_lock] desligado todo fence é 0, e só apagá-lo resolve)"
                 ),
             ),
             #[cfg(feature = "generation-pointer")]
@@ -1302,13 +1343,14 @@ impl Msg<'_> {
                 fence_key,
             } => pick(
                 format!(
-                    "fence: stuck: {held} in {pointer} is above {fence} in {current}; set \
-                     {fence_key} at or above {held} and publish again, or delete {pointer}"
+                    "fence: stuck: {held} in {pointer} is above {fence} in {current}; raise \
+                     {fence_key} with meada snapshot fence recover --at-least {held} and publish \
+                     again, or delete {pointer}"
                 ),
                 format!(
                     "fence: travado: {held} em {pointer} está acima de {fence} em {current}; \
-                     defina {fence_key} igual ou acima de {held} e publique de novo, ou apague \
-                     {pointer}"
+                     eleve {fence_key} com meada snapshot fence recover --at-least {held} e \
+                     publique de novo, ou apague {pointer}"
                 ),
             ),
             #[cfg(feature = "generation-pointer")]
@@ -1323,9 +1365,93 @@ impl Msg<'_> {
                 ),
             ),
             #[cfg(feature = "refresh-lock")]
-            Msg::LockHeld(key) => pick(
-                format!("{key}: held by another refresh: nothing run"),
-                format!("{key}: em posse de outro refresh: nada executado"),
+            Msg::LockHeld {
+                key,
+                holder: Some([host, pid, started, holds]),
+            } => pick(
+                format!(
+                    "{key}: held by host {host}, process {pid}, since {started}, for {holds}: \
+                     nothing run"
+                ),
+                format!(
+                    "{key}: em posse do host {host}, processo {pid}, desde {started}, para \
+                     {holds}: nada executado"
+                ),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::LockHeld { key, holder: None } => pick(
+                format!("{key}: held by an unknown holder: nothing run"),
+                format!("{key}: em posse de um detentor desconhecido: nada executado"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::PointerNotRetained { id, key } => pick(
+                format!("{key}: generation {id} is not retained: the pointer did not move"),
+                format!("{key}: a geração {id} não está retida: o ponteiro não se moveu"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::BadGenerationArg(text) => pick(
+                format!("{text}: not a generation id of 16 lowercase hex characters"),
+                format!("{text}: não é um id de geração de 16 caracteres hexadecimais minúsculos"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::BadFenceArg(text) => pick(
+                format!("--at-least {text}: not a decimal fence"),
+                format!("--at-least {text}: não é um fence decimal"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::FenceNotCounted(problem) => pick(
+                format!("{problem}: not counted"),
+                format!("{problem}: não contado"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::HeartbeatBad(key) => pick(
+                format!("{key}: not a heartbeat, a JSON object whose fence is a decimal or null"),
+                format!(
+                    "{key}: não é um heartbeat, um objeto JSON cujo fence é um decimal ou null"
+                ),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::NodeNameBad { key, name } => pick(
+                format!(
+                    "{key}: \"{name}\" is not a node name (lowercase letters, digits, . and -, 1 \
+                     to 63 characters)"
+                ),
+                format!(
+                    "{key}: \"{name}\" não é um nome de nó (letras minúsculas, dígitos, . e -, \
+                     de 1 a 63 caracteres)"
+                ),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotPointer => pick(
+                "Move the workspace's generation pointer under the refresh lock.".into(),
+                "Move o ponteiro de geração do workspace sob o lock de refresh.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotPointerSet => pick(
+                "Point the fleet at a retained generation: a rollback, or forward again.".into(),
+                "Aponta a frota para uma geração retida: um rollback, ou adiante de novo.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotPointerGeneration => pick(
+                "The generation id, one of the retained set.".into(),
+                "O id da geração, um dos retidos.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotFence => pick(
+                "Recover the refresh lock's fence under the lock.".into(),
+                "Recupera o fence do lock de refresh sob o lock.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotFenceRecover => pick(
+                "Raise the fence to the highest one recorded in Valkey, never lowering it."
+                    .into(),
+                "Eleva o fence ao maior registrado no Valkey, sem nunca baixá-lo.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotFenceAtLeast => pick(
+                "A floor for the fence, such as one read in a node's <local_dir>/current."
+                    .into(),
+                "Um piso para o fence, como um lido no <local_dir>/current de um nó.".into(),
             ),
             #[cfg(feature = "refresh-lock")]
             Msg::LockLost(key) => pick(
