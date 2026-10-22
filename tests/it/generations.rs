@@ -1517,8 +1517,9 @@ fn the_host_name_in_lowercase_names_a_node_by_default() {
 const BOOTSTRAP: &str = "ops/bootstrap.toml";
 
 /// `ops/bootstrap.toml` in `dir`: the fleet manifest's sections, `[workspace] source = "store"`
-/// and `index_dir`.
+/// and `index_dir`, emptied of what a previous run left.
 fn store_bootstrap(dir: &Path, index_dir: &str) {
+    let _ = fs::remove_dir_all(dir.join("ops").join(index_dir));
     let manifest = fs::read_to_string(dir.join(MANIFEST)).unwrap();
     let sections = &manifest[manifest.find("\n[snapshot]").unwrap()..];
     let bootstrap =
