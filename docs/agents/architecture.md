@@ -1176,6 +1176,8 @@ one for the area a change touches.
 - `mcp.rs`: the stop signal drains for at most `DRAIN` (25 seconds, no flag, under Kubernetes'
   30-second default grace period); past it the connections left are dropped, an answer still
   waiting on an index lock included, and the exit is 0.
+- `ui.rs`: `meada-ui.json` is read up to `VERSION_MAX` (4 KiB); a larger file counts as front
+  end files built for another version, and the console refuses to start.
 - `render.rs`: a source file an answer reads (`render::source`, for `path:line` and a symbol's
   source) is read only through plain relative parts of its path, through no symbolic link, as a
   regular file of at most `SOURCE_MAX` (16 MiB); anything else renders as unavailable, the path
