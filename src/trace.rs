@@ -4,8 +4,6 @@
 
 use std::collections::{HashMap, HashSet};
 
-use serde::Serialize;
-
 use crate::contract::{self, Level, Link};
 use crate::entry::EntryPoint;
 use crate::index::{CallSite, Consumer, Export, Symbol};
@@ -13,6 +11,9 @@ use crate::render;
 use crate::render::{
     DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, line_of, mark, unresolved,
 };
+use meada_core::export::{Mark, Process, Step as ProcessStep, Via as StepVia};
+use meada_core::trace::{Chain, Row, arrow, level_mark};
+
 use crate::repo::Change;
 use crate::workspace::{Missing, Workspace};
 
@@ -324,47 +325,6 @@ enum Lookup<'a> {
     Answer(Vec<String>),
 }
 
-/// One line of the chain.
-struct Row {
-    text: String,
-    repo: usize,
-    /// The level of the call or link that reached it.
-    level: Option<Level>,
-    link: bool,
-    /// What ends the line once it is complete: ` drift: missing <paths>` after a link whose
-    /// consumer reads fields its provider lacks (spec #23).
-    end: String,
-}
-
-impl Row {
-    /// A line reached through a call at `level`, or a line with no level.
-    fn call(text: String, repo: usize, level: Option<Level>) -> Self {
-        Self {
-            text,
-            repo,
-            level,
-            link: false,
-            end: String::new(),
-        }
-    }
-
-    /// A line reached through `link`.
-    fn link(text: String, repo: usize, link: &Link) -> Self {
-        let missing = link.drift.iter().flat_map(|d| d.missing.keys());
-        let missing: Vec<&str> = missing.map(String::as_str).collect();
-        Self {
-            text,
-            repo,
-            level: Some(link.level),
-            link: true,
-            end: match missing.is_empty() {
-                true => String::new(),
-                false => format!(" drift: missing {}", missing.join(", ")),
-            },
-        }
-    }
-}
-
 /// A depth-first walk of the graph that writes the chain as it goes.
 struct Walk<'g, 'a> {
     graph: &'g Graph<'a>,
@@ -611,61 +571,17 @@ impl<'a> Walk<'_, 'a> {
         }
     }
 
-    /// The rows that fit the budget with room for the footer, the cut note if any, then the
-    /// footer and the missing peers.
+    /// The chain as `meada_core::trace::Chain` answers it, with the missing peers.
     fn finish(self, budget: Option<usize>) -> String {
-        let budget = budget.unwrap_or(render::DEFAULT_BUDGET);
-        let missing: Vec<String> = (self.graph.workspace.missing.iter())
+        let missing = (self.graph.workspace.missing.iter())
             .map(Missing::text)
             .collect();
-        let footer = |weakest: Option<Level>, hops: usize, repos: usize, tokens: usize| {
-            let weakest = weakest.map_or("none", Level::name);
-            let mut text =
-                format!("chain: {weakest} · {hops} hops · {repos} repos · {tokens} tokens\n");
-            for line in &missing {
-                text += line;
-                text += "\n";
-            }
-            text
+        let chain = Chain {
+            rows: self.rows,
+            missing,
         };
-        let stats = |rows: &[Row]| {
-            let weakest = rows.iter().filter_map(|r| r.level).max();
-            let hops = rows.iter().filter(|r| r.link).count();
-            let repos = rows.iter().map(|r| r.repo).collect::<HashSet<_>>().len();
-            (weakest, hops, repos)
-        };
-        // Room for the widest footer the shown rows can give: an answer within budget uses at
-        // most `budget` tokens.
-        let (_, hops, repos) = stats(&self.rows);
-        let widest = footer(Some(Level::Ambiguous), hops, repos, budget);
-        let lines: Vec<String> = self.rows.iter().map(|r| r.text.clone()).collect();
-        let room = budget.saturating_sub(render::tokens(&widest));
-        let (shown, body) = render::cut(&lines, render::bytes(room), budget);
-        let (weakest, hops, repos) = stats(&self.rows[..shown]);
-        // The footer counts its own tokens: settle on the count that includes its digits.
-        let mut tokens = 0;
-        loop {
-            let answer = body.clone() + &footer(weakest, hops, repos, tokens);
-            match render::tokens(&answer) {
-                t if t == tokens => return answer,
-                t => tokens = t,
-            }
-        }
+        chain.answer(budget)
     }
-}
-
-/// ` [<level>]` after a process step reached by a call that is not exact. Unlike
-/// `render::mark`, it names no reason: a step keeps the call's level, not the call.
-fn level_mark(level: Option<Level>) -> String {
-    match level {
-        Some(Level::Exact) | None => String::new(),
-        Some(level) => format!(" [{}]", level.name()),
-    }
-}
-
-/// `→[<level>: <reason>]`.
-fn arrow(link: &Link) -> String {
-    format!("→[{}: {}]", link.level.name(), link.reason)
 }
 
 /// How a step of a process was reached.
@@ -676,37 +592,6 @@ enum Via<'a> {
     /// A call inside a repository, or a note under one.
     Call,
     Link(&'a Link),
-}
-
-/// What sets a step apart from a plain node followed once.
-#[derive(Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-enum Mark {
-    /// The node is already on the current branch: shown, not expanded.
-    Cycle,
-    /// The node was expanded earlier in the process: shown as a reference.
-    Seen,
-    /// An ambiguous call or link: one step listing its candidates, not expanded.
-    Ambiguous,
-    /// A consumer whose contract Meada could not read (`node` is its call site).
-    Unresolved,
-    /// A consumer of `contract` that no provider serves (`node` is its call site).
-    NoProvider,
-    /// A channel side Meada could not name, which links to nothing (`node` is its site).
-    Produces,
-    Consumes,
-    /// The branch is `PROCESS_DEPTH` deep: shown, not expanded.
-    DepthLimit,
-}
-
-impl Mark {
-    /// The verb of the channel side a mark stands for, `Produces` or `Consumes`.
-    fn verb(self) -> &'static str {
-        match self {
-            Mark::Produces => "produces",
-            _ => "consumes",
-        }
-    }
 }
 
 /// How deep a process walk follows one branch before it stops and says so.
@@ -754,34 +639,6 @@ impl<'a> Step<'a> {
         self.contract = Some(contract);
         self
     }
-}
-
-/// The process of one entry point as `meada export` shows it.
-#[derive(Serialize)]
-pub(crate) struct Process {
-    entry_point: String,
-    kind: &'static str,
-    label: String,
-    steps: Vec<ProcessStep>,
-}
-
-#[derive(Serialize)]
-struct ProcessStep {
-    depth: usize,
-    repository: String,
-    level: Option<Level>,
-    /// `entry`, `call` or `link`.
-    via: &'static str,
-    node: String,
-    /// The reason of the link that reached the step.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    reason: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    mark: Option<Mark>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    candidates: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    contract: Option<String>,
 }
 
 /// What a step of a process goes on to.
@@ -990,9 +847,9 @@ impl<'a> Graph<'a> {
             repository: self.workspace.repos[s.repo].identity.clone(),
             level: s.level,
             via: match s.via {
-                Via::Entry => "entry",
-                Via::Call => "call",
-                Via::Link(_) => "link",
+                Via::Entry => StepVia::Entry,
+                Via::Call => StepVia::Call,
+                Via::Link(_) => StepVia::Link,
             },
             node: s.node.to_string(),
             reason: match s.via {
@@ -1005,7 +862,7 @@ impl<'a> Graph<'a> {
         });
         Process {
             entry_point: entry.identity.clone(),
-            kind: entry.kind.name(),
+            kind: entry.kind,
             label: entry.label.clone(),
             steps: steps.collect(),
         }

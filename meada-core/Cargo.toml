@@ -2,7 +2,7 @@
 name = "meada-core"
 version.workspace = true
 edition.workspace = true
-description = "The deterministic core of Meada: the workspace manifest's schema and checks, and the ids, for the CLI and the browser"
+description = "The deterministic core of Meada: the workspace manifest's schema and checks, the ids, the export's types and the text answers, for the CLI and the browser"
 license.workspace = true
 repository.workspace = true
 keywords = ["code-graph", "meada", "wasm"]

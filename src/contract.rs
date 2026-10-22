@@ -5,8 +5,6 @@
 
 use std::collections::HashMap;
 
-use serde::Serialize;
-
 use crate::channel::Channel;
 use crate::entry::EntryKind;
 use crate::http::Http;
@@ -14,69 +12,10 @@ use crate::index::{Consumer, Export, Indexed, Provider};
 use crate::package::Packages;
 use crate::resolve::Code;
 use crate::resource::Resource;
-use crate::shape::{Drift, Shape};
+use crate::shape::Shape;
 use crate::workspace::Repository;
 
-/// How well a link is established. The order is the strength, strongest first: exact >
-/// declared > inferred > decided > ambiguous (ADR 0005), so a chain takes its greatest
-/// (weakest) level.
-#[derive(Serialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-#[serde(rename_all = "lowercase")]
-pub enum Level {
-    Exact,
-    /// From a declaration in `meada.toml`, such as a shared resource (spec #19).
-    Declared,
-    Inferred,
-    /// From `meada.decisions.toml` (ADR 0006).
-    Decided,
-    Ambiguous,
-}
-
-impl Level {
-    pub fn name(self) -> &'static str {
-        match self {
-            Level::Exact => "exact",
-            Level::Declared => "declared",
-            Level::Inferred => "inferred",
-            Level::Decided => "decided",
-            Level::Ambiguous => "ambiguous",
-        }
-    }
-
-    /// The level `name` names, as the index stores call levels.
-    pub fn parse(name: &str) -> Option<Self> {
-        [
-            Level::Exact,
-            Level::Declared,
-            Level::Inferred,
-            Level::Decided,
-            Level::Ambiguous,
-        ]
-        .into_iter()
-        .find(|l| l.name() == name)
-    }
-}
-
-/// A consumer linked to a provider through a contract. Each side is a call site, a symbol, a
-/// file or a whole repository, as its kind places it: an HTTP consumer is a call and its
-/// provider a symbol; a channel consumer is its handler and its producer a call.
-#[derive(Serialize)]
-pub struct Link {
-    pub consumer: String,
-    pub provider: String,
-    pub contract: String,
-    pub level: Level,
-    pub reason: String,
-    /// Who decided a `decided` link: `human` or a model id.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub by: Option<String>,
-    /// The probability a model stated for a `decided` link.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub p: Option<f64>,
-    /// The drift of an HTTP link with a shape on both sides (spec #23, `http::drift`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub drift: Option<Drift>,
-}
+pub use meada_core::export::{Level, Link};
 
 /// A contract the repository holds, before the index gives its site an identity.
 pub struct Found {
@@ -209,9 +148,7 @@ pub struct Related<'e> {
     pub shape: Option<&'e Shape>,
 }
 
-/// A line of a `search` answer: its rank (0 exact, 1 prefix, 2 substring), the key that breaks
-/// ties, and the line.
-pub type Hit = (u8, String, String);
+pub use meada_core::search::Hit;
 
 /// A contract kind: the whole interface of one, so that the engine, the open items, the
 /// decisions, the trace and the entry points ask a kind instead of naming it. Every question

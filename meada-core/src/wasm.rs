@@ -1,5 +1,6 @@
 //! The browser's bindings (feature `wasm-bindgen`): the console's workspace editor validates and
-//! names a version with the same functions as the CLI.
+//! names a version with the same functions as the CLI, and the graph views read an export with
+//! the types the binary writes it with.
 
 use wasm_bindgen::prelude::*;
 
@@ -28,4 +29,13 @@ pub fn workspace_version_id(src: &str) -> Option<String> {
         .map(|(e, blocks)| (e.repo.as_str(), e.path.as_str(), blocks))
         .collect();
     Some(crate::ids::workspace_version_id(&entries))
+}
+
+/// The export `text` (what `meada export` prints) read into the export types and written again,
+/// so the views get the canonical JSON to `JSON.parse`; throws, naming the field, when it does
+/// not fit them.
+#[wasm_bindgen(js_name = parseExport)]
+pub fn parse_export(text: &str) -> Result<String, String> {
+    let export = crate::export::parse(text)?;
+    export.write().map_err(|e| e.to_string())
 }

@@ -32,7 +32,7 @@ mod render;
 pub mod repo;
 mod resolve;
 mod resource;
-mod shape;
+use meada_core::shape;
 #[cfg(feature = "snapshot")]
 pub mod snapshot;
 mod trace;

@@ -80,7 +80,7 @@ modules updates it.
   quoted and block scalars strings, a non-scalar key an error, and every node built, aliases
   included, charged to a budget of 4 times the source length plus 64 KiB (over it, the
   document is unreadable). Readers only see `serde_json::Value`.
-- `shape.rs` (spec #21, ADR 0009): `Shape {source, fields, open, scalars, declared, optional,
+- `shape.rs` (in `meada-core`, reached as `crate::shape`; spec #21, ADR 0009): `Shape {source, fields, open, scalars, declared, optional,
   imports, guessed}`, the one form of what a
   contract carries, whatever it is read from, so shape drift (spec #23) compares shapes without
   caring about their source. `fields` and `open` are sorted sets of field paths: dotted, `[]`

@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use serde::{Deserialize, Serialize};
 
-use crate::contract::Level;
+use crate::export::Level;
 
 /// The field paths a payload carries. A path is dotted, with array elements written `[]`
 /// (`items[].id`); a payload that is itself an array starts with `[]` (`[].id`). Every node
@@ -367,17 +367,17 @@ pub fn shown(path: &str) -> &str {
 }
 
 /// The field paths a consumer reads that the provider does not return (spec #23).
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Drift {
     /// The consumer's paths the provider's shape does not contain, each the shallowest one
     /// of its branch (nothing below a missing path is listed), with the level of that report:
     /// `exact` when the provider's shape is declared and the path comes from a declared type,
     /// else `inferred`. It is not the link's level.
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub missing: BTreeMap<String, Level>,
     /// The consumer's paths below an open part of the provider's shape, each with that open
     /// path: not checked, and never drift.
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub unchecked: BTreeMap<String, String>,
 }
 
@@ -437,7 +437,7 @@ pub fn drift(provider: &Shape, consumer: &Shape) -> Option<Drift> {
 }
 
 /// Each path from the root down to `path`, shallowest first: `items`, `items[]`, `items[].id`.
-pub(crate) fn prefixes(path: &str) -> impl Iterator<Item = &str> {
+pub fn prefixes(path: &str) -> impl Iterator<Item = &str> {
     let ends = (path.char_indices())
         .filter(|&(i, c)| i > 0 && (c == '.' || c == '['))
         .map(|(i, _)| i);
@@ -447,7 +447,7 @@ pub(crate) fn prefixes(path: &str) -> impl Iterator<Item = &str> {
 #[cfg(test)]
 mod tests {
     use super::{GRAFT_BUDGET, Import, PACKAGE_HOPS, Shape, Source, Want, drift, fill};
-    use crate::contract::Level;
+    use crate::export::Level;
 
     fn set(paths: &[&str]) -> std::collections::BTreeSet<String> {
         paths.iter().map(|p| p.to_string()).collect()

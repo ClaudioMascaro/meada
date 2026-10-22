@@ -95,7 +95,7 @@ fn unlisted(doc: &str, anchor: &str, end: &str, names: &[String]) -> Vec<String>
 
 #[test]
 fn every_entry_point_kind_is_listed_in_the_map() {
-    let entry = fs::read_to_string("src/entry.rs").unwrap();
+    let entry = fs::read_to_string("meada-core/src/export.rs").unwrap();
     // The arms of `EntryKind::name`: `EntryKind::Route => "route",`.
     let kinds: Vec<String> = (entry.lines())
         .filter_map(|l| l.trim().strip_prefix("EntryKind::")?.split_once(" => \""))
@@ -116,8 +116,8 @@ fn every_entry_point_kind_is_listed_in_the_map() {
 
 #[test]
 fn every_process_mark_is_listed_in_the_queries_map() {
-    let trace = fs::read_to_string("src/trace.rs").unwrap();
-    let start = trace.find("\nenum Mark {").expect("enum Mark");
+    let trace = fs::read_to_string("meada-core/src/export.rs").unwrap();
+    let start = trace.find("\npub enum Mark {").expect("enum Mark");
     // The variants as serde's `kebab-case` writes them: `DepthLimit` is `depth-limit`.
     let marks: Vec<String> = (trace[start..].lines().skip(2))
         .map(str::trim)
