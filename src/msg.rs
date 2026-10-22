@@ -464,6 +464,9 @@ pub enum Msg<'a> {
     },
     #[cfg(feature = "github-app")]
     GithubAppAllThrottled(&'a str),
+    /// A `get` whose every candidate's mint was throttled.
+    #[cfg(feature = "github-app")]
+    GithubAppNoToken(&'a str),
     #[cfg(feature = "github-app")]
     GithubAppStatus {
         url: &'a str,
@@ -1598,6 +1601,11 @@ impl Msg<'_> {
                 format!("toda instalação que cobre {owner} está limitada; tentando assim mesmo"),
             ),
             #[cfg(feature = "github-app")]
+            Msg::GithubAppNoToken(owner) => pick(
+                format!("no installation covering {owner} gave a token: each mint was throttled"),
+                format!("nenhuma instalação que cobre {owner} deu um token: cada mint foi limitado"),
+            ),
+            #[cfg(feature = "github-app")]
             Msg::GithubAppStatus { url, status } => pick(
                 format!("{url}: http status {status}"),
                 format!("{url}: status http {status}"),
@@ -1624,8 +1632,8 @@ impl Msg<'_> {
             ),
             #[cfg(feature = "github-app")]
             Msg::GithubAppRepositoryUrl => pick(
-                "is not https://<host>/<owner>/<repo>".into(),
-                "não é https://<host>/<owner>/<repo>".into(),
+                "the repository URL is not https://<host>/<owner>/<repo>".into(),
+                "a URL do repositório não é https://<host>/<owner>/<repo>".into(),
             ),
             Msg::About => pick(
                 "LLM-free code graph for agents and people".into(),

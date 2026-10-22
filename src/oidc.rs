@@ -39,6 +39,7 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 use ureq::http::Uri;
 
+use crate::modules::{Shape, agent, reachable};
 use crate::msg::Msg;
 
 /// An answer of the server.
@@ -122,7 +123,7 @@ pub struct Config {
 
 impl File {
     pub fn validate(self) -> Result<Config, crate::modules::Problem> {
-        if !reachable(&self.issuer, Shape::Issuer) {
+        if !reachable(&self.issuer, Shape::Path) {
             return Err(("oidc.issuer", Msg::OidcUrl { bare: false }.text()));
         }
         if !reachable(&self.public_url, Shape::Bare) {
@@ -173,43 +174,6 @@ impl File {
             scopes,
             refresh,
         })
-    }
-}
-
-/// What an `[oidc]` URL may hold past its host.
-#[derive(Clone, Copy, PartialEq)]
-enum Shape {
-    /// A path (`issuer`).
-    Issuer,
-    /// Nothing (`public_url`).
-    Bare,
-    /// A path and a query (the metadata's `jwks_uri`).
-    Jwks,
-}
-
-/// Whether `url` is an endpoint the module may name: `https`, or `http` on loopback
-/// (`localhost`, `127.0.0.0/8`, `::1`; an IPv4-mapped address is not loopback), with a host, no
-/// user and no fragment, and past its host what `shape` allows.
-fn reachable(url: &str, shape: Shape) -> bool {
-    let Ok(uri) = url.parse::<Uri>() else {
-        return false;
-    };
-    let (Some(authority), Some(host)) = (uri.authority(), uri.host()) else {
-        return false;
-    };
-    if authority.as_str().contains('@') || url.contains('#') {
-        return false;
-    }
-    if uri.query().is_some() && shape != Shape::Jwks {
-        return false;
-    }
-    if shape == Shape::Bare && !matches!(uri.path(), "" | "/") {
-        return false;
-    }
-    match uri.scheme_str() {
-        Some("https") => true,
-        Some("http") => crate::modules::loopback(host),
-        _ => false,
     }
 }
 
@@ -279,9 +243,6 @@ pub struct Oidc {
     kid_fetched: Mutex<Option<Instant>>,
 }
 
-/// The client of the issuer, the one every module's outbound call goes through.
-use crate::modules::agent;
-
 /// `GET url`, at most `max` bytes of a success answer; a redirect is no success.
 fn get(agent: &ureq::Agent, url: &str, max: u64) -> Result<Vec<u8>, String> {
     let mut response =
@@ -344,7 +305,7 @@ fn metadata(agent: &ureq::Agent, url: &str, issuer: &str) -> Result<String, Stri
         return Err(Msg::OidcIssuerMismatch(&metadata.issuer).text());
     }
     let jwks_uri = metadata.jwks_uri.unwrap_or_default();
-    match reachable(&jwks_uri, Shape::Jwks) {
+    match reachable(&jwks_uri, Shape::Query) {
         true => Ok(jwks_uri),
         false => Err(Msg::OidcJwksUri(&Msg::OidcJwksUrl.text()).text()),
     }
@@ -761,7 +722,7 @@ mod tests {
             "http://127.0.0.1:9",
             "http://[::1]:9",
         ] {
-            assert!(reachable(good, Shape::Issuer), "{good}");
+            assert!(reachable(good, Shape::Path), "{good}");
         }
         for bad in [
             "http://id.example",
@@ -777,17 +738,17 @@ mod tests {
             "http://[::ffff:127.0.0.1]",
             "http://localhost:80@evil.com",
         ] {
-            assert!(!reachable(bad, Shape::Issuer), "{bad}");
+            assert!(!reachable(bad, Shape::Path), "{bad}");
         }
         assert!(!reachable("https://meada.example/prefix", Shape::Bare));
         // A `jwks_uri` may carry a query, never a user or a fragment.
-        assert!(reachable("https://id.example/jwks?realm=a", Shape::Jwks));
+        assert!(reachable("https://id.example/jwks?realm=a", Shape::Query));
         for bad in [
             "https://u@id.example/jwks?realm=a",
             "https://id.example/jwks?realm=a#f",
             "http://id.example/jwks?realm=a",
         ] {
-            assert!(!reachable(bad, Shape::Jwks), "{bad}");
+            assert!(!reachable(bad, Shape::Query), "{bad}");
         }
         let key = |extra: &str| section(extra).unwrap_err().0;
         assert_eq!(

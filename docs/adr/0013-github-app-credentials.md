@@ -50,7 +50,9 @@ left aside until it resets.
   are listed on the next `get`. There is no `owners` key and no installation id in the manifest.
 - **Selection.** For a host and an owner, the covering installations in a stable order (App id,
   then installation id), those marked throttled skipped, one picked round robin through one
-  Valkey counter. The same Valkey state and the same request give the same choice.
+  Valkey counter. The same Valkey state and the same request give the same choice. When every
+  one is marked, all are tried: a mark without `retry-after` is an estimate, so refusing would
+  turn a guess into an outage, and a fetch that fails again doubles the mark.
 - **Tokens in Valkey.** A token is minted only when Valkey holds none for that installation with
   at least 10 minutes left, under a per-installation lock so concurrent `get`s mint once, and
   cached with a TTL that ends 10 minutes before it expires. Whoever can read that Valkey can read
@@ -62,7 +64,7 @@ left aside until it resets.
   for 1 minute doubled on each repeat while it holds. The module's own REST calls mark their
   installation (a mint) or their App (a listing) the same way, from `retry-after`, else from
   `x-ratelimit-reset` when `x-ratelimit-remaining` is 0, else for 1 minute. A `get` whose mint is
-  throttled takes the next installation.
+  throttled takes the next installation, and fails when every mint was.
 - **Only the job runs the module.** `meada mcp --listen` reads the blocks with the manifest and
   never calls GitHub.
 - HTTP goes through the binary's ureq client with the OIDC module's policy (no redirect, no

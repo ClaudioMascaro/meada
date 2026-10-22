@@ -400,6 +400,18 @@ fn a_mint_answered_429_marks_its_installation_and_another_one_answers() {
     let mut admin = admin(&valkey);
     assert!((115..=120).contains(&ttl(&mut admin, case, "installation:11:throttled")));
     assert_eq!(api.with(|s| s.minted.len()), 1);
+    // With 21's mint throttled too, the `get` fails saying so, and tries nothing "anyway".
+    api.with(|s| s.throttled.insert(21, 120));
+    let cached = format!("{}:github-app:{HOST}:installation:21:token", prefix(case));
+    let _: () = redis::cmd("DEL").arg(cached).query(&mut admin).unwrap();
+    let (_, stderr, ok) = ask(&dir, HOST, "acme/web");
+    api.clean(&stderr);
+    assert!(!ok, "{stderr}");
+    let failed = format!("no installation covering {HOST}/acme gave a token: each mint was");
+    assert!(
+        stderr.contains(&failed) && !stderr.contains("anyway"),
+        "{stderr}"
+    );
 }
 
 #[test]

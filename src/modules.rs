@@ -238,6 +238,45 @@ pub fn loopback(host: &str) -> bool {
             .is_ok_and(|ip| ip.is_loopback())
 }
 
+/// What a module's endpoint URL may hold past its host.
+#[cfg(any(feature = "oidc", feature = "github-app"))]
+#[derive(Clone, Copy, PartialEq)]
+pub enum Shape {
+    /// A path (`[oidc]` `issuer`, `[[github_app]]` `api`).
+    Path,
+    /// Nothing (`[oidc]` `public_url`).
+    Bare,
+    /// A path and a query (the OIDC metadata's `jwks_uri`).
+    Query,
+}
+
+/// Whether `url` is an endpoint a module may name: `https`, or `http` on loopback
+/// (`localhost`, `127.0.0.0/8`, `::1`; an IPv4-mapped address is not loopback), with a host, no
+/// user and no fragment, and past its host what `shape` allows.
+#[cfg(any(feature = "oidc", feature = "github-app"))]
+pub fn reachable(url: &str, shape: Shape) -> bool {
+    let Ok(uri) = url.parse::<ureq::http::Uri>() else {
+        return false;
+    };
+    let (Some(authority), Some(host)) = (uri.authority(), uri.host()) else {
+        return false;
+    };
+    if authority.as_str().contains('@') || url.contains('#') {
+        return false;
+    }
+    if uri.query().is_some() && shape != Shape::Query {
+        return false;
+    }
+    if shape == Shape::Bare && !matches!(uri.path(), "" | "/") {
+        return false;
+    }
+    match uri.scheme_str() {
+        Some("https") => true,
+        Some("http") => loopback(host),
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;

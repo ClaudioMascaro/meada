@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use toml::de::{DeTable, DeValue};
 use ureq::http::{HeaderMap, Uri};
 
-use crate::modules::{Problem, Secret};
+use crate::modules::{Problem, Secret, Shape, reachable};
 use crate::msg::Msg;
 use crate::valkey::{self, Valkey, scrub};
 
@@ -103,7 +103,7 @@ impl File {
         if !named {
             return Err(("github_app.host", Msg::GithubAppHost.text()));
         }
-        if !reachable(&self.api) {
+        if !reachable(&self.api, Shape::Path) {
             return Err(("github_app.api", Msg::GithubAppApi.text()));
         }
         let app_id = crate::modules::at_least("github_app.app_id", Some(self.app_id), 1, 1)?;
@@ -116,25 +116,6 @@ impl File {
             app_id,
             key,
         })
-    }
-}
-
-/// Whether `url` is an `api` the module may call: `https`, or `http` on loopback, with a host,
-/// a path or none, and no user, query or fragment.
-fn reachable(url: &str) -> bool {
-    let Ok(uri) = url.parse::<Uri>() else {
-        return false;
-    };
-    let (Some(authority), Some(host)) = (uri.authority(), uri.host()) else {
-        return false;
-    };
-    if authority.as_str().contains('@') || url.contains('#') || uri.query().is_some() {
-        return false;
-    }
-    match uri.scheme_str() {
-        Some("https") => true,
-        Some("http") => crate::modules::loopback(host),
-        _ => false,
     }
 }
 
@@ -194,6 +175,7 @@ fn error_in(
 }
 
 /// What the helper answers: stdout for git, and lines for stderr.
+#[derive(Default)]
 pub struct Reply {
     pub stdout: String,
     pub notes: Vec<String>,
@@ -446,8 +428,13 @@ impl<'a> Run<'a> {
         self.key(&app.host, &format!("app:{}:{name}", app.app_id))
     }
 
-    fn installation_key(&self, at: Candidate, name: &str) -> String {
-        self.key(&at.app.host, &format!("installation:{}:{name}", at.id))
+    fn installation_key(&self, host: &str, id: u64, name: &str) -> String {
+        self.key(host, &format!("installation:{id}:{name}"))
+    }
+
+    /// Which installation last answered `get` for `owner/repo`, for `throttled`.
+    fn last_key(&self, host: &str, owner: &str, repo: &str) -> String {
+        self.key(host, &format!("repo:{owner}/{repo}:last"))
     }
 
     async fn exists(&self, key: &str) -> Result<bool, String> {
@@ -588,9 +575,10 @@ impl<'a> Run<'a> {
     /// minted under the installation's lock, another run's mint awaited up to `LOCK_TTL`.
     /// `Ok(None)` when the installation is throttled, the mint's 403 or 429 marking it.
     async fn token(&mut self, at: Candidate<'_>) -> Result<Option<(String, u64)>, String> {
-        let cached = self.installation_key(at, "token");
-        let lock = self.installation_key(at, "mint");
-        let throttled = self.installation_key(at, "throttled");
+        let (host, id) = (&at.app.host, at.id);
+        let cached = self.installation_key(host, id, "token");
+        let lock = self.installation_key(host, id, "mint");
+        let throttled = self.installation_key(host, id, "throttled");
         let deadline = Instant::now() + Duration::from_secs(LOCK_TTL);
         loop {
             let held: Option<String> = self.valkey.query(cmd("GET").arg(&cached)).await?;
@@ -654,32 +642,19 @@ impl<'a> Run<'a> {
     }
 }
 
-/// The `[valkey]` section and every App of the manifest at `manifest`, read without touching a
-/// mirror.
-fn apps(manifest: &Path) -> crate::Result<(Option<valkey::Config>, Vec<Config>)> {
-    crate::workspace::Manifest::github_apps(manifest)
-}
-
-fn reply() -> Reply {
-    Reply {
-        stdout: String::new(),
-        notes: Vec::new(),
-    }
-}
-
 /// `meada github-app credential --workspace <manifest> <action>`: git's credential helper, its
 /// request on `input`. `get` answers a covered repository; `store` does nothing; `erase` drops
 /// the cached token git sends back, so the next `get` mints another.
 pub fn credential(manifest: &Path, action: &str, input: &mut dyn Read) -> crate::Result<Reply> {
     let request = request(input)?;
-    let mut reply = reply();
+    let mut reply = Reply::default();
     if action == "store" || request.protocol.as_deref() != Some("https") {
         return Ok(reply);
     }
     let Some(host) = request.host.map(|h| h.to_ascii_lowercase()) else {
         return Ok(reply);
     };
-    let (config, all) = apps(manifest)?;
+    let (config, all) = crate::workspace::Manifest::github_apps(manifest)?;
     let apps: Vec<&Config> = all.iter().filter(|a| a.host == host).collect();
     let path = request.path.as_deref();
     let Some(config) = config.filter(|_| !apps.is_empty()) else {
@@ -729,8 +704,8 @@ pub fn credential(manifest: &Path, action: &str, input: &mut dyn Read) -> crate:
 }
 
 /// The answer to `get` for `owner/repo`: an installation round robin among those not
-/// throttled (all of them when every one is), the next one when its mint is throttled. `None`
-/// when no installation covers the owner.
+/// throttled (all of them when every one is), the next one when its mint is throttled, and an
+/// error when every mint is. `None` when no installation covers the owner.
 async fn get(
     run: &mut Run<'_>,
     apps: &[&Config],
@@ -744,7 +719,10 @@ async fn get(
     }
     let mut open = Vec::new();
     for at in &all {
-        if !run.exists(&run.installation_key(*at, "throttled")).await? {
+        if !run
+            .exists(&run.installation_key(host, at.id, "throttled"))
+            .await?
+        {
             open.push(*at);
         }
     }
@@ -761,7 +739,7 @@ async fn get(
         let Some((token, expires)) = run.token(at).await? else {
             continue;
         };
-        let last = run.key(host, &format!("repo:{owner}/{repo}:last"));
+        let last = run.last_key(host, owner, repo);
         let set = cmd("SET")
             .arg(&last)
             .arg(at.id)
@@ -773,7 +751,7 @@ async fn get(
             "username={USERNAME}\npassword={token}\npassword_expiry_utc={expires}\n"
         )));
     }
-    Err(Msg::GithubAppAllThrottled(&covered).text())
+    Err(Msg::GithubAppNoToken(&covered).text())
 }
 
 /// Drops the cached token of `owner`'s installation that holds `password`, the token git was
@@ -788,7 +766,7 @@ async fn erase(
         return Ok(());
     };
     for at in run.candidates(apps, owner, false).await? {
-        let cached = run.installation_key(at, "token");
+        let cached = run.installation_key(&at.app.host, at.id, "token");
         let held: Option<String> = run.valkey.query(cmd("GET").arg(&cached)).await?;
         let token = held.as_deref().and_then(|h| h.split_once(' '));
         if token.is_some_and(|(_, token)| token == password) {
@@ -799,9 +777,10 @@ async fn erase(
 }
 
 /// `meada github-app throttled --workspace <manifest> <url> [--retry-after <s>]`: marks the
-/// installation that last answered `get` for the repository at `url` throttled.
+/// installation that last answered `get` for the repository at `url` throttled. A refused `url`
+/// is never echoed: it may carry a token.
 pub fn throttled(manifest: &Path, url: &str, retry_after: Option<u64>) -> crate::Result<Reply> {
-    let bad = || format!("{url}: {}", Msg::GithubAppRepositoryUrl.text());
+    let bad = || Msg::GithubAppRepositoryUrl.text();
     let uri: Uri = url.parse().map_err(|_| bad())?;
     let (Some("https"), Some(host)) = (uri.scheme_str(), uri.host()) else {
         return Err(bad().into());
@@ -812,8 +791,8 @@ pub fn throttled(manifest: &Path, url: &str, retry_after: Option<u64>) -> crate:
     }
     .to_ascii_lowercase();
     let (owner, repo) = repository(uri.path()).ok_or_else(bad)?;
-    let (config, all) = apps(manifest)?;
-    let mut reply = reply();
+    let (config, all) = crate::workspace::Manifest::github_apps(manifest)?;
+    let mut reply = Reply::default();
     let Some(config) = config.filter(|_| all.iter().any(|a| a.host == host)) else {
         let uncovered = Msg::GithubAppUncovered {
             host: &host,
@@ -824,13 +803,13 @@ pub fn throttled(manifest: &Path, url: &str, retry_after: Option<u64>) -> crate:
     };
     let run = async {
         let run = Run::open(&config).await?;
-        let last = run.key(&host, &format!("repo:{owner}/{repo}:last"));
+        let last = run.last_key(&host, &owner, &repo);
         let id: Option<String> = run.valkey.query(cmd("GET").arg(&last)).await?;
         let Some(id) = id.and_then(|id| id.parse::<u64>().ok()) else {
             let repo = format!("{host}/{owner}/{repo}");
             return Ok(Msg::GithubAppNotAnswered(&repo).text());
         };
-        let key = run.key(&host, &format!("installation:{id}:throttled"));
+        let key = run.installation_key(&host, id, "throttled");
         let secs = run.mark(&key, retry_after).await?;
         let what = format!("installation {id}");
         Ok::<_, String>(Msg::GithubAppMarked { what: &what, secs }.text())
@@ -970,6 +949,25 @@ mod tests {
         ];
         assert_eq!(wait(&headers(&left), 1000), None);
         assert_eq!(wait(&headers(&[]), 1000), None);
+    }
+
+    #[test]
+    fn a_refused_repository_url_is_never_echoed() {
+        // Refused before the manifest is read: a trailing slash, `http`, no repository, garbage.
+        for url in [
+            "https://x-access-token:ghs_s3cret@github.com/acme/web/",
+            "http://x-access-token:ghs_s3cret@github.com/acme/web",
+            "https://x-access-token:ghs_s3cret@github.com/acme",
+            "x-access-token:ghs_s3cret@github.com",
+        ] {
+            let why = throttled(Path::new("m.toml"), url, None).err().unwrap();
+            let why = why.to_string();
+            assert_eq!(why, Msg::GithubAppRepositoryUrl.text(), "{url}");
+            assert!(
+                !why.contains("s3cret") && !why.contains("x-access"),
+                "{why}"
+            );
+        }
     }
 
     #[test]

@@ -192,10 +192,6 @@ pub struct Manifest {
     /// The `[oidc]` section, when the build has the module.
     #[cfg(feature = "oidc")]
     pub oidc: Option<crate::oidc::Config>,
-    /// The `[[github_app]]` blocks, when the build has the module; `read` checks that
-    /// `[valkey]` is there too.
-    #[cfg(feature = "github-app")]
-    pub github_apps: Vec<crate::github_app::Config>,
 }
 
 /// One `[[repository]]` of a manifest.
@@ -325,11 +321,10 @@ impl Manifest {
         }
         #[cfg(feature = "oidc")]
         let oidc = modules::validated(file, &src, parsed.oidc, |o| o.validate())?;
+        // The `[[github_app]]` blocks are checked, `[valkey]` among their needs; only
+        // `github_apps` keeps them.
         #[cfg(feature = "github-app")]
-        let github_apps = {
-            let blocks = parsed.github_apps;
-            crate::github_app::validated(file, &src, base, blocks, valkey.is_some())?
-        };
+        crate::github_app::validated(file, &src, base, parsed.github_apps, valkey.is_some())?;
         // Each entry's blocks as written, in manifest order: the typed read checked them.
         #[cfg(feature = "snapshot")]
         let mut written = crate::snapshot::entry_blocks(&src).into_iter();
@@ -394,8 +389,6 @@ impl Manifest {
             refresh_lock,
             #[cfg(feature = "oidc")]
             oidc,
-            #[cfg(feature = "github-app")]
-            github_apps,
         })
     }
 
@@ -484,8 +477,6 @@ impl Manifest {
             refresh_lock: None,
             #[cfg(feature = "oidc")]
             oidc: None,
-            #[cfg(feature = "github-app")]
-            github_apps: Vec::new(),
         })
     }
 
