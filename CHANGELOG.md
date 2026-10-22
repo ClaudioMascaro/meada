@@ -8,6 +8,19 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Workspace versions (spec #293, ADR 0014, feature `generation-pointer`): the `[[repository]]`
+  entries of a workspace stored as immutable documents in the snapshot store,
+  `workspaces/<version id>.json` (id, author, time, message, entries in manifest order), the id
+  derived from the entries alone. `meada workspace import <file> --message <text> [--author
+  <name>] --workspace <bootstrap manifest>` validates the file's entries before any connection
+  and stores a version, or answers the one already stored; `meada workspace list` prints the
+  versions newest first, the current one (`{<key_prefix>}:workspace`) marked; `meada workspace
+  show [<version>]` prints a version as `[[repository]]` entries. Everything read back is
+  checked as hostile input. The new `[workspace]` section, read in every build, takes `source =
+  "file"` (the default) or `"store"`, which needs `generation-pointer`, `[snapshot]` and
+  `[generations]` and no `[[repository]]`; until `meada workspace pull`, the commands that read
+  entries refuse it, and the `--generations` commands serve as before.
+
 - Management console (spec #293, ADR 0014, feature `ui`, in `cloud`, no crate of its own):
   `meada ui --listen <addr> --workspace <bootstrap manifest>` serves, read only and behind the
   operator's reverse proxy, the front end's files from the new `[ui]` section's `dir` and a JSON

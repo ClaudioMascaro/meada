@@ -397,6 +397,32 @@ one for the area a change touches.
   `Msg::FenceBelowNode` and changes nothing; with no pointer file the node takes it whatever
   its fence. `engine::status_generations` adds a `fence: stuck: ...` line (`Msg::FenceStuck`)
   when the node's fence is above the one `reach_pointer` read, with no effect on the exit code.
+  `snapshot/versions.rs` (feature `generation-pointer`, ADR 0014) holds the workspace
+  versions: the `[[repository]]` entries of a workspace as immutable documents in the store, at
+  `workspaces/<version id>.json` under `[snapshot] prefix` (`Version`: `id`, `author`, `time`
+  in RFC 3339 UTC, `message`, and `repositories` in manifest order, each entry its `repo` and
+  `path` as written plus its blocks as `entry_blocks` gives them), stored with the size and
+  hash metadata every object carries and never rewritten. The id is
+  `meada_core::ids::workspace_version_id` of the entries alone. The current version is
+  `{<key_prefix>}:workspace`, a hash `{id, fence}` under the pointer's hash tag (`pointer_key`,
+  read by `current`, moved by `meada workspace apply`, #302). `import` (`meada workspace import
+  <file> --message <text> [--author <name>] --workspace <bootstrap manifest>`) reads the file's
+  `[[repository]]` entries through `meada_core::manifest::validate_entries`, names each other
+  top-level key on stderr as not imported (`Msg::WorkspaceNotImported`), and validates before
+  `Store::connect`; entries whose document is stored upload nothing and answer it with its first
+  author and message (`Msg::WorkspaceStored`). `list` reads and checks the pointer first (a
+  malformed one, `Msg::WorkspaceBadPointer`, refuses the listing), then every object under
+  `workspaces/` (`Store::list`), sorted newest first by time, then id; a name that is not an id,
+  or a document that fails `checked`, is a `!` line. `show [<version>]` checks the argument
+  first (`Msg::BadVersionArg`), takes the current version without one
+  (`Msg::WorkspaceNoCurrent`, naming `meada workspace apply`) and prints the entries as
+  `[[repository]]` tables, which `import` reads back to the same id. `checked` treats a
+  document as hostile: at most `VERSION_MAX`, its id the one its key names, its time's shape,
+  its entries rendered as `[[repository]]` text and validated as a workspace's
+  (`meada_core::manifest::validate`), and the id derived from them again. The commands need
+  `[generations]` in the bootstrap manifest (`Msg::WorkspaceNoSections`), not `source =
+  "store"`, so an operator imports before switching. The author without `--author` is
+  `cli_author`, `cli:<login>@<host>` (from the environment in a build without `refresh-lock`).
   `snapshot/lock.rs` (feature `refresh-lock`, which implies `generation-pointer`; crate `nix`,
   Unix only, a `compile_error!` elsewhere) is the refresh lock, section `[refresh_lock]` (`ttl_seconds`, default 300, at
   least 10; `Manifest::read` refuses it without `[generations]`). Keys under the same hash tag:
@@ -463,6 +489,17 @@ one for the area a change touches.
   check the text decides (identities included, `entry_problems`) are `meada_core::manifest`'s;
   `mirror` keeps the checks that need the mirror, after them. A mirror's own `meada.toml` wins whole: the
   entry's blocks are ignored, not merged, and `Listed::ignored` names them for `status`.
+  The file `--workspace` names is the bootstrap manifest: its `[workspace]` section, read in
+  every build, has `source`, `"file"` (the default, and what a file without the section means:
+  its own `[[repository]]` entries) or `"store"` (the current workspace version,
+  `snapshot/versions.rs`). `source = "store"` without `generation-pointer` is an error naming
+  the feature (`Msg::WorkspaceStoreNeedsFeature`), without `[snapshot]` or `[generations]` one
+  naming them (`modules::needs`), and beside a `[[repository]]` one naming both
+  (`Msg::WorkspaceStoreBeside`); `Manifest::store` records it, with no entries. Until
+  `meada workspace pull` (#302), `Manifest::read_listed` refuses such a manifest naming
+  `[workspace] source` (`Msg::WorkspaceStoreRefused`) where entries are read: `index`,
+  `status`, `export` and `mcp --listen` without `--generations`, and `snapshot publish`; the
+  `--generations` commands take their repositories from the generation and serve as before.
   `index.rs`: the SQLite schema, the freshness pipeline in `refresh` (with `fresh`, its
   read-only twin for `meada snapshot publish`: the same walk, `packs_of` and stamps, and a file
   whose stat moved but whose hash did not is no difference), and
@@ -1222,6 +1259,8 @@ one for the area a change touches.
   waiting on an index lock included, and the exit is 0.
 - `ui.rs`: `meada-ui.json` is read up to `VERSION_MAX` (4 KiB); a larger file counts as front
   end files built for another version, and the console refuses to start.
+- `snapshot/versions.rs`: a workspace version document holds at most `VERSION_MAX` (4 MiB);
+  past it the document is refused (on import) or listed as malformed, naming its key.
 - `render.rs`: a source file an answer reads (`render::source`, for `path:line` and a symbol's
   source) is read only through plain relative parts of its path, through no symbolic link, as a
   regular file of at most `SOURCE_MAX` (16 MiB); anything else renders as unavailable, the path

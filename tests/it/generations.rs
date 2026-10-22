@@ -741,3 +741,359 @@ fn a_retained_generation_stays_on_every_node_until_it_is_dropped() {
         );
     }
 }
+
+/// `meada <args>` in `dir` under `lang`, with the store's key id: stdout, stderr and the exit
+/// code.
+pub(crate) fn meada_in(dir: &Path, lang: &str, args: &[&str]) -> (String, String, Option<i32>) {
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_meada"))
+        .current_dir(dir)
+        .args(args)
+        .env("LANG", lang)
+        .env("MEADA_TEST_S3_KEY", crate::snapshot::KEY_ID)
+        .env_remove("MEADA_TEST_S3_TOKEN")
+        .output()
+        .expect("meada runs");
+    let text = |bytes: &[u8]| String::from_utf8_lossy(bytes).into_owned();
+    (text(&out.stdout), text(&out.stderr), out.status.code())
+}
+
+/// `meada workspace <args> --workspace ops/meada.workspace.toml` in `dir`, in English.
+fn workspace(dir: &Path, args: &[&str]) -> (String, String, Option<i32>) {
+    let args: Vec<&str> = (["workspace"].into_iter())
+        .chain(args.iter().copied())
+        .chain(["--workspace", MANIFEST])
+        .collect();
+    meada_in(dir, "en_US.UTF-8", &args)
+}
+
+/// `meada workspace import <file> --message <message> --author <author>`: the id it printed and
+/// stderr.
+fn import(dir: &Path, file: &str, message: &str, author: &str) -> (String, String) {
+    let args = ["import", file, "--message", message, "--author", author];
+    let (stdout, stderr, code) = workspace(dir, &args);
+    assert_eq!(code, Some(0), "{stderr}");
+    (stdout.trim().to_string(), stderr)
+}
+
+/// The store key of the workspace version `id` in a fleet's store.
+fn version_key(id: &str) -> String {
+    format!("prod/meada/workspaces/{id}.json")
+}
+
+/// `{<prefix>}:workspace` of `case`.
+fn workspace_pointer(case: &str) -> String {
+    format!("{{{}}}:workspace", prefix(case))
+}
+
+/// Whether `text` is a time as a version records it.
+fn is_time(text: &str) -> bool {
+    let shape = "dddd-dd-ddTdd:dd:ddZ";
+    text.len() == shape.len()
+        && (text.bytes().zip(shape.bytes())).all(|(b, s)| match s {
+            b'd' => b.is_ascii_digit(),
+            _ => b == s,
+        })
+}
+
+/// `import` of the chain's manifest stores `workspaces/<id>.json` with every field and the
+/// metadata of every object, and prints the id; its other sections are named as not imported.
+/// The same entries again upload nothing and answer the first author and message; two entries
+/// swapped are another version.
+#[test]
+fn import_stores_a_version_once_and_answers_its_id() {
+    let Some(fleet) = Fleet::new("workspace_import", 3) else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let (id, stderr) = import(dir, MANIFEST, "first", "alice");
+    let text = fs::read_to_string(dir.join(MANIFEST)).unwrap();
+    let not_imported = |key: &str, found: &str| {
+        let line = crate::manifest::line_of(&text, found);
+        format!(
+            "meada: {MANIFEST}:{line}: `{key}`: not imported: a workspace version holds only \
+             [[repository]] entries\n"
+        )
+    };
+    let expected: String = [
+        not_imported("generations", "[generations]"),
+        not_imported("index_dir", "index_dir"),
+        not_imported("snapshot", "[snapshot]"),
+        not_imported("valkey", "[valkey]"),
+    ]
+    .concat();
+    assert_eq!(stderr, expected);
+    let entries: Vec<(&str, String)> = (crate::manifest::CHAIN.iter())
+        .map(|(repo, path)| (*repo, format!("../{path}")))
+        .collect();
+    let blocks = serde_json::json!({});
+    let hashed: Vec<(&str, &str, &serde_json::Value)> = (entries.iter())
+        .map(|(repo, path)| (*repo, path.as_str(), &blocks))
+        .collect();
+    assert_eq!(id, meada_core::ids::workspace_version_id(&hashed));
+    let s3 = bucket(&fleet.endpoint, &fleet.bucket);
+    let key = version_key(&id);
+    let bytes = crate::snapshot::get(&s3, &key);
+    let (size, hash) = crate::snapshot::metadata(&s3, &key);
+    assert_eq!(size, bytes.len() as u64);
+    assert_eq!(hash, blake3::hash(&bytes).to_hex().to_string());
+    let document: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let time = document["time"].as_str().unwrap().to_string();
+    assert!(is_time(&time), "{time}");
+    let repositories: Vec<serde_json::Value> = (entries.iter())
+        .map(|(repo, path)| serde_json::json!({"repo": repo, "path": path}))
+        .collect();
+    let expected = serde_json::json!({
+        "id": id,
+        "author": "alice",
+        "time": time,
+        "message": "first",
+        "repositories": repositories,
+    });
+    assert_eq!(document, expected);
+    let stored = objects(&s3, "prod/meada/workspaces");
+    assert_eq!(stored.len(), 1);
+    std::thread::sleep(std::time::Duration::from_millis(1100));
+    let (again, stderr) = import(dir, MANIFEST, "second", "bob");
+    assert_eq!(again, id);
+    let first = format!("meada: {id} is stored already, by alice at {time}: first\n");
+    assert!(stderr.ends_with(&first), "{stderr}");
+    assert_eq!(objects(&s3, "prod/meada/workspaces"), stored);
+    assert_eq!(crate::snapshot::get(&s3, &key), bytes);
+    let swapped = (text.replacen("chain/web\"", "chain/SWAP\"", 1))
+        .replacen("chain-web\"", "chain-SWAP\"", 1)
+        .replacen("chain/gateway\"", "chain/web\"", 1)
+        .replacen("chain-gateway\"", "chain-web\"", 1)
+        .replacen("chain/SWAP\"", "chain/gateway\"", 1)
+        .replacen("chain-SWAP\"", "chain-gateway\"", 1);
+    assert_ne!(swapped, text);
+    fs::write(dir.join("ops/swapped.toml"), &swapped).unwrap();
+    let (other, _) = import(dir, "ops/swapped.toml", "swapped", "alice");
+    assert_ne!(other, id);
+    assert_eq!(objects(&s3, "prod/meada/workspaces").len(), 2);
+}
+
+/// A bootstrap manifest whose store and Valkey listen nowhere, in `<dir>/ops/`.
+fn unreachable_bootstrap(dir: &Path) {
+    let dead = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = dead.local_addr().unwrap().port();
+    drop(dead);
+    fs::write(dir.join("ops/s3-secret"), "secret\n").unwrap();
+    let bootstrap = format!(
+        "index_dir = \"../indexes\"\n{}\n[valkey]\nurl = \"redis://127.0.0.1:{port}\"\n\n\
+         [generations]\nkeep = 3\n",
+        crate::snapshot::section(&format!("http://127.0.0.1:{port}"), "nowhere")
+    );
+    fs::write(dir.join(MANIFEST), bootstrap).unwrap();
+}
+
+/// A file with a validation error: the error names the file, the line and the dotted key, its
+/// other sections are named as not imported, and nothing is uploaded: the store and Valkey the
+/// bootstrap manifest names listen nowhere, and no connection error comes.
+#[test]
+fn import_validates_before_any_connection() {
+    let dir = chain_manifest("workspace_import_invalid");
+    unreachable_bootstrap(&dir);
+    let invalid = "index_dir = \"/srv\"\n\n[snapshot]\nbucket = \"x\"\n\n[[repository]]\n\
+                   repo = \"example.com/chain/web\"\npath = \"../chain-web\"\nbranch = \"main\"\n";
+    fs::write(dir.join("ops/invalid.toml"), invalid).unwrap();
+    let args = ["import", "ops/invalid.toml", "--message", "m"];
+    let (stdout, stderr, code) = workspace(&dir, &args);
+    assert_eq!((stdout.as_str(), code), ("", Some(1)));
+    assert_eq!(
+        stderr,
+        "meada: ops/invalid.toml:1: `index_dir`: not imported: a workspace version holds only \
+         [[repository]] entries\n\
+         meada: ops/invalid.toml:3: `snapshot`: not imported: a workspace version holds only \
+         [[repository]] entries\n\
+         meada: ops/invalid.toml:9: `repository.branch` is not a meada.workspace.toml key\n"
+    );
+    let local = "[[repository]]\nrepo = \"local/web\"\npath = \"w\"\n";
+    fs::write(dir.join("ops/invalid.toml"), local).unwrap();
+    let (stdout, stderr, code) = workspace(&dir, &args);
+    assert_eq!((stdout.as_str(), code), ("", Some(1)));
+    assert_eq!(
+        stderr,
+        "meada: ops/invalid.toml: local/web: a local identity: server mode serves repositories \
+         by their remote\n"
+    );
+}
+
+/// `list` shows the versions newest first, with no version current until
+/// `{<key_prefix>}:workspace` names one; a malformed pointer refuses the listing naming its key,
+/// and a corrupted or forged document is listed as malformed.
+#[test]
+fn list_marks_the_current_version_and_names_what_is_malformed() {
+    let Some(fleet) = Fleet::new("workspace_list", 3) else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let (v1, _) = import(dir, MANIFEST, "one", "alice");
+    std::thread::sleep(std::time::Duration::from_millis(1100));
+    let fewer = "[[repository]]\nrepo = \"example.com/chain/web\"\npath = \"../chain-web\"\n";
+    fs::write(dir.join("ops/fewer.toml"), fewer).unwrap();
+    let (v2, _) = import(dir, "ops/fewer.toml", "two\nlines", "bob");
+    let s3 = bucket(&fleet.endpoint, &fleet.bucket);
+    let time = |id: &str| {
+        let document = crate::snapshot::get(&s3, &version_key(id));
+        let document: serde_json::Value = serde_json::from_slice(&document).unwrap();
+        document["time"].as_str().unwrap().to_string()
+    };
+    let (t1, t2) = (time(&v1), time(&v2));
+    let key = workspace_pointer(fleet.case);
+    let (stdout, stderr, code) = workspace(dir, &["list"]);
+    assert_eq!(code, Some(0), "{stderr}");
+    let both = |mark: char| format!("  {v2} {t2} bob: two\\nlines\n{mark} {v1} {t1} alice: one\n");
+    assert_eq!(stdout, both(' '));
+    let none = format!(
+        "meada: {key}: no workspace version is current: apply one with `meada workspace apply`\n"
+    );
+    assert_eq!(stderr, none);
+    let mut valkey = admin(&fleet.valkey);
+    send(&mut valkey, &["HSET", &key, "id", &v1, "fence", "1"]);
+    let (stdout, stderr, code) = workspace(dir, &["list"]);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    assert_eq!(stdout, both('*'));
+    send(&mut valkey, &["HSET", &key, "id", "../escape"]);
+    let (stdout, stderr, code) = workspace(dir, &["list"]);
+    assert_eq!((stdout.as_str(), code), ("", Some(1)));
+    assert_eq!(
+        stderr,
+        format!(
+            "meada: {key}: not a hash of `id`, a workspace version id of 16 lowercase hex \
+             characters, and `fence`, a decimal fence\n"
+        )
+    );
+    send(&mut valkey, &["HSET", &key, "id", &v1]);
+    let corrupted = version_key("000000000000000a");
+    crate::snapshot::put(&s3, &corrupted, b"{}");
+    let forged = version_key("000000000000000b");
+    crate::snapshot::put_stored(&s3, &forged, &crate::snapshot::get(&s3, &version_key(&v1)));
+    let (stdout, stderr, code) = workspace(dir, &["list"]);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    assert_eq!(
+        stdout,
+        both('*')
+            + &format!(
+                "! {corrupted}: not stored with the size and hash it records\n\
+                 ! {forged}: malformed: not the workspace version document of its id\n"
+            )
+    );
+}
+
+/// `show <id>` prints the entries in the `[[repository]]` shape, blocks included, and importing
+/// that output gives the same id; with no current version `show` names `meada workspace apply`,
+/// and with one it prints that one. A malformed id is refused first.
+#[test]
+fn show_prints_the_entries_import_reads_back() {
+    let Some(fleet) = Fleet::new("workspace_show", 3) else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let key = workspace_pointer(fleet.case);
+    let (stdout, stderr, code) = workspace(dir, &["show"]);
+    assert_eq!((stdout.as_str(), code), ("", Some(1)));
+    assert_eq!(
+        stderr,
+        format!(
+            "meada: {key}: no workspace version is current: apply one with `meada workspace \
+             apply`\n"
+        )
+    );
+    let (stdout, stderr, code) = workspace(dir, &["show", "../0000000000000"]);
+    assert_eq!((stdout.as_str(), code), ("", Some(1)));
+    assert_eq!(
+        stderr,
+        "meada: ../0000000000000: not a workspace version id of 16 lowercase hex characters\n"
+    );
+    let blocks = "[[repository]]\nrepo = \"example.com/chain/web\"\npath = \"../chain-web\"\n\
+                  [repository.serve]\n\
+                  [[repository.peer]]\nrepo = \"example.com/chain/gateway\"\n\
+                  base_url_env = [\"GATEWAY_URL\"]\n\n\
+                  [[repository]]\nrepo = \"example.com/chain/gateway\"\n\
+                  path = \"/srv/chain-gateway\"\n\
+                  [repository.serve]\nprefix = \"/api/\"\nhosts = [\"api.example.com\"]\n\
+                  [[repository.resource]]\nkind = \"postgres\"\nid = \"orders\"\n\
+                  role = \"read-write\"\nvia = [\"src/db.ts::query\"]\n";
+    fs::write(dir.join("ops/blocks.toml"), blocks).unwrap();
+    let (id, _) = import(dir, "ops/blocks.toml", "blocks", "alice");
+    let (shown, stderr, code) = workspace(dir, &["show", &id]);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    assert_eq!(
+        shown,
+        "[[repository]]\npath = \"../chain-web\"\nrepo = \"example.com/chain/web\"\n\n\
+         [[repository.peer]]\nbase_url_env = [\"GATEWAY_URL\"]\n\
+         repo = \"example.com/chain/gateway\"\n\n\
+         [repository.serve]\n\n\
+         [[repository]]\npath = \"/srv/chain-gateway\"\nrepo = \"example.com/chain/gateway\"\n\n\
+         [[repository.resource]]\nid = \"orders\"\nkind = \"postgres\"\nrole = \"read-write\"\n\
+         via = [\"src/db.ts::query\"]\n\n\
+         [repository.serve]\nhosts = [\"api.example.com\"]\nprefix = \"/api/\"\n"
+    );
+    fs::write(dir.join("ops/shown.toml"), &shown).unwrap();
+    let (again, stderr) = import(dir, "ops/shown.toml", "again", "bob");
+    assert_eq!(again, id, "{stderr}");
+    let mut valkey = admin(&fleet.valkey);
+    send(&mut valkey, &["HSET", &key, "id", &id, "fence", "1"]);
+    let (current, stderr, code) = workspace(dir, &["show"]);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    assert_eq!(current, shown);
+}
+
+/// With `[workspace] source = "store"` (until `meada workspace pull`), the commands that read
+/// `[[repository]]` entries refuse naming `[workspace] source`, and a node's `--generations`
+/// commands serve as before.
+#[test]
+fn a_store_source_is_refused_where_entries_are_read_and_nodes_serve_as_before() {
+    let Some(fleet) = Fleet::new("workspace_store_source", 3) else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let g1 = fleet.publish();
+    let (node, _) = fleet.node("node");
+    assert_eq!(fleet.pull(&node), g1);
+    let manifest = fs::read_to_string(dir.join(MANIFEST)).unwrap();
+    let sections = &manifest[manifest.find("\n[snapshot]").unwrap()..];
+    let bootstrap =
+        format!("index_dir = \"../indexes\"\n{sections}\n[workspace]\nsource = \"store\"\n");
+    fs::write(dir.join("ops/bootstrap.toml"), bootstrap).unwrap();
+    let refused = "meada: ops/bootstrap.toml: [workspace] source = \"store\": this command reads \
+                   [[repository]] entries, which only source = \"file\" lists\n";
+    let bootstrap = ["--workspace", "ops/bootstrap.toml"];
+    let commands: [&[&str]; 5] = [
+        &["index"],
+        &["status"],
+        &["export", "--repo", WEB],
+        &["snapshot", "publish"],
+        &["mcp", "--listen", "127.0.0.1:0"],
+    ];
+    for command in commands {
+        let args = [command, &bootstrap].concat();
+        let (stdout, stderr, code) = meada_in(dir, "en_US.UTF-8", &args);
+        assert_eq!((stdout.as_str(), code), ("", Some(1)), "{args:?}: {stderr}");
+        assert_eq!(stderr, refused, "{args:?}");
+    }
+    let file = dir.join(&node);
+    let toml = fs::read_to_string(&file).unwrap() + "\n[workspace]\nsource = \"store\"\n";
+    fs::write(&file, toml).unwrap();
+    let (stdout, stderr, code) = probe(dir, &node);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""), "{stdout}");
+    let export = [
+        "export",
+        "--workspace",
+        &node,
+        "--repo",
+        WEB,
+        "--generations",
+    ];
+    let (stdout, stderr, code) = meada_in(dir, "en_US.UTF-8", &export);
+    assert_eq!(code, Some(0), "{stderr}");
+    assert!(stdout.contains(WEB), "{stdout}");
+    let server = serve(dir, &node);
+    block_on(async {
+        let client = server.client(&format!("/{WEB}")).await;
+        let query = serde_json::json!({"query": "health"});
+        let found = client.call_tool(call("search", query)).await.unwrap();
+        assert!(text(&found).contains("src/status.ts"), "{}", text(&found));
+        client.cancel().await.unwrap();
+    });
+}

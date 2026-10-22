@@ -50,7 +50,7 @@ impl Engine {
     pub fn open_manifest(manifest: &Path, repo: &str) -> Result<Self> {
         let shown = manifest.display().to_string();
         Self::read(
-            Manifest::read(manifest)?.workspace(repo, &|_| true)?,
+            Manifest::read_listed(manifest)?.workspace(repo, &|_| true)?,
             Fix::Index(&shown),
         )
     }
@@ -1030,7 +1030,7 @@ pub fn status(dir: &Path) -> Result<String> {
 /// as locally, only when every repository is indexed at the current schema. It only reads, as
 /// `Engine::open_manifest` does.
 pub fn status_workspace(manifest: &Path) -> Result<String> {
-    let listed = Manifest::read(manifest)?;
+    let listed = Manifest::read_listed(manifest)?;
     let shown = manifest.display().to_string();
     let missing = listed.missing();
     // Informational: the exit code of the probe depends on local state only.
@@ -1082,7 +1082,7 @@ pub fn status_workspace(manifest: &Path) -> Result<String> {
 /// missing index or one of another schema. Returns the problems, one `<repo>: <problem>` per
 /// repository that could not be refreshed, in manifest order; one does not stop the others.
 pub fn index_workspace(manifest: &Path) -> Result<Vec<String>> {
-    let listed = Manifest::read(manifest)?;
+    let listed = Manifest::read_listed(manifest)?;
     let refresh = |r: &Repository| {
         let db = index::open(&r.index, &r.root, &r.identity, &r.config.serve)?;
         index::refresh(&db, &r.root, &r.identity, &r.config.serve)
@@ -1103,7 +1103,7 @@ pub fn index_workspace(manifest: &Path) -> Result<Vec<String>> {
 /// the current schema version. Otherwise every problem, one per line, each index problem naming
 /// `meada index --workspace`. It only reads.
 pub fn served(manifest: &Path) -> Result<Manifest> {
-    let listed = Manifest::read(manifest)?;
+    let listed = Manifest::read_listed(manifest)?;
     let shown = manifest.display().to_string();
     let problems: Vec<String> = (listed.entries.iter())
         .filter_map(|l| match &l.repository {
@@ -1132,7 +1132,7 @@ pub fn ready(manifest: &Path) -> bool {
     if served(manifest).is_ok() {
         return true;
     }
-    let Ok(listed) = Manifest::read(manifest) else {
+    let Ok(listed) = Manifest::read_listed(manifest) else {
         return false;
     };
     let states: Vec<_> = (listed.entries.iter())
