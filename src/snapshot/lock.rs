@@ -34,6 +34,8 @@ use serde::Deserialize;
 use tokio::signal::unix::{SignalKind, signal};
 use tokio::time::{Instant, sleep_until, timeout_at};
 
+pub(super) use super::generations::now;
+use super::generations::rfc3339;
 use crate::msg::Msg;
 use crate::valkey::{self, Valkey};
 use crate::workspace::Manifest;
@@ -226,29 +228,6 @@ pub fn cli_author() -> String {
     let user = nix::unistd::User::from_uid(uid).ok().flatten();
     let login = user.map_or_else(|| uid.to_string(), |u| u.name);
     format!("cli:{login}@{}", host())
-}
-
-/// The seconds since the Unix epoch.
-pub(super) fn now() -> u64 {
-    let since = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
-    since.map_or(0, |d| d.as_secs())
-}
-
-/// `secs` since the epoch in RFC 3339, UTC, to the second (the civil date by Howard Hinnant's
-/// algorithm, years starting in March).
-fn rfc3339(secs: u64) -> String {
-    let (days, day) = ((secs / 86_400) as i64, secs % 86_400);
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = yoe + era * 400 + i64::from(m <= 2);
-    let (h, min, s) = (day / 3600, day % 3600 / 60, day % 60);
-    format!("{y:04}-{m:02}-{d:02}T{h:02}:{min:02}:{s:02}Z")
 }
 
 /// `meada snapshot lock --workspace <manifest> -- <command>`: the child's exit code (128 plus
@@ -469,14 +448,6 @@ mod tests {
                 "{meada:prod}:holder".into()
             )
         );
-    }
-
-    #[test]
-    fn a_start_time_is_rfc_3339_in_utc_to_the_second() {
-        assert_eq!(rfc3339(0), "1970-01-01T00:00:00Z");
-        assert_eq!(rfc3339(951_825_599), "2000-02-29T11:59:59Z");
-        assert_eq!(rfc3339(1_792_627_199), "2026-10-21T23:59:59Z");
-        assert_eq!(rfc3339(4_107_542_400), "2100-03-01T00:00:00Z");
     }
 
     #[test]

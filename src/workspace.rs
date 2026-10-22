@@ -198,6 +198,10 @@ pub struct Manifest {
     /// The `[ui]` section, when the build has the module (ADR 0014).
     #[cfg(feature = "ui")]
     pub ui: Option<crate::ui::Config>,
+    /// `[workspace] source = "store"` (ADR 0014): the repositories come from the current
+    /// workspace version, and `entries` is empty.
+    #[cfg(feature = "generation-pointer")]
+    pub store: bool,
 }
 
 /// One `[[repository]]` of a manifest.
@@ -241,6 +245,25 @@ struct ManifestFile {
     #[cfg(feature = "github-app")]
     #[serde(default, rename = "github_app")]
     github_apps: Vec<crate::github_app::File>,
+    workspace: Option<WorkspaceFile>,
+}
+
+/// The `[workspace]` section (ADR 0014), read in every build: where the repositories come from.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WorkspaceFile {
+    #[serde(default)]
+    source: Source,
+}
+
+#[derive(Deserialize, Default, PartialEq)]
+#[serde(rename_all = "lowercase")]
+enum Source {
+    /// The file's own `[[repository]]` entries.
+    #[default]
+    File,
+    /// The current workspace version in the snapshot store.
+    Store,
 }
 
 /// An entry's blocks as the configuration of a mirror with no `meada.toml`.
@@ -298,6 +321,25 @@ impl Manifest {
         // `github_apps` keeps them.
         #[cfg(feature = "github-app")]
         crate::github_app::validated(file, &src, base, parsed.github_apps, valkey.is_some())?;
+        let store = parsed.workspace.is_some_and(|w| w.source == Source::Store);
+        #[cfg(not(feature = "generation-pointer"))]
+        if store {
+            let needs = Msg::WorkspaceStoreNeedsFeature.text();
+            return Err(config::error_at(file, &src, "workspace.source", &needs));
+        }
+        #[cfg(feature = "generation-pointer")]
+        if store {
+            let missing = [
+                ("snapshot", snapshot.is_none()),
+                ("generations", generations.is_none()),
+            ];
+            let missing: Vec<&str> = (missing.iter()).filter(|m| m.1).map(|m| m.0).collect();
+            modules::needs(file, &src, "workspace", &missing)?;
+            if !parsed.repositories.is_empty() {
+                let beside = Msg::WorkspaceStoreBeside.text();
+                return Err(config::error_at(file, &src, "repository", &beside));
+            }
+        }
         // Each entry's blocks as written, in manifest order: the typed read checked them.
         #[cfg(feature = "snapshot")]
         let mut written = crate::snapshot::entry_blocks(&src).into_iter();
@@ -363,7 +405,21 @@ impl Manifest {
             oidc,
             #[cfg(feature = "ui")]
             ui,
+            #[cfg(feature = "generation-pointer")]
+            store,
         })
+    }
+
+    /// `read` for a command that reads the file's `[[repository]]` entries: a manifest whose
+    /// repositories come from the store (`[workspace] source = "store"`) is refused, naming it.
+    pub fn read_listed(file: &Path) -> Result<Self> {
+        let read = Self::read(file)?;
+        #[cfg(feature = "generation-pointer")]
+        if read.store {
+            let shown = file.display().to_string();
+            return Err(Msg::WorkspaceStoreRefused(&shown).text().into());
+        }
+        Ok(read)
     }
 
     /// The `[valkey]` section and the `[[github_app]]` blocks of the manifest at `file`,
@@ -453,6 +509,8 @@ impl Manifest {
             oidc: None,
             #[cfg(feature = "ui")]
             ui: None,
+            #[cfg(feature = "generation-pointer")]
+            store: false,
         })
     }
 

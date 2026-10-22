@@ -119,6 +119,141 @@ fn the_operations_need_the_refresh_lock_feature() {
     }
 }
 
+/// `meada <args>` in `dir` under `lang`: stdout, stderr and the exit code.
+fn run_lang(dir: &Path, lang: &str, args: &[&str]) -> (String, String, Option<i32>) {
+    let out = Command::new(env!("CARGO_BIN_EXE_meada"))
+        .current_dir(dir)
+        .args(args)
+        .env("LANG", lang)
+        .output()
+        .expect("meada runs");
+    let text = |bytes: &[u8]| String::from_utf8_lossy(bytes).into_owned();
+    (text(&out.stdout), text(&out.stderr), out.status.code())
+}
+
+/// `[workspace]`'s errors under `pt_BR` and `en_US`: an unknown key, and `source = "store"`
+/// in a build without `generation-pointer`.
+#[test]
+fn workspace_section_errors_follow_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_workspace_section");
+    let head = "index_dir = \"../indexes\"\n\n[workspace]\n";
+    let mut cases = vec![(
+        "mode = 1\n",
+        "meada: ops/meada.workspace.toml:4: `workspace.mode` is not a meada.workspace.toml key\n",
+        "meada: ops/meada.workspace.toml:4: `workspace.mode` não é uma chave do \
+         meada.workspace.toml\n",
+    )];
+    if !cfg!(feature = "generation-pointer") {
+        cases.push((
+            "source = \"store\"\n",
+            "meada: ops/meada.workspace.toml:4: `workspace.source`: \"store\" needs a Meada built \
+             with the generation-pointer feature\n",
+            "meada: ops/meada.workspace.toml:4: `workspace.source`: \"store\" exige um Meada \
+             compilado com a feature generation-pointer\n",
+        ));
+    }
+    for (section, en, pt) in cases {
+        fs::write(dir.join(MANIFEST), format!("{head}{section}")).unwrap();
+        for (lang, expected) in [("en_US.UTF-8", en), ("pt_BR.UTF-8", pt)] {
+            let refused = (String::new(), expected.to_string(), Some(1));
+            let args = ["index", "--workspace", MANIFEST];
+            assert_eq!(run_lang(&dir, lang, &args), refused, "{lang} {section}");
+        }
+    }
+}
+
+/// With `generation-pointer`, under `pt_BR` and `en_US`: `[workspace] source = "store"` without
+/// its sections and beside `[[repository]]`, a command that reads entries refusing it, and the
+/// refusals of `meada workspace` that need no service (a malformed id, checked first, and a
+/// bootstrap manifest without `[generations]`).
+#[cfg(feature = "generation-pointer")]
+#[test]
+fn workspace_refusals_follow_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest, line_of};
+    let dir = chain_manifest("cli_workspace");
+    let entries = fs::read_to_string(dir.join(MANIFEST)).unwrap();
+    let sections = format!(
+        "{}\n[valkey]\nurl = \"redis://127.0.0.1:6390\"\n\n[generations]\nkeep = 3\n",
+        crate::snapshot::section("http://127.0.0.1:9", "nowhere")
+    );
+    let store = "\n[workspace]\nsource = \"store\"\n";
+    let manifest = "meada: ops/meada.workspace.toml";
+    let no_sections = format!("index_dir = \"../indexes\"\n{store}");
+    let beside = format!("{entries}{sections}{store}");
+    let bootstrap = format!("index_dir = \"../indexes\"\n{sections}{store}");
+    let cases = [
+        (
+            no_sections,
+            vec!["index", "--workspace", MANIFEST],
+            format!("{manifest}:3: [workspace] needs [snapshot] and [generations]\n"),
+            format!("{manifest}:3: [workspace] exige [snapshot] e [generations]\n"),
+        ),
+        (
+            beside.clone(),
+            vec!["index", "--workspace", MANIFEST],
+            format!(
+                "{manifest}:{}: `repository`: [[repository]] entries beside [workspace] source = \
+                 \"store\": the repositories come from the current workspace version\n",
+                line_of(&beside, "[[repository]]")
+            ),
+            format!(
+                "{manifest}:{}: `repository`: entradas [[repository]] ao lado de [workspace] \
+                 source = \"store\": os repositórios vêm da versão atual do workspace\n",
+                line_of(&beside, "[[repository]]")
+            ),
+        ),
+        (
+            bootstrap.clone(),
+            vec!["index", "--workspace", MANIFEST],
+            format!(
+                "{manifest}: [workspace] source = \"store\": this command reads [[repository]] \
+                 entries, which only source = \"file\" lists\n"
+            ),
+            format!(
+                "{manifest}: [workspace] source = \"store\": este comando lê entradas \
+                 [[repository]], que só source = \"file\" lista\n"
+            ),
+        ),
+        (
+            bootstrap,
+            vec![
+                "workspace",
+                "show",
+                "0000000000000ABC",
+                "--workspace",
+                MANIFEST,
+            ],
+            "meada: 0000000000000ABC: not a workspace version id of 16 lowercase hex \
+             characters\n"
+                .into(),
+            "meada: 0000000000000ABC: não é um id de versão do workspace de 16 caracteres \
+             hexadecimais minúsculos\n"
+                .into(),
+        ),
+        (
+            entries,
+            vec!["workspace", "list", "--workspace", MANIFEST],
+            format!(
+                "{manifest}: no [generations] section: workspace versions need [snapshot] and \
+                 [generations]\n"
+            ),
+            format!(
+                "{manifest}: sem seção [generations]: versões do workspace exigem [snapshot] e \
+                 [generations]\n"
+            ),
+        ),
+    ];
+    fs::write(dir.join("ops/s3-secret"), "secret\n").unwrap();
+    for (toml, args, en, pt) in cases {
+        fs::write(dir.join(MANIFEST), &toml).unwrap();
+        for (lang, expected) in [("en_US.UTF-8", en), ("pt_BR.UTF-8", pt)] {
+            let refused = (String::new(), expected, Some(1));
+            assert_eq!(run_lang(&dir, lang, &args), refused, "{lang} {args:?}");
+        }
+    }
+}
+
 /// The operations' refusals that need no service, under `pt_BR` and `en_US`: a malformed id
 /// (checked first) and a manifest without `[refresh_lock]`, for `pointer set`, `retain` and
 /// `drop` and `fence recover`.

@@ -7,8 +7,9 @@
 //! Store layout under `prefix`: `repos/<identity>/<bundle id>.tar` (an uncompressed tar of
 //! `index.db`, then the mirror under `mirror/`, `.git` included), `generations/<generation
 //! id>.json` (the `Document`) and `current` (the current generation id and a newline; with
-//! `[generations]` the pointer lives in Valkey instead, `generations`). Every object carries its
-//! size and BLAKE3 hash as metadata (`store::Stored`).
+//! `[generations]` the pointer lives in Valkey instead, `generations`), and with it the workspace
+//! versions, `workspaces/<version id>.json` (`versions`). Every object carries its size and
+//! BLAKE3 hash as metadata (`store::Stored`).
 
 #[cfg(feature = "generation-pointer")]
 pub mod generations;
@@ -21,6 +22,8 @@ compile_error!("the refresh-lock feature is Unix only");
 pub mod pull;
 pub mod serve;
 pub mod store;
+#[cfg(feature = "generation-pointer")]
+pub mod versions;
 
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -280,7 +283,7 @@ struct Bundle {
 /// (`index::fresh`), is missing or is of another schema, and any mirror that is not clean; a
 /// failure before the last write leaves the pointer as it was.
 pub fn publish(manifest: &Path) -> Result<String> {
-    let listed = Manifest::read(manifest)?;
+    let listed = Manifest::read_listed(manifest)?;
     let shown = manifest.display().to_string();
     let Some(config) = listed.snapshot.clone() else {
         return Err(Msg::SnapshotNoSection(&shown).text().into());

@@ -78,6 +78,93 @@ enum Command {
         #[arg(long)]
         workspace: PathBuf,
     },
+    #[cfg(feature = "generation-pointer")]
+    Workspace {
+        #[command(subcommand)]
+        command: WorkspaceCommand,
+    },
+}
+
+/// `meada workspace` (ADR 0014, feature `generation-pointer`).
+#[cfg(feature = "generation-pointer")]
+#[derive(Subcommand)]
+enum WorkspaceCommand {
+    Import {
+        file: PathBuf,
+        #[arg(long)]
+        message: String,
+        #[arg(long)]
+        author: Option<String>,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    List {
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Show {
+        version: Option<String>,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+}
+
+/// `meada workspace`: the answer on stdout (an id, the listing, the entries), notes on stderr;
+/// on a failure every line on stderr and exit 1.
+#[cfg(feature = "generation-pointer")]
+fn workspace(command: WorkspaceCommand) -> ! {
+    use meada::snapshot::versions;
+    let mut notes = Vec::new();
+    let answer = match command {
+        WorkspaceCommand::Import {
+            file,
+            message,
+            author,
+            workspace,
+        } => {
+            let author = author.unwrap_or_else(versions::cli_author);
+            (versions::import(&workspace, &file, &message, &author, &mut notes)).map(|imported| {
+                if let Some(first) = &imported.first {
+                    let (author, message) = (
+                        versions::shown(&first.author),
+                        versions::shown(&first.message),
+                    );
+                    let stored = Msg::WorkspaceStored {
+                        id: &first.id,
+                        author: &author,
+                        time: &first.time,
+                        message: &message,
+                    };
+                    notes.push(stored.text());
+                }
+                format!("{}\n", imported.id)
+            })
+        }
+        WorkspaceCommand::List { workspace } => versions::list(&workspace).map(|listing| {
+            if let Err(none) = &listing.current {
+                notes.push(none.clone());
+            }
+            listing.text()
+        }),
+        WorkspaceCommand::Show { version, workspace } => {
+            versions::show(&workspace, version.as_deref())
+        }
+    };
+    for line in notes.iter().flat_map(|n| n.lines()) {
+        eprintln!("meada: {line}");
+    }
+    match answer {
+        Ok(text) => {
+            print!("{text}");
+            std::process::exit(0);
+        }
+        Err(e) => {
+            for line in e.to_string().lines() {
+                eprintln!("meada: {line}");
+            }
+            std::process::exit(1);
+        }
+    }
 }
 
 /// `meada github-app` (ADR 0013, feature `github-app`).
@@ -347,6 +434,26 @@ fn main() -> ExitCode {
             .mut_arg("listen", |a| a.help(Msg::UiListenHelp.text()))
             .mut_arg("workspace", |a| a.help(Msg::UiWorkspaceHelp.text()))
     });
+    #[cfg(feature = "generation-pointer")]
+    let matches = matches.mut_subcommand("workspace", |c| {
+        let bootstrap = |a: clap::Arg| a.help(Msg::WorkspaceBootstrapHelp.text());
+        (c.about(Msg::Workspace.text()))
+            .mut_subcommand("import", |c| {
+                (c.about(Msg::WorkspaceImport.text()))
+                    .mut_arg("file", |a| a.help(Msg::WorkspaceImportFile.text()))
+                    .mut_arg("message", |a| a.help(Msg::WorkspaceImportMessage.text()))
+                    .mut_arg("author", |a| a.help(Msg::WorkspaceImportAuthor.text()))
+                    .mut_arg("workspace", bootstrap)
+            })
+            .mut_subcommand("list", |c| {
+                (c.about(Msg::WorkspaceList.text())).mut_arg("workspace", bootstrap)
+            })
+            .mut_subcommand("show", |c| {
+                (c.about(Msg::WorkspaceShow.text()))
+                    .mut_arg("version", |a| a.help(Msg::WorkspaceShowVersion.text()))
+                    .mut_arg("workspace", bootstrap)
+            })
+    });
     #[cfg(feature = "snapshot")]
     let matches = ["status", "export", "mcp"]
         .into_iter()
@@ -450,6 +557,8 @@ fn main() -> ExitCode {
         } => pull(&workspace, every),
         #[cfg(feature = "github-app")]
         Command::GithubApp { command } => github_app(command),
+        #[cfg(feature = "generation-pointer")]
+        Command::Workspace { command } => workspace(command),
         // Every problem that refuses the start on its own line. The API is English whatever
         // `LANG` says, as the MCP surface is (ADR 0008).
         #[cfg(feature = "ui")]

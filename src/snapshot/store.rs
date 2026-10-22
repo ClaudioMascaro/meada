@@ -325,6 +325,19 @@ impl Store {
         (found == *expected).then_some(()).ok_or_else(bad)
     }
 
+    /// The keys of the objects directly under `prefix` (`<prefix>/<name>`), sorted. They are
+    /// hostile: a caller checks each name before using it.
+    #[cfg(feature = "generation-pointer")]
+    pub async fn list(&self, prefix: &str) -> Result<Vec<String>, String> {
+        let listed = self.s3.list_with_delimiter(Some(&Self::key(prefix)?)).await;
+        let listed = listed.map_err(|e| self.scrub(e))?;
+        let mut keys: Vec<String> = (listed.objects.into_iter())
+            .map(|o| o.location.to_string())
+            .collect();
+        keys.sort();
+        Ok(keys)
+    }
+
     /// Stores `bytes` at `key` with their size and hash.
     pub async fn put(&self, key: &str, bytes: Vec<u8>) -> Result<(), String> {
         let options = PutOptions {

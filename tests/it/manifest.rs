@@ -450,6 +450,102 @@ fn a_snapshot_section_without_its_feature_is_an_error_naming_the_feature() {
     }
 }
 
+/// The 1-based line of the first `found` in `text`.
+#[cfg(feature = "generation-pointer")]
+pub(crate) fn line_of(text: &str, found: &str) -> usize {
+    text[..text.find(found).unwrap()].matches('\n').count() + 1
+}
+
+/// `[workspace]` (ADR 0014) is read in every build: an unknown key and an unknown source name the
+/// file, the line and the key; without `generation-pointer`, `source = "store"` names the
+/// feature. `source = "file"` is the file as before.
+#[test]
+fn the_workspace_section_is_read_in_every_build() {
+    let dir = mirrors("manifest_workspace_section");
+    let mut cases = vec![
+        (
+            "index_dir = \"../indexes\"\n\n[workspace]\nsource = \"git\"\n",
+            "meada: ops/meada.workspace.toml:4: `workspace.source`: unknown variant `git`, \
+             expected `file` or `store`\n",
+        ),
+        (
+            "index_dir = \"../indexes\"\n\n[workspace]\nrepositories = \"store\"\n",
+            "meada: ops/meada.workspace.toml:4: `workspace.repositories` is not a \
+             meada.workspace.toml key\n",
+        ),
+    ];
+    if !cfg!(feature = "generation-pointer") {
+        cases.push((
+            "index_dir = \"../indexes\"\n\n[workspace]\n\nsource = \"store\"\n",
+            "meada: ops/meada.workspace.toml:5: `workspace.source`: \"store\" needs a Meada built \
+             with the generation-pointer feature\n",
+        ));
+    }
+    for (toml, expected) in cases {
+        write_manifest(&dir, toml);
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {toml}");
+            assert_eq!(stderr, expected, "{command}: {toml}");
+        }
+    }
+    let dir = chain_manifest("manifest_workspace_file");
+    let manifest = dir.join(MANIFEST);
+    let toml = fs::read_to_string(&manifest).unwrap() + "\n[workspace]\nsource = \"file\"\n";
+    fs::write(&manifest, toml).unwrap();
+    let (_, stderr, ok) = run(&dir, "index");
+    assert!(ok, "{stderr}");
+    let (stdout, stderr, ok) = run(&dir, "status");
+    assert!(ok, "{stderr}");
+    for (repo, _) in CHAIN {
+        assert!(stdout.contains(repo), "{stdout}");
+    }
+}
+
+/// `source = "store"` with the feature: without `[snapshot]` or `[generations]` the error names
+/// them, and beside a `[[repository]]` it names both.
+#[cfg(feature = "generation-pointer")]
+#[test]
+fn a_store_source_needs_its_sections_and_no_repository_entry() {
+    let dir = mirrors("manifest_workspace_store");
+    let valkey = "\n[valkey]\nurl = \"redis://127.0.0.1:6390\"\n";
+    let snapshot = crate::snapshot::section("http://127.0.0.1:9", "nowhere");
+    let store = "\n[workspace]\nsource = \"store\"\n";
+    let entry = "\n[[repository]]\nrepo = \"example.com/chain/web\"\npath = \"../chain-web\"\n";
+    let head = "index_dir = \"../indexes\"\n";
+    let sections = format!("{snapshot}{valkey}\n[generations]\nkeep = 3\n");
+    let cases = [
+        (
+            format!("{head}{store}"),
+            "[workspace]",
+            "[workspace] needs [snapshot] and [generations]",
+        ),
+        (
+            format!("{head}{snapshot}{store}"),
+            "[workspace]",
+            "[workspace] needs [generations]",
+        ),
+        (
+            format!("{head}{sections}{store}{entry}"),
+            "[[repository]]",
+            "`repository`: [[repository]] entries beside [workspace] source = \"store\": the \
+             repositories come from the current workspace version",
+        ),
+    ];
+    for (toml, at, problem) in cases {
+        write_manifest(&dir, &toml);
+        let expected = format!(
+            "meada: ops/meada.workspace.toml:{}: {problem}\n",
+            line_of(&toml, at)
+        );
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {toml}");
+            assert_eq!(stderr, expected, "{command}: {toml}");
+        }
+    }
+}
+
 /// The `[valkey]` section of a build that has the module: its keys are checked, and each error
 /// names the file, the line and the key without echoing the URL.
 #[cfg(feature = "valkey")]

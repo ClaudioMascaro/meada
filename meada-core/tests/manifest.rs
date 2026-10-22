@@ -1,7 +1,7 @@
 //! A workspace text's validation at the crate's public seam: the errors the CLI prints for the
 //! same text, naming the file, the line and the dotted key, or the entry.
 
-use meada_core::manifest::validate;
+use meada_core::manifest::{validate, validate_entries};
 
 const FILE: &str = "ops/meada.workspace.toml";
 
@@ -76,5 +76,26 @@ fn every_entry_whose_identity_cannot_be_served_is_named() {
             "a.com/../z: not a repository identity: a segment is empty, `.` or `..`",
             "a.com/x: listed twice",
         ]
+    );
+}
+
+/// A whole manifest's `[[repository]]` entries, its other keys and sections unread, checked as a
+/// workspace's text is (`meada workspace import`).
+#[test]
+fn a_manifest_s_entries_are_validated_alone() {
+    let src = "index_dir = \"/srv\"\n\n[snapshot]\nbucket = \"b\"\n\n\
+               [[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n";
+    let entries = validate_entries(FILE, src).unwrap_or_else(|e| panic!("{e:?}"));
+    assert_eq!(entries.len(), 1);
+    let src = "index_dir = \"/srv\"\n\n[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n\
+               [[repository.peer]]\nrepo = \"a.com/y\"\npath = \"../y\"\n";
+    assert_eq!(
+        validate_entries(FILE, src).err().unwrap_or_default(),
+        ["ops/meada.workspace.toml:8: `repository.peer.path` is not a meada.workspace.toml key"]
+    );
+    let src = "index_dir = \"/srv\"\n\n[[repository]]\nrepo = \"local/x\"\npath = \"x\"\n";
+    assert_eq!(
+        validate_entries(FILE, src).err().unwrap_or_default(),
+        ["local/x: a local identity: server mode serves repositories by their remote"]
     );
 }

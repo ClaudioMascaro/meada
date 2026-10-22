@@ -651,6 +651,57 @@ pub enum Msg<'a> {
         message: Option<&'a str>,
     },
     AnswerNoChoices,
+    /// `[workspace] source = "store"` in a build without `generation-pointer`.
+    #[cfg(not(feature = "generation-pointer"))]
+    WorkspaceStoreNeedsFeature,
+    /// `[[repository]]` entries beside `[workspace] source = "store"`.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceStoreBeside,
+    /// A command that reads `[[repository]]` entries, given a `source = "store"` manifest.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceStoreRefused(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    Workspace,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceImport,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceList,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceShow,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceImportFile,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceImportMessage,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceImportAuthor,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceShowVersion,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceBootstrapHelp,
+    /// A bootstrap manifest given to `meada workspace` without `[generations]`.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceNoSections(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    BadVersionArg(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceNoCurrent(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceBadPointer(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceNotVersion(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceNoVersion(&'a str),
+    /// A key or section of an imported file that is not a `[[repository]]` entry.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceNotImported,
+    /// An import whose entries are stored already: the version as first stored.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceStored {
+        id: &'a str,
+        author: &'a str,
+        time: &'a str,
+        message: &'a str,
+    },
 }
 
 impl Msg<'_> {
@@ -2147,6 +2198,144 @@ impl Msg<'_> {
             Msg::AnswerNoChoices => pick(
                 "unreadable: no choices".into(),
                 "ilegível: nenhuma escolha em `choices`".into(),
+            ),
+            #[cfg(not(feature = "generation-pointer"))]
+            Msg::WorkspaceStoreNeedsFeature => pick(
+                "\"store\" needs a Meada built with the generation-pointer feature".into(),
+                "\"store\" exige um Meada compilado com a feature generation-pointer".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceStoreBeside => pick(
+                "[[repository]] entries beside [workspace] source = \"store\": the repositories \
+                 come from the current workspace version"
+                    .into(),
+                "entradas [[repository]] ao lado de [workspace] source = \"store\": os \
+                 repositórios vêm da versão atual do workspace"
+                    .into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceStoreRefused(manifest) => pick(
+                format!(
+                    "{manifest}: [workspace] source = \"store\": this command reads [[repository]] \
+                     entries, which only source = \"file\" lists"
+                ),
+                format!(
+                    "{manifest}: [workspace] source = \"store\": este comando lê entradas \
+                     [[repository]], que só source = \"file\" lista"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::Workspace => pick(
+                "Manage the workspace versions in the snapshot store".into(),
+                "Gerencia as versões do workspace no store de snapshots".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceImport => pick(
+                "Store the [[repository]] entries of a manifest file as a workspace version and \
+                 print its id"
+                    .into(),
+                "Guarda as entradas [[repository]] de um manifesto como uma versão do workspace \
+                 e imprime seu id"
+                    .into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceList => pick(
+                "List the workspace versions, newest first, the current one marked".into(),
+                "Lista as versões do workspace, da mais nova à mais antiga, marcando a atual"
+                    .into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceShow => pick(
+                "Print a workspace version as [[repository]] entries".into(),
+                "Imprime uma versão do workspace como entradas [[repository]]".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceImportFile => pick(
+                "The manifest file whose [[repository]] entries are imported".into(),
+                "O manifesto cujas entradas [[repository]] são importadas".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceImportMessage => pick(
+                "Why the workspace changes".into(),
+                "Por que o workspace muda".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceImportAuthor => pick(
+                "The version's author (cli:<login>@<host> by default)".into(),
+                "O autor da versão (cli:<login>@<host> por padrão)".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceShowVersion => pick(
+                "The workspace version id (the current one by default)".into(),
+                "O id da versão do workspace (a atual por padrão)".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceBootstrapHelp => pick(
+                "The bootstrap manifest, with its [snapshot] and [generations] sections".into(),
+                "O manifesto de bootstrap, com as seções [snapshot] e [generations]".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceNoSections(manifest) => pick(
+                format!(
+                    "{manifest}: no [generations] section: workspace versions need [snapshot] \
+                     and [generations]"
+                ),
+                format!(
+                    "{manifest}: sem seção [generations]: versões do workspace exigem [snapshot] \
+                     e [generations]"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::BadVersionArg(text) => pick(
+                format!("{text}: not a workspace version id of 16 lowercase hex characters"),
+                format!(
+                    "{text}: não é um id de versão do workspace de 16 caracteres hexadecimais \
+                     minúsculos"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceNoCurrent(key) => pick(
+                format!("{key}: no workspace version is current: apply one with `meada workspace apply`"),
+                format!(
+                    "{key}: nenhuma versão do workspace é a atual: aplique uma com `meada \
+                     workspace apply`"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceBadPointer(key) => pick(
+                format!(
+                    "{key}: not a hash of `id`, a workspace version id of 16 lowercase hex \
+                     characters, and `fence`, a decimal fence"
+                ),
+                format!(
+                    "{key}: não é um hash de `id`, um id de versão do workspace de 16 caracteres \
+                     hexadecimais minúsculos, e `fence`, um fence decimal"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceNotVersion(key) => pick(
+                format!("{key}: malformed: not the workspace version document of its id"),
+                format!("{key}: malformado: não é o documento da versão do workspace do seu id"),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceNoVersion(key) => pick(
+                format!("{key}: no such workspace version in the store"),
+                format!("{key}: essa versão do workspace não está no store"),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceNotImported => pick(
+                "not imported: a workspace version holds only [[repository]] entries".into(),
+                "não importado: uma versão do workspace só guarda entradas [[repository]]".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceStored {
+                id,
+                author,
+                time,
+                message,
+            } => pick(
+                format!("{id} is stored already, by {author} at {time}: {message}"),
+                format!("{id} já está guardada, por {author} em {time}: {message}"),
             ),
         }
     }

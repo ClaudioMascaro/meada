@@ -240,17 +240,37 @@ struct Entries {
     repositories: Vec<EntryFile>,
 }
 
+/// The `[[repository]]` entries of a whole manifest's text, every other key left unread: what
+/// `meada workspace import` takes from a file.
+#[derive(Deserialize)]
+struct Imported {
+    #[serde(default, rename = "repository")]
+    repositories: Vec<EntryFile>,
+}
+
 /// The entries of the workspace text `src`, shown as `file`, or every problem its text decides
 /// as the CLI prints them: the parse error (`<file>:<line>: <what>`), or each entry's
 /// `<repo>: <problem>`.
 pub fn validate(file: &str, src: &str) -> Result<Vec<EntryFile>, Vec<String>> {
     let parsed: Entries = parse(file, src, "meada.workspace.toml").map_err(|e| vec![e])?;
-    let problems = entry_problems(parsed.repositories.iter().map(|e| e.repo.as_str()));
-    let problems: Vec<String> = (parsed.repositories.iter().zip(problems))
+    checked(parsed.repositories)
+}
+
+/// `validate` over the `[[repository]]` entries of the manifest text `src` alone: its other
+/// top-level keys and sections are not read (`meada workspace import`).
+pub fn validate_entries(file: &str, src: &str) -> Result<Vec<EntryFile>, Vec<String>> {
+    let parsed: Imported = parse(file, src, "meada.workspace.toml").map_err(|e| vec![e])?;
+    checked(parsed.repositories)
+}
+
+/// `entries`, or each one's `<repo>: <problem>` that its identity decides.
+fn checked(entries: Vec<EntryFile>) -> Result<Vec<EntryFile>, Vec<String>> {
+    let problems = entry_problems(entries.iter().map(|e| e.repo.as_str()));
+    let problems: Vec<String> = (entries.iter().zip(problems))
         .filter_map(|(e, problem)| Some(format!("{}: {}", e.repo, problem?)))
         .collect();
     match problems.is_empty() {
-        true => Ok(parsed.repositories),
+        true => Ok(entries),
         false => Err(problems),
     }
 }
