@@ -84,6 +84,11 @@ remaining points. This ADR records the decisions; the spec fixes the details the
   one its team owns. The operator maps a team's group in `[oidc.groups]` to the identities the
   team owns, and to an identity before the team can add it: an addition outside the grant is
   refused alike whether or not the identity is already in the workspace.
+- Under the GitHub grant provider of #319, where a subject's grant also holds what its GitHub
+  login reads on GitHub, an addition is not refused as outside the grant: a repository outside
+  the workspace has no permissions listed yet. The entry records the adder's GitHub login, and
+  the job fetches it only while that login holds one of the accepted roles on the repository,
+  checked at every refresh. Who reads it is decided by GitHub's roles, as for every entry.
 - A change is authorized by its diff against the current version, entry by entry, keyed by
   identity. A refused change is a 403 that names every entry it may not change, with a reason
   each, and writes nothing. It never names an identity outside the subject's grant: those are
@@ -126,7 +131,8 @@ remaining points. This ADR records the decisions; the spec fixes the details the
   delegation.
 - **Ownership widening the read grant.** Owning an entry would show its configuration to a token
   the grant does not admit, and the console would have two rules for what a subject reads. The
-  grant stays the one rule; the operator maps the team's group in `[oidc.groups]`.
+  grant stays the one rule; the operator maps the team's group in `[oidc.groups]`. #319 widens
+  the grant itself, from GitHub roles, never from ownership.
 - **Ownership in the bootstrap manifest.** A static manifest changes by pull request and redeploy,
   reviewed in the ops repository, and has no editor through which a team could act on it; an
   owner there would mean nothing. It is an error, so the key never looks effective where it is
@@ -134,7 +140,8 @@ remaining points. This ADR records the decisions; the spec fixes the details the
 - **Ownership read from the git host** (CODEOWNERS, GitHub teams). The console would call GitHub,
   against ADR 0012's outbound rule and ADR 0014's console that never calls it, and ownership would
   depend on one forge and on files inside the mirrors. The owner is a fact of the workspace
-  version, with an author and a message.
+  version, with an author and a message. #319 reads GitHub roles for the grant, not for
+  ownership, and in the job, which already calls GitHub (ADR 0013), not in the console.
 - **Several owners per entry.** Two teams editing one entry would need a rule between them; one
   owner keeps the diff's answer simple, and a shared repository stays the global operator's.
 - **Teams moving generations.** The pointer, the retained set and the fence are the fleet's, not a
@@ -162,7 +169,8 @@ remaining points. This ADR records the decisions; the spec fixes the details the
 - ADR 0014 carries inline amendments: its roles gain the team operator, and its rejected option
   "Several workspaces per fleet" points here.
 - ADR 0012's rule that the grant's mapping lives with the operator, not in a `[[repository]]`
-  entry, stands: an owner grants no read.
+  entry, stands: an owner grants no read. It holds for the claims grant; #319 adds GitHub roles
+  as a second source, unioned with it.
 - The operator owns more: mapping each team's group in `[oidc.groups]` to the identities it
   owns, assigning a team its first entry, and accepting that a team may add a repository the job
   fetches with the fleet's credentials. Until #316 decides, one team's failing repository can
