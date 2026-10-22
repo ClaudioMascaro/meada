@@ -423,6 +423,28 @@ one for the area a change touches.
   `Msg::FenceBelowNode` and changes nothing; with no pointer file the node takes it whatever
   its fence. `engine::status_generations` adds a `fence: stuck: ...` line (`Msg::FenceStuck`)
   when the node's fence is above the one `reach_pointer` read, with no effect on the exit code.
+  `snapshot/heartbeat.rs` (feature `generation-pointer`, crate `nix` for the host name; ADR
+  0014) is the node heartbeat. `main.rs`'s `pull` loop calls `heartbeat::beat` at the end of
+  every round of `pull --every` (never of a single pull), whether the round swapped, changed
+  nothing or failed, and `heartbeat::check` once before the loop: with `[generations]`, a host
+  name that is no node name, with no `[snapshot] node_name`, refuses to start
+  (`Msg::NodeNameHost`, naming `[snapshot] node_name`). Without `[generations]` neither runs
+  and no connection opens. The key `{<key_prefix>}:node:<name>` holds a JSON object (`name`;
+  `generation` and `fence`, from the node pointer file, null without one; `held`, `serve::ids`;
+  `ready`, `engine::served_generation` succeeding, the predicate `status --generations` exits
+  on; `version`; `time`, RFC 3339 UTC to the second), and the `WRITE` script sets it with a TTL
+  of three `--every` periods, adds the name to `{<key_prefix>}:nodes` scored by the expiry in
+  Unix seconds by Valkey's own clock (`TIME`), and removes every name whose score is at or
+  below now, so the set never keeps the names of pods long gone and the console lists nodes
+  without scanning. `[snapshot] node_name` (`snapshot::is_node_name`: lowercase letters,
+  digits, `.` and `-`, 1 to 63 characters; an error naming the file, the line and the key
+  otherwise) defaults to the host name in lowercase; names must be unique, as pod names are,
+  since two nodes with one name overwrite each other's heartbeat. A write that fails, or that
+  Valkey does not answer within `WRITE_TIMEOUT` (two seconds, the bound the probe waits for
+  Valkey), is one stderr warning for the round (`Msg::HeartbeatNotWritten`, the key and the
+  scrubbed reason): the round's outcome, the pointer file, the exit code and the readiness do
+  not change. `fence recover` reads these keys (`operation.rs`: `heartbeat_fence`,
+  `is_node_name`).
   `snapshot/versions.rs` (feature `generation-pointer`, ADR 0014) holds the workspace
   versions: the `[[repository]]` entries of a workspace as immutable documents in the store, at
   `workspaces/<version id>.json` under `[snapshot] prefix` (`Version`: `id`, `author`, `time`
@@ -454,7 +476,7 @@ one for the area a change touches.
   least 10; `Manifest::read` refuses it without `[generations]`). Keys under the same hash tag:
   `{<key_prefix>}:lock`, `{<key_prefix>}:fence`, which Meada only `INCR`s and `fence recover`
   raises, never lowers, and `{<key_prefix>}:holder`, a hash beside the lock with its TTL
-  (`host`, the lowercased host name until `[snapshot] node_name` exists; `pid`; `started`, RFC
+  (`host`, the lowercased host name; `pid`; `started`, RFC
   3339 in UTC to the second; `holds`: `lock <program>`, the child's program without its
   arguments, or `<operation> cli:<login>@<host>`). `acquire` is shared by `lock` and the
   operations: `TAKE` (`SET lock <token> NX PX <ttl>` and, when taken, the holder written with

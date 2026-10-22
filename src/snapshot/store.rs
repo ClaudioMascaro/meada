@@ -520,6 +520,7 @@ mod tests {
                 token: Secret::Env("MEADA_TEST_TLS_NO_TOKEN".into()),
             },
             local_dir: None,
+            node_name: None,
         };
         let store = Store::connect(&config).unwrap();
         let runtime = tokio::runtime::Builder::new_current_thread()

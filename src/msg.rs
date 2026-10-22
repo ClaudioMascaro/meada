@@ -222,6 +222,8 @@ pub enum Msg<'a> {
     #[cfg(feature = "snapshot")]
     SnapshotBucket,
     #[cfg(feature = "snapshot")]
+    SnapshotNodeName,
+    #[cfg(feature = "snapshot")]
     SnapshotPrefix,
     #[cfg(feature = "snapshot")]
     SnapshotBoth(&'a str),
@@ -403,6 +405,15 @@ pub enum Msg<'a> {
     /// A heartbeat key whose value is no heartbeat.
     #[cfg(feature = "refresh-lock")]
     HeartbeatBad(&'a str),
+    /// The host name is no node name, and `[snapshot] node_name` is not set.
+    #[cfg(feature = "generation-pointer")]
+    NodeNameHost(&'a str),
+    /// A round's heartbeat that could not be written: the key and why.
+    #[cfg(feature = "generation-pointer")]
+    HeartbeatNotWritten {
+        key: &'a str,
+        reason: &'a str,
+    },
     /// A member of the node set (`key`) that is not a node name, shown escaped.
     #[cfg(feature = "refresh-lock")]
     NodeNameBad {
@@ -1129,6 +1140,11 @@ impl Msg<'_> {
                     .into(),
             ),
             #[cfg(feature = "snapshot")]
+            Msg::SnapshotNodeName => pick(
+                "must be 1 to 63 lowercase letters, digits, `.` and `-`".into(),
+                "deve ter de 1 a 63 letras minúsculas, dígitos, `.` e `-`".into(),
+            ),
+            #[cfg(feature = "snapshot")]
             Msg::SnapshotPrefix => pick(
                 "must be `/`-separated segments, none of them empty, `.` or `..`".into(),
                 "deve ter segmentos separados por `/`, nenhum vazio, `.` ou `..`".into(),
@@ -1566,6 +1582,22 @@ impl Msg<'_> {
                 format!(
                     "{key}: não é um heartbeat, um objeto JSON cujo fence é um decimal ou null"
                 ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::NodeNameHost(host) => pick(
+                format!(
+                    "the host name \"{host}\" is not a node name (lowercase letters, digits, . and \
+                     -, 1 to 63 characters): set [snapshot] node_name"
+                ),
+                format!(
+                    "o nome do host \"{host}\" não é um nome de nó (letras minúsculas, dígitos, . e \
+                     -, de 1 a 63 caracteres): defina [snapshot] node_name"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::HeartbeatNotWritten { key, reason } => pick(
+                format!("heartbeat not written to {key}: {reason}"),
+                format!("heartbeat não gravado em {key}: {reason}"),
             ),
             #[cfg(feature = "refresh-lock")]
             Msg::NodeNameBad { key, name } => pick(

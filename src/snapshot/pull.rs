@@ -709,6 +709,7 @@ mod tests {
             path_style: false,
             credentials: Credentials::Instance,
             local_dir: None,
+            node_name: None,
         }
     }
 

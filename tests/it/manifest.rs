@@ -1152,3 +1152,32 @@ fn status_probe_answers_fast_and_ready_while_a_writer_holds_an_index() {
     );
     writer.execute_batch("ROLLBACK").unwrap();
 }
+
+/// `[snapshot] node_name` (#298): a configured name is checked against the node name pattern, and
+/// each failure names the file, the line and the key.
+#[cfg(feature = "snapshot")]
+#[test]
+fn a_bad_node_name_names_the_file_the_line_and_the_key() {
+    let dir = mirrors("manifest_node_name");
+    let head = format!(
+        "index_dir = \"../indexes\"\n{}",
+        crate::snapshot::section("http://127.0.0.1:9", "b-1")
+    );
+    for name in ["Upper", "a_b", "", &"a".repeat(64)] {
+        let toml = format!("{head}node_name = \"{name}\"\n");
+        write_manifest(&dir, &toml);
+        let line = toml[..toml.find("node_name").unwrap()]
+            .matches('\n')
+            .count()
+            + 1;
+        let expected = format!(
+            "meada: ops/meada.workspace.toml:{line}: `snapshot.node_name`: must be 1 to 63 \
+             lowercase letters, digits, `.` and `-`\n"
+        );
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {name:?}");
+            assert_eq!(stderr, expected, "{command}: {name:?}");
+        }
+    }
+}

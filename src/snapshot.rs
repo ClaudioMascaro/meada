@@ -13,6 +13,8 @@
 
 #[cfg(feature = "generation-pointer")]
 pub mod generations;
+#[cfg(feature = "generation-pointer")]
+pub mod heartbeat;
 #[cfg(feature = "refresh-lock")]
 pub mod lock;
 #[cfg(feature = "refresh-lock")]
@@ -63,6 +65,7 @@ pub struct File {
     session_token_env: Option<String>,
     session_token_file: Option<String>,
     local_dir: Option<String>,
+    node_name: Option<String>,
 }
 
 /// Where the store's credentials come from: one source, the one the section names.
@@ -107,6 +110,9 @@ pub struct Config {
     pub credentials: Credentials,
     /// Where nodes keep the generations they pull (#273, #274).
     pub local_dir: Option<PathBuf>,
+    /// The name of this node's heartbeat (#298), checked against the node name pattern; the
+    /// host name in lowercase when unset.
+    pub node_name: Option<String>,
 }
 
 impl File {
@@ -133,6 +139,9 @@ impl File {
                 .any(|s| matches!(s, "" | "." | "..") || s.contains(['\\', '*', '?']))
         {
             return Err(("snapshot.prefix", Msg::SnapshotPrefix.text()));
+        }
+        if (self.node_name.as_deref()).is_some_and(|name| !is_node_name(name)) {
+            return Err(("snapshot.node_name", Msg::SnapshotNodeName.text()));
         }
         let pairs = [
             (
@@ -196,8 +205,15 @@ impl File {
             path_style: self.path_style,
             credentials,
             local_dir: self.local_dir.map(|d| base.join(d)),
+            node_name: self.node_name,
         })
     }
+}
+
+/// Whether `name` is a node name: lowercase letters, digits, `.` and `-`, 1 to 63 characters.
+pub(crate) fn is_node_name(name: &str) -> bool {
+    (1..=63).contains(&name.len())
+        && (name.bytes()).all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'.' | b'-'))
 }
 
 /// Why `url` is no store endpoint: an `https` URL, or `http` when the host is loopback
@@ -662,6 +678,7 @@ mod tests {
         assert_eq!(config.prefix, "");
         assert!(!config.path_style);
         assert_eq!(config.local_dir, None);
+        assert_eq!(config.node_name, None);
         let env = |v: &str| Secret::Env(v.into());
         assert_eq!(
             config.credentials,
@@ -676,9 +693,10 @@ mod tests {
         let config = section(&format!(
             "{REQUIRED}prefix = \"prod/a\"\npath_style = true\naccess_key_id_env = \"K\"\n\
              secret_access_key_file = \"secret\"\nsession_token_file = \"/run/token\"\n\
-             local_dir = \"generations\""
+             local_dir = \"generations\"\nnode_name = \"meada-node-0\""
         ))
         .unwrap();
+        assert_eq!(config.node_name.as_deref(), Some("meada-node-0"));
         assert_eq!(config.key("current"), "prod/a/current");
         assert!(config.path_style);
         assert_eq!(config.local_dir, Some("/etc/meada/generations".into()));
@@ -697,6 +715,16 @@ mod tests {
         ] {
             let toml = format!("{REQUIRED}credentials = \"{source}\"");
             assert_eq!(section(&toml).unwrap().credentials, credentials);
+        }
+    }
+
+    #[test]
+    fn a_node_name_is_lowercase_letters_digits_dots_and_dashes() {
+        for good in ["a", "meada-node-0", "node.example.com", &"a".repeat(63)] {
+            assert!(is_node_name(good), "{good}");
+        }
+        for bad in ["", "Upper", "a_b", "a b", "../x", "a:b", &"a".repeat(64)] {
+            assert!(!is_node_name(bad), "{bad}");
         }
     }
 
@@ -721,6 +749,19 @@ mod tests {
             (REQUIRED.replace("meada-store", "Meada"), "snapshot.bucket"),
             (REQUIRED.replace("meada-store", "ab"), "snapshot.bucket"),
             (REQUIRED.replace("meada-store", "-ab"), "snapshot.bucket"),
+            (
+                format!("{REQUIRED}node_name = \"Upper\""),
+                "snapshot.node_name",
+            ),
+            (
+                format!("{REQUIRED}node_name = \"a_b\""),
+                "snapshot.node_name",
+            ),
+            (format!("{REQUIRED}node_name = \"\""), "snapshot.node_name"),
+            (
+                format!("{REQUIRED}node_name = \"{}\"", "a".repeat(64)),
+                "snapshot.node_name",
+            ),
             (format!("{REQUIRED}prefix = \"/prod\""), "snapshot.prefix"),
             (format!("{REQUIRED}prefix = \"a/../b\""), "snapshot.prefix"),
             (format!("{REQUIRED}prefix = \"a//b\""), "snapshot.prefix"),

@@ -36,6 +36,7 @@ use tokio::time::{Instant, sleep_until, timeout_at};
 
 pub(super) use super::generations::now;
 use super::generations::rfc3339;
+use super::heartbeat::host;
 use crate::msg::Msg;
 use crate::valkey::{self, Valkey};
 use crate::workspace::Manifest;
@@ -211,15 +212,6 @@ pub async fn acquire(
 /// terminal unescaped.
 fn shown(field: &[u8]) -> String {
     String::from_utf8_lossy(field).escape_debug().to_string()
-}
-
-/// The host name in lowercase, as the holder names it.
-// ponytail: `[snapshot] node_name` (#298) replaces it when the manifest sets one.
-pub fn host() -> String {
-    let name = nix::unistd::gethostname()
-        .ok()
-        .and_then(|h| h.into_string().ok());
-    name.unwrap_or_default().to_lowercase()
 }
 
 /// The author of an operation run from the command line: `cli:<login>@<host>`.

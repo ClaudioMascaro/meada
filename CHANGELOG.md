@@ -8,6 +8,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Node heartbeat (spec #293, ADR 0014, feature `generation-pointer`): with `[generations]`,
+  every round of `meada snapshot pull --every <seconds>` ends by writing the node's state into
+  Valkey, whether the round swapped, changed nothing or failed: `{<key_prefix>}:node:<name>`, a
+  JSON document (`name`, `generation`, `fence`, `held`, `ready`, `version`, `time`) living three
+  periods, and the name in the sorted set `{<key_prefix>}:nodes`, scored by the expiry in Unix
+  seconds, from which the same script removes every expired name. A single `pull` and a node
+  without `[generations]` write none. A write that fails is one warning for the round and
+  changes nothing else. The new optional `[snapshot] node_name` names the node (the host name
+  in lowercase by default), checked against the node name pattern; names must be unique.
+
 - Workspace versions (spec #293, ADR 0014, feature `generation-pointer`): the `[[repository]]`
   entries of a workspace stored as immutable documents in the snapshot store,
   `workspaces/<version id>.json` (id, author, time, message, entries in manifest order), the id

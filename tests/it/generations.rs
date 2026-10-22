@@ -151,7 +151,7 @@ fn generation(response: &ureq::http::Response<ureq::Body>) -> Option<String> {
 }
 
 /// `GET url`: status, `Content-Type`, `Meada-Generation` and body.
-fn get(url: &str) -> (u16, String, Option<String>, String) {
+pub(crate) fn get(url: &str) -> (u16, String, Option<String>, String) {
     get_with(url, &[])
 }
 
@@ -193,7 +193,7 @@ fn post_trace(url: &str) -> (u16, Option<String>, serde_json::Value) {
 }
 
 /// The `_meta` generation of a tool result.
-fn meta(result: &rmcp::model::CallToolResult) -> Option<String> {
+pub(crate) fn meta(result: &rmcp::model::CallToolResult) -> Option<String> {
     let meta = result.meta.as_ref()?;
     Some(meta.get("meada/generation")?.as_str()?.to_string())
 }
@@ -1096,4 +1096,411 @@ fn a_store_source_is_refused_where_entries_are_read_and_nodes_serve_as_before() 
         assert!(text(&found).contains("src/status.ts"), "{}", text(&found));
         client.cancel().await.unwrap();
     });
+}
+
+// The heartbeat (#298): each round of `meada snapshot pull --every` writes the node's state.
+
+/// `meada snapshot pull --every 1` on `manifest` in `dir`, a companion that is killed when
+/// dropped.
+pub(crate) struct Companion(std::process::Child);
+
+impl Companion {
+    pub(crate) fn start(dir: &Path, manifest: &str, env: &[(&str, &str)]) -> Self {
+        let mut command = crate::snapshot::pull_command(dir, manifest, &["--every", "1"]);
+        command.envs(env.iter().copied());
+        command.stdout(std::process::Stdio::piped());
+        command.stderr(std::process::Stdio::piped());
+        Self(command.spawn().expect("meada runs"))
+    }
+
+    /// Kills it: what it wrote on stdout and on stderr.
+    pub(crate) fn stop(mut self) -> (String, String) {
+        use std::io::Read;
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+        let (mut stdout, mut stderr) = (String::new(), String::new());
+        let _ = self.0.stdout.take().unwrap().read_to_string(&mut stdout);
+        let _ = self.0.stderr.take().unwrap().read_to_string(&mut stderr);
+        (stdout, stderr)
+    }
+}
+
+impl Drop for Companion {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+/// The key of node `name` in `case`'s prefix.
+fn node_key(case: &str, name: &str) -> String {
+    format!("{{{}}}:node:{name}", prefix(case))
+}
+
+/// The node set of `case`, `{<key_prefix>}:nodes`.
+fn nodes_key(case: &str) -> String {
+    format!("{{{}}}:nodes", prefix(case))
+}
+
+/// The heartbeat document of node `name`, `None` while there is none.
+fn beat(valkey: &mut redis::Connection, case: &str, name: &str) -> Option<serde_json::Value> {
+    let text: Option<String> = redis::cmd("GET")
+        .arg(node_key(case, name))
+        .query(valkey)
+        .unwrap();
+    text.map(|t| serde_json::from_str(&t).unwrap())
+}
+
+/// The first heartbeat of `name` that `wanted` accepts, polled every 20 ms for 30 s.
+fn wait_beat(
+    valkey: &mut redis::Connection,
+    case: &str,
+    name: &str,
+    wanted: impl Fn(&serde_json::Value) -> bool,
+) -> serde_json::Value {
+    for _ in 0..1500 {
+        if let Some(beat) = beat(valkey, case, name).filter(&wanted) {
+            return beat;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    panic!("no heartbeat of {name} that was wanted");
+}
+
+/// Sets `[snapshot] node_name` of the node at `manifest` (relative to the fleet's directory).
+fn name_node(fleet: &Fleet, manifest: &str, name: &str) {
+    let file = fleet.dir.join(manifest);
+    let toml = fs::read_to_string(&file).unwrap();
+    let marker = "local_dir = \"generations\"\n";
+    let toml = toml.replace(marker, &format!("{marker}node_name = \"{name}\"\n"));
+    fs::write(&file, toml).unwrap();
+}
+
+/// Valkey's clock in Unix seconds.
+fn server_time(valkey: &mut redis::Connection) -> u64 {
+    let (seconds, _): (u64, u64) = redis::cmd("TIME").query(valkey).unwrap();
+    seconds
+}
+
+/// Whether `time` is an RFC 3339 UTC instant to the second.
+fn is_rfc3339_utc(time: &str) -> bool {
+    let shape = b"dddd-dd-ddTdd:dd:ddZ";
+    time.len() == shape.len()
+        && time.bytes().zip(shape).all(|(b, s)| match s {
+            b'd' => b.is_ascii_digit(),
+            s => b == *s,
+        })
+}
+
+/// A round writes `{<key_prefix>}:node:<name>` with the node pointer file, the held
+/// directories, the readiness `status --generations` reports and the binary's version; the name
+/// is in `{<key_prefix>}:nodes` scored by the key's expiry in Unix seconds; the TTL is three
+/// periods. A round that swaps writes the new generation and its fence.
+#[test]
+fn every_round_of_pull_every_writes_the_nodes_heartbeat() {
+    let Some(fleet) = Fleet::new("heartbeat_fields", 3) else {
+        return;
+    };
+    let mut valkey = admin(&fleet.valkey);
+    let g1 = fleet.publish();
+    let (node, local) = fleet.node("one");
+    let name = "meada-node-0";
+    name_node(&fleet, &node, name);
+
+    let companion = Companion::start(&fleet.dir, &node, &[]);
+    let first = wait_beat(&mut valkey, fleet.case, name, |_| true);
+    // Right after the write: the TTL is three periods, and the score is the expiry.
+    let ttl: i64 = (redis::cmd("PTTL"))
+        .arg(node_key(fleet.case, name))
+        .query(&mut valkey)
+        .unwrap();
+    assert!((2_000..=3_000).contains(&ttl), "ttl {ttl} ms");
+    let score: u64 = (redis::cmd("ZSCORE"))
+        .arg(nodes_key(fleet.case))
+        .arg(name)
+        .query(&mut valkey)
+        .unwrap();
+    let now = server_time(&mut valkey);
+    assert!(
+        (now + 1..=now + 3).contains(&score),
+        "score {score} at {now}"
+    );
+    let members: Vec<String> = (redis::cmd("ZRANGE"))
+        .arg(nodes_key(fleet.case))
+        .arg(0)
+        .arg(-1)
+        .query(&mut valkey)
+        .unwrap();
+    assert_eq!(members, [name]);
+
+    assert_eq!(
+        fs::read_to_string(local.join("current")).unwrap(),
+        format!("{g1} 0\n")
+    );
+    let mut fields: Vec<&String> = first.as_object().unwrap().keys().collect();
+    fields.sort();
+    assert_eq!(
+        fields,
+        [
+            "fence",
+            "generation",
+            "held",
+            "name",
+            "ready",
+            "time",
+            "version"
+        ]
+    );
+    assert_eq!(first["name"], name);
+    assert_eq!(first["generation"], g1.as_str());
+    assert_eq!(first["fence"], 0);
+    assert_eq!(first["held"], serde_json::json!([g1]));
+    assert_eq!(first["version"], env!("CARGO_PKG_VERSION"));
+    assert!(is_rfc3339_utc(first["time"].as_str().unwrap()), "{first}");
+    // The readiness is the one `status --generations` exits on.
+    let (_, stderr, code) = probe(&fleet.dir, &node);
+    assert_eq!(
+        (code, first["ready"].as_bool()),
+        (Some(0), Some(true)),
+        "{stderr}"
+    );
+    companion.stop();
+
+    // A swap writes the new generation and fence: the pointer gets fence 5.
+    next_commit(&fleet.dir, "chain-web", "second");
+    let g2 = fleet.publish();
+    let prefix = prefix(fleet.case);
+    redis::cmd("HSET")
+        .arg(format!("{{{prefix}}}:current"))
+        .arg("fence")
+        .arg(5)
+        .exec(&mut valkey)
+        .unwrap();
+    redis::cmd("LSET")
+        .arg(format!("{{{prefix}}}:retained"))
+        .arg(0)
+        .arg(format!("{g2}:5"))
+        .exec(&mut valkey)
+        .unwrap();
+    let companion = Companion::start(&fleet.dir, &node, &[]);
+    let second = wait_beat(&mut valkey, fleet.case, name, |b| {
+        b["generation"] == g2.as_str()
+    });
+    companion.stop();
+    assert_eq!(second["fence"], 5);
+    assert_eq!(second["held"], serde_json::json!(sorted(&[&g1, &g2])));
+    assert_eq!(
+        fs::read_to_string(local.join("current")).unwrap(),
+        format!("{g2} 5\n")
+    );
+}
+
+/// Once the companion stops the key expires; the next heartbeat another node writes removes the
+/// stale name from the node set.
+#[test]
+fn a_stopped_node_expires_and_the_next_heartbeat_removes_its_name() {
+    let Some(fleet) = Fleet::new("heartbeat_expiry", 3) else {
+        return;
+    };
+    let mut valkey = admin(&fleet.valkey);
+    fleet.publish();
+    let (one, _) = fleet.node("one");
+    let (two, _) = fleet.node("two");
+    name_node(&fleet, &one, "node-one");
+    name_node(&fleet, &two, "node-two");
+
+    let companion = Companion::start(&fleet.dir, &one, &[]);
+    wait_beat(&mut valkey, fleet.case, "node-one", |_| true);
+    companion.stop();
+    for _ in 0..200 {
+        if beat(&mut valkey, fleet.case, "node-one").is_none() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert!(
+        beat(&mut valkey, fleet.case, "node-one").is_none(),
+        "expired"
+    );
+    // The name outlives the key until another heartbeat cleans the set.
+    let members = |valkey: &mut redis::Connection| -> Vec<String> {
+        let mut members: Vec<String> = redis::cmd("ZRANGE")
+            .arg(nodes_key(fleet.case))
+            .arg(0)
+            .arg(-1)
+            .query(valkey)
+            .unwrap();
+        members.sort();
+        members
+    };
+    assert_eq!(members(&mut valkey), ["node-one"]);
+
+    let companion = Companion::start(&fleet.dir, &two, &[]);
+    wait_beat(&mut valkey, fleet.case, "node-two", |_| true);
+    companion.stop();
+    assert_eq!(members(&mut valkey), ["node-two"]);
+}
+
+/// A round that fails (a malformed pointer in Valkey) still writes the heartbeat of the node's
+/// unchanged state.
+#[test]
+fn a_failed_round_still_writes_the_heartbeat() {
+    let Some(fleet) = Fleet::new("heartbeat_failed", 3) else {
+        return;
+    };
+    let mut valkey = admin(&fleet.valkey);
+    let g1 = fleet.publish();
+    let (node, local) = fleet.node("one");
+    name_node(&fleet, &node, "node-one");
+    assert_eq!(fleet.pull(&node), g1);
+
+    let prefix = prefix(fleet.case);
+    redis::cmd("HSET")
+        .arg(format!("{{{prefix}}}:current"))
+        .arg("fence")
+        .arg("not-a-fence")
+        .exec(&mut valkey)
+        .unwrap();
+    let companion = Companion::start(&fleet.dir, &node, &[]);
+    // Rounds have failed for a while when the key is deleted and written again.
+    std::thread::sleep(std::time::Duration::from_millis(2_500));
+    redis::cmd("DEL")
+        .arg(node_key(fleet.case, "node-one"))
+        .exec(&mut valkey)
+        .unwrap();
+    let beat = wait_beat(&mut valkey, fleet.case, "node-one", |_| true);
+    let (stdout, stderr) = companion.stop();
+    assert_eq!(stdout, "");
+    assert!(
+        !stderr.is_empty() && !stderr.contains("heartbeat not written"),
+        "{stderr}"
+    );
+    assert_eq!(beat["generation"], g1.as_str());
+    assert_eq!(beat["fence"], 0);
+    assert_eq!(beat["held"], serde_json::json!([g1]));
+    assert_eq!(beat["ready"], true);
+    assert_eq!(
+        fs::read_to_string(local.join("current")).unwrap(),
+        format!("{g1} 0\n")
+    );
+}
+
+/// A single `pull` writes no heartbeat, and with `[valkey]` but no `[generations]` a `pull
+/// --every` writes none either.
+#[test]
+fn only_pull_every_with_generations_writes_a_heartbeat() {
+    let Some(fleet) = Fleet::new("heartbeat_none", 3) else {
+        return;
+    };
+    let mut valkey = admin(&fleet.valkey);
+    fleet.publish();
+    let (node, _) = fleet.node("one");
+    fleet.pull(&node);
+    let written = |valkey: &mut redis::Connection| -> Vec<String> {
+        redis::cmd("KEYS")
+            .arg(format!("{{{}}}:node*", prefix(fleet.case)))
+            .query(valkey)
+            .unwrap()
+    };
+    assert_eq!(written(&mut valkey), Vec::<String>::new());
+
+    // A store without Valkey's pointer, and a node with `[valkey]` only.
+    let case = "heartbeat_plain";
+    let name = bucket_name(case);
+    bucket(&fleet.endpoint, &name);
+    let dir = store_manifest(case, &fleet.endpoint, &name, SECRET);
+    let (id, stderr, code) = publish(&dir, MANIFEST);
+    assert_eq!(code, Some(0), "{stderr}");
+    let (plain, local) = named_node(&dir, "plain", &fleet.endpoint, &name);
+    let file = dir.join(&plain);
+    let toml = fs::read_to_string(&file).unwrap()
+        + &format!(
+            "\n[valkey]\nurl = \"{}\"\nkey_prefix = \"{}\"\n",
+            fleet.valkey,
+            prefix(fleet.case)
+        );
+    fs::write(&file, toml).unwrap();
+    let companion = Companion::start(&dir, &plain, &[]);
+    for _ in 0..200 {
+        if local.join("current").exists() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    // Two more rounds.
+    std::thread::sleep(std::time::Duration::from_millis(2_500));
+    let (stdout, stderr) = companion.stop();
+    assert_eq!((stdout.trim(), stderr.as_str()), (id.trim(), ""));
+    assert_eq!(written(&mut valkey), Vec::<String>::new());
+}
+
+/// With Valkey unreachable each round prints one warning naming the heartbeat and no password;
+/// the pointer file, stdout and `status --generations`' exit code are what they were.
+#[test]
+fn an_unreachable_valkey_costs_one_warning_per_round_and_nothing_else() {
+    let Some(fleet) = Fleet::new("heartbeat_outage", 3) else {
+        return;
+    };
+    let g1 = fleet.publish();
+    let (node, local) = fleet.node("one");
+    name_node(&fleet, &node, "node-one");
+    assert_eq!(fleet.pull(&node), g1);
+    let before = (
+        fs::read(local.join("current")).unwrap(),
+        probe(&fleet.dir, &node).2,
+    );
+
+    let file = fleet.dir.join(&node);
+    let toml = fs::read_to_string(&file).unwrap();
+    let toml = toml.replace(
+        &format!("url = \"{}\"", fleet.valkey),
+        "url = \"redis://127.0.0.1:1\"\npassword_env = \"MEADA_TEST_HEARTBEAT_PASSWORD\"",
+    );
+    fs::write(&file, toml).unwrap();
+    let password = "hunter2-heartbeat";
+    let companion = Companion::start(
+        &fleet.dir,
+        &node,
+        &[("MEADA_TEST_HEARTBEAT_PASSWORD", password)],
+    );
+    std::thread::sleep(std::time::Duration::from_millis(3_500));
+    let (stdout, stderr) = companion.stop();
+    assert_eq!(stdout, "");
+    // Each round also fails to read the pointer from the same Valkey: its error is the
+    // pull's, and the heartbeat's is one line of its own.
+    let beats: Vec<&str> = (stderr.lines())
+        .filter(|l| l.starts_with("meada: heartbeat not written to "))
+        .collect();
+    assert!(beats.len() >= 2, "{stderr}");
+    for line in &beats {
+        assert!(line.contains("node-one"), "{line}");
+    }
+    assert!(!stderr.contains(password), "{stderr}");
+    let after = (
+        fs::read(local.join("current")).unwrap(),
+        probe(&fleet.dir, &node).2,
+    );
+    assert_eq!(after, before);
+}
+
+/// Without `[snapshot] node_name` the heartbeat carries the host name in lowercase.
+#[test]
+fn the_host_name_in_lowercase_names_a_node_by_default() {
+    let Some(fleet) = Fleet::new("heartbeat_host", 3) else {
+        return;
+    };
+    let host = nix::unistd::gethostname().unwrap();
+    let host = host.into_string().unwrap().to_lowercase();
+    let pattern = |b: u8| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'.' | b'-');
+    if host.is_empty() || host.len() > 63 || !host.bytes().all(pattern) {
+        eprintln!("skipped: the host name {host:?} is no node name");
+        return;
+    }
+    let mut valkey = admin(&fleet.valkey);
+    fleet.publish();
+    let (node, _) = fleet.node("one");
+    let companion = Companion::start(&fleet.dir, &node, &[]);
+    let beat = wait_beat(&mut valkey, fleet.case, &host, |_| true);
+    companion.stop();
+    assert_eq!(beat["name"], host.as_str());
 }
