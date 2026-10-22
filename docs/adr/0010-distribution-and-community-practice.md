@@ -18,6 +18,16 @@ what the repository has in place for contributors.
   (Linux, macOS and Windows, on x86_64 and arm64), and a shell installer.
 - An npm wrapper (`npx meada`) ships before 1.0, because agent MCP configurations often launch
   servers with `npx`.
+- (Amended 2026-10-22; #279.) Releases also publish the OCI image
+  `ghcr.io/claudiomascaro/meada`, for Linux amd64 and arm64, as `<version>` and `latest`
+  (default build), and `<version>-cloud` and `latest-cloud` (`--features cloud`). Prereleases
+  get no `latest*` tag. One multi-stage Dockerfile builds from source with the pinned Rust
+  toolchain and `cargo build --release --locked`; the runtime is Debian bookworm-slim with
+  git (at least 2.38) and CA roots, a non-root user and its home, `ENTRYPOINT ["meada"]` and
+  no default command. Manifests, mirrors and indexes are operator mounts. A separate container
+  workflow publishes the images when a release is published; cargo-dist's generated workflow
+  stays unchanged. The base is refreshed only with a Meada release. Signing, attestations and
+  SBOM are deferred until an operator requests them.
 - The crate is published at v0.1, the first real release. crates.io discourages placeholder
   crates, and a publish cannot be undone, only yanked. The npm name is published with the
   wrapper.

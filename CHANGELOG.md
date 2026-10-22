@@ -8,6 +8,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Multi-arch OCI images (issue #279): `ghcr.io/claudiomascaro/meada:<version>` and `latest`
+  for the default build, `<version>-cloud` and `latest-cloud` for every cloud module, on
+  Linux amd64 and arm64. Prereleases get version tags only. The Debian bookworm-slim runtime
+  includes git and CA roots, runs without root and has no default command or embedded data.
+  A separate release workflow builds both variants from source with the lockfile; its pull
+  request check builds the default amd64 image and searches it over HTTP. The base is refreshed
+  only with a Meada release.
+
 - Static management console frontend (spec #293, ADR 0014): Vite, React and strict TypeScript
   with the shared WebAssembly core, Brazilian Portuguese and English navigation, configuration,
   session and bootstrap manifest pages. OIDC sign-in uses authorization code with PKCE S256;

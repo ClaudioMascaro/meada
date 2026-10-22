@@ -12,7 +12,7 @@ indexación usa un LLM.
 
 ## Instalación
 
-Elige una de cuatro formas.
+Elige una de cinco formas.
 
 - **Cargo**: `cargo install meada`.
 - **Binario listo**: descarga el archivo de tu sistema desde los
@@ -22,6 +22,15 @@ Elige una de cuatro formas.
   `curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ClaudioMascaro/meada/releases/latest/download/meada-installer.sh | sh`.
 - **npm**: `npx meada <comando>` descarga el binario listo de tu plataforma y lo ejecuta, sin
   instalar nada antes.
+- **Contenedor**: `ghcr.io/claudiomascaro/meada:<versión>` para el build predeterminado, o
+  `<versión>-cloud` con todos los módulos cloud, ambos para Linux amd64 y arm64. `latest` y
+  `latest-cloud` siguen la última release estable; las prereleases solo tienen tags de versión.
+  La base Debian bookworm-slim (git y certificados CA) solo se actualiza con una release de Meada.
+  La imagen se ejecuta sin root y no define comando: pasa los argumentos explícitamente, por
+  ejemplo `docker run --rm ghcr.io/claudiomascaro/meada:latest --version`. Para servir,
+  monta el manifiesto, los espejos y los índices, y pasa
+  `mcp --listen 0.0.0.0:7333 --workspace /etc/meada/meada.workspace.toml`, siguiendo
+  [Modo servidor](#modo-servidor) y su configuración de admisión.
 
 ## Configuración
 

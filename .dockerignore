@@ -1,0 +1,15 @@
+*
+!Cargo.toml
+!Cargo.lock
+!rust-toolchain.toml
+!src/
+!src/**
+!examples/
+!examples/golden_diff.rs
+!meada-core/
+!meada-core/Cargo.toml
+!meada-core/src/
+!meada-core/src/**
+!tests/
+!tests/golden/
+!tests/golden/schema.txt
