@@ -46,7 +46,10 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `freshness` (cold vs refreshed, also an edited zod schema dropping a field, edited calls moving
   every repository's communities and processes, and the chain's export byte-identical under
   `meada::with_reversed_walk`), `items` (open items and their `search` goldens, fixtures
-  `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`), `mcp`
+  `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`; with
+  `refresh-lock`, the operations' refusals: a malformed id, no `[refresh_lock]`, a generation
+  not retained, a lock held by a named or an unknown holder; without it, no `snapshot pointer`
+  or `snapshot fence`), `mcp`
   (the binary over stdio), `server` (`meada mcp --listen` as a child process over the chain's
   mirrors, through rmcp's streamable HTTP client and plain HTTP requests: the stdio tools and
   `trace` byte for byte, the 404 listing, the `uncommitted` refusal, the behind line before and
@@ -66,9 +69,15 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `generations` (the generation pointer and pins: a pin answered on every node until it is no
   longer retained, the 404 of a pin not held, `Origin` refused before a pin, every id and fence
   from Valkey checked, a retained generation that fails to pull, the probe reading Valkey,
-  `[generations]` errors), `refresh_lock` (`snapshot lock`: the child terminated past the TTL,
-  killed past the grace, stopped when the lock changes hands, a SIGTERM reaching it, a stale
-  fence refused, a lost fence stopping a node, `[refresh_lock]` errors), `oidc` (`[oidc]`
+  `[generations]` errors, `snapshot pointer set` rolling two nodes back to G1's goldens until
+  the next publish, a generation not retained and malformed ids refused), `refresh_lock`
+  (`snapshot lock`: the child terminated past the TTL, killed past the grace, stopped when the
+  lock changes hands, a SIGTERM reaching it, a stale fence refused, a lost fence stopping a node
+  with the recovery named in both languages, `[refresh_lock]` errors; the operations: each
+  refused while a lock holds, naming the holder, the holder's fields, TTL, renewal and release,
+  no lock or holder left by an operation, a stuck fleet moving again after `fence recover`, the
+  highest recorded fence and the `--at-least` floor, never lowered, live, expired and malformed
+  heartbeats written by hand), `oidc` (`[oidc]`
   against an issuer and a JWKS served on loopback: a token admits what its claim lists and leaks
   nowhere, a rotated key, an oversized JWKS refusing the start, a pinned path admitted as its
   identity), `github_app` (`github-app credential` and `throttled` against a GitHub API served
