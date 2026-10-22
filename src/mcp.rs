@@ -552,19 +552,42 @@ fn run(
     gate: Gate,
     routes: impl FnOnce(&StreamableHttpServerConfig) -> Routes,
 ) -> crate::Result<()> {
+    serve_http(address, move |_, config| {
+        let routes = Arc::new(routes(config));
+        move |request| {
+            let (routes, gate) = (routes.clone(), gate.clone());
+            async move { route(&routes, &gate, request).await }
+        }
+    })
+}
+
+/// A plain HTTP/1 server over `address`, the node's and the console's (`ui`, feature `ui`):
+/// `make` gets the bound address and the MCP transport's configuration and returns what answers
+/// each request. The first line on stderr is the bound address. On SIGINT or SIGTERM it stops
+/// accepting, lets the answers in flight finish for at most the drain bound (a second signal
+/// ends the wait), drops what is left and returns.
+pub(crate) fn serve_http<F, A>(
+    address: SocketAddr,
+    make: impl FnOnce(SocketAddr, &StreamableHttpServerConfig) -> F,
+) -> crate::Result<()>
+where
+    F: Fn(Request<Incoming>) -> A + Clone + Send + Sync + 'static,
+    A: Future<Output = Response<BoxBody<Bytes, Infallible>>> + Send + 'static,
+{
     let drain = DRAIN_BOUND.get();
     let runtime = tokio::runtime::Runtime::new()?;
     let stopped: crate::Result<()> = runtime.block_on(async {
         let listener = tokio::net::TcpListener::bind(address).await?;
         // Before the address is printed: a signal sent on reading it is never lost.
         let mut stop = Stop::install()?;
-        eprintln!("listening on http://{}", listener.local_addr()?);
+        let bound = listener.local_addr()?;
+        eprintln!("listening on http://{bound}");
         let config = StreamableHttpServerConfig::default()
             .with_legacy_session_mode(false)
             .with_json_response(true)
             .disable_allowed_hosts()
             .enforce_origin_validation();
-        let routes = Arc::new(routes(&config));
+        let answer = make(bound, &config);
         let (stopping, _) = tokio::sync::watch::channel(());
         let mut connections = tokio::task::JoinSet::new();
         loop {
@@ -581,12 +604,12 @@ fn run(
                     continue;
                 }
             };
-            let (routes, gate) = (routes.clone(), gate.clone());
+            let answer = answer.clone();
             let mut stopping = stopping.subscribe();
             connections.spawn(async move {
                 let service = service_fn(move |request| {
-                    let (routes, gate) = (routes.clone(), gate.clone());
-                    async move { Ok::<_, Infallible>(route(&routes, &gate, request).await) }
+                    let answer = answer(request);
+                    async move { Ok::<_, Infallible>(answer.await) }
                 });
                 // A connection that breaks ends only itself; the timer is what makes hyper's
                 // header read timeout close one that sends nothing.
@@ -817,7 +840,7 @@ const GENERATION_HEADER: &str = "meada-generation";
 
 /// The address `--listen` names: `host:port`, `:port` or `port`, the host an IP address or
 /// `localhost`; without one, the loopback interface. No name is resolved.
-fn address(listen: &str) -> crate::Result<SocketAddr> {
+pub(crate) fn address(listen: &str) -> crate::Result<SocketAddr> {
     let invalid = || {
         format!(
             "`--listen {listen}`: pass host:port, :port or port, the host an IP address or localhost"

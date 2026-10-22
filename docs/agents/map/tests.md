@@ -86,7 +86,17 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   throttled installation skipped until its retry time, a mint answered 429 passing to the next
   installation, a token minted again after its cache runs out or `erase`, an uncovered host or
   owner, a new block and new installations after the refresh, `[[github_app]]` errors, no
-  request from `mcp --listen`, and no key, JWT or token on stderr), `resources` (resource `search`, `context`, `trace` start and `status`
+  request from `mcp --listen`, and no key, JWT or token on stderr), `ui` (`meada ui` as a child
+  process over a `[ui] dir` it writes, with a `meada-ui.json` naming this build's version, in
+  plain HTTP over raw sockets so no path is normalised: the `config`, `session` and `manifest`
+  documents, the JSON 404, the `manifest` errors of a file broken after the start; the
+  `--listen` forms and both flags required; the `Host` 403 before the `Origin` 403, a write
+  without `Origin` refused; static files with their content type, cache rule and security
+  headers, `..`, `%2e%2e`, an empty segment, a symbolic link out of the directory and an unknown
+  extension refused, no listing, an unknown path answering `index.html`; no cookie or
+  `Access-Control-*` header on any answer; every start refusal listed at once; a
+  `password_file`'s content in no answer, with `valkey`; and an answer in flight, blocked on a
+  FIFO, received after SIGTERM, then exit 0), `resources` (resource `search`, `context`, `trace` start and `status`
   over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
   fixture: kafkajs forms, fan-out, same-repository links, an unrelated `send`; amqplib queues,
   publishes through a binding of another repository, the empty exchange, queues named like the

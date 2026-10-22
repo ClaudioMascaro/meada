@@ -74,9 +74,9 @@ fn config_errors_follow_lang() {
     }
 }
 
-/// The default build's help: a feature's subcommand (`meada snapshot`, `meada github-app`) is
-/// absent from it.
-#[cfg(not(any(feature = "snapshot", feature = "github-app")))]
+/// The default build's help: a feature's subcommand (`meada snapshot`, `meada github-app`,
+/// `meada ui`) is absent from it.
+#[cfg(not(any(feature = "snapshot", feature = "github-app", feature = "ui")))]
 #[test]
 fn help_follows_lang() {
     let repo = fixture_repo("cli_help", "ts-basic", None);
@@ -86,6 +86,19 @@ fn help_follows_lang() {
             &meada(&repo, lang, "--help"),
         );
     }
+}
+
+/// `meada ui` exists only in a build with the `ui` feature (ADR 0014).
+#[cfg(not(feature = "ui"))]
+#[test]
+fn the_console_subcommand_is_absent_without_its_feature() {
+    let out = Command::new(env!("CARGO_BIN_EXE_meada"))
+        .args(["ui", "--listen", "0", "--workspace", "meada.workspace.toml"])
+        .output()
+        .expect("meada runs");
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("unrecognized subcommand 'ui'"), "{stderr}");
 }
 
 /// Without the `refresh-lock` feature, `meada snapshot pointer` and `meada snapshot fence` do

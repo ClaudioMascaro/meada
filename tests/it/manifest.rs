@@ -412,6 +412,13 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
             "meada: ops/meada.workspace.toml:2: [oidc] needs a Meada built with the oidc feature\n",
         ));
     }
+    // `ui` needs no `valkey` either.
+    if !cfg!(feature = "ui") {
+        cases.push((
+            "index_dir = \"../indexes\"\n\n\n\n[ui]\ndir = \"ui\"\n",
+            "meada: ops/meada.workspace.toml:5: [ui] needs a Meada built with the ui feature\n",
+        ));
+    }
     for (toml, expected) in cases {
         write_manifest(&dir, toml);
         for command in ["index", "status"] {

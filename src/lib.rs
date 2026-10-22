@@ -36,6 +36,8 @@ mod shape;
 #[cfg(feature = "snapshot")]
 pub mod snapshot;
 mod trace;
+#[cfg(feature = "ui")]
+pub mod ui;
 #[cfg(feature = "valkey")]
 mod valkey;
 mod workspace;

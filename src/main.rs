@@ -71,6 +71,13 @@ enum Command {
         #[command(subcommand)]
         command: GithubAppCommand,
     },
+    #[cfg(feature = "ui")]
+    Ui {
+        #[arg(long)]
+        listen: String,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
 }
 
 /// `meada github-app` (ADR 0013, feature `github-app`).
@@ -218,18 +225,19 @@ fn pull(manifest: &Path, every: Option<u64>) -> ! {
     }
 }
 
-/// `meada mcp --listen`. In debug builds `MEADA_DRAIN_MS` shortens the drain bound (a knob for
-/// tests and not documented; a release binary has no way to shorten the bound).
-fn listen_at(listen: &str, manifest: &Path) -> meada::Result<()> {
+/// `serve`, a listener (`meada mcp --listen`, `meada ui`). In debug builds `MEADA_DRAIN_MS`
+/// shortens the drain bound (a knob for tests and not documented; a release binary has no way
+/// to shorten the bound).
+fn drained(serve: impl FnOnce() -> meada::Result<()>) -> meada::Result<()> {
     #[cfg(debug_assertions)]
     if let Some(bound) = std::env::var("MEADA_DRAIN_MS")
         .ok()
         .and_then(|ms| ms.parse().ok())
         .map(std::time::Duration::from_millis)
     {
-        return meada::mcp::with_drain_bound(bound, || meada::mcp::listen(listen, manifest));
+        return meada::mcp::with_drain_bound(bound, serve);
     }
-    meada::mcp::listen(listen, manifest)
+    serve()
 }
 
 fn main() -> ExitCode {
@@ -317,6 +325,12 @@ fn main() -> ExitCode {
                     .mut_arg("retry_after", |a| a.help(Msg::GithubAppRetryAfter.text()))
             })
     });
+    #[cfg(feature = "ui")]
+    let matches = matches.mut_subcommand("ui", |c| {
+        (c.about(Msg::Ui.text()))
+            .mut_arg("listen", |a| a.help(Msg::UiListenHelp.text()))
+            .mut_arg("workspace", |a| a.help(Msg::UiWorkspaceHelp.text()))
+    });
     #[cfg(feature = "snapshot")]
     let matches = ["status", "export", "mcp"]
         .into_iter()
@@ -368,7 +382,9 @@ fn main() -> ExitCode {
             // The MCP surface is English whatever `LANG` says (ADR 0008).
             msg::init(None);
             match (listen, workspace) {
-                (Some(listen), Some(manifest)) => listen_at(&listen, &manifest),
+                (Some(listen), Some(manifest)) => {
+                    drained(|| meada::mcp::listen(&listen, &manifest))
+                }
                 _ => meada::mcp::serve(),
             }
         }
@@ -418,6 +434,19 @@ fn main() -> ExitCode {
         } => pull(&workspace, every),
         #[cfg(feature = "github-app")]
         Command::GithubApp { command } => github_app(command),
+        // Every problem that refuses the start on its own line. The API is English whatever
+        // `LANG` says, as the MCP surface is (ADR 0008).
+        #[cfg(feature = "ui")]
+        Command::Ui { listen, workspace } => {
+            msg::init(None);
+            if let Err(e) = drained(|| meada::ui::listen(&listen, &workspace)) {
+                for line in e.to_string().lines() {
+                    eprintln!("meada: {line}");
+                }
+                std::process::exit(1);
+            }
+            Ok(())
+        }
         // The child's exit code, or 1 with the reason: the lock held elsewhere or lost.
         #[cfg(feature = "refresh-lock")]
         Command::Snapshot {

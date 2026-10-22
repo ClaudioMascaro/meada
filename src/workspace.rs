@@ -195,6 +195,9 @@ pub struct Manifest {
     /// The `[oidc]` section, when the build has the module.
     #[cfg(feature = "oidc")]
     pub oidc: Option<crate::oidc::Config>,
+    /// The `[ui]` section, when the build has the module (ADR 0014).
+    #[cfg(feature = "ui")]
+    pub ui: Option<crate::ui::Config>,
 }
 
 /// One `[[repository]]` of a manifest.
@@ -233,6 +236,8 @@ struct ManifestFile {
     refresh_lock: Option<crate::snapshot::lock::File>,
     #[cfg(feature = "oidc")]
     oidc: Option<crate::oidc::File>,
+    #[cfg(feature = "ui")]
+    ui: Option<crate::ui::File>,
     #[cfg(feature = "github-app")]
     #[serde(default, rename = "github_app")]
     github_apps: Vec<crate::github_app::File>,
@@ -287,6 +292,8 @@ impl Manifest {
         }
         #[cfg(feature = "oidc")]
         let oidc = modules::validated(file, &src, parsed.oidc, |o| o.validate())?;
+        #[cfg(feature = "ui")]
+        let ui = crate::ui::validated(file, &src, base, parsed.ui)?;
         // The `[[github_app]]` blocks are checked, `[valkey]` among their needs; only
         // `github_apps` keeps them.
         #[cfg(feature = "github-app")]
@@ -354,6 +361,8 @@ impl Manifest {
             refresh_lock,
             #[cfg(feature = "oidc")]
             oidc,
+            #[cfg(feature = "ui")]
+            ui,
         })
     }
 
@@ -442,6 +451,8 @@ impl Manifest {
             refresh_lock: None,
             #[cfg(feature = "oidc")]
             oidc: None,
+            #[cfg(feature = "ui")]
+            ui: None,
         })
     }
 
