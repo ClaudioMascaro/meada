@@ -379,21 +379,25 @@ pub enum Msg<'a> {
     OidcUrl {
         bare: bool,
     },
+    /// A `jwks_uri` that is not `https` (or `http` on loopback) with a host and no user or
+    /// fragment.
+    #[cfg(feature = "oidc")]
+    OidcJwksUrl,
     #[cfg(feature = "oidc")]
     OidcEmpty,
-    /// None of the issuer's metadata documents could be read: each URL tried with why.
+    /// A configured scope holding a character no RFC 6749 scope-token carries.
+    #[cfg(feature = "oidc")]
+    OidcScope {
+        scope: &'a str,
+        bad: char,
+    },
+    /// None of the issuer's metadata documents could be used: each URL tried with why.
     #[cfg(feature = "oidc")]
     OidcMetadata(&'a str),
     #[cfg(feature = "oidc")]
-    OidcIssuerMismatch {
-        url: &'a str,
-        found: &'a str,
-    },
+    OidcIssuerMismatch(&'a str),
     #[cfg(feature = "oidc")]
-    OidcJwksUri {
-        url: &'a str,
-        why: &'a str,
-    },
+    OidcJwksUri(&'a str),
     #[cfg(feature = "oidc")]
     OidcJwks {
         url: &'a str,
@@ -1352,21 +1356,35 @@ impl Msg<'_> {
                     .into(),
             ),
             #[cfg(feature = "oidc")]
+            Msg::OidcJwksUrl => pick(
+                "must be an https:// URL with a host and no user or fragment (http:// only on \
+                 loopback)"
+                    .into(),
+                "deve ser uma URL https:// com um host e sem usuário ou fragmento (http:// só \
+                 em loopback)"
+                    .into(),
+            ),
+            #[cfg(feature = "oidc")]
             Msg::OidcEmpty => pick("must not be empty".into(), "não pode ser vazio".into()),
+            #[cfg(feature = "oidc")]
+            Msg::OidcScope { scope, bad } => pick(
+                format!("{scope:?} holds {bad:?}, which a scope cannot carry (RFC 6749)"),
+                format!("{scope:?} contém {bad:?}, que um escopo não pode ter (RFC 6749)"),
+            ),
             #[cfg(feature = "oidc")]
             Msg::OidcMetadata(tried) => pick(
                 format!("oidc: the issuer's metadata could not be read: {tried}"),
                 format!("oidc: os metadados do issuer não puderam ser lidos: {tried}"),
             ),
             #[cfg(feature = "oidc")]
-            Msg::OidcIssuerMismatch { url, found } => pick(
-                format!("oidc: {url} names the issuer {found:?}, not the configured one"),
-                format!("oidc: {url} nomeia o issuer {found:?}, não o configurado"),
+            Msg::OidcIssuerMismatch(found) => pick(
+                format!("names the issuer {found:?}, not the configured one"),
+                format!("nomeia o issuer {found:?}, não o configurado"),
             ),
             #[cfg(feature = "oidc")]
-            Msg::OidcJwksUri { url, why } => pick(
-                format!("oidc: the jwks_uri of {url} {why}"),
-                format!("oidc: o jwks_uri de {url} {why}"),
+            Msg::OidcJwksUri(why) => pick(
+                format!("its jwks_uri {why}"),
+                format!("o seu jwks_uri {why}"),
             ),
             #[cfg(feature = "oidc")]
             Msg::OidcJwks { url, why } => pick(

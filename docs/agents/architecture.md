@@ -141,14 +141,16 @@ one for the area a change touches.
   not empty, scopes RFC 6749 scope-tokens, `jwks_refresh_seconds` at least 60). `Oidc::start`,
   called by `mcp::Gate::new` before the listener binds, finds the metadata at the URLs the MCP
   specification tries in order (`metadata_urls`: RFC 8414 and OpenID discovery with the path
-  inserted, then OpenID's appended), checks its `issuer` and `jwks_uri`, reads the JWKS (only
+  inserted, then OpenID's appended, passing over a document that does not parse or names
+  another issuer), checks its `jwks_uri` (which may carry a query), reads the JWKS (only
   signing keys: RSA, or EC on P-256 and P-384) and starts a thread that reads it again every
   `jwks_refresh_seconds` until the module is dropped; every request goes through ureq with no
   redirect, no proxy, `FETCH_TIMEOUT` and a cap, and the platform verifier for `https`.
   `Oidc::admit` refuses an `Origin` with 403, serves the metadata of any path under
   `.well-known/oauth-protected-resource` (`resource` is `<public_url>/<path>`, percent-encoded),
-  and otherwise reads the one `Authorization: Bearer` header: `ALGORITHMS` only, a cached key
-  that `fits` the header (`kid`, the key's own `alg`, its type and curve), the JWKS fetched again
+  and otherwise reads the one `Authorization: Bearer` header (another scheme counts as no
+  token): `ALGORITHMS` only, no `crit`, a cached key that `fits` the header (`kid` when both
+  carry one, the key's own `alg`, its type and curve), the JWKS fetched again
   when none does (`refetch`, at most once per `KID_REFRESH_EVERY`), `exp` and `nbf` with
   `LEEWAY`, `iss`, `aud` against the configured audience or the path's and its identity's
   resources, then the scopes (403 when one is missing). The grant is `identities_claim` as an
@@ -1004,7 +1006,9 @@ one for the area a change touches.
   keys stay). An identity whose path starts with `.well-known/oauth-protected-resource` is
   unreachable with `[oidc]`, since that path serves the metadata. The `scope` claim is read as a
   space-separated string; `scp` and arrays are not read. With `audience` unset, the root's 404
-  takes a token whose `aud` is `public_url` itself.
+  takes a token whose `aud` is `public_url` itself. The caps are inclusive: a body of exactly
+  the cap is read. The `oidc` build carries `rsa`, whose RUSTSEC-2023-0071 (Marvin timing) hits
+  private-key operations; Meada only verifies with public keys, so it does not apply.
 - `mcp.rs`: the stop signal drains for at most `DRAIN` (25 seconds, no flag, under Kubernetes'
   30-second default grace period); past it the connections left are dropped, an answer still
   waiting on an index lock included, and the exit is 0.

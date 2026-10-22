@@ -93,12 +93,16 @@ fn sign(key: &EncodingKey, kid: &str, alg: Algorithm, claims: &Value) -> String 
     jsonwebtoken::encode(&header, claims, key).unwrap()
 }
 
-/// The claims of a token of `issuer` for the resource at `path`, granting `identities`.
+/// The scope every server here requires.
+const SCOPE: &str = "meada:read";
+
+/// The claims of a token of `issuer` for the resource at `path`, granting `identities`, with
+/// the required scope.
 fn claims(issuer: &str, path: &str, identities: &[&str]) -> Value {
     json!({
         "iss": issuer, "aud": format!("{PUBLIC}/{path}"),
         "exp": jsonwebtoken::get_current_timestamp() + 300,
-        "meada_repositories": identities,
+        "meada_repositories": identities, "scope": format!("openid {SCOPE}"),
     })
 }
 
@@ -110,12 +114,12 @@ fn oidc_manifest(case: &str, issuer: &str) -> std::path::PathBuf {
     dir
 }
 
-/// `[oidc]` for `issuer`, appended to the manifest `manifest` of `dir`.
+/// `[oidc]` for `issuer`, requiring `SCOPE`, appended to the manifest `manifest` of `dir`.
 fn append(dir: &Path, manifest: &str, issuer: &str) {
     let file = dir.join(manifest);
     let section = format!(
         "\n[oidc]\nissuer = \"{issuer}\"\npublic_url = \"{PUBLIC}/\"\n\
-         identities_claim = \"meada_repositories\"\n"
+         identities_claim = \"meada_repositories\"\nscopes = [\"{SCOPE}\"]\n"
     );
     fs::write(&file, fs::read_to_string(&file).unwrap() + &section).unwrap();
 }
@@ -125,23 +129,25 @@ fn start(dir: &Path) -> Server {
     Server::start_args(dir, &args, &[])
 }
 
-/// What `url` answers with `token` and `headers`: its status, `WWW-Authenticate` and body. With
-/// `trace`, a `tools/call` of `trace` from `dashboard` POSTed alone, else a GET.
-fn ask(url: &str, token: Option<&str>, headers: &[(&str, &str)], trace: bool) -> Answer {
+/// What `url` answers with `token` and `headers` (values as bytes, so not always UTF-8): its
+/// status, `WWW-Authenticate` and body. With `trace`, a `tools/call` of `trace` from
+/// `dashboard` POSTed alone, else a GET.
+fn ask(url: &str, token: Option<&str>, headers: &[(&str, &[u8])], trace: bool) -> Answer {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .http_status_as_error(false)
         .build()
         .into();
+    let value = |bytes: &[u8]| ureq::http::HeaderValue::from_bytes(bytes).unwrap();
     let mut sent = Vec::new();
     if let Some(token) = token {
-        sent.push(("Authorization".to_string(), format!("Bearer {token}")));
+        sent.push(("Authorization", value(format!("Bearer {token}").as_bytes())));
     }
-    sent.extend(headers.iter().map(|(k, v)| (k.to_string(), v.to_string())));
+    sent.extend(headers.iter().map(|(k, v)| (*k, value(v))));
     let response = match trace {
         true => {
             let mut request = agent.post(url);
             for (name, value) in &sent {
-                request = request.header(name, value);
+                request = request.header(*name, value);
             }
             let message = json!({
                 "jsonrpc": "2.0", "id": 1, "method": "tools/call",
@@ -155,7 +161,7 @@ fn ask(url: &str, token: Option<&str>, headers: &[(&str, &str)], trace: bool) ->
         false => {
             let mut request = agent.get(url);
             for (name, value) in &sent {
-                request = request.header(name, value);
+                request = request.header(*name, value);
             }
             request.call()
         }
@@ -172,6 +178,35 @@ fn ask(url: &str, token: Option<&str>, headers: &[(&str, &str)], trace: bool) ->
         kind,
         body,
     }
+}
+
+/// The status and `WWW-Authenticate` of a GET of `url` sending `headers` as raw lines, for the
+/// shapes an HTTP client refuses to send (two `Authorization` headers, a value not in UTF-8).
+fn raw(url: &str, headers: &[&[u8]]) -> (u16, Option<String>) {
+    let (host, path) = url
+        .strip_prefix("http://")
+        .unwrap()
+        .split_once('/')
+        .unwrap();
+    let mut request =
+        format!("GET /{path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n").into_bytes();
+    for header in headers {
+        request.extend_from_slice(header);
+        request.extend_from_slice(b"\r\n");
+    }
+    request.extend_from_slice(b"\r\n");
+    let mut stream = std::net::TcpStream::connect(host).unwrap();
+    stream.write_all(&request).unwrap();
+    let mut answer = Vec::new();
+    std::io::Read::read_to_end(&mut stream, &mut answer).unwrap();
+    let answer = String::from_utf8_lossy(&answer);
+    let head = answer.split("\r\n\r\n").next().unwrap();
+    let status = head.split(' ').nth(1).unwrap().parse().unwrap();
+    let challenge = head.lines().find_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        (name.eq_ignore_ascii_case("www-authenticate")).then(|| value.trim().to_string())
+    });
+    (status, challenge)
 }
 
 #[derive(Debug)]
@@ -199,14 +234,18 @@ fn golden() -> String {
     .unwrap()
 }
 
-/// The challenges of a request to `path` with no token and with a refused one.
+/// The challenges at `path`: no token, a refused one, a token without the identity, and one
+/// without the scope.
 fn missing(path: &str) -> Option<String> {
-    Some(format!("Bearer resource_metadata=\"{METADATA}/{path}\""))
+    Some(format!(
+        "Bearer resource_metadata=\"{METADATA}/{path}\", scope=\"{SCOPE}\""
+    ))
 }
 
 fn invalid(path: &str) -> Option<String> {
     Some(format!(
-        "Bearer error=\"invalid_token\", resource_metadata=\"{METADATA}/{path}\""
+        "Bearer error=\"invalid_token\", resource_metadata=\"{METADATA}/{path}\", \
+         scope=\"{SCOPE}\""
     ))
 }
 
@@ -214,6 +253,20 @@ fn forbidden(path: &str) -> Option<String> {
     Some(format!(
         "Bearer error=\"insufficient_scope\", resource_metadata=\"{METADATA}/{path}\""
     ))
+}
+
+fn unscoped(path: &str) -> Option<String> {
+    Some(format!(
+        "Bearer error=\"insufficient_scope\", resource_metadata=\"{METADATA}/{path}\", \
+         scope=\"{SCOPE}\""
+    ))
+}
+
+/// A token of `issuer` for `path`, granting `WEB`, without the required scope.
+fn scopeless(issuer: &str, signing: &EncodingKey, path: &str) -> String {
+    let mut claims = claims(issuer, path, &[WEB]);
+    claims["scope"] = "openid".into();
+    sign(signing, "k1", Algorithm::ES256, &claims)
 }
 
 /// The tokens a refusal test sends: each is refused with 401 `invalid_token` at `/<path>`.
@@ -284,6 +337,7 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
                 "resource": format!("{PUBLIC}/{path}"),
                 "authorization_servers": [issuer.base],
                 "bearer_methods_supported": ["header"],
+                "scopes_supported": [SCOPE],
             })
         );
     }
@@ -296,12 +350,15 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
         (answer.status, answer.challenge.as_deref()),
         (
             401,
-            Some(format!("Bearer resource_metadata=\"{METADATA}\"").as_str())
+            Some(format!("Bearer resource_metadata=\"{METADATA}\", scope=\"{SCOPE}\"").as_str())
         )
     );
     assert!(!answer.body.contains(WEB), "{}", answer.body);
     let answer = ask(&at("example.com/chain/nope"), None, &[], false);
     assert_eq!(answer.challenge, missing("example.com/chain/nope"));
+    // A CR LF in the path stays encoded in the one challenge header.
+    let answer = ask(&at("x%0D%0AX-Evil:%201"), None, &[], false);
+    assert_eq!(answer.challenge, missing("x%0D%0AX-Evil:%201"));
 
     // A valid token in the query string is not read.
     let valid = sign(
@@ -329,6 +386,18 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
         assert_eq!(answer.body, "unauthorized\n", "{case}");
         sent.push(token);
     }
+    // Two `Authorization` headers, or one that is not UTF-8, carrying a valid token.
+    let header = format!("Authorization: Bearer {valid}").into_bytes();
+    let twice = raw(&at(WEB), &[&header, &header]);
+    assert_eq!(twice, (401, invalid(WEB)));
+    let mut bytes = header.clone();
+    bytes.push(0xff);
+    assert_eq!(raw(&at(WEB), &[&bytes]), (401, invalid(WEB)));
+    // A valid token without the required scope.
+    let token = scopeless(&issuer.base, &signing, WEB);
+    let answer = ask(&at(WEB), Some(&token), &[], true);
+    assert_eq!((answer.status, answer.challenge), (403, unscoped(WEB)));
+    sent.push(token);
 
     // A valid token reads what its claim lists, as the golden has it.
     assert_eq!(traced(&ask(&at(WEB), Some(&valid), &[], true)), golden());
@@ -345,7 +414,7 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
     let answer = ask(
         &at(WEB),
         Some(&valid),
-        &[("Origin", "https://evil.example")],
+        &[("Origin", &b"https://evil.example"[..])],
         true,
     );
     assert_eq!(answer.status, 403);
@@ -518,11 +587,22 @@ fn a_pinned_path_is_admitted_as_its_identity_is() {
     let other = sign(&signing, "k1", Algorithm::ES256, &other);
     let answer = ask(&at(&pinned), Some(&other), &[], true);
     assert_eq!((answer.status, answer.challenge), (403, forbidden(&pinned)));
+    let answer = ask(
+        &at(&pinned),
+        Some(&scopeless(&issuer.base, &signing, WEB)),
+        &[],
+        true,
+    );
+    assert_eq!((answer.status, answer.challenge), (403, unscoped(&pinned)));
 
-    // A generation the node does not hold: 401 without a token, the 404 with one.
+    // A generation the node does not hold: 401 without a token, 403 with one that does not
+    // grant the identity, the 404 with one that does.
     let gone = format!("{WEB}@ffffffffffffffff");
     let answer = ask(&at(&gone), None, &[], false);
     assert_eq!((answer.status, answer.challenge), (401, missing(&gone)));
+    assert!(!answer.body.contains(&g1), "{}", answer.body);
+    let answer = ask(&at(&gone), Some(&other), &[], false);
+    assert_eq!((answer.status, answer.challenge), (403, forbidden(&gone)));
     assert!(!answer.body.contains(&g1), "{}", answer.body);
     let token = sign(
         &signing,

@@ -461,7 +461,9 @@ el `resource` fijado. Un token pasa con un algoritmo asimétrico (RS256, RS384, 
 ES384, PS256) que coincida con la clave, `iss` igual a `issuer`, un `aud` igual a `audience` o,
 sin ella, a la URL de `/<identidad>` (que los pins también aceptan, de modo que un token lee el
 repositorio en toda generación), `exp` obligatorio y `nbf` respetado con 60 s de margen, y todo
-scope configurado en su `scope`. Un token en la query string nunca se lee.
+scope configurado en su `scope`. Un token en la query string nunca se lee. `scope` se lee solo
+como string separado por espacios; `scp` y un `scope` en array no se leen, así que, con `scopes`
+definido, un proveedor que envía `scp` (Okta, por ejemplo) necesita un claim mapper a `scope`.
 
 Sin token, o con uno que no pasa: 401 con `WWW-Authenticate: Bearer
 resource_metadata="<public_url>/.well-known/oauth-protected-resource/<ruta>"`, más

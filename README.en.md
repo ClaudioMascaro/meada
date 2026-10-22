@@ -444,7 +444,10 @@ same with the pinned `resource`. A token passes with an asymmetric algorithm (RS
 RS512, ES256, ES384, PS256) that fits its key, `iss` equal to `issuer`, an `aud` equal to
 `audience` or, without it, to the URL of `/<identity>` (which pins accept too, so one token
 reads a repository at every generation), `exp` present and `nbf` honoured with 60 s of leeway,
-and every configured scope in its `scope`. A token in the query string is never read.
+and every configured scope in its `scope`. A token in the query string is never read. `scope`
+is read only as a space-separated string; `scp` and an array-valued `scope` are not read, so,
+with `scopes` set, a provider that sends `scp` (Okta, for example) needs a claim mapper to
+`scope`.
 
 No token, or one that does not pass: 401 with `WWW-Authenticate: Bearer
 resource_metadata="<public_url>/.well-known/oauth-protected-resource/<path>"`, plus

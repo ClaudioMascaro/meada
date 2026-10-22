@@ -114,10 +114,10 @@ pub struct Config {
 
 impl File {
     pub fn validate(self) -> Result<Config, (&'static str, String)> {
-        if !reachable(&self.issuer, false) {
+        if !reachable(&self.issuer, Shape::Issuer) {
             return Err(("oidc.issuer", Msg::OidcUrl { bare: false }.text()));
         }
-        if !reachable(&self.public_url, true) {
+        if !reachable(&self.public_url, Shape::Bare) {
             return Err(("oidc.public_url", Msg::OidcUrl { bare: true }.text()));
         }
         if self.audience.as_deref() == Some("") {
@@ -127,12 +127,14 @@ impl File {
             return Err(("oidc.identities_claim", Msg::OidcEmpty.text()));
         }
         let scopes = self.scopes.unwrap_or_default();
-        // RFC 6749's scope-token: what a quoted `scope` parameter can carry as is.
-        let token = |s: &String| {
-            !s.is_empty() && (s.bytes()).all(|b| matches!(b, 0x21 | 0x23..=0x5b | 0x5d..=0x7e))
-        };
-        if !scopes.iter().all(token) {
-            return Err(("oidc.scopes", Msg::OidcEmpty.text()));
+        for scope in &scopes {
+            // RFC 6749's scope-token: what a quoted `scope` parameter can carry as is.
+            let bad = (scope.chars()).find(|c| !matches!(c, '!' | '#'..='[' | ']'..='~'));
+            match bad {
+                _ if scope.is_empty() => return Err(("oidc.scopes", Msg::OidcEmpty.text())),
+                Some(bad) => return Err(("oidc.scopes", Msg::OidcScope { scope, bad }.text())),
+                None => {}
+            }
         }
         let refresh = self.jwks_refresh_seconds.unwrap_or(REFRESH_DEFAULT);
         let refresh = match u64::try_from(refresh) {
@@ -153,20 +155,34 @@ impl File {
     }
 }
 
+/// What an `[oidc]` URL may hold past its host.
+#[derive(Clone, Copy, PartialEq)]
+enum Shape {
+    /// A path (`issuer`).
+    Issuer,
+    /// Nothing (`public_url`).
+    Bare,
+    /// A path and a query (the metadata's `jwks_uri`).
+    Jwks,
+}
+
 /// Whether `url` is an endpoint the module may name: `https`, or `http` on loopback
-/// (`localhost`, `127.0.0.0/8`, `::1`), with a host and no user, query or fragment; with `bare`,
-/// no path either.
-fn reachable(url: &str, bare: bool) -> bool {
+/// (`localhost`, `127.0.0.0/8`, `::1`; an IPv4-mapped address is not loopback), with a host, no
+/// user and no fragment, and past its host what `shape` allows.
+fn reachable(url: &str, shape: Shape) -> bool {
     let Ok(uri) = url.parse::<Uri>() else {
         return false;
     };
     let (Some(authority), Some(host)) = (uri.authority(), uri.host()) else {
         return false;
     };
-    if authority.as_str().contains('@') || uri.query().is_some() || url.contains('#') {
+    if authority.as_str().contains('@') || url.contains('#') {
         return false;
     }
-    if bare && !matches!(uri.path(), "" | "/") {
+    if uri.query().is_some() && shape != Shape::Jwks {
+        return false;
+    }
+    if shape == Shape::Bare && !matches!(uri.path(), "" | "/") {
         return false;
     }
     let host = host.trim_start_matches('[').trim_end_matches(']');
@@ -251,7 +267,9 @@ fn get(agent: &ureq::Agent, url: &str, max: u64) -> Result<Vec<u8>, String> {
     if !status.is_success() {
         return Err(format!("http status {}", status.as_u16()));
     }
-    (response.body_mut().with_config().limit(max).read_to_vec()).map_err(|e| e.to_string())
+    // ureq refuses a body that fills its limit, so `max` bytes take a limit one past it.
+    let body = response.body_mut().with_config().limit(max + 1);
+    body.read_to_vec().map_err(|e| e.to_string())
 }
 
 /// The metadata URLs of `issuer`, in the order the MCP authorization specification tries them:
@@ -276,41 +294,37 @@ fn metadata_urls(issuer: &str) -> Vec<String> {
     urls
 }
 
-/// The `jwks_uri` of the first metadata document of `issuer` that answers: it must name
-/// `issuer` (RFC 8414) and an endpoint the module may reach.
+/// The `jwks_uri` of the first metadata document of `issuer` that can be used: it must name
+/// `issuer` (RFC 8414) and an endpoint the module may reach. A document that cannot is passed
+/// over as an unanswered one is, and each is named in the error when none can.
 fn discover(agent: &ureq::Agent, issuer: &str) -> Result<String, String> {
+    let mut tried = Vec::new();
+    for url in metadata_urls(issuer) {
+        match metadata(agent, &url, issuer) {
+            Ok(jwks_uri) => return Ok(jwks_uri),
+            Err(why) => tried.push(format!("{url}: {why}")),
+        }
+    }
+    Err(Msg::OidcMetadata(&tried.join("; ")).text())
+}
+
+/// The `jwks_uri` of the metadata document at `url`, or why it cannot be used.
+fn metadata(agent: &ureq::Agent, url: &str, issuer: &str) -> Result<String, String> {
     #[derive(Deserialize)]
     struct Metadata {
         issuer: String,
         jwks_uri: Option<String>,
     }
-    let mut tried = Vec::new();
-    for url in metadata_urls(issuer) {
-        let body = match get(agent, &url, METADATA_MAX) {
-            Ok(body) => body,
-            Err(why) => {
-                tried.push(format!("{url}: {why}"));
-                continue;
-            }
-        };
-        let metadata: Metadata = serde_json::from_slice(&body)
-            .map_err(|e| Msg::OidcMetadata(&format!("{url}: {e}")).text())?;
-        if metadata.issuer != issuer {
-            let found = &metadata.issuer;
-            return Err(Msg::OidcIssuerMismatch { url: &url, found }.text());
-        }
-        let jwks_uri = metadata.jwks_uri.unwrap_or_default();
-        if !reachable(&jwks_uri, false) {
-            let why = Msg::OidcUrl { bare: false }.text();
-            return Err(Msg::OidcJwksUri {
-                url: &url,
-                why: &why,
-            }
-            .text());
-        }
-        return Ok(jwks_uri);
+    let body = get(agent, url, METADATA_MAX)?;
+    let metadata: Metadata = serde_json::from_slice(&body).map_err(|e| e.to_string())?;
+    if metadata.issuer != issuer {
+        return Err(Msg::OidcIssuerMismatch(&metadata.issuer).text());
     }
-    Err(Msg::OidcMetadata(&tried.join("; ")).text())
+    let jwks_uri = metadata.jwks_uri.unwrap_or_default();
+    match reachable(&jwks_uri, Shape::Jwks) {
+        true => Ok(jwks_uri),
+        false => Err(Msg::OidcJwksUri(&Msg::OidcJwksUrl.text()).text()),
+    }
 }
 
 /// The signing keys of the JWKS at `url` the module accepts: RSA, or EC on P-256 or P-384, for
@@ -355,10 +369,13 @@ fn algorithm(named: &jsonwebtoken::jwk::KeyAlgorithm) -> Option<Algorithm> {
     ALGORITHMS.contains(&algorithm).then_some(algorithm)
 }
 
-/// Whether `key` is the one `header` names and fits its algorithm: the same `kid` when the
-/// header has one, the algorithm the key names when it names one, and its type and curve.
+/// Whether `key` is the one `header` names and fits its algorithm: the same `kid` when both
+/// have one, the algorithm the key names when it names one, and its type and curve.
 fn fits(key: &Jwk, header: &Header) -> bool {
-    let kid = (header.kid.as_deref()).is_none_or(|kid| key.common.key_id.as_deref() == Some(kid));
+    let kid = match (header.kid.as_deref(), key.common.key_id.as_deref()) {
+        (Some(named), Some(kid)) => named == kid,
+        _ => true,
+    };
     let named =
         (key.common.key_algorithm.as_ref()).is_none_or(|a| algorithm(a) == Some(header.alg));
     let kind = match (&key.algorithm, header.alg) {
@@ -373,7 +390,9 @@ fn fits(key: &Jwk, header: &Header) -> bool {
     kid && named && kind
 }
 
-/// The token of `headers`' one `Authorization: Bearer` header: `Ok(None)` without one.
+/// The token of `headers`' one `Authorization: Bearer` header: `Ok(None)` without one, or with
+/// another scheme (RFC 6750 §3.1: no bearer token was sent); two headers, a value that is not
+/// UTF-8 and an empty token are refused.
 fn bearer(headers: &HeaderMap) -> Result<Option<&str>, Refusal> {
     let mut values = headers.get_all(header::AUTHORIZATION).iter();
     let Some(value) = values.next() else {
@@ -383,11 +402,13 @@ fn bearer(headers: &HeaderMap) -> Result<Option<&str>, Refusal> {
         return Err(Refusal::Invalid);
     }
     let value = value.to_str().map_err(|_| Refusal::Invalid)?;
-    let (scheme, token) = value.split_once(' ').ok_or(Refusal::Invalid)?;
-    let token = token.trim();
-    match scheme.eq_ignore_ascii_case("bearer") && !token.is_empty() {
-        true => Ok(Some(token)),
-        false => Err(Refusal::Invalid),
+    let (scheme, token) = value.split_once(' ').unwrap_or((value, ""));
+    if !scheme.eq_ignore_ascii_case("bearer") {
+        return Ok(None);
+    }
+    match token.trim() {
+        "" => Err(Refusal::Invalid),
+        token => Ok(Some(token)),
     }
 }
 
@@ -535,7 +556,8 @@ impl Oidc {
     /// `aud` among `audiences`, and every configured scope.
     fn verify(&self, token: &str, audiences: &[String]) -> Result<Grant, Refusal> {
         let header = jsonwebtoken::decode_header(token).map_err(|_| Refusal::Invalid)?;
-        if !ALGORITHMS.contains(&header.alg) {
+        // `crit` names extensions the token needs understood (RFC 7515 §4.1.11): none is.
+        if !ALGORITHMS.contains(&header.alg) || header.crit.is_some() {
             return Err(Refusal::Invalid);
         }
         if !self.keys().iter().any(|key| fits(key, &header)) {
@@ -583,13 +605,16 @@ impl Oidc {
     }
 
     /// Fetches the JWKS for a `kid` it lacks, unless an unknown `kid` already did within
-    /// `KID_REFRESH_EVERY`. A request arriving during the fetch waits for it.
+    /// `KID_REFRESH_EVERY`. The lock only claims the fetch: a request arriving during it does
+    /// not wait, and is checked against the keys cached then.
     fn refetch(&self) {
-        let mut fetched = self.kid_fetched.lock().unwrap_or_else(|e| e.into_inner());
-        if fetched.is_some_and(|at| at.elapsed() < KID_REFRESH_EVERY) {
-            return;
+        {
+            let mut fetched = self.kid_fetched.lock().unwrap_or_else(|e| e.into_inner());
+            if fetched.is_some_and(|at| at.elapsed() < KID_REFRESH_EVERY) {
+                return;
+            }
+            *fetched = Some(Instant::now());
         }
-        *fetched = Some(Instant::now());
         self.refresh();
     }
 
@@ -647,7 +672,7 @@ mod tests {
             "http://127.0.0.1:9",
             "http://[::1]:9",
         ] {
-            assert!(reachable(good, false), "{good}");
+            assert!(reachable(good, Shape::Issuer), "{good}");
         }
         for bad in [
             "http://id.example",
@@ -657,18 +682,40 @@ mod tests {
             "ftp://id.example",
             "id.example",
             "",
+            // Names that only look like loopback, and an IPv4-mapped loopback address.
+            "http://localhost.evil.com",
+            "http://127.0.0.1.nip.io",
+            "http://[::ffff:127.0.0.1]",
+            "http://localhost:80@evil.com",
         ] {
-            assert!(!reachable(bad, false), "{bad}");
+            assert!(!reachable(bad, Shape::Issuer), "{bad}");
         }
-        assert!(!reachable("https://meada.example/prefix", true));
+        assert!(!reachable("https://meada.example/prefix", Shape::Bare));
+        // A `jwks_uri` may carry a query, never a user or a fragment.
+        assert!(reachable("https://id.example/jwks?realm=a", Shape::Jwks));
+        for bad in [
+            "https://u@id.example/jwks?realm=a",
+            "https://id.example/jwks?realm=a#f",
+            "http://id.example/jwks?realm=a",
+        ] {
+            assert!(!reachable(bad, Shape::Jwks), "{bad}");
+        }
         let key = |extra: &str| section(extra).unwrap_err().0;
         assert_eq!(
             key("jwks_refresh_seconds = 59"),
             "oidc.jwks_refresh_seconds"
         );
         assert_eq!(key("audience = \"\""), "oidc.audience");
-        assert_eq!(key("scopes = [\"a b\"]"), "oidc.scopes");
-        assert_eq!(key("scopes = [\"a\\\"\"]"), "oidc.scopes");
+        let scope = |extra: &str| section(extra).unwrap_err().1;
+        assert_eq!(
+            scope("scopes = [\"a b\"]"),
+            "\"a b\" holds ' ', which a scope cannot carry (RFC 6749)"
+        );
+        assert_eq!(
+            scope("scopes = [\"a\\\"\"]"),
+            "\"a\\\"\" holds '\"', which a scope cannot carry (RFC 6749)"
+        );
+        assert_eq!(scope("scopes = [\"\"]"), "must not be empty");
         assert_eq!(
             section("scopes = [\"meada:read\"]").unwrap().scopes,
             ["meada:read"]
@@ -1028,14 +1075,32 @@ mod tests {
                 ))
             )
         );
-        let mut basic = HeaderMap::new();
-        basic.insert(header::AUTHORIZATION, "Basic YTpi".parse().unwrap());
+        // A CR LF in the path stays encoded: the challenge is one header.
         assert_eq!(
-            answer(basic, "a").1.unwrap(),
+            answer(HeaderMap::new(), "a\r\nX-Evil: 1").1.unwrap(),
             format!(
-                "Bearer error=\"invalid_token\", resource_metadata=\"{metadata}/a\", scope=\"meada:read\""
+                "Bearer resource_metadata=\"{metadata}/a%0D%0AX-Evil:%201\", scope=\"meada:read\""
             )
         );
+        // Another scheme is no bearer token (RFC 6750 §3.1); an empty bearer, two headers or
+        // a value that is not UTF-8 are refused.
+        let with = |values: &[&[u8]]| {
+            let mut headers = HeaderMap::new();
+            for value in values {
+                let value = header::HeaderValue::from_bytes(value).unwrap();
+                headers.append(header::AUTHORIZATION, value);
+            }
+            answer(headers, "a").1.unwrap()
+        };
+        let none = format!("Bearer resource_metadata=\"{metadata}/a\", scope=\"meada:read\"");
+        let refused = format!(
+            "Bearer error=\"invalid_token\", resource_metadata=\"{metadata}/a\", scope=\"meada:read\""
+        );
+        assert_eq!(with(&[b"Basic YTpi"]), none);
+        assert_eq!(with(&[b"Basic"]), none);
+        assert_eq!(with(&[b"Bearer "]), refused);
+        assert_eq!(with(&[b"Bearer a.b.c", b"Bearer a.b.c"]), refused);
+        assert_eq!(with(&[b"Bearer a.b.\xff"]), refused);
         let mut origin = HeaderMap::new();
         origin.insert(header::ORIGIN, "https://evil.example".parse().unwrap());
         assert_eq!(answer(origin, METADATA_PATH), (403, None));
@@ -1074,16 +1139,22 @@ mod tests {
     }
 
     #[test]
+    /// The RFC 8414 document answers 200 with junk, so OpenID discovery's is used; its
+    /// `jwks_uri` carries a query.
     fn start_reads_the_metadata_the_issuer_names_and_its_jwks() {
         let (_, jwk) = key("k1");
         let keys = set(&[&jwk]);
         let (base, _) = issuer(move |base, path| match path {
+            "/.well-known/oauth-authorization-server" => {
+                (200, String::new(), "<html>sign in</html>".into())
+            }
             "/.well-known/openid-configuration" => (
                 200,
                 String::new(),
-                serde_json::json!({"issuer": base, "jwks_uri": format!("{base}/jwks")}).to_string(),
+                serde_json::json!({"issuer": base, "jwks_uri": format!("{base}/jwks?realm=a")})
+                    .to_string(),
             ),
-            "/jwks" => (200, String::new(), keys.clone()),
+            "/jwks?realm=a" => (200, String::new(), keys.clone()),
             _ => (404, String::new(), String::new()),
         });
         let config = Config {
@@ -1091,8 +1162,40 @@ mod tests {
             ..config(None, &[])
         };
         let oidc = Oidc::start(config).unwrap();
-        assert_eq!(oidc.jwks_uri, format!("{base}/jwks"));
+        assert_eq!(oidc.jwks_uri, format!("{base}/jwks?realm=a"));
         assert_eq!(oidc.keys().len(), 1);
+    }
+
+    /// A document naming another issuer is passed over too, and the next one is used.
+    #[test]
+    fn a_document_naming_another_issuer_is_passed_over() {
+        let (_, jwk) = key("k1");
+        let keys = set(&[&jwk]);
+        let (base, _) = issuer(move |base, path| {
+            match path {
+            "/.well-known/oauth-authorization-server" => (
+                200,
+                String::new(),
+                serde_json::json!({"issuer": "https://other.example", "jwks_uri": "https://other.example/jwks"})
+                    .to_string(),
+            ),
+            "/.well-known/openid-configuration" => (
+                200,
+                String::new(),
+                serde_json::json!({"issuer": base, "jwks_uri": format!("{base}/jwks")}).to_string(),
+            ),
+            "/jwks" => (200, String::new(), keys.clone()),
+            _ => (404, String::new(), String::new()),
+        }
+        });
+        let config = Config {
+            issuer: base.clone(),
+            ..config(None, &[])
+        };
+        assert_eq!(
+            Oidc::start(config).unwrap().jwks_uri,
+            format!("{base}/jwks")
+        );
     }
 
     #[test]
@@ -1149,11 +1252,15 @@ mod tests {
         let (base, _) = issuer(|_, path| {
             let size = match path {
                 "/metadata" => METADATA_MAX + 1,
+                "/exact" => METADATA_MAX,
                 _ => JWKS_MAX + 1,
             };
             (200, String::new(), " ".repeat(size as usize))
         });
         let agent = agent(FETCH_TIMEOUT);
+        // The cap is inclusive.
+        let exact = get(&agent, &format!("{base}/exact"), METADATA_MAX).unwrap();
+        assert_eq!(exact.len() as u64, METADATA_MAX);
         let big = get(&agent, &format!("{base}/metadata"), METADATA_MAX).unwrap_err();
         assert!(big.contains("limit"), "{big}");
         let big = jwks(&agent, &format!("{base}/jwks")).unwrap_err();
@@ -1206,5 +1313,56 @@ mod tests {
         oidc.jwks_uri = "http://127.0.0.1:9/jwks".into();
         oidc.refresh();
         assert_eq!(oidc.keys().len(), 2);
+    }
+
+    /// While an unknown `kid` fetches the JWKS, another one does not wait for the fetch: the
+    /// lock is never held across the network.
+    #[test]
+    fn a_fetch_in_flight_holds_no_request_back() {
+        let (_, jwk) = key("k1");
+        let keys = set(&[&jwk]);
+        let (base, hits) = issuer(move |_, _| {
+            std::thread::sleep(Duration::from_secs(2));
+            (200, String::new(), keys.clone())
+        });
+        let mut oidc = module(config(None, &[]), vec![jwk]);
+        oidc.jwks_uri = format!("{base}/jwks");
+        let oidc = Arc::new(oidc);
+        let (stray, _) = key("stray");
+        let token = sign(&stray, "stray", Algorithm::ES256, &claims(|_| {}));
+        let fetching = {
+            let (oidc, token) = (oidc.clone(), token.clone());
+            std::thread::spawn(move || admitted(&oidc, &token, "a", "a").unwrap_err().0)
+        };
+        while hits.load(Ordering::SeqCst) == 0 {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let started = Instant::now();
+        assert_eq!(admitted(&oidc, &token, "a", "a").unwrap_err().0, 401);
+        assert!(
+            started.elapsed() < Duration::from_secs(1),
+            "{:?}",
+            started.elapsed()
+        );
+        assert_eq!(fetching.join().unwrap(), 401);
+    }
+
+    /// A JWK with no `kid` fits a token naming one; a JWK with a `kid` fits only that one; a
+    /// token with `crit` is refused.
+    #[test]
+    fn a_key_without_a_kid_fits_and_crit_is_refused() {
+        let (signing, mut jwk) = key("k1");
+        jwk.common.key_id = None;
+        let oidc = module(config(None, &[]), vec![jwk]);
+        let token = sign(&signing, "any", Algorithm::ES256, &claims(|_| {}));
+        assert_eq!(admitted(&oidc, &token, "a", "a"), Ok((true, false)));
+        let mut named = Header::new(Algorithm::ES256);
+        named.kid = Some("k1".into());
+        let (_, kid) = key("k2");
+        assert!(!fits(&kid, &named));
+        let mut critical = Header::new(Algorithm::ES256);
+        critical.crit = Some(vec!["exp".into()]);
+        let token = jsonwebtoken::encode(&critical, &claims(|_| {}), &signing).unwrap();
+        assert_eq!(admitted(&oidc, &token, "a", "a").unwrap_err().0, 401);
     }
 }

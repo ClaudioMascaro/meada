@@ -683,8 +683,12 @@ async fn route(
                     let mut repos = held.listed.entries.iter().map(|l| l.repo.as_str());
                     named(plain(StatusCode::NOT_FOUND, listing(&mut repos)), &held.id)
                 }
-                // A pin of a generation the node does not hold.
+                // A pin of a generation the node does not hold: only to a request that may read
+                // the identity it names.
                 Ok(None) => {
+                    if let Some(refused) = pass.refused(identity, target) {
+                        return refused;
+                    }
                     let local = current.local();
                     let now = crate::snapshot::pull::current(local).ok().flatten();
                     let now = now.map(|(id, _)| id);
