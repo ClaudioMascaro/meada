@@ -2,8 +2,15 @@
 //! --workspace <bootstrap manifest>` serves the front end's files from `[ui] dir` and a read-only
 //! JSON API under `/api/v1/`, on the listener `meada mcp --listen` uses (`mcp::serve_http`). It is
 //! never a node's route and never an MCP server. Every request goes through, in order, the `Host`
-//! check, the `Origin` check, admission (the operator's proxy: every request is a viewer's) and
-//! routing. No answer sets a cookie or carries an `Access-Control-*` header.
+//! check, the `Origin` check, admission and routing. No answer sets a cookie or carries an
+//! `Access-Control-*` header.
+//!
+//! Admission: behind the operator's proxy every request is a viewer's that reads everything.
+//! With `[oidc]` (feature `oidc`) the console is a resource server as a node is: a bearer token
+//! for `[ui] audience`, checked by the nodes' own module (`Oidc::admit_console`), except for the
+//! static files and `config`, which the browser needs to log in. Every admitted subject is a
+//! viewer, and the token's grant bounds every view (`Session::reads`, #290): a repository outside
+//! it is absent, while state that belongs to no repository is shown whole.
 
 use std::convert::Infallible;
 use std::fs;
@@ -11,9 +18,9 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use http_body_util::{BodyExt, Full, combinators::BoxBody};
-use hyper::body::Bytes;
-use hyper::{Method, Request, Response, StatusCode, header};
+use http_body_util::{BodyExt, Full, Limited, combinators::BoxBody};
+use hyper::body::{Bytes, Incoming};
+use hyper::{HeaderMap, Method, Request, Response, StatusCode, header};
 use percent_encoding::percent_decode_str;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -25,6 +32,10 @@ use crate::workspace::Manifest;
 
 type Answer = Response<BoxBody<Bytes, Infallible>>;
 
+/// A request's body as the console read it: empty except for the token check's, or the status
+/// refusing it (413 past `CHECK_MAX`, 400 when it could not be read).
+type Body = std::result::Result<Bytes, StatusCode>;
+
 /// The version the front end's files must be built for.
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -35,9 +46,11 @@ const VERSION_FILE: &str = "meada-ui.json";
 // ponytail: the most bytes of `meada-ui.json`; past it the file counts as another version.
 const VERSION_MAX: u64 = 4096;
 
-/// The content security policy of every answer.
-const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; \
-                   frame-ancestors 'none'";
+/// The path of the token check, the one route whose body the console reads.
+const CHECK: &str = "/api/v1/admission/check";
+
+/// The most bytes of a token check's body: a JWT in `{"token": ...}` with room to spare.
+const CHECK_MAX: usize = 16 << 10;
 
 /// The fixed bodies of the 403s.
 const HOST_REFUSED: &str = "Forbidden: Host header is not allowed\n";
@@ -59,8 +72,8 @@ pub struct File {
     operator_claim: Option<String>,
 }
 
-/// The validated section. `client_id` is read here and checked with the console's admission
-/// (#306), `operations` and the operator keys with the operations (#307).
+/// The validated section. `client_id` is checked at start beside `[oidc]`, `operations` and the
+/// operator keys with the operations (#307).
 #[derive(Clone, Debug)]
 pub struct Config {
     /// The front end's files.
@@ -137,22 +150,80 @@ struct Console {
     /// The bootstrap manifest as loaded at start, a JSON table. It names secrets' variables and
     /// files only: a section holds no secret (ADR 0012).
     loaded: Value,
+    /// The identities of the manifest's `[[repository]]` entries, in manifest order.
+    #[cfg(feature = "oidc")]
+    served: Vec<String>,
+    /// The content security policy of every answer.
+    csp: header::HeaderValue,
+    /// The nodes' OIDC module, with `[oidc]`: the console's admission.
+    #[cfg(feature = "oidc")]
+    oidc: Option<Arc<crate::oidc::Oidc>>,
+}
+
+/// Who asks: the admitted subject (none behind the proxy), always a viewer for now (operators
+/// come with #307), and what the request may read.
+struct Session {
+    subject: Option<String>,
+    /// The token's grant; none behind the proxy, where every identity is read.
+    #[cfg(feature = "oidc")]
+    grant: Option<crate::oidc::Grant>,
+}
+
+impl Session {
+    /// Whether the session may read `identity`. Every view that lists or answers about a
+    /// repository asks it (the manifest's entries here; the read routes and the playground of
+    /// #304 and #305 through the same call), as a node bounds its answers (#290).
+    fn reads(&self, identity: &str) -> bool {
+        #[cfg(feature = "oidc")]
+        if let Some(grant) = &self.grant {
+            return grant.reads(identity);
+        }
+        let _ = identity;
+        true
+    }
+
+    /// Whether the session reads every identity: behind the proxy, or a `*` grant.
+    fn whole(&self) -> bool {
+        #[cfg(feature = "oidc")]
+        if let Some(grant) = &self.grant {
+            return matches!(grant, crate::oidc::Grant::All);
+        }
+        true
+    }
 }
 
 /// `meada ui`: refuses to start, listing every problem, when the bootstrap manifest at
 /// `manifest` has errors or no `[ui]`, when `[ui] dir` is missing or built for another Meada
-/// version, or with `[oidc]` (until the console admits tokens, #306). Then serves at `listen`
-/// (`host:port`, `:port` or `port`, the loopback interface without a host) until SIGINT or
-/// SIGTERM, as `meada mcp --listen` does.
+/// version, or with `[oidc]` when `[ui] client_id` is missing or the issuer's metadata or JWKS
+/// cannot be read. Then serves at `listen` (`host:port`, `:port` or `port`, the loopback
+/// interface without a host) until SIGINT or SIGTERM, as `meada mcp --listen` does.
 pub fn listen(listen: &str, manifest: &Path) -> Result<()> {
     let address = crate::mcp::address(listen)?;
     let console = Arc::new(Console::start(manifest)?);
     crate::mcp::serve_http(address, move |bound, _| {
-        move |request: Request<hyper::body::Incoming>| {
+        move |request: Request<Incoming>| {
             let console = console.clone();
-            async move { tokio::task::block_in_place(|| console.answer(bound, &request)) }
+            async move {
+                let (parts, body) = request.into_parts();
+                let body = read(&parts, body).await;
+                let request = Request::from_parts(parts, body);
+                tokio::task::block_in_place(|| console.answer(bound, &request))
+            }
         }
     })
+}
+
+/// The body of a POST to the token check, at most `CHECK_MAX` bytes; any other request's is
+/// left unread. It lives only for its request: nothing stores, prints or forwards it.
+async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
+    if parts.method != Method::POST || parts.uri.path() != CHECK {
+        return Ok(Bytes::new());
+    }
+    match Limited::new(body, CHECK_MAX).collect().await {
+        Ok(collected) => Ok(collected.to_bytes()),
+        Err(e) if e.is::<http_body_util::LengthLimitError>() => Err(StatusCode::PAYLOAD_TOO_LARGE),
+        Err(_) => Err(StatusCode::BAD_REQUEST),
+    }
 }
 
 impl Console {
@@ -165,8 +236,8 @@ impl Console {
         let at = |key: &str, problem: String| crate::config::error_at(file, &src, key, &problem);
         let mut problems = Vec::new();
         #[cfg(feature = "oidc")]
-        if read.oidc.is_some() {
-            problems.push(at("oidc", Msg::UiOidc.text()));
+        if read.oidc.is_some() && ui.client_id.is_none() {
+            problems.push(at("ui", Msg::KeyMissing("ui.client_id").text()));
         }
         let dir = ui.dir.display().to_string();
         let root = (ui.dir.canonicalize().ok()).filter(|root| root.is_dir());
@@ -189,6 +260,19 @@ impl Console {
                 }
             }
         }
+        // As a node does: the issuer's metadata and JWKS read now, a start check.
+        #[cfg(feature = "oidc")]
+        let oidc = match read.oidc.clone().map(crate::oidc::Oidc::start).transpose() {
+            Ok(oidc) => oidc,
+            Err(e) => {
+                problems.push(e);
+                None
+            }
+        };
+        #[cfg(feature = "oidc")]
+        let issuer = oidc.as_ref().map(|oidc| origin(oidc.login().0));
+        #[cfg(not(feature = "oidc"))]
+        let issuer: Option<&str> = None;
         let (Some(root), true) = (root, problems.is_empty()) else {
             let lines: Vec<String> = problems.iter().map(|p| p.to_string()).collect();
             return Err(lines.join("\n").into());
@@ -199,20 +283,25 @@ impl Console {
             ui,
             root,
             loaded: serde_json::to_value(table)?,
+            #[cfg(feature = "oidc")]
+            served: read.entries.iter().map(|e| e.repo.clone()).collect(),
+            csp: header::HeaderValue::from_str(&csp(issuer))?,
+            #[cfg(feature = "oidc")]
+            oidc,
         })
     }
 
     /// The answer to `request`, the listener bound at `bound`.
-    fn answer<B>(&self, bound: SocketAddr, request: &Request<B>) -> Answer {
+    fn answer(&self, bound: SocketAddr, request: &Request<Body>) -> Answer {
         let mut answer = self.checked(bound, request);
         let headers = answer.headers_mut();
         headers.insert("x-content-type-options", "nosniff".parse().unwrap());
         headers.insert("referrer-policy", "no-referrer".parse().unwrap());
-        headers.insert("content-security-policy", CSP.parse().unwrap());
+        headers.insert("content-security-policy", self.csp.clone());
         answer
     }
 
-    fn checked<B>(&self, bound: SocketAddr, request: &Request<B>) -> Answer {
+    fn checked(&self, bound: SocketAddr, request: &Request<Body>) -> Answer {
         let headers = request.headers();
         let host = headers.get(header::HOST).and_then(|h| h.to_str().ok());
         if !host.is_some_and(|host| self.hosts(host, bound)) {
@@ -229,13 +318,58 @@ impl Console {
             None if write => return plain(StatusCode::FORBIDDEN, WRITE_REFUSED),
             _ => {}
         }
-        // Admission: the operator's proxy admits; every request is a viewer's.
         let path = request.uri().path();
-        match path.strip_prefix("/api/v1/") {
-            Some(route) => self.api(write, route),
+        let route = path.strip_prefix("/api/v1/");
+        let session = match self.admit(headers, route) {
+            Ok(session) => session,
+            Err(refused) => return *refused,
+        };
+        match route {
+            Some(route) => self.api(request, route, &session),
             None if write => plain(StatusCode::METHOD_NOT_ALLOWED, "Method Not Allowed\n"),
             None => self.file(path),
         }
+    }
+
+    /// Admission of a request to the API route `route` (`None`: a static file). Behind the
+    /// proxy every request is a viewer's; with `[oidc]`, a bearer token for `[ui] audience`,
+    /// except for the static files and `config`, which the browser needs to log in.
+    fn admit(
+        &self,
+        headers: &HeaderMap,
+        route: Option<&str>,
+    ) -> std::result::Result<Session, Box<Answer>> {
+        let open = matches!(route, None | Some("config"));
+        #[cfg(feature = "oidc")]
+        if let Some(oidc) = &self.oidc
+            && !open
+        {
+            return match oidc.admit_console(headers, &self.ui.audience) {
+                Ok(admitted) => Ok(Session {
+                    subject: admitted.subject,
+                    grant: Some(admitted.grant),
+                }),
+                Err((status, challenge)) => {
+                    let (code, message) = match status {
+                        StatusCode::UNAUTHORIZED => ("unauthorized", Msg::UiUnauthorized.text()),
+                        _ => ("forbidden", Msg::UiScope.text()),
+                    };
+                    let mut answer = error(status, code, &message);
+                    if let Ok(challenge) = header::HeaderValue::from_str(&challenge) {
+                        answer
+                            .headers_mut()
+                            .insert(header::WWW_AUTHENTICATE, challenge);
+                    }
+                    Err(Box::new(answer))
+                }
+            };
+        }
+        let _ = (headers, open);
+        Ok(Session {
+            subject: None,
+            #[cfg(feature = "oidc")]
+            grant: None,
+        })
     }
 
     /// Whether `host`, a request's `Host`, is `public_url`'s host and port, or the bound address
@@ -245,42 +379,134 @@ impl Console {
         host.eq_ignore_ascii_case(public) || (bound.ip().is_loopback() && host == bound.to_string())
     }
 
-    /// The API's answer at `/api/v1/<route>`.
-    fn api(&self, write: bool, route: &str) -> Answer {
+    /// The API's answer at `/api/v1/<route>` to `session`.
+    fn api(&self, request: &Request<Body>, route: &str, session: &Session) -> Answer {
+        let method = request.method();
+        let read = matches!(*method, Method::GET | Method::HEAD);
         let document = match route {
-            _ if write => None,
-            "config" => Some(json!({"version": VERSION, "operations": self.ui.operations})),
-            "session" => Some(json!({"subject": null, "role": "viewer"})),
-            "manifest" => Some(self.manifest()),
+            "config" if read => Some(self.config()),
+            "session" if read => Some(json!({"subject": session.subject, "role": "viewer"})),
+            "manifest" if read => Some(self.manifest(session)),
+            #[cfg(feature = "oidc")]
+            "admission" if read => (self.oidc.as_ref()).map(|o| o.admission(&|i| session.reads(i))),
+            #[cfg(feature = "oidc")]
+            "admission/check" if *method == Method::POST => match &self.oidc {
+                Some(oidc) => return self.check(oidc, request.body(), session),
+                None => None,
+            },
             _ => None,
         };
         match document {
             Some(document) => json_answer(StatusCode::OK, &document),
-            None => {
-                let message = Msg::UiNoRoute.text();
-                let error = json!({"error": {"code": "not_found", "message": message}});
-                json_answer(StatusCode::NOT_FOUND, &error)
-            }
+            None => error(StatusCode::NOT_FOUND, "not_found", &Msg::UiNoRoute.text()),
         }
+    }
+
+    /// The console's version and `operations`; with `[oidc]`, what the browser logs in with: the
+    /// issuer, `[ui] client_id`, the scopes and the audience its token must carry.
+    fn config(&self) -> Value {
+        #[allow(unused_mut)]
+        let mut config = json!({"version": VERSION, "operations": self.ui.operations});
+        #[cfg(feature = "oidc")]
+        if let Some(oidc) = &self.oidc {
+            let (issuer, scopes) = oidc.login();
+            config["issuer"] = issuer.into();
+            config["client_id"] = self.ui.client_id.clone().into();
+            config["scopes"] = scopes.into();
+            config["audience"] = self.ui.audience.clone().into();
+        }
+        config
     }
 
     /// The bootstrap manifest as loaded at start, the module sections the build has, and the
     /// errors of the file as it now stands on disk, read again: a mounted file changed since the
-    /// start shows its problems before a restart.
-    fn manifest(&self) -> Value {
-        let errors: Vec<String> = match Manifest::read(&self.file) {
+    /// start shows its problems before a restart. For a session that does not read everything,
+    /// the `[[repository]]` entries outside its grant are absent, and so is the text of an error
+    /// that could name one (only its file and line are left).
+    fn manifest(&self, session: &Session) -> Value {
+        let mut errors: Vec<String> = match Manifest::read(&self.file) {
             Ok(_) => Vec::new(),
             Err(e) => e.to_string().lines().map(String::from).collect(),
         };
+        let mut loaded = self.loaded.clone();
+        if !session.whole() {
+            if let Some(Value::Array(entries)) = loaded.get_mut("repository") {
+                entries.retain(|e| e["repo"].as_str().is_some_and(|r| session.reads(r)));
+            }
+            let on_disk = fs::read_to_string(&self.file).ok();
+            let on_disk = on_disk.and_then(|src| toml::from_str::<toml::Table>(&src).ok());
+            let hidden: Option<Vec<String>> = on_disk.map(|table| {
+                let table = serde_json::to_value(table).unwrap_or_default();
+                (identities(&table).chain(identities(&self.loaded)))
+                    .filter(|i| !session.reads(i))
+                    .map(str::to_string)
+                    .collect()
+            });
+            let file = self.file.display().to_string();
+            for line in &mut errors {
+                let named = hidden
+                    .as_ref()
+                    .is_none_or(|h| h.iter().any(|i| line.contains(i.as_str())));
+                if named {
+                    *line = position(line, &file);
+                }
+            }
+        }
         let modules: Vec<Value> = (modules::MODULES.iter())
             .map(|m| json!({"section": m.section, "feature": m.feature, "built": m.built}))
             .collect();
         json!({
             "file": self.file.display().to_string(),
-            "manifest": self.loaded,
+            "manifest": loaded,
             "modules": modules,
             "errors": errors,
         })
+    }
+
+    /// The token check: each check of the pasted token as a node makes it, against the cached
+    /// keys only, and the identities its grant admits among those served that `session` reads.
+    /// The token lives only for this request.
+    #[cfg(feature = "oidc")]
+    fn check(&self, oidc: &crate::oidc::Oidc, body: &Body, session: &Session) -> Answer {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Pasted {
+            token: String,
+        }
+        let body = match body {
+            Ok(body) => body,
+            Err(StatusCode::PAYLOAD_TOO_LARGE) => {
+                let message = Msg::UiTooLarge(CHECK_MAX).text();
+                return error(StatusCode::PAYLOAD_TOO_LARGE, "too_large", &message);
+            }
+            Err(status) => return error(*status, "bad_request", &Msg::UiCheckBody.text()),
+        };
+        // Never serde's text: it could quote the body.
+        let Ok(pasted) = serde_json::from_slice::<Pasted>(body) else {
+            return error(
+                StatusCode::BAD_REQUEST,
+                "bad_request",
+                &Msg::UiCheckBody.text(),
+            );
+        };
+        let served: Vec<&str> = self.served.iter().map(String::as_str).collect();
+        let checked = oidc.check(&pasted.token, &served);
+        let identities = checked.grant.map(|grant| {
+            (served.iter())
+                .filter(|i| grant.reads(i) && session.reads(i))
+                .collect::<Vec<_>>()
+        });
+        let checks = json!({
+            "signature": checked.signature,
+            "issuer": checked.issuer,
+            "audience": checked.audience,
+            "lifetime": checked.lifetime,
+            "scopes": checked.scopes,
+        });
+        json_answer(
+            StatusCode::OK,
+            &json!({"checks": checks, "identities": identities}),
+        )
     }
 
     /// The file of `[ui] dir` that `path` names: percent-decoded, a 404 for a `..`, `.` or empty
@@ -300,6 +526,42 @@ impl Console {
                 _ => not_found(),
             },
         }
+    }
+}
+
+/// The content security policy of every answer: `connect-src` adds `issuer`, the issuer's
+/// origin, with `[oidc]`.
+fn csp(issuer: Option<&str>) -> String {
+    let connect = issuer.map_or("'self'".to_string(), |issuer| format!("'self' {issuer}"));
+    format!(
+        "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src {connect}; \
+         frame-ancestors 'none'"
+    )
+}
+
+/// The origin of `url`, a URL `modules::reachable` passed: its scheme and authority.
+#[cfg(feature = "oidc")]
+fn origin(url: &str) -> &str {
+    let after = url.find("://").map_or(0, |at| at + 3);
+    let end = url[after..].find('/').map_or(url.len(), |at| after + at);
+    &url[..end]
+}
+
+/// The `repo` of each `[[repository]]` entry of `manifest`, a manifest as a JSON table.
+fn identities(manifest: &Value) -> impl Iterator<Item = &str> {
+    let entries = manifest.get("repository").and_then(Value::as_array);
+    (entries.into_iter().flatten()).filter_map(|e| e.get("repo").and_then(Value::as_str))
+}
+
+/// The position of the manifest error `line` about `file`: `<file>:<line>`, its text left out.
+fn position(line: &str, file: &str) -> String {
+    let rest = line.strip_prefix(file).and_then(|r| r.strip_prefix(':'));
+    let number: String = (rest.unwrap_or("").chars())
+        .take_while(char::is_ascii_digit)
+        .collect();
+    match number.is_empty() {
+        true => file.to_string(),
+        false => format!("{file}:{number}"),
     }
 }
 
@@ -371,6 +633,14 @@ fn plain(status: StatusCode, body: &'static str) -> Answer {
 
 fn not_found() -> Answer {
     plain(StatusCode::NOT_FOUND, "Not Found\n")
+}
+
+/// The API's error: `{"error": {"code": ..., "message": ...}}`.
+fn error(status: StatusCode, code: &str, message: &str) -> Answer {
+    json_answer(
+        status,
+        &json!({"error": {"code": code, "message": message}}),
+    )
 }
 
 fn json_answer(status: StatusCode, document: &Value) -> Answer {

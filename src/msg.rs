@@ -476,6 +476,12 @@ pub enum Msg<'a> {
     },
     #[cfg(feature = "oidc")]
     OidcJwksNoKey,
+    /// A JWKS that is not that JSON document: where it fails, never what it holds.
+    #[cfg(feature = "oidc")]
+    OidcJwksShape {
+        line: usize,
+        column: usize,
+    },
     #[cfg(feature = "oidc")]
     OidcRefreshFailed(&'a str),
     #[cfg(feature = "snapshot")]
@@ -561,9 +567,18 @@ pub enum Msg<'a> {
     /// A bootstrap manifest given to `meada ui` without `[ui]`.
     #[cfg(feature = "ui")]
     UiNoSection,
-    /// `[oidc]` in the console's bootstrap manifest, before the console admits tokens (#306).
-    #[cfg(feature = "ui")]
-    UiOidc,
+    /// A request to the console with no valid bearer token (feature `oidc`).
+    #[cfg(all(feature = "ui", feature = "oidc"))]
+    UiUnauthorized,
+    /// A valid token to the console without every configured scope.
+    #[cfg(all(feature = "ui", feature = "oidc"))]
+    UiScope,
+    /// A token check whose body is no `{"token": "<JWT>"}`.
+    #[cfg(all(feature = "ui", feature = "oidc"))]
+    UiCheckBody,
+    /// A request body past its route's cap, in bytes.
+    #[cfg(all(feature = "ui", feature = "oidc"))]
+    UiTooLarge(usize),
     /// `[ui] dir` that is not a directory.
     #[cfg(feature = "ui")]
     UiDirMissing(&'a str),
@@ -1729,6 +1744,11 @@ impl Msg<'_> {
                     .into(),
             ),
             #[cfg(feature = "oidc")]
+            Msg::OidcJwksShape { line, column } => pick(
+                format!("it is not a JSON Web Key Set (line {line}, column {column})"),
+                format!("ele não é um JSON Web Key Set (linha {line}, coluna {column})"),
+            ),
+            #[cfg(feature = "oidc")]
             Msg::OidcRefreshFailed(why) => pick(
                 format!("meada: {why}; keeping the cached keys"),
                 format!("meada: {why}; as chaves em cache continuam"),
@@ -1906,14 +1926,25 @@ impl Msg<'_> {
                 "the bootstrap manifest has no [ui] section".into(),
                 "o manifesto de bootstrap não tem seção [ui]".into(),
             ),
-            #[cfg(feature = "ui")]
-            Msg::UiOidc => pick(
-                "[oidc] is not yet supported by the console: remove it and deploy the console \
-                 behind a proxy that admits its users"
-                    .into(),
-                "[oidc] ainda não é suportado pelo console: remova-o e implante o console atrás \
-                 de um proxy que admita seus usuários"
-                    .into(),
+            #[cfg(all(feature = "ui", feature = "oidc"))]
+            Msg::UiUnauthorized => pick(
+                "a valid bearer token from the issuer is needed".into(),
+                "é preciso um bearer token válido do issuer".into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "oidc"))]
+            Msg::UiScope => pick(
+                "the token lacks a scope the console requires".into(),
+                "o token não tem um escopo que o console exige".into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "oidc"))]
+            Msg::UiCheckBody => pick(
+                "the body must be {\"token\": \"<JWT>\"}".into(),
+                "o corpo deve ser {\"token\": \"<JWT>\"}".into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "oidc"))]
+            Msg::UiTooLarge(max) => pick(
+                format!("the body is over {max} bytes"),
+                format!("o corpo passa de {max} bytes"),
             ),
             #[cfg(feature = "ui")]
             Msg::UiDirMissing(dir) => pick(

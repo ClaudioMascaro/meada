@@ -15,6 +15,10 @@ use serde_json::{Value, json};
 use crate::manifest::{MANIFEST, run_args};
 use crate::server::Server;
 
+/// With `[oidc]`: the console's admission, its routes and the grant bounding every view.
+#[cfg(feature = "oidc")]
+mod oidc;
+
 /// The console's own origin in every bootstrap manifest here.
 const PUBLIC: &str = "http://localhost:7999";
 
@@ -23,7 +27,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const INDEX: &str = "<!doctype html><title>Meada</title>\n";
 
-/// The exact content security policy of every answer.
+/// The exact content security policy of every answer without `[oidc]`.
 const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; \
                    frame-ancestors 'none'";
 
@@ -33,7 +37,7 @@ const OUTSIDE: &str = "outside-the-ui-dir-4f1c";
 /// A console's directory: `ui/` with a few files of a front end built for `version` (none
 /// without one), `outside.txt` beside it with symbolic links to it and to its directory from
 /// inside, and `ops/meada.workspace.toml` with `head`, then `[ui]` with `ui` as its body.
-fn console_dir(case: &str, version: Option<&str>, head: &str, ui: &str) -> PathBuf {
+pub(super) fn console_dir(case: &str, version: Option<&str>, head: &str, ui: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(case);
     let _ = fs::remove_dir_all(&dir);
     let files = dir.join("ui");
@@ -57,19 +61,19 @@ fn console_dir(case: &str, version: Option<&str>, head: &str, ui: &str) -> PathB
     dir
 }
 
-fn write_manifest(dir: &Path, head: &str, ui: &str) {
+pub(super) fn write_manifest(dir: &Path, head: &str, ui: &str) {
     fs::create_dir_all(dir.join("ops")).unwrap();
     let text = format!("index_dir = \"../indexes\"\n{head}\n[ui]\n{ui}");
     fs::write(dir.join(MANIFEST), text).unwrap();
 }
 
 /// The `[ui]` body every console here starts with.
-fn ui_section() -> String {
+pub(super) fn ui_section() -> String {
     format!("dir = \"../ui\"\npublic_url = \"{PUBLIC}\"\n")
 }
 
 /// `meada ui --listen <listen> --workspace ops/meada.workspace.toml` running in `dir`.
-fn start(dir: &Path, listen: &str) -> Server {
+pub(super) fn start(dir: &Path, listen: &str) -> Server {
     Server::start_command(
         dir,
         "ui",
@@ -79,25 +83,25 @@ fn start(dir: &Path, listen: &str) -> Server {
 }
 
 /// An answer read off the wire.
-struct Reply {
-    status: u16,
+pub(super) struct Reply {
+    pub(super) status: u16,
     /// Names in lowercase.
-    headers: Vec<(String, String)>,
-    body: String,
+    pub(super) headers: Vec<(String, String)>,
+    pub(super) body: String,
 }
 
 impl Reply {
-    fn header(&self, name: &str) -> Option<&str> {
+    pub(super) fn header(&self, name: &str) -> Option<&str> {
         let found = self.headers.iter().find(|(n, _)| n == name);
         found.map(|(_, v)| v.as_str())
     }
 
-    fn json(&self) -> Value {
+    pub(super) fn json(&self) -> Value {
         serde_json::from_str(&self.body).unwrap_or_else(|_| panic!("JSON: {}", self.body))
     }
 
     /// No cookie and no CORS header: no page of another origin reads an answer.
-    fn assert_no_cookie_or_cors(&self) {
+    pub(super) fn assert_no_cookie_or_cors(&self) {
         for (name, _) in &self.headers {
             assert!(
                 name != "set-cookie" && !name.starts_with("access-control-"),
@@ -109,7 +113,18 @@ impl Reply {
 
 /// `method path` over a connection of its own to `console`, with `headers` (a `Host` of the
 /// bound address unless they name one), sent as written: nothing normalises the path.
-fn send(console: &Server, method: &str, path: &str, headers: &[(&str, &str)]) -> Reply {
+pub(super) fn send(console: &Server, method: &str, path: &str, headers: &[(&str, &str)]) -> Reply {
+    send_body(console, method, path, headers, "")
+}
+
+/// `send` with `body`.
+pub(super) fn send_body(
+    console: &Server,
+    method: &str,
+    path: &str,
+    headers: &[(&str, &str)],
+    body: &str,
+) -> Reply {
     let address = console.url.trim_start_matches("http://");
     let mut stream = TcpStream::connect(address).unwrap();
     stream
@@ -122,7 +137,7 @@ fn send(console: &Server, method: &str, path: &str, headers: &[(&str, &str)]) ->
     for (name, value) in headers {
         request += &format!("{name}: {value}\r\n");
     }
-    request += "Content-Length: 0\r\n\r\n";
+    request += &format!("Content-Length: {}\r\n\r\n{body}", body.len());
     stream.write_all(request.as_bytes()).unwrap();
     let mut raw = Vec::new();
     stream.read_to_end(&mut raw).unwrap();
@@ -141,7 +156,7 @@ fn send(console: &Server, method: &str, path: &str, headers: &[(&str, &str)]) ->
     }
 }
 
-fn get(console: &Server, path: &str) -> Reply {
+pub(super) fn get(console: &Server, path: &str) -> Reply {
     send(console, "GET", path, &[])
 }
 
@@ -371,7 +386,7 @@ fn serves_the_front_end_s_files_and_nothing_else() {
 #[test]
 fn refuses_to_start_naming_every_problem() {
     let at = format!("meada: {MANIFEST}");
-    let mut cases = vec![
+    let cases = vec![
         (
             "ui_refuse_keys",
             Some(VERSION),
@@ -438,21 +453,6 @@ fn refuses_to_start_naming_every_problem() {
             )],
         ),
     ];
-    // `[oidc]` until the console admits tokens (#306), listed with the other problems.
-    if cfg!(feature = "oidc") {
-        cases.push((
-            "ui_refuse_oidc",
-            Some("0.0.0-other"),
-            "\n[oidc]\nissuer = \"https://id.example\"\npublic_url = \"https://meada.example\"\n\
-             identities_claim = \"repos\"\n"
-                .to_string(),
-            ui_section(),
-            vec![
-                format!("{at}:3: `oidc`: [oidc] is not yet supported by the console"),
-                format!("{at}:9: `ui.dir`: `ops/../ui` holds files built for Meada 0.0.0-other"),
-            ],
-        ));
-    }
     for (case, version, head, ui, expected) in cases {
         let dir = console_dir(case, version, &head, &ui);
         let (stdout, stderr, code) = run_args(

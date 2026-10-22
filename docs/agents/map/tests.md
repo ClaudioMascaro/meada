@@ -115,7 +115,18 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   extension refused, no listing, an unknown path answering `index.html`; no cookie or
   `Access-Control-*` header on any answer; every start refusal listed at once; a
   `password_file`'s content in no answer, with `valkey`; and an answer in flight, blocked on a
-  FIFO, received after SIGTERM, then exit 0), `resources` (resource `search`, `context`, `trace` start and `status`
+  FIFO, received after SIGTERM, then exit 0; with `oidc`, in `ui/oidc.rs`, against the `oidc`
+  module's loopback issuer, which logs every request: no token, an expired one, the nodes'
+  audience, another issuer and `HS256` get 401 with `WWW-Authenticate`, a missing scope 403, a
+  valid token the viewer's `session`; static files and `config` (the issuer, `client_id`, the
+  scopes) without a token, the issuer's origin in every answer's `connect-src`; the start
+  refused without `[ui] client_id`, metadata or JWKS; `admission` with the metadata, the key
+  ids, the last read, the groups table bounded by the grant and, after the JWKS fails, the
+  failed refresh; `admission/check` per check for a valid, an expired, a wrong-audience, a
+  forged and an unknown-`kid` token, the identities bounded by both grants, no request to the
+  issuer and no pasted token in its log, a 413 past the cap and a fixed 400; a viewer's grant
+  bounding the manifest's entries and its error text, whole for `*`; the admission routes
+  absent without `[oidc]`; no token, claim value or identity on stderr), `resources` (resource `search`, `context`, `trace` start and `status`
   over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
   fixture: kafkajs forms, fan-out, same-repository links, an unrelated `send`; amqplib queues,
   publishes through a binding of another repository, the empty exchange, queues named like the

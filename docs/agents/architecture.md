@@ -228,33 +228,59 @@ one for the area a change touches.
   request) is the union of `identities_claim` and what `[oidc.groups]` maps the groups of
   `groups_claim` to, a claim counting only as an array of strings, `*` from either for all;
   routing checks it and it bounds the workspace of each answer (`mcp.rs`). No token, error text
-  of `jsonwebtoken` or claim value is ever printed.
+  of `jsonwebtoken` or claim value is ever printed. With feature `ui`, the console reaches the
+  same checks through `admit_console` (one audience, `[ui] audience`; a `Bearer` challenge with
+  no `resource_metadata`), `check` (a pasted token's outcome per check, signature, issuer,
+  audience as a node checks it, lifetime and scopes, and its grant when every check passes,
+  against the cached keys only, so it never fetches) and `admission` (the issuer's metadata as
+  read at start, the cached key ids, the last read and a refresh that failed since, with its
+  reason and never the answer's body, and the groups table bounded by the caller's grant).
 - `ui.rs` (feature `ui`, no crate of its own; `cloud` enables it): the management console's
   process (ADR 0014), `meada ui --listen <addr> --workspace <bootstrap manifest>`, read only,
   on the node's listener (`mcp::serve_http`, `mcp::address`, the same drain); never a node's
   route, never an MCP server. `File` is `[ui]` and `validated` lists every problem of it at
   once (`dir` and `public_url` required, `public_url` `https` or loopback `http` with nothing
   past the host through `modules::reachable`; `audience` defaults to `public_url`; `client_id`,
-  `operations`, `operator_groups` and `operator_claim` are read, and checked by #306 and #307).
-  `Console::start` refuses, listing every problem: a manifest error, no `[ui]`, `[oidc]` (until
-  the console admits tokens, #306), a `[ui] dir` that is not a directory, and the version check:
+  `operations`, `operator_groups` and `operator_claim` are read, and the last three checked by
+  #307). `Console::start` refuses, listing every problem: a manifest error, no `[ui]`, `[oidc]`
+  without `[ui] client_id`, `[oidc]` whose issuer's metadata or JWKS cannot be read
+  (`Oidc::start`, as a node), a `[ui] dir` that is not a directory, and the version check:
   `meada-ui.json` at the root of `[ui] dir` must be `{"version": "<this Meada version>"}`, and
   a missing, oversized (`VERSION_MAX`) or unreadable file counts as another version, both
   versions named. Each request goes, in order, through the `Host` check (403 unless `Host` is
   `public_url`'s host and port, or the bound address on loopback), the `Origin` check (403 for
   an `Origin` other than `public_url`, and for a write, any method but `GET` and `HEAD`, without
-  one), admission (the operator's proxy: every request is a viewer's), then routing; the 403
-  bodies are fixed text. `/api/v1/` is the JSON API (`config`, `session`, `manifest`; errors
-  `{"error": {"code", "message"}}`, an unknown path a 404 in that shape); `manifest` answers the
-  file as loaded at start (a TOML table as JSON: secrets' variable and file names only), the
-  module table with what this build has, and the errors of the file as it now stands on disk,
-  read again per request. Every other path is a file of `[ui] dir`: percent-decoded, a 404 for a
+  one), admission (`Console::admit`), then routing; the 403 bodies are fixed text. Admission:
+  behind the operator's proxy every request is a viewer's that reads everything; with `[oidc]`
+  (feature `oidc`) a bearer token for `[ui] audience` through the nodes' module
+  (`Oidc::admit_console`), a 401 with `WWW-Authenticate: Bearer` (and `error="invalid_token"`
+  when a token was sent) or a 403 for a missing scope, both as JSON errors. The static files
+  and `config` need no token, since the browser needs them to log in. Every admitted subject is
+  a viewer (operators come with #307). The request's `Session` carries the token's grant, and
+  `Session::reads` is the one check every view of a repository goes through, as #290 bounds a
+  node's answers: a repository outside the grant is absent, state that belongs to no repository
+  is shown whole, a `*` grant reads everything; the read routes (#304) and the playground
+  (#305) bound theirs through it. `/api/v1/` is the JSON API (`config`, `session`, `manifest`,
+  and with `[oidc]` `admission` and `POST admission/check`; errors `{"error": {"code",
+  "message"}}`, an unknown path a 404 in that shape, as the admission routes are without
+  `[oidc]`); `config` adds, with `[oidc]`, the issuer, `client_id`, the scopes and the audience
+  the browser's authorization code flow with PKCE needs; `session` is the subject and `viewer`;
+  `manifest` answers the file as loaded at start (a TOML table as JSON: secrets' variable and
+  file names only), the module table with what this build has, and the errors of the file as it
+  now stands on disk, read again per request, for a session that does not read everything
+  without the `[[repository]]` entries outside its grant and with only the file and line of an
+  error whose text could name one; `admission/check` reads `{"token": ...}` (the one body the
+  console reads, `CHECK_MAX`) and answers each check's outcome and the identities, of the
+  manifest's entries, that both the token's grant and the session's admit; the token lives
+  only for that request, and a body that does not parse is a fixed 400, never serde's text.
+  Every other path is a file of `[ui] dir`: percent-decoded, a 404 for a
   `..`, `.` or empty segment, a NUL or a backslash, a resolved path (symbolic links followed)
   outside the canonical `[ui] dir`, or an extension outside the fixed table (`content_type`); a
   path that names no file, a directory included (none is listed), answers `index.html` unless it
   is under `/api/`. Files under `assets/` are cacheable for a year and immutable, every other one
-  `no-cache`. Every answer carries `nosniff`, `Referrer-Policy: no-referrer` and the fixed
-  content security policy (`CSP`); none sets a cookie or an `Access-Control-*` header.
+  `no-cache`. Every answer carries `nosniff`, `Referrer-Policy: no-referrer` and the content
+  security policy (`csp`, whose `connect-src` adds the issuer's origin with `[oidc]`); none sets
+  a cookie or an `Access-Control-*` header.
 - `github_app.rs` (feature `github-app`, which needs `valkey`; `jsonwebtoken` with `use_pem`
   only here): git's credential helper for the indexing job (ADR 0013). `File` is one
   `[[github_app]]` block and `validated` checks them all (`host` a git host name, lowercase; `api`
@@ -1258,7 +1284,10 @@ one for the area a change touches.
   30-second default grace period); past it the connections left are dropped, an answer still
   waiting on an index lock included, and the exit is 0.
 - `ui.rs`: `meada-ui.json` is read up to `VERSION_MAX` (4 KiB); a larger file counts as front
-  end files built for another version, and the console refuses to start.
+  end files built for another version, and the console refuses to start. A token check's body
+  is read up to `CHECK_MAX` (16 KiB); past it the answer is a 413. The token check lists the
+  identities of the bootstrap manifest's `[[repository]]` entries only: with `[workspace]
+  source = "store"` it lists none until the read routes (#304) bring the current version.
 - `snapshot/versions.rs`: a workspace version document holds at most `VERSION_MAX` (4 MiB);
   past it the document is refused (on import) or listed as malformed, naming its key.
 - `render.rs`: a source file an answer reads (`render::source`, for `path:line` and a symbol's
