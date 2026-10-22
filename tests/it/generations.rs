@@ -575,3 +575,89 @@ fn the_status_probe_reads_the_current_generation_from_valkey() {
         assert!(stdout.contains(&line), "{stdout}");
     }
 }
+
+/// `meada snapshot pointer set` (ADR 0014) under the refresh lock: G1 and G2 published, two
+/// nodes on G2; a generation outside the retained list and a malformed id are refused, then
+/// `set G1` gives the pointer a fence above G2's, both nodes swap back on their next pull and
+/// `/<identity>` answers G1's goldens, until the next publish moves the pointer past it.
+#[cfg(feature = "refresh-lock")]
+#[test]
+fn pointer_set_rolls_every_node_back_until_the_next_publish() {
+    use crate::refresh_lock::{fleet, get, key, locked_publish, released, run_in};
+    let Some(fleet) = fleet("generations_rollback") else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let mut valkey = admin(&fleet.valkey);
+    let g1 = locked_publish(dir);
+    next_commit(dir, "chain-web", "second");
+    let g2 = locked_publish(dir);
+    let nodes = [fleet.node("one"), fleet.node("two")];
+    for (node, _) in &nodes {
+        assert_eq!(fleet.pull(node), g2);
+    }
+    let set = |id: &str| {
+        let args = ["snapshot", "pointer", "set", id, "--workspace", MANIFEST];
+        run_in(dir, "en_US.UTF-8", &args)
+    };
+    let before = pointer(&mut valkey, fleet.case);
+    assert_eq!(before.0, [g2.clone(), "2".into()]);
+
+    // Outside the retained list: refused naming it, after taking (and releasing) the lock.
+    let retained = key(&fleet, "retained");
+    let refused = format!(
+        "meada: {retained}: generation 0000000000000000 is not retained: the pointer did not \
+         move\n"
+    );
+    let (stdout, stderr, code) = set("0000000000000000");
+    assert_eq!((code, stdout.as_str(), stderr), (Some(1), "", refused));
+    assert_eq!(get(&fleet, "fence").as_deref(), Some("3"));
+    // Malformed: refused before the lock is taken, so the fence did not move either.
+    for bad in [
+        g1.to_uppercase(),
+        "../../../../etc/".into(),
+        g1[..15].into(),
+    ] {
+        let (stdout, stderr, code) = set(&bad);
+        assert_eq!((code, stdout.as_str()), (Some(1), ""), "{bad}");
+        let refused = format!("meada: {bad}: not a generation id of 16 lowercase hex characters\n");
+        assert_eq!(stderr, refused);
+    }
+    assert_eq!(get(&fleet, "fence").as_deref(), Some("3"));
+    assert_eq!(pointer(&mut valkey, fleet.case), before);
+    assert!(released(&fleet));
+
+    let (stdout, stderr, code) = set(&g1);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    assert_eq!(stdout, format!("{g1} 4\n"));
+    let list = vec![format!("{g1}:4"), format!("{g2}:2")];
+    assert_eq!(
+        pointer(&mut valkey, fleet.case),
+        (vec![g1.clone(), "4".into()], list)
+    );
+    assert!(released(&fleet));
+    for (node, local) in &nodes {
+        assert_eq!(fleet.pull(node), g1);
+        let file = fs::read_to_string(local.join("current")).unwrap();
+        assert_eq!(file, format!("{g1} 4\n"));
+    }
+    let server = serve(dir, &nodes[0].0);
+    block_on(async {
+        let client = server.client(&format!("/{WEB}")).await;
+        let from = serde_json::json!({"from": "dashboard"});
+        let trace = client.call_tool(call("trace", from)).await.unwrap();
+        assert_golden("chain.trace-down.txt", text(&trace));
+        assert_eq!(meta(&trace).as_deref(), Some(g1.as_str()));
+        let second = serde_json::json!({"query": "second"});
+        let found = client.call_tool(call("search", second)).await.unwrap();
+        assert!(!text(&found).contains("src/status.ts"), "{}", text(&found));
+        client.cancel().await.unwrap();
+    });
+
+    next_commit(dir, "chain-web", "third");
+    let g3 = locked_publish(dir);
+    assert_eq!(pointer(&mut valkey, fleet.case).0, [g3.clone(), "5".into()]);
+    for (node, _) in &nodes {
+        assert_eq!(fleet.pull(node), g3);
+    }
+}

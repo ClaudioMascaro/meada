@@ -73,9 +73,10 @@ impl File {
     }
 }
 
-/// The lock's two keys: the lock and the fence.
-pub fn keys(config: &valkey::Config) -> (String, String) {
-    (config.key("lock", true), config.key("fence", true))
+/// The lock's keys: the lock, the fence and the holder.
+pub fn keys(config: &valkey::Config) -> (String, String, String) {
+    let key = |name| config.key(name, true);
+    (key("lock"), key("fence"), key("holder"))
 }
 
 /// The token and fence of the lock a job runs under, as `publish` reads them.
@@ -124,21 +125,131 @@ pub async fn holds(valkey: &Valkey, config: &valkey::Config, token: &str) -> Res
     }
 }
 
-/// Compare-and-extend: 1 when the lock held the token and lives `ARGV[2]` ms more, 0 if not.
+/// Takes the lock and writes its holder, both with the TTL. KEYS: lock, holder. ARGV: token, TTL
+/// in ms, then the holder's host, pid, started and holds. Nil when taken; else the holder's four
+/// fields, each nil when missing (a lock taken by an older binary has no holder).
+const TAKE: &str = r"
+if redis.call('SET', KEYS[1], ARGV[1], 'NX', 'PX', ARGV[2]) then
+  redis.call('DEL', KEYS[2])
+  redis.call('HSET', KEYS[2], 'host', ARGV[3], 'pid', ARGV[4], 'started', ARGV[5], 'holds', ARGV[6])
+  redis.call('PEXPIRE', KEYS[2], ARGV[2])
+  return false
+end
+return redis.call('HMGET', KEYS[2], 'host', 'pid', 'started', 'holds')
+";
+
+/// Compare-and-extend, the holder with the lock (KEYS: lock, holder): 1 when the lock held the
+/// token and lives `ARGV[2]` ms more, 0 if not.
 const RENEW: &str = r"
 if redis.call('GET', KEYS[1]) == ARGV[1] then
+  redis.call('PEXPIRE', KEYS[2], ARGV[2])
   return redis.call('PEXPIRE', KEYS[1], ARGV[2])
 end
 return 0
 ";
 
-/// Compare-and-delete: the lock goes only while it holds the token.
+/// Compare-and-delete: the lock and its holder go only while the lock holds the token.
 const RELEASE: &str = r"
 if redis.call('GET', KEYS[1]) == ARGV[1] then
+  redis.call('DEL', KEYS[2])
   return redis.call('DEL', KEYS[1])
 end
 return 0
 ";
+
+/// Takes the refresh lock for `ttl` as `meada snapshot lock` does, its holder saying what
+/// `holds` it, then `INCR`s the fence: the token and the fence, or an error naming the key (a
+/// lock already held names its holder). Whoever gets `Ok` calls `release`.
+pub async fn acquire(
+    valkey: &Valkey,
+    config: &valkey::Config,
+    ttl: Duration,
+    holds: &str,
+) -> Result<Held, String> {
+    let (lock, fence_key, holder) = keys(config);
+    let token = token()?;
+    let mut take = cmd("EVAL");
+    take.arg(TAKE).arg(2).arg(&lock).arg(&holder);
+    take.arg(&token).arg(millis(ttl)).arg(host());
+    take.arg(std::process::id()).arg(rfc3339(now())).arg(holds);
+    let held: Option<Vec<Option<Vec<u8>>>> = match valkey.query(&take).await {
+        Ok(held) => held,
+        // The server may have taken the lock and the answer been lost: release ours, if it is.
+        Err(e) => {
+            release(valkey, config, &token).await;
+            return Err(format!("{lock}: {e}"));
+        }
+    };
+    if let Some(fields) = held {
+        let fields: Vec<String> = fields.iter().flatten().map(|f| shown(f)).collect();
+        let holder = match fields.as_slice() {
+            [host, pid, started, holds] => Some([host.as_str(), pid, started, holds]),
+            _ => None,
+        };
+        return Err(Msg::LockHeld { key: &lock, holder }.text());
+    }
+    let incr = cmd("INCR").arg(&fence_key).clone();
+    let fence = match valkey.query::<i64>(&incr).await {
+        Ok(fence) => u64::try_from(fence).ok().filter(|f| *f > 0),
+        Err(e) => {
+            release(valkey, config, &token).await;
+            return Err(format!("{fence_key}: {e}"));
+        }
+    };
+    match fence {
+        Some(fence) => Ok(Held { token, fence }),
+        None => {
+            release(valkey, config, &token).await;
+            Err(Msg::LockBadFence(&fence_key).text())
+        }
+    }
+}
+
+/// A holder's field as a message shows it: Valkey's bytes are hostile, so none reaches a
+/// terminal unescaped.
+fn shown(field: &[u8]) -> String {
+    String::from_utf8_lossy(field).escape_debug().to_string()
+}
+
+/// The host name in lowercase, as the holder names it.
+// ponytail: `[snapshot] node_name` (#298) replaces it when the manifest sets one.
+pub fn host() -> String {
+    let name = nix::unistd::gethostname()
+        .ok()
+        .and_then(|h| h.into_string().ok());
+    name.unwrap_or_default().to_lowercase()
+}
+
+/// The author of an operation run from the command line: `cli:<login>@<host>`.
+pub fn cli_author() -> String {
+    let uid = nix::unistd::getuid();
+    let user = nix::unistd::User::from_uid(uid).ok().flatten();
+    let login = user.map_or_else(|| uid.to_string(), |u| u.name);
+    format!("cli:{login}@{}", host())
+}
+
+/// The seconds since the Unix epoch.
+pub(super) fn now() -> u64 {
+    let since = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
+    since.map_or(0, |d| d.as_secs())
+}
+
+/// `secs` since the epoch in RFC 3339, UTC, to the second (the civil date by Howard Hinnant's
+/// algorithm, years starting in March).
+fn rfc3339(secs: u64) -> String {
+    let (days, day) = ((secs / 86_400) as i64, secs % 86_400);
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    let (h, min, s) = (day / 3600, day % 3600 / 60, day % 60);
+    format!("{y:04}-{m:02}-{d:02}T{h:02}:{min:02}:{s:02}Z")
+}
 
 /// `meada snapshot lock --workspace <manifest> -- <command>`: the child's exit code (128 plus
 /// the signal when a signal ended it), or an error: the lock already held (nothing run), the
@@ -173,39 +284,16 @@ async fn supervise(
         listen(SignalKind::quit())?,
     );
     let valkey = Valkey::connect(config).await?;
-    let (lock, fence_key) = keys(config);
-    let (token, ttl, ms) = (token()?, section.ttl, millis(section.ttl));
+    let (lock, ms) = (keys(config).0, millis(section.ttl));
+    let ttl = section.ttl;
     // A renewal counts from before it was sent: the lock lives at least a TTL from then.
     let mut renewed = Instant::now();
-    let set = cmd("SET")
-        .arg(&lock)
-        .arg(&token)
-        .arg("NX")
-        .arg("PX")
-        .arg(ms)
-        .clone();
-    let taken: Option<String> = match valkey.query(&set).await {
-        Ok(taken) => taken,
-        // The server may have taken the lock and the answer been lost: release ours, if it is.
-        Err(e) => {
-            release(&valkey, &lock, &token).await;
-            return Err(format!("{lock}: {e}"));
-        }
-    };
-    if taken.is_none() {
-        return Err(Msg::LockHeld(&lock).text());
-    }
-    let started = async {
-        let incr = cmd("INCR").arg(&fence_key).clone();
-        let fence: i64 = (valkey.query(&incr).await).map_err(|e| format!("{fence_key}: {e}"))?;
-        let fence = (u64::try_from(fence).ok().filter(|f| *f > 0))
-            .ok_or_else(|| Msg::LockBadFence(&fence_key).text())?;
-        spawn(command, &token, fence)
-    };
-    let child = match started.await {
+    let program = command[0].to_string_lossy();
+    let Held { token, fence } = acquire(&valkey, config, ttl, &format!("lock {program}")).await?;
+    let child = match spawn(command, &token, fence) {
         Ok(child) => child,
         Err(e) => {
-            release(&valkey, &lock, &token).await;
+            release(&valkey, config, &token).await;
             return Err(e);
         }
     };
@@ -230,8 +318,9 @@ async fn supervise(
     // The command outlives the future that borrows it: declared first, dropped last.
     let renew = cmd("EVAL")
         .arg(RENEW)
-        .arg(1)
+        .arg(2)
         .arg(&lock)
+        .arg(keys(config).2)
         .arg(&token)
         .arg(ms)
         .clone();
@@ -286,7 +375,7 @@ async fn supervise(
     };
     // Whatever the child left in its group goes with it.
     let _ = killpg(group, Signal::SIGKILL);
-    release(&valkey, &lock, &token).await;
+    release(&valkey, config, &token).await;
     let status = (status.map_err(|_| "the child's waiter stopped".to_string())?)
         .map_err(|e| e.to_string())?;
     if lost {
@@ -325,10 +414,12 @@ fn spawn(command: &[OsString], token: &str, fence: u64) -> Result<std::process::
         .map_err(|e| format!("{}: {e}", program.to_string_lossy()))
 }
 
-/// Compare-and-delete within `RELEASE_TIMEOUT`; a lock it could not release expires with its
-/// TTL.
-async fn release(valkey: &Valkey, lock: &str, token: &str) {
-    let script = cmd("EVAL").arg(RELEASE).arg(1).arg(lock).arg(token).clone();
+/// Compare-and-delete of the lock and its holder within `RELEASE_TIMEOUT`; a lock it could not
+/// release expires with its TTL, the holder with it.
+pub async fn release(valkey: &Valkey, config: &valkey::Config, token: &str) {
+    let (lock, _, holder) = keys(config);
+    let mut script = cmd("EVAL");
+    script.arg(RELEASE).arg(2).arg(lock).arg(holder).arg(token);
     let released = valkey.query::<i64>(&script);
     let _ = tokio::time::timeout(RELEASE_TIMEOUT, released).await;
 }
@@ -372,7 +463,25 @@ mod tests {
         let config = config.validate(Path::new("/")).unwrap();
         assert_eq!(
             keys(&config),
-            ("{meada:prod}:lock".into(), "{meada:prod}:fence".into())
+            (
+                "{meada:prod}:lock".into(),
+                "{meada:prod}:fence".into(),
+                "{meada:prod}:holder".into()
+            )
         );
+    }
+
+    #[test]
+    fn a_start_time_is_rfc_3339_in_utc_to_the_second() {
+        assert_eq!(rfc3339(0), "1970-01-01T00:00:00Z");
+        assert_eq!(rfc3339(951_825_599), "2000-02-29T11:59:59Z");
+        assert_eq!(rfc3339(1_792_627_199), "2026-10-21T23:59:59Z");
+        assert_eq!(rfc3339(4_107_542_400), "2100-03-01T00:00:00Z");
+    }
+
+    #[test]
+    fn a_holder_s_field_reaches_no_terminal_unescaped() {
+        assert_eq!(shown(b"lock sh"), "lock sh");
+        assert_eq!(shown(b"a\x1b[2Jb\n"), "a\\u{1b}[2Jb\\n");
     }
 }

@@ -138,6 +138,18 @@ All notable changes to Meada are recorded here. The format follows
   failed with 403 or 429, marks the installation that served it; a 403 or 429 to the module's
   own calls marks its installation or App the same way. No private key, JWT or token reaches
   stderr or an error. `meada mcp --listen` never calls GitHub.
+- Server mode, pointer and fence operations (ADR 0014, #299, feature `refresh-lock`, needing
+  `[refresh_lock]`): `meada snapshot pointer set <generation> --workspace <manifest>` moves the
+  Valkey pointer to a retained generation (a rollback, or forward again) with a fence above
+  every node's, so nodes swap on their next pull; the rollback holds until the next publish.
+  `meada snapshot fence recover [--at-least <fence>] --workspace <manifest>` raises
+  `{<key_prefix>}:fence` to the highest fence recorded in the pointer, the retained list and
+  every live heartbeat, or to the floor given, never lowering it; what it cannot read is named
+  on stderr and not counted. Each takes the refresh lock itself and releases it. The lock now
+  has a holder, `{<key_prefix>}:holder` (host, process, start time and what holds it), written,
+  renewed and deleted with it, and every refusal of a held lock names it. The messages for a
+  refused, lowered or stuck fence name `meada snapshot fence recover` instead of setting the
+  fence key by hand.
 - npm installer (spec #32): cargo-dist builds and publishes an npm package named `meada` with each
   release, at the crate's version, so `npx meada mcp` launches the MCP server and `npx meada
   <command>` runs any command; the release configuration is planned as a dry run on pull requests.

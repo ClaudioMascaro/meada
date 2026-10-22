@@ -349,12 +349,15 @@ one for the area a change touches.
   writes both (`EVAL`; KEYS current, retained and `{<key_prefix>}:lock`, ARGV id, fence, keep
   and the refresh lock's token, empty without one): with a token it returns 0 unless the lock
   holds it (`Msg::LockNotHeld`) and -1 unless the fence is above `current`'s
-  (`Msg::FenceRefused`, naming `{<key_prefix>}:fence` and the recovery; the two fences compare
+  (`Msg::FenceRefused`, naming `{<key_prefix>}:fence` and `meada snapshot fence recover`, as
+  `Msg::FenceBelowNode` and `Msg::FenceStuck` do with `--at-least`; the two fences compare
   as decimal text, leading zeros dropped, so none loses precision as a Lua number, and -2 for a
   stored fence that is no decimal); then it removes every entry of the id, pushes
   `<id>:<fence>`, trims and sets the hash. `publish` connects to Valkey before any upload and
   calls `point` last, with fence `0` and no token without `[refresh_lock]`, instead of writing
-  the store's `current`. `read` is the pull's side: `HMGET current id fence` and `LRANGE retained 0
+  the store's `current`; `meada snapshot pointer set` (`operation::pointer_set`) calls it with
+  its own token and fence to move the pointer to a retained generation, a rollback that the
+  next publish undoes. `read` is the pull's side: `HMGET current id fence` and `LRANGE retained 0
   keep-1`, every id checked by `is_id` and every fence by `snapshot::fence` before anything
   else; a missing pointer, an empty list or a malformed entry is an error naming the key. With
   it, `pull_locked` (through `Source::wanted`) fetches the current generation if the node lacks
@@ -371,11 +374,19 @@ one for the area a change touches.
   `snapshot/lock.rs` (feature `refresh-lock`, which implies `generation-pointer`; crate `nix`,
   Unix only, a `compile_error!` elsewhere) is the refresh lock, section `[refresh_lock]` (`ttl_seconds`, default 300, at
   least 10; `Manifest::read` refuses it without `[generations]`). Keys under the same hash tag:
-  `{<key_prefix>}:lock` and `{<key_prefix>}:fence`, which Meada only `INCR`s. `run` is `meada
-  snapshot lock`: `SET lock <token> NX PX <ttl>` (a token of 16 bytes of `/dev/urandom` in hex;
-  a lock already held is `Msg::LockHeld`, nothing run; a `SET` that errs releases the token
-  anyway, since the server may have taken it), `INCR fence` (a result that is not a
-  positive `u64` is `Msg::LockBadFence`), then the child, spawned on the main thread in a
+  `{<key_prefix>}:lock`, `{<key_prefix>}:fence`, which Meada only `INCR`s and `fence recover`
+  raises, never lowers, and `{<key_prefix>}:holder`, a hash beside the lock with its TTL
+  (`host`, the lowercased host name until `[snapshot] node_name` exists; `pid`; `started`, RFC
+  3339 in UTC to the second; `holds`: `lock <program>`, the child's program without its
+  arguments, or `<operation> cli:<login>@<host>`). `acquire` is shared by `lock` and the
+  operations: `TAKE` (`SET lock <token> NX PX <ttl>` and, when taken, the holder written with
+  the same TTL, in one script; else the holder's fields, so a lock already held is
+  `Msg::LockHeld` naming its host, process, start time and what holds it, or an unknown holder
+  for a lock without one, every field escaped; a token of 16 bytes of `/dev/urandom` in hex; a
+  script that errs releases the token anyway, since the server may have taken it), then `INCR
+  fence` (a result that is not a positive `u64` is `Msg::LockBadFence`). `RENEW` extends the
+  holder with the lock and `RELEASE` deletes both, each only while the lock holds the token.
+  `run` is `meada snapshot lock`: `acquire`, then the child, spawned on the main thread in a
   process group of its own (`process_group(0)`) with `MEADA_REFRESH_LOCK` and
   `MEADA_REFRESH_FENCE`; on Linux its `pre_exec` arms `PR_SET_PDEATHSIG` (SIGTERM) and refuses
   to run if `lock` already died, the crate's one `unsafe`. A thread waits for the child; the
@@ -389,6 +400,23 @@ one for the area a change touches.
   lock` equals the token) runs before each bundle upload and before the document's (a token
   with no `[generations]` is an error, never a pass), and the
   token and fence go to `point`.
+  `snapshot/operation.rs` (feature `refresh-lock`, ADR 0014) holds the operations, which the
+  console calls in process too: each checks its arguments first (an id by `is_id`, a fence by
+  `snapshot::fence`), needs `[refresh_lock]` (`Msg::LockNoSection`), runs under `acquire` with
+  a holder naming it and its author, makes one write through a script that checks the token,
+  and calls `release` whatever the write did, so it leaves no lock and no holder (a release
+  Valkey misses expires with the TTL). `pointer_set` (`meada snapshot pointer set <generation>`)
+  refuses an id outside the first `keep` entries of `retained` (`Msg::PointerNotRetained`), then
+  calls `point` with its token and fence, so the moved pointer's fence is above every node's
+  and nodes swap on their next pull; it prints `<id> <fence>`. The rollback holds until the
+  next publish moves the pointer past it: to stay back, the operator suspends the refresh job.
+  `fence_recover` (`meada snapshot fence recover [--at-least <fence>]`) reads the pointer, every
+  `retained` entry and the heartbeat (`{<key_prefix>}:node:<name>`, its `fence` a `u64` or
+  null) of every name of `{<key_prefix>}:nodes` scored above now, as hostile input: a malformed
+  pointer, entry, node name or heartbeat is a `Msg::FenceNotCounted` line on stderr and does not
+  count, a name whose key expired is skipped. `RAISE` sets `fence` to the highest of those and
+  the floor only when that is above the stored one (decimal text, as `POINT` compares); it
+  prints the fence it leaves, which counts the operation's own `INCR`.
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.

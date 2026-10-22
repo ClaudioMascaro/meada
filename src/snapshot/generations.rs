@@ -154,7 +154,7 @@ pub async fn current(valkey: &Valkey, config: &valkey::Config) -> Result<(String
 }
 
 /// The hash `{<key_prefix>}:current` (`key`), as `HMGET key id fence` returns it.
-fn pointer(key: &str, fields: &[Option<Vec<u8>>]) -> Result<(String, u64), String> {
+pub(super) fn pointer(key: &str, fields: &[Option<Vec<u8>>]) -> Result<(String, u64), String> {
     let text = |bytes: &[u8]| std::str::from_utf8(bytes).ok().map(str::to_string);
     match fields {
         [None, None] => Err(Msg::SnapshotNoCurrent(key).text()),
