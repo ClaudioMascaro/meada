@@ -76,6 +76,29 @@ mirror needs only `meada index --workspace`. It refuses `trace` with `changes: u
 changed since indexing.
 Everything the engine returns is sorted: the same files give byte-identical output.
 
+## Crates
+
+The repository is a Cargo workspace (ADR 0014): the `meada` binary's crate at the root (`src/`,
+`tests/`), and `meada-core/`, the deterministic part the binary and the console's front end
+share. Both take one version from the workspace, and `meada` depends on `meada-core` at exactly
+it. `meada-core` has no rusqlite, tree-sitter, filesystem, process or network code and no async
+runtime; it builds for `wasm32-unknown-unknown`, its `wasm-bindgen` feature (never the binary's)
+exporting `init`, `validate` and `workspaceVersionId`. CI's `core` job builds it with wasm-pack
+and checks both trees.
+
+- `meada-core/src/manifest.rs`: a workspace manifest's `[[repository]]` (`EntryFile`,
+  `EntryPeer`) and the `[serve]` and `[[resource]]` shapes `meada.toml` shares (`Serve`,
+  `Resource`, `Role`, `declared`, `gateway_path`); `parse` and `error_at`, the errors naming
+  the file, the line and the dotted key (`line_of`); `identity_problem` and `entry_problems`
+  (an identity listed twice); `validate`, a workspace text's entries or its problems as the CLI
+  prints them (a text holding only `[[repository]]` entries).
+- `meada-core/src/ids.rs`: `bundle_id`, `generation_id` (ADR 0012), `workspace_version_id`
+  (ADR 0014: the canonical JSON of the entries, `{"blocks","path","repo"}` in manifest order),
+  `is_id`, `fence`, `entry_blocks`.
+- `meada-core/src/msg.rs`: the messages of those checks and the language flag the binary's
+  `msg.rs` reads too; `meada-core/src/http.rs`: `normalize_path` and `PARAM`, which the HTTP
+  kind re-exports. `qualify` and `parent` (dotted names) live in its `lib.rs`.
+
 ## Modules (`src/`)
 
 Each line names what a module owns; the file in `map/` it points to has the detail. Read the
@@ -217,7 +240,8 @@ one for the area a change touches.
   `region`, `bucket` and `prefix` shapes; one credential source,
   the static keys only with `static`, at most one of each `*_env`/`*_file` pair). `bundle_id`
   and `generation_id` are the ids of ADR 0012 (`is_id` their shape); `entry_blocks` gives each
-  manifest entry's blocks as canonical JSON (`Listed::blocks`). `publish` is `meada snapshot
+  manifest entry's blocks as canonical JSON (`Listed::blocks`); all four, and `fence`, are
+  `meada_core::ids`'s, re-exported. `publish` is `meada snapshot
   publish`: per repository `index::open_read` plus `index::fresh`, `repo::unclean` and
   `repo::head`, every problem listed; then `store_generation` uploads the missing bundles (a
   first pass measures the tar's size and hash, a second streams it as a multipart upload with
@@ -249,7 +273,7 @@ one for the area a change touches.
   id>/index.db` and `<bundle id>/mirror/`; a pull in progress writes only `<generation
   id>.partial/` and `current.new`. Steps: the store's `current` must be an id and a newline
   (`store_pointer`); `checked` refuses a document before any path is built from it (its
-  generation id, `workspace::identity_problem` per identity plus no duplicate and no character
+  generation id, `identity_problem` (`meada_core::manifest`) per identity plus no duplicate and no character
   a git remote URL cannot hold, each bundle key `repos/<identity>/<bundle id>.tar` under the
   prefix, hash and `HEAD` shapes, the size sum, the generation id derived again); per bundle,
   `Store::download` streams it to a file checked against the document's size and hash, and
@@ -371,7 +395,9 @@ one for the area a change touches.
   `workspace.rs` also reads the workspace manifest (`Manifest`) and refuses the entries server
   mode cannot serve; an entry's `[repository.serve]`, `[[repository.resource]]` and
   `[[repository.peer]]` reuse `config.rs`'s shapes (the peer without `path`) and are the
-  configuration of a mirror with no `meada.toml`. A mirror's own `meada.toml` wins whole: the
+  configuration of a mirror with no `meada.toml`. The entry's schema, those shapes and every
+  check the text decides (identities included, `entry_problems`) are `meada_core::manifest`'s;
+  `mirror` keeps the checks that need the mirror, after them. A mirror's own `meada.toml` wins whole: the
   entry's blocks are ignored, not merged, and `Listed::ignored` names them for `status`.
   `index.rs`: the SQLite schema, the freshness pipeline in `refresh` (with `fresh`, its
   read-only twin for `meada snapshot publish`: the same walk, `packs_of` and stamps, and a file
@@ -1000,6 +1026,13 @@ one for the area a change touches.
 
 ## Tests (`tests/`)
 
+- `meada-core/tests/` tests that crate at its public seam, and `cargo test` runs them with the
+  binary's (both crates are default members): `ids.rs`, the bundle and generation ids against
+  their canonical texts (the cases the `snapshot` module held), `is_id`, `fence`,
+  `entry_blocks`, and the workspace version id (its canonical text, the same for the same
+  entries however written, changed by a swap, a path or a block); `manifest.rs`, `validate`
+  (the entries in order, text errors with file, line and dotted key, every unservable identity
+  named). The binary's manifest errors stay in `tests/it/manifest.rs`.
 - The integration tests are one binary, `tests/it/main.rs`, so `cargo test` links it once: a
   module per subject (`tests/it/<subject>.rs`) and the harness in `tests/it/common/`. A new
   subject is a file there and its `mod` line in `main.rs` (`every_file_here_is_a_module` checks

@@ -1,17 +1,14 @@
 //! The CLI's message catalog: pt-BR and English, one match arm per message. The language comes
 //! from `LANG` (ADR 0008): pt-BR when it starts with `pt`, English otherwise. Only the CLI calls
-//! `init`, so the MCP server and the library tests stay in English.
-
-use std::sync::atomic::{AtomicBool, Ordering};
+//! `init`, so the MCP server and the library tests stay in English. The messages of the checks
+//! `meada-core` holds are its catalog's, and the language is its flag: `init` sets it for both.
 
 use crate::decisions::Cause;
 use crate::document::Format;
 
-static PT: AtomicBool = AtomicBool::new(false);
-
 /// Picks the language from the value of `LANG`; `None` is English.
 pub fn init(lang: Option<&str>) {
-    PT.store(lang.is_some_and(|l| l.starts_with("pt")), Ordering::Relaxed);
+    meada_core::msg::init(lang);
 }
 
 /// Where an index that cannot be read is fixed (`index::open_read`).
@@ -30,8 +27,7 @@ pub enum Msg<'a> {
     OtherVersion,
     Indexed(i64),
     OtherVersionWorkspace,
-    UnsafeIdentity,
-    LocalIdentity,
+    /// `meada_core::msg::Msg::ListedTwice`.
     ListedTwice,
     NoMirror(&'a str),
     NotACheckout(&'a str),
@@ -183,14 +179,9 @@ pub enum Msg<'a> {
         path: &'a str,
         reference: &'a str,
     },
+    /// `meada_core::msg::Msg::KeyMissing`.
     KeyMissing(&'a str),
-    NotInRepository(&'a str),
-    KeyUnknown {
-        key: &'a str,
-        file: &'a str,
-    },
-    NotLowercase(&'a str),
-    NoLeadingSlash(&'a str),
+    /// `meada_core::msg::Msg::Empty`.
     Empty,
     NeedsFeature {
         section: &'a str,
@@ -607,7 +598,8 @@ pub enum Msg<'a> {
 
 impl Msg<'_> {
     pub fn text(&self) -> String {
-        let pt = PT.load(Ordering::Relaxed);
+        use meada_core::msg::Msg as Core;
+        let pt = meada_core::msg::pt();
         let pick = |en: String, pt_br: String| if pt { pt_br } else { en };
         match self {
             Msg::NotIndexed => pick("not indexed".into(), "não indexado".into()),
@@ -623,16 +615,7 @@ impl Msg<'_> {
                 "indexed by another version; rebuilt by meada index --workspace".into(),
                 "indexado por outra versão; reconstruído por meada index --workspace".into(),
             ),
-            Msg::UnsafeIdentity => pick(
-                "not a repository identity: a segment is empty, `.` or `..`".into(),
-                "não é uma identidade de repositório: um segmento está vazio ou é `.` ou `..`"
-                    .into(),
-            ),
-            Msg::LocalIdentity => pick(
-                "a local identity: server mode serves repositories by their remote".into(),
-                "uma identidade local: o modo servidor serve repositórios pelo remoto".into(),
-            ),
-            Msg::ListedTwice => pick("listed twice".into(), "listado duas vezes".into()),
+            Msg::ListedTwice => Core::ListedTwice.text(),
             Msg::NoMirror(path) => pick(
                 format!("`{path}` does not exist"),
                 format!("`{path}` não existe"),
@@ -926,30 +909,8 @@ impl Msg<'_> {
                 format!("{path}: external path item reference {reference} not followed, its routes are not read"),
                 format!("{path}: referência externa de path item {reference} não seguida, suas rotas não são lidas"),
             ),
-            Msg::KeyMissing(key) => pick(format!("`{key}` is missing"), format!("falta `{key}`")),
-            Msg::NotInRepository(path) => pick(
-                format!("`{path}` is not a path inside the repository"),
-                format!("`{path}` não é um caminho dentro do repositório"),
-            ),
-            Msg::KeyUnknown { key, file } => pick(
-                format!("`{key}` is not a {file} key"),
-                format!("`{key}` não é uma chave do {file}"),
-            ),
-            Msg::NotLowercase(value) => pick(
-                format!(
-                    "`{value}` is not a lowercase identifier \
-                     (ASCII letters, digits and hyphens, starting with a letter)"
-                ),
-                format!(
-                    "`{value}` não é um identificador em minúsculas \
-                     (letras ASCII, dígitos e hífens, começando por uma letra)"
-                ),
-            ),
-            Msg::NoLeadingSlash(value) => pick(
-                format!("`{value}` must start with `/`"),
-                format!("`{value}` deve começar com `/`"),
-            ),
-            Msg::Empty => pick("is empty".into(), "está vazio".into()),
+            Msg::KeyMissing(key) => Core::KeyMissing(key).text(),
+            Msg::Empty => Core::Empty.text(),
             Msg::NeedsFeature { section, feature } => pick(
                 format!("[{section}] needs a Meada built with the {feature} feature"),
                 format!("[{section}] exige um Meada compilado com a feature {feature}"),

@@ -8,6 +8,8 @@ modules updates it.
   from the `meada.toml` files (peers by `path` hint, then sibling clones; siblings that name a
   repository already in join, transitively; a sibling with an invalid `meada.toml` or
   `meada.decisions.toml` is skipped). Peers not found go to `Workspace::missing`. `config` parses
+  (the `[serve]` and `[[resource]]` shapes and their deserializers are `meada_core::manifest`'s,
+  re-exported)
   `[[peer]]`, `[serve] hosts`, `[serve] prefix` and `strip` (each must start with `/`, normalized
   by `gateway_key`), `[serve] documents` (`repo_paths`: repository-relative, none absolute or
   with a `..` segment, `./` and doubled `/` dropped; added to the documents discovery finds;

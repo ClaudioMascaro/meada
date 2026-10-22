@@ -1,10 +1,22 @@
-[package]
-name = "meada"
+# The binary's crate at the root, and `meada-core` (ADR 0014): one version for both, `meada`
+# depending on `meada-core` at exactly that version; `meada-core` is published first.
+[workspace]
+members = [".", "meada-core"]
+default-members = [".", "meada-core"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
-description = "LLM-free code graph that links repositories through the contracts they share, served over MCP"
 license = "Apache-2.0"
 repository = "https://github.com/ClaudioMascaro/meada"
+
+[package]
+name = "meada"
+version.workspace = true
+edition.workspace = true
+description = "LLM-free code graph that links repositories through the contracts they share, served over MCP"
+license.workspace = true
+repository.workspace = true
 readme = "README.md"
 keywords = ["code-graph", "mcp", "tree-sitter", "cross-repo", "code-intelligence"]
 categories = ["development-tools", "command-line-utilities"]
@@ -24,6 +36,8 @@ http-body-util = "0.1.3"
 hyper = { version = "1.9.0", features = ["server", "http1"] }
 hyper-util = { version = "0.1.21", features = ["tokio"] }
 ignore = "0.4.33"
+# At the workspace's version, exactly: bump both together.
+meada-core = { path = "meada-core", version = "=0.1.0" }
 # The OIDC module's JWT validation (ADR 0012), only behind `oidc`, and the GitHub App module's
 # JWT signing (ADR 0013), only behind `github-app`: RustCrypto as its backend, since the other,
 # aws-lc-rs, would be a second rustls provider beside ring. PEM reading (`use_pem`) only with
