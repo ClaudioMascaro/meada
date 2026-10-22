@@ -8,6 +8,8 @@ export const routes = [
   { path: '/config', label: 'config' },
   { path: '/session', label: 'session' },
   { path: '/manifest', label: 'manifest' },
+  { path: '/playground', label: 'playground' },
+  { path: '/graph', label: 'graph' },
 ] as const;
 
 export function Shell({ path, locale, onLanguage, session, t, children, onNavigate }: {

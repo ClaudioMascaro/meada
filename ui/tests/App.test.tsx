@@ -34,3 +34,16 @@ test('page navigation stays in the console and configuration is reachable after 
   expect(location.pathname).toBe('/config');
   expect(fetch).toHaveBeenCalledTimes(2);
 });
+
+test('the shell opens playground and graph without another session or export request', async () => {
+  history.replaceState(null, '', '/config');
+  const fetch = vi.fn().mockResolvedValue(Response.json(session));
+  vi.stubGlobal('fetch', fetch);
+  await act(() => root.render(<App api={new Api(new Auth(config))} config={config} initialLanguage="en" />));
+  await waitFor(() => expect(host.textContent).toContain(session.subject));
+  await act(() => { fireEvent.click(getByRole(host, 'link', { name: 'Query playground' })); });
+  expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe('Query playground');
+  await act(() => { fireEvent.click(getByRole(host, 'link', { name: 'Code graph' })); });
+  expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe('Code graph');
+  expect(fetch).toHaveBeenCalledTimes(1);
+});

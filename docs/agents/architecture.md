@@ -131,8 +131,13 @@ memory-only bearer. Only the pending redirect's verifier and state enter session
 both are removed on callback. `main.tsx` handles `/auth/callback` before rendering the shell;
 `App.tsx` keeps page navigation in process so changing pages does not discard the bearer.
 `pages.tsx` provides semantic navigation and the configuration, session and bootstrap manifest
-views, with view models in `models.ts` and all interface copy in `i18n.ts`. Later operational
-pages join that shell. Vitest exercises the built WASM and the public client, view-model and DOM
+views, with view models in `models.ts` and navigation copy in `i18n.ts`. `PlaygroundPage.tsx`
+sends the MCP-shaped query that `playground.ts` builds, displaying the answer unchanged.
+`GraphPage.tsx` fetches an export through `Api.export`, and `graph.ts` checks it with WASM
+`parseExport` before deriving communities, contracts, cross-repository links, drift and
+applied/stale decisions. View changes are local; explicit generation exports are cached in the
+page and a current-generation load reads again. `graph-i18n.ts` holds this area's pt-BR/en
+copy. Later operational pages join that shell. Vitest exercises the built WASM and the public client, view-model and DOM
 seams, without a browser end-to-end suite.
 
 ## Modules (`src/`)
