@@ -107,9 +107,9 @@ impl Config {
         }
     }
 
-    /// The password, read now from the variable or the file the section names (on a blocking
-    /// thread, so a slow mount stalls no timeout).
-    async fn secret(&self) -> Result<Option<String>, String> {
+    /// The AUTH password, read now from the variable or the file the section names (on a
+    /// blocking thread, so a slow mount stalls no timeout).
+    async fn auth(&self) -> Result<Option<String>, String> {
         let Some(password) = self.password.clone() else {
             return Ok(None);
         };
@@ -144,7 +144,7 @@ pub struct Valkey {
 
 impl Valkey {
     pub async fn connect(config: &Config) -> Result<Self, String> {
-        let secret = config.secret().await?;
+        let secret = config.auth().await?;
         let secret_text = secret.clone();
         let scrub = |e: redis::RedisError| scrub(&e.to_string(), secret_text.as_deref());
         let mut info = (config.url.as_str().into_connection_info()).map_err(scrub)?;
@@ -347,14 +347,11 @@ pub(crate) mod tests {
         url
     }
 
-    /// A password made at run time, another on each call: the tests use no literal credential.
+    /// A password made at run time, another on each call (each `RandomState` has keys of its
+    /// own): the tests use no literal credential.
     fn made_password() -> String {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-        static MADE: AtomicUsize = AtomicUsize::new(0);
-        let n = MADE.fetch_add(1, Ordering::Relaxed);
-        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
-        let nanos = now.map_or(0, |d| d.subsec_nanos());
-        format!("pw-{:x}-{n}-{nanos:x}", std::process::id())
+        use std::hash::{BuildHasher, RandomState};
+        RandomState::new().hash_one(std::process::id()).to_string()
     }
 
     /// A config for `url` as `user`, the password in a file of this test's own.
