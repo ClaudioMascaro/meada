@@ -12,7 +12,7 @@ where `Repository::index` says it lives, and ATTACHes every **peer** to the firs
 connection as `peer<n>`. Locally the index is the checkout's own `.meada/index.db`. In
 **server mode**, `Engine::open_manifest(manifest, repo)` builds the workspace from the
 **workspace manifest** instead (`workspace::Manifest`: every listed repository, `repo` first,
-then manifest order, nothing discovered) and each index lives at
+then manifest order, nothing discovered; under an OIDC grant only the granted ones) and each index lives at
 `<index_dir>/<identity>/index.db`; `engine::index_workspace` and `engine::status_workspace`
 are `meada index --workspace` and `meada status --workspace`. An engine opened from a
 manifest opens every index read-only on one connection (`index::open_read`: nothing created,
@@ -116,7 +116,12 @@ one for the area a change touches.
   lets everything through; with `[oidc]` (feature `oidc`) it is `oidc::Oidc::admit`, which
   answers itself (the protected resource metadata, a 401) or hands routing a `Pass`, whose grant routing checks
   at an endpoint (`Pass::refused`, the 403) and filters every 404 listing through
-  (`Pass::reads`). The pin is split from the path before the gate, so a pinned path is admitted
+  (`Pass::reads`). Routing then puts the `Pass` in the request's extensions, which rmcp's
+  stateless transport hands the tool inside the request's `http::request::Parts`:
+  `Meada::answer` opens the engine (`open_listed`, `open_held`) over `Manifest::workspace` with
+  `Pass::reads`, which drops every entry outside the grant before the missing peers are
+  computed, so no answer names one, even as missing (#290); a call with no `Pass` is a tool
+  error. The pin is split from the path before the gate, so a pinned path is admitted
   as its identity is. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `modules.rs`, `valkey.rs`: the cloud modules (ADR 0012). `modules.rs` is the section table,
@@ -166,7 +171,7 @@ one for the area a change touches.
   when none does (`refetch`, at most once per `KID_REFRESH_EVERY`), `exp` and `nbf` with
   `LEEWAY`, `iss`, `aud` against the configured audience or the path's and its identity's
   resources, then the scopes (403 when one is missing). The grant is `identities_claim` as an
-  array, `*` for all. No token, error text of `jsonwebtoken` or claim value is ever printed.
+  array, `*` for all; routing checks it and it bounds the workspace of each answer (`mcp.rs`). No token, error text of `jsonwebtoken` or claim value is ever printed.
 - `snapshot.rs`, `snapshot/store.rs`, `snapshot/pull.rs` (feature `snapshot`; the only places
   `object_store`, `reqwest` as a client of Meada's own and `tar` are used): the snapshot store. `File` is the
   `[snapshot]` section and `File::validate` its `Config` (an `https` endpoint, or `http` on

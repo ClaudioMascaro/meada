@@ -105,8 +105,9 @@ All notable changes to Meada are recorded here. The format follows
   an asymmetric algorithm that fits its key, `iss`, `aud` (the configured audience, or the
   endpoint's URL, which its pins accept too), `exp` and `nbf`, and every configured scope; a
   missing or invalid token gets 401 with `WWW-Authenticate`, and a valid one whose
-  `identities_claim` does not list the endpoint's identity gets 403. Authentication runs before
-  routing, so a 404 needs a valid token and lists only what it may read. The JWKS is read again
+  `identities_claim` does not list the endpoint's identity gets 403; behind an endpoint it may
+  read, every answer covers only the repositories the claim lists (#290). Authentication runs
+  before routing, so a 404 needs a valid token and lists only what it may read. The JWKS is read again
   every `jwks_refresh_seconds` and on an unknown `kid`, at most once a minute, keeping the cached
   keys when that fails. No token or part of one reaches stderr or an error; the proxy stays the
   documented default admission.

@@ -128,7 +128,10 @@ before: the stdio server, discovery and freshness on demand are unchanged.
   one fact two sources.
 - In server mode the workspace of every query is every repository the manifest lists, the named
   one first. Peers named in a `meada.toml` but absent from the manifest are reported missing,
-  as today; Meada does not look for them by path hint or sibling clone.
+  as today; Meada does not look for them by path hint or sibling clone. (Amended 2026-10-22;
+  #290: under an OIDC grant, ADR 0012, the workspace is the granted repositories of the
+  manifest, the named one first, then manifest order; a repository outside the grant is absent
+  from every answer and is not reported missing.)
 - Each repository's `meada.decisions.toml` is still read from its mirror. Server mode never runs
   `meada decide`.
 - Locally nothing changes: discovery by `[[peer]]` hints and sibling clones works as ADR 0005

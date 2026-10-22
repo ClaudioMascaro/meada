@@ -50,33 +50,44 @@ impl Engine {
     pub fn open_manifest(manifest: &Path, repo: &str) -> Result<Self> {
         let shown = manifest.display().to_string();
         Self::read(
-            Manifest::read(manifest)?.workspace(repo)?,
+            Manifest::read(manifest)?.workspace(repo, &|_| true)?,
             Fix::Index(&shown),
         )
     }
 
     /// `open_manifest` over `listed`, the manifest at `manifest` as `served` read it when the
-    /// server started: only `repo`'s mirror is checked again (`Repository::recheck`), and every
-    /// index is opened as `open_manifest` opens it. A call of `meada mcp --listen`.
-    pub(crate) fn open_listed(listed: &Manifest, repo: &str, manifest: &Path) -> Result<Self> {
-        let workspace = listed.clone().workspace(repo)?;
+    /// server started, with the repositories `reads` (`Manifest::workspace`): only `repo`'s
+    /// mirror is checked again (`Repository::recheck`), and every index is opened as
+    /// `open_manifest` opens it. A call of `meada mcp --listen`.
+    pub(crate) fn open_listed(
+        listed: &Manifest,
+        repo: &str,
+        manifest: &Path,
+        reads: &dyn Fn(&str) -> bool,
+    ) -> Result<Self> {
+        let workspace = listed.clone().workspace(repo, reads)?;
         (workspace.repos[0].recheck()).map_err(|problem| format!("{repo}: {problem}"))?;
         Self::read(workspace, Fix::Index(&manifest.display().to_string()))
     }
 
     /// `open_manifest` over the generation `held` (`--generations`, feature `snapshot`), `repo`
     /// first, for one answer: the repositories, mirrors and indexes are the ones the generation
-    /// recorded and every index opens read-only. Nothing is read before the indexes; the
-    /// mirrors are not touched with `git`, since the pull checked them. A call of `meada mcp
-    /// --listen --generations` answers from the generation its request was routed by.
+    /// recorded that `reads` (`Manifest::workspace`), and every index opens read-only. Nothing
+    /// is read before the indexes; the mirrors are not touched with `git`, since the pull
+    /// checked them. A call of `meada mcp --listen --generations` answers from the generation
+    /// its request was routed by.
     #[cfg(feature = "snapshot")]
-    pub(crate) fn open_held(held: &crate::snapshot::serve::Held, repo: &str) -> Result<Self> {
+    pub(crate) fn open_held(
+        held: &crate::snapshot::serve::Held,
+        repo: &str,
+        reads: &dyn Fn(&str) -> bool,
+    ) -> Result<Self> {
         let dir = held.dir.display().to_string();
         let fix = Fix::Generation {
             id: &held.id,
             dir: &dir,
         };
-        Self::read(held.listed.clone().workspace(repo)?, fix)
+        Self::read(held.listed.clone().workspace(repo, reads)?, fix)
     }
 
     /// `open_held` over the generation current in the `local_dir` of the node manifest at
@@ -85,7 +96,7 @@ impl Engine {
     pub fn open_node(manifest: &Path, repo: &str) -> Result<Self> {
         let (_, local) = crate::snapshot::serve::node(manifest)?;
         repo::isolate(&local);
-        Self::open_held(&crate::snapshot::serve::held(&local)?, repo)
+        Self::open_held(&crate::snapshot::serve::held(&local)?, repo, &|_| true)
     }
 
     /// Opens every index of `workspace` read-only; `fix` says where an index that cannot be
@@ -1093,7 +1104,7 @@ pub fn status_workspace(manifest: &Path) -> Result<String> {
     });
     let first = rows.first().map(|(repo, _, _)| repo.clone());
     let report = match (indexed, first) {
-        (true, Some(first)) => (listed.workspace(&first))
+        (true, Some(first)) => (listed.workspace(&first, &|_| true))
             .and_then(|workspace| Engine::read(workspace, Fix::Index(&shown)))
             .and_then(|engine| engine.status_report())
             .unwrap_or_default(),
@@ -1151,7 +1162,7 @@ pub fn served(manifest: &Path) -> Result<Manifest> {
     }
     // The whole workspace opens too: what a call opens, whichever repository it names.
     let first = (listed.entries.first()).ok_or_else(|| format!("{shown}: no repository listed"))?;
-    Engine::open_listed(&listed, &first.repo, manifest)?;
+    Engine::open_listed(&listed, &first.repo, manifest, &|_| true)?;
     Ok(listed)
 }
 
@@ -1209,7 +1220,7 @@ pub fn served_generation(manifest: &Path) -> Result<(PathBuf, Vec<String>)> {
     }
     let first = (held.listed.entries.first())
         .ok_or_else(|| format!("{}: no repository listed", local.display()))?;
-    Engine::open_held(&held, &first.repo)?;
+    Engine::open_held(&held, &first.repo, &|_| true)?;
     let served = held.listed.entries.iter().map(|l| l.repo.clone());
     Ok((local, served.collect()))
 }

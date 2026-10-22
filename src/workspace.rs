@@ -473,10 +473,15 @@ impl Manifest {
         missing
     }
 
-    /// The workspace of a query about `first`: every listed repository, `first` first, then
-    /// manifest order. Refused while any entry cannot be served, naming each problem.
-    pub fn workspace(self, first: &str) -> Result<Workspace> {
-        let missing = self.missing();
+    /// The workspace of a query about `first`: every listed repository that `reads` (a token's
+    /// grant, #290), `first` first, then manifest order. One it does not read is absent, as if
+    /// the manifest did not list it, and is not missing either. Refused while any entry kept
+    /// cannot be served, naming each problem.
+    pub fn workspace(mut self, first: &str, reads: &dyn Fn(&str) -> bool) -> Result<Workspace> {
+        // Before `missing`, so neither a problem nor a missing peer names one left out.
+        self.entries.retain(|l| reads(&l.repo));
+        let mut missing = self.missing();
+        missing.retain(|m| reads(&m.repo));
         let mut repos = Vec::new();
         let mut problems = Vec::new();
         for listed in self.entries {

@@ -99,7 +99,8 @@ enum Source {
         last_root: Arc<Mutex<Option<PathBuf>>>,
     },
     /// The workspace of the manifest at `manifest`, as `listed` read it at start, `identity`
-    /// first (server mode): read-only, one engine per call, and no request to the client.
+    /// first (server mode): read-only, one engine per call, and no request to the client. A
+    /// call reads only the repositories its request's `Pass` may read.
     Served {
         listed: Arc<Manifest>,
         manifest: Arc<Path>,
@@ -107,8 +108,8 @@ enum Source {
     },
     /// The generation `<local_dir>/current` named when the request was routed, or the one its
     /// path pinned, `identity` first (server mode with `--generations`, feature `snapshot`): as
-    /// `Served`, with the repositories the generation recorded. With `named` (the node has
-    /// `[generations]`), each result names the generation in its `_meta`.
+    /// `Served`, with the repositories the generation recorded that the `Pass` may read. With
+    /// `named` (the node has `[generations]`), each result names the generation in its `_meta`.
     #[cfg(feature = "snapshot")]
     Generation {
         held: Arc<crate::snapshot::serve::Held>,
@@ -120,26 +121,38 @@ enum Source {
 impl Meada {
     /// Opens the engine where `source` says and runs `ask`; over stdio it refreshes the index
     /// first, and a client that fails `roots/list` or does not answer in time gets its last root,
-    /// or a tool error when it sent none. The engine blocks (SQLite, and a read that meets a commit waits up to the busy
-    /// timeout), so it runs where the runtime expects blocking work.
+    /// or a tool error when it sent none. In server mode the workspace holds what the request's
+    /// `Pass` may read, and a call without one (never routed) is a tool error. The engine blocks
+    /// (SQLite, and a read that meets a commit waits up to the busy timeout), so it runs where
+    /// the runtime expects blocking work.
     async fn answer(
         &self,
         ctx: RequestContext<RoleServer>,
         ask: impl FnOnce(&Engine) -> crate::Result<String>,
     ) -> CallToolResult {
-        let open = match &self.source {
-            Source::Roots { last_root } => match root_dir(&ctx, last_root).await {
+        let pass = (ctx.extensions.get::<hyper::http::request::Parts>())
+            .and_then(|parts| parts.extensions.get::<Pass>());
+        let open = match (&self.source, pass) {
+            (Source::Roots { last_root }, _) => match root_dir(&ctx, last_root).await {
                 Ok(dir) => tokio::task::block_in_place(|| Engine::open(&dir)),
                 Err(why) => return self.result(Err(why)),
             },
-            Source::Served {
-                listed,
-                manifest,
-                identity,
-            } => tokio::task::block_in_place(|| Engine::open_listed(listed, identity, manifest)),
+            (_, None) => return self.result(Err("the request was not admitted".into())),
+            (
+                Source::Served {
+                    listed,
+                    manifest,
+                    identity,
+                },
+                Some(pass),
+            ) => tokio::task::block_in_place(|| {
+                Engine::open_listed(listed, identity, manifest, &|i| pass.reads(i))
+            }),
             #[cfg(feature = "snapshot")]
-            Source::Generation { held, identity, .. } => {
-                tokio::task::block_in_place(|| Engine::open_held(held, identity))
+            (Source::Generation { held, identity, .. }, Some(pass)) => {
+                tokio::task::block_in_place(|| {
+                    Engine::open_held(held, identity, &|i| pass.reads(i))
+                })
             }
         };
         let answer = tokio::task::block_in_place(|| open.and_then(|engine| ask(&engine)));
@@ -399,6 +412,9 @@ struct Gate {
 }
 
 /// What a request `Gate` let through may read: every identity, or those its token grants.
+/// Routing hands it to the endpoint in the request's extensions, so a call's workspace holds
+/// only what it may read.
+#[derive(Clone)]
 struct Pass {
     #[cfg(feature = "oidc")]
     token: Option<(Arc<crate::oidc::Oidc>, crate::oidc::Grant)>,
@@ -656,12 +672,12 @@ impl Stop {
 /// naming it, the current one and the held ones if not; every answer then carries its
 /// generation in `Meada-Generation`. A request carrying `Origin` gets 403 before anything
 /// else (`browser`). `gate` answers next: with `[oidc]`, a request it lets through is refused
-/// with 403 at an endpoint its token may not read, and a 404 lists only the identities the
-/// token may read.
+/// with 403 at an endpoint its token may not read, a 404 lists only the identities the token may
+/// read, and the endpoint gets its `Pass`.
 async fn route(
     routes: &Routes,
     gate: &Gate,
-    request: Request<Incoming>,
+    mut request: Request<Incoming>,
 ) -> Response<BoxBody<Bytes, Infallible>> {
     if let Some(refused) = browser(request.headers()) {
         return refused;
@@ -706,7 +722,10 @@ async fn route(
         } => match endpoints.get(identity) {
             Some(endpoint) => match pass.refused(identity, identity) {
                 Some(refused) => refused,
-                None => endpoint.handle(request).await,
+                None => {
+                    request.extensions_mut().insert(pass.clone());
+                    endpoint.handle(request).await
+                }
             },
             None => plain(StatusCode::NOT_FOUND, listing(&mut all.lines())),
         },
@@ -737,6 +756,7 @@ async fn route(
                         identity: target.into(),
                         named: *pins,
                     };
+                    request.extensions_mut().insert(pass.clone());
                     named(endpoint(source, config).handle(request).await, &id)
                 }
                 Ok(Some(held)) => {

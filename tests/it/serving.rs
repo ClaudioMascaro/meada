@@ -317,7 +317,7 @@ const HAND: &str = "00000000000000aa";
 /// mirrors (copied, `.git` included) and indexes under `<case>/hand/generations/HAND/`, its
 /// document and the pointer naming it. Returns the case directory, the node's manifest relative
 /// to it and its `local_dir`.
-fn hand_node(case: &str) -> (PathBuf, String, PathBuf) {
+pub(crate) fn hand_node(case: &str) -> (PathBuf, String, PathBuf) {
     let dir = chain_manifest(case);
     assert!(run(&dir, "index").2, "index");
     let (manifest, local) = named_node(&dir, "hand", "http://127.0.0.1:1", "meada-hand");

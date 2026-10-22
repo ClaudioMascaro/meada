@@ -129,10 +129,17 @@ fn start(dir: &Path) -> Server {
     Server::start_args(dir, &args, &[])
 }
 
+/// A tool and its arguments, `tools/call`ed alone.
+type Call = Option<(&'static str, Value)>;
+
+/// `trace` from `dashboard`, which crosses every link of the chain.
+fn trace() -> Call {
+    Some(("trace", json!({"from": "dashboard"})))
+}
+
 /// What `url` answers with `token` and `headers` (values as bytes, so not always UTF-8): its
-/// status, `WWW-Authenticate` and body. With `trace`, a `tools/call` of `trace` from
-/// `dashboard` POSTed alone, else a GET.
-fn ask(url: &str, token: Option<&str>, headers: &[(&str, &[u8])], trace: bool) -> Answer {
+/// status, `WWW-Authenticate` and body. With `call`, that tool call POSTed alone, else a GET.
+fn ask(url: &str, token: Option<&str>, headers: &[(&str, &[u8])], call: Call) -> Answer {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .http_status_as_error(false)
         .build()
@@ -143,22 +150,22 @@ fn ask(url: &str, token: Option<&str>, headers: &[(&str, &[u8])], trace: bool) -
         sent.push(("Authorization", value(format!("Bearer {token}").as_bytes())));
     }
     sent.extend(headers.iter().map(|(k, v)| (*k, value(v))));
-    let response = match trace {
-        true => {
+    let response = match call {
+        Some((name, arguments)) => {
             let mut request = agent.post(url);
             for (name, value) in &sent {
                 request = request.header(*name, value);
             }
             let message = json!({
                 "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-                "params": {"name": "trace", "arguments": {"from": "dashboard"}}
+                "params": {"name": name, "arguments": arguments}
             });
             request
                 .header("Accept", "application/json, text/event-stream")
                 .header("Content-Type", "application/json")
                 .send(message.to_string())
         }
-        false => {
+        None => {
             let mut request = agent.get(url);
             for (name, value) in &sent {
                 request = request.header(*name, value);
@@ -217,7 +224,7 @@ struct Answer {
     body: String,
 }
 
-/// The text of a `trace` result POSTed alone.
+/// The text of a tool result POSTed alone.
 fn traced(answer: &Answer) -> String {
     assert_eq!(answer.status, 200, "{answer:?}");
     let json: Value = serde_json::from_str(&answer.body).unwrap();
@@ -232,6 +239,41 @@ fn golden() -> String {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/chain.trace-down.txt"),
     )
     .unwrap()
+}
+
+/// The tool calls on `/WEB` that, with every repository granted, each reach a peer.
+fn reaching() -> [Call; 3] {
+    [
+        trace(),
+        Some(("search", json!({"query": "listOrders"}))),
+        Some(("context", json!({"symbol": "src/orders.ts::listOrders"}))),
+    ]
+}
+
+/// What `token` reads at `url` through each call of `reaching`.
+fn answers(url: &str, token: &str) -> Vec<String> {
+    (reaching().into_iter())
+        .map(|call| traced(&ask(url, Some(token), &[], call)))
+        .collect()
+}
+
+/// Fails when `answer` names a chain repository other than `WEB`, a path only a peer holds, or
+/// a missing peer, or does not name `WEB` (an error would pass otherwise).
+fn web_only(answer: &str) {
+    assert!(answer.contains(WEB), "{answer}");
+    for leak in [
+        "example.com/chain/gateway",
+        "example.com/chain/catalog",
+        "example.com/chain/worker",
+        "src/server.ts",
+        "src/catalog.ts",
+        "app/api/",
+        "lib/products.ts",
+        "src/jobs.ts",
+        "missing peer",
+    ] {
+        assert!(!answer.contains(leak), "{leak} in: {answer}");
+    }
 }
 
 /// The challenges at `path`: no token, a refused one, a token without the identity, and one
@@ -307,7 +349,7 @@ fn refused_tokens(issuer: &str, signing: &EncodingKey, path: &str) -> Vec<(&'sta
 
 /// No token, a refused one, a token in the query string, a token for another repository and an
 /// `Origin` get their answers at `/WEB`; the 404s need a token and list only what it may read;
-/// a valid token's `trace` equals the golden; both metadata documents answer without a token;
+/// a `*` token's `trace` equals the golden; both metadata documents answer without a token;
 /// and no part of any token sent reaches stderr, the JWKS refresh failure included.
 #[test]
 fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
@@ -324,7 +366,7 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
             &at(&format!(".well-known/oauth-protected-resource/{path}")),
             None,
             &[],
-            false,
+            None,
         );
         assert_eq!(
             (answer.status, answer.kind.as_str()),
@@ -343,9 +385,9 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
     }
 
     // No token, at the endpoint, the root and an unknown path: 401, no listing.
-    let answer = ask(&at(WEB), None, &[], true);
+    let answer = ask(&at(WEB), None, &[], trace());
     assert_eq!((answer.status, answer.challenge), (401, missing(WEB)));
-    let answer = ask(&format!("{}/", server.url), None, &[], false);
+    let answer = ask(&format!("{}/", server.url), None, &[], None);
     assert_eq!(
         (answer.status, answer.challenge.as_deref()),
         (
@@ -354,10 +396,10 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
         )
     );
     assert!(!answer.body.contains(WEB), "{}", answer.body);
-    let answer = ask(&at("example.com/chain/nope"), None, &[], false);
+    let answer = ask(&at("example.com/chain/nope"), None, &[], None);
     assert_eq!(answer.challenge, missing("example.com/chain/nope"));
     // A CR LF in the path stays encoded in the one challenge header.
-    let answer = ask(&at("x%0D%0AX-Evil:%201"), None, &[], false);
+    let answer = ask(&at("x%0D%0AX-Evil:%201"), None, &[], None);
     assert_eq!(answer.challenge, missing("x%0D%0AX-Evil:%201"));
 
     // A valid token in the query string is not read.
@@ -365,19 +407,19 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
         &signing,
         "k1",
         Algorithm::ES256,
-        &claims(&issuer.base, WEB, &[WEB]),
+        &claims(&issuer.base, WEB, &["*"]),
     );
     sent.push(valid.clone());
     let answer = ask(
         &format!("{}?access_token={valid}", at(WEB)),
         None,
         &[],
-        true,
+        trace(),
     );
     assert_eq!((answer.status, answer.challenge), (401, missing(WEB)));
 
     for (case, token) in refused_tokens(&issuer.base, &signing, WEB) {
-        let answer = ask(&at(WEB), Some(&token), &[], true);
+        let answer = ask(&at(WEB), Some(&token), &[], trace());
         assert_eq!(
             (answer.status, answer.challenge),
             (401, invalid(WEB)),
@@ -395,12 +437,12 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
     assert_eq!(raw(&at(WEB), &[&bytes]), (401, invalid(WEB)));
     // A valid token without the required scope.
     let token = scopeless(&issuer.base, &signing, WEB);
-    let answer = ask(&at(WEB), Some(&token), &[], true);
+    let answer = ask(&at(WEB), Some(&token), &[], trace());
     assert_eq!((answer.status, answer.challenge), (403, unscoped(WEB)));
     sent.push(token);
 
-    // A valid token reads what its claim lists, as the golden has it.
-    assert_eq!(traced(&ask(&at(WEB), Some(&valid), &[], true)), golden());
+    // A `*` token reads the whole chain, as the golden has it.
+    assert_eq!(traced(&ask(&at(WEB), Some(&valid), &[], trace())), golden());
     let other = sign(
         &signing,
         "k1",
@@ -408,14 +450,14 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
         &claims(&issuer.base, WEB, &["example.com/chain/catalog"]),
     );
     sent.push(other.clone());
-    let answer = ask(&at(WEB), Some(&other), &[], true);
+    let answer = ask(&at(WEB), Some(&other), &[], trace());
     assert_eq!((answer.status, answer.challenge), (403, forbidden(WEB)));
     // A browser's request is refused whatever its token.
     let answer = ask(
         &at(WEB),
         Some(&valid),
         &[("Origin", &b"https://evil.example"[..])],
-        true,
+        trace(),
     );
     assert_eq!(answer.status, 403);
 
@@ -430,7 +472,7 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
         (root(&["*"]), SERVED.to_string()),
         (root(&[]), String::new()),
     ] {
-        let answer = ask(&format!("{}/", server.url), Some(&token), &[], false);
+        let answer = ask(&format!("{}/", server.url), Some(&token), &[], None);
         assert_eq!(
             (answer.status, answer.body.as_str()),
             (404, listed.as_str())
@@ -444,7 +486,7 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
         Algorithm::ES256,
         &claims(&issuer.base, unknown, &[WEB]),
     );
-    let answer = ask(&at(unknown), Some(&token), &[], false);
+    let answer = ask(&at(unknown), Some(&token), &[], None);
     assert_eq!((answer.status, answer.body), (404, format!("{WEB}\n")));
     sent.push(token);
 
@@ -458,11 +500,11 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
         &claims(&issuer.base, WEB, &[WEB]),
     );
     assert_eq!(
-        ask(&at(WEB), Some(&token), &[], true).challenge,
+        ask(&at(WEB), Some(&token), &[], trace()).challenge,
         invalid(WEB)
     );
     sent.push(token);
-    assert_eq!(traced(&ask(&at(WEB), Some(&valid), &[], true)), golden());
+    assert_eq!(traced(&ask(&at(WEB), Some(&valid), &[], trace())), golden());
 
     let stderr = server.stderr();
     assert!(stderr.contains("keeping the cached keys"), "{stderr}");
@@ -489,13 +531,58 @@ fn a_rotated_key_is_picked_up_on_its_first_token() {
             key,
             kid,
             Algorithm::ES256,
-            &claims(&issuer.base, WEB, &[WEB]),
+            &claims(&issuer.base, WEB, &["*"]),
         );
         assert_eq!(
-            traced(&ask(&at, Some(&token), &[], true)),
+            traced(&ask(&at, Some(&token), &[], trace())),
             golden(),
             "{kid}"
         );
+    }
+}
+
+/// Behind `/WEB`, a token reads only the repositories its claim lists (#290): listing all four,
+/// each answer reaches a peer, the trace as the golden has it; granting `WEB` alone, no answer
+/// names a peer, a path only a peer holds or a missing peer.
+#[test]
+fn a_grant_scopes_the_workspace_of_every_answer() {
+    let (signing, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let dir = oidc_manifest("oidc_grant", &issuer.base);
+    let server = start(&dir);
+    let at = format!("{}/{WEB}", server.url);
+    let grant = |identities: &[&str]| {
+        let claims = claims(&issuer.base, WEB, identities);
+        sign(&signing, "k1", Algorithm::ES256, &claims)
+    };
+    let every: Vec<&str> = SERVED.lines().collect();
+    let full = answers(&at, &grant(&every));
+    assert_eq!(full[0], golden());
+    for answer in &full[1..] {
+        assert!(answer.contains("example.com/chain/gateway"), "{answer}");
+    }
+    for answer in answers(&at, &grant(&[WEB])) {
+        web_only(&answer);
+    }
+}
+
+/// The same grant over a generation made by hand (`--generations`, no store needed).
+#[cfg(feature = "snapshot")]
+#[test]
+fn a_grant_scopes_the_workspace_of_a_generation() {
+    let (signing, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let (dir, manifest, _) = crate::serving::hand_node("oidc_grant_generation");
+    append(&dir, &manifest, &issuer.base);
+    let server = crate::serving::serve(&dir, &manifest);
+    let token = sign(
+        &signing,
+        "k1",
+        Algorithm::ES256,
+        &claims(&issuer.base, WEB, &[WEB]),
+    );
+    for answer in answers(&format!("{}/{WEB}", server.url), &token) {
+        web_only(&answer);
     }
 }
 
@@ -553,16 +640,16 @@ fn a_pinned_path_is_admitted_as_its_identity_is() {
         &at(&format!(".well-known/oauth-protected-resource/{pinned}")),
         None,
         &[],
-        false,
+        None,
     );
     let document: Value = serde_json::from_str(&answer.body).unwrap();
     assert_eq!(document["resource"], format!("{PUBLIC}/{pinned}"));
     assert_eq!(document["authorization_servers"], json!([issuer.base]));
 
-    let answer = ask(&at(&pinned), None, &[], true);
+    let answer = ask(&at(&pinned), None, &[], trace());
     assert_eq!((answer.status, answer.challenge), (401, missing(&pinned)));
     for (case, token) in refused_tokens(&issuer.base, &signing, WEB) {
-        let answer = ask(&at(&pinned), Some(&token), &[], true);
+        let answer = ask(&at(&pinned), Some(&token), &[], trace());
         assert_eq!(
             (answer.status, answer.challenge),
             (401, invalid(&pinned)),
@@ -575,33 +662,43 @@ fn a_pinned_path_is_admitted_as_its_identity_is() {
             &signing,
             "k1",
             Algorithm::ES256,
-            &claims(&issuer.base, audience, &[WEB]),
+            &claims(&issuer.base, audience, &["*"]),
         );
         assert_eq!(
-            traced(&ask(&at(&pinned), Some(&token), &[], true)),
+            traced(&ask(&at(&pinned), Some(&token), &[], trace())),
             golden(),
             "{audience}"
         );
     }
+    // A token granting `WEB` alone reads none of the peers at the pin.
+    let web = sign(
+        &signing,
+        "k1",
+        Algorithm::ES256,
+        &claims(&issuer.base, WEB, &[WEB]),
+    );
+    for answer in answers(&at(&pinned), &web) {
+        web_only(&answer);
+    }
     let other = claims(&issuer.base, WEB, &["example.com/chain/catalog"]);
     let other = sign(&signing, "k1", Algorithm::ES256, &other);
-    let answer = ask(&at(&pinned), Some(&other), &[], true);
+    let answer = ask(&at(&pinned), Some(&other), &[], trace());
     assert_eq!((answer.status, answer.challenge), (403, forbidden(&pinned)));
     let answer = ask(
         &at(&pinned),
         Some(&scopeless(&issuer.base, &signing, WEB)),
         &[],
-        true,
+        trace(),
     );
     assert_eq!((answer.status, answer.challenge), (403, unscoped(&pinned)));
 
     // A generation the node does not hold: 401 without a token, 403 with one that does not
     // grant the identity, the 404 with one that does.
     let gone = format!("{WEB}@ffffffffffffffff");
-    let answer = ask(&at(&gone), None, &[], false);
+    let answer = ask(&at(&gone), None, &[], None);
     assert_eq!((answer.status, answer.challenge), (401, missing(&gone)));
     assert!(!answer.body.contains(&g1), "{}", answer.body);
-    let answer = ask(&at(&gone), Some(&other), &[], false);
+    let answer = ask(&at(&gone), Some(&other), &[], None);
     assert_eq!((answer.status, answer.challenge), (403, forbidden(&gone)));
     assert!(!answer.body.contains(&g1), "{}", answer.body);
     let token = sign(
@@ -610,7 +707,7 @@ fn a_pinned_path_is_admitted_as_its_identity_is() {
         Algorithm::ES256,
         &claims(&issuer.base, WEB, &[WEB]),
     );
-    let answer = ask(&at(&gone), Some(&token), &[], false);
+    let answer = ask(&at(&gone), Some(&token), &[], None);
     assert_eq!(answer.status, 404);
     assert_eq!(
         answer.body,
@@ -624,6 +721,6 @@ fn a_pinned_path_is_admitted_as_its_identity_is() {
         Algorithm::ES256,
         &claims(&issuer.base, &none, &[WEB]),
     );
-    let answer = ask(&at(&none), Some(&token), &[], false);
+    let answer = ask(&at(&none), Some(&token), &[], None);
     assert_eq!((answer.status, answer.body), (404, format!("{WEB}\n")));
 }

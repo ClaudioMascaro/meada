@@ -205,6 +205,12 @@ to the client, so it keeps no channel back to it.
   for a repository it may not read gets 403. Authentication runs before routing (after the
   `Origin` check of #262), so no 404 lists an identity or a generation to a caller without a
   valid token, and a valid token's 404 lists only what it may read.
+- The grant also bounds what an admitted endpoint answers (amended 2026-10-22, #290): the
+  workspace of a query is the repositories of the manifest, or of the generation, that the
+  token's claim lists, the named one first, then manifest order. A repository outside the grant
+  is absent from every answer, as if the manifest did not list it: no identity, symbol, path,
+  source line or link of it, and it is not reported missing. A `*` grant, and server mode
+  without `[oidc]`, keep the whole workspace.
 - No token passthrough: Meada never forwards a token, issues none, registers no client and is no
   authorization server. No stderr line or error carries a token or any part of it.
 - The issuer's metadata and JWKS are read at start, before the listener binds, through the HTTP

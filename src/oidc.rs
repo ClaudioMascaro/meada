@@ -15,7 +15,8 @@
 //! a token, and checks the token: an asymmetric `alg` that fits the key, the signature, `iss`,
 //! `aud`, `exp` (required) and `nbf` with `LEEWAY`, and every configured scope. A missing or invalid token is
 //! a 401 naming the metadata. What passes is a `Grant`: the identities the token's
-//! `identities_claim` lists (`*` for all), which routing checks (403) and lists (404).
+//! `identities_claim` lists (`*` for all), which routing checks (403) and lists (404), and which
+//! bounds the workspace of every answer behind it (#290): a repository outside it is absent.
 //!
 //! Meada never forwards a token, and no error or stderr line holds one or any of its parts:
 //! the 401 and 403 bodies are fixed, and a refused token is never described.
@@ -189,6 +190,7 @@ fn reachable(url: &str, shape: Shape) -> bool {
 }
 
 /// What a token admitted may read.
+#[derive(Clone)]
 pub enum Grant {
     /// Its claim lists `*`.
     All,
