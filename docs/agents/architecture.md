@@ -125,7 +125,14 @@ one for the area a change touches.
   section whose feature is missing is an error naming the file, the line, the section and the
   feature, and a section the table lacks stays an unknown key. A module ticket adds its row and
   sets `built` to `cfg!(feature = ..)`. The `cloud` feature turns on every module at once and,
-  as `refresh-lock` is, is Unix only. `valkey.rs` (feature `valkey`, internal; the only place
+  as `refresh-lock` is, is Unix only. `modules.rs` also holds what the modules share, each
+  behind the features that use it: `Problem` (a section key and its message) and `validated`,
+  which turns one into the `file:line` error; `at_least` (an optional integer with a default
+  and a minimum, `Msg::AtLeast`); `loopback` (`localhost`, `127.0.0.0/8` or `::1`, the one
+  host test of every `http` exception); `Secret` (a variable or a file, at most one of the pair,
+  and `read_secret`, a bounded regular file whose error names only the file); `block_on` (a
+  current-thread runtime shut down without waiting) and `within` (a `status` line's bounded
+  wait). `valkey.rs` (feature `valkey`, internal; the only place
   the `redis` crate is used) is the one Valkey client the modules share: `File` is the
   `[valkey]` section, `File::validate` turns it into a `Config` (no password in the URL, `rediss`
   outside loopback, at most one of `password_env` and `password_file`, no `{` or `}` in
@@ -185,7 +192,7 @@ one for the area a change touches.
   others through object_store's providers given exactly those inputs, IMDSv2 over IPv4 only),
   stay in memory and are scrubbed from every error: the static secret is replaced, and an S3
   error body loses its `CanonicalRequest`, `StringToSign` and their `*Bytes` echoes. The
-  secret files are read through `config::read_bounded`, as `valkey.rs` reads its own. Each
+  secret files are read through `modules::read_secret`, as `valkey.rs` reads its own. Each
   bundle keeps its `open_read` connection, the read transaction its freshness check ran in,
   until its upload ends. Every object carries `meada-size` and `meada-blake3` metadata.
   `snapshot/pull.rs` is `meada snapshot pull` (`pull`, once; `main.rs` loops for `--every`),
@@ -231,7 +238,7 @@ one for the area a change touches.
   it; `Current::pinned` keeps one `Held` per pinned id, read once while held and dropped once
   `ids` no longer lists it, so what it keeps is bounded by what the node holds; a read that fails
   because a pull deleted the directory after the listing is `None`, the pin's 404, through
-  `unless_gone`), `ids` (the generations held) and `reach` (the store's current id within two
+  `unless_gone`), `ids` (the generations held) and `reach` (the store's current id within `CURRENT_ID_TIMEOUT`, two
   seconds, for the probe; with `[generations]`, `reach_pointer`: Valkey's current id, then a
   HEAD of its document in the store, within the same bound, the reason prefixed `valkey:` or
   `store:`). It only reads; the pull is the only writer of `local_dir`. A pinned call still open
