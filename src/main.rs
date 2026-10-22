@@ -144,6 +144,39 @@ enum SnapshotCommand {
         #[arg(last = true, required = true, value_name = "COMMAND")]
         command: Vec<std::ffi::OsString>,
     },
+    #[cfg(feature = "refresh-lock")]
+    Pointer {
+        #[command(subcommand)]
+        command: PointerCommand,
+    },
+    #[cfg(feature = "refresh-lock")]
+    Fence {
+        #[command(subcommand)]
+        command: FenceCommand,
+    },
+}
+
+/// `meada snapshot pointer` (ADR 0014, feature `refresh-lock`).
+#[cfg(feature = "refresh-lock")]
+#[derive(Subcommand)]
+enum PointerCommand {
+    Set {
+        generation: String,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+}
+
+/// `meada snapshot fence` (ADR 0014, feature `refresh-lock`).
+#[cfg(feature = "refresh-lock")]
+#[derive(Subcommand)]
+enum FenceCommand {
+    Recover {
+        #[arg(long, value_name = "FENCE")]
+        at_least: Option<String>,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
 }
 
 /// `meada snapshot pull`: the generation id on stdout when the pointer file moved, or once
@@ -251,6 +284,22 @@ fn main() -> ExitCode {
             (c.about(Msg::SnapshotLock.text()))
                 .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
                 .mut_arg("command", |a| a.help(Msg::SnapshotLockCommand.text()))
+        })
+        .mut_subcommand("pointer", |c| {
+            (c.about(Msg::SnapshotPointer.text())).mut_subcommand("set", |c| {
+                (c.about(Msg::SnapshotPointerSet.text()))
+                    .mut_arg("generation", |a| {
+                        a.help(Msg::SnapshotPointerGeneration.text())
+                    })
+                    .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
+            })
+        })
+        .mut_subcommand("fence", |c| {
+            (c.about(Msg::SnapshotFence.text())).mut_subcommand("recover", |c| {
+                (c.about(Msg::SnapshotFenceRecover.text()))
+                    .mut_arg("at_least", |a| a.help(Msg::SnapshotFenceAtLeast.text()))
+                    .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
+            })
         })
     });
     #[cfg(feature = "github-app")]
@@ -382,6 +431,45 @@ fn main() -> ExitCode {
                 std::process::exit(1);
             }
         },
+        // The new state is the only line on stdout.
+        #[cfg(feature = "refresh-lock")]
+        Command::Snapshot {
+            command:
+                SnapshotCommand::Pointer {
+                    command:
+                        PointerCommand::Set {
+                            generation,
+                            workspace,
+                        },
+                },
+        } => {
+            let author = meada::snapshot::lock::cli_author();
+            meada::snapshot::operation::pointer_set(&workspace, &generation, &author)
+                .map(|state| println!("{state}"))
+        }
+        // What could not be counted on stderr, the new fence on stdout.
+        #[cfg(feature = "refresh-lock")]
+        Command::Snapshot {
+            command:
+                SnapshotCommand::Fence {
+                    command:
+                        FenceCommand::Recover {
+                            at_least,
+                            workspace,
+                        },
+                },
+        } => {
+            let author = meada::snapshot::lock::cli_author();
+            let at_least = at_least.as_deref();
+            meada::snapshot::operation::fence_recover(&workspace, at_least, &author).map(
+                |(fence, skipped)| {
+                    for line in skipped.iter().flat_map(|s| s.lines()) {
+                        eprintln!("meada: {line}");
+                    }
+                    println!("{fence}");
+                },
+            )
+        }
         Command::Export {
             workspace: Some(manifest),
             repo: Some(repo),

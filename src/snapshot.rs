@@ -14,6 +14,8 @@
 pub mod generations;
 #[cfg(feature = "refresh-lock")]
 pub mod lock;
+#[cfg(feature = "refresh-lock")]
+pub mod operation;
 #[cfg(all(feature = "refresh-lock", not(unix)))]
 compile_error!("the refresh-lock feature is Unix only");
 pub mod pull;
