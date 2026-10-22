@@ -261,6 +261,11 @@ pub use meada_core::ids::{bundle_id, entry_blocks, fence, generation_id, is_id};
 #[derive(Serialize, Deserialize)]
 pub struct Document {
     pub generation: String,
+    /// The workspace version that produced the generation (`source = "store"`, ADR 0014),
+    /// absent with `source = "file"`. Not part of any id; a document stored keeps the version
+    /// that first produced it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace: Option<String>,
     /// In manifest order.
     pub repositories: Vec<Entry>,
 }
@@ -391,7 +396,13 @@ pub fn publish(manifest: &Path) -> Result<String> {
         #[cfg(feature = "refresh-lock")]
         held,
     };
-    crate::modules::block_on(store_generation(&config, &generation, bundles, pointer))??;
+    // The pulled workspace version with `source = "store"`; never part of an id.
+    #[cfg(feature = "generation-pointer")]
+    let workspace = listed.version.clone();
+    #[cfg(not(feature = "generation-pointer"))]
+    let workspace = None;
+    let stored = store_generation(&config, &generation, workspace, bundles, pointer);
+    crate::modules::block_on(stored)??;
     Ok(generation)
 }
 
@@ -412,10 +423,13 @@ struct Pointer {
     held: Option<lock::Held>,
 }
 
-/// Stores the generation `generation` of `bundles`, then points `pointer` at it.
+/// Stores the generation `generation` of `bundles`, its document naming the workspace version
+/// `workspace` when one produced it, then points `pointer` at it. A document already stored is
+/// verified and kept as it is, with the version that first produced it.
 async fn store_generation(
     config: &Config,
     generation: &str,
+    workspace: Option<String>,
     bundles: Vec<Bundle>,
     #[cfg_attr(not(feature = "generation-pointer"), allow(unused_variables))] pointer: Pointer,
 ) -> std::result::Result<(), String> {
@@ -468,6 +482,7 @@ async fn store_generation(
             }
             let document_text = Document {
                 generation: generation.to_string(),
+                workspace,
                 repositories,
             };
             let mut text = serde_json::to_vec_pretty(&document_text).map_err(|e| e.to_string())?;

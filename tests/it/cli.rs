@@ -207,12 +207,25 @@ fn workspace_refusals_follow_lang() {
             bootstrap.clone(),
             vec!["index", "--workspace", MANIFEST],
             format!(
-                "{manifest}: [workspace] source = \"store\": this command reads [[repository]] \
-                 entries, which only source = \"file\" lists\n"
+                "{manifest}: [workspace] source = \"store\": no workspace version pulled in \
+                 ops/../indexes/workspace: run `meada workspace pull` first\n"
             ),
             format!(
-                "{manifest}: [workspace] source = \"store\": este comando lê entradas \
-                 [[repository]], que só source = \"file\" lista\n"
+                "{manifest}: [workspace] source = \"store\": nenhuma versão do workspace \
+                 baixada em ops/../indexes/workspace: rode `meada workspace pull` antes\n"
+            ),
+        ),
+        (
+            bootstrap.clone(),
+            vec!["mcp", "--listen", "127.0.0.1:0", "--workspace", MANIFEST],
+            format!(
+                "{manifest}: [workspace] source = \"store\": a managed workspace's nodes serve \
+                 generations: run meada mcp --listen with --generations\n"
+            ),
+            // The MCP surface is English whatever `LANG` says (ADR 0008).
+            format!(
+                "{manifest}: [workspace] source = \"store\": a managed workspace's nodes serve \
+                 generations: run meada mcp --listen with --generations\n"
             ),
         ),
         (
@@ -230,6 +243,18 @@ fn workspace_refusals_follow_lang() {
             "meada: 0000000000000ABC: não é um id de versão do workspace de 16 caracteres \
              hexadecimais minúsculos\n"
                 .into(),
+        ),
+        (
+            entries.clone(),
+            vec!["workspace", "pull", "--workspace", MANIFEST],
+            format!(
+                "{manifest}: no [generations] section: workspace versions need [snapshot] and \
+                 [generations]\n"
+            ),
+            format!(
+                "{manifest}: sem seção [generations]: versões do workspace exigem [snapshot] e \
+                 [generations]\n"
+            ),
         ),
         (
             entries,
@@ -286,6 +311,13 @@ fn operation_refusals_follow_lang() {
             assert_eq!(run_in(&dir, lang, &args), refused(section), "{lang} {op}");
         }
         assert_eq!(run_in(&dir, lang, &recover), refused(section), "{lang}");
+        let apply = |id| ["workspace", "apply", id, "--workspace", MANIFEST];
+        let malformed = malformed.replace("generation id", "workspace version id");
+        let malformed = malformed.replace("id de geração de 16", "id de versão do workspace de 16");
+        let malformed_id = run_in(&dir, lang, &apply("000000000000000A"));
+        assert_eq!(malformed_id, refused(&malformed), "{lang} apply");
+        let args = apply("0000000000000000");
+        assert_eq!(run_in(&dir, lang, &args), refused(section), "{lang} apply");
     }
 }
 
@@ -503,5 +535,81 @@ fn a_bad_node_name_follows_lang() {
         let refused = (String::new(), expected, Some(1));
         let args = ["index", "--workspace", MANIFEST];
         assert_eq!(run_lang(&dir, lang, &args), refused, "{lang}");
+    }
+}
+
+/// `meada workspace apply` and `pull` against the services, under `pt_BR` and `en_US`: a
+/// version the store does not hold, no current version, a pointer whose fence is not above the
+/// current file's, and a pull that finds its version current.
+#[cfg(feature = "refresh-lock")]
+#[test]
+fn workspace_apply_and_pull_refusals_follow_lang() {
+    use crate::generations::{admin, import, prefix, send, version_key, workspace_pointer};
+    use crate::manifest::MANIFEST;
+    use crate::refresh_lock::{fleet, run_in};
+    let Some(fleet) = fleet("cli_workspace_pull") else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let pointer = workspace_pointer(fleet.case);
+    let fence_key = format!("{{{}}}:fence", prefix(fleet.case));
+    let refused = |stderr: String| (String::new(), stderr, Some(1));
+    let pull = ["workspace", "pull", "--workspace", MANIFEST];
+    let zero = "0000000000000000";
+    let apply = ["workspace", "apply", zero, "--workspace", MANIFEST];
+    let missing = version_key(zero);
+    for (lang, none, unknown) in [
+        (
+            "en_US.UTF-8",
+            format!(
+                "meada: {pointer}: no workspace version is current: apply one with `meada \
+                 workspace apply`\n"
+            ),
+            format!("meada: {missing}: no such workspace version in the store\n"),
+        ),
+        (
+            "pt_BR.UTF-8",
+            format!(
+                "meada: {pointer}: nenhuma versão do workspace é a atual: aplique uma com \
+                 `meada workspace apply`\n"
+            ),
+            format!("meada: {missing}: essa versão do workspace não está no store\n"),
+        ),
+    ] {
+        assert_eq!(run_in(dir, lang, &pull), refused(none), "{lang}");
+        assert_eq!(run_in(dir, lang, &apply), refused(unknown), "{lang}");
+    }
+
+    let (v1, _) = import(dir, MANIFEST, "one", "alice");
+    let mut valkey = admin(&fleet.valkey);
+    send(&mut valkey, &["HSET", &pointer, "id", &v1, "fence", "2"]);
+    assert_eq!(run_in(dir, "en_US.UTF-8", &pull).2, Some(0));
+    let current = (
+        format!("{v1}\n"),
+        format!("meada: {v1}: já é a versão atual do workspace: nada mudou\n"),
+        Some(0),
+    );
+    assert_eq!(run_in(dir, "pt_BR.UTF-8", &pull), current);
+    send(&mut valkey, &["HSET", &pointer, "fence", "1"]);
+    let file = "ops/../indexes/workspace/current";
+    for (lang, expected) in [
+        (
+            "en_US.UTF-8",
+            format!(
+                "meada: {pointer}: workspace version {v1} has fence 1, not above fence 2 in \
+                 {file}: not swapped; raise {fence_key} with meada snapshot fence recover \
+                 --at-least 2 and apply again, or delete {file}\n"
+            ),
+        ),
+        (
+            "pt_BR.UTF-8",
+            format!(
+                "meada: {pointer}: a versão do workspace {v1} tem fence 1, não maior que o fence \
+                 2 em {file}: não trocada; eleve {fence_key} com meada snapshot fence recover \
+                 --at-least 2 e aplique de novo, ou apague {file}\n"
+            ),
+        ),
+    ] {
+        assert_eq!(run_in(dir, lang, &pull), refused(expected), "{lang}");
     }
 }

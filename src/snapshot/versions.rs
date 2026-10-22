@@ -11,8 +11,15 @@
 //! the store or Valkey is hostile: each name, id and fence is checked against its pattern, and a
 //! document is bounded in size, its entries validated again and its id derived from them again
 //! before it is used.
+//!
+//! `meada workspace pull` brings the current version onto the machine, under
+//! `<index_dir>/workspace/` (`DIR`): `<id>.json`, the document as stored, and `current`, one line
+//! `<id> <fence>`, swapped by rename and never to a lower fence; `pull.lock` keeps one pull at a
+//! time. `index`, `status`, `export` and `snapshot publish` read the version `current` names
+//! from there (`pulled`, through `Manifest::read_listed`), checked again, and never connect.
 
-use std::path::Path;
+use std::fs::{self, File};
+use std::path::{Path, PathBuf};
 
 use meada_core::ids::workspace_version_id;
 use meada_core::manifest::{EntryFile, validate, validate_entries};
@@ -22,7 +29,7 @@ use serde_json::{Map, Value as Json};
 
 use super::generations::{now, rfc3339};
 use super::store::Store;
-use super::{Config, entry_blocks, fence, is_id};
+use super::{Config, entry_blocks, fence, is_id, pull};
 use crate::msg::Msg;
 use crate::valkey::{self, Valkey};
 use crate::workspace::Manifest;
@@ -30,6 +37,11 @@ use crate::workspace::Manifest;
 // ponytail: the most a workspace version document may hold in the store; past it the document
 // is refused, naming its key.
 const VERSION_MAX: u64 = 4 << 20;
+
+/// The directory under `index_dir` where `pull` leaves the current version.
+pub const DIR: &str = "workspace";
+/// The current file in `DIR`: `<id> <fence>`.
+const CURRENT: &str = "current";
 
 /// A workspace version document (`workspaces/<id>.json`), never rewritten once stored.
 #[derive(Serialize, Deserialize)]
@@ -47,6 +59,7 @@ pub struct Version {
 struct Sections {
     snapshot: Config,
     valkey: valkey::Config,
+    index_dir: PathBuf,
 }
 
 /// `manifest`'s `[snapshot]` and `[valkey]`, or the error naming it when it has no
@@ -54,7 +67,11 @@ struct Sections {
 fn sections(manifest: &Path) -> crate::Result<Sections> {
     let read = Manifest::read(manifest)?;
     match (read.generations, read.snapshot, read.valkey) {
-        (Some(_), Some(snapshot), Some(valkey)) => Ok(Sections { snapshot, valkey }),
+        (Some(_), Some(snapshot), Some(valkey)) => Ok(Sections {
+            snapshot,
+            valkey,
+            index_dir: read.index_dir,
+        }),
         _ => Err(Msg::WorkspaceNoSections(&manifest.display().to_string())
             .text()
             .into()),
@@ -345,4 +362,175 @@ pub fn cli_author() -> String {
     let login = var(["USER", "USERNAME"]).unwrap_or_default();
     let host = var(["HOSTNAME", "COMPUTERNAME"]).unwrap_or_default();
     format!("cli:{login}@{}", host.to_lowercase())
+}
+
+/// `meada workspace apply <version> --workspace <manifest>` (feature `refresh-lock`): once the
+/// store holds the version `id`'s document, checked, moves `{<key_prefix>}:workspace` to `id`
+/// with the operation's fence under the refresh lock (`APPLY`); `<id> <fence>`. The id is
+/// checked before anything is read.
+#[cfg(feature = "refresh-lock")]
+pub fn apply(manifest: &Path, id: &str, author: &str) -> crate::Result<String> {
+    if !is_id(id) {
+        return Err(Msg::BadVersionArg(&id.escape_debug().to_string())
+            .text()
+            .into());
+    }
+    let sections = super::operation::sections(manifest)?;
+    let key = version_key(&sections.snapshot, id);
+    let check = async {
+        let store = Store::connect(&sections.snapshot)?;
+        match stored(&store, &key, id).await? {
+            Some(_) => Ok(()),
+            None => Err(Msg::WorkspaceNoVersion(&key).text()),
+        }
+    };
+    crate::modules::block_on(check)??;
+    super::operation::locked(
+        &sections,
+        &format!("workspace apply {author}"),
+        async |valkey, config, _, held| {
+            let (lock, pointer) = (config.key("lock", true), pointer_key(config));
+            let mut script = cmd("EVAL");
+            script.arg(APPLY).arg(2).arg(&lock).arg(&pointer);
+            script.arg(&held.token).arg(id).arg(held.fence);
+            let wrote = valkey.query::<i64>(&script).await;
+            match wrote.map_err(|e| format!("{pointer}: {e}"))? {
+                1 => Ok(format!("{id} {}", held.fence)),
+                0 => Err(Msg::LockNotHeld(&lock).text()),
+                -1 => Err(Msg::FenceRefused {
+                    fence: held.fence,
+                    current: &pointer,
+                    fence_key: &config.key("fence", true),
+                }
+                .text()),
+                _ => Err(Msg::WorkspaceBadPointer(&pointer).text()),
+            }
+        },
+    )
+}
+
+/// Points the workspace (`KEYS[2]`) at the version `ARGV[2]` with the fence `ARGV[3]` while the
+/// lock (`KEYS[1]`) holds the token `ARGV[1]`: 0 without the lock, -1 unless the fence is above
+/// the one the pointer holds (compared as decimal text), -2 when that one is no decimal; else
+/// the hash set, and 1.
+#[cfg(feature = "refresh-lock")]
+const APPLY: &str = r"
+if redis.call('GET', KEYS[1]) ~= ARGV[1] then
+  return 0
+end
+local held = redis.call('HGET', KEYS[2], 'fence')
+if held then
+  if not string.match(held, '^%d+$') then
+    return -2
+  end
+  held = (string.gsub(held, '^0+(%d)', '%1'))
+  local fence = ARGV[3]
+  if #fence < #held or (#fence == #held and fence <= held) then
+    return -1
+  end
+end
+redis.call('HSET', KEYS[2], 'id', ARGV[2], 'fence', ARGV[3])
+return 1
+";
+
+/// What `meada workspace pull` did.
+#[derive(Debug, PartialEq)]
+pub enum Pulled {
+    /// The current file now names this version.
+    Swapped(String),
+    /// The current file already named the pointer's version and fence: nothing changed.
+    Current(String),
+}
+
+/// `meada workspace pull --workspace <manifest>`: the pointer `{<key_prefix>}:workspace` and the
+/// version's document read and checked (`current`, `checked`) before anything on disk changes;
+/// then, one pull at a time, the document written to `<index_dir>/workspace/<id>.json` and the
+/// current file swapped by rename, never to a fence that is not above its own. Only the current
+/// version's document and the one it replaced stay. A failure leaves the current file and the
+/// documents as they were.
+pub fn pull(manifest: &Path) -> crate::Result<Pulled> {
+    let sections = sections(manifest)?;
+    let pointer = pointer_key(&sections.valkey);
+    let fetch = async {
+        let valkey = Valkey::connect(&sections.valkey).await?;
+        let current = current(&valkey, &sections.valkey).await?;
+        let (id, fence) = current.ok_or_else(|| Msg::WorkspaceNoCurrent(&pointer).text())?;
+        let store = Store::connect(&sections.snapshot)?;
+        let key = version_key(&sections.snapshot, &id);
+        let bytes = store.get(&key, VERSION_MAX).await?;
+        let bytes = bytes.ok_or_else(|| Msg::WorkspaceNoVersion(&key).text())?;
+        checked(&key, &id, &bytes)?;
+        Ok::<_, String>((id, fence, bytes))
+    };
+    let (id, fence, bytes) = crate::modules::block_on(fetch)??;
+
+    let dir = sections.index_dir.join(DIR);
+    let at = pull::io_at(&dir);
+    fs::create_dir_all(&dir).map_err(&at)?;
+    let lock = (File::options().read(true).write(true).create(true))
+        .truncate(false)
+        .open(dir.join("pull.lock"))
+        .map_err(&at)?;
+    lock.lock().map_err(&at)?;
+    let file = dir.join(CURRENT);
+    let previous = pull::pointer_file(&file, |shown| Msg::WorkspaceCurrentBad(shown).text())?;
+    let document = dir.join(format!("{id}.json"));
+    if let Some((held_id, held)) = &previous {
+        if (held_id, *held) == (&id, fence) && document.is_file() {
+            return Ok(Pulled::Current(id));
+        }
+        if fence < *held || (fence == *held && held_id != &id) {
+            let file = file.display().to_string();
+            return Err(Msg::WorkspaceFenceBelow {
+                key: &pointer,
+                id: &id,
+                fence,
+                held: *held,
+                file: &file,
+                fence_key: &sections.valkey.key("fence", true),
+            }
+            .text()
+            .into());
+        }
+    }
+    let had = document.is_file();
+    let new = dir.join(format!("{id}.json.new"));
+    let written = (fs::write(&new, &bytes).map_err(pull::io_at(&new)))
+        .and_then(|()| fs::rename(&new, &document).map_err(pull::io_at(&document)))
+        .and_then(|()| pull::swap(&dir, &id, fence));
+    if let Err(e) = written {
+        let _ = fs::remove_file(&new);
+        if !had {
+            let _ = fs::remove_file(&document);
+        }
+        return Err(e.into());
+    }
+    // Only the current version and the one it replaced; a failure is left for the next pull.
+    let replaced = previous.map(|(id, _)| id);
+    for entry in fs::read_dir(&dir).into_iter().flatten().flatten() {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        let stem = name.strip_suffix(".json").filter(|stem| is_id(stem));
+        if stem.is_some_and(|stem| stem != id && Some(stem) != replaced.as_deref()) {
+            let _ = fs::remove_file(entry.path());
+        }
+    }
+    Ok(Pulled::Swapped(id))
+}
+
+/// The version the current file of `dir` (`<index_dir>/workspace/`) names, read from disk and
+/// checked as a pull checks it: its id, its entries and their text in the `[[repository]]`
+/// shape; `None` without a current file. No connection is opened.
+pub fn pulled(dir: &Path) -> Result<Option<(String, Vec<EntryFile>, String)>, String> {
+    let file = dir.join(CURRENT);
+    let current = pull::pointer_file(&file, |shown| Msg::WorkspaceCurrentBad(shown).text())?;
+    let Some((id, _)) = current else {
+        return Ok(None);
+    };
+    let path = dir.join(format!("{id}.json"));
+    let shown = path.display().to_string();
+    let bytes = crate::config::read_bounded(&path, VERSION_MAX)?;
+    let (_, text) = checked(&shown, &id, &bytes)?;
+    let entries = validate(&shown, &text).map_err(|_| Msg::WorkspaceNotVersion(&shown).text())?;
+    Ok(Some((id, entries, text)))
 }

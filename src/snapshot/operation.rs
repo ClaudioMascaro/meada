@@ -18,15 +18,15 @@ use crate::valkey::{self, Valkey};
 use crate::workspace::Manifest;
 
 /// The sections of a workspace the operations need.
-struct Sections {
-    lock: lock::Config,
-    valkey: valkey::Config,
-    keep: u64,
-    snapshot: super::Config,
+pub(super) struct Sections {
+    pub(super) lock: lock::Config,
+    pub(super) valkey: valkey::Config,
+    pub(super) keep: u64,
+    pub(super) snapshot: super::Config,
 }
 
 /// `manifest`'s sections, or the error naming it when it has no `[refresh_lock]`.
-fn sections(manifest: &Path) -> crate::Result<Sections> {
+pub(super) fn sections(manifest: &Path) -> crate::Result<Sections> {
     let listed = Manifest::read(manifest)?;
     // `[refresh_lock]` needs `[generations]`, which needs `[valkey]` and `[snapshot]`
     // (`Manifest::read`).
@@ -50,7 +50,7 @@ fn sections(manifest: &Path) -> crate::Result<Sections> {
 
 /// Runs `op` under the refresh lock of the workspace of `sections`, its holder saying `holds`,
 /// with `[generations]`'s `keep`; the lock and the holder are released whatever `op` returned.
-fn locked<T>(
+pub(super) fn locked<T>(
     sections: &Sections,
     holds: &str,
     op: impl AsyncFnOnce(&Valkey, &valkey::Config, u64, &Held) -> Result<T, String>,
@@ -283,8 +283,8 @@ pub fn fence_recover(
     )
 }
 
-/// The highest fence recorded in the pointer, the retained list and the heartbeat of every live
-/// name of `{<key_prefix>}:nodes`, 0 for none. Everything is hostile: what fails a check is
+/// The highest fence recorded in the pointer, the workspace pointer, the retained list and the
+/// heartbeat of every live name of `{<key_prefix>}:nodes`, 0 for none. Everything is hostile: what fails a check is
 /// named in `skipped` and not counted.
 async fn recorded(
     valkey: &Valkey,
@@ -303,6 +303,11 @@ async fn recorded(
             Ok((_, fence)) => fences.push(fence),
             Err(e) => skip(e),
         }
+    }
+    // The workspace pointer (`meada workspace apply`) takes its fence from the same counter.
+    match super::versions::current(valkey, config).await {
+        Ok(found) => fences.extend(found.map(|(_, fence)| fence)),
+        Err(e) => skip(e),
     }
 
     let range = cmd("LRANGE").arg(&retained).arg(0).arg(-1).clone();

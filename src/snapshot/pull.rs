@@ -65,13 +65,23 @@ pub enum Pulled {
 /// The generation id and fence `<local_dir>/current` names, `None` when there is none. The id
 /// is checked against the id shape before it becomes part of a path.
 pub fn current(local_dir: &Path) -> std::result::Result<Option<(String, u64)>, String> {
-    let path = local_dir.join(POINTER);
-    if fs::symlink_metadata(&path).is_err_and(|e| e.kind() == io::ErrorKind::NotFound) {
+    pointer_file(&local_dir.join(POINTER), |shown| {
+        Msg::SnapshotPointerBad(shown).text()
+    })
+}
+
+/// The id and fence the pointer file `path` names (one line, `<id> <fence>`), `None` when there
+/// is none; anything else is the error `bad` gives for the path shown.
+pub(super) fn pointer_file(
+    path: &Path,
+    bad: impl Fn(&str) -> String,
+) -> std::result::Result<Option<(String, u64)>, String> {
+    if fs::symlink_metadata(path).is_err_and(|e| e.kind() == io::ErrorKind::NotFound) {
         return Ok(None);
     }
     let shown = path.display().to_string();
-    let bad = || Msg::SnapshotPointerBad(&shown).text();
-    let bytes = crate::config::read_bounded(&path, POINTER_MAX).map_err(|_| bad())?;
+    let bad = || bad(&shown);
+    let bytes = crate::config::read_bounded(path, POINTER_MAX).map_err(|_| bad())?;
     let text = String::from_utf8(bytes).map_err(|_| bad())?;
     let (id, fence) = (text.strip_suffix('\n'))
         .and_then(|line| line.split_once(' '))
@@ -257,7 +267,7 @@ fn clear(local: &Path, doomed: impl Fn(&str) -> bool) {
 }
 
 /// `current.new` written with `<id> <fence>` and renamed over the pointer file.
-fn swap(local: &Path, id: &str, fence: u64) -> std::result::Result<(), String> {
+pub(super) fn swap(local: &Path, id: &str, fence: u64) -> std::result::Result<(), String> {
     let new = local.join("current.new");
     let at = io_at(&new);
     let mut file = File::create(&new).map_err(&at)?;
@@ -267,7 +277,7 @@ fn swap(local: &Path, id: &str, fence: u64) -> std::result::Result<(), String> {
     fs::rename(&new, local.join(POINTER)).map_err(at)
 }
 
-fn io_at(path: &Path) -> impl Fn(io::Error) -> String + use<> {
+pub(super) fn io_at(path: &Path) -> impl Fn(io::Error) -> String + use<> {
     let shown = path.display().to_string();
     move |e| format!("{shown}: {e}")
 }
@@ -341,6 +351,14 @@ fn checked(
     let document: Document = serde_json::from_slice(bytes).map_err(|_| not())?;
     if document.generation != id {
         return Err(not());
+    }
+    if let Some(version) = document.workspace.as_deref().filter(|v| !is_id(v)) {
+        let version = version.escape_debug().to_string();
+        return Err(Msg::SnapshotBadWorkspace {
+            key,
+            version: &version,
+        }
+        .text());
     }
     let hex = |text: &str, lens: &[usize]| {
         lens.contains(&text.len()) && text.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))

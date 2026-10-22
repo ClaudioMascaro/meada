@@ -51,9 +51,13 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   not retained, the current generation dropped, a full kept set, a lock held by a named or an
   unknown holder; without it, no `snapshot pointer`
   or `snapshot fence`; `[workspace]`'s errors and, with `generation-pointer`, `source = "store"`
-  without its sections or beside `[[repository]]`, a command reading entries refusing it, and
-  `meada workspace`'s refusals of a malformed id and of a manifest without `[generations]`; with
-  `snapshot`, the `[snapshot] node_name` error in both languages),
+  without its sections or beside `[[repository]]`, `index` without a pulled version naming
+  `meada workspace pull`, `mcp --listen` naming `--generations`, and `meada workspace`'s
+  refusals of a malformed id and of a manifest without `[generations]` (`pull` included); with
+  `refresh-lock`, `workspace apply`'s malformed id and missing `[refresh_lock]`, and against the
+  services `apply` of a version not stored, `pull` with no current version, below the current
+  file's fence and already current; with `snapshot`, the `[snapshot] node_name` error in both
+  languages),
   `mcp`
   (the binary over stdio), `server` (`meada mcp --listen` as a child process over the chain's
   mirrors, through rmcp's streamable HTTP client and plain HTTP requests: the stdio tools and
@@ -85,8 +89,20 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   list` newest first, the current one marked once `{<key_prefix>}:workspace` names it, a
   malformed pointer refused, a corrupted and a forged document listed as malformed; `workspace
   show` of entries with blocks read back by `import` to the same id, and with no current
-  version naming `meada workspace apply`; and `source = "store"` refused by `index`, `status`,
-  `export`, `snapshot publish` and `mcp --listen`, while the `--generations` commands serve),
+  version naming `meada workspace apply`; `workspace pull` refused with no current version,
+  writing the document and the current file, current on a second run, swapping after the
+  pointer moves and keeping only the current version and the one it replaced, refusing a
+  pointer whose fence is not above the current file's; a malformed pointer id or fence, a
+  document of another id, one whose id does not derive from its entries, an oversized one and
+  one with invalid entries each refused, the directory unchanged; `index` over a pulled version
+  opening no connection to its `[snapshot]` and `[valkey]` ports, the export goldens after it;
+  with the chain stored, applied and pulled, `index` and `export` giving the export goldens,
+  `status` the file's report, `publish` recording the version in the document's `workspace`
+  field with the ids of a file's publish, the stored document unchanged by a file's publish and
+  after another version, no field from a file's new generation, a node pulling and serving it
+  and refusing a field that is no version id; and without a pulled version `index`, `status`,
+  `export` and `snapshot publish` naming `meada workspace pull` and `mcp --listen` naming
+  `--generations`, while the `--generations` commands serve),
   `refresh_lock`
   (`snapshot lock`: the child terminated past the TTL, killed past the grace, stopped when the
   lock changes hands, a SIGTERM reaching it, a stale fence refused, a lost fence stopping a node
@@ -97,7 +113,10 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   not stored, past `KEPT_MAX`, current, not retained), a stuck fleet moving again after `fence
   recover`, the
   highest recorded fence and the `--at-least` floor, never lowered, live, expired and malformed
-  heartbeats written by hand), `oidc` (`[oidc]`
+  heartbeats written by hand; `workspace apply` moving `{<key_prefix>}:workspace` with a fence
+  above the previous one and rolling back with a new one, refused for a version not stored,
+  while a job holds the lock and with the fence lowered, `fence recover` counting the workspace
+  pointer, and a malformed id refused before any connection), `oidc` (`[oidc]`
   against an issuer and a JWKS served on loopback: a token admits what its claim lists and leaks
   nowhere, a rotated key, an oversized JWKS refusing the start, a pinned path admitted as its
   identity), `github_app` (`github-app credential` and `throttled` against a GitHub API served

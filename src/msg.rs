@@ -273,6 +273,12 @@ pub enum Msg<'a> {
     SnapshotPointerBad(&'a str),
     #[cfg(feature = "snapshot")]
     SnapshotNotDocument(&'a str),
+    /// A generation document (`key`) whose `workspace` field is not a version id.
+    #[cfg(feature = "snapshot")]
+    SnapshotBadWorkspace {
+        key: &'a str,
+        version: &'a str,
+    },
     #[cfg(feature = "snapshot")]
     SnapshotIdentityChars,
     #[cfg(feature = "snapshot")]
@@ -683,9 +689,37 @@ pub enum Msg<'a> {
     /// `[[repository]]` entries beside `[workspace] source = "store"`.
     #[cfg(feature = "generation-pointer")]
     WorkspaceStoreBeside,
-    /// A command that reads `[[repository]]` entries, given a `source = "store"` manifest.
+    /// `meada mcp --listen` without `--generations`, given a `source = "store"` manifest.
     #[cfg(feature = "generation-pointer")]
     WorkspaceStoreRefused(&'a str),
+    /// A command that reads the pulled workspace version, with none under `dir`.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceNotPulled {
+        manifest: &'a str,
+        dir: &'a str,
+    },
+    /// The pulled version's current file (`<index_dir>/workspace/current`), malformed.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceCurrentBad(&'a str),
+    /// A pull whose pointer's fence is not above the current file's.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceFenceBelow {
+        key: &'a str,
+        id: &'a str,
+        fence: u64,
+        held: u64,
+        file: &'a str,
+        fence_key: &'a str,
+    },
+    /// `meada workspace pull` when the current file already names the pointer's version.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceAlreadyCurrent(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    WorkspacePull,
+    #[cfg(feature = "refresh-lock")]
+    WorkspaceApply,
+    #[cfg(feature = "refresh-lock")]
+    WorkspaceApplyVersion,
     #[cfg(feature = "generation-pointer")]
     Workspace,
     #[cfg(feature = "generation-pointer")]
@@ -1285,6 +1319,17 @@ impl Msg<'_> {
             Msg::SnapshotNotDocument(key) => pick(
                 format!("{key}: not the generation document of its id"),
                 format!("{key}: não é o documento de geração do seu id"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotBadWorkspace { key, version } => pick(
+                format!(
+                    "{key}: `workspace` {version}: not a workspace version id of 16 lowercase \
+                     hex characters"
+                ),
+                format!(
+                    "{key}: `workspace` {version}: não é um id de versão do workspace de 16 \
+                     caracteres hexadecimais minúsculos"
+                ),
             ),
             #[cfg(feature = "snapshot")]
             Msg::SnapshotIdentityChars => pick(
@@ -2279,13 +2324,75 @@ impl Msg<'_> {
             #[cfg(feature = "generation-pointer")]
             Msg::WorkspaceStoreRefused(manifest) => pick(
                 format!(
-                    "{manifest}: [workspace] source = \"store\": this command reads [[repository]] \
-                     entries, which only source = \"file\" lists"
+                    "{manifest}: [workspace] source = \"store\": a managed workspace's nodes \
+                     serve generations: run meada mcp --listen with --generations"
                 ),
                 format!(
-                    "{manifest}: [workspace] source = \"store\": este comando lê entradas \
-                     [[repository]], que só source = \"file\" lista"
+                    "{manifest}: [workspace] source = \"store\": os nós de um workspace \
+                     gerenciado servem gerações: rode meada mcp --listen com --generations"
                 ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceNotPulled { manifest, dir } => pick(
+                format!(
+                    "{manifest}: [workspace] source = \"store\": no workspace version pulled \
+                     in {dir}: run `meada workspace pull` first"
+                ),
+                format!(
+                    "{manifest}: [workspace] source = \"store\": nenhuma versão do workspace \
+                     baixada em {dir}: rode `meada workspace pull` antes"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceCurrentBad(path) => pick(
+                format!(
+                    "{path}: not `<workspace version id> <fence>`; delete it and run `meada \
+                     workspace pull`"
+                ),
+                format!(
+                    "{path}: não é `<id da versão do workspace> <fence>`; apague-o e rode \
+                     `meada workspace pull`"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceFenceBelow {
+                key,
+                id,
+                fence,
+                held,
+                file,
+                fence_key,
+            } => pick(
+                format!(
+                    "{key}: workspace version {id} has fence {fence}, not above fence {held} \
+                     in {file}: not swapped; raise {fence_key} with meada snapshot fence \
+                     recover --at-least {held} and apply again, or delete {file}"
+                ),
+                format!(
+                    "{key}: a versão do workspace {id} tem fence {fence}, não maior que o \
+                     fence {held} em {file}: não trocada; eleve {fence_key} com meada snapshot \
+                     fence recover --at-least {held} e aplique de novo, ou apague {file}"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceAlreadyCurrent(id) => pick(
+                format!("{id}: already the current workspace version: nothing changed"),
+                format!("{id}: já é a versão atual do workspace: nada mudou"),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspacePull => pick(
+                "Bring the current workspace version onto this machine, under index_dir".into(),
+                "Traz a versão atual do workspace para esta máquina, sob o index_dir".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::WorkspaceApply => pick(
+                "Make a stored workspace version the current one, under the refresh lock".into(),
+                "Torna atual uma versão guardada do workspace, sob o lock de refresh".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::WorkspaceApplyVersion => pick(
+                "The workspace version id to apply".into(),
+                "O id da versão do workspace a aplicar".into(),
             ),
             #[cfg(feature = "generation-pointer")]
             Msg::Workspace => pick(
