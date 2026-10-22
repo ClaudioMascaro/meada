@@ -192,6 +192,10 @@ pub struct Manifest {
     /// The `[oidc]` section, when the build has the module.
     #[cfg(feature = "oidc")]
     pub oidc: Option<crate::oidc::Config>,
+    /// The `[[github_app]]` blocks, when the build has the module; `read` checks that
+    /// `[valkey]` is there too.
+    #[cfg(feature = "github-app")]
+    pub github_apps: Vec<crate::github_app::Config>,
 }
 
 /// One `[[repository]]` of a manifest.
@@ -230,6 +234,9 @@ struct ManifestFile {
     refresh_lock: Option<crate::snapshot::lock::File>,
     #[cfg(feature = "oidc")]
     oidc: Option<crate::oidc::File>,
+    #[cfg(feature = "github-app")]
+    #[serde(default, rename = "github_app")]
+    github_apps: Vec<crate::github_app::File>,
 }
 
 /// A `[[repository]]`: `serve` and `resource` take the shapes of `meada.toml`'s, `peer` that
@@ -318,6 +325,11 @@ impl Manifest {
         }
         #[cfg(feature = "oidc")]
         let oidc = modules::validated(file, &src, parsed.oidc, |o| o.validate())?;
+        #[cfg(feature = "github-app")]
+        let github_apps = {
+            let blocks = parsed.github_apps;
+            crate::github_app::validated(file, &src, base, blocks, valkey.is_some())?
+        };
         // Each entry's blocks as written, in manifest order: the typed read checked them.
         #[cfg(feature = "snapshot")]
         let mut written = crate::snapshot::entry_blocks(&src).into_iter();
@@ -382,7 +394,29 @@ impl Manifest {
             refresh_lock,
             #[cfg(feature = "oidc")]
             oidc,
+            #[cfg(feature = "github-app")]
+            github_apps,
         })
+    }
+
+    /// The `[valkey]` section and the `[[github_app]]` blocks of the manifest at `file`,
+    /// checked as `read` checks them, without reading any mirror: what each git credential
+    /// request needs (`meada github-app`), where `read` would run `git` in every mirror.
+    #[cfg(feature = "github-app")]
+    pub(crate) fn github_apps(
+        file: &Path,
+    ) -> Result<(
+        Option<crate::valkey::Config>,
+        Vec<crate::github_app::Config>,
+    )> {
+        let src = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
+        modules::check(file, &src)?;
+        let parsed: ManifestFile = config::parse(file, &src, "meada.workspace.toml")?;
+        let base = file.parent().unwrap_or(Path::new(""));
+        let valkey = modules::validated(file, &src, parsed.valkey, |v| v.validate(base))?;
+        let has_valkey = valkey.is_some();
+        let apps = crate::github_app::validated(file, &src, base, parsed.github_apps, has_valkey)?;
+        Ok((valkey, apps))
     }
 
     /// The workspace of a pulled generation (`meada snapshot pull`, ADR 0012), which `dir`
@@ -450,6 +484,8 @@ impl Manifest {
             refresh_lock: None,
             #[cfg(feature = "oidc")]
             oidc: None,
+            #[cfg(feature = "github-app")]
+            github_apps: Vec::new(),
         })
     }
 

@@ -276,21 +276,8 @@ pub struct Oidc {
     kid_fetched: Mutex<Option<Instant>>,
 }
 
-/// The client of the issuer: no redirect, no proxy, a bound on each request, and the system's
-/// roots for `https`.
-fn agent(timeout: Duration) -> ureq::Agent {
-    let tls = ureq::tls::TlsConfig::builder()
-        .root_certs(ureq::tls::RootCerts::PlatformVerifier)
-        .build();
-    ureq::Agent::config_builder()
-        .timeout_global(Some(timeout))
-        .max_redirects(0)
-        .http_status_as_error(false)
-        .proxy(None)
-        .tls_config(tls)
-        .build()
-        .into()
-}
+/// The client of the issuer, the one every module's outbound call goes through.
+use crate::modules::agent;
 
 /// `GET url`, at most `max` bytes of a success answer; a redirect is no success.
 fn get(agent: &ureq::Agent, url: &str, max: u64) -> Result<Vec<u8>, String> {

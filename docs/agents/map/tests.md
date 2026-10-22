@@ -71,7 +71,13 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   fence refused, a lost fence stopping a node, `[refresh_lock]` errors), `oidc` (`[oidc]`
   against an issuer and a JWKS served on loopback: a token admits what its claim lists and leaks
   nowhere, a rotated key, an oversized JWKS refusing the start, a pinned path admitted as its
-  identity), `resources` (resource `search`, `context`, `trace` start and `status`
+  identity), `github_app` (`github-app credential` and `throttled` against a GitHub API served
+  on loopback that verifies each App's JWT against the fixture keys of
+  `tests/fixtures/github-app/`: a minted token cached and reused, two Apps taken in turn, a
+  throttled installation skipped until its retry time, a mint answered 429 passing to the next
+  installation, a token minted again after its cache runs out or `erase`, an uncovered host or
+  owner, a new block and new installations after the refresh, `[[github_app]]` errors, no
+  request from `mcp --listen`, and no key, JWT or token on stderr), `resources` (resource `search`, `context`, `trace` start and `status`
   over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
   fixture: kafkajs forms, fan-out, same-repository links, an unrelated `send`; amqplib queues,
   publishes through a binding of another repository, the empty exchange, queues named like the

@@ -222,7 +222,9 @@ mirrors are kept clean by the operator's job.
   cost this ADR removes.
 - **A watcher in the server.** ADR 0004 rejected it, and the fetch job already knows when a
   mirror moves.
-- **Meada fetching mirrors itself.** Puts the network in Meada (invariant 4).
+- **Meada fetching mirrors itself.** Puts the network in Meada (invariant 4). (Amended
+  2026-10-22; #289: still rejected. ADR 0013's GitHub App module only answers the credential
+  request of the operator's own `git fetch`; the job fetches.)
 - **A snapshot of the whole workspace per refresh.** Needs one database or a generation scheme
   across indexes (invariant 5); per-repository consistency suffices while links derive at query
   time. (Amended 2026-10-21; ADR 0012: the snapshot module adopts it as opt-in, for several
