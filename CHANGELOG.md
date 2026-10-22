@@ -16,6 +16,12 @@ All notable changes to Meada are recorded here. The format follows
   request check builds the default amd64 image and searches it over HTTP. The base is refreshed
   only with a Meada release.
 
+- Console query playground and code graph views (spec #293): run the read-only MCP tools
+  against a repository and held generation, preserving their answer text, and inspect
+  communities, contracts, cross-repository links, shape drift and decisions through accessible
+  tables. A repository export is checked by the shared WebAssembly core and reused across
+  graph views in the browser.
+
 - Static management console frontend (spec #293, ADR 0014): Vite, React and strict TypeScript
   with the shared WebAssembly core, Brazilian Portuguese and English navigation, configuration,
   session and bootstrap manifest pages. OIDC sign-in uses authorization code with PKCE S256;

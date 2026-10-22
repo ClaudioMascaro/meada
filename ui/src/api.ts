@@ -37,7 +37,7 @@ export function loadConfig(): Promise<Config> {
 export class Api {
   constructor(readonly auth: Auth) {}
 
-  async request<T>(route: string, init: RequestInit = {}): Promise<T> {
+  private async response(route: string, init: RequestInit = {}): Promise<Response> {
     const headers = new Headers(init.headers);
     if (this.auth.token) headers.set('Authorization', `Bearer ${this.auth.token}`);
     const response = await fetch(`/api/v1/${route}`, {
@@ -48,7 +48,18 @@ export class Api {
       await this.auth.login();
       throw new ApiError(401, 'session_expired', 'session_expired');
     }
-    return read<T>(response);
+    return response;
+  }
+
+  async request<T>(route: string, init: RequestInit = {}): Promise<T> {
+    return read<T>(await this.response(route, init));
+  }
+
+  async export(repository: string, generation: string): Promise<string> {
+    const query = generation ? `?${new URLSearchParams({ generation })}` : '';
+    const response = await this.response(`repositories/${encodeURIComponent(repository)}/export${query}`);
+    if (!response.ok) await read<never>(response);
+    return response.text();
   }
 
   session(): Promise<Session> { return this.request('session'); }

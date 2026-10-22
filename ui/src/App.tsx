@@ -4,7 +4,9 @@ import { Api, ApiError } from './api';
 import { copy } from './i18n';
 import type { Language } from './i18n';
 import { loadCore } from './core';
-import { ConfigPage, ManifestPage, SessionPage, Shell } from './pages';
+import { ConfigPage, ManifestPage, SessionPage, Shell, routes } from './pages';
+import { PlaygroundPage } from './PlaygroundPage';
+import { GraphPage } from './GraphPage';
 
 export function App({ api, config, initialLanguage }: { api: Api; config: Config; initialLanguage: Language }) {
   const [locale, setLocale] = useState(initialLanguage);
@@ -52,8 +54,8 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
   }, [api, path, session, attempt, signedOut]);
 
   useEffect(() => {
-    const name = path === '/session' ? t.session : path === '/manifest' ? t.manifest : t.config;
-    document.title = `${name} · Meada`;
+    const route = routes.find(route => route.path === path);
+    document.title = `${route ? t[route.label] : t.notFound} · Meada`;
   }, [path, t]);
 
   async function login() {
@@ -74,6 +76,8 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
         api.auth.clear(); setSession(undefined); setSignedOut(true);
       } : undefined} /> : <p role="status">{t.loading}</p>
       : path === '/manifest' ? manifest ? <ManifestPage manifest={manifest} t={t} /> : <p role="status">{t.loading}</p>
+      : path === '/playground' ? <PlaygroundPage api={api} locale={locale} />
+      : path === '/graph' ? <GraphPage api={api} locale={locale} />
       : <h1>{t.notFound}</h1>}
   </Shell>;
 }
