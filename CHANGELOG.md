@@ -150,6 +150,17 @@ All notable changes to Meada are recorded here. The format follows
   renewed and deleted with it, and every refusal of a held lock names it. The messages for a
   refused, lowered or stuck fence name `meada snapshot fence recover` instead of setting the
   fence key by hand.
+- Retained generations kept by hand (ADR 0014, #300, feature `refresh-lock`): `meada snapshot
+  pointer retain <generation> --workspace <manifest>` keeps a generation whose document the
+  store holds on every node, outside the `keep` trim, in the new set `{<key_prefix>}:kept`
+  (appended at the retained list's oldest end with the operation's fence when it was not
+  retained); `meada snapshot pointer drop <generation> --workspace <manifest>` frees a
+  generation that is not current, kept or not, and the next pull deletes it. Each prints the id
+  and takes the refresh lock itself. The kept set holds at most `KEPT_MAX` (8) generations. The
+  pointer script now trims only entries that are not kept, down to `keep` of them, and every
+  pull holds the whole retained list (at most `keep` plus `KEPT_MAX` entries, refused past it),
+  so a pin on a kept generation answers until it is dropped; `pointer set` accepts any retained
+  generation.
 - npm installer (spec #32): cargo-dist builds and publishes an npm package named `meada` with each
   release, at the crate's version, so `npx meada mcp` launches the MCP server and `npx meada
   <command>` runs any command; the release configuration is planned as a dry run on pull requests.
