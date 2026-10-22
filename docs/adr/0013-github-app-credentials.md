@@ -66,7 +66,11 @@ left aside until it resets.
   `x-ratelimit-reset` when `x-ratelimit-remaining` is 0, else for 1 minute. A `get` whose mint is
   throttled takes the next installation, and fails when every mint was.
 - **Only the job runs the module.** `meada mcp --listen` reads the blocks with the manifest and
-  never calls GitHub.
+  never calls GitHub. (Amended 2026-10-22; #319: ADR 0016 adds the module's second REST use,
+  `meada github-app roles`, which the job runs at every refresh: it lists each repository's
+  collaborators with their `role_name` through the installation the selection above picks, under
+  the same throttle marks, token cache and round robin, and needs no permission beyond the
+  repository permission Metadata (read). The console still never calls GitHub.)
 - HTTP goes through the binary's ureq client with the OIDC module's policy (no redirect, no
   proxy, a timeout and a size cap per answer, the system's roots). No private key, JWT or token
   reaches stderr or an error, and every Valkey key lives under the section's `key_prefix`.

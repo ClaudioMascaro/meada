@@ -39,6 +39,9 @@ amended for it (2 and 4) and one was added (6).
    runs. (Amended 2026-10-21; ADR 0012: with a cloud module, Meada's own index also covers the
    object prefix of the snapshot store, the Valkey key prefix and the local generations
    directory the manifest names; Meada writes nothing outside them and never into a mirror.)
+   (Amended 2026-10-22; #319: ADR 0016 adds the Postgres schema `[postgres] schema` names,
+   beside the store prefix, the Valkey key prefix and the local directories; every table of the
+   data layer lives in it, and Meada writes nothing outside it.)
 4. The MCP server has no tool that writes: it never changes the user's files, configuration or
    decisions. Its only write is refreshing Meada's own index before it answers (invariant 3,
    ADR 0004). (Amended 2026-10-21; in server mode, ADR 0011, the server writes nothing: the

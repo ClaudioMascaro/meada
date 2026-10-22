@@ -89,6 +89,15 @@ remaining points. This ADR records the decisions; the spec fixes the details the
   the workspace has no permissions listed yet. The entry records the adder's GitHub login, and
   the job fetches it only while that login holds one of the accepted roles on the repository,
   checked at every refresh. Who reads it is decided by GitHub's roles, as for every entry.
+  (Amended 2026-10-22; #319: ADR 0016 spells the rule out. The entry's `added_by` is the adder's
+  login, which the console sets from the saver's login claim and never from its text; an
+  addition on the provider's host without a login is refused `unattributed`, a team operator's
+  change of `added_by` is refused `added_by_change`, and `outside_grant` is not applied to an
+  addition on the host that carries `added_by`, with one exception: an identity the workspace
+  already holds outside the grant is refused `outside_grant`, named as the subject submitted it,
+  which tells the team operator it is present, accepted under shared trust. The job's role check
+  writes the exclusions before the fetch, and the global operator may set, clear or replace
+  `added_by`.)
 - A change is authorized by its diff against the current version, entry by entry, keyed by
   identity. A refused change is a 403 that names every entry it may not change, with a reason
   each, and writes nothing. It never names an identity outside the subject's grant: those are

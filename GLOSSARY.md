@@ -136,6 +136,37 @@ teams own and nothing else: no owner change, no entry without an owner, no gener
 A group becomes a team when the global operator assigns it its first entry.
 _Avoid_: team admin, team lead, maintainer, tenant admin
 
+**Identity provider**:
+The one token issuer of a server mode deployment, configured in `[oidc]` with its `type`
+(generic, Entra ID, Okta or Keycloak) and the table of settings that type needs. It issues the
+tokens nodes and the console admit, carries the claims grant (`identities_claim` and
+`[oidc.groups]`) and, with the directory, pushes its users and groups to the console. Always
+written in full: "provider" alone is the side of a contract (ADR 0016).
+_Avoid_: provider, IdP, auth provider, login provider
+
+**Grant provider**:
+A source of a token's grant: the identity provider's claims grant, and the GitHub grant provider
+(`[oidc.github]`), which grants what the token's GitHub login holds an accepted role on, in the
+permissions set the job's role check wrote at the last refresh. A token's grant is the union of
+every configured grant provider's identities. Always written in full, never "provider" (ADR
+0016).
+_Avoid_: provider, grant source, permission source, authorizer
+
+**Data layer**:
+Postgres as a cloud module (`[postgres]`): the durable mutable state of server mode, beside the
+immutable snapshot store and the volatile Valkey, holding the audit, the permissions set and the
+directory in one schema that only `meada postgres migrate` changes. The console, the job's role
+check and the CLI twins that write connect to it; nodes only read it; `meada index` never
+connects (ADR 0016).
+_Avoid_: database, persistence layer, state store
+
+**Directory**:
+The users and groups the identity provider pushes into the data layer through the console's
+SCIM 2.0 endpoint (`[directory]`). It feeds the owner picker, flags an owner that names no group,
+deprovisions a user the identity provider deactivated and gives an Entra ID overage token its
+groups. Meada never pulls it: inbound only (ADR 0016).
+_Avoid_: user store, LDAP, address book, IdP sync
+
 ### Across repositories
 
 **Peer**:
