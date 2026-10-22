@@ -45,22 +45,7 @@ fn named(path: &str, format: &str) -> bool {
         && (stem == format || stem.strip_suffix(format).is_some_and(|s| s.ends_with('.')))
 }
 
-/// The kind of a document read, named by its top-level field: `openapi` or `asyncapi`.
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum Format {
-    Openapi,
-    Asyncapi,
-}
-
-impl Format {
-    pub fn name(self) -> &'static str {
-        match self {
-            Format::Openapi => "openapi",
-            Format::Asyncapi => "asyncapi",
-        }
-    }
-}
+pub use meada_core::export::Format;
 
 /// What Meada read from one document. Nothing else of the file is kept.
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]

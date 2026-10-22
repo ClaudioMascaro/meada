@@ -437,6 +437,13 @@ All notable changes to Meada are recorded here. The format follows
   `meada-core` is published to crates.io before `meada`, so `cargo install meada` keeps
   working. Nothing a user sees changes: every message, golden and dependency of the default
   build is what it was.
+- `meada-core` also holds the export's types, the results of `search`, `context` and `trace`
+  with their text answers and the token budget, and shape drift (ADR 0009) as `context`,
+  `search` and `status` show it (#297): the binary writes every export and renders every answer
+  through them. Its `wasm-bindgen` feature exports `parseExport`, which reads an export into
+  those types and writes it again, or names the field that does not fit. Every export, `search`,
+  `context` and `trace` golden is what it was, and an export read and written again is the same
+  bytes.
 - The default model of the `decisions` decider is now `typesafe/jev-1.14` (was `typesafe/jev-1.13`);
   `MEADA_DECIDER_MODEL` still overrides it. The request and answer shapes are unchanged.
 

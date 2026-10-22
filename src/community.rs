@@ -4,14 +4,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use serde::Serialize;
-
-/// A community of one repository: its name and its members, sorted.
-#[derive(Debug, PartialEq, Eq, Serialize)]
-pub(crate) struct Community {
-    pub(crate) name: String,
-    pub(crate) members: Vec<String>,
-}
+pub(crate) use meada_core::export::Community;
 
 /// The communities of one repository, by name. Each `(caller, target)` of `calls` is one call
 /// site at `exact` or `inferred`; `dir` gives a symbol's parent directory, repository-relative

@@ -10,7 +10,10 @@ modules updates it.
   an index; when every repository is already indexed at the current schema it refreshes them
   like a query, to evaluate decisions, and writes
   only inside `.meada/`; otherwise, or when that fails, it prints the states and no decision
-  lines). It owns the `context` and `search` rendering; `trace` lives in `trace.rs`. It imports no kind
+  lines). It builds the results of `context` and `search` (each line placed: a `path:line` reads
+  the file) and `meada-core` turns them into the answer: `search::answer` sorts and cuts the hits,
+  `context::Symbol::answer` cuts a symbol's context; `trace` lives in `trace.rs`. `export` writes
+  through `meada_core::export` (`index::Export::written`, then `Export::write`). It imports no kind
   module: where a rule belongs to a kind it asks `ContractKind` (through the seam's free
   functions or `KINDS`), in the phase order `Engine::exports` and `core_links` fix (see
   "New contract kind" in the architecture map). The valid `kind` words of `search` are derived
@@ -68,11 +71,12 @@ modules updates it.
   of the manifest the hop went through; the reason is never parsed). A `workspace:` range is never
   plain: a consumer through one always shows `range unchecked`, even inside its own repository,
   which `pkg-mono.context-add.txt` pins (`b` through `workspace:*`; `c`, ambiguous with `fork`).
-- `drift_view.rs`: shape drift (spec #23) as `context`, `search` and `status` show it, with no
-  drift computed of its own: `entries` takes every link with a `Link::drift` or, but for an
-  ambiguous one, whose consumer has a shape in the exports, and finds its consumer call by
-  scanning every repository's calls (Known ceilings); `consumers`, `matches` and `counts`
-  render. `search` kind `drift` ranks against the route path the seam's `parts` gives (its
+- `drift_view.rs` and `meada-core`'s `drift.rs`: shape drift (spec #23, ADR 0009) as `context`,
+  `search` and `status` show it, with no drift computed of its own: `entries` (binary) takes
+  every link with a `Link::drift` or, but for an ambiguous one, whose consumer has a shape in the
+  exports (`drift::shown_link`), and finds its consumer call by scanning every repository's calls
+  (Known ceilings); `consumers`, `matches` and `counts` (core) render. `Drift` and
+  `shape::drift` live in `meada-core`'s `shape.rs`. `search` kind `drift` ranks against the route path the seam's `parts` gives (its
   second part). `context` on a contract its kind lists by its providers alone (`View::consumer`
   is `None`, as an HTTP route) appends, after the providers, one
   `<repository> consumer <path>:<line> <caller>` per linked consumer that read fields of the
@@ -110,12 +114,13 @@ modules updates it.
   from `Export::communities`) and `processes: <summary>: <label> (<repository>), ...` (the
   summary below, or `none`), sorted by entry point identity.
   `Graph::processes_of` finds them by walking upstream, inverting `Graph::edges` over every
-  node, so membership is the reachability the process walk follows. `processes_line` opens
+  node, so membership is the reachability the process walk follows. `processes_line`
+  (`meada-core`'s `context.rs`) opens
   with a summary whenever the symbol belongs to a process, `<n> (<k> route, <k> export; <r>
   repositories)` (kinds in `EntryKind::ALL` order, only those with a count), then the entries
   that fit its room, then `+<m> more` for the rest; when not even one fits, the summary is the
   line. The room is what the budget leaves after the header and community, less the note of
-  the final cut. `context_fresh` cuts in this order: the span text first (`render::cut`, with
+  the final cut. `context::Symbol::answer` cuts in this order: the span text first (`render::cut`, with
   its own note; left out when not even the note fits, so the agent reads it from the lines the
   header's range names), then the tail (callers, callees, consumers, contracts) by
   the usual cut; the header, community and processes lines survive it. An answer that fits
@@ -124,16 +129,20 @@ modules updates it.
 - `trace.rs` process walk (spec #31): `Graph::process(entry)` is the one walk (`Descent`, its own
   variant beside `Walk`, which `trace` down keeps as is) and returns `Vec<Step>`: depth, the
   repository, how it was reached (`Via`: the entry, a call, a link), the level, the node and a
-  `Mark` (`cycle`, `seen`, `ambiguous`, `unresolved`, `no-provider`, `produces` or `consumes`
+  `Mark` (in `meada-core`'s `export.rs`: `cycle`, `seen`, `ambiguous`, `unresolved`,
+  `no-provider`, `produces` or `consumes`
   for an unresolved channel side, `depth-limit`; `tests/it/docs.rs` checks every variant is here).
   `Walk::show` renders a step in the chain's line grammar (`trace` from `process::<identity>`,
   found in `Graph::entry_points`: first line `process <label>`, then the steps, then the
-  `finish` footer), and `Graph::export_process` turns the same steps into `Export::processes`.
+  footer), and `Graph::export_process` turns the same steps into `Export::processes`
+  (`meada_core::export::Process`).
   Children of a step are `Graph::edges` (calls in source order, then identity, then what each
   call reaches); an ambiguous call or link is one step listing its candidates; a symbol is expanded at its first
   occurrence (`(see above)` after), a step already on the branch is `(cycle)`. The entry
   points themselves are in `entry.rs`.
-- `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer. A link
+- `trace.rs`: `Graph` over all exports and links, depth-first `Walk`; `meada-core`'s `trace.rs`
+  holds the result (`Row`, `Chain`) and its answer (`Chain::answer`: the rows that fit, the cut
+  note, the chain footer, the missing peers), with `level_mark` and `arrow`. A link
   whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
   down and back going up; a call-site consumer the other way. A channel link (producer call,
   handler symbol) goes down from the producing call (`call_down` reads `into[call]`) into the
@@ -149,18 +158,18 @@ modules updates it.
   both end their branch (`Graph::ends`): `Walk::reach`, the one way a link crossing writes its
   row, pushes them and enters anything else. A line reached through a link with drift ends
   with ` drift: missing <paths>` (comma-separated, after any `(cycle)` or `(see above)`):
-  `Row::link` reads `Link::drift` and `Walk::push` appends it. Starts take only HTTP routes, symbols and call
+  `Row::link` (core) reads `Link::drift` and `Walk::push` appends it. Starts take only HTTP routes, symbols and call
   sites; a start in a kind with `ContractKind::sides` (`resource::...`, `channel::...`) gets an
   answer pointing to `context`. A package hop is a call-site consumer linked to a symbol, like an
   HTTP call: `call_down` crosses it from the call into the provider's function and on through its
   callees, and `trace` up reaches the call through `into[symbol]`; a hop into another repository
   counts in the footer's hops and repositories.
-- `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
-  2000) and the line helpers `Files`, `label`, `callee`, `unresolved`, `mark` (` [<level>:
+- `meada-core`'s `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes;
+  `DEFAULT_BUDGET` 2000) and the line helpers `label`, `callee`, `unresolved`, `mark` (` [<level>:
   <reason>]` after a call that is not exact, in `trace` and in `context`'s callers and callees;
   the reason is derived when rendering, never stored: `one method named render`, `2 functions or
   classes named render`), plus the markers `REPOSITORY_LEVEL` and `DOCUMENTED_ONLY`. Display
-  only.
+  only. The binary's `render.rs` re-exports them beside `Files` and `source`, which read a file.
 - `mcp.rs`: three tools (`search`, `context`, `trace`) over rmcp, each a thin call to `Engine`
   that reopens it per call. `Meada::source` says where: over stdio (`serve`), on the client's
   first `file://` root (`roots/list`, asked per call when the client declared the capability),

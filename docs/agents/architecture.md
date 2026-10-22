@@ -83,8 +83,8 @@ The repository is a Cargo workspace (ADR 0014): the `meada` binary's crate at th
 share. Both take one version from the workspace, and `meada` depends on `meada-core` at exactly
 it. `meada-core` has no rusqlite, tree-sitter, filesystem, process or network code and no async
 runtime; it builds for `wasm32-unknown-unknown`, its `wasm-bindgen` feature (never the binary's)
-exporting `init`, `validate` and `workspaceVersionId`. CI's `core` job builds it with wasm-pack
-and checks both trees.
+exporting `init`, `validate`, `workspaceVersionId` and `parseExport`. CI's `core` job builds it
+with wasm-pack and checks both trees.
 
 - `meada-core/src/manifest.rs`: a workspace manifest's `[[repository]]` (`EntryFile`,
   `EntryPeer`) and the `[serve]` and `[[resource]]` shapes `meada.toml` shares (`Serve`,
@@ -98,6 +98,25 @@ and checks both trees.
 - `meada-core/src/msg.rs`: the messages of those checks and the language flag the binary's
   `msg.rs` reads too; `meada-core/src/http.rs`: `normalize_path` and `PARAM`, which the HTTP
   kind re-exports. `qualify` and `parent` (dotted names) live in its `lib.rs`.
+- `meada-core/src/export.rs`: the export's types as `meada export` writes them (`Export` and
+  every piece, `Level`, `Link`, `Process` with its `Step`, `Via` and `Mark`, `Stale`, `Cause`,
+  `EntryKind`, `Format`, `How`), `Serialize` and `Deserialize`, so a parsed export written again
+  (`Export::write`) is the same bytes; `parse` reads one or names the field that does not fit
+  (`calls[3].span: missing field ...`), which `parseExport` exports to the browser. The binary
+  re-exports the shared pieces where they lived (`index`, `contract`, `package`, `decisions`,
+  `community`, `entry`, `document`) and keeps its own `Export`, `Provider`, `Consumer`,
+  `Document` and `Package` with what only the build needs, turned into these by
+  `index::Export::written`.
+- `meada-core/src/shape.rs`: shapes and shape drift (ADR 0009: `Drift`, `{missing, unchecked}`,
+  `shape::drift`), which the binary reaches as `crate::shape`. `drift.rs`: how `context`,
+  `search` and `status` show a link's drift (`consumers`, `matches`, `counts`, over the `Entry`s
+  the binary's `drift_view.rs` places).
+- `meada-core/src/render.rs`: the token budget and line helpers every answer shares (`budgeted`,
+  `cut`, `note`, `tokens`, `label`, `callee`, `mark`, `rank`, `section`); `search.rs` (`Hit`,
+  `answer`), `context.rs` (`Symbol::answer`, its cut order and `processes_line`, `shape_lines`)
+  and `trace.rs` (`Row`, `Chain::answer` with the footer): the results of `search`, `context`
+  and `trace` and their text answers. The engine walks the indexes and places each line (a
+  `path:line` reads the file); these assemble and cut the answer.
 
 ## Modules (`src/`)
 
@@ -105,13 +124,16 @@ Each line names what a module owns; the file in `map/` it points to has the deta
 one for the area a change touches.
 
 - `engine.rs`: `Engine`, the one query seam (`open`, `refresh`, `export`, `search`, `context`,
-  `trace`, open items, decisions, `status`); it renders `search` and `context`. `items.rs`: open
-  items, derived in one place. `trace.rs`: the `Graph`, the walk, the chain footer and the
-  process walk (`Graph::process`, the step list `trace` renders and the export carries).
+  `trace`, open items, decisions, `status`); it builds the results of `search` and `context`,
+  which `meada-core` renders. `items.rs`: open items, derived in one place. `trace.rs`: the
+  `Graph`, the walk and the process walk (`Graph::process`, the step list `trace` renders and the
+  export carries); `meada-core`'s `trace.rs` closes the chain with its footer.
   `entry.rs`: entry points (spec #31), found when an index is written.
-  `drift_view.rs`: how `context`, `search` and `status` show `Link::drift`; it reads no kind (the
-  stored links, the exports' consumer shapes, the calls and the seam's `parts`).
-  `render.rs`: token budget and line helpers. `mcp.rs`: three read-only tools, one definition over
+  `drift_view.rs`: places the links `context`, `search` and `status` show with their drift
+  (`entries`); it reads no kind (the stored links, the exports' consumer shapes, the calls and the
+  seam's `parts`), and `meada-core`'s `drift.rs` turns them into lines.
+  `render.rs`: the source files an answer reads (`Files`, `source`), re-exporting
+  `meada-core`'s budget and line helpers. `mcp.rs`: three read-only tools, one definition over
   two transports: stdio, about the client's first `file://` root or the server's cwd without
   roots (also for an answer with no local root; a client that fails or does not answer
   `roots/list` within `ROOTS_TIMEOUT`, 5 s, gets the last root it sent, else a tool error),
@@ -458,8 +480,8 @@ one for the area a change touches.
   contracts (specs #22, #24, #30 and #25), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
   [map/contracts.md](map/contracts.md).
-- `document/`, `shape.rs`, `literals.rs`, `zod.rs`: OpenAPI and AsyncAPI provider documents, the
-  shape a contract carries, and the shapes read from a handler's returned literals and zod
+- `document/`, `literals.rs`, `zod.rs` (and `meada-core`'s `shape.rs`): OpenAPI and AsyncAPI
+  provider documents, the shape a contract carries, and the shapes read from a handler's returned literals and zod
   schemas (`lang/ts/types.rs` finds the schema a `z.infer` annotation names). Detail:
   [map/documents.md](map/documents.md).
 
@@ -824,7 +846,7 @@ one for the area a change touches.
   consumer)`, which `http::drift` runs over the workspace's links in
   `Engine::links_and_decisions`, after the decisions replay, setting `Link::drift`: `trace`
   (`Row::link`), the export and every other reader of links see the same value;
-  `drift_view.rs` renders it for `context` (a route's consumers that read fields, with their
+  `drift_view.rs` places it and `meada-core`'s `drift.rs` renders it for `context` (a route's consumers that read fields, with their
   drift), `search` (kind `drift`) and `status` (a count per repository): it computes no drift
   of its own and reads no kind: it reads `Link::drift`, the exports' consumer shapes (which
   consumers read fields), their calls (where each consumer is) and the seam's `parts` (the part
@@ -971,7 +993,9 @@ one for the area a change touches.
   `src/bin/`. TS/JS declares none.
 - New **config key**: add the field to `Config`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
-- New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/it/mcp.rs` and
+- New **MCP tool**: `mcp.rs`, one `Engine` method that builds the tool's result, its result
+  type and text answer in a module of `meada-core` beside `search.rs`, `context.rs` and
+  `trace.rs` (no file, index or process access there), and watch `tests/it/mcp.rs` and
   `tests/it/server.rs`: the tool list (descriptions plus parameter schemas) must stay within
   1,000 tokens. A tool is added once for both transports: the `#[tool_router]` of `Meada` serves
   stdio and every HTTP endpoint.
@@ -1060,7 +1084,9 @@ one for the area a change touches.
   `entry_blocks`, and the workspace version id (its canonical text, the same for the same
   entries however written, changed by a swap, a path or a block); `manifest.rs`, `validate`
   (the entries in order, text errors with file, line and dotted key, every unservable identity
-  named). The binary's manifest errors stay in `tests/it/manifest.rs`.
+  named); `export.rs`, every `*.export.json` golden read with `export::parse` and written
+  again byte for byte, and `parse` refusing a missing field or one of the wrong type, naming it.
+  The binary's manifest errors stay in `tests/it/manifest.rs`.
 - The integration tests are one binary, `tests/it/main.rs`, so `cargo test` links it once: a
   module per subject (`tests/it/<subject>.rs`) and the harness in `tests/it/common/`. A new
   subject is a file there and its `mod` line in `main.rs` (`every_file_here_is_a_module` checks
