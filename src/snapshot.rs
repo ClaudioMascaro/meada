@@ -30,8 +30,11 @@ use crate::workspace::Manifest;
 use crate::{Result, index, repo};
 use store::{Store, Stored};
 
-/// The most a generation document may hold, and `current`.
+// ponytail: the most a generation document may hold in the store, or as a node holds it; past
+// it the document is refused, naming its key or file.
 const DOCUMENT_MAX: u64 = 16 << 20;
+// ponytail: the most the store's `current` may hold (an id and a newline); past it the
+// pointer is refused, naming its key.
 const CURRENT_MAX: u64 = 64;
 
 /// The `[snapshot]` section as written.

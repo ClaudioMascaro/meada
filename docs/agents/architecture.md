@@ -235,8 +235,8 @@ one for the area a change touches.
   seconds, for the probe; with `[generations]`, `reach_pointer`: Valkey's current id, then a
   HEAD of its document in the store, within the same bound, the reason prefixed `valkey:` or
   `store:`). It only reads; the pull is the only writer of `local_dir`. A pinned call still open
-  on a generation that a pull's retention deletes may fail mid-call: the pull holds no lease on
-  what the server reads.
+  on a generation that a pull's retention deletes may fail mid-call: the pull does not wait for
+  what the server is still reading.
   `snapshot/generations.rs` (feature `generation-pointer`, which implies `snapshot` and
   `valkey`; no crate of its own) is the generation pointer, section `[generations]` (`keep`,
   default 3, at least 2; `Manifest::read` refuses it without `[snapshot]` and `[valkey]` through
@@ -1003,7 +1003,15 @@ one for the area a change touches.
   `HEADER_EXTENSION_MAX` (64 KiB), which a scan of the headers checks before the tar crate,
   which reads them into memory whole, sees the archive. Past any of them the pull fails and
   changes nothing. A symbolic link whose target goes through another symbolic link is refused
-  even when both stay inside the mirror. A sparse file is refused.
+  even when both stay inside the mirror. A sparse file is refused. The node pointer file holds at
+  most `POINTER_MAX` (64 bytes); past it the pointer file is malformed.
+- `snapshot.rs`: a generation document holds at most `DOCUMENT_MAX` (16 MiB), in the store and
+  as a node holds it, and the store's `current` at most `CURRENT_MAX` (64 bytes); past either
+  the object is refused, naming its key or file, and a pull changes nothing.
+- `snapshot/store.rs`: a credential file (key id, secret, token) holds at most `SECRET_MAX`
+  (16 KiB); past it the file is refused, naming it.
+- `valkey.rs`: `password_file` holds at most `PASSWORD_MAX` (4096 bytes) and `ca_file` at most
+  `CA_MAX` (1 MiB); past either the connection fails, naming the file.
 - `oidc.rs`: each metadata and JWKS request takes at most `FETCH_TIMEOUT` (10 seconds), a
   metadata document at most `METADATA_MAX` (64 KiB) and a JWKS at most `JWKS_MAX` (256 KiB);
   past any of them the request fails (at start, the start is refused; on a refresh, the cached

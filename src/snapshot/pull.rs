@@ -38,7 +38,8 @@ pub const POINTER: &str = "current";
 pub const DOCUMENT: &str = "generation.json";
 /// The lock one pull at a time holds, under `local_dir`.
 const LOCK: &str = "pull.lock";
-/// The most the pointer file may hold: an id, a space, a `u64` fence and a newline.
+// ponytail: the most the node pointer file may hold (an id, a space, a `u64` fence and a
+// newline); past it the pointer file is malformed.
 const POINTER_MAX: u64 = 64;
 // ponytail: the most bytes a generation's bundles may hold together, as its document records
 // them (checked before any download), and the most its regular files may hold once extracted.

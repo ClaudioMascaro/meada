@@ -22,8 +22,9 @@ use crate::msg::Msg;
 pub const REACH_TIMEOUT: Duration = Duration::from_millis(800);
 /// A connection attempt, and an answer, of the shared client.
 const NETWORK_TIMEOUT: Duration = Duration::from_secs(2);
-/// The most `password_file` may hold, and the most `ca_file` may.
+// ponytail: the most `password_file` may hold; past it the connection fails, naming the file.
 const PASSWORD_MAX: u64 = 4096;
+// ponytail: the most `ca_file` may hold; past it the connection fails, naming the file.
 const CA_MAX: u64 = 1 << 20;
 
 /// The `[valkey]` section as written.
@@ -348,6 +349,10 @@ pub(crate) mod tests {
             assert!(err.ends_with(why), "{err}");
         }
         assert!(read_file(&dir.join("none"), PASSWORD_MAX).await.is_err());
+        let ca = dir.join("ca");
+        std::fs::write(&ca, vec![b'x'; CA_MAX as usize + 1]).unwrap();
+        let err = read_file(&ca, CA_MAX).await.unwrap_err();
+        assert!(err.ends_with("larger than 1048576 bytes"), "{err}");
     }
 
     #[test]

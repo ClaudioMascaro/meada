@@ -26,7 +26,8 @@ use crate::msg::Msg;
 /// The object metadata every object Meada stores carries: its size and BLAKE3 hash.
 const SIZE: &str = "meada-size";
 const HASH: &str = "meada-blake3";
-/// The most a key id, a secret, a token or a token file may hold.
+// ponytail: the most a credential file (a key id, a secret, a token) may hold; past it the file
+// is refused, naming it.
 const SECRET_MAX: u64 = 16 * 1024;
 /// Each part of a bundle's multipart upload, and how many are in flight at once.
 pub const PART: usize = 8 << 20;

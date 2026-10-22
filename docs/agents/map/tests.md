@@ -50,7 +50,28 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   (the binary over stdio), `server` (`meada mcp --listen` as a child process over the chain's
   mirrors, through rmcp's streamable HTTP client and plain HTTP requests: the stdio tools and
   `trace` byte for byte, the 404 listing, the `uncommitted` refusal, the behind line before and
-  after `meada index`, two stateless servers answering alternate calls, the refused start), `resources` (resource `search`, `context`, `trace` start and `status`
+  after `meada index`, two stateless servers answering alternate calls, the refused start, and
+  `Origin` refused with 403 before the 404 listing), `snapshot` (the first of the five cloud
+  module modules, ADR 0012, each built with its feature; a test that needs Valkey or an
+  S3-compatible server, `MEADA_TEST_VALKEY_URL` or `MEADA_TEST_S3_ENDPOINT`, prints why and
+  skips without it, or fails with `MEADA_TEST_SERVICES_REQUIRED=1`; here `snapshot publish`
+  and `snapshot pull`: a republish or a second machine uploads nothing, the refused publish, no
+  secret in an authentication failure, no redirect followed, `[snapshot]` errors, a pull that
+  keeps the previous generation, corrupted and hostile generations (bundles, tar entries, ids,
+  identities, index schemas, a pointer and a document past their bounds) changing nothing, a
+  pulled mirror that runs nothing its bundle configured, a nested repository refused),
+  `serving` (`mcp --listen --generations`, `status --generations` and `export --generations`:
+  the chain goldens from a pulled generation, a swap between two calls, the probe and the start
+  depending only on the node, the fixed 503, an index naming files outside its mirror),
+  `generations` (the generation pointer and pins: a pin answered on every node until it is no
+  longer retained, the 404 of a pin not held, `Origin` refused before a pin, every id and fence
+  from Valkey checked, a retained generation that fails to pull, the probe reading Valkey,
+  `[generations]` errors), `refresh_lock` (`snapshot lock`: the child terminated past the TTL,
+  killed past the grace, stopped when the lock changes hands, a SIGTERM reaching it, a stale
+  fence refused, a lost fence stopping a node, `[refresh_lock]` errors), `oidc` (`[oidc]`
+  against an issuer and a JWKS served on loopback: a token admits what its claim lists and leaks
+  nowhere, a rotated key, an oversized JWKS refusing the start, a pinned path admitted as its
+  identity), `resources` (resource `search`, `context`, `trace` start and `status`
   over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
   fixture: kafkajs forms, fan-out, same-repository links, an unrelated `send`; amqplib queues,
   publishes through a binding of another repository, the empty exchange, queues named like the

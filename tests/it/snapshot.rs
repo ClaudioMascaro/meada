@@ -888,6 +888,25 @@ fn a_corrupted_or_hostile_generation_fails_the_pull_and_leaves_the_previous_one(
             "prod/meada/current: does not hold an id",
         ),
         (
+            "a pointer past `CURRENT_MAX`",
+            Box::new(|| {
+                put_stored(&s3, "prod/meada/current", &[b'0'; 65]);
+                String::new()
+            }),
+            "prod/meada/current: not stored with the size and hash it records",
+        ),
+        (
+            "a document past `DOCUMENT_MAX`",
+            Box::new(|| {
+                let id = "00000000000000dd";
+                let key = format!("prod/meada/generations/{id}.json");
+                put_stored(&s3, &key, &vec![b' '; (16 << 20) + 1]);
+                put_stored(&s3, "prod/meada/current", format!("{id}\n").as_bytes());
+                String::new()
+            }),
+            "prod/meada/generations/00000000000000dd.json: not stored with the size and hash",
+        ),
+        (
             "a hostile identity",
             Box::new(|| stage(&s3, "example.com/../../escaped", &head, &valid, None)),
             "not a repository identity",
