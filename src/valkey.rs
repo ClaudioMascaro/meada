@@ -57,8 +57,7 @@ pub struct Config {
     ca_file: Option<PathBuf>,
 }
 
-/// A problem with a key of the section: its dotted name and the message.
-pub type Problem = (&'static str, String);
+use crate::modules::Problem;
 
 impl File {
     /// The section checked; relative paths are relative to `base`, the manifest's directory.

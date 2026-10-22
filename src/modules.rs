@@ -2,6 +2,8 @@
 //! to the cargo feature that owns it, in every build. A section in a build without its feature
 //! is an error naming the feature; a section the table does not list stays an unknown key.
 //! A module ticket registers its section here and sets `built` to its own `cfg!(feature = ..)`.
+//! The helpers the modules share live here too: the section checks, the loopback test, the
+//! blocking runtime and the secret read from a variable or a file.
 
 use std::path::Path;
 
@@ -48,22 +50,77 @@ pub const MODULES: [Module; 5] = [
 /// The first section of `src`, the content of `file`, whose feature this build lacks. A file
 /// that does not parse passes: the typed read names its syntax error.
 pub fn check(file: &Path, src: &str) -> Result<()> {
-    let Ok(table) = DeTable::parse(src) else {
-        return Ok(());
-    };
-    let found = table.get_ref().iter().find_map(|(key, _)| {
-        let module = MODULES
-            .iter()
-            .find(|m| !m.built && m.section == key.get_ref().as_ref())?;
-        Some((key.span().start, module))
+    let found = first_key(src, |key| {
+        MODULES.iter().find(|m| !m.built && m.section == key)
     });
     let Some((at, module)) = found else {
         return Ok(());
     };
     let (section, feature) = (module.section, module.feature);
     let what = Msg::NeedsFeature { section, feature }.text();
+    Err(located(file, src, at, &what))
+}
+
+/// The error for `section` of `src`, the content of `file`, when the sections it needs that
+/// `missing` names are not there: `[section] needs [missing...]`, at the section's line.
+#[cfg(feature = "generation-pointer")]
+pub fn needs(file: &Path, src: &str, section: &str, missing: &[&str]) -> Result<()> {
+    if missing.is_empty() {
+        return Ok(());
+    }
+    let at = first_key(src, |key| (key == section).then_some(())).map_or(0, |(at, ())| at);
+    let what = Msg::NeedsSections {
+        section,
+        needed: missing,
+    }
+    .text();
+    Err(located(file, src, at, &what))
+}
+
+/// The first top-level key of `src` that `pick` maps to something, with its offset; `None` for
+/// a file that does not parse.
+fn first_key<T>(src: &str, pick: impl Fn(&str) -> Option<T>) -> Option<(usize, T)> {
+    let table = DeTable::parse(src).ok()?;
+    (table.get_ref().iter())
+        .find_map(|(key, _)| Some((key.span().start, pick(key.get_ref().as_ref())?)))
+}
+
+/// `<file>:<line>: <what>`, the line that of offset `at` of `src`, the content of `file`.
+fn located(file: &Path, src: &str, at: usize, what: &str) -> Box<dyn std::error::Error> {
     let line = crate::config::line_of(src, at);
-    Err(format!("{}:{line}: {what}", file.display()).into())
+    format!("{}:{line}: {what}", file.display()).into()
+}
+
+/// A problem with a key of a module section: its dotted name and the message.
+#[cfg(any(feature = "valkey", feature = "snapshot", feature = "oidc"))]
+pub type Problem = (&'static str, String);
+
+/// `section` of `src`, the content of `file`, checked by `validate` when the manifest has it; a
+/// problem is an error naming the file, the line and the key.
+#[cfg(any(feature = "valkey", feature = "snapshot", feature = "oidc"))]
+pub fn validated<S, C>(
+    file: &Path,
+    src: &str,
+    section: Option<S>,
+    validate: impl FnOnce(S) -> std::result::Result<C, Problem>,
+) -> Result<Option<C>> {
+    (section.map(validate).transpose())
+        .map_err(|(key, problem)| crate::config::error_at(file, src, key, &problem))
+}
+
+/// An optional integer setting at `key`: `value`, or `default` when unset, if it is at least
+/// `min`; else `Msg::AtLeast`.
+#[cfg(any(feature = "generation-pointer", feature = "oidc"))]
+pub fn at_least(
+    key: &'static str,
+    value: Option<i64>,
+    default: i64,
+    min: i64,
+) -> std::result::Result<u64, Problem> {
+    match u64::try_from(value.unwrap_or(default)) {
+        Ok(value) if value >= min as u64 => Ok(value),
+        _ => Err((key, Msg::AtLeast(min).text())),
+    }
 }
 
 /// Whether `host`, as a URL names it (an IPv6 address with or without its brackets), is
@@ -76,29 +133,6 @@ pub fn loopback(host: &str) -> bool {
         || ip
             .parse::<std::net::IpAddr>()
             .is_ok_and(|ip| ip.is_loopback())
-}
-
-/// The error for `section` of `src`, the content of `file`, when the sections it needs that
-/// `missing` names are not there: `[section] needs [missing...]`, at the section's line.
-#[cfg(feature = "generation-pointer")]
-pub fn needs(file: &Path, src: &str, section: &str, missing: &[&str]) -> Result<()> {
-    if missing.is_empty() {
-        return Ok(());
-    }
-    let at = (DeTable::parse(src).ok())
-        .and_then(|table| {
-            let table = table.get_ref();
-            let key = table.keys().find(|key| key.get_ref().as_ref() == section)?;
-            Some(key.span().start)
-        })
-        .unwrap_or(0);
-    let what = Msg::NeedsSections {
-        section,
-        needed: missing,
-    }
-    .text();
-    let line = crate::config::line_of(src, at);
-    Err(format!("{}:{line}: {what}", file.display()).into())
 }
 
 #[cfg(test)]

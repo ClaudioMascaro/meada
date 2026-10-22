@@ -113,7 +113,7 @@ pub struct Config {
 }
 
 impl File {
-    pub fn validate(self) -> Result<Config, (&'static str, String)> {
+    pub fn validate(self) -> Result<Config, crate::modules::Problem> {
         if !reachable(&self.issuer, Shape::Issuer) {
             return Err(("oidc.issuer", Msg::OidcUrl { bare: false }.text()));
         }
@@ -136,14 +136,10 @@ impl File {
                 None => {}
             }
         }
-        let refresh = self.jwks_refresh_seconds.unwrap_or(REFRESH_DEFAULT);
-        let refresh = match u64::try_from(refresh) {
-            Ok(seconds) if seconds >= REFRESH_MIN as u64 => Duration::from_secs(seconds),
-            _ => {
-                let at_least = Msg::AtLeast(REFRESH_MIN).text();
-                return Err(("oidc.jwks_refresh_seconds", at_least));
-            }
-        };
+        let key = "oidc.jwks_refresh_seconds";
+        let seconds = self.jwks_refresh_seconds;
+        let refresh = crate::modules::at_least(key, seconds, REFRESH_DEFAULT, REFRESH_MIN)?;
+        let refresh = Duration::from_secs(refresh);
         Ok(Config {
             issuer: self.issuer,
             public_url: self.public_url.trim_end_matches('/').to_string(),
@@ -641,7 +637,7 @@ mod tests {
 
     use super::*;
 
-    fn section(extra: &str) -> Result<Config, (&'static str, String)> {
+    fn section(extra: &str) -> Result<Config, crate::modules::Problem> {
         let src = format!(
             "issuer = \"https://id.example/realms/agents\"\npublic_url = \
              \"https://meada.example/\"\nidentities_claim = \"meada_repositories\"\n{extra}"

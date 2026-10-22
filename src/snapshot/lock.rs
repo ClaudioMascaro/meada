@@ -64,14 +64,12 @@ pub struct Config {
 }
 
 impl File {
-    pub fn validate(self) -> Result<Config, (&'static str, String)> {
-        let ttl = self.ttl_seconds.unwrap_or(TTL_DEFAULT);
-        match u64::try_from(ttl) {
-            Ok(ttl) if ttl >= TTL_MIN as u64 => Ok(Config {
-                ttl: Duration::from_secs(ttl),
-            }),
-            _ => Err(("refresh_lock.ttl_seconds", Msg::AtLeast(TTL_MIN).text())),
-        }
+    pub fn validate(self) -> Result<Config, crate::modules::Problem> {
+        let key = "refresh_lock.ttl_seconds";
+        let ttl = crate::modules::at_least(key, self.ttl_seconds, TTL_DEFAULT, TTL_MIN)?;
+        Ok(Config {
+            ttl: Duration::from_secs(ttl),
+        })
     }
 }
 

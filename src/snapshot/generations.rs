@@ -35,12 +35,9 @@ pub struct Config {
 }
 
 impl File {
-    pub fn validate(self) -> Result<Config, (&'static str, String)> {
-        let keep = self.keep.unwrap_or(KEEP_DEFAULT);
-        match u64::try_from(keep) {
-            Ok(keep) if keep >= KEEP_MIN as u64 => Ok(Config { keep }),
-            _ => Err(("generations.keep", Msg::AtLeast(KEEP_MIN).text())),
-        }
+    pub fn validate(self) -> Result<Config, crate::modules::Problem> {
+        let keep = crate::modules::at_least("generations.keep", self.keep, KEEP_DEFAULT, KEEP_MIN)?;
+        Ok(Config { keep })
     }
 }
 
