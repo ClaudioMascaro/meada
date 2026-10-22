@@ -33,7 +33,7 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `freshness` moves a `mod`, declares the orphan, adds a module, drops the `[[bin]]`, edits a
   `pub use`, moves an item between files and renames a package, and
   exports it with the walk reversed), `xlang` (a TypeScript and a Python repository linked both ways, over HTTP
-  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files), `index` (export, schema rebuild, writes only in `.meada/`), `self_index` (a copy of this repository's tracked files, indexed in about 6 s in debug: no call from `src/` reaches `tests/fixtures/`, and `Resolver.call` has an `exact` caller), `hostile` (per pack, repositories of pathological files sized past the limits of Known ceilings: deep nesting, long chains, wide files and manifests, values traced through chains and lattices of constants, wrappers, parameters and return values; each indexed on a thread with a small stack within a time budget, so a recursion with no limit aborts the run and a loop with none fails it; `--nocapture` names each case as it starts), `query` (search/context), `workspace` (peers, status, config errors), `manifest` (server mode's workspace manifest: `index`, `status` and `export --repo` with `--workspace`, the refused entries, manifest errors, entry blocks configuring mirrors with no `meada.toml` and ignored under one, decisions replayed, reads that write nothing and see the index until `meada index` refreshes it, nothing written into a mirror, refreshed equals cold), `gateway`
+  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files), `index` (export, schema rebuild, writes only in `.meada/`), `self_index` (a copy of this repository's tracked files, indexed in about 6 s in debug: no call from `src/` reaches `tests/fixtures/`, and `Resolver.call` has an `exact` caller), `hostile` (per pack, repositories of pathological files sized past the limits of Known ceilings: deep nesting, long chains, wide files and manifests, values traced through chains and lattices of constants, wrappers, parameters and return values; each indexed on a thread with a small stack within a time budget, so a recursion with no limit aborts the run and a loop with none fails it; `--nocapture` names each case as it starts), `query` (search/context), `workspace` (peers, status, config errors), `manifest` (server mode's workspace manifest: `index`, `status` and `export --repo` with `--workspace`, the refused entries, manifest errors, entry blocks configuring mirrors with no `meada.toml` and ignored under one, decisions replayed, reads that write nothing and see the index until `meada index` refreshes it, nothing written into a mirror, refreshed equals cold, `[workspace]`'s unknown key and source, `source = "file"` as before, `source = "store"` naming `generation-pointer` without it and its sections or `[[repository]]` with it), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export
   carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a channel handler's process, a cycle, an
@@ -50,7 +50,10 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `refresh-lock`, the operations' refusals: a malformed id, no `[refresh_lock]`, a generation
   not retained, the current generation dropped, a full kept set, a lock held by a named or an
   unknown holder; without it, no `snapshot pointer`
-  or `snapshot fence`), `mcp`
+  or `snapshot fence`; `[workspace]`'s errors and, with `generation-pointer`, `source = "store"`
+  without its sections or beside `[[repository]]`, a command reading entries refusing it, and
+  `meada workspace`'s refusals of a malformed id and of a manifest without `[generations]`),
+  `mcp`
   (the binary over stdio), `server` (`meada mcp --listen` as a child process over the chain's
   mirrors, through rmcp's streamable HTTP client and plain HTTP requests: the stdio tools and
   `trace` byte for byte, the 404 listing, the `uncommitted` refusal, the behind line before and
@@ -73,7 +76,17 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   generation that fails to pull, the probe reading Valkey,
   `[generations]` errors, `snapshot pointer set` rolling two nodes back to G1's goldens until
   the next publish, a generation not retained and malformed ids refused, a generation kept by
-  `pointer retain` held and pinned on two nodes past `keep` until `pointer drop`), `refresh_lock`
+  `pointer retain` held and pinned on two nodes past `keep` until `pointer drop`; the workspace
+  versions: `workspace import` of the chain's manifest storing `workspaces/<id>.json` with every
+  field and its metadata, the same entries again uploading nothing and answering the first
+  author and message, two entries swapped giving another id, an invalid file refused with its
+  file, line and key before any connection, its other sections named as not imported; `workspace
+  list` newest first, the current one marked once `{<key_prefix>}:workspace` names it, a
+  malformed pointer refused, a corrupted and a forged document listed as malformed; `workspace
+  show` of entries with blocks read back by `import` to the same id, and with no current
+  version naming `meada workspace apply`; and `source = "store"` refused by `index`, `status`,
+  `export`, `snapshot publish` and `mcp --listen`, while the `--generations` commands serve),
+  `refresh_lock`
   (`snapshot lock`: the child terminated past the TTL, killed past the grace, stopped when the
   lock changes hands, a SIGTERM reaching it, a stale fence refused, a lost fence stopping a node
   with the recovery named in both languages, `[refresh_lock]` errors; the operations: each
