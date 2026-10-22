@@ -8,6 +8,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Static management console frontend (spec #293, ADR 0014): Vite, React and strict TypeScript
+  with the shared WebAssembly core, Brazilian Portuguese and English navigation, configuration,
+  session and bootstrap manifest pages. OIDC sign-in uses authorization code with PKCE S256;
+  bearer tokens stay in memory. The standalone frontend gate pins Node and wasm-pack, installs
+  from a lockfile and writes the matching Meada version into `meada-ui.json`. Cargo builds
+  remain independent of Node.
+
 - Node heartbeat (spec #293, ADR 0014, feature `generation-pointer`): with `[generations]`,
   every round of `meada snapshot pull --every <seconds>` ends by writing the node's state into
   Valkey, whether the round swapped, changed nothing or failed: `{<key_prefix>}:node:<name>`, a

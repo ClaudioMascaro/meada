@@ -118,6 +118,23 @@ with wasm-pack and checks both trees.
   and `trace` and their text answers. The engine walks the indexes and places each line (a
   `path:line` reads the file); these assemble and cut the answer.
 
+## Console frontend (`ui/`)
+
+The static console (ADR 0014) is a separate Vite/React/strict TypeScript build. `npm ci`,
+`npm run wasm`, `npm run build`, `npm run check:version` and `npm test` run inside `ui/`, with
+Node pinned by `.nvmrc` and wasm-pack by `scripts/wasm.mjs`. Cargo never invokes them. The
+WASM bundle builds from `meada-core` into ignored `ui/wasm/`; Vite puts content-hashed scripts,
+styles and WASM under `dist/assets/`, with `meada-ui.json` carrying the workspace version.
+
+`src/api.ts` owns the same-origin `/api/v1/` client; `auth.ts` owns OIDC discovery, PKCE and the
+memory-only bearer. Only the pending redirect's verifier and state enter sessionStorage, and
+both are removed on callback. `main.tsx` handles `/auth/callback` before rendering the shell;
+`App.tsx` keeps page navigation in process so changing pages does not discard the bearer.
+`pages.tsx` provides semantic navigation and the configuration, session and bootstrap manifest
+views, with view models in `models.ts` and all interface copy in `i18n.ts`. Later operational
+pages join that shell. Vitest exercises the built WASM and the public client, view-model and DOM
+seams, without a browser end-to-end suite.
+
 ## Modules (`src/`)
 
 Each line names what a module owns; the file in `map/` it points to has the detail. Read the

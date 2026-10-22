@@ -458,10 +458,15 @@ impl Console {
     }
 
     /// The console's version and `operations`; with `[oidc]`, what the browser logs in with: the
-    /// issuer, `[ui] client_id`, the scopes and the audience its token must carry.
+    /// issuer, `[ui] client_id`, the scopes and the audience its token must carry. The public
+    /// URL fixes the browser's callback even when the listener was opened through loopback.
     fn config(&self) -> Value {
         #[allow(unused_mut)]
-        let mut config = json!({"version": VERSION, "operations": self.ui.operations});
+        let mut config = json!({
+            "version": VERSION,
+            "operations": self.ui.operations,
+            "public_url": self.ui.public_url,
+        });
         #[cfg(feature = "oidc")]
         if let Some(oidc) = &self.oidc {
             let (issuer, scopes) = oidc.login();
