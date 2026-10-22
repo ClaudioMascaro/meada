@@ -237,7 +237,9 @@ to one writer per index.
 
 Opt-in modules, off by default; each is documented below when it lands. A module is a cargo
 feature plus one section of `meada.workspace.toml`; the release binaries are the default build,
-with none, and a section in a build without its feature is an error naming the feature.
+with none, and a section in a build without its feature is an error naming the feature. The
+`cloud` feature turns them all on at once (`cargo install meada --features cloud`) and, like
+`refresh-lock`, builds on Unix only.
 
 **Snapshot** (feature `snapshot`, `cargo install meada --features snapshot`). One job indexes
 and publishes; nodes receive the result whole, instead of each indexing its own mirrors. After

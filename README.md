@@ -240,7 +240,9 @@ respeite um único escritor por índice.
 
 Módulos opt-in, desligados por padrão; cada um é documentado abaixo quando chegar. Um módulo é
 uma feature do cargo mais uma seção de `meada.workspace.toml`; os binários de release são o build
-padrão, sem nenhum, e uma seção num build sem a sua feature é um erro que nomeia a feature.
+padrão, sem nenhum, e uma seção num build sem a sua feature é um erro que nomeia a feature. A
+feature `cloud` liga todos de uma vez (`cargo install meada --features cloud`) e, como
+`refresh-lock`, só compila em Unix.
 
 **Snapshot** (feature `snapshot`, `cargo install meada --features snapshot`). Um job indexa e
 publica; os nós recebem o resultado inteiro, em vez de cada um indexar os próprios espelhos.

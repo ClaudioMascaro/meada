@@ -123,7 +123,8 @@ one for the area a change touches.
   it and whether this build has it. `Manifest::read` checks it before the typed parse, so a
   section whose feature is missing is an error naming the file, the line, the section and the
   feature, and a section the table lacks stays an unknown key. A module ticket adds its row and
-  sets `built` to `cfg!(feature = ..)`. `valkey.rs` (feature `valkey`, internal; the only place
+  sets `built` to `cfg!(feature = ..)`. The `cloud` feature turns on every module at once and,
+  as `refresh-lock` is, is Unix only. `valkey.rs` (feature `valkey`, internal; the only place
   the `redis` crate is used) is the one Valkey client the modules share: `File` is the
   `[valkey]` section, `File::validate` turns it into a `Config` (no password in the URL, `rediss`
   outside loopback, at most one of `password_env` and `password_file`, no `{` or `}` in
