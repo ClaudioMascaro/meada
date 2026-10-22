@@ -1,6 +1,6 @@
 //! The operations on the generation pointer and the fence (ADR 0014, feature `refresh-lock`):
-//! `meada snapshot pointer set` and `meada snapshot fence recover`, which the console calls
-//! too. Each checks its arguments, takes the refresh lock as `meada snapshot lock` does
+//! `meada snapshot pointer set`, `retain` and `drop`, and `meada snapshot fence recover`, which
+//! the console calls too. Each checks its arguments, takes the refresh lock as `meada snapshot lock` does
 //! (`lock::acquire`: a fresh token, the holder naming the operation and its author, its own
 //! fence), makes its one write through a script that checks the lock still holds its token, and
 //! releases the lock and the holder whatever the write did.
@@ -9,53 +9,84 @@ use std::path::Path;
 
 use redis::cmd;
 
-use super::generations::{self, pointer};
+use super::generations::{self, KEPT_MAX, pointer};
 use super::lock::{self, Held};
-use super::{fence, is_id};
+use super::store::Store;
+use super::{fence, is_id, pull};
 use crate::msg::Msg;
 use crate::valkey::{self, Valkey};
 use crate::workspace::Manifest;
 
-/// Runs `op` under the refresh lock of `manifest`'s workspace, its holder saying `holds`, with
-/// `[generations]`'s `keep`; the lock and the holder are released whatever `op` returned.
+/// The sections of a workspace the operations need.
+struct Sections {
+    lock: lock::Config,
+    valkey: valkey::Config,
+    keep: u64,
+    snapshot: super::Config,
+}
+
+/// `manifest`'s sections, or the error naming it when it has no `[refresh_lock]`.
+fn sections(manifest: &Path) -> crate::Result<Sections> {
+    let listed = Manifest::read(manifest)?;
+    // `[refresh_lock]` needs `[generations]`, which needs `[valkey]` and `[snapshot]`
+    // (`Manifest::read`).
+    match (
+        listed.refresh_lock,
+        listed.valkey,
+        listed.generations,
+        listed.snapshot,
+    ) {
+        (Some(lock), Some(valkey), Some(generations), Some(snapshot)) => Ok(Sections {
+            lock,
+            valkey,
+            keep: generations.keep,
+            snapshot,
+        }),
+        _ => Err(Msg::LockNoSection(&manifest.display().to_string())
+            .text()
+            .into()),
+    }
+}
+
+/// Runs `op` under the refresh lock of the workspace of `sections`, its holder saying `holds`,
+/// with `[generations]`'s `keep`; the lock and the holder are released whatever `op` returned.
 fn locked<T>(
-    manifest: &Path,
+    sections: &Sections,
     holds: &str,
     op: impl AsyncFnOnce(&Valkey, &valkey::Config, u64, &Held) -> Result<T, String>,
 ) -> crate::Result<T> {
-    let listed = Manifest::read(manifest)?;
-    let shown = manifest.display().to_string();
-    // `[refresh_lock]` needs `[generations]`, which needs `[valkey]` (`Manifest::read`).
-    let (Some(section), Some(config), Some(generations)) =
-        (listed.refresh_lock, listed.valkey, listed.generations)
-    else {
-        return Err(Msg::LockNoSection(&shown).text().into());
-    };
+    let config = &sections.valkey;
     let run = async {
-        let valkey = Valkey::connect(&config).await?;
-        let held = lock::acquire(&valkey, &config, section.ttl, holds).await?;
-        let done = op(&valkey, &config, generations.keep, &held).await;
-        lock::release(&valkey, &config, &held.token).await;
+        let valkey = Valkey::connect(config).await?;
+        let held = lock::acquire(&valkey, config, sections.lock.ttl, holds).await?;
+        let done = op(&valkey, config, sections.keep, &held).await;
+        lock::release(&valkey, config, &held.token).await;
         done
     };
     Ok(crate::modules::block_on(run)??)
 }
 
-/// `meada snapshot pointer set <generation>`: points the workspace at `id`, one of the
-/// generations nodes hold (the first `keep` of `{<key_prefix>}:retained`), with the operation's
-/// fence, through the pointer script; `<id> <fence>`.
-pub fn pointer_set(manifest: &Path, id: &str, author: &str) -> crate::Result<String> {
-    if !is_id(id) {
-        return Err(Msg::BadGenerationArg(&id.escape_debug().to_string())
+/// `id` when it is a generation id, else the refusal naming the argument.
+fn generation_arg(id: &str) -> crate::Result<()> {
+    match is_id(id) {
+        true => Ok(()),
+        false => Err(Msg::BadGenerationArg(&id.escape_debug().to_string())
             .text()
-            .into());
+            .into()),
     }
+}
+
+/// `meada snapshot pointer set <generation>`: points the workspace at `id`, one of the
+/// generations nodes hold (`{<key_prefix>}:retained`), with the operation's fence, through the
+/// pointer script; `<id> <fence>`.
+pub fn pointer_set(manifest: &Path, id: &str, author: &str) -> crate::Result<String> {
+    generation_arg(id)?;
     locked(
-        manifest,
+        &sections(manifest)?,
         &format!("pointer set {author}"),
         async |valkey, config, keep, held| {
             let retained = generations::keys(config).1;
-            let range = cmd("LRANGE").arg(&retained).arg(0).arg(keep - 1).clone();
+            let range = cmd("LRANGE").arg(&retained).arg(0).arg(-1).clone();
             let entries: Vec<Vec<u8>> =
                 (valkey.query(&range).await).map_err(|e| format!("{retained}: {e}"))?;
             let mine = format!("{id}:");
@@ -70,6 +101,132 @@ pub fn pointer_set(manifest: &Path, id: &str, author: &str) -> crate::Result<Str
             }
             generations::point(valkey, config, keep, id, Some(&held.token), held.fence).await?;
             Ok(format!("{id} {}", held.fence))
+        },
+    )
+}
+
+/// Retains and keeps a generation while the lock (`KEYS[1]`) holds the token `ARGV[1]`: 0
+/// without the lock; 1 when the kept set (`KEYS[3]`) already holds the id `ARGV[2]`, nothing
+/// changed; -1 when it already holds `ARGV[4]` ids; else, with no entry of the id in the
+/// retained list (`KEYS[2]`), `<id>:<fence>` (`ARGV[3]`) appended at its oldest end, the id
+/// added to the kept set, and 1.
+const RETAIN: &str = r"
+if redis.call('GET', KEYS[1]) ~= ARGV[1] then
+  return 0
+end
+if redis.call('SISMEMBER', KEYS[3], ARGV[2]) == 1 then
+  return 1
+end
+if redis.call('SCARD', KEYS[3]) >= tonumber(ARGV[4]) then
+  return -1
+end
+local mine = ARGV[2] .. ':'
+local listed = false
+for _, entry in ipairs(redis.call('LRANGE', KEYS[2], 0, -1)) do
+  if string.sub(entry, 1, #mine) == mine then
+    listed = true
+  end
+end
+if not listed then
+  redis.call('RPUSH', KEYS[2], mine .. ARGV[3])
+end
+redis.call('SADD', KEYS[3], ARGV[2])
+return 1
+";
+
+/// `meada snapshot pointer retain <generation>`: once the store holds `id`'s document, checked as
+/// a pull checks it, keeps the generation on every node outside the `keep` trim (`RETAIN`, with
+/// the operation's fence); `id`.
+pub fn pointer_retain(manifest: &Path, id: &str, author: &str) -> crate::Result<String> {
+    generation_arg(id)?;
+    let sections = sections(manifest)?;
+    let check = async {
+        let store = Store::connect(&sections.snapshot)?;
+        pull::stored_document(&store, &sections.snapshot, id).await
+    };
+    crate::modules::block_on(check)??;
+    locked(
+        &sections,
+        &format!("pointer retain {author}"),
+        async |valkey, config, _, held| {
+            let (lock, retained, kept) = (
+                config.key("lock", true),
+                generations::keys(config).1,
+                generations::kept(config),
+            );
+            let mut script = cmd("EVAL");
+            script
+                .arg(RETAIN)
+                .arg(3)
+                .arg(&lock)
+                .arg(&retained)
+                .arg(&kept);
+            script
+                .arg(&held.token)
+                .arg(id)
+                .arg(held.fence)
+                .arg(KEPT_MAX);
+            let wrote = valkey.query::<i64>(&script).await;
+            match wrote.map_err(|e| format!("{retained}, {kept}: {e}"))? {
+                1 => Ok(id.to_string()),
+                -1 => Err(Msg::KeptFull {
+                    key: &kept,
+                    max: KEPT_MAX,
+                }
+                .text()),
+                _ => Err(Msg::LockNotHeld(&lock).text()),
+            }
+        },
+    )
+}
+
+/// Drops a generation while the lock (`KEYS[1]`) holds the token `ARGV[1]`: 0 without the lock,
+/// -1 when the pointer (`KEYS[2]`) names the id `ARGV[2]`, -2 when the retained list (`KEYS[3]`)
+/// has no entry of it; else every entry of it removed from the list and the id from the kept set
+/// (`KEYS[4]`), and 1.
+const DROP: &str = r"
+if redis.call('GET', KEYS[1]) ~= ARGV[1] then
+  return 0
+end
+if redis.call('HGET', KEYS[2], 'id') == ARGV[2] then
+  return -1
+end
+local mine = ARGV[2] .. ':'
+local listed = false
+for _, entry in ipairs(redis.call('LRANGE', KEYS[3], 0, -1)) do
+  if string.sub(entry, 1, #mine) == mine then
+    redis.call('LREM', KEYS[3], 0, entry)
+    listed = true
+  end
+end
+if not listed then
+  return -2
+end
+redis.call('SREM', KEYS[4], ARGV[2])
+return 1
+";
+
+/// `meada snapshot pointer drop <generation>`: removes `id`, retained and not current, from the
+/// retained list and the kept set (`DROP`), so the next pull deletes it; `id`.
+pub fn pointer_drop(manifest: &Path, id: &str, author: &str) -> crate::Result<String> {
+    generation_arg(id)?;
+    locked(
+        &sections(manifest)?,
+        &format!("pointer drop {author}"),
+        async |valkey, config, _, held| {
+            let lock = config.key("lock", true);
+            let ((current, retained), kept) =
+                (generations::keys(config), generations::kept(config));
+            let mut script = cmd("EVAL");
+            script.arg(DROP).arg(4).arg(&lock).arg(&current);
+            script.arg(&retained).arg(&kept).arg(&held.token).arg(id);
+            let wrote = valkey.query::<i64>(&script).await;
+            match wrote.map_err(|e| format!("{current}, {retained}, {kept}: {e}"))? {
+                1 => Ok(id.to_string()),
+                -1 => Err(Msg::DropCurrent { id, key: &current }.text()),
+                -2 => Err(Msg::DropNotRetained { id, key: &retained }.text()),
+                _ => Err(Msg::LockNotHeld(&lock).text()),
+            }
         },
     )
 }
@@ -108,7 +265,7 @@ pub fn fence_recover(
         }
     };
     locked(
-        manifest,
+        &sections(manifest)?,
         &format!("fence recover {author}"),
         async |valkey, config, _, held| {
             let mut skipped = Vec::new();

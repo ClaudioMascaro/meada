@@ -325,6 +325,12 @@ pub enum Msg<'a> {
     GenerationsBadEntry(&'a str),
     #[cfg(feature = "generation-pointer")]
     GenerationsEmpty(&'a str),
+    /// A retained list (`key`) longer than `keep` plus the kept maximum (`max`).
+    #[cfg(feature = "generation-pointer")]
+    GenerationsTooLong {
+        key: &'a str,
+        max: u64,
+    },
     /// The pointer script refused a fence not above `current`'s (`{<key_prefix>}:fence` lost).
     #[cfg(feature = "generation-pointer")]
     FenceRefused {
@@ -367,6 +373,24 @@ pub enum Msg<'a> {
         id: &'a str,
         key: &'a str,
     },
+    /// `pointer retain` past the kept maximum `max` of the kept set `key`.
+    #[cfg(feature = "refresh-lock")]
+    KeptFull {
+        key: &'a str,
+        max: u64,
+    },
+    /// `pointer drop` of the current generation, which the pointer `key` names.
+    #[cfg(feature = "refresh-lock")]
+    DropCurrent {
+        id: &'a str,
+        key: &'a str,
+    },
+    /// `pointer drop` of a generation outside the retained list `key`.
+    #[cfg(feature = "refresh-lock")]
+    DropNotRetained {
+        id: &'a str,
+        key: &'a str,
+    },
     /// A generation id on the command line that is not one.
     #[cfg(feature = "refresh-lock")]
     BadGenerationArg(&'a str),
@@ -391,6 +415,12 @@ pub enum Msg<'a> {
     SnapshotPointerSet,
     #[cfg(feature = "refresh-lock")]
     SnapshotPointerGeneration,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotPointerRetain,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotPointerRetainGeneration,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotPointerDrop,
     #[cfg(feature = "refresh-lock")]
     SnapshotFence,
     #[cfg(feature = "refresh-lock")]
@@ -1313,6 +1343,19 @@ impl Msg<'_> {
                 format!("{key}: empty: no generation is retained there"),
                 format!("{key}: vazia: nenhuma geração está retida lá"),
             ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::GenerationsTooLong { key, max } => pick(
+                format!(
+                    "{key}: holds more than {max} entries, `keep` plus the {kept} kept \
+                     generations allowed",
+                    kept = crate::snapshot::generations::KEPT_MAX
+                ),
+                format!(
+                    "{key}: tem mais de {max} entradas, `keep` mais as {kept} gerações mantidas \
+                     permitidas",
+                    kept = crate::snapshot::generations::KEPT_MAX
+                ),
+            ),
             #[cfg(feature = "snapshot")]
             Msg::SnapshotRetainedSkipped { id, why } => pick(
                 format!("retained generation {id} not pulled, the next pull retries: {why}"),
@@ -1416,6 +1459,27 @@ impl Msg<'_> {
                 format!("{key}: a geração {id} não está retida: o ponteiro não se moveu"),
             ),
             #[cfg(feature = "refresh-lock")]
+            Msg::KeptFull { key, max } => pick(
+                format!(
+                    "{key}: already keeps {max} generations, the most it may: drop one first \
+                     (meada snapshot pointer drop)"
+                ),
+                format!(
+                    "{key}: já mantém {max} gerações, o máximo permitido: remova uma antes \
+                     (meada snapshot pointer drop)"
+                ),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::DropCurrent { id, key } => pick(
+                format!("{key}: generation {id} is the current one: nothing dropped"),
+                format!("{key}: a geração {id} é a atual: nada removido"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::DropNotRetained { id, key } => pick(
+                format!("{key}: generation {id} is not retained: nothing dropped"),
+                format!("{key}: a geração {id} não está retida: nada removido"),
+            ),
+            #[cfg(feature = "refresh-lock")]
             Msg::BadGenerationArg(text) => pick(
                 format!("{text}: not a generation id of 16 lowercase hex characters"),
                 format!("{text}: não é um id de geração de 16 caracteres hexadecimais minúsculos"),
@@ -1462,6 +1526,23 @@ impl Msg<'_> {
             Msg::SnapshotPointerGeneration => pick(
                 "The generation id, one of the retained set.".into(),
                 "O id da geração, um dos retidos.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotPointerRetain => pick(
+                "Keep a generation on every node, outside the keep trim, until it is dropped."
+                    .into(),
+                "Mantém uma geração em todo nó, fora do corte de keep, até ser removida.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotPointerRetainGeneration => pick(
+                "The generation id, one whose document the store holds.".into(),
+                "O id da geração, uma cujo documento o store guarda.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotPointerDrop => pick(
+                "Stop retaining a generation that is not current; the next pull deletes it."
+                    .into(),
+                "Deixa de reter uma geração que não é a atual; o próximo pull a apaga.".into(),
             ),
             #[cfg(feature = "refresh-lock")]
             Msg::SnapshotFence => pick(

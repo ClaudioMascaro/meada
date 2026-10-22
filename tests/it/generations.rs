@@ -130,7 +130,7 @@ fn held(local: &Path) -> Vec<String> {
     ids
 }
 
-fn sorted(ids: &[&str]) -> Vec<String> {
+pub(crate) fn sorted(ids: &[&str]) -> Vec<String> {
     let mut ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
     ids.sort();
     ids
@@ -382,7 +382,11 @@ fn every_id_and_fence_read_from_valkey_is_checked_before_the_node_changes() {
     let (bare, bad_fence) = (g1.clone(), format!("{g1}:x"));
     let pointer = "decimal fence";
     let entry = "<generation id>:<fence>";
-    let cases: [(&str, Vec<&str>, &str, &str); 11] = [
+    // `keep` plus the kept maximum is 10: with G1's entry, 11.
+    let many: Vec<String> = (0..10).map(|n| format!("{n:016x}:0")).collect();
+    let many = many.iter().map(String::as_str);
+    let too_long: Vec<&str> = ["RPUSH", r].into_iter().chain(many).collect();
+    let cases: [(&str, Vec<&str>, &str, &str); 12] = [
         (
             "a path in the id",
             vec!["HSET", c, "id", "../../../../etc/"],
@@ -424,6 +428,7 @@ fn every_id_and_fence_read_from_valkey_is_checked_before_the_node_changes() {
             r,
             entry,
         ),
+        ("a list too long", too_long, r, "holds more than 10 entries"),
     ];
     let reset = |valkey: &mut redis::Connection| {
         send(valkey, &["DEL", c, r]);
@@ -659,5 +664,80 @@ fn pointer_set_rolls_every_node_back_until_the_next_publish() {
     assert_eq!(pointer(&mut valkey, fleet.case).0, [g3.clone(), "5".into()]);
     for (node, _) in &nodes {
         assert_eq!(fleet.pull(node), g3);
+    }
+}
+
+/// `meada snapshot pointer retain` and `drop` (ADR 0014): two nodes, `keep = 2`; G1 retained,
+/// then three more publishes: both nodes still hold G1 and `/<identity>@G1` answers its goldens,
+/// while G2, beyond `keep` and not kept, is gone. After `drop G1` the next pull deletes it and
+/// its pin is the 404 naming it, the current generation and the held ones.
+#[cfg(feature = "refresh-lock")]
+#[test]
+fn a_retained_generation_stays_on_every_node_until_it_is_dropped() {
+    use crate::refresh_lock::{key, locked_publish, released, run_in};
+    let Some(fleet) = Fleet::new("generations_kept", 2) else {
+        return;
+    };
+    append_section(&fleet.dir, "\n[refresh_lock]\nttl_seconds = 10\n");
+    let dir = &fleet.dir;
+    let mut valkey = admin(&fleet.valkey);
+    let pointer_op = |op: &str, id: &str| {
+        let args = ["snapshot", "pointer", op, id, "--workspace", MANIFEST];
+        run_in(dir, "en_US.UTF-8", &args)
+    };
+    let kept = || -> Vec<String> {
+        let members = redis::cmd("SMEMBERS").arg(key(&fleet, "kept")).clone();
+        members.query(&mut admin(&fleet.valkey)).unwrap()
+    };
+    let printed = |id: &str| (format!("{id}\n"), String::new(), Some(0));
+    let g1 = locked_publish(dir);
+    let nodes = [fleet.node("one"), fleet.node("two")];
+    for (node, _) in &nodes {
+        assert_eq!(fleet.pull(node), g1);
+    }
+    assert_eq!(pointer_op("retain", &g1), printed(&g1));
+    assert!(released(&fleet));
+    assert_eq!(kept(), std::slice::from_ref(&g1));
+    // Already retained: only kept, its entry as it was.
+    assert_eq!(pointer(&mut valkey, fleet.case).1, [format!("{g1}:1")]);
+
+    let mut ids = vec![g1.clone()];
+    for line in ["second", "third", "fourth"] {
+        next_commit(dir, "chain-web", line);
+        ids.push(locked_publish(dir));
+        for (node, _) in &nodes {
+            assert_eq!(fleet.pull(node), *ids.last().unwrap());
+        }
+    }
+    let [_, g2, g3, g4] = &ids[..] else {
+        panic!("{ids:?}")
+    };
+    // The fences: G1's publish 1, the retain 2, then 3, 4 and 5.
+    let list = vec![format!("{g4}:5"), format!("{g3}:4"), format!("{g1}:1")];
+    assert_eq!(pointer(&mut valkey, fleet.case).1, list);
+    let servers: Vec<Server> = (nodes.iter()).map(|(node, _)| serve(dir, node)).collect();
+    for ((_, local), server) in nodes.iter().zip(&servers) {
+        assert_eq!(held(local), sorted(&[&g1, g3, g4]));
+        assert!(!held(local).contains(g2));
+        answers(server, &g1, g4);
+    }
+
+    assert_eq!(pointer_op("drop", &g1), printed(&g1));
+    assert!(released(&fleet));
+    assert!(kept().is_empty());
+    assert_eq!(pointer(&mut valkey, fleet.case).1, list[..2].to_vec());
+    let holds = sorted(&[g3, g4]);
+    for ((node, local), server) in nodes.iter().zip(&servers) {
+        assert_eq!(fleet.pull(node), *g4);
+        assert_eq!(held(local), holds);
+        let (status, _, named, body) = get(&format!("{}/{WEB}@{g1}", server.url));
+        assert_eq!((status, named.as_deref()), (404, Some(g4.as_str())));
+        assert_eq!(
+            body,
+            format!(
+                "generation {g1} is not held here\ncurrent: {g4}\nheld: {}\n",
+                holds.join(" ")
+            )
+        );
     }
 }

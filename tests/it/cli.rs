@@ -120,14 +120,15 @@ fn the_operations_need_the_refresh_lock_feature() {
 }
 
 /// The operations' refusals that need no service, under `pt_BR` and `en_US`: a malformed id
-/// (checked first) and a manifest without `[refresh_lock]`.
+/// (checked first) and a manifest without `[refresh_lock]`, for `pointer set`, `retain` and
+/// `drop` and `fence recover`.
 #[cfg(feature = "refresh-lock")]
 #[test]
 fn operation_refusals_follow_lang() {
     use crate::manifest::{MANIFEST, chain_manifest};
     use crate::refresh_lock::run_in;
     let dir = chain_manifest("cli_operations");
-    let set = |id| ["snapshot", "pointer", "set", id, "--workspace", MANIFEST];
+    let pointer = |op, id| ["snapshot", "pointer", op, id, "--workspace", MANIFEST];
     let recover = ["snapshot", "fence", "recover", "--workspace", MANIFEST];
     let refused = |stderr: &str| (String::new(), stderr.to_string(), Some(1));
     for (lang, malformed, section) in [
@@ -143,20 +144,19 @@ fn operation_refusals_follow_lang() {
             "meada: ops/meada.workspace.toml: sem seção [refresh_lock]: o lock não tem TTL\n",
         ),
     ] {
-        let malformed_id = run_in(&dir, lang, &set("000000000000000A"));
-        assert_eq!(malformed_id, refused(malformed), "{lang}");
-        for args in [&set("0000000000000000")[..], &recover] {
-            assert_eq!(
-                run_in(&dir, lang, args),
-                refused(section),
-                "{lang} {args:?}"
-            );
+        for op in ["set", "retain", "drop"] {
+            let malformed_id = run_in(&dir, lang, &pointer(op, "000000000000000A"));
+            assert_eq!(malformed_id, refused(malformed), "{lang} {op}");
+            let args = pointer(op, "0000000000000000");
+            assert_eq!(run_in(&dir, lang, &args), refused(section), "{lang} {op}");
         }
+        assert_eq!(run_in(&dir, lang, &recover), refused(section), "{lang}");
     }
 }
 
 /// The operations' refusals against Valkey, under `pt_BR` and `en_US`: a generation not
-/// retained, a lock whose holder is named, and one with no holder (taken by an older binary).
+/// retained (`pointer set` and `drop`), the current one dropped, a full kept set, a lock whose
+/// holder is named, and one with no holder (taken by an older binary).
 #[cfg(feature = "refresh-lock")]
 #[test]
 fn operation_refusals_with_valkey_follow_lang() {
@@ -190,6 +190,40 @@ fn operation_refusals_with_valkey_follow_lang() {
     ];
     for (lang, expected) in not_retained {
         assert_eq!(run_in(dir, lang, &set(zero)), refused(expected), "{lang}");
+    }
+    let (current, kept) = (key(&fleet, "current"), key(&fleet, "kept"));
+    let drop = |id| ["snapshot", "pointer", "drop", id, "--workspace", MANIFEST];
+    let retain = |id| ["snapshot", "pointer", "retain", id, "--workspace", MANIFEST];
+    let filler: Vec<String> = (0..8).map(|n| format!("{n:016x}")).collect();
+    let sadd: Vec<&str> = ["SADD", kept.as_str()]
+        .into_iter()
+        .chain(filler.iter().map(String::as_str))
+        .collect();
+    send(&mut admin(&fleet.valkey), &sadd);
+    let operations = [
+        (
+            "en_US.UTF-8",
+            format!("meada: {retained}: generation {zero} is not retained: nothing dropped\n"),
+            format!("meada: {current}: generation {g1} is the current one: nothing dropped\n"),
+            format!(
+                "meada: {kept}: already keeps 8 generations, the most it may: drop one first \
+                 (meada snapshot pointer drop)\n"
+            ),
+        ),
+        (
+            "pt_BR.UTF-8",
+            format!("meada: {retained}: a geração {zero} não está retida: nada removido\n"),
+            format!("meada: {current}: a geração {g1} é a atual: nada removido\n"),
+            format!(
+                "meada: {kept}: já mantém 8 gerações, o máximo permitido: remova uma antes \
+                 (meada snapshot pointer drop)\n"
+            ),
+        ),
+    ];
+    for (lang, outside, is_current, full) in operations {
+        assert_eq!(run_in(dir, lang, &drop(zero)), refused(outside), "{lang}");
+        assert_eq!(run_in(dir, lang, &drop(&g1)), refused(is_current), "{lang}");
+        assert_eq!(run_in(dir, lang, &retain(&g1)), refused(full), "{lang}");
     }
 
     let mut valkey = admin(&fleet.valkey);

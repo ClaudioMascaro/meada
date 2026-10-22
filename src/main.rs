@@ -172,6 +172,16 @@ enum PointerCommand {
         #[arg(long)]
         workspace: PathBuf,
     },
+    Retain {
+        generation: String,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Drop {
+        generation: String,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
 }
 
 /// `meada snapshot fence` (ADR 0014, feature `refresh-lock`).
@@ -294,13 +304,19 @@ fn main() -> ExitCode {
                 .mut_arg("command", |a| a.help(Msg::SnapshotLockCommand.text()))
         })
         .mut_subcommand("pointer", |c| {
-            (c.about(Msg::SnapshotPointer.text())).mut_subcommand("set", |c| {
-                (c.about(Msg::SnapshotPointerSet.text()))
-                    .mut_arg("generation", |a| {
-                        a.help(Msg::SnapshotPointerGeneration.text())
-                    })
+            fn sub(c: clap::Command, about: Msg<'static>, id: Msg<'static>) -> clap::Command {
+                (c.about(about.text()))
+                    .mut_arg("generation", |a| a.help(id.text()))
                     .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
-            })
+            }
+            let id = || Msg::SnapshotPointerGeneration;
+            (c.about(Msg::SnapshotPointer.text()))
+                .mut_subcommand("set", |c| sub(c, Msg::SnapshotPointerSet, id()))
+                .mut_subcommand("retain", |c| {
+                    let id = Msg::SnapshotPointerRetainGeneration;
+                    sub(c, Msg::SnapshotPointerRetain, id)
+                })
+                .mut_subcommand("drop", |c| sub(c, Msg::SnapshotPointerDrop, id()))
         })
         .mut_subcommand("fence", |c| {
             (c.about(Msg::SnapshotFence.text())).mut_subcommand("recover", |c| {
@@ -475,6 +491,36 @@ fn main() -> ExitCode {
             let author = meada::snapshot::lock::cli_author();
             meada::snapshot::operation::pointer_set(&workspace, &generation, &author)
                 .map(|state| println!("{state}"))
+        }
+        #[cfg(feature = "refresh-lock")]
+        Command::Snapshot {
+            command:
+                SnapshotCommand::Pointer {
+                    command:
+                        PointerCommand::Retain {
+                            generation,
+                            workspace,
+                        },
+                },
+        } => {
+            let author = meada::snapshot::lock::cli_author();
+            meada::snapshot::operation::pointer_retain(&workspace, &generation, &author)
+                .map(|id| println!("{id}"))
+        }
+        #[cfg(feature = "refresh-lock")]
+        Command::Snapshot {
+            command:
+                SnapshotCommand::Pointer {
+                    command:
+                        PointerCommand::Drop {
+                            generation,
+                            workspace,
+                        },
+                },
+        } => {
+            let author = meada::snapshot::lock::cli_author();
+            meada::snapshot::operation::pointer_drop(&workspace, &generation, &author)
+                .map(|id| println!("{id}"))
         }
         // What could not be counted on stderr, the new fence on stdout.
         #[cfg(feature = "refresh-lock")]
