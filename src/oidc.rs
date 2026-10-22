@@ -230,7 +230,8 @@ impl Grant {
     }
 
     /// The grant of `claims` under `config`: the identities its claim lists and those its groups
-    /// map to. A claim that is not an array, and a group the table lacks, grant nothing.
+    /// map to. A claim that is not an array of strings, and a group the table lacks, grant
+    /// nothing.
     fn of(claims: &Map<String, Value>, config: &Config) -> Self {
         let listed = config.claim.iter().flat_map(|claim| strings(claims, claim));
         let mapped = (config.groups.iter()).flat_map(|(claim, table)| {
@@ -246,13 +247,15 @@ impl Grant {
     }
 }
 
-/// The strings of `claims`' array `claim`; none when it is no array.
+/// The strings of `claims`' array `claim`; none when it is no array or holds anything but
+/// strings, so a malformed claim fails closed.
 fn strings<'a>(
     claims: &'a Map<String, Value>,
     claim: &str,
 ) -> impl Iterator<Item = &'a str> + use<'a> {
     let array = claims.get(claim).and_then(Value::as_array);
-    array.into_iter().flatten().filter_map(Value::as_str)
+    let strings = array.and_then(|a| a.iter().map(Value::as_str).collect::<Option<Vec<_>>>());
+    strings.into_iter().flatten()
 }
 
 /// Why a token is not admitted.
@@ -735,9 +738,10 @@ mod tests {
         assert_eq!(granted(both), only(&["a", "b"]));
         assert_eq!(granted(json!({"groups": ["g", "p"]})), None);
         assert_eq!(granted(json!({"groups": ["unmapped"]})), only(&[]));
-        // Not an array grants nothing; in an array, what is not a string is skipped.
+        // Not an array of strings grants nothing, even through its string elements.
         let shapes = json!({"meada_repositories": "a", "groups": [{"g": 1}, 7, "g"]});
-        assert_eq!(granted(shapes), only(&["b"]));
+        assert_eq!(granted(shapes), only(&[]));
+        assert_eq!(granted(json!({"meada_repositories": ["a", 7]})), only(&[]));
         assert_eq!(granted(json!({"groups": "g"})), only(&[]));
         assert_eq!(granted(json!({})), only(&[]));
     }

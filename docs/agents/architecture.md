@@ -174,10 +174,10 @@ one for the area a change touches.
   when none does (`refetch`, at most once per `KID_REFRESH_EVERY`), `exp` and `nbf` with
   `LEEWAY`, `iss`, `aud` against the configured audience or the path's and its identity's
   resources, then the scopes (403 when one is missing). The grant (`Grant::of`, once per
-  request) is the union of `identities_claim` as an array and what `[oidc.groups]` maps the
-  groups of `groups_claim` to, `*` from either for all; routing checks it and it bounds the
-  workspace of each answer (`mcp.rs`). No token, error text of `jsonwebtoken` or claim value is
-  ever printed.
+  request) is the union of `identities_claim` and what `[oidc.groups]` maps the groups of
+  `groups_claim` to, a claim counting only as an array of strings, `*` from either for all;
+  routing checks it and it bounds the workspace of each answer (`mcp.rs`). No token, error text
+  of `jsonwebtoken` or claim value is ever printed.
 - `github_app.rs` (feature `github-app`, which needs `valkey`; `jsonwebtoken` with `use_pem`
   only here): git's credential helper for the indexing job (ADR 0013). `File` is one
   `[[github_app]]` block and `validated` checks them all (`host` a git host name, lowercase;
