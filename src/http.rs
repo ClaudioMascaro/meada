@@ -18,8 +18,7 @@ mod python;
 mod rust;
 mod ts;
 
-/// What every parameter (`[id]`, `[...slug]`, `:id`, a template hole) becomes in a path.
-pub const PARAM: &str = "{}";
+pub use meada_core::http::{PARAM, normalize_path};
 
 /// The method of a provider that serves every method: `http::ANY::<path>`.
 const ANY: &str = "ANY";
@@ -29,31 +28,6 @@ pub struct Http;
 /// The contract identifier of `method` on `path`.
 pub fn contract(method: &str, path: &str) -> String {
     format!("http::{}::{}", method.to_uppercase(), normalize_path(path))
-}
-
-/// Drops the query string, the fragment and a trailing `/`, and turns every segment holding
-/// a parameter into `PARAM`. Case and API versions are kept. Template holes must already be
-/// written as `PARAM`.
-pub fn normalize_path(path: &str) -> String {
-    let path = path.split(['?', '#']).next().unwrap_or("");
-    let segments: Vec<&str> = path
-        .split('/')
-        .map(|s| {
-            let param = s.contains(PARAM)
-                || s.starts_with(':')
-                || (s.starts_with('[') && s.ends_with(']'))
-                || (s.contains('{') && s.contains('}'))
-                || (s.starts_with('<') && s.ends_with('>'));
-            if param { PARAM } else { s }
-        })
-        .collect();
-    let path = segments.join("/");
-    let path = path.trim_end_matches('/');
-    if path.starts_with('/') {
-        path.to_string()
-    } else {
-        format!("/{path}")
-    }
 }
 
 const METHODS: &[&str] = &["GET", "HEAD", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"];

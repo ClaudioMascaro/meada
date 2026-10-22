@@ -405,6 +405,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- The repository is a Cargo workspace (ADR 0014, #296): beside the `meada` binary, the library
+  crate `meada-core` holds the schema of a workspace manifest's `[[repository]]` entries with
+  every check their text decides, the bundle and generation ids of ADR 0012 and the new
+  workspace version id. It builds for WebAssembly (feature `wasm-bindgen`, which the binary never
+  enables) for the management console's front end. Both crates share one version, and
+  `meada-core` is published to crates.io before `meada`, so `cargo install meada` keeps
+  working. Nothing a user sees changes: every message, golden and dependency of the default
+  build is what it was.
 - The default model of the `decisions` decider is now `typesafe/jev-1.14` (was `typesafe/jev-1.13`);
   `MEADA_DECIDER_MODEL` still overrides it. The request and answer shapes are unchanged.
 

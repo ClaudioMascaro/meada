@@ -43,16 +43,4 @@ mod zod;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-/// `name` under the dotted `scope`: `outer.inner`, or `name` alone at the top.
-fn qualify(scope: &str, name: &str) -> String {
-    if scope.is_empty() {
-        name.to_string()
-    } else {
-        format!("{scope}.{name}")
-    }
-}
-
-/// The scope enclosing the dotted `scope`, empty at the top: `outer` for `outer.inner`.
-fn parent(scope: &str) -> &str {
-    scope.rsplit_once('.').map_or("", |(parent, _)| parent)
-}
+use meada_core::{parent, qualify};

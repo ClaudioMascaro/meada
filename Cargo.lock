@@ -1421,6 +1421,7 @@ dependencies = [
  "hyper-util",
  "ignore",
  "jsonwebtoken",
+ "meada-core",
  "nix",
  "nodejs-semver",
  "object_store",
@@ -1446,6 +1447,17 @@ dependencies = [
  "tree-sitter-typescript",
  "ureq",
  "yaml-rust2",
+]
+
+[[package]]
+name = "meada-core"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+ "toml",
+ "wasm-bindgen",
 ]
 
 [[package]]
