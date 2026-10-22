@@ -112,14 +112,29 @@ _Avoid_: dashboard, admin panel, UI
 
 **Operator**:
 Whoever runs a server mode deployment and owns its boundary, its admission, its services and
-its job. In the console, operator is also the one role that may write, held by the admitted
-people the identity provider marks with the group or claim the console names.
-_Avoid_: admin, superuser, owner
+its job. In the console, the global operator is the role that may make every write, held by the
+admitted people the identity provider marks with the group or claim the console names; a team
+operator may change only its teams' entries (ADR 0015).
+_Avoid_: admin, superuser
 
 **Viewer**:
-A person the console admits who is not an operator: reads every view, within what a node would
-answer their token, and writes nothing.
+A person the console admits who is neither the global operator nor a team operator: reads every
+view, within what a node would answer their token, and writes nothing.
 _Avoid_: reader, guest, read-only user
+
+**Owner**:
+The OIDC group, read from the token's `groups_claim`, that an entry of the workspace version
+names as the team answering for that repository. An entry has at most one owner; one without an
+owner is the global operator's. The owner is part of the workspace version, never of a
+generation, and never widens what a token may read (ADR 0015).
+_Avoid_: tenant, maintainer, team lead, CODEOWNER
+
+**Team operator**:
+A person the console admits, not the global operator, one of whose groups owns an entry of the
+current workspace version that their grant reads. They may edit, remove and add entries their
+teams own and nothing else: no owner change, no entry without an owner, no generation operation.
+A group becomes a team when the global operator assigns it its first entry.
+_Avoid_: team admin, team lead, maintainer, tenant admin
 
 ### Across repositories
 
