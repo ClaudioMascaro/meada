@@ -30,8 +30,21 @@ All notable changes to Meada are recorded here. The format follows
   console's own `Origin`) before routing; no answer sets a cookie or a CORS header. Static files
   are served from a fixed extension table, with `nosniff`, `no-referrer` and a fixed content
   security policy, and no path leaves `[ui] dir`. The start is refused, every problem listed,
-  for `[ui]` errors, a missing `[ui] dir`, front end files built for another version
-  (`meada-ui.json`) and, until the console admits tokens, `[oidc]`. Serving nodes do not change.
+  for `[ui]` errors, a missing `[ui] dir` and front end files built for another version
+  (`meada-ui.json`). Serving nodes do not change.
+
+- Console admission with `[oidc]` (spec #293, ADR 0014, features `ui` and `oidc`): the console
+  is a resource server like the nodes, admitting a bearer token for `[ui] audience` with the
+  nodes' own OIDC module (401 with `WWW-Authenticate`, 403 for a missing scope); the static
+  files and `config` need no token, and `config` adds the issuer, the new required `[ui]
+  client_id`, the scopes and the audience for the browser's authorization code flow with PKCE.
+  Every admitted subject is a viewer (`session`). `GET /api/v1/admission` shows the issuer's
+  metadata, the JWKS cache (key ids, last read, a failed refresh with its reason) and the groups
+  table; `POST /api/v1/admission/check` answers a pasted token's outcome per check and the
+  identities its grant admits, from the cached keys only, holding the token for that request
+  alone (body capped at 16 KiB). The token's grant bounds every view as it bounds a node's
+  answers. The start is refused when the issuer's metadata or JWKS cannot be read. A JWKS that
+  is not a key set is now reported by line and column, never by its content, on nodes too.
 
 - Server mode (spec #259, ADR 0011): `meada mcp --listen <addr> --workspace <manifest>` serves
   the three tools over MCP streamable HTTP, one endpoint per repository at `/<identity>`, from

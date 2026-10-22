@@ -24,28 +24,35 @@ const SERVED: &str = "example.com/chain/web\nexample.com/chain/gateway\nexample.
                       example.com/chain/worker\n";
 
 /// An issuer on loopback: OpenID discovery at its root and the JWKS it holds, which a test may
-/// rotate, or set to `None` to answer 500.
-struct Issuer {
-    base: String,
+/// rotate, or set to `None` to answer 500. `log` holds every request it received, its request
+/// line and headers as sent.
+pub(crate) struct Issuer {
+    pub(crate) base: String,
     jwks: Arc<Mutex<Option<String>>>,
+    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    pub(crate) log: Arc<Mutex<Vec<String>>>,
 }
 
 impl Issuer {
-    fn new(jwks: String) -> Self {
+    pub(crate) fn new(jwks: String) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let base = format!("http://{}", listener.local_addr().unwrap());
         let jwks = Arc::new(Mutex::new(Some(jwks)));
-        let (at, held) = (base.clone(), jwks.clone());
+        let log = Arc::new(Mutex::new(Vec::new()));
+        let (at, held, logged) = (base.clone(), jwks.clone(), log.clone());
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let Ok(mut stream) = stream else { continue };
                 let mut reader = BufReader::new(stream.try_clone().unwrap());
                 let mut line = String::new();
                 let _ = reader.read_line(&mut line);
+                let mut request = line.clone();
                 let mut header = String::new();
                 while reader.read_line(&mut header).is_ok_and(|n| n > 2) {
+                    request += &header;
                     header.clear();
                 }
+                logged.lock().unwrap().push(request);
                 let (status, body) = match line.split(' ').nth(1).unwrap_or("") {
                     "/.well-known/openid-configuration" => (
                         200,
@@ -64,16 +71,16 @@ impl Issuer {
                 );
             }
         });
-        Self { base, jwks }
+        Self { base, jwks, log }
     }
 
-    fn serve(&self, jwks: Option<String>) {
+    pub(crate) fn serve(&self, jwks: Option<String>) {
         *self.jwks.lock().unwrap() = jwks;
     }
 }
 
 /// A P-256 key generated now: the signing key and its public JWK, with `kid`.
-fn key(kid: &str) -> (EncodingKey, Jwk) {
+pub(crate) fn key(kid: &str) -> (EncodingKey, Jwk) {
     let rng = ring::rand::SystemRandom::new();
     let alg = &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING;
     let pkcs8 = ring::signature::EcdsaKeyPair::generate_pkcs8(alg, &rng).unwrap();
@@ -83,11 +90,11 @@ fn key(kid: &str) -> (EncodingKey, Jwk) {
     (signing, jwk)
 }
 
-fn set(keys: &[&Jwk]) -> String {
+pub(crate) fn set(keys: &[&Jwk]) -> String {
     json!({ "keys": keys }).to_string()
 }
 
-fn sign(key: &EncodingKey, kid: &str, alg: Algorithm, claims: &Value) -> String {
+pub(crate) fn sign(key: &EncodingKey, kid: &str, alg: Algorithm, claims: &Value) -> String {
     let mut header = Header::new(alg);
     header.kid = Some(kid.into());
     jsonwebtoken::encode(&header, claims, key).unwrap()
