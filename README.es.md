@@ -133,10 +133,9 @@ de saltos, los repositorios involucrados y los tokens usados.
 > clientes (TLS, tokens, SSO, política de red); el módulo OIDC, abajo, es la alternativa opt-in. Sin host, el servidor escucha solo en el loopback; escuchar
 > más allá es una elección explícita del operador, y un proxy mal configurado expone el código.
 > Meada no revisa el encabezado `Host` (un proxy con nombre propio funciona) y responde 403 a
-> cualquier solicitud con `Origin` (protección contra navegadores y DNS rebinding). Brecha
-> conocida: el 404 que lista las identidades servidas responde antes de esa revisión, así que
-> una página de DNS rebinding puede leer la lista de identidades de repositorio. El proxy no
-> debe exponer Meada más allá de los clientes que admite.
+> cualquier solicitud con `Origin` (protección contra navegadores y DNS rebinding), en
+> cualquier ruta y antes de cualquier otra respuesta. El proxy no debe exponer Meada más allá
+> de los clientes que admite.
 
 El modo servidor ejecuta Meada una vez para una organización: `meada mcp --listen` sirve las
 herramientas por HTTP a partir de espejos de los repositorios que lista un manifiesto de

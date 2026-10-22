@@ -152,7 +152,16 @@ fn generation(response: &ureq::http::Response<ureq::Body>) -> Option<String> {
 
 /// `GET url`: status, `Content-Type`, `Meada-Generation` and body.
 fn get(url: &str) -> (u16, String, Option<String>, String) {
-    let mut response = agent().get(url).call().unwrap();
+    get_with(url, &[])
+}
+
+/// `get` with more `headers`.
+fn get_with(url: &str, headers: &[(&str, &str)]) -> (u16, String, Option<String>, String) {
+    let mut request = agent().get(url);
+    for (name, value) in headers {
+        request = request.header(*name, *value);
+    }
+    let mut response = request.call().unwrap();
     let kind = response.headers()["content-type"]
         .to_str()
         .unwrap()
@@ -330,6 +339,17 @@ fn a_pin_answers_its_generation_on_every_node_until_it_is_no_longer_retained() {
                 holds.join(" ")
             )
         );
+        // Without `[oidc]`, a browser's request (DNS rebinding) gets 403 before routing: no
+        // pin's ids, no listing.
+        let origin = [("Origin", "http://evil.example")];
+        for path in [format!("/{WEB}@{g1}"), format!("/{WEB}@{last}"), "/".into()] {
+            let (status, _, _, body) = get_with(&format!("{}{path}", server.url), &origin);
+            assert_eq!(status, 403, "{path}");
+            assert!(
+                !body.contains(&last) && !body.contains(WEB),
+                "{path}: {body}"
+            );
+        }
     }
 }
 

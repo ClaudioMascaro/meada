@@ -94,8 +94,9 @@ one for the area a change touches.
   stateless, JSON responses on a hyper listener), one endpoint per repository of the manifest at `/<identity>`, a 404
   listing the identities served elsewhere (with `--generations`, `listen_generations` makes
   the endpoint per request from the current generation's identities, so a pull that adds a
-  repository needs no restart, and a node with no readable generation answers 503 with the fixed body `no servable generation`, the problem on stderr; it answers before the `Origin` check, which refuses
-  any request carrying one with 403; no `Host` check). With `[generations]` on the node
+  repository needs no restart, and a node with no readable generation answers 503 with the fixed body `no servable generation`, the problem on stderr; no `Host` check). A request carrying `Origin` gets 403
+  before anything else, on every path and in every build (`mcp::browser`, called first in
+  `route`): no listing, pin 404 or 503 reaches a browser. With `[generations]` on the node
   (`Routes::Generation { pins: true }`) the routing rule is: the decoded path, a trailing slash
   stripped, is `/<identity>@<generation>` when what follows its last `@` is an id
   (`snapshot::is_id`); that generation is served from `<local_dir>/<generation>/`
@@ -110,9 +111,9 @@ one for the area a change touches.
   hidden `with_drain_bound` shortens it, `main.rs` reads `MEADA_DRAIN_MS` for it in debug builds only, a second signal ends the wait), then cancels
   rmcp's `cancellation_token` (earlier it would end calls in flight with an error), drops what
   is left and exits 0 without waiting for the runtime's threads. Every request goes through
-  `Gate` before routing: in the default build, or with no `[oidc]`, it lets everything through;
-  with `[oidc]` (feature `oidc`) it is `oidc::Oidc::admit`, which answers itself (an `Origin`,
-  the protected resource metadata, a 401) or hands routing a `Pass`, whose grant routing checks
+  `Gate` before routing, after the `Origin` check: in the default build, or with no `[oidc]`, it
+  lets everything through; with `[oidc]` (feature `oidc`) it is `oidc::Oidc::admit`, which
+  answers itself (the protected resource metadata, a 401) or hands routing a `Pass`, whose grant routing checks
   at an endpoint (`Pass::refused`, the 403) and filters every 404 listing through
   (`Pass::reads`). The pin is split from the path before the gate, so a pinned path is admitted
   as its identity is. `main.rs`: clap.
@@ -148,7 +149,8 @@ one for the area a change touches.
   signing keys: RSA, or EC on P-256 and P-384) and starts a thread that reads it again every
   `jwks_refresh_seconds` until the module is dropped; every request goes through ureq with no
   redirect, no proxy, `FETCH_TIMEOUT` and a cap, and the platform verifier for `https`.
-  `Oidc::admit` refuses an `Origin` with 403, serves the metadata of any path under
+  `Oidc::admit` (reached only without `Origin`, which `mcp::route` refuses first) serves the
+  metadata of any path under
   `.well-known/oauth-protected-resource` (`resource` is `<public_url>/<path>`, percent-encoded),
   and otherwise reads the one `Authorization: Bearer` header (another scheme counts as no
   token): `ALGORITHMS` only, no `crit`, a cached key that `fits` the header (`kid` when both

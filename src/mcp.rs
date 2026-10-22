@@ -650,14 +650,18 @@ impl Stop {
 /// served, one per line. With pins, `/<identity>@<generation>` (the generation what follows the
 /// last `@`, when it is an id) answers from that generation if the node holds it, and is a 404
 /// naming it, the current one and the held ones if not; every answer then carries its
-/// generation in `Meada-Generation`. `gate` answers first: with `[oidc]`, a request it lets
-/// through is refused with 403 at an endpoint its token may not read, and a 404 lists only the
-/// identities the token may read.
+/// generation in `Meada-Generation`. A request carrying `Origin` gets 403 before anything
+/// else (`browser`). `gate` answers next: with `[oidc]`, a request it lets through is refused
+/// with 403 at an endpoint its token may not read, and a 404 lists only the identities the
+/// token may read.
 async fn route(
     routes: &Routes,
     gate: &Gate,
     request: Request<Incoming>,
 ) -> Response<BoxBody<Bytes, Infallible>> {
+    if let Some(refused) = browser(request.headers()) {
+        return refused;
+    }
     let path = percent_decode_str(request.uri().path()).decode_utf8();
     let path = path.as_deref().unwrap_or("");
     let identity = path.strip_prefix('/').unwrap_or(path);
@@ -757,8 +761,8 @@ async fn route(
                         None => response,
                     }
                 }
-                // The body is fixed: the request may come from anyone, before the `Origin`
-                // check, and the problem names local paths.
+                // The body is fixed: the request may come from anyone, and the problem names
+                // local paths.
                 Err(problem) => {
                     eprintln!("meada: {problem}");
                     plain(StatusCode::SERVICE_UNAVAILABLE, UNSERVABLE.into())
@@ -766,6 +770,18 @@ async fn route(
             }
         }
     }
+}
+
+/// The 403 for a request carrying `Origin` (a browser, as on a DNS rebinding page), for every
+/// path and with or without `[oidc]`: no listing, pin or 503 reaches a browser.
+fn browser(headers: &header::HeaderMap) -> Option<Response<BoxBody<Bytes, Infallible>>> {
+    headers.contains_key(header::ORIGIN).then(|| {
+        Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+            .body(Full::from("Forbidden: Origin header is not allowed\n").boxed())
+            .expect("a valid response")
+    })
 }
 
 /// The body of the 503 a node answers while it holds no servable generation.

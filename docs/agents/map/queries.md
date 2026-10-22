@@ -171,7 +171,8 @@ modules updates it.
   It binds a hyper HTTP/1 listener and routes `/<identity>` (percent-decoded, a trailing slash
   tolerated) to that repository's rmcp `StreamableHttpService`: stateless (no
   session), JSON responses, no `Host` check (a reverse proxy forwards its own name) and any
-  `Origin` refused (a browser, as on a DNS rebinding page); other paths get a `text/plain` 404
+  `Origin` refused with 403 before routing, on every path (a browser, as on a DNS rebinding
+  page, `browser`); other paths get a `text/plain` 404
   with one identity per line. `trace` from `uncommitted` is refused there, and `context` on a
   span whose file moved says `index behind the mirror: run meada index --workspace` instead of
   refreshing. Stdout is the protocol over stdio: log to stderr. No tool writes.

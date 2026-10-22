@@ -127,9 +127,8 @@ and the tokens used.
 > network policy); the OIDC module, below, is the opt-in alternative. With no host the server listens on the loopback interface only; listening
 > beyond it is the operator's explicit choice, and a misconfigured proxy exposes source.
 > Meada checks no `Host` header (a proxy with a real hostname works) and answers 403 to any
-> request carrying `Origin` (browser and DNS-rebinding protection). Known gap: the 404 that
-> lists the identities served answers before that check, so a DNS-rebinding page can read the
-> list of repository identities. The proxy must not expose Meada beyond the clients it admits.
+> request carrying `Origin` (browser and DNS-rebinding protection), on every path and before
+> any other answer. The proxy must not expose Meada beyond the clients it admits.
 
 Server mode runs Meada once for an organisation: `meada mcp --listen` serves the tools over
 HTTP from mirrors of the repositories a workspace manifest lists, each index outside its
