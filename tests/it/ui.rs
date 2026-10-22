@@ -181,7 +181,7 @@ fn serves_config_session_and_manifest() {
     assert_eq!(config.header("content-type"), Some("application/json"));
     assert_eq!(
         config.json(),
-        json!({"version": VERSION, "operations": false})
+        json!({"version": VERSION, "operations": false, "public_url": PUBLIC})
     );
 
     let session = get(&console, "/api/v1/session");

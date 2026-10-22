@@ -80,10 +80,9 @@ jobs:
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo test --locked --all-features
 
-  # meada-core in the browser (ADR 0014): built for WebAssembly with wasm-pack, holding none of
-  # the binary's crates, and its bindings in no build of the binary. The cargo gate needs none of
-  # this, nor Node.
-  core:
+  # The standalone frontend gate (ADR 0014). Rust contributors need neither Node nor wasm-pack.
+  # Keep the core dependency boundaries here beside its browser build.
+  frontend:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -113,7 +112,21 @@ jobs:
           tar -xzf "$archive" -C "$RUNNER_TEMP/wasm-pack"
           install -m 755 "$(find "$RUNNER_TEMP/wasm-pack" -type f -name wasm-pack)" "$HOME/.cargo/bin/"
           wasm-pack --version
-      - run: wasm-pack build meada-core --target web -- --locked --features wasm-bindgen
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ui/.nvmrc
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm ci
+        working-directory: ui
+      - run: npm run wasm
+        working-directory: ui
+      - run: npm run build
+        working-directory: ui
+      - run: npm run check:version
+        working-directory: ui
+      - run: npm test
+        working-directory: ui
 
   docs:
     runs-on: ubuntu-24.04

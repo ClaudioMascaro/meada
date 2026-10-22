@@ -167,7 +167,7 @@ fn admits_a_bearer_token_for_the_console_s_audience() {
     assert_eq!(
         config.json(),
         json!({
-            "version": VERSION, "operations": false, "issuer": base,
+            "version": VERSION, "operations": false, "public_url": PUBLIC, "issuer": base,
             "client_id": "meada-console", "scopes": [SCOPE], "audience": PUBLIC,
         })
     );

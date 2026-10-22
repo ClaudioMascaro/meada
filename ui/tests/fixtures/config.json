@@ -1,0 +1,1 @@
+{"version": "0.1.0", "operations": false, "issuer": "https://identity.example", "client_id": "meada-console", "scopes": ["meada:read"], "audience": "https://console.example", "public_url": "https://console.example"}

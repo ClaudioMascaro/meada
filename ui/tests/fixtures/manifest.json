@@ -1,0 +1,16 @@
+{
+  "file": "ops/meada.workspace.toml",
+  "manifest": {
+    "index_dir": "../indexes",
+    "valkey": {"url_env":"MEADA_VALKEY_URL","key_prefix":"meada"},
+    "github_app": [{"app_id":"42","private_key_file":"/run/secrets/github.pem"}],
+    "ui": {"dir":"../ui","public_url":"https://console.example"}
+  },
+  "modules": [
+    {"section":"valkey","feature":"valkey","built":true},
+    {"section":"snapshot","feature":"snapshot","built":true},
+    {"section":"github_app","feature":"github-app","built":false},
+    {"section":"ui","feature":"ui","built":true}
+  ],
+  "errors": ["ops/meada.workspace.toml:6: `ui.colour` is not a meada.workspace.toml key"]
+}
