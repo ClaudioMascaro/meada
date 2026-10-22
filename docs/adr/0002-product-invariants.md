@@ -44,9 +44,8 @@ amended for it (2 and 4) and one was added (6).
    ADR 0004). (Amended 2026-10-21; in server mode, ADR 0011, the server writes nothing: the
    operator refreshes with `meada index`.) It exposes few tools and returns compact output under a default token budget. A
    write tool needs a new ADR. Peers are local paths only: Meada never clones or fetches a peer,
-   so the network stays out of indexing. (Amended 2026-10-21; ADR 0012: with the session-store
-   module the server also writes MCP session state under its key prefix; no tool writes.
-   `meada snapshot pull` moves bundles Meada published; it never fetches from a git remote.)
+   so the network stays out of indexing. (Amended 2026-10-21; ADR 0012: `meada snapshot pull`
+   moves bundles Meada published; it never fetches from a git remote.)
 5. Each repository keeps its own index; cross-repo context links indexes without merging them.
 6. Determinism: the same inputs (the source tree, `meada.toml` and `meada.decisions.toml`) give
    the same answers and the same canonical export (`meada export`, sorted JSON). The index file

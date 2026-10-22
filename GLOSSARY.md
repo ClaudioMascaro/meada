@@ -51,8 +51,7 @@ _Avoid_: hosted mode, cloud, daemon
 **Cloud module**:
 An opt-in part of server mode for a deployment on several nodes: a cargo feature, off by
 default, plus one section of the workspace manifest (the snapshot store, the generation
-pointer, the refresh lock, the session store, OIDC). A build without the feature carries none
-of its crates, and with no section a build behaves as the default one (ADR 0012).
+pointer, the refresh lock, OIDC). A build without the feature carries none of its crates, and with no section a build behaves as the default one (ADR 0012).
 _Avoid_: plugin, extension, cloud mode
 
 **Generation**:

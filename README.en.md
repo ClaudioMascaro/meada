@@ -219,8 +219,8 @@ to one writer per index.
   protocol 2026-07-28 have no session at all.
 - **Reverse proxy.** Forward `MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name` and every
   `Mcp-Param-*` header unchanged (SEP-2243: rmcp rejects a request whose headers disagree with
-  its body); the proxy may route on them. Forward `Mcp-Session-Id` for legacy clients and the
-  `Meada-Generation` response header. Add no `Origin` header: Meada answers 403 to any request
+  its body); the proxy may route on them. Forward the `Meada-Generation` response
+  header. Add no `Origin` header: Meada answers 403 to any request
   that carries one, so a browser page cannot call it directly. Meada checks no `Host`, and
   `--listen` takes an IP literal or `localhost`, never a name it resolves.
 - **Readiness.** An init step first (`meada index --workspace` or the copy of the indexes). Then

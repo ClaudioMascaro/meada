@@ -399,6 +399,11 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
             "index_dir = \"../indexes\"\n\n[cache]\nurl = \"redis://127.0.0.1\"\n",
             "meada: ops/meada.workspace.toml:3: `cache` is not a meada.workspace.toml key\n",
         ),
+        // The session store was not built (#277): its section is an unknown key too.
+        (
+            "index_dir = \"../indexes\"\n\n[sessions]\nttl_seconds = 60\n",
+            "meada: ops/meada.workspace.toml:3: `sessions` is not a meada.workspace.toml key\n",
+        ),
     ];
     // `oidc` needs no `valkey`, so a build may have it here.
     if !cfg!(feature = "oidc") {

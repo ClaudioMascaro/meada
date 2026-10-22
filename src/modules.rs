@@ -17,7 +17,7 @@ pub struct Module {
     pub built: bool,
 }
 
-pub const MODULES: [Module; 6] = [
+pub const MODULES: [Module; 5] = [
     Module {
         section: "valkey",
         feature: "valkey",
@@ -42,12 +42,6 @@ pub const MODULES: [Module; 6] = [
         section: "oidc",
         feature: "oidc",
         built: cfg!(feature = "oidc"),
-    },
-    // The section below belongs to a module not built yet: no build has its feature.
-    Module {
-        section: "sessions",
-        feature: "session-store",
-        built: false,
     },
 ];
 

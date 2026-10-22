@@ -353,7 +353,7 @@ pub(crate) mod tests {
     #[test]
     fn every_key_goes_through_the_prefix_and_the_tagged_ones_share_a_hash_tag() {
         let config = section("url = \"redis://localhost\"\nkey_prefix = \"meada:prod\"").unwrap();
-        assert_eq!(config.key("sessions:abc", false), "meada:prod:sessions:abc");
+        assert_eq!(config.key("note:abc", false), "meada:prod:note:abc");
         assert_eq!(config.key("current", true), "{meada:prod}:current");
         assert_eq!(config.key("fence", true), "{meada:prod}:fence");
     }

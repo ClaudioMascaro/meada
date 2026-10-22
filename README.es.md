@@ -227,8 +227,8 @@ operador respete un único escritor por índice.
   sessions), y los clientes en el protocolo 2026-07-28 ni siquiera tienen sesión.
 - **Proxy inverso.** Reenvíe sin cambios `MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name` y todo
   encabezado `Mcp-Param-*` (SEP-2243: rmcp rechaza una petición cuyos encabezados discrepan del
-  cuerpo); el proxy puede enrutar por ellos. Reenvíe `Mcp-Session-Id` para clientes antiguos y
-  el encabezado de respuesta `Meada-Generation`. No añada `Origin`: Meada responde 403 a toda
+  cuerpo); el proxy puede enrutar por ellos. Reenvíe el encabezado de respuesta
+  `Meada-Generation`. No añada `Origin`: Meada responde 403 a toda
   petición que lo lleve, así una página de navegador no puede llamarlo directamente. Meada no
   comprueba `Host`, y `--listen` acepta una IP o `localhost`, nunca un nombre que resuelva.
 - **Disponibilidad.** Primero un paso de init (`meada index --workspace` o la copia de los

@@ -120,8 +120,8 @@ one for the area a change touches.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `modules.rs`, `valkey.rs`: the cloud modules (ADR 0012). `modules.rs` is the section table,
   in every build: each module section of `meada.workspace.toml` (`[valkey]`, `[snapshot]`,
-  `[generations]`, `[refresh_lock]`, `[sessions]`, `[oidc]`) with the cargo feature that owns
-  it and whether this build has it. `Manifest::read` checks it before the typed parse, so a
+  `[generations]`, `[refresh_lock]`, `[oidc]`) with the cargo feature that owns it and
+  whether this build has it. `Manifest::read` checks it before the typed parse, so a
   section whose feature is missing is an error naming the file, the line, the section and the
   feature, and a section the table lacks stays an unknown key. A module ticket adds its row and
   sets `built` to `cfg!(feature = ..)`. The `cloud` feature turns on every module at once and,
