@@ -370,9 +370,9 @@ pub enum Msg<'a> {
     SnapshotLockCommand,
     #[cfg(feature = "snapshot")]
     GenerationNotHeld(&'a str),
-    /// An `[oidc]` URL that is not `https` (or `http` on loopback) with a host and no user,
-    /// query or fragment; with `bare`, no path either.
-    #[cfg(feature = "oidc")]
+    /// An `[oidc]` URL, or `[ui] public_url`, that is not `https` (or `http` on loopback) with
+    /// a host and no user, query or fragment; with `bare`, no path either.
+    #[cfg(any(feature = "oidc", feature = "ui"))]
     OidcUrl {
         bare: bool,
     },
@@ -480,6 +480,33 @@ pub enum Msg<'a> {
     GithubAppNotAnswered(&'a str),
     #[cfg(feature = "github-app")]
     GithubAppRepositoryUrl,
+    /// `meada ui` (feature `ui`, ADR 0014).
+    #[cfg(feature = "ui")]
+    Ui,
+    #[cfg(feature = "ui")]
+    UiListenHelp,
+    #[cfg(feature = "ui")]
+    UiWorkspaceHelp,
+    /// A bootstrap manifest given to `meada ui` without `[ui]`.
+    #[cfg(feature = "ui")]
+    UiNoSection,
+    /// `[oidc]` in the console's bootstrap manifest, before the console admits tokens (#306).
+    #[cfg(feature = "ui")]
+    UiOidc,
+    /// `[ui] dir` that is not a directory.
+    #[cfg(feature = "ui")]
+    UiDirMissing(&'a str),
+    /// `[ui] dir` whose `meada-ui.json` names `found` (`None`: missing, oversized or
+    /// unreadable) instead of this build's version.
+    #[cfg(feature = "ui")]
+    UiVersion {
+        dir: &'a str,
+        found: Option<&'a str>,
+        expected: &'a str,
+    },
+    /// An `/api/v1/` path with no route.
+    #[cfg(feature = "ui")]
+    UiNoRoute,
     About,
     Index,
     Status,
@@ -1377,7 +1404,7 @@ impl Msg<'_> {
                 format!("generation {id} is not held here"),
                 format!("a geração {id} não está retida aqui"),
             ),
-            #[cfg(feature = "oidc")]
+            #[cfg(any(feature = "oidc", feature = "ui"))]
             Msg::OidcUrl { bare: false } => pick(
                 "must be an https:// URL with a host and no user, query or fragment (http:// \
                  only on loopback)"
@@ -1386,7 +1413,7 @@ impl Msg<'_> {
                  (http:// só em loopback)"
                     .into(),
             ),
-            #[cfg(feature = "oidc")]
+            #[cfg(any(feature = "oidc", feature = "ui"))]
             Msg::OidcUrl { bare: true } => pick(
                 "must be an https:// URL with a host and nothing after it (http:// only on \
                  loopback)"
@@ -1595,6 +1622,74 @@ impl Msg<'_> {
             Msg::GithubAppRepositoryUrl => pick(
                 "the repository URL is not https://<host>/<owner>/<repo>".into(),
                 "a URL do repositório não é https://<host>/<owner>/<repo>".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::Ui => pick(
+                "Serve the management console, read only, at host:port, :port or port (loopback \
+                 without a host)."
+                    .into(),
+                "Serve o console de gestão, só leitura, em host:porta, :porta ou porta (loopback \
+                 sem host)."
+                    .into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiListenHelp => pick(
+                "Where the console listens: host:port, :port or port (loopback without a host)"
+                    .into(),
+                "Onde o console escuta: host:porta, :porta ou porta (loopback sem host)".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiWorkspaceHelp => pick(
+                "The bootstrap manifest, with its [ui] section".into(),
+                "O manifesto de bootstrap, com a seção [ui]".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiNoSection => pick(
+                "the bootstrap manifest has no [ui] section".into(),
+                "o manifesto de bootstrap não tem seção [ui]".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiOidc => pick(
+                "[oidc] is not yet supported by the console: remove it and deploy the console \
+                 behind a proxy that admits its users"
+                    .into(),
+                "[oidc] ainda não é suportado pelo console: remova-o e implante o console atrás \
+                 de um proxy que admita seus usuários"
+                    .into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiDirMissing(dir) => pick(
+                format!("`{dir}` is not a directory"),
+                format!("`{dir}` não é um diretório"),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiVersion {
+                dir,
+                found: Some(found),
+                expected,
+            } => pick(
+                format!("`{dir}` holds files built for Meada {found}, not {expected}"),
+                format!("`{dir}` tem arquivos feitos para o Meada {found}, não {expected}"),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiVersion {
+                dir,
+                found: None,
+                expected,
+            } => pick(
+                format!(
+                    "`{dir}` has no readable meada-ui.json naming its version; this is \
+                     Meada {expected}"
+                ),
+                format!(
+                    "`{dir}` não tem um meada-ui.json legível com a versão; este é o \
+                     Meada {expected}"
+                ),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiNoRoute => pick(
+                "no API route at this path".into(),
+                "nenhuma rota da API neste caminho".into(),
             ),
             Msg::About => pick(
                 "LLM-free code graph for agents and people".into(),

@@ -40,6 +40,7 @@ mod serving;
 mod snapshot;
 mod stale;
 mod trace;
+mod ui;
 mod urls;
 mod workspace;
 mod xlang;

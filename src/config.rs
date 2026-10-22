@@ -112,7 +112,12 @@ pub(crate) fn parse<T: DeserializeOwned>(file: &Path, src: &str, name: &str) -> 
 
 /// An error about the dotted `key` of `src`, the content of `file`, as `parse` words one
 /// (`meada_core::manifest::error_at`).
-#[cfg(any(feature = "valkey", feature = "snapshot", feature = "oidc"))]
+#[cfg(any(
+    feature = "valkey",
+    feature = "snapshot",
+    feature = "oidc",
+    feature = "ui"
+))]
 pub(crate) fn error_at(
     file: &Path,
     src: &str,

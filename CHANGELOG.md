@@ -8,6 +8,18 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Management console (spec #293, ADR 0014, feature `ui`, in `cloud`, no crate of its own):
+  `meada ui --listen <addr> --workspace <bootstrap manifest>` serves, read only and behind the
+  operator's reverse proxy, the front end's files from the new `[ui]` section's `dir` and a JSON
+  API under `/api/v1/` with `config`, `session` and `manifest` (the manifest as loaded, never a
+  secret's value, the module sections this build has, and the errors of the file as it now
+  stands on disk). Each request passes a `Host` check and an `Origin` check (a write needs the
+  console's own `Origin`) before routing; no answer sets a cookie or a CORS header. Static files
+  are served from a fixed extension table, with `nosniff`, `no-referrer` and a fixed content
+  security policy, and no path leaves `[ui] dir`. The start is refused, every problem listed,
+  for `[ui]` errors, a missing `[ui] dir`, front end files built for another version
+  (`meada-ui.json`) and, until the console admits tokens, `[oidc]`. Serving nodes do not change.
+
 - Server mode (spec #259, ADR 0011): `meada mcp --listen <addr> --workspace <manifest>` serves
   the three tools over MCP streamable HTTP, one endpoint per repository at `/<identity>`, from
   mirrors that a workspace manifest (`meada.workspace.toml`) lists. Each index lives under the

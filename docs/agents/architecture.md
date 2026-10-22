@@ -146,11 +146,13 @@ one for the area a change touches.
   `Pass::reads`, which drops every entry outside the grant before the missing peers are
   computed, so no answer names one, even as missing (#290); a call with no `Pass` is a tool
   error. The pin is split from the path before the gate, so a pinned path is admitted
-  as its identity is. `main.rs`: clap.
+  as its identity is. The serving loop (bind, the address line, `Stop`, the drain) is
+  `mcp::serve_http`, generic over what answers a request: the node's `run` hands it `route`
+  over `Routes` and `Gate`, the console (`ui.rs`) its own answer. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `modules.rs`, `valkey.rs`: the cloud modules (ADR 0012). `modules.rs` is the section table,
   in every build: each module section of `meada.workspace.toml` (`[valkey]`, `[snapshot]`,
-  `[generations]`, `[refresh_lock]`, `[oidc]`, `[[github_app]]`) with the cargo feature that
+  `[generations]`, `[refresh_lock]`, `[oidc]`, `[[github_app]]`, `[ui]`) with the cargo feature that
   owns it and whether this build has it. `Manifest::read` checks it before the typed parse, so a
   section whose feature is missing is an error naming the file, the line, the section and the
   feature, and a section the table lacks stays an unknown key. A module ticket adds its row and
@@ -205,6 +207,32 @@ one for the area a change touches.
   `groups_claim` to, a claim counting only as an array of strings, `*` from either for all;
   routing checks it and it bounds the workspace of each answer (`mcp.rs`). No token, error text
   of `jsonwebtoken` or claim value is ever printed.
+- `ui.rs` (feature `ui`, no crate of its own; `cloud` enables it): the management console's
+  process (ADR 0014), `meada ui --listen <addr> --workspace <bootstrap manifest>`, read only,
+  on the node's listener (`mcp::serve_http`, `mcp::address`, the same drain); never a node's
+  route, never an MCP server. `File` is `[ui]` and `validated` lists every problem of it at
+  once (`dir` and `public_url` required, `public_url` `https` or loopback `http` with nothing
+  past the host through `modules::reachable`; `audience` defaults to `public_url`; `client_id`,
+  `operations`, `operator_groups` and `operator_claim` are read, and checked by #306 and #307).
+  `Console::start` refuses, listing every problem: a manifest error, no `[ui]`, `[oidc]` (until
+  the console admits tokens, #306), a `[ui] dir` that is not a directory, and the version check:
+  `meada-ui.json` at the root of `[ui] dir` must be `{"version": "<this Meada version>"}`, and
+  a missing, oversized (`VERSION_MAX`) or unreadable file counts as another version, both
+  versions named. Each request goes, in order, through the `Host` check (403 unless `Host` is
+  `public_url`'s host and port, or the bound address on loopback), the `Origin` check (403 for
+  an `Origin` other than `public_url`, and for a write, any method but `GET` and `HEAD`, without
+  one), admission (the operator's proxy: every request is a viewer's), then routing; the 403
+  bodies are fixed text. `/api/v1/` is the JSON API (`config`, `session`, `manifest`; errors
+  `{"error": {"code", "message"}}`, an unknown path a 404 in that shape); `manifest` answers the
+  file as loaded at start (a TOML table as JSON: secrets' variable and file names only), the
+  module table with what this build has, and the errors of the file as it now stands on disk,
+  read again per request. Every other path is a file of `[ui] dir`: percent-decoded, a 404 for a
+  `..`, `.` or empty segment, a NUL or a backslash, a resolved path (symbolic links followed)
+  outside the canonical `[ui] dir`, or an extension outside the fixed table (`content_type`); a
+  path that names no file, a directory included (none is listed), answers `index.html` unless it
+  is under `/api/`. Files under `assets/` are cacheable for a year and immutable, every other one
+  `no-cache`. Every answer carries `nosniff`, `Referrer-Policy: no-referrer` and the fixed
+  content security policy (`CSP`); none sets a cookie or an `Access-Control-*` header.
 - `github_app.rs` (feature `github-app`, which needs `valkey`; `jsonwebtoken` with `use_pem`
   only here): git's credential helper for the indexing job (ADR 0013). `File` is one
   `[[github_app]]` block and `validated` checks them all (`host` a git host name, lowercase; `api`

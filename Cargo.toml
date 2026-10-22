@@ -128,8 +128,11 @@ oidc = ["dep:jsonwebtoken", "ureq/platform-verifier"]
 # git's credential helper with GitHub App installation tokens (`[[github_app]]`, ADR 0013): the
 # App's JWT signed from its PEM key, its REST calls through the binary's own ureq client.
 github-app = ["valkey", "dep:jsonwebtoken", "jsonwebtoken/use_pem", "ureq/platform-verifier"]
+# The management console (`[ui]`, `meada ui`, ADR 0014): the node's hyper listener and
+# serde_json. No crate of its own.
+ui = []
 # Every cloud module at once (ADR 0012). Unix only, since `refresh-lock` is.
-cloud = ["snapshot", "generation-pointer", "refresh-lock", "oidc", "github-app"]
+cloud = ["snapshot", "generation-pointer", "refresh-lock", "oidc", "github-app", "ui"]
 
 # `cargo test` runs the example's own tests too.
 [[example]]
