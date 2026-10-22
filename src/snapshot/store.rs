@@ -20,7 +20,8 @@ use object_store::{
 };
 use reqwest::Url;
 
-use super::{Config, Credentials, Secret};
+use super::{Config, Credentials};
+use crate::modules::{Secret, read_secret};
 use crate::msg::Msg;
 
 /// The object metadata every object Meada stores carries: its size and BLAKE3 hash.
@@ -168,10 +169,10 @@ impl Store {
                 token,
             } => {
                 let credential = AwsCredential {
-                    key_id: secret_value(key_id)?.ok_or_else(|| unset(key_id))?,
-                    secret_key: secret_value(secret)?.ok_or_else(|| unset(secret))?,
+                    key_id: key_id.read(SECRET_MAX)?.ok_or_else(|| unset(key_id))?,
+                    secret_key: secret.read(SECRET_MAX)?.ok_or_else(|| unset(secret))?,
                     // The default variable may be unset: a key pair without a session.
-                    token: secret_value(token)?,
+                    token: token.read(SECRET_MAX)?,
                 };
                 secrets.push(credential.secret_key.clone());
                 secrets.extend(credential.token.clone());
@@ -180,7 +181,7 @@ impl Store {
             }
             Credentials::WebIdentity => {
                 let token_file = env("AWS_WEB_IDENTITY_TOKEN_FILE")?;
-                read_secret(Path::new(&token_file))?;
+                read_secret(Path::new(&token_file), SECRET_MAX)?;
                 let sts = format!("https://sts.{}.amazonaws.com", config.region);
                 allowed.extend(Url::parse(&sts).ok().as_ref().and_then(Origin::of));
                 builder = builder
@@ -193,7 +194,7 @@ impl Store {
                 let agent = pod_agent(&uri).ok_or_else(|| Msg::SnapshotPodUrl.text())?;
                 allowed.extend(Origin::of(&agent));
                 let token_file = env("AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE")?;
-                read_secret(Path::new(&token_file))?;
+                read_secret(Path::new(&token_file), SECRET_MAX)?;
                 builder = builder
                     .with_config(AmazonS3ConfigKey::ContainerCredentialsFullUri, uri)
                     .with_config(
@@ -418,22 +419,6 @@ fn unset(secret: &Secret) -> String {
     }
 }
 
-/// The value of `secret`: `None` for an unset variable, an error for a file that cannot be read.
-fn secret_value(secret: &Secret) -> Result<Option<String>, String> {
-    match secret {
-        Secret::Env(var) => Ok(std::env::var(var).ok()),
-        Secret::File(file) => read_secret(file).map(Some),
-    }
-}
-
-/// The content of the regular file `path` (`config::read_bounded`, at most `SECRET_MAX`
-/// bytes), without the editor's trailing newline.
-fn read_secret(path: &Path) -> Result<String, String> {
-    let bytes = crate::config::read_bounded(path, SECRET_MAX)?;
-    let text = String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", path.display()))?;
-    Ok(text.trim_end_matches(['\n', '\r']).to_string())
-}
-
 /// The elements of an S3 error body that echo the signed request: with a session token from
 /// any credential source, `x-amz-security-token` is in them.
 const ECHOES: [&str; 4] = [
@@ -561,13 +546,10 @@ mod tests {
         let (small, big) = (dir.join("small"), dir.join("big"));
         std::fs::write(&small, "s3cret\n").unwrap();
         std::fs::write(&big, vec![b'x'; SECRET_MAX as usize + 1]).unwrap();
-        assert_eq!(read_secret(&small).unwrap(), "s3cret");
-        assert!(read_secret(&big).unwrap_err().ends_with("bytes"));
-        assert!(
-            read_secret(&dir)
-                .unwrap_err()
-                .ends_with("not a regular file")
-        );
+        let read = |path: &std::path::Path| read_secret(path, SECRET_MAX);
+        assert_eq!(read(&small).unwrap(), "s3cret");
+        assert!(read(&big).unwrap_err().ends_with("bytes"));
+        assert!(read(&dir).unwrap_err().ends_with("not a regular file"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

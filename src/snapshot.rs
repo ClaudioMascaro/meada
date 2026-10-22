@@ -25,6 +25,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::modules::{Problem, Secret};
 use crate::msg::{Fix, Msg};
 use crate::workspace::Manifest;
 use crate::{Result, index, repo};
@@ -70,13 +71,6 @@ enum Source {
     Instance,
 }
 
-/// Where a static credential comes from.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Secret {
-    Env(String),
-    File(PathBuf),
-}
-
 /// The credential source, with the static keys' places. Nothing here is a secret.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Credentials {
@@ -109,8 +103,6 @@ pub struct Config {
     /// Where nodes keep the generations they pull (#273, #274).
     pub local_dir: Option<PathBuf>,
 }
-
-use crate::modules::Problem;
 
 impl File {
     /// The section checked; relative paths are relative to `base`, the manifest's directory.
@@ -174,12 +166,9 @@ impl File {
                 };
                 return Err((key, Msg::SnapshotStaticOnly.text()));
             }
-            secrets.push(match (env, file) {
-                (Some(_), Some(_)) => return Err((key, Msg::SnapshotBoth(other).text())),
-                (Some(var), None) => Secret::Env(var),
-                (None, Some(file)) => Secret::File(base.join(file)),
-                (None, None) => Secret::Env(default.into()),
-            });
+            let both = || (key, Msg::SnapshotBoth(other).text());
+            let named = Secret::named(env, file, base, both)?;
+            secrets.push(named.unwrap_or_else(|| Secret::Env(default.into())));
         }
         let credentials = match self.credentials {
             Source::Static => {

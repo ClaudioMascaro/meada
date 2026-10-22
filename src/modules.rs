@@ -123,6 +123,50 @@ pub fn at_least(
     }
 }
 
+/// Where a secret comes from: an environment variable or a file. Nothing here is a secret.
+#[cfg(any(feature = "valkey", feature = "snapshot"))]
+#[derive(Clone, Debug, PartialEq)]
+pub enum Secret {
+    Env(String),
+    File(std::path::PathBuf),
+}
+
+#[cfg(any(feature = "valkey", feature = "snapshot"))]
+impl Secret {
+    /// The secret the `env` and `file` keys of a section name (`file` relative to `base`):
+    /// `None` when neither does, the `both` problem when both do.
+    pub fn named(
+        env: Option<String>,
+        file: Option<String>,
+        base: &Path,
+        both: impl FnOnce() -> Problem,
+    ) -> std::result::Result<Option<Self>, Problem> {
+        match (env, file) {
+            (Some(_), Some(_)) => Err(both()),
+            (Some(var), None) => Ok(Some(Self::Env(var))),
+            (None, Some(file)) => Ok(Some(Self::File(base.join(file)))),
+            (None, None) => Ok(None),
+        }
+    }
+
+    /// Its value, read now: `None` for an unset variable, a file through `read_secret`.
+    pub fn read(&self, max: u64) -> std::result::Result<Option<String>, String> {
+        match self {
+            Self::Env(var) => Ok(std::env::var(var).ok()),
+            Self::File(file) => read_secret(file, max).map(Some),
+        }
+    }
+}
+
+/// The regular file `path` (`config::read_bounded`, at most `max` bytes) as UTF-8, without the
+/// editor's trailing newline. An error names the file, never what it holds.
+#[cfg(any(feature = "valkey", feature = "snapshot"))]
+pub fn read_secret(path: &Path, max: u64) -> std::result::Result<String, String> {
+    let bytes = crate::config::read_bounded(path, max)?;
+    let text = String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", path.display()))?;
+    Ok(text.trim_end_matches(['\n', '\r']).to_string())
+}
+
 /// `run` to its end on a current-thread runtime of its own, then shut down without waiting:
 /// dropping it would wait for a blocking thread still in a DNS lookup or a file read, for as long
 /// as the resolver or the mount takes.

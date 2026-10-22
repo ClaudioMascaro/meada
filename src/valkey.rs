@@ -15,6 +15,7 @@ use redis::{
 };
 use serde::Deserialize;
 
+use crate::modules::{Problem, Secret};
 use crate::msg::Msg;
 
 /// How long `meada status` waits for Valkey to answer its ping: a dead one must not stall the
@@ -40,25 +41,15 @@ pub struct File {
     ca_file: Option<String>,
 }
 
-/// Where the password comes from.
-#[derive(Clone, Debug, PartialEq)]
-enum Password {
-    None,
-    Env(String),
-    File(PathBuf),
-}
-
 /// The validated section. The URL holds no password, so nothing here is a secret.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Config {
     url: String,
-    password: Password,
+    password: Option<Secret>,
     cluster: bool,
     key_prefix: String,
     ca_file: Option<PathBuf>,
 }
-
-use crate::modules::Problem;
 
 impl File {
     /// The section checked; relative paths are relative to `base`, the manifest's directory.
@@ -84,12 +75,8 @@ impl File {
             }
             _ => {}
         }
-        let password = match (self.password_env, self.password_file) {
-            (Some(_), Some(_)) => return Err(("valkey.password_file", Msg::ValkeyBoth.text())),
-            (Some(var), None) => Password::Env(var),
-            (None, Some(file)) => Password::File(base.join(file)),
-            (None, None) => Password::None,
-        };
+        let both = || ("valkey.password_file", Msg::ValkeyBoth.text());
+        let password = Secret::named(self.password_env, self.password_file, base, both)?;
         let key_prefix = self.key_prefix.unwrap_or_else(|| "meada".into());
         let prefix = "valkey.key_prefix";
         if key_prefix.is_empty() {
@@ -120,20 +107,16 @@ impl Config {
         }
     }
 
-    /// The password, read now from the variable or the file the section names.
+    /// The password, read now from the variable or the file the section names (on a blocking
+    /// thread, so a slow mount stalls no timeout).
     async fn secret(&self) -> Result<Option<String>, String> {
-        match &self.password {
-            Password::None => Ok(None),
-            Password::Env(var) => match std::env::var(var) {
-                Ok(value) => Ok(Some(value)),
-                Err(_) => Err(Msg::ValkeyEnvUnset(var).text()),
-            },
-            Password::File(file) => {
-                let text = read_file(file, PASSWORD_MAX).await?;
-                let text = String::from_utf8(text).map_err(|_| file.display().to_string())?;
-                // A trailing newline is the editor's, not the password's.
-                Ok(Some(text.trim_end_matches(['\n', '\r']).to_string()))
-            }
+        let Some(password) = self.password.clone() else {
+            return Ok(None);
+        };
+        let read = tokio::task::spawn_blocking(move || password.read(PASSWORD_MAX)).await;
+        match (read.map_err(|e| e.to_string())??, &self.password) {
+            (None, Some(Secret::Env(var))) => Err(Msg::ValkeyEnvUnset(var).text()),
+            (value, _) => Ok(value),
         }
     }
 }
@@ -255,14 +238,17 @@ pub(crate) mod tests {
     fn the_section_takes_its_defaults_and_resolves_paths_from_the_manifest() {
         let config = section("url = \"redis://localhost\"").unwrap();
         assert_eq!(config.key_prefix, "meada");
-        assert_eq!(config.password, Password::None);
+        assert_eq!(config.password, None);
         assert!(!config.cluster && config.ca_file.is_none());
         let config = section(
             "url = \"rediss://meada@cache.example.internal:6379\"\npassword_file = \"valkey\"\n\
              cluster = true\nkey_prefix = \"meada:prod\"\nca_file = \"/etc/meada/ca.pem\"",
         )
         .unwrap();
-        assert_eq!(config.password, Password::File("/etc/meada/valkey".into()));
+        assert_eq!(
+            config.password,
+            Some(Secret::File("/etc/meada/valkey".into()))
+        );
         assert_eq!(config.ca_file, Some("/etc/meada/ca.pem".into()));
         assert!(config.cluster);
     }
