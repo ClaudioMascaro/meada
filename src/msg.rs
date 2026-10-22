@@ -385,6 +385,9 @@ pub enum Msg<'a> {
     OidcJwksUrl,
     #[cfg(feature = "oidc")]
     OidcEmpty,
+    /// An `[oidc]` section with neither `identities_claim` nor `groups_claim`.
+    #[cfg(feature = "oidc")]
+    OidcNoClaim,
     /// A configured scope holding a character no RFC 6749 scope-token carries.
     #[cfg(feature = "oidc")]
     OidcScope {
@@ -1366,6 +1369,11 @@ impl Msg<'_> {
             ),
             #[cfg(feature = "oidc")]
             Msg::OidcEmpty => pick("must not be empty".into(), "não pode ser vazio".into()),
+            #[cfg(feature = "oidc")]
+            Msg::OidcNoClaim => pick(
+                "set `identities_claim`, `groups_claim` or both".into(),
+                "defina `identities_claim`, `groups_claim` ou os dois".into(),
+            ),
             #[cfg(feature = "oidc")]
             Msg::OidcScope { scope, bad } => pick(
                 format!("{scope:?} holds {bad:?}, which a scope cannot carry (RFC 6749)"),

@@ -154,7 +154,8 @@ one for the area a change touches.
   backend, never aws-lc-rs): server mode as an OAuth 2.1 resource server. `File` is the
   `[oidc]` section and `File::validate` its `Config` (`issuer` `https` or loopback `http` with no
   user, query or fragment, `public_url` the same with no path, `identities_claim` and `audience`
-  not empty, scopes RFC 6749 scope-tokens, `jwks_refresh_seconds` at least 60). `Oidc::start`,
+  not empty, `groups_claim` (not empty) and its `[oidc.groups]` table together, at least one of
+  the two claims, scopes RFC 6749 scope-tokens, `jwks_refresh_seconds` at least 60). `Oidc::start`,
   called by `mcp::Gate::new` before the listener binds, finds the metadata at the URLs the MCP
   specification tries in order (`metadata_urls`: RFC 8414 and OpenID discovery with the path
   inserted, then OpenID's appended, passing over a document that does not parse or names
@@ -170,8 +171,9 @@ one for the area a change touches.
   carry one, the key's own `alg`, its type and curve), the JWKS fetched again
   when none does (`refetch`, at most once per `KID_REFRESH_EVERY`), `exp` and `nbf` with
   `LEEWAY`, `iss`, `aud` against the configured audience or the path's and its identity's
-  resources, then the scopes (403 when one is missing). The grant is `identities_claim` as an
-  array, `*` for all; routing checks it and it bounds the workspace of each answer (`mcp.rs`). No token, error text of `jsonwebtoken` or claim value is ever printed.
+  resources, then the scopes (403 when one is missing). The grant (`Grant::of`, once per request) is the union of
+  `identities_claim` as an array and what `[oidc.groups]` maps the groups of `groups_claim` to,
+  `*` from either for all; routing checks it and it bounds the workspace of each answer (`mcp.rs`). No token, error text of `jsonwebtoken` or claim value is ever printed.
 - `snapshot.rs`, `snapshot/store.rs`, `snapshot/pull.rs` (feature `snapshot`; the only places
   `object_store`, `reqwest` as a client of Meada's own and `tar` are used): the snapshot store. `File` is the
   `[snapshot]` section and `File::validate` its `Config` (an `https` endpoint, or `http` on

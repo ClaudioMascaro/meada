@@ -586,6 +586,68 @@ fn a_grant_scopes_the_workspace_of_a_generation() {
     }
 }
 
+/// The group `append_groups` maps to `WEB`, and one it leaves unmapped.
+const MAPPED: &str = "team-web-7c1d";
+const UNMAPPED: &str = "team-none-5e2a";
+
+/// `append`'s `[oidc]` with `groups_claim = "groups"` and `[oidc.groups]` mapping `MAPPED` to
+/// `WEB`.
+fn append_groups(dir: &Path, manifest: &str, issuer: &str) {
+    append(dir, manifest, issuer);
+    let file = dir.join(manifest);
+    let groups = format!("groups_claim = \"groups\"\n[oidc.groups]\n\"{MAPPED}\" = [\"{WEB}\"]\n");
+    fs::write(&file, fs::read_to_string(&file).unwrap() + &groups).unwrap();
+}
+
+/// A token carrying only groups (`MAPPED` and `UNMAPPED`, no `meada_repositories`) reads `/WEB`,
+/// gets 403 on another repository and sees only `WEB` in the root's 404; stderr names neither
+/// group.
+fn grants_web_through_its_groups(server: Server, issuer: &str, signing: &EncodingKey) {
+    let token = |path: &str| {
+        let mut claims = claims(issuer, path, &[]);
+        claims.as_object_mut().unwrap().remove("meada_repositories");
+        claims["groups"] = json!([MAPPED, UNMAPPED]);
+        if path.is_empty() {
+            claims["aud"] = PUBLIC.into();
+        }
+        sign(signing, "k1", Algorithm::ES256, &claims)
+    };
+    let at = |path: &str| format!("{}/{path}", server.url);
+    traced(&ask(&at(WEB), Some(&token(WEB)), &[], trace()));
+    let catalog = "example.com/chain/catalog";
+    let answer = ask(&at(catalog), Some(&token(catalog)), &[], trace());
+    assert_eq!((answer.status, answer.challenge), (403, forbidden(catalog)));
+    let answer = ask(&at(""), Some(&token("")), &[], None);
+    assert_eq!((answer.status, answer.body), (404, format!("{WEB}\n")));
+    let stderr = server.stderr();
+    for group in [MAPPED, UNMAPPED] {
+        assert!(!stderr.contains(group), "{group} on stderr: {stderr}");
+    }
+}
+
+/// `[oidc.groups]` grants what a token's groups map to (#291).
+#[test]
+fn a_token_reads_what_its_groups_map_to() {
+    let (signing, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let dir = chain_manifest("oidc_groups");
+    assert!(run(&dir, "index").2);
+    append_groups(&dir, MANIFEST, &issuer.base);
+    grants_web_through_its_groups(start(&dir), &issuer.base, &signing);
+}
+
+/// The same token gets the same grant on a generation made by hand (`--generations`).
+#[cfg(feature = "snapshot")]
+#[test]
+fn a_token_reads_what_its_groups_map_to_on_a_generation() {
+    let (signing, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let (dir, manifest, _) = crate::serving::hand_node("oidc_groups_generation");
+    append_groups(&dir, &manifest, &issuer.base);
+    let server = crate::serving::serve(&dir, &manifest);
+    grants_web_through_its_groups(server, &issuer.base, &signing);
+}
+
 /// A JWKS past its cap, or an issuer that does not answer, refuses the start: nothing listens.
 #[test]
 fn an_oversized_jwks_refuses_the_start() {

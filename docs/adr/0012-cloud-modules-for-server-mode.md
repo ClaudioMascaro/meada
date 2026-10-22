@@ -211,6 +211,14 @@ to the client, so it keeps no channel back to it.
   is absent from every answer, as if the manifest did not list it: no identity, symbol, path,
   source line or link of it, and it is not reported missing. A `*` grant, and server mode
   without `[oidc]`, keep the whole workspace.
+- A token may also be granted through its groups (amended 2026-10-22, #291): `groups_claim`
+  names a top-level claim holding group names, and the manifest's `[oidc.groups]` table maps
+  each group to identities (`*` for all), set together. The grant is the union of the
+  identities `identities_claim` lists and those the token's groups map to; either claim may be
+  missing, and a group the table does not map, or a claim that is not an array of strings,
+  grants nothing. The mapping lives with the operator, not in a repository's `[[repository]]`
+  entry, and the grant is computed once, at admission. An identity the server does not serve
+  grants nothing: there is no start check, since a node's manifest lists no repositories.
 - No token passthrough: Meada never forwards a token, issues none, registers no client and is no
   authorization server. No stderr line or error carries a token or any part of it.
 - The issuer's metadata and JWKS are read at start, before the listener binds, through the HTTP

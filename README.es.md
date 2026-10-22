@@ -433,19 +433,31 @@ proveedor del operador. Meada no emite tokens, no registra clientes y nunca reen
 issuer = "https://id.ejemplo.internal/realms/agentes"
 public_url = "https://meada.ejemplo.internal"   # la URL que usan los clientes, detrás del proxy
 audience = "https://meada.ejemplo.internal"     # opcional; por defecto: la URL canónica del endpoint
-identities_claim = "meada_repositories"
+identities_claim = "meada_repositories"          # opcional con groups_claim
+groups_claim = "groups"                          # opcional, junto con [oidc.groups]
 scopes = ["meada:read"]                          # opcional, anunciado y exigido
 jwks_refresh_seconds = 3600                      # por defecto; como mínimo 60
+
+[oidc.groups]                                    # un grupo del token: las identidades que permite
+"equipo-pagos" = ["github.ejemplo.internal/acme/payments-api", "github.ejemplo.internal/acme/ledger"]
+"plataforma" = ["*"]
 ```
 
 En el proveedor: un audience igual a `audience` (o, sin ella, a la URL de cada endpoint,
 `<public_url>/<identidad>`); un claim mapper que pone en `identities_claim` la lista de
-identidades que el cliente puede leer (`"*"` las permite todas); y client credentials para los
-agentes headless y para el backend de un portal, que piden su token al proveedor. Una página en
-el navegador no puede llamar a Meada directamente: con `[oidc]`, toda solicitud con `Origin`
-recibe 403, en cualquier ruta, así que un portal llama desde su backend. El proxy reenvía sin
-cambios `Authorization` y los encabezados del SEP-2243 (`MCP-Protocol-Version`, `Mcp-Method`,
-`Mcp-Name`, `Mcp-Param-*`).
+identidades que el cliente puede leer (`"*"` las permite todas), o en `groups_claim` sus grupos; y
+client credentials para los agentes headless y para el backend de un portal, que piden su token al
+proveedor. Una página en el navegador no puede llamar a Meada directamente: con `[oidc]`, toda
+solicitud con `Origin` recibe 403, en cualquier ruta, así que un portal llama desde su backend. El
+proxy reenvía sin cambios `Authorization` y los encabezados del SEP-2243 (`MCP-Protocol-Version`,
+`Mcp-Method`, `Mcp-Name`, `Mcp-Param-*`).
+
+Con `groups_claim`, la tabla `[oidc.groups]` del manifiesto mapea cada grupo a las identidades
+que permite (`"*"` para todas), y `identities_claim` pasa a ser opcional: las dos claves van
+juntas, y una sección sin ninguno de los dos claims impide el arranque. Un token lee la unión de
+las identidades de su `identities_claim` y de las que mapean sus grupos. Un claim ausente o que no
+es un array de strings, un grupo que la tabla no mapea y una identidad que el servidor no sirve no
+permiten nada; un error de tipeo le aparece a quien llama como un 403.
 
 Al arrancar, antes de escuchar, Meada lee los metadatos del issuer (RFC 8414 u OpenID
 Discovery, en las rutas y el orden que define la especificación de MCP, verificando que el
@@ -471,12 +483,13 @@ definido, un proveedor que envía `scp` (Okta, por ejemplo) necesita un claim ma
 Sin token, o con uno que no pasa: 401 con `WWW-Authenticate: Bearer
 resource_metadata="<public_url>/.well-known/oauth-protected-resource/<ruta>"`, más
 `error="invalid_token"` cuando llegó un token y `scope` cuando está configurado. Un token válido
-cuyo claim no lista la identidad del endpoint, también en un pin: 403 con
-`error="insufficient_scope"`; sin un scope exigido, el mismo 403 con `scope`. La autenticación
-va antes del enrutamiento: el 404 de la raíz, de una ruta desconocida y de una generación que el
-nodo no guarda exige un token válido para esa ruta (sin `audience`, el de la raíz tiene `aud`
-igual a `public_url`) y lista solo las identidades que puede leer. Ningún token, ni parte de
-uno, aparece en stderr o en un error.
+que no puede leer la identidad del endpoint, también en un pin: 403 con
+`error="insufficient_scope"`; sin un scope exigido, el mismo 403 con `scope`. Detrás de un
+endpoint que el token puede leer, toda respuesta cubre solo los repositorios que puede leer. La
+autenticación va antes del enrutamiento: el 404 de la raíz, de una ruta desconocida y de una
+generación que el nodo no guarda exige un token válido para esa ruta (sin `audience`, el de la
+raíz tiene `aud` igual a `public_url`) y lista solo las identidades que puede leer. Ningún token,
+ni parte de uno, aparece en stderr o en un error.
 
 ## Decisiones
 
