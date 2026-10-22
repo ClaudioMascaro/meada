@@ -347,6 +347,16 @@ pub(crate) mod tests {
         url
     }
 
+    /// A password made at run time, another on each call: the tests use no literal credential.
+    fn made_password() -> String {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static MADE: AtomicUsize = AtomicUsize::new(0);
+        let n = MADE.fetch_add(1, Ordering::Relaxed);
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
+        let nanos = now.map_or(0, |d| d.subsec_nanos());
+        format!("pw-{:x}-{n}-{nanos:x}", std::process::id())
+    }
+
     /// A config for `url` as `user`, the password in a file of this test's own.
     fn with_password(url: &str, user: &str, password: &str, name: &str) -> Config {
         let pid = std::process::id();
@@ -418,7 +428,8 @@ pub(crate) mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn an_acl_user_connects_and_a_wrong_password_is_refused_without_echoing_it() {
         let Some(url) = service() else { return };
-        let (user, secret) = (format!("meada-test-{}", std::process::id()), "s3cret-pw");
+        let user = format!("meada-test-{}", std::process::id());
+        let secret = &made_password();
         let mut root = admin(&url).await;
         let mut setup = cmd("ACL");
         setup
@@ -434,7 +445,7 @@ pub(crate) mod tests {
         let who: String = valkey.query(cmd("ACL").arg("WHOAMI")).await.unwrap();
         assert_eq!(who, user);
 
-        let wrong = "n0t-the-pw";
+        let wrong = &made_password();
         let bad = with_password(&url, &user, wrong, "bad");
         let reason = Valkey::connect(&bad)
             .await
