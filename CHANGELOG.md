@@ -71,6 +71,21 @@ All notable changes to Meada are recorded here. The format follows
   answers. The start is refused when the issuer's metadata or JWKS cannot be read. A JWKS that
   is not a key set is now reported by line and column, never by its content, on nodes too.
 
+- Console playground and exports (spec #293, ADR 0014, feature `ui`): `POST /api/v1/query`
+  takes `{"repository", "generation", "tool", "arguments"}` (`search`, `context` or `trace`,
+  the arguments as the MCP tool takes them; body capped at 16 KiB) and answers `{"text",
+  "generation"}`, the text the node's tool answers byte for byte; `GET
+  /api/v1/repositories/<identity>/export?generation=<id>` answers the bytes `meada export`
+  prints. The console answers both in process and never calls a node: with `[snapshot]`, from
+  the generations its own `meada snapshot pull` keeps in its `local_dir` (the current one by
+  default, a retained one when named, `generation` its id); without it, from the indexes under
+  `index_dir` of the repositories its manifest lists (`generation` null). It starts without a
+  servable generation or index: the two routes then answer a 503 naming `meada snapshot pull`
+  or `meada index --workspace`, and the next request after it answers with no restart. An
+  unknown repository, one outside the viewer's grant and a generation not held are 404s, the
+  last naming the held ones; peers outside the grant are left out of the answer, as on a node;
+  `trace` with `changes: uncommitted` is refused with the node's text.
+
 - Server mode (spec #259, ADR 0011): `meada mcp --listen <addr> --workspace <manifest>` serves
   the three tools over MCP streamable HTTP, one endpoint per repository at `/<identity>`, from
   mirrors that a workspace manifest (`meada.workspace.toml`) lists. Each index lives under the

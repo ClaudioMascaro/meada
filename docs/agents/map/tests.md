@@ -135,7 +135,19 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   extension refused, no listing, an unknown path answering `index.html`; no cookie or
   `Access-Control-*` header on any answer; every start refusal listed at once; a
   `password_file`'s content in no answer, with `valkey`; and an answer in flight, blocked on a
-  FIFO, received after SIGTERM, then exit 0; with `oidc`, in `ui/oidc.rs`, against the `oidc`
+  FIFO, received after SIGTERM, then exit 0; in `ui/playground.rs`, the playground and the
+  exports over the chain: started before `meada index --workspace`, both a 503 naming it while
+  `config` and `manifest` answer, then with no restart `search`, `context` and `trace` equal to
+  the chain goldens with `generation` null and every export equal to its golden, `index_dir`
+  byte-identical after them; with `snapshot` (skipped without the store), the same before and
+  after an init `meada snapshot pull` into the console's `local_dir` (naming `meada snapshot
+  pull`, then the goldens with the current id, by default and named), a second pull's
+  generation answering the next query, the retained one when named, an unheld generation a 404
+  naming both held ids, `local_dir` byte-identical; in both, `trace` with `changes:
+  uncommitted` refused with the node's text, an unknown repository and an unheld generation a
+  404, a body over `QUERY_MAX` a 413, malformed JSON, an unknown tool, arguments not the tool's
+  or an unknown key a fixed 400, a query without the console's `Origin` or with a foreign one
+  a 403; with `oidc`, in `ui/oidc.rs`, against the `oidc`
   module's loopback issuer, which logs every request: no token, an expired one, the nodes'
   audience, another issuer and `HS256` get 401 with `WWW-Authenticate`, a missing scope 403, a
   valid token the viewer's `session`; static files and `config` (the issuer, `client_id`, the
@@ -145,7 +157,10 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   failed refresh; `admission/check` per check for a valid, an expired, a wrong-audience, a
   forged and an unknown-`kid` token, the identities bounded by both grants, no request to the
   issuer and no pasted token in its log, a 413 past the cap and a fixed 400; a viewer's grant
-  bounding the manifest's entries and its error text, whole for `*`; the admission routes
+  bounding the manifest's entries and its error text, whole for `*`; the playground and the
+  exports under a grant, the goldens for `*`, a `WEB`-only trace and export with no peer
+  outside the grant, the repositories outside it the 404 of one not served, a 401 without a
+  token; the admission routes
   absent without `[oidc]`; no token, claim value or identity on stderr), `resources` (resource `search`, `context`, `trace` start and `status`
   over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
   fixture: kafkajs forms, fan-out, same-repository links, an unrelated `send`; amqplib queues,

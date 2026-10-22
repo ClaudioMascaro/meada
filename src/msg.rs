@@ -594,8 +594,20 @@ pub enum Msg<'a> {
     #[cfg(all(feature = "ui", feature = "oidc"))]
     UiCheckBody,
     /// A request body past its route's cap, in bytes.
-    #[cfg(all(feature = "ui", feature = "oidc"))]
+    #[cfg(feature = "ui")]
     UiTooLarge(usize),
+    /// A playground query whose body is not a query of one of the tools.
+    #[cfg(feature = "ui")]
+    UiQueryBody,
+    /// A repository the console does not serve, or one outside the viewer's grant.
+    #[cfg(feature = "ui")]
+    UiNoRepository(&'a str),
+    /// A generation the console does not hold, and the ones it holds.
+    #[cfg(feature = "ui")]
+    UiNotHeld {
+        id: &'a str,
+        held: &'a [String],
+    },
     /// `[ui] dir` that is not a directory.
     #[cfg(feature = "ui")]
     UiDirMissing(&'a str),
@@ -2018,11 +2030,42 @@ impl Msg<'_> {
                 "the body must be {\"token\": \"<JWT>\"}".into(),
                 "o corpo deve ser {\"token\": \"<JWT>\"}".into(),
             ),
-            #[cfg(all(feature = "ui", feature = "oidc"))]
+            #[cfg(feature = "ui")]
             Msg::UiTooLarge(max) => pick(
                 format!("the body is over {max} bytes"),
                 format!("o corpo passa de {max} bytes"),
             ),
+            #[cfg(feature = "ui")]
+            Msg::UiQueryBody => pick(
+                "the body must be {\"repository\", \"generation\", \"tool\", \"arguments\"}, the \
+                 tool search, context or trace and the arguments its own"
+                    .into(),
+                "o corpo deve ser {\"repository\", \"generation\", \"tool\", \"arguments\"}, a \
+                 ferramenta search, context ou trace e os argumentos os dela"
+                    .into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiNoRepository(repo) => pick(
+                format!("`{repo}` is not a repository this console serves"),
+                format!("`{repo}` não é um repositório que este console serve"),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiNotHeld { id, held } => {
+                let held = match held.is_empty() {
+                    true => None,
+                    false => Some(held.join(" ")),
+                };
+                pick(
+                    format!(
+                        "generation {id} is not held here; held: {}",
+                        held.as_deref().unwrap_or("none")
+                    ),
+                    format!(
+                        "a geração {id} não está retida aqui; retidas: {}",
+                        held.as_deref().unwrap_or("nenhuma")
+                    ),
+                )
+            }
             #[cfg(feature = "ui")]
             Msg::UiDirMissing(dir) => pick(
                 format!("`{dir}` is not a directory"),
