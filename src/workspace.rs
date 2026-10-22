@@ -451,6 +451,8 @@ impl Manifest {
             refresh_lock: None,
             #[cfg(feature = "oidc")]
             oidc: None,
+            #[cfg(feature = "ui")]
+            ui: None,
         })
     }
 
