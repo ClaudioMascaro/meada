@@ -38,7 +38,8 @@ pub const POINTER: &str = "current";
 pub const DOCUMENT: &str = "generation.json";
 /// The lock one pull at a time holds, under `local_dir`.
 const LOCK: &str = "pull.lock";
-/// The most the pointer file may hold: an id, a space, a `u64` fence and a newline.
+// ponytail: the most the node pointer file may hold (an id, a space, a `u64` fence and a
+// newline); past it the pointer file is malformed.
 const POINTER_MAX: u64 = 64;
 // ponytail: the most bytes a generation's bundles may hold together, as its document records
 // them (checked before any download), and the most its regular files may hold once extracted.
@@ -108,12 +109,9 @@ pub fn pull(manifest: &Path) -> Result<(Pulled, Vec<String>)> {
         Err(fs::TryLockError::Error(e)) => return Err(at(e).into()),
     }
     repo::isolate(&local);
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?;
-    let pulled = runtime.block_on(pull_locked(&config, &local, source));
-    runtime.shutdown_background();
-    Ok(pulled?)
+    Ok(crate::modules::block_on(pull_locked(
+        &config, &local, source,
+    ))??)
 }
 
 /// Where a pull learns the current generation: the store's `current`, or with `[generations]`

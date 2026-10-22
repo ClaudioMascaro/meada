@@ -173,7 +173,16 @@ fn agent() -> ureq::Agent {
 
 /// `GET url`: status, `Content-Type` and body.
 pub(crate) fn get(url: &str) -> (u16, String, String) {
-    let mut response = agent().get(url).call().unwrap();
+    get_with(url, &[])
+}
+
+/// `get` with more `headers`.
+pub(crate) fn get_with(url: &str, headers: &[(&str, &str)]) -> (u16, String, String) {
+    let mut request = agent().get(url);
+    for (name, value) in headers {
+        request = request.header(*name, *value);
+    }
+    let mut response = request.call().unwrap();
     let kind = response.headers()["content-type"]
         .to_str()
         .unwrap()
@@ -292,6 +301,11 @@ async fn serves_each_repository_over_http_as_the_stdio_server_answers_it() {
         let (status, kind, body) = get(&format!("{}{path}", server.url));
         assert_eq!((status, body.as_str()), (404, SERVED), "{path}");
         assert!(kind.starts_with("text/plain"), "{kind}");
+        // A browser's request (DNS rebinding) gets 403 before routing, without the listing.
+        let origin = [("Origin", "http://evil.example")];
+        let (status, _, body) = get_with(&format!("{}{path}", server.url), &origin);
+        assert_eq!(status, 403, "{path}");
+        assert!(!body.contains("example.com/chain"), "{path}: {body}");
     }
 
     let uncommitted = (client

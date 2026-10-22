@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use crate::common::{assert_golden, git};
 use crate::manifest::{CHAIN, MANIFEST, chain_manifest, contents, run, run_args};
-use crate::server::{Server, call, get, text};
+use crate::server::{Server, call, get, get_with, text};
 use crate::snapshot::{
     HOSTILE_SCHEMAS, KEY_ID, SECRET, block_on, bucket, bucket_name, crafted_index, named_node,
     next_commit, publish, pull, service, store_manifest,
@@ -351,7 +351,8 @@ fn hand_node(case: &str) -> (PathBuf, String, PathBuf) {
 }
 
 /// A node whose current generation stops being servable answers every request 503 with a fixed
-/// body: no local path and no parse error reaches a client the `Origin` check has not seen.
+/// body: no local path and no parse error reaches a client. A browser's request gets the 403
+/// before it.
 #[test]
 fn a_node_with_no_servable_generation_answers_503_with_a_fixed_body() {
     let (dir, manifest, local) = hand_node("serving_unservable");
@@ -365,6 +366,8 @@ fn a_node_with_no_servable_generation_answers_503_with_a_fixed_body() {
     for path in ["", &format!("/{WEB}")] {
         let (status, _, body) = get(&format!("{}{path}", server.url));
         assert_eq!((status, body.as_str()), (503, "no servable generation\n"));
+        let origin = [("Origin", "http://evil.example")];
+        assert_eq!(get_with(&format!("{}{path}", server.url), &origin).0, 403);
     }
 }
 

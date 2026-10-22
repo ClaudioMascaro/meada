@@ -157,9 +157,7 @@ before: the stdio server, discovery and freshness on demand are unchanged.
 ### Refresh by command
 
 - In server mode the server only reads. It opens indexes read-only, stats nothing per call and
-  writes nothing, not even a refresh. (Amended 2026-10-21; ADR 0012: with the session-store
-  module the server also writes MCP session state to Valkey, under its key prefix; it still
-  never writes an index or a file.)
+  writes nothing, not even a refresh.
 - The operator refreshes: after a mirror moves, the operator's fetch job or a webhook runs
   `meada index --workspace <path>`, which refreshes every repository of the manifest the way a
   local refresh does (a stat per file, a hash of the changed ones). Meada still never clones or

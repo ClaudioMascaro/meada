@@ -61,14 +61,21 @@ cargo test
 
 ## Antes de abrir el PR
 
-Estos tres comandos son los mismos que corre la CI (`fmt`, `clippy`, `test`), y los tres deben
-pasar:
+Estos tres comandos son los mismos que corre la CI en el build por defecto (`fmt`, `clippy`,
+`test`), y los tres deben pasar:
 
 ```sh
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo test
 ```
+
+Un cambio bajo la feature de un módulo de nube `<f>` (ADR 0012) también pasa por
+`cargo clippy --all-targets --features <f> -- -D warnings` y `cargo test --features <f>`. La CI
+tiene además el job `cloud`: comprueba que el build por defecto no trae ningún crate de módulo y
+corre clippy y los tests con `--all-features`, contra un Valkey y un servidor compatible con S3
+(los tests que los necesitan leen `MEADA_TEST_VALKEY_URL` y `MEADA_TEST_S3_ENDPOINT`, y sin
+ellas avisan y se saltan).
 
 Si el cambio toca el comportamiento, incluye la prueba que lo cubre.
 

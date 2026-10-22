@@ -64,14 +64,12 @@ pub struct Config {
 }
 
 impl File {
-    pub fn validate(self) -> Result<Config, (&'static str, String)> {
-        let ttl = self.ttl_seconds.unwrap_or(TTL_DEFAULT);
-        match u64::try_from(ttl) {
-            Ok(ttl) if ttl >= TTL_MIN as u64 => Ok(Config {
-                ttl: Duration::from_secs(ttl),
-            }),
-            _ => Err(("refresh_lock.ttl_seconds", Msg::AtLeast(TTL_MIN).text())),
-        }
+    pub fn validate(self) -> Result<Config, crate::modules::Problem> {
+        let key = "refresh_lock.ttl_seconds";
+        let ttl = crate::modules::at_least(key, self.ttl_seconds, TTL_DEFAULT, TTL_MIN)?;
+        Ok(Config {
+            ttl: Duration::from_secs(ttl),
+        })
     }
 }
 
@@ -151,12 +149,9 @@ pub fn run(manifest: &Path, command: &[OsString]) -> crate::Result<i32> {
     let (Some(section), Some(valkey)) = (listed.refresh_lock, listed.valkey) else {
         return Err(Msg::LockNoSection(&shown).text().into());
     };
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?;
-    let code = runtime.block_on(supervise(&section, &valkey, command));
-    runtime.shutdown_background();
-    Ok(code?)
+    Ok(crate::modules::block_on(supervise(
+        &section, &valkey, command,
+    ))??)
 }
 
 /// The TTL in milliseconds, as `PX` and `PEXPIRE` take it.

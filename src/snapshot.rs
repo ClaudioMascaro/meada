@@ -25,13 +25,17 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::modules::{Problem, Secret};
 use crate::msg::{Fix, Msg};
 use crate::workspace::Manifest;
 use crate::{Result, index, repo};
 use store::{Store, Stored};
 
-/// The most a generation document may hold, and `current`.
+// ponytail: the most a generation document may hold in the store, or as a node holds it; past
+// it the document is refused, naming its key or file.
 const DOCUMENT_MAX: u64 = 16 << 20;
+// ponytail: the most the store's `current` may hold (an id and a newline); past it the
+// pointer is refused, naming its key.
 const CURRENT_MAX: u64 = 64;
 
 /// The `[snapshot]` section as written.
@@ -67,13 +71,6 @@ enum Source {
     Instance,
 }
 
-/// Where a static credential comes from.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Secret {
-    Env(String),
-    File(PathBuf),
-}
-
 /// The credential source, with the static keys' places. Nothing here is a secret.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Credentials {
@@ -106,9 +103,6 @@ pub struct Config {
     /// Where nodes keep the generations they pull (#273, #274).
     pub local_dir: Option<PathBuf>,
 }
-
-/// A problem with a key of the section: its dotted name and the message.
-pub type Problem = (&'static str, String);
 
 impl File {
     /// The section checked; relative paths are relative to `base`, the manifest's directory.
@@ -172,12 +166,9 @@ impl File {
                 };
                 return Err((key, Msg::SnapshotStaticOnly.text()));
             }
-            secrets.push(match (env, file) {
-                (Some(_), Some(_)) => return Err((key, Msg::SnapshotBoth(other).text())),
-                (Some(var), None) => Secret::Env(var),
-                (None, Some(file)) => Secret::File(base.join(file)),
-                (None, None) => Secret::Env(default.into()),
-            });
+            let both = || (key, Msg::SnapshotBoth(other).text());
+            let named = Secret::named(env, file, base, both)?;
+            secrets.push(named.unwrap_or_else(|| Secret::Env(default.into())));
         }
         let credentials = match self.credentials {
             Source::Static => {
@@ -222,14 +213,10 @@ fn endpoint(url: &str) -> std::result::Result<bool, String> {
     }
     let host = parsed.host_str().unwrap_or_default();
     let ip = host.trim_start_matches('[').trim_end_matches(']');
-    let loopback = host == "localhost"
-        || ip
-            .parse::<std::net::IpAddr>()
-            .is_ok_and(|ip| ip.is_loopback());
     let named = host != "localhost" && ip.parse::<std::net::IpAddr>().is_err();
     match parsed.scheme() {
         "https" => Ok(named),
-        "http" if loopback => Ok(false),
+        "http" if crate::modules::loopback(host) => Ok(false),
         "http" => Err(Msg::SnapshotEndpointPlain.text()),
         _ => Err(Msg::SnapshotEndpointInvalid.text()),
     }
@@ -455,18 +442,13 @@ pub fn publish(manifest: &Path) -> Result<String> {
         .map(|b| (b.identity.as_str(), bundle_of(&b.key)))
         .collect();
     let generation = generation_id(&ids);
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?;
     let pointer = Pointer {
         #[cfg(feature = "generation-pointer")]
         generations: (listed.generations.clone()).zip(listed.valkey.clone()),
         #[cfg(feature = "refresh-lock")]
         held,
     };
-    let stored = runtime.block_on(store_generation(&config, &generation, bundles, pointer));
-    runtime.shutdown_background();
-    stored?;
+    crate::modules::block_on(store_generation(&config, &generation, bundles, pointer))??;
     Ok(generation)
 }
 

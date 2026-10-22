@@ -21,8 +21,9 @@ Valkey's):
   true`, `session_store: None`), so a client that initialized on one pod and lands on another
   gets a 404. #262 runs stateless instead, which answers every client that needs no session.
 - Protocol 2026-07-28 drops sessions (SEP-2567): rmcp serves it statelessly whatever the
-  configuration says. Only clients that negotiate an older protocol and keep an
-  `Mcp-Session-Id` still need state shared across pods.
+  configuration says. With `legacy_session_mode: false` it serves a client on an older protocol
+  statelessly too, and those revisions make `Mcp-Session-Id` optional, so no client needs state
+  shared across pods.
 - SQLite over a network filesystem shared by a writer and readers is unsupported: SQLite's own
   guidance reports broken locks and corrupted databases. N pods cannot read one `index_dir` on
   EFS or NFS while a job writes it, so the result of one indexing run has to reach each pod
@@ -66,10 +67,9 @@ A **cloud module** is a cargo feature, off by default, plus one section of
 | Feature | Implies | Section | Needs the sections | Adds |
 | --- | --- | --- | --- | --- |
 | `snapshot` | | `[snapshot]` | | `meada snapshot publish`, `meada snapshot pull`, `--generations` |
-| `valkey` (internal) | | `[valkey]` | | the Valkey connection the next three share |
+| `valkey` (internal) | | `[valkey]` | | the Valkey connection the next two share |
 | `generation-pointer` | `snapshot`, `valkey` | `[generations]` | `[snapshot]`, `[valkey]` | the current and retained generations in Valkey, pins |
 | `refresh-lock` | `generation-pointer` | `[refresh_lock]` | `[generations]` | `meada snapshot lock`, fences |
-| `session-store` | `valkey` | `[sessions]` | `[valkey]` | MCP sessions in Valkey for older clients |
 | `oidc` | | `[oidc]` | | Meada as an OAuth resource server |
 | `cloud` | all of the above | | | |
 
@@ -128,8 +128,8 @@ A **cloud module** is a cargo feature, off by default, plus one section of
 - Every key goes through one function that adds the manifest's `key_prefix`, which may not
   contain `{` or `}`, so no prefix can change the hash tag below. The keys one script
   reads or writes together (the pointer, the retained list, the lock and the fence) share the
-  hash tag `{<key_prefix>}`, so they land on one slot in cluster mode. Session keys need no tag.
-- Valkey holds pointers, a lock and session state, never an index. Nodes learn a new generation
+  hash tag `{<key_prefix>}`, so they land on one slot in cluster mode.
+- Valkey holds pointers and a lock, never an index. Nodes learn a new generation
   by polling (`meada snapshot pull --every`), never by pub/sub, which is at most once.
 
 ### Generations
@@ -165,7 +165,7 @@ A **cloud module** is a cargo feature, off by default, plus one section of
   generation the node's pointer file names, read per call, with the repositories and blocks the
   generation recorded; the node's manifest contributes its module sections. Readiness depends
   only on what the node holds: a store or Valkey that cannot be reached changes no exit code and
-  stops no answer outside a legacy session.
+  stops no answer.
 - Without the generation pointer, the store holds the current pointer and a node keeps its
   current and previous generations. With it, Valkey holds the current generation and a retained
   list that every node mirrors, so the fleet holds one set; with the refresh lock, each pointer
@@ -188,10 +188,10 @@ A **cloud module** is a cargo feature, off by default, plus one section of
 ### Sessions
 
 Stateless is the default (#262) and stays the transport for every client on protocol
-2026-07-28, which rmcp serves with no session whatever the configuration. The session-store
-module turns rmcp's stateful mode on with a Valkey store only for clients that negotiate an
-older protocol and keep a session. It becomes dead weight as clients move, and its ticket runs
-last of the tail, to be closed if no such client needs it by then.
+2026-07-28, which rmcp serves with no session whatever the configuration. There is no session
+store: #277 was closed as not planned, since older clients are served statelessly as well (no
+`Mcp-Session-Id` is sent, and those revisions make it optional) and server mode sends no request
+to the client, so it keeps no channel back to it.
 
 ### OIDC
 
@@ -285,13 +285,11 @@ last of the tail, to be closed if no such client needs it by then.
 - Spec #259 story 16 holds with no module configured, in any build.
 - The tail is cut as: the Valkey connection and the section table (#271); the snapshot store in
   three tickets, publish (#272), pull (#273) and serving (#274); the generation pointer and pins
-  (#275); the refresh lock (#276); the session store (#277, last, closed if unneeded); OIDC
-  (#278).
+  (#275); the refresh lock (#276); OIDC (#278).
 - New crates enter only behind a feature, and CI checks the default build for them. The gate of
   a change under a feature runs clippy and the tests with it.
 - The operator owns the store, Valkey and the OIDC provider. The store's and Valkey's
-  availability affects publishing and pulling: a node keeps serving what it holds. Two answers
-  depend on a service: with the session-store module, a Valkey error during a session load
-  answers 503 to that legacy session; with the OIDC module, a provider unreachable at start
+  availability affects publishing and pulling: a node keeps serving what it holds. One answer
+  depends on a service: with the OIDC module, a provider unreachable at start
   refuses the start, and a key rotation reaches Meada only while the provider's JWKS can be
   read.

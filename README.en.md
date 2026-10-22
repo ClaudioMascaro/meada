@@ -127,9 +127,8 @@ and the tokens used.
 > network policy); the OIDC module, below, is the opt-in alternative. With no host the server listens on the loopback interface only; listening
 > beyond it is the operator's explicit choice, and a misconfigured proxy exposes source.
 > Meada checks no `Host` header (a proxy with a real hostname works) and answers 403 to any
-> request carrying `Origin` (browser and DNS-rebinding protection). Known gap: the 404 that
-> lists the identities served answers before that check, so a DNS-rebinding page can read the
-> list of repository identities. The proxy must not expose Meada beyond the clients it admits.
+> request carrying `Origin` (browser and DNS-rebinding protection), on every path and before
+> any other answer. The proxy must not expose Meada beyond the clients it admits.
 
 Server mode runs Meada once for an organisation: `meada mcp --listen` serves the tools over
 HTTP from mirrors of the repositories a workspace manifest lists, each index outside its
@@ -220,8 +219,8 @@ to one writer per index.
   protocol 2026-07-28 have no session at all.
 - **Reverse proxy.** Forward `MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name` and every
   `Mcp-Param-*` header unchanged (SEP-2243: rmcp rejects a request whose headers disagree with
-  its body); the proxy may route on them. Forward `Mcp-Session-Id` for legacy clients and the
-  `Meada-Generation` response header. Add no `Origin` header: Meada answers 403 to any request
+  its body); the proxy may route on them. Forward the `Meada-Generation` response
+  header. Add no `Origin` header: Meada answers 403 to any request
   that carries one, so a browser page cannot call it directly. Meada checks no `Host`, and
   `--listen` takes an IP literal or `localhost`, never a name it resolves.
 - **Readiness.** An init step first (`meada index --workspace` or the copy of the indexes). Then
@@ -237,7 +236,9 @@ to one writer per index.
 
 Opt-in modules, off by default; each is documented below when it lands. A module is a cargo
 feature plus one section of `meada.workspace.toml`; the release binaries are the default build,
-with none, and a section in a build without its feature is an error naming the feature.
+with none, and a section in a build without its feature is an error naming the feature. The
+`cloud` feature turns them all on at once (`cargo install meada --features cloud`) and, like
+`refresh-lock`, builds on Unix only.
 
 **Snapshot** (feature `snapshot`, `cargo install meada --features snapshot`). One job indexes
 and publishes; nodes receive the result whole, instead of each indexing its own mirrors. After

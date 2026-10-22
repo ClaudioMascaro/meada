@@ -110,6 +110,8 @@ refresh-lock = ["generation-pointer", "dep:nix"]
 # Meada as an OAuth resource server (`[oidc]`): the issuer's metadata and JWKS come through the
 # binary's own ureq client, which then verifies certificates against the system's roots.
 oidc = ["dep:jsonwebtoken", "ureq/platform-verifier"]
+# Every cloud module at once (ADR 0012). Unix only, since `refresh-lock` is.
+cloud = ["snapshot", "generation-pointer", "refresh-lock", "oidc"]
 
 # `cargo test` runs the example's own tests too.
 [[example]]

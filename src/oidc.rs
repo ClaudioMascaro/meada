@@ -10,10 +10,10 @@
 //! `jwks_refresh_seconds`, and a token naming a `kid` the cached set lacks refreshes it, at most
 //! once per `KID_REFRESH_EVERY`. A failed refresh keeps the cached keys and says so on stderr.
 //!
-//! `Oidc::admit` runs before routing: it serves the protected resource metadata (RFC 9728) of
-//! any path, without a token; refuses a request carrying `Origin` (a browser) with 403; and
-//! checks the token: an asymmetric `alg` that fits the key, the signature, `iss`, `aud`, `exp`
-//! (required) and `nbf` with `LEEWAY`, and every configured scope. A missing or invalid token is
+//! `Oidc::admit` runs before routing, after `mcp::route` refused a request carrying `Origin` (a
+//! browser) with 403: it serves the protected resource metadata (RFC 9728) of any path, without
+//! a token, and checks the token: an asymmetric `alg` that fits the key, the signature, `iss`,
+//! `aud`, `exp` (required) and `nbf` with `LEEWAY`, and every configured scope. A missing or invalid token is
 //! a 401 naming the metadata. What passes is a `Grant`: the identities the token's
 //! `identities_claim` lists (`*` for all), which routing checks (403) and lists (404).
 //!
@@ -113,7 +113,7 @@ pub struct Config {
 }
 
 impl File {
-    pub fn validate(self) -> Result<Config, (&'static str, String)> {
+    pub fn validate(self) -> Result<Config, crate::modules::Problem> {
         if !reachable(&self.issuer, Shape::Issuer) {
             return Err(("oidc.issuer", Msg::OidcUrl { bare: false }.text()));
         }
@@ -136,14 +136,10 @@ impl File {
                 None => {}
             }
         }
-        let refresh = self.jwks_refresh_seconds.unwrap_or(REFRESH_DEFAULT);
-        let refresh = match u64::try_from(refresh) {
-            Ok(seconds) if seconds >= REFRESH_MIN as u64 => Duration::from_secs(seconds),
-            _ => {
-                let at_least = Msg::AtLeast(REFRESH_MIN).text();
-                return Err(("oidc.jwks_refresh_seconds", at_least));
-            }
-        };
+        let key = "oidc.jwks_refresh_seconds";
+        let seconds = self.jwks_refresh_seconds;
+        let refresh = crate::modules::at_least(key, seconds, REFRESH_DEFAULT, REFRESH_MIN)?;
+        let refresh = Duration::from_secs(refresh);
         Ok(Config {
             issuer: self.issuer,
             public_url: self.public_url.trim_end_matches('/').to_string(),
@@ -185,12 +181,9 @@ fn reachable(url: &str, shape: Shape) -> bool {
     if shape == Shape::Bare && !matches!(uri.path(), "" | "/") {
         return false;
     }
-    let host = host.trim_start_matches('[').trim_end_matches(']');
-    let loopback =
-        host == "localhost" || (host.parse::<std::net::IpAddr>()).is_ok_and(|ip| ip.is_loopback());
     match uri.scheme_str() {
         Some("https") => true,
-        Some("http") => loopback,
+        Some("http") => crate::modules::loopback(host),
         _ => false,
     }
 }
@@ -446,22 +439,17 @@ impl Oidc {
 
     /// Whether the request to `path` (percent-decoded, without its leading and trailing
     /// slashes) goes on to routing, and with what grant; `identity` is the repository `path`
-    /// names (`path` without its pin, if it has one). Otherwise the answer: 403 for a request
-    /// carrying `Origin`; the protected resource metadata of a path under
-    /// `.well-known/oauth-protected-resource`, with no token needed; 401 for a missing or
-    /// invalid token and 403 for a missing scope. Blocks on the JWKS fetch an unknown `kid`
-    /// causes.
+    /// names (`path` without its pin, if it has one). Otherwise the answer: the protected
+    /// resource metadata of a path under `.well-known/oauth-protected-resource`, with no token
+    /// needed; 401 for a missing or invalid token and 403 for a missing scope. Blocks on the
+    /// JWKS fetch an unknown `kid` causes. A request carrying `Origin` never reaches it
+    /// (`mcp::route` refuses it first).
     pub fn admit(
         &self,
         headers: &HeaderMap,
         path: &str,
         identity: &str,
     ) -> Result<Grant, Box<Reply>> {
-        if headers.contains_key(header::ORIGIN) {
-            let body = "Forbidden: Origin header is not allowed\n".into();
-            let refused = reply(StatusCode::FORBIDDEN, "text/plain; charset=utf-8", body);
-            return Err(Box::new(refused));
-        }
         if let Some(resource) = path.strip_prefix(METADATA_PATH)
             && (resource.is_empty() || resource.starts_with('/'))
         {
@@ -649,7 +637,7 @@ mod tests {
 
     use super::*;
 
-    fn section(extra: &str) -> Result<Config, (&'static str, String)> {
+    fn section(extra: &str) -> Result<Config, crate::modules::Problem> {
         let src = format!(
             "issuer = \"https://id.example/realms/agents\"\npublic_url = \
              \"https://meada.example/\"\nidentities_claim = \"meada_repositories\"\n{extra}"
@@ -1101,9 +1089,6 @@ mod tests {
         assert_eq!(with(&[b"Bearer "]), refused);
         assert_eq!(with(&[b"Bearer a.b.c", b"Bearer a.b.c"]), refused);
         assert_eq!(with(&[b"Bearer a.b.\xff"]), refused);
-        let mut origin = HeaderMap::new();
-        origin.insert(header::ORIGIN, "https://evil.example".parse().unwrap());
-        assert_eq!(answer(origin, METADATA_PATH), (403, None));
         // The metadata of a path and of a pinned one.
         for (path, resource) in [
             (format!("{METADATA_PATH}/a"), "https://meada.example/a"),

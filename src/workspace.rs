@@ -296,14 +296,11 @@ impl Manifest {
         };
         let base = file.parent().unwrap_or(Path::new(""));
         #[cfg(feature = "valkey")]
-        let valkey = (parsed.valkey.map(|v| v.validate(base)).transpose())
-            .map_err(|(key, problem)| config::error_at(file, &src, key, &problem))?;
+        let valkey = modules::validated(file, &src, parsed.valkey, |v| v.validate(base))?;
         #[cfg(feature = "snapshot")]
-        let snapshot = (parsed.snapshot.map(|s| s.validate(base)).transpose())
-            .map_err(|(key, problem)| config::error_at(file, &src, key, &problem))?;
+        let snapshot = modules::validated(file, &src, parsed.snapshot, |s| s.validate(base))?;
         #[cfg(feature = "generation-pointer")]
-        let generations = (parsed.generations.map(|g| g.validate()).transpose())
-            .map_err(|(key, problem)| config::error_at(file, &src, key, &problem))?;
+        let generations = modules::validated(file, &src, parsed.generations, |g| g.validate())?;
         #[cfg(feature = "generation-pointer")]
         if generations.is_some() {
             let missing = [
@@ -314,15 +311,13 @@ impl Manifest {
             modules::needs(file, &src, "generations", &missing)?;
         }
         #[cfg(feature = "refresh-lock")]
-        let refresh_lock = (parsed.refresh_lock.map(|l| l.validate()).transpose())
-            .map_err(|(key, problem)| config::error_at(file, &src, key, &problem))?;
+        let refresh_lock = modules::validated(file, &src, parsed.refresh_lock, |l| l.validate())?;
         #[cfg(feature = "refresh-lock")]
         if refresh_lock.is_some() && generations.is_none() {
             modules::needs(file, &src, "refresh_lock", &["generations"])?;
         }
         #[cfg(feature = "oidc")]
-        let oidc = (parsed.oidc.map(|o| o.validate()).transpose())
-            .map_err(|(key, problem)| config::error_at(file, &src, key, &problem))?;
+        let oidc = modules::validated(file, &src, parsed.oidc, |o| o.validate())?;
         // Each entry's blocks as written, in manifest order: the typed read checked them.
         #[cfg(feature = "snapshot")]
         let mut written = crate::snapshot::entry_blocks(&src).into_iter();

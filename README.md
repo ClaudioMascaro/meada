@@ -127,10 +127,9 @@ repositórios envolvidos e os tokens usados.
 > (TLS, tokens, SSO, política de rede); o módulo OIDC, abaixo, é a alternativa opt-in. Sem `host`, o servidor escuta só no loopback; escutar além
 > dele é uma escolha explícita do operador, e um proxy mal configurado expõe o código.
 > O Meada não confere o cabeçalho `Host` (um proxy com nome próprio funciona) e responde 403 a
-> qualquer requisição com `Origin` (proteção contra navegadores e DNS rebinding). Lacuna
-> conhecida: o 404 que lista as identidades servidas responde antes dessa checagem, então uma
-> página de DNS rebinding pode ler a lista de identidades de repositório. O proxy não deve
-> expor o Meada além dos clientes que admite.
+> qualquer requisição com `Origin` (proteção contra navegadores e DNS rebinding), em qualquer
+> caminho e antes de qualquer outra resposta. O proxy não deve expor o Meada além dos clientes
+> que admite.
 
 O modo servidor roda o Meada uma vez para uma organização: `meada mcp --listen` serve as
 ferramentas por HTTP a partir de espelhos dos repositórios que um manifesto de workspace lista,
@@ -221,8 +220,8 @@ respeite um único escritor por índice.
   necessária, e clientes no protocolo 2026-07-28 nem têm sessão.
 - **Proxy reverso.** Encaminhe sem alterar `MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name` e
   todo cabeçalho `Mcp-Param-*` (SEP-2243: o rmcp rejeita uma requisição cujos cabeçalhos
-  discordam do corpo); o proxy pode rotear por eles. Encaminhe `Mcp-Session-Id` para clientes
-  antigos e o cabeçalho de resposta `Meada-Generation`. Não adicione `Origin`: o Meada responde
+  discordam do corpo); o proxy pode rotear por eles. Encaminhe o cabeçalho de resposta
+  `Meada-Generation`. Não adicione `Origin`: o Meada responde
   403 a qualquer requisição que o traga, e assim uma página de navegador não o chama
   diretamente. O Meada não confere `Host`, e `--listen` aceita um IP ou `localhost`, nunca um
   nome que ele resolva.
@@ -240,7 +239,9 @@ respeite um único escritor por índice.
 
 Módulos opt-in, desligados por padrão; cada um é documentado abaixo quando chegar. Um módulo é
 uma feature do cargo mais uma seção de `meada.workspace.toml`; os binários de release são o build
-padrão, sem nenhum, e uma seção num build sem a sua feature é um erro que nomeia a feature.
+padrão, sem nenhum, e uma seção num build sem a sua feature é um erro que nomeia a feature. A
+feature `cloud` liga todos de uma vez (`cargo install meada --features cloud`) e, como
+`refresh-lock`, só compila em Unix.
 
 **Snapshot** (feature `snapshot`, `cargo install meada --features snapshot`). Um job indexa e
 publica; os nós recebem o resultado inteiro, em vez de cada um indexar os próprios espelhos.

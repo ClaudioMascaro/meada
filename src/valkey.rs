@@ -4,7 +4,6 @@
 //! password comes only from the environment variable or the file the section names; it
 //! appears in no error and on no stderr line.
 
-use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -16,14 +15,17 @@ use redis::{
 };
 use serde::Deserialize;
 
+use crate::modules::{Problem, Secret};
 use crate::msg::Msg;
 
-/// How long `meada status` waits for Valkey to answer: a dead one must not stall the probe.
-pub const REACH_TIMEOUT: Duration = Duration::from_millis(800);
+/// How long `meada status` waits for Valkey to answer its ping: a dead one must not stall the
+/// probe.
+const PING_TIMEOUT: Duration = Duration::from_millis(800);
 /// A connection attempt, and an answer, of the shared client.
 const NETWORK_TIMEOUT: Duration = Duration::from_secs(2);
-/// The most `password_file` may hold, and the most `ca_file` may.
+// ponytail: the most `password_file` may hold; past it the connection fails, naming the file.
 const PASSWORD_MAX: u64 = 4096;
+// ponytail: the most `ca_file` may hold; past it the connection fails, naming the file.
 const CA_MAX: u64 = 1 << 20;
 
 /// The `[valkey]` section as written.
@@ -39,26 +41,15 @@ pub struct File {
     ca_file: Option<String>,
 }
 
-/// Where the password comes from.
-#[derive(Clone, Debug, PartialEq)]
-enum Password {
-    None,
-    Env(String),
-    File(PathBuf),
-}
-
 /// The validated section. The URL holds no password, so nothing here is a secret.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Config {
     url: String,
-    password: Password,
+    password: Option<Secret>,
     cluster: bool,
     key_prefix: String,
     ca_file: Option<PathBuf>,
 }
-
-/// A problem with a key of the section: its dotted name and the message.
-pub type Problem = (&'static str, String);
 
 impl File {
     /// The section checked; relative paths are relative to `base`, the manifest's directory.
@@ -71,7 +62,7 @@ impl File {
             return Err((url, Msg::ValkeyUrlPassword.text()));
         }
         match info.addr() {
-            ConnectionAddr::Tcp(host, _) if !loopback(host) => {
+            ConnectionAddr::Tcp(host, _) if !crate::modules::loopback(host) => {
                 return Err((url, Msg::ValkeyUrlPlain.text()));
             }
             ConnectionAddr::TcpTls { insecure: true, .. } => {
@@ -84,12 +75,8 @@ impl File {
             }
             _ => {}
         }
-        let password = match (self.password_env, self.password_file) {
-            (Some(_), Some(_)) => return Err(("valkey.password_file", Msg::ValkeyBoth.text())),
-            (Some(var), None) => Password::Env(var),
-            (None, Some(file)) => Password::File(base.join(file)),
-            (None, None) => Password::None,
-        };
+        let both = || ("valkey.password_file", Msg::ValkeyBoth.text());
+        let password = Secret::named(self.password_env, self.password_file, base, both)?;
         let key_prefix = self.key_prefix.unwrap_or_else(|| "meada".into());
         let prefix = "valkey.key_prefix";
         if key_prefix.is_empty() {
@@ -108,11 +95,6 @@ impl File {
     }
 }
 
-/// `localhost`, `127.0.0.0/8` and `::1`.
-fn loopback(host: &str) -> bool {
-    host == "localhost" || host.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback())
-}
-
 impl Config {
     /// The one function every key the modules build goes through: `<key_prefix>:<name>`, or
     /// `{<key_prefix>}:<name>` when `tagged`, so the keys one script reads or writes together
@@ -125,20 +107,16 @@ impl Config {
         }
     }
 
-    /// The password, read now from the variable or the file the section names.
+    /// The password, read now from the variable or the file the section names (on a blocking
+    /// thread, so a slow mount stalls no timeout).
     async fn secret(&self) -> Result<Option<String>, String> {
-        match &self.password {
-            Password::None => Ok(None),
-            Password::Env(var) => match std::env::var(var) {
-                Ok(value) => Ok(Some(value)),
-                Err(_) => Err(Msg::ValkeyEnvUnset(var).text()),
-            },
-            Password::File(file) => {
-                let text = read_file(file, PASSWORD_MAX).await?;
-                let text = String::from_utf8(text).map_err(|_| file.display().to_string())?;
-                // A trailing newline is the editor's, not the password's.
-                Ok(Some(text.trim_end_matches(['\n', '\r']).to_string()))
-            }
+        let Some(password) = self.password.clone() else {
+            return Ok(None);
+        };
+        let read = tokio::task::spawn_blocking(move || password.read(PASSWORD_MAX)).await;
+        match (read.map_err(|e| e.to_string())??, &self.password) {
+            (None, Some(Secret::Env(var))) => Err(Msg::ValkeyEnvUnset(var).text()),
+            (value, _) => Ok(value),
         }
     }
 }
@@ -231,18 +209,10 @@ fn scrub(text: &str, secret: Option<&str>) -> String {
     }
 }
 
-/// Whether Valkey answers within `REACH_TIMEOUT`, or why not.
+/// Whether Valkey answers within `PING_TIMEOUT`, or why not.
 pub fn reach(config: &Config) -> Result<(), String> {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| e.to_string())?;
     let ping = async { Valkey::connect(config).await?.ping().await };
-    let answer = runtime.block_on(async { tokio::time::timeout(REACH_TIMEOUT, ping).await });
-    // Dropping the runtime would wait for a blocking thread still in a DNS lookup or a file
-    // read, for as long as the resolver or the mount takes.
-    runtime.shutdown_background();
-    answer.unwrap_or_else(|_| Err(Msg::ValkeyTimeout(REACH_TIMEOUT.as_millis() as u64).text()))
+    crate::modules::within(PING_TIMEOUT, ping, Msg::ValkeyTimeout)
 }
 
 /// The `valkey:` line `meada status --workspace` prints.
@@ -268,14 +238,17 @@ pub(crate) mod tests {
     fn the_section_takes_its_defaults_and_resolves_paths_from_the_manifest() {
         let config = section("url = \"redis://localhost\"").unwrap();
         assert_eq!(config.key_prefix, "meada");
-        assert_eq!(config.password, Password::None);
+        assert_eq!(config.password, None);
         assert!(!config.cluster && config.ca_file.is_none());
         let config = section(
             "url = \"rediss://meada@cache.example.internal:6379\"\npassword_file = \"valkey\"\n\
              cluster = true\nkey_prefix = \"meada:prod\"\nca_file = \"/etc/meada/ca.pem\"",
         )
         .unwrap();
-        assert_eq!(config.password, Password::File("/etc/meada/valkey".into()));
+        assert_eq!(
+            config.password,
+            Some(Secret::File("/etc/meada/valkey".into()))
+        );
         assert_eq!(config.ca_file, Some("/etc/meada/ca.pem".into()));
         assert!(config.cluster);
     }
@@ -348,12 +321,16 @@ pub(crate) mod tests {
             assert!(err.ends_with(why), "{err}");
         }
         assert!(read_file(&dir.join("none"), PASSWORD_MAX).await.is_err());
+        let ca = dir.join("ca");
+        std::fs::write(&ca, vec![b'x'; CA_MAX as usize + 1]).unwrap();
+        let err = read_file(&ca, CA_MAX).await.unwrap_err();
+        assert!(err.ends_with("larger than 1048576 bytes"), "{err}");
     }
 
     #[test]
     fn every_key_goes_through_the_prefix_and_the_tagged_ones_share_a_hash_tag() {
         let config = section("url = \"redis://localhost\"\nkey_prefix = \"meada:prod\"").unwrap();
-        assert_eq!(config.key("sessions:abc", false), "meada:prod:sessions:abc");
+        assert_eq!(config.key("note:abc", false), "meada:prod:note:abc");
         assert_eq!(config.key("current", true), "{meada:prod}:current");
         assert_eq!(config.key("fence", true), "{meada:prod}:fence");
     }
@@ -368,6 +345,16 @@ pub(crate) mod tests {
             eprintln!("skipped: MEADA_TEST_VALKEY_URL is not set");
         }
         url
+    }
+
+    /// A password made at run time, another on each call: the tests use no literal credential.
+    fn made_password() -> String {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static MADE: AtomicUsize = AtomicUsize::new(0);
+        let n = MADE.fetch_add(1, Ordering::Relaxed);
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
+        let nanos = now.map_or(0, |d| d.subsec_nanos());
+        format!("pw-{:x}-{n}-{nanos:x}", std::process::id())
     }
 
     /// A config for `url` as `user`, the password in a file of this test's own.
@@ -441,7 +428,8 @@ pub(crate) mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn an_acl_user_connects_and_a_wrong_password_is_refused_without_echoing_it() {
         let Some(url) = service() else { return };
-        let (user, secret) = (format!("meada-test-{}", std::process::id()), "s3cret-pw");
+        let user = format!("meada-test-{}", std::process::id());
+        let secret = &made_password();
         let mut root = admin(&url).await;
         let mut setup = cmd("ACL");
         setup
@@ -457,7 +445,7 @@ pub(crate) mod tests {
         let who: String = valkey.query(cmd("ACL").arg("WHOAMI")).await.unwrap();
         assert_eq!(who, user);
 
-        let wrong = "n0t-the-pw";
+        let wrong = &made_password();
         let bad = with_password(&url, &user, wrong, "bad");
         let reason = Valkey::connect(&bad)
             .await

@@ -94,8 +94,9 @@ one for the area a change touches.
   stateless, JSON responses on a hyper listener), one endpoint per repository of the manifest at `/<identity>`, a 404
   listing the identities served elsewhere (with `--generations`, `listen_generations` makes
   the endpoint per request from the current generation's identities, so a pull that adds a
-  repository needs no restart, and a node with no readable generation answers 503 with the fixed body `no servable generation`, the problem on stderr; it answers before the `Origin` check, which refuses
-  any request carrying one with 403; no `Host` check). With `[generations]` on the node
+  repository needs no restart, and a node with no readable generation answers 503 with the fixed body `no servable generation`, the problem on stderr; no `Host` check). A request carrying `Origin` gets 403
+  before anything else, on every path and in every build (`mcp::browser`, called first in
+  `route`): no listing, pin 404 or 503 reaches a browser. With `[generations]` on the node
   (`Routes::Generation { pins: true }`) the routing rule is: the decoded path, a trailing slash
   stripped, is `/<identity>@<generation>` when what follows its last `@` is an id
   (`snapshot::is_id`); that generation is served from `<local_dir>/<generation>/`
@@ -110,20 +111,28 @@ one for the area a change touches.
   hidden `with_drain_bound` shortens it, `main.rs` reads `MEADA_DRAIN_MS` for it in debug builds only, a second signal ends the wait), then cancels
   rmcp's `cancellation_token` (earlier it would end calls in flight with an error), drops what
   is left and exits 0 without waiting for the runtime's threads. Every request goes through
-  `Gate` before routing: in the default build, or with no `[oidc]`, it lets everything through;
-  with `[oidc]` (feature `oidc`) it is `oidc::Oidc::admit`, which answers itself (an `Origin`,
-  the protected resource metadata, a 401) or hands routing a `Pass`, whose grant routing checks
+  `Gate` before routing, after the `Origin` check: in the default build, or with no `[oidc]`, it
+  lets everything through; with `[oidc]` (feature `oidc`) it is `oidc::Oidc::admit`, which
+  answers itself (the protected resource metadata, a 401) or hands routing a `Pass`, whose grant routing checks
   at an endpoint (`Pass::refused`, the 403) and filters every 404 listing through
   (`Pass::reads`). The pin is split from the path before the gate, so a pinned path is admitted
   as its identity is. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `modules.rs`, `valkey.rs`: the cloud modules (ADR 0012). `modules.rs` is the section table,
   in every build: each module section of `meada.workspace.toml` (`[valkey]`, `[snapshot]`,
-  `[generations]`, `[refresh_lock]`, `[sessions]`, `[oidc]`) with the cargo feature that owns
-  it and whether this build has it. `Manifest::read` checks it before the typed parse, so a
+  `[generations]`, `[refresh_lock]`, `[oidc]`) with the cargo feature that owns it and
+  whether this build has it. `Manifest::read` checks it before the typed parse, so a
   section whose feature is missing is an error naming the file, the line, the section and the
   feature, and a section the table lacks stays an unknown key. A module ticket adds its row and
-  sets `built` to `cfg!(feature = ..)`. `valkey.rs` (feature `valkey`, internal; the only place
+  sets `built` to `cfg!(feature = ..)`. The `cloud` feature turns on every module at once and,
+  as `refresh-lock` is, is Unix only. `modules.rs` also holds what the modules share, each
+  behind the features that use it: `Problem` (a section key and its message) and `validated`,
+  which turns one into the `file:line` error; `at_least` (an optional integer with a default
+  and a minimum, `Msg::AtLeast`); `loopback` (`localhost`, `127.0.0.0/8` or `::1`, the one
+  host test of every `http` exception); `Secret` (a variable or a file, at most one of the pair,
+  and `read_secret`, a bounded regular file whose error names only the file); `block_on` (a
+  current-thread runtime shut down without waiting) and `within` (a `status` line's bounded
+  wait). `valkey.rs` (feature `valkey`, internal; the only place
   the `redis` crate is used) is the one Valkey client the modules share: `File` is the
   `[valkey]` section, `File::validate` turns it into a `Config` (no password in the URL, `rediss`
   outside loopback, at most one of `password_env` and `password_file`, no `{` or `}` in
@@ -132,7 +141,7 @@ one for the area a change touches.
   connects. Every key goes through `Config::key(name, tagged)`: `<key_prefix>:<name>`, or
   `{<key_prefix>}:<name>` for the keys one script touches together (pointer, lock, fence). An
   error from the client has the password scrubbed. `status --workspace` prints `valkey:
-  reachable` or `valkey: unreachable (<reason>)` after waiting at most `REACH_TIMEOUT`; the
+  reachable` or `valkey: unreachable (<reason>)` after waiting at most `PING_TIMEOUT`; the
   line is informational and never changes the probe's exit code. With a `ca_file` the client
   trusts that file alone, not the system roots as well (redis-rs replaces them).
 - `oidc.rs` (feature `oidc`; the only place `jsonwebtoken` is used, with RustCrypto as its
@@ -147,7 +156,8 @@ one for the area a change touches.
   signing keys: RSA, or EC on P-256 and P-384) and starts a thread that reads it again every
   `jwks_refresh_seconds` until the module is dropped; every request goes through ureq with no
   redirect, no proxy, `FETCH_TIMEOUT` and a cap, and the platform verifier for `https`.
-  `Oidc::admit` refuses an `Origin` with 403, serves the metadata of any path under
+  `Oidc::admit` (reached only without `Origin`, which `mcp::route` refuses first) serves the
+  metadata of any path under
   `.well-known/oauth-protected-resource` (`resource` is `<public_url>/<path>`, percent-encoded),
   and otherwise reads the one `Authorization: Bearer` header (another scheme counts as no
   token): `ALGORITHMS` only, no `crit`, a cached key that `fits` the header (`kid` when both
@@ -182,7 +192,7 @@ one for the area a change touches.
   others through object_store's providers given exactly those inputs, IMDSv2 over IPv4 only),
   stay in memory and are scrubbed from every error: the static secret is replaced, and an S3
   error body loses its `CanonicalRequest`, `StringToSign` and their `*Bytes` echoes. The
-  secret files are read through `config::read_bounded`, as `valkey.rs` reads its own. Each
+  secret files are read through `modules::read_secret`, as `valkey.rs` reads its own. Each
   bundle keeps its `open_read` connection, the read transaction its freshness check ran in,
   until its upload ends. Every object carries `meada-size` and `meada-blake3` metadata.
   `snapshot/pull.rs` is `meada snapshot pull` (`pull`, once; `main.rs` loops for `--every`),
@@ -228,12 +238,12 @@ one for the area a change touches.
   it; `Current::pinned` keeps one `Held` per pinned id, read once while held and dropped once
   `ids` no longer lists it, so what it keeps is bounded by what the node holds; a read that fails
   because a pull deleted the directory after the listing is `None`, the pin's 404, through
-  `unless_gone`), `ids` (the generations held) and `reach` (the store's current id within two
+  `unless_gone`), `ids` (the generations held) and `reach` (the store's current id within `CURRENT_ID_TIMEOUT`, two
   seconds, for the probe; with `[generations]`, `reach_pointer`: Valkey's current id, then a
   HEAD of its document in the store, within the same bound, the reason prefixed `valkey:` or
   `store:`). It only reads; the pull is the only writer of `local_dir`. A pinned call still open
-  on a generation that a pull's retention deletes may fail mid-call: the pull holds no lease on
-  what the server reads.
+  on a generation that a pull's retention deletes may fail mid-call: the pull does not wait for
+  what the server is still reading.
   `snapshot/generations.rs` (feature `generation-pointer`, which implies `snapshot` and
   `valkey`; no crate of its own) is the generation pointer, section `[generations]` (`keep`,
   default 3, at least 2; `Manifest::read` refuses it without `[snapshot]` and `[valkey]` through
@@ -1000,7 +1010,15 @@ one for the area a change touches.
   `HEADER_EXTENSION_MAX` (64 KiB), which a scan of the headers checks before the tar crate,
   which reads them into memory whole, sees the archive. Past any of them the pull fails and
   changes nothing. A symbolic link whose target goes through another symbolic link is refused
-  even when both stay inside the mirror. A sparse file is refused.
+  even when both stay inside the mirror. A sparse file is refused. The node pointer file holds at
+  most `POINTER_MAX` (64 bytes); past it the pointer file is malformed.
+- `snapshot.rs`: a generation document holds at most `DOCUMENT_MAX` (16 MiB), in the store and
+  as a node holds it, and the store's `current` at most `CURRENT_MAX` (64 bytes); past either
+  the object is refused, naming its key or file, and a pull changes nothing.
+- `snapshot/store.rs`: a credential file (key id, secret, token) holds at most `SECRET_MAX`
+  (16 KiB); past it the file is refused, naming it.
+- `valkey.rs`: `password_file` holds at most `PASSWORD_MAX` (4096 bytes) and `ca_file` at most
+  `CA_MAX` (1 MiB); past either the connection fails, naming the file.
 - `oidc.rs`: each metadata and JWKS request takes at most `FETCH_TIMEOUT` (10 seconds), a
   metadata document at most `METADATA_MAX` (64 KiB) and a JWKS at most `JWKS_MAX` (256 KiB);
   past any of them the request fails (at start, the start is refused; on a refresh, the cached
