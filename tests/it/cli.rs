@@ -477,3 +477,31 @@ fn status_reports_drift_follow_lang() {
         );
     }
 }
+
+/// `[snapshot] node_name`'s error under `pt_BR` and `en_US`.
+#[cfg(feature = "snapshot")]
+#[test]
+fn a_bad_node_name_follows_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_node_name");
+    let snapshot = crate::snapshot::section("http://127.0.0.1:9", "b-1");
+    let toml = format!("index_dir = \"../indexes\"\n{snapshot}node_name = \"Upper\"\n");
+    fs::write(dir.join(MANIFEST), &toml).unwrap();
+    let line = toml.matches('\n').count();
+    let manifest = "meada: ops/meada.workspace.toml";
+    for (lang, expected) in [
+        (
+            "en_US.UTF-8",
+            "must be 1 to 63 lowercase letters, digits, `.` and `-`",
+        ),
+        (
+            "pt_BR.UTF-8",
+            "deve ter de 1 a 63 letras minúsculas, dígitos, `.` e `-`",
+        ),
+    ] {
+        let expected = format!("{manifest}:{line}: `snapshot.node_name`: {expected}\n");
+        let refused = (String::new(), expected, Some(1));
+        let args = ["index", "--workspace", MANIFEST];
+        assert_eq!(run_lang(&dir, lang, &args), refused, "{lang}");
+    }
+}

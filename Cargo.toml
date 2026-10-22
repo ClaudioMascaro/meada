@@ -118,10 +118,11 @@ snapshot = [
     "dep:rustls",
     "dep:rustls-platform-verifier",
 ]
-# The current and retained generations in Valkey, and pins (`[generations]`). No crate of its own.
-generation-pointer = ["snapshot", "valkey"]
+# The current and retained generations in Valkey, and pins (`[generations]`); `nix` names the host
+# in the heartbeat.
+generation-pointer = ["snapshot", "valkey", "dep:nix"]
 # The refresh lock and its fencing tokens (`[refresh_lock]`, `meada snapshot lock`).
-refresh-lock = ["generation-pointer", "dep:nix"]
+refresh-lock = ["generation-pointer"]
 # Meada as an OAuth resource server (`[oidc]`): the issuer's metadata and JWKS come through the
 # binary's own ureq client, which then verifies certificates against the system's roots.
 oidc = ["dep:jsonwebtoken", "ureq/platform-verifier"]

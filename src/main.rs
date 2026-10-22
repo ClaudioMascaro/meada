@@ -289,6 +289,16 @@ enum FenceCommand {
 #[cfg(feature = "snapshot")]
 fn pull(manifest: &Path, every: Option<u64>) -> ! {
     use meada::snapshot::pull::Pulled;
+    // A host name that is no node name refuses to start; a round never refuses.
+    #[cfg(feature = "generation-pointer")]
+    if every.is_some()
+        && let Err(e) = meada::snapshot::heartbeat::check(manifest)
+    {
+        for line in e.to_string().lines() {
+            eprintln!("meada: {line}");
+        }
+        std::process::exit(1);
+    }
     loop {
         let pulled = meada::snapshot::pull::pull(manifest).map(|(pulled, warnings)| {
             for line in warnings.iter().flat_map(|w| w.lines()) {
@@ -318,6 +328,12 @@ fn pull(manifest: &Path, every: Option<u64>) -> ! {
         let Some(seconds) = every else {
             std::process::exit(0);
         };
+        #[cfg(feature = "generation-pointer")]
+        if let Some(warning) = meada::snapshot::heartbeat::beat(manifest, seconds) {
+            for line in warning.lines() {
+                eprintln!("meada: {line}");
+            }
+        }
         std::thread::sleep(std::time::Duration::from_secs(seconds));
     }
 }

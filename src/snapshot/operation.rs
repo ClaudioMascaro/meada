@@ -12,7 +12,7 @@ use redis::cmd;
 use super::generations::{self, KEPT_MAX, pointer};
 use super::lock::{self, Held};
 use super::store::Store;
-use super::{fence, is_id, pull};
+use super::{fence, is_id, is_node_name, pull};
 use crate::msg::Msg;
 use crate::valkey::{self, Valkey};
 use crate::workspace::Manifest;
@@ -364,13 +364,6 @@ fn heartbeat_fence(beat: &[u8]) -> Option<Option<u64>> {
     }
 }
 
-/// Whether `name` is a node name: lowercase letters, digits, `.` and `-`, 1 to 63 characters.
-// ponytail: #298 checks `node_name` against the same pattern; one function once both land.
-fn is_node_name(name: &str) -> bool {
-    (1..=63).contains(&name.len())
-        && (name.bytes()).all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'.' | b'-'))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -396,16 +389,6 @@ mod tests {
                 "{}",
                 String::from_utf8_lossy(bad)
             );
-        }
-    }
-
-    #[test]
-    fn a_node_name_is_lowercase_letters_digits_dots_and_dashes() {
-        for good in ["a", "meada-node-0", "node.example.com", &"a".repeat(63)] {
-            assert!(is_node_name(good), "{good}");
-        }
-        for bad in ["", "Upper", "a_b", "a b", "../x", "a:b", &"a".repeat(64)] {
-            assert!(!is_node_name(bad), "{bad}");
         }
     }
 }
