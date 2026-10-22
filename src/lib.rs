@@ -23,6 +23,8 @@ mod literals;
 pub mod mcp;
 mod modules;
 pub mod msg;
+#[cfg(feature = "oidc")]
+mod oidc;
 mod package;
 mod render;
 pub mod repo;

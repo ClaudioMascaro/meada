@@ -382,7 +382,7 @@ fn manifest_errors_name_the_file_the_line_and_the_key() {
 #[test]
 fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
     let dir = mirrors("manifest_module_sections");
-    for (toml, expected) in [
+    let mut cases = vec![
         (
             "index_dir = \"../indexes\"\n\n[valkey]\nurl = \"redis://127.0.0.1\"\n",
             "meada: ops/meada.workspace.toml:3: [valkey] needs a Meada built with the valkey feature\n",
@@ -396,14 +396,18 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
             "meada: ops/meada.workspace.toml:3: [refresh_lock] needs a Meada built with the refresh-lock feature\n",
         ),
         (
-            "index_dir = \"../indexes\"\n[oidc]\nissuer = \"https://id.example.com\"\n",
-            "meada: ops/meada.workspace.toml:2: [oidc] needs a Meada built with the oidc feature\n",
-        ),
-        (
             "index_dir = \"../indexes\"\n\n[cache]\nurl = \"redis://127.0.0.1\"\n",
             "meada: ops/meada.workspace.toml:3: `cache` is not a meada.workspace.toml key\n",
         ),
-    ] {
+    ];
+    // `oidc` needs no `valkey`, so a build may have it here.
+    if !cfg!(feature = "oidc") {
+        cases.push((
+            "index_dir = \"../indexes\"\n[oidc]\nissuer = \"https://id.example.com\"\n",
+            "meada: ops/meada.workspace.toml:2: [oidc] needs a Meada built with the oidc feature\n",
+        ));
+    }
+    for (toml, expected) in cases {
         write_manifest(&dir, toml);
         for command in ["index", "status"] {
             let (stdout, stderr, ok) = run(&dir, command);

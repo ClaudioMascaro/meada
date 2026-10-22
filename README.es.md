@@ -127,8 +127,8 @@ de saltos, los repositorios involucrados y los tokens usados.
 ## Modo servidor
 
 > **Atención.** En modo servidor Meada devuelve fragmentos de código fuente a quien logre
-> conectarse, y no autentica a nadie: el proxy inverso del operador admite a los clientes (TLS,
-> tokens, SSO, política de red). Sin host, el servidor escucha solo en el loopback; escuchar
+> conectarse, y por defecto no autentica a nadie: el proxy inverso del operador admite a los
+> clientes (TLS, tokens, SSO, política de red); el módulo OIDC, abajo, es la alternativa opt-in. Sin host, el servidor escucha solo en el loopback; escuchar
 > más allá es una elección explícita del operador, y un proxy mal configurado expone el código.
 > Meada no revisa el encabezado `Host` (un proxy con nombre propio funciona) y responde 403 a
 > cualquier solicitud con `Origin` (protección contra navegadores y DNS rebinding). Brecha
@@ -417,6 +417,63 @@ el `<local_dir>/current` de algún nodo), o borre el `<local_dir>/current` del n
 toma la generación actual. Apagar `[refresh_lock]` después de que los nodos registraron fences
 por encima de 0 también detiene la flota, ya que sin el candado todo fence es 0: borre el
 `<local_dir>/current` de cada nodo.
+
+**OIDC** (feature `oidc`; `cargo install meada --features oidc`). La admisión por defecto sigue
+siendo el proxy inverso, como dice el aviso al inicio de esta sección; el módulo OIDC es la
+alternativa para quien quiere que el propio Meada verifique quién llama. Con la sección `[oidc]`,
+el servidor se vuelve un resource server OAuth 2.1, como la especificación de autorización de
+MCP (2026-07-28) lo describe: toda solicitud lleva `Authorization: Bearer <JWT>` emitido por el
+proveedor del operador. Meada no emite tokens, no registra clientes y nunca reenvía un token.
+
+```toml
+[oidc]
+issuer = "https://id.ejemplo.internal/realms/agentes"
+public_url = "https://meada.ejemplo.internal"   # la URL que usan los clientes, detrás del proxy
+audience = "https://meada.ejemplo.internal"     # opcional; por defecto: la URL canónica del endpoint
+identities_claim = "meada_repositories"
+scopes = ["meada:read"]                          # opcional, anunciado y exigido
+jwks_refresh_seconds = 3600                      # por defecto; como mínimo 60
+```
+
+En el proveedor: un audience igual a `audience` (o, sin ella, a la URL de cada endpoint,
+`<public_url>/<identidad>`); un claim mapper que pone en `identities_claim` la lista de
+identidades que el cliente puede leer (`"*"` las permite todas); y client credentials para los
+agentes headless y para el backend de un portal, que piden su token al proveedor. Una página en
+el navegador no puede llamar a Meada directamente: con `[oidc]`, toda solicitud con `Origin`
+recibe 403, en cualquier ruta, así que un portal llama desde su backend. El proxy reenvía sin
+cambios `Authorization` y los encabezados del SEP-2243 (`MCP-Protocol-Version`, `Mcp-Method`,
+`Mcp-Name`, `Mcp-Param-*`).
+
+Al arrancar, antes de escuchar, Meada lee los metadatos del issuer (RFC 8414 u OpenID
+Discovery, en las rutas y el orden que define la especificación de MCP, verificando que el
+`issuer` del documento es el configurado) y el JWKS que nombran; una falla impide el arranque.
+`issuer`, `public_url` y el `jwks_uri` deben ser `https` fuera de loopback; ninguna de las
+solicitudes sigue una redirección ni pasa por un proxy, cada una tiene 10 s y un tope de tamaño,
+y los certificados se verifican contra las raíces del sistema. El JWKS se vuelve a leer cada
+`jwks_refresh_seconds` y cuando llega un token con un `kid` desconocido, como mucho una vez por
+minuto; si la relectura falla, las claves en caché siguen y stderr lo dice.
+
+`GET /.well-known/oauth-protected-resource/<identidad>` responde sin token los metadatos del
+recurso (RFC 9728): `resource` igual a `<public_url>/<identidad>`, `authorization_servers` igual
+a `[issuer]`, `bearer_methods_supported` igual a `["header"]` y `scopes_supported` cuando hay
+`scopes`; `/.well-known/oauth-protected-resource/<identidad>@<generación>` responde lo mismo con
+el `resource` fijado. Un token pasa con un algoritmo asimétrico (RS256, RS384, RS512, ES256,
+ES384, PS256) que coincida con la clave, `iss` igual a `issuer`, un `aud` igual a `audience` o,
+sin ella, a la URL de `/<identidad>` (que los pins también aceptan, de modo que un token lee el
+repositorio en toda generación), `exp` obligatorio y `nbf` respetado con 60 s de margen, y todo
+scope configurado en su `scope`. Un token en la query string nunca se lee. `scope` se lee solo
+como string separado por espacios; `scp` y un `scope` en array no se leen, así que, con `scopes`
+definido, un proveedor que envía `scp` (Okta, por ejemplo) necesita un claim mapper a `scope`.
+
+Sin token, o con uno que no pasa: 401 con `WWW-Authenticate: Bearer
+resource_metadata="<public_url>/.well-known/oauth-protected-resource/<ruta>"`, más
+`error="invalid_token"` cuando llegó un token y `scope` cuando está configurado. Un token válido
+cuyo claim no lista la identidad del endpoint, también en un pin: 403 con
+`error="insufficient_scope"`; sin un scope exigido, el mismo 403 con `scope`. La autenticación
+va antes del enrutamiento: el 404 de la raíz, de una ruta desconocida y de una generación que el
+nodo no guarda exige un token válido para esa ruta (sin `audience`, el de la raíz tiene `aud`
+igual a `public_url`) y lista solo las identidades que puede leer. Ningún token, ni parte de
+uno, aparece en stderr o en un error.
 
 ## Decisiones
 

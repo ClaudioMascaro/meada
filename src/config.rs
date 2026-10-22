@@ -276,7 +276,7 @@ pub(crate) fn line_of(src: &str, at: usize) -> usize {
 /// An error about the dotted `key` of `src`, the content of `file`, as `parse` words one: the
 /// file, the line of the key (of its table when the key is absent, its default being the
 /// problem; of the file when neither is there), the key and the message.
-#[cfg(any(feature = "valkey", feature = "snapshot"))]
+#[cfg(any(feature = "valkey", feature = "snapshot", feature = "oidc"))]
 pub(crate) fn error_at(
     file: &Path,
     src: &str,

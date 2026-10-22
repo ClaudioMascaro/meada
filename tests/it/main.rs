@@ -26,6 +26,7 @@ mod index;
 mod items;
 mod manifest;
 mod mcp;
+mod oidc;
 mod packages;
 mod processes;
 mod pypi;
