@@ -89,8 +89,9 @@ one for the area a change touches.
   stored links, the exports' consumer shapes, the calls and the seam's `parts`).
   `render.rs`: token budget and line helpers. `mcp.rs`: three read-only tools, one definition over
   two transports: stdio, about the client's first `file://` root or the server's cwd without
-  roots, and in server mode streamable HTTP (`meada mcp --listen`, stateless, JSON responses on
-  a hyper listener), one endpoint per repository of the manifest at `/<identity>`, a 404
+  roots (a client that does not answer `roots/list` within `ROOTS_TIMEOUT`, 5 s, gets the last
+  root it sent, else a tool error), and in server mode streamable HTTP (`meada mcp --listen`,
+  stateless, JSON responses on a hyper listener), one endpoint per repository of the manifest at `/<identity>`, a 404
   listing the identities served elsewhere (with `--generations`, `listen_generations` makes
   the endpoint per request from the current generation's identities, so a pull that adds a
   repository needs no restart, and a node with no readable generation answers 503 with the fixed body `no servable generation`, the problem on stderr; it answers before the `Origin` check, which refuses
