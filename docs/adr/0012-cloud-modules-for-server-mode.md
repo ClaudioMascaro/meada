@@ -92,10 +92,14 @@ A **cloud module** is a cargo feature, off by default, plus one section of
 
 - A module connects only to the endpoints the operator configured, inside the operator's
   boundary: the store's `endpoint`, the Valkey `url`, the OIDC `issuer` and the `jwks_uri` its
-  metadata names, plus the credential endpoint of the source `credentials` names (below). No
-  client follows a redirect to another host, with one exception: a Valkey cluster client follows
-  the cluster's `MOVED` and `ASK` to the nodes the cluster announces, always over TLS (the
-  section requires a `rediss` seed when `cluster` is on).
+  metadata names, plus the credential endpoint of the source `credentials` names (below).
+  (Amended 2026-10-22; #289: ADR 0013 adds each `[[github_app]]` block's `api`, the GitHub REST
+  endpoint that lists installations and mints their tokens. On GitHub Enterprise Cloud and
+  github.com it lies outside the operator's boundary, which is accepted because the job's
+  fetches already go to that host.) No client follows a redirect to another host, with one
+  exception: a Valkey cluster client follows the cluster's `MOVED` and `ASK` to the nodes the
+  cluster announces, always over TLS (the section requires a `rediss` seed when `cluster` is
+  on).
 - The store's credentials come from one source, the one `credentials` names; no other is read.
   Besides `static` (keys from the environment or files, below), three sources reach an endpoint
   the operator chose by choosing them, each a recorded exception:
@@ -205,6 +209,20 @@ to the client, so it keeps no channel back to it.
   for a repository it may not read gets 403. Authentication runs before routing (after the
   `Origin` check of #262), so no 404 lists an identity or a generation to a caller without a
   valid token, and a valid token's 404 lists only what it may read.
+- The grant also bounds what an admitted endpoint answers (amended 2026-10-22, #290): the
+  workspace of a query is the repositories of the manifest, or of the generation, that the
+  token's claim lists, the named one first, then manifest order. A repository outside the grant
+  is absent from every answer, as if the manifest did not list it: no identity, symbol, path,
+  source line or link of it, and it is not reported missing. A `*` grant, and server mode
+  without `[oidc]`, keep the whole workspace.
+- A token may also be granted through its groups (amended 2026-10-22, #291): `groups_claim`
+  names a top-level claim holding group names, and the manifest's `[oidc.groups]` table maps
+  each group to identities (`*` for all), set together. The grant is the union of the
+  identities `identities_claim` lists and those the token's groups map to; either claim may be
+  missing, and a group the table does not map, or a claim that is not an array of strings,
+  grants nothing. The mapping lives with the operator, not in a repository's `[[repository]]`
+  entry, and the grant is computed once, at admission. An identity the server does not serve
+  grants nothing: there is no start check, since a node's manifest lists no repositories.
 - No token passthrough: Meada never forwards a token, issues none, registers no client and is no
   authorization server. No stderr line or error carries a token or any part of it.
 - The issuer's metadata and JWKS are read at start, before the listener binds, through the HTTP

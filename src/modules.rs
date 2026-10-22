@@ -19,7 +19,7 @@ pub struct Module {
     pub built: bool,
 }
 
-pub const MODULES: [Module; 5] = [
+pub const MODULES: [Module; 6] = [
     Module {
         section: "valkey",
         feature: "valkey",
@@ -45,6 +45,11 @@ pub const MODULES: [Module; 5] = [
         feature: "oidc",
         built: cfg!(feature = "oidc"),
     },
+    Module {
+        section: "github_app",
+        feature: "github-app",
+        built: cfg!(feature = "github-app"),
+    },
 ];
 
 /// The first section of `src`, the content of `file`, whose feature this build lacks. A file
@@ -63,7 +68,7 @@ pub fn check(file: &Path, src: &str) -> Result<()> {
 
 /// The error for `section` of `src`, the content of `file`, when the sections it needs that
 /// `missing` names are not there: `[section] needs [missing...]`, at the section's line.
-#[cfg(feature = "generation-pointer")]
+#[cfg(any(feature = "generation-pointer", feature = "github-app"))]
 pub fn needs(file: &Path, src: &str, section: &str, missing: &[&str]) -> Result<()> {
     if missing.is_empty() {
         return Ok(());
@@ -110,7 +115,11 @@ pub fn validated<S, C>(
 
 /// An optional integer setting at `key`: `value`, or `default` when unset, if it is at least
 /// `min`; else `Msg::AtLeast`.
-#[cfg(any(feature = "generation-pointer", feature = "oidc"))]
+#[cfg(any(
+    feature = "generation-pointer",
+    feature = "oidc",
+    feature = "github-app"
+))]
 pub fn at_least(
     key: &'static str,
     value: Option<i64>,
@@ -200,6 +209,23 @@ pub fn within<T>(
     answer.unwrap_or_else(|_| Err(timeout(bound.as_millis() as u64).text()))
 }
 
+/// The HTTP client of a module's outbound calls: no redirect, no proxy, `timeout` for each request
+/// from connection to last byte, and the system's roots for `https`.
+#[cfg(any(feature = "oidc", feature = "github-app"))]
+pub fn agent(timeout: std::time::Duration) -> ureq::Agent {
+    let tls = ureq::tls::TlsConfig::builder()
+        .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+        .build();
+    ureq::Agent::config_builder()
+        .timeout_global(Some(timeout))
+        .max_redirects(0)
+        .http_status_as_error(false)
+        .proxy(None)
+        .tls_config(tls)
+        .build()
+        .into()
+}
+
 /// Whether `host`, as a URL names it (an IPv6 address with or without its brackets), is
 /// loopback: `localhost`, `127.0.0.0/8` or `::1`. A name that only starts like one, and an
 /// IPv4-mapped address, are not.
@@ -210,6 +236,45 @@ pub fn loopback(host: &str) -> bool {
         || ip
             .parse::<std::net::IpAddr>()
             .is_ok_and(|ip| ip.is_loopback())
+}
+
+/// What a module's endpoint URL may hold past its host.
+#[cfg(any(feature = "oidc", feature = "github-app"))]
+#[derive(Clone, Copy, PartialEq)]
+pub enum Shape {
+    /// A path (`[oidc]` `issuer`, `[[github_app]]` `api`).
+    Path,
+    /// Nothing (`[oidc]` `public_url`).
+    Bare,
+    /// A path and a query (the OIDC metadata's `jwks_uri`).
+    Query,
+}
+
+/// Whether `url` is an endpoint a module may name: `https`, or `http` on loopback
+/// (`localhost`, `127.0.0.0/8`, `::1`; an IPv4-mapped address is not loopback), with a host, no
+/// user and no fragment, and past its host what `shape` allows.
+#[cfg(any(feature = "oidc", feature = "github-app"))]
+pub fn reachable(url: &str, shape: Shape) -> bool {
+    let Ok(uri) = url.parse::<ureq::http::Uri>() else {
+        return false;
+    };
+    let (Some(authority), Some(host)) = (uri.authority(), uri.host()) else {
+        return false;
+    };
+    if authority.as_str().contains('@') || url.contains('#') {
+        return false;
+    }
+    if uri.query().is_some() && shape != Shape::Query {
+        return false;
+    }
+    if shape == Shape::Bare && !matches!(uri.path(), "" | "/") {
+        return false;
+    }
+    match uri.scheme_str() {
+        Some("https") => true,
+        Some("http") => loopback(host),
+        _ => false,
+    }
 }
 
 #[cfg(test)]
@@ -253,6 +318,17 @@ mod tests {
         assert_eq!(
             err,
             "m.toml:3: [oidc] needs a Meada built with the oidc feature"
+        );
+    }
+
+    #[cfg(not(feature = "github-app"))]
+    #[test]
+    fn the_github_app_blocks_without_their_feature_name_it() {
+        let src = "index_dir = \"i\"\n\n[[github_app]]\nhost = \"github.com\"\n";
+        let err = check(Path::new("m.toml"), src).unwrap_err().to_string();
+        assert_eq!(
+            err,
+            "m.toml:3: [github_app] needs a Meada built with the github-app feature"
         );
     }
 

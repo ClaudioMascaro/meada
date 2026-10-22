@@ -12,9 +12,10 @@ where `Repository::index` says it lives, and ATTACHes every **peer** to the firs
 connection as `peer<n>`. Locally the index is the checkout's own `.meada/index.db`. In
 **server mode**, `Engine::open_manifest(manifest, repo)` builds the workspace from the
 **workspace manifest** instead (`workspace::Manifest`: every listed repository, `repo` first,
-then manifest order, nothing discovered) and each index lives at
-`<index_dir>/<identity>/index.db`; `engine::index_workspace` and `engine::status_workspace`
-are `meada index --workspace` and `meada status --workspace`. An engine opened from a
+then manifest order, nothing discovered; under an OIDC grant only the granted ones) and each
+index lives at `<index_dir>/<identity>/index.db`; `engine::index_workspace` and
+`engine::status_workspace` are `meada index --workspace` and `meada status --workspace`. An
+engine opened from a
 manifest opens every index read-only on one connection (`index::open_read`: nothing created,
 `trusted_schema` off and `SQLITE_DBCONFIG_DEFENSIVE` on, since a generation's index comes from
 a store, one read transaction held until the engine drops, so an answer sees each index as one commit left
@@ -116,24 +117,33 @@ one for the area a change touches.
   lets everything through; with `[oidc]` (feature `oidc`) it is `oidc::Oidc::admit`, which
   answers itself (the protected resource metadata, a 401) or hands routing a `Pass`, whose grant routing checks
   at an endpoint (`Pass::refused`, the 403) and filters every 404 listing through
-  (`Pass::reads`). The pin is split from the path before the gate, so a pinned path is admitted
+  (`Pass::reads`). Routing then puts the `Pass` in the request's extensions, which rmcp's
+  stateless transport hands the tool inside the request's `http::request::Parts`:
+  `Meada::answer` opens the engine (`open_listed`, `open_held`) over `Manifest::workspace` with
+  `Pass::reads`, which drops every entry outside the grant before the missing peers are
+  computed, so no answer names one, even as missing (#290); a call with no `Pass` is a tool
+  error. The pin is split from the path before the gate, so a pinned path is admitted
   as its identity is. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `modules.rs`, `valkey.rs`: the cloud modules (ADR 0012). `modules.rs` is the section table,
   in every build: each module section of `meada.workspace.toml` (`[valkey]`, `[snapshot]`,
-  `[generations]`, `[refresh_lock]`, `[oidc]`) with the cargo feature that owns it and
-  whether this build has it. `Manifest::read` checks it before the typed parse, so a
+  `[generations]`, `[refresh_lock]`, `[oidc]`, `[[github_app]]`) with the cargo feature that
+  owns it and whether this build has it. `Manifest::read` checks it before the typed parse, so a
   section whose feature is missing is an error naming the file, the line, the section and the
   feature, and a section the table lacks stays an unknown key. A module ticket adds its row and
   sets `built` to `cfg!(feature = ..)`. The `cloud` feature turns on every module at once and,
   as `refresh-lock` is, is Unix only. `modules.rs` also holds what the modules share, each
   behind the features that use it: `Problem` (a section key and its message) and `validated`,
   which turns one into the `file:line` error; `at_least` (an optional integer with a default
-  and a minimum, `Msg::AtLeast`); `loopback` (`localhost`, `127.0.0.0/8` or `::1`, the one
-  host test of every `http` exception); `Secret` (a variable or a file, at most one of the pair,
-  and `read_secret`, a bounded regular file whose error names only the file); `block_on` (a
-  current-thread runtime shut down without waiting) and `within` (a `status` line's bounded
-  wait). `valkey.rs` (feature `valkey`, internal; the only place
+  and a minimum, `Msg::AtLeast`); `needs` (a section missing the sections it needs);
+  `agent` (the ureq client of every module's outbound HTTP: no redirect, no proxy, a timeout, the
+  platform verifier); `loopback` (`localhost`, `127.0.0.0/8` or `::1`, the one host test of every
+  `http` exception); `reachable` (an endpoint URL a module may name: `https` or loopback `http`, a
+  host, no user or fragment, and past the host what its `Shape` allows: a path, nothing, or a path
+  and a query); `Secret` (a variable or a file, at most one of the pair, and `read_secret`, a
+  bounded regular file whose error names only the file); `block_on` (a current-thread runtime shut
+  down without waiting) and `within` (a `status` line's bounded wait). `valkey.rs` (feature
+  `valkey`, internal; the only place
   the `redis` crate is used) is the one Valkey client the modules share: `File` is the
   `[valkey]` section, `File::validate` turns it into a `Config` (no password in the URL, `rediss`
   outside loopback, at most one of `password_env` and `password_file`, no `{` or `}` in
@@ -145,11 +155,13 @@ one for the area a change touches.
   reachable` or `valkey: unreachable (<reason>)` after waiting at most `PING_TIMEOUT`; the
   line is informational and never changes the probe's exit code. With a `ca_file` the client
   trusts that file alone, not the system roots as well (redis-rs replaces them).
-- `oidc.rs` (feature `oidc`; the only place `jsonwebtoken` is used, with RustCrypto as its
-  backend, never aws-lc-rs): server mode as an OAuth 2.1 resource server. `File` is the
-  `[oidc]` section and `File::validate` its `Config` (`issuer` `https` or loopback `http` with no
-  user, query or fragment, `public_url` the same with no path, `identities_claim` and `audience`
-  not empty, scopes RFC 6749 scope-tokens, `jwks_refresh_seconds` at least 60). `Oidc::start`,
+- `oidc.rs` (feature `oidc`; with `github_app.rs` the only places `jsonwebtoken` is used, with
+  RustCrypto as its backend, never aws-lc-rs): server mode as an OAuth 2.1 resource server. `File`
+  is the `[oidc]` section and `File::validate` its `Config` (`issuer` `https` or loopback `http`
+  with no user, query or fragment, `public_url` the same with no path (`modules::reachable`),
+  `identities_claim` and `audience` not empty, `groups_claim` (not empty) and its `[oidc.groups]`
+  table together, at least one of the two claims, scopes RFC 6749 scope-tokens,
+  `jwks_refresh_seconds` at least 60). `Oidc::start`,
   called by `mcp::Gate::new` before the listener binds, finds the metadata at the URLs the MCP
   specification tries in order (`metadata_urls`: RFC 8414 and OpenID discovery with the path
   inserted, then OpenID's appended, passing over a document that does not parse or names
@@ -165,8 +177,39 @@ one for the area a change touches.
   carry one, the key's own `alg`, its type and curve), the JWKS fetched again
   when none does (`refetch`, at most once per `KID_REFRESH_EVERY`), `exp` and `nbf` with
   `LEEWAY`, `iss`, `aud` against the configured audience or the path's and its identity's
-  resources, then the scopes (403 when one is missing). The grant is `identities_claim` as an
-  array, `*` for all. No token, error text of `jsonwebtoken` or claim value is ever printed.
+  resources, then the scopes (403 when one is missing). The grant (`Grant::of`, once per
+  request) is the union of `identities_claim` and what `[oidc.groups]` maps the groups of
+  `groups_claim` to, a claim counting only as an array of strings, `*` from either for all;
+  routing checks it and it bounds the workspace of each answer (`mcp.rs`). No token, error text
+  of `jsonwebtoken` or claim value is ever printed.
+- `github_app.rs` (feature `github-app`, which needs `valkey`; `jsonwebtoken` with `use_pem`
+  only here): git's credential helper for the indexing job (ADR 0013). `File` is one
+  `[[github_app]]` block and `validated` checks them all (`host` a git host name, lowercase; `api`
+  `https` or loopback `http` with no user, query or fragment (`modules::reachable`); `app_id` at
+  least 1; one of `private_key_file` and `private_key_env`; one App once per host; `[valkey]`
+  required through `modules::needs`), each problem at the line of its own block (`error_in`).
+  `workspace::Manifest::github_apps` reads only `[valkey]` and the blocks, never a mirror, since
+  the helper runs on every git request. `credential` reads git's request strictly (`request`:
+  `key=value` lines to a blank line, at most `INPUT_MAX`, a fixed error that echoes nothing) and
+  the path as `<owner>/<repo>` (`repository`, lowercase); `get` lists each App's installations
+  when its `listed` mark has expired (`Run::refresh`, under a lock, at most every
+  `REFRESH_EVERY`, replaced in one `EVAL`), takes the owner's installations ordered by App id
+  and installation id, skips the throttled ones (all of them are tried when every one is),
+  picks one through an `INCR` counter, and answers its cached token or mints one under a
+  per-installation lock (`Run::token`), caching it until `TOKEN_MARGIN` before it expires; a
+  throttled mint passes to the next installation, and a `get` fails when every mint is throttled.
+  `erase` drops the cached token equal to the password git sends; `store` does nothing. `throttled`
+  marks the installation the repository's `last` key names; a URL it refuses is never echoed, since
+  it may carry a token. A 403 or 429 marks for `retry-after`, else until `x-ratelimit-reset` when
+  `x-ratelimit-remaining` is 0, else for a minute doubled while the mark holds (`Run::mark`).
+  Every key is `<key_prefix>:github-app:<host>:...` through `valkey::Config::key` (`Run::key`,
+  `app_key`, `installation_key`, `last_key`, one helper per shape): `app:<id>:`
+  `installations` (a hash, owner to installation id), `listed`, `listing`, `throttled`;
+  `installation:<id>:` `token` (`<expiry> <token>`), `mint`, `throttled`;
+  `owner:<owner>:next` (the counter, the only key with no TTL); `repo:<owner>/<repo>:last`. A
+  token must be visible ASCII before it is cached or answered, so the API cannot inject a
+  protocol line. Errors carry an HTTP status or a URL, never a body, and the JWT is scrubbed
+  from ureq's (`valkey::scrub`).
 - `snapshot.rs`, `snapshot/store.rs`, `snapshot/pull.rs` (feature `snapshot`; the only places
   `object_store`, `reqwest` as a client of Meada's own and `tar` are used): the snapshot store. `File` is the
   `[snapshot]` section and `File::validate` its `Config` (an `https` endpoint, or `http` on
@@ -1029,6 +1072,18 @@ one for the area a change touches.
   takes a token whose `aud` is `public_url` itself. The caps are inclusive: a body of exactly
   the cap is read. The `oidc` build carries `rsa`, whose RUSTSEC-2023-0071 (Marvin timing) hits
   private-key operations; Meada only verifies with public keys, so it does not apply.
+- `github_app.rs`: each REST request takes at most `REQUEST_TIMEOUT` (10 seconds) and reads at
+  most `ANSWER_MAX` (4 MiB); an App's installations are listed over at most `PAGES_MAX` pages of
+  100 (10,000 installations), the rest unseen; a `private_key_file` holds at most `KEY_MAX` (16
+  KiB) and git's request at most `INPUT_MAX` (64 KiB). The time margins are fixed, not
+  configured: `TOKEN_MARGIN` and `REFRESH_EVERY` (10 minutes each), the JWT's `JWT_LIFE` (9
+  minutes) and `JWT_BACKDATE` (60 s), `INSTALLATIONS_TTL` (the listed installations stay usable
+  an hour while listing fails), `LAST_TTL` (`throttled` finds the installation of a `get` within
+  an hour), `LOCK_TTL` (30 s, a listing or mint lock and the wait for another run's) and
+  `THROTTLE_MAX` (a mark lasts at most an hour). A lock that expires under its holder lets a
+  second run list or mint too. The `github-app` build signs with RustCrypto's `rsa`, whose
+  RUSTSEC-2023-0071 (Marvin timing) applies to private-key operations; the JWT is signed in the
+  job's process, at most once per App per run, where no remote party times it.
 - `mcp.rs`: the stop signal drains for at most `DRAIN` (25 seconds, no flag, under Kubernetes'
   30-second default grace period); past it the connections left are dropped, an answer still
   waiting on an index lock included, and the exit is 0.

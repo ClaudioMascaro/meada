@@ -105,11 +105,27 @@ All notable changes to Meada are recorded here. The format follows
   an asymmetric algorithm that fits its key, `iss`, `aud` (the configured audience, or the
   endpoint's URL, which its pins accept too), `exp` and `nbf`, and every configured scope; a
   missing or invalid token gets 401 with `WWW-Authenticate`, and a valid one whose
-  `identities_claim` does not list the endpoint's identity gets 403. Authentication runs before
-  routing, so a 404 needs a valid token and lists only what it may read. The JWKS is read again
+  `identities_claim` does not list the endpoint's identity gets 403; behind an endpoint it may
+  read, every answer covers only the repositories the claim lists (#290). A token may also be
+  granted through its groups: `groups_claim` with the `[oidc.groups]` table mapping a group to
+  identities, the grant being the union of both claims (#291). Authentication runs
+  before routing, so a 404 needs a valid token and lists only what it may read. The JWKS is read again
   every `jwks_refresh_seconds` and on an unknown `kid`, at most once a minute, keeping the cached
   keys when that fails. No token or part of one reaches stderr or an error; the proxy stays the
   documented default admission.
+- Server mode, GitHub App credentials (ADR 0013, feature `github-app`, blocks `[[github_app]]`
+  with `host`, `api`, `app_id` and one of `private_key_file` and `private_key_env`; needs
+  `[valkey]`): `meada github-app credential --workspace <manifest> <get|store|erase>` is git's
+  credential helper for the indexing job. `get` answers `x-access-token` and a GitHub App
+  installation token for a repository some installation covers, minted once and cached in
+  Valkey until 10 minutes before it expires; installations are listed from the GitHub API at
+  most every 10 minutes and taken round robin per owner, skipping the throttled ones. A
+  repository no installation covers gets no answer and exit 0, with one stderr line naming the
+  host and the owner. `erase` drops the token git was refused with. `meada github-app throttled
+  --workspace <manifest> <repository URL> [--retry-after <seconds>]`, run after a fetch that
+  failed with 403 or 429, marks the installation that served it; a 403 or 429 to the module's
+  own calls marks its installation or App the same way. No private key, JWT or token reaches
+  stderr or an error. `meada mcp --listen` never calls GitHub.
 - npm installer (spec #32): cargo-dist builds and publishes an npm package named `meada` with each
   release, at the crate's version, so `npx meada mcp` launches the MCP server and `npx meada
   <command>` runs any command; the release configuration is planned as a dry run on pull requests.

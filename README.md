@@ -422,18 +422,31 @@ não emite token, não registra cliente e nunca repassa um token.
 issuer = "https://id.exemplo.internal/realms/agentes"
 public_url = "https://meada.exemplo.internal"   # a URL que os clientes usam, atrás do proxy
 audience = "https://meada.exemplo.internal"     # opcional; padrão: a URL canônica do endpoint
-identities_claim = "meada_repositories"
+identities_claim = "meada_repositories"          # opcional com groups_claim
+groups_claim = "groups"                          # opcional, junto com [oidc.groups]
 scopes = ["meada:read"]                          # opcional, anunciado e exigido
 jwks_refresh_seconds = 3600                      # padrão; no mínimo 60
+
+[oidc.groups]                                    # um grupo do token: as identidades que ele libera
+"time-pagamentos" = ["github.exemplo.internal/acme/payments-api", "github.exemplo.internal/acme/ledger"]
+"plataforma" = ["*"]
 ```
 
 No provedor: um audience igual a `audience` (ou, sem ela, à URL de cada endpoint,
 `<public_url>/<identidade>`); um claim mapper que põe em `identities_claim` a lista das
-identidades que o cliente pode ler (`"*"` libera todas); e client credentials para os agentes
-headless e para o backend de um portal, que pedem o token ao provedor. Uma página no navegador
-não chama o Meada direto: com `[oidc]`, toda requisição com `Origin` recebe 403, em qualquer
-caminho, então um portal chama do seu backend. O proxy repassa sem mudar o `Authorization` e os
-cabeçalhos do SEP-2243 (`MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name`, `Mcp-Param-*`).
+identidades que o cliente pode ler (`"*"` libera todas), ou em `groups_claim` os grupos dele; e
+client credentials para os agentes headless e para o backend de um portal, que pedem o token ao
+provedor. Uma página no navegador não chama o Meada direto: com `[oidc]`, toda requisição com
+`Origin` recebe 403, em qualquer caminho, então um portal chama do seu backend. O proxy repassa
+sem mudar o `Authorization` e os cabeçalhos do SEP-2243 (`MCP-Protocol-Version`, `Mcp-Method`,
+`Mcp-Name`, `Mcp-Param-*`).
+
+Com `groups_claim`, a tabela `[oidc.groups]` do manifesto mapeia cada grupo para as identidades
+que ele libera (`"*"` para todas), e `identities_claim` fica opcional: as duas chaves vêm juntas,
+e uma seção sem nenhum dos dois claims recusa a subida. O token lê a união das identidades do seu
+`identities_claim` e das que os seus grupos mapeiam. Um claim ausente ou que não é um array de
+strings, um grupo que a tabela não mapeia e uma identidade que o servidor não serve não liberam
+nada; um erro de digitação aparece para quem chama como 403.
 
 Na subida, antes de escutar, o Meada lê os metadados do issuer (RFC 8414 ou OpenID Discovery,
 nos caminhos e na ordem que a especificação do MCP define, conferindo que o `issuer` do
@@ -459,13 +472,82 @@ para `scope`.
 
 Sem token, ou com um token que não passa: 401 com `WWW-Authenticate: Bearer
 resource_metadata="<public_url>/.well-known/oauth-protected-resource/<caminho>"`, mais
-`error="invalid_token"` quando veio um token e `scope` quando configurado. Um token válido cujo
-claim não lista a identidade do endpoint, num pin também: 403 com `error="insufficient_scope"`;
-sem um escopo exigido, o mesmo 403 com `scope`. A autenticação vem antes do roteamento: o 404
-da raiz, de um caminho desconhecido e de uma geração que o nó não guarda exige um token válido
-para aquele caminho (sem `audience`, o da raiz tem `aud` igual a `public_url`) e lista só as
-identidades que ele pode ler. Nenhum token nem pedaço de um token aparece em
-stderr ou num erro.
+`error="invalid_token"` quando veio um token e `scope` quando configurado. Um token válido que não
+pode ler a identidade do endpoint, num pin também: 403 com `error="insufficient_scope"`; sem um
+escopo exigido, o mesmo 403 com `scope`. Atrás de um endpoint que o token pode ler, toda resposta
+cobre só os repositórios que ele pode ler. A autenticação vem antes do roteamento: o 404 da raiz,
+de um caminho desconhecido e de uma geração que o nó não guarda exige um token válido para aquele
+caminho (sem `audience`, o da raiz tem `aud` igual a `public_url`) e lista só as identidades que
+ele pode ler. Nenhum token nem pedaço de um token aparece em stderr ou num erro.
+
+**GitHub App** (feature `github-app`, que inclui o Valkey; `cargo install meada --features
+github-app`). O Meada continua sem buscar nada: quem faz o fetch dos espelhos é o git do job de
+indexação, e o Meada só responde ao pedido de credencial do git com tokens de instalação de um
+ou mais GitHub Apps, emitidos e renovados por ele. As instalações são descobertas pela API do
+GitHub, não declaradas; a carga se reparte entre os Apps e as instalações, e uma instalação
+limitada fica de lado até liberar. Só o job usa o módulo: `meada mcp --listen` lê os blocos com
+o manifesto e nunca chama o GitHub.
+
+```toml
+[valkey]                                # obrigatório com [[github_app]]
+url = "rediss://meada@cache.exemplo.internal:6379"
+password_file = "/run/secrets/valkey"
+
+[[github_app]]
+host = "github.com"                     # o host git que ele atende, como o git o nomeia
+api = "https://api.github.com"          # a URL base da API REST; no GHES, https://<host>/api/v3
+app_id = 123456
+private_key_file = "/run/secrets/github-app.pem"   # ou private_key_env, nunca os dois
+```
+
+Pode haver vários blocos `[[github_app]]`, um por App (dois blocos do mesmo App no mesmo host são
+um erro). `api` precisa ser `https` fora de loopback, e um bloco sem `[valkey]`, sem chave ou com
+as duas, ou com uma chave desconhecida recusa a execução nomeando a chave ou a seção. A chave
+privada só vem do arquivo ou da variável e nunca aparece em stderr nem num erro, como o JWT do
+App e os tokens.
+
+No job, antes do fetch, o git usa o Meada como credential helper do host, com o caminho do
+repositório na requisição (use o caminho absoluto do manifesto, já que o git roda o helper no
+diretório do espelho):
+
+```sh
+git config --global credential.https://github.com.helper \
+  "!meada github-app credential --workspace /etc/meada/meada.workspace.toml"
+git config --global credential.useHttpPath true
+```
+
+Para `https://github.com/<owner>/<repo>`, o `get` responde `username=x-access-token`, um token
+de uma instalação que cobre o `<owner>` e o seu `password_expiry_utc`. As instalações de cada App
+são listadas com o JWT dele (RS256, emitido 60 s no passado, expirando em 9 minutos) e guardadas
+no Valkey, de novo no máximo a cada 10 minutos; um bloco novo entra no próximo `get`, sem
+reiniciar nada. Entre as instalações que cobrem o owner, em ordem estável (id do App, depois id
+da instalação), o Meada pula as marcadas como limitadas e escolhe uma em rodízio, por um contador
+no Valkey. Um token só é emitido quando o Valkey não guarda um daquela instalação com pelo menos
+10 minutos de vida; uma trava por instalação faz `get`s simultâneos emitirem uma vez só, e o
+token fica em cache até 10 minutos antes de expirar. Quem lê esse Valkey lê o código-fonte por
+esse tempo. Um repositório que nenhuma instalação cobre não recebe resposta, com saída 0 (o git
+tenta o próximo helper) e uma linha em stderr com o host e o owner. `store` não faz nada; o
+`erase`, que o git manda depois de um 401, descarta o token recusado, e o próximo `get` emite
+outro.
+
+Nem o git nem o GitHub avisam o helper de um limite secundário (403 ou 429). Por isso, depois de
+um fetch que falhou assim, o job roda:
+
+```sh
+meada github-app throttled --workspace /etc/meada/meada.workspace.toml \
+  https://github.com/<owner>/<repo> --retry-after <segundos>
+```
+
+Isso marca como limitada a instalação que respondeu por último para aquele repositório (o Meada
+lembra por uma hora), até o `--retry-after` ou, sem ele, por 1 minuto, dobrando a cada repetição
+enquanto a marca vale. As chamadas REST do próprio módulo que recebem 403 ou 429 marcam a sua
+instalação (um token) ou o seu App (a listagem) do mesmo jeito, pelo `retry-after`, senão pelo
+`x-ratelimit-reset` quando `x-ratelimit-remaining` é 0, senão por 1 minuto; um `get` cujo token
+foi limitado passa para a próxima instalação. Com git 2.54 ou mais novo, `http.maxRetries`
+faz o próprio git respeitar o `Retry-After` de um 429 nas suas requisições GET.
+
+No GitHub.com e no GitHub Enterprise Cloud, `api` fica fora da fronteira do operador; isso é
+aceito porque os fetches do job já vão para esse host (ADR 0013).
 
 ## Decisões
 

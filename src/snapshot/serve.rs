@@ -262,7 +262,7 @@ mod tests {
         let routed = current.get().unwrap();
         // The pointer moves between the route and the answer.
         point(&local, B);
-        let engine = Engine::open_held(&routed, REPO).unwrap();
+        let engine = Engine::open_held(&routed, REPO, &|_| true).unwrap();
         assert!(engine.search("alpha", None, None).unwrap().contains("a.ts"));
         let beta = engine.search("beta", None, None).unwrap();
         assert!(beta.starts_with("no matches"), "{beta}");
@@ -294,7 +294,7 @@ mod tests {
         let current = Current::new(local.clone());
         let pinned = current.pinned(A).unwrap().unwrap();
         assert_eq!(pinned.id, A);
-        let engine = Engine::open_held(&pinned, REPO).unwrap();
+        let engine = Engine::open_held(&pinned, REPO, &|_| true).unwrap();
         assert!(engine.search("alpha", None, None).unwrap().contains("a.ts"));
         assert_eq!(current.get().unwrap().id, B);
         assert!(current.pinned("00000000000000cc").unwrap().is_none());
@@ -387,7 +387,10 @@ mod tests {
         point(&local, A);
         fs::remove_file(local.join(A).join(BUNDLE).join("index.db")).unwrap();
         let held = held(&local).unwrap();
-        let e = Engine::open_held(&held, REPO).err().unwrap().to_string();
+        let e = Engine::open_held(&held, REPO, &|_| true)
+            .err()
+            .unwrap()
+            .to_string();
         let dir = local.join(A).display().to_string();
         assert!(e.contains(&format!("generation {A}; remove {dir} and run meada snapshot pull again, or publish a new generation")), "{e}");
     }

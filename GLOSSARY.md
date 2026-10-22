@@ -78,6 +78,18 @@ moves only to a higher fence and a node's never to a lower one, so a stalled job
 a newer generation; without the lock every fence is `0`.
 _Avoid_: epoch, version, fencing number
 
+**GitHub App**:
+A `[[github_app]]` block of the workspace manifest: the git host it serves, its REST `api`, its
+App id and its private key. With the module, Meada answers the indexing job's git credential
+requests with tokens of the App's installations (ADR 0013).
+_Avoid_: connection, integration, bot
+
+**Installation**:
+A GitHub App installed on an owner (a user or an organisation), GitHub's own term. Meada lists
+each App's installations from the GitHub API, keeps them in Valkey, and mints an installation
+token for the one it picks for a repository of that owner.
+_Avoid_: connection, account, tenant
+
 ### Across repositories
 
 **Peer**:

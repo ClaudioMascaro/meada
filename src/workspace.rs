@@ -230,6 +230,9 @@ struct ManifestFile {
     refresh_lock: Option<crate::snapshot::lock::File>,
     #[cfg(feature = "oidc")]
     oidc: Option<crate::oidc::File>,
+    #[cfg(feature = "github-app")]
+    #[serde(default, rename = "github_app")]
+    github_apps: Vec<crate::github_app::File>,
 }
 
 /// A `[[repository]]`: `serve` and `resource` take the shapes of `meada.toml`'s, `peer` that
@@ -318,6 +321,10 @@ impl Manifest {
         }
         #[cfg(feature = "oidc")]
         let oidc = modules::validated(file, &src, parsed.oidc, |o| o.validate())?;
+        // The `[[github_app]]` blocks are checked, `[valkey]` among their needs; only
+        // `github_apps` keeps them.
+        #[cfg(feature = "github-app")]
+        crate::github_app::validated(file, &src, base, parsed.github_apps, valkey.is_some())?;
         // Each entry's blocks as written, in manifest order: the typed read checked them.
         #[cfg(feature = "snapshot")]
         let mut written = crate::snapshot::entry_blocks(&src).into_iter();
@@ -383,6 +390,26 @@ impl Manifest {
             #[cfg(feature = "oidc")]
             oidc,
         })
+    }
+
+    /// The `[valkey]` section and the `[[github_app]]` blocks of the manifest at `file`,
+    /// checked as `read` checks them, without reading any mirror: what each git credential
+    /// request needs (`meada github-app`), where `read` would run `git` in every mirror.
+    #[cfg(feature = "github-app")]
+    pub(crate) fn github_apps(
+        file: &Path,
+    ) -> Result<(
+        Option<crate::valkey::Config>,
+        Vec<crate::github_app::Config>,
+    )> {
+        let src = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
+        modules::check(file, &src)?;
+        let parsed: ManifestFile = config::parse(file, &src, "meada.workspace.toml")?;
+        let base = file.parent().unwrap_or(Path::new(""));
+        let valkey = modules::validated(file, &src, parsed.valkey, |v| v.validate(base))?;
+        let has_valkey = valkey.is_some();
+        let apps = crate::github_app::validated(file, &src, base, parsed.github_apps, has_valkey)?;
+        Ok((valkey, apps))
     }
 
     /// The workspace of a pulled generation (`meada snapshot pull`, ADR 0012), which `dir`
@@ -473,10 +500,15 @@ impl Manifest {
         missing
     }
 
-    /// The workspace of a query about `first`: every listed repository, `first` first, then
-    /// manifest order. Refused while any entry cannot be served, naming each problem.
-    pub fn workspace(self, first: &str) -> Result<Workspace> {
-        let missing = self.missing();
+    /// The workspace of a query about `first`: every listed repository that `reads` (a token's
+    /// grant, #290), `first` first, then manifest order. One it does not read is absent, as if
+    /// the manifest did not list it, and is not missing either. Refused while any entry kept
+    /// cannot be served, naming each problem.
+    pub fn workspace(mut self, first: &str, reads: &dyn Fn(&str) -> bool) -> Result<Workspace> {
+        // Before `missing`, so neither a problem nor a missing peer names one left out.
+        self.entries.retain(|l| reads(&l.repo));
+        let mut missing = self.missing();
+        missing.retain(|m| reads(&m.repo));
         let mut repos = Vec::new();
         let mut problems = Vec::new();
         for listed in self.entries {

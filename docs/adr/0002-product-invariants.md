@@ -45,7 +45,9 @@ amended for it (2 and 4) and one was added (6).
    operator refreshes with `meada index`.) It exposes few tools and returns compact output under a default token budget. A
    write tool needs a new ADR. Peers are local paths only: Meada never clones or fetches a peer,
    so the network stays out of indexing. (Amended 2026-10-21; ADR 0012: `meada snapshot pull`
-   moves bundles Meada published; it never fetches from a git remote.)
+   moves bundles Meada published; it never fetches from a git remote.) (Amended 2026-10-22;
+   #289: Meada still never fetches. With the GitHub App module of ADR 0013, git fetches the
+   operator's mirrors and Meada answers git's credential request with an installation token.)
 5. Each repository keeps its own index; cross-repo context links indexes without merging them.
 6. Determinism: the same inputs (the source tree, `meada.toml` and `meada.decisions.toml`) give
    the same answers and the same canonical export (`meada export`, sorted JSON). The index file

@@ -128,7 +128,10 @@ before: the stdio server, discovery and freshness on demand are unchanged.
   one fact two sources.
 - In server mode the workspace of every query is every repository the manifest lists, the named
   one first. Peers named in a `meada.toml` but absent from the manifest are reported missing,
-  as today; Meada does not look for them by path hint or sibling clone.
+  as today; Meada does not look for them by path hint or sibling clone. (Amended 2026-10-22;
+  #290: under an OIDC grant, ADR 0012, the workspace is the granted repositories of the
+  manifest, the named one first, then manifest order; a repository outside the grant is absent
+  from every answer and is not reported missing.)
 - Each repository's `meada.decisions.toml` is still read from its mirror. Server mode never runs
   `meada decide`.
 - Locally nothing changes: discovery by `[[peer]]` hints and sibling clones works as ADR 0005
@@ -219,7 +222,9 @@ mirrors are kept clean by the operator's job.
   cost this ADR removes.
 - **A watcher in the server.** ADR 0004 rejected it, and the fetch job already knows when a
   mirror moves.
-- **Meada fetching mirrors itself.** Puts the network in Meada (invariant 4).
+- **Meada fetching mirrors itself.** Puts the network in Meada (invariant 4). (Amended
+  2026-10-22; #289: still rejected. ADR 0013's GitHub App module only answers the credential
+  request of the operator's own `git fetch`; the job fetches.)
 - **A snapshot of the whole workspace per refresh.** Needs one database or a generation scheme
   across indexes (invariant 5); per-repository consistency suffices while links derive at query
   time. (Amended 2026-10-21; ADR 0012: the snapshot module adopts it as opt-in, for several

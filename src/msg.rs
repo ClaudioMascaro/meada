@@ -50,6 +50,8 @@ pub enum Msg<'a> {
     },
     WorkspaceHelp,
     ListenHelp,
+    /// A tool call on a served workspace that reached the server without passing admission.
+    NotAdmitted,
     RepoHelp,
     IgnoredBlock {
         block: &'a str,
@@ -315,12 +317,16 @@ pub enum Msg<'a> {
     SnapshotStoreReachable(&'a str),
     #[cfg(feature = "snapshot")]
     SnapshotStoreUnreachable(&'a str),
-    #[cfg(feature = "generation-pointer")]
+    #[cfg(any(feature = "generation-pointer", feature = "github-app"))]
     NeedsSections {
         section: &'a str,
         needed: &'a [&'a str],
     },
-    #[cfg(any(feature = "generation-pointer", feature = "oidc"))]
+    #[cfg(any(
+        feature = "generation-pointer",
+        feature = "oidc",
+        feature = "github-app"
+    ))]
     AtLeast(i64),
     #[cfg(feature = "generation-pointer")]
     GenerationsBadPointer(&'a str),
@@ -385,6 +391,9 @@ pub enum Msg<'a> {
     OidcJwksUrl,
     #[cfg(feature = "oidc")]
     OidcEmpty,
+    /// An `[oidc]` section with neither `identities_claim` nor `groups_claim`.
+    #[cfg(feature = "oidc")]
+    OidcNoClaim,
     /// A configured scope holding a character no RFC 6749 scope-token carries.
     #[cfg(feature = "oidc")]
     OidcScope {
@@ -414,6 +423,72 @@ pub enum Msg<'a> {
     },
     #[cfg(feature = "snapshot")]
     GenerationsHelp,
+    #[cfg(feature = "github-app")]
+    GithubApp,
+    #[cfg(feature = "github-app")]
+    GithubAppCredential,
+    #[cfg(feature = "github-app")]
+    GithubAppAction,
+    #[cfg(feature = "github-app")]
+    GithubAppThrottled,
+    #[cfg(feature = "github-app")]
+    GithubAppRepository,
+    #[cfg(feature = "github-app")]
+    GithubAppRetryAfter,
+    /// A `host` that is not a git host name with an optional port.
+    #[cfg(feature = "github-app")]
+    GithubAppHost,
+    /// An `api` that is not `https` (or `http` on loopback) with a host and no user, query or
+    /// fragment.
+    #[cfg(feature = "github-app")]
+    GithubAppApi,
+    #[cfg(feature = "github-app")]
+    GithubAppKeyBoth,
+    #[cfg(feature = "github-app")]
+    GithubAppKeyNone,
+    #[cfg(feature = "github-app")]
+    GithubAppTwice,
+    /// The App's key, named by where it comes from, does not read as an RSA key in PEM.
+    #[cfg(feature = "github-app")]
+    GithubAppKey(&'a str),
+    #[cfg(feature = "github-app")]
+    GithubAppInput,
+    #[cfg(feature = "github-app")]
+    GithubAppPath,
+    #[cfg(feature = "github-app")]
+    GithubAppNoPath(&'a str),
+    #[cfg(feature = "github-app")]
+    GithubAppUncovered {
+        host: &'a str,
+        owner: &'a str,
+    },
+    #[cfg(feature = "github-app")]
+    GithubAppAllThrottled(&'a str),
+    /// A `get` whose every candidate's mint was throttled.
+    #[cfg(feature = "github-app")]
+    GithubAppNoToken(&'a str),
+    #[cfg(feature = "github-app")]
+    GithubAppStatus {
+        url: &'a str,
+        status: u16,
+    },
+    #[cfg(feature = "github-app")]
+    GithubAppAnswer(&'a str),
+    /// What a REST call answered 403 or 429 marked: an App or an installation, for `secs`.
+    #[cfg(feature = "github-app")]
+    GithubAppMarked {
+        what: &'a str,
+        secs: u64,
+    },
+    #[cfg(feature = "github-app")]
+    GithubAppWaited {
+        what: &'a str,
+        secs: u64,
+    },
+    #[cfg(feature = "github-app")]
+    GithubAppNotAnswered(&'a str),
+    #[cfg(feature = "github-app")]
+    GithubAppRepositoryUrl,
     About,
     Index,
     Status,
@@ -551,6 +626,10 @@ impl Msg<'_> {
                 "Modo servidor: serve por MCP streamable HTTP em host:porta, :porta ou porta \
                  (loopback sem host), com --workspace"
                     .into(),
+            ),
+            Msg::NotAdmitted => pick(
+                "the request was not admitted".into(),
+                "a requisição não foi admitida".into(),
             ),
             Msg::RepoHelp => pick(
                 "Server mode: the identity of the repository to export".into(),
@@ -1165,7 +1244,7 @@ impl Msg<'_> {
                 format!("store: unreachable ({reason})"),
                 format!("store: inalcançável ({reason})"),
             ),
-            #[cfg(feature = "generation-pointer")]
+            #[cfg(any(feature = "generation-pointer", feature = "github-app"))]
             Msg::NeedsSections { section, needed } => {
                 let needed: Vec<String> = needed.iter().map(|s| format!("[{s}]")).collect();
                 pick(
@@ -1173,7 +1252,7 @@ impl Msg<'_> {
                     format!("[{section}] exige {}", needed.join(" e ")),
                 )
             }
-            #[cfg(any(feature = "generation-pointer", feature = "oidc"))]
+            #[cfg(any(feature = "generation-pointer", feature = "oidc", feature = "github-app"))]
             Msg::AtLeast(min) => pick(
                 format!("must be at least {min}"),
                 format!("deve ser pelo menos {min}"),
@@ -1367,6 +1446,11 @@ impl Msg<'_> {
             #[cfg(feature = "oidc")]
             Msg::OidcEmpty => pick("must not be empty".into(), "não pode ser vazio".into()),
             #[cfg(feature = "oidc")]
+            Msg::OidcNoClaim => pick(
+                "set `identities_claim`, `groups_claim` or both".into(),
+                "defina `identities_claim`, `groups_claim` ou os dois".into(),
+            ),
+            #[cfg(feature = "oidc")]
             Msg::OidcScope { scope, bad } => pick(
                 format!("{scope:?} holds {bad:?}, which a scope cannot carry (RFC 6749)"),
                 format!("{scope:?} contém {bad:?}, que um escopo não pode ter (RFC 6749)"),
@@ -1411,6 +1495,145 @@ impl Msg<'_> {
                 "Usa a geração que `meada snapshot pull` tornou atual neste nó, com a seção \
                  [snapshot] do manifesto de --workspace"
                     .into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubApp => pick(
+                "git credentials from GitHub App installation tokens, for the indexing job."
+                    .into(),
+                "Credenciais do git a partir de tokens de instalação de GitHub App, para o job \
+                 de indexação."
+                    .into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppCredential => pick(
+                "git's credential helper: answer get with an installation token, ignore store, \
+                 drop the cached token on erase."
+                    .into(),
+                "Credential helper do git: responde get com um token de instalação, ignora \
+                 store, descarta o token em cache no erase."
+                    .into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppAction => pick(
+                "The operation git asks for: get, store or erase.".into(),
+                "A operação que o git pede: get, store ou erase.".into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppThrottled => pick(
+                "Mark the installation that last answered for a repository as throttled, after \
+                 a fetch that failed with 403 or 429."
+                    .into(),
+                "Marca como limitada a instalação que respondeu por último para um repositório, \
+                 depois de um fetch que falhou com 403 ou 429."
+                    .into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppRepository => pick(
+                "The https URL of the repository whose fetch failed.".into(),
+                "A URL https do repositório cujo fetch falhou.".into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppRetryAfter => pick(
+                "The Retry-After of the failed fetch, in seconds; without it, 1 minute, doubled \
+                 on each repeat."
+                    .into(),
+                "O Retry-After do fetch que falhou, em segundos; sem ele, 1 minuto, dobrado a \
+                 cada repetição."
+                    .into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppHost => pick(
+                "must be a git host name, with an optional port".into(),
+                "deve ser o nome de um host git, com uma porta opcional".into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppApi => pick(
+                "must be an https:// URL with a host and no user, query or fragment (http:// \
+                 only on loopback)"
+                    .into(),
+                "deve ser uma URL https:// com um host e sem usuário, query ou fragmento \
+                 (http:// só em loopback)"
+                    .into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppKeyBoth => pick(
+                "is set together with private_key_file: use one of the two".into(),
+                "está junto de private_key_file: use um dos dois".into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppKeyNone => pick(
+                "needs private_key_file or private_key_env".into(),
+                "exige private_key_file ou private_key_env".into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppTwice => pick(
+                "names an App another [[github_app]] block already lists for this host".into(),
+                "nomeia um App que outro bloco [[github_app]] já lista para este host".into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppKey(source) => pick(
+                format!("{source}: not an RSA private key in PEM"),
+                format!("{source}: não é uma chave privada RSA em PEM"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppInput => pick(
+                "git's request is not key=value lines within 64 KiB".into(),
+                "o pedido do git não são linhas key=value em até 64 KiB".into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppPath => pick(
+                "git's path is not <owner>/<repo>".into(),
+                "o path do git não é <owner>/<repo>".into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppNoPath(host) => pick(
+                format!("{host}: git sent no path; set credential.useHttpPath = true"),
+                format!("{host}: o git não mandou path; defina credential.useHttpPath = true"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppUncovered { host, owner } => pick(
+                format!("no GitHub App installation covers {host}/{owner}"),
+                format!("nenhuma instalação de GitHub App cobre {host}/{owner}"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppAllThrottled(owner) => pick(
+                format!("every installation covering {owner} is throttled; trying them anyway"),
+                format!("toda instalação que cobre {owner} está limitada; tentando assim mesmo"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppNoToken(owner) => pick(
+                format!("no installation covering {owner} gave a token: each mint was throttled"),
+                format!("nenhuma instalação que cobre {owner} deu um token: cada mint foi limitado"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppStatus { url, status } => pick(
+                format!("{url}: http status {status}"),
+                format!("{url}: status http {status}"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppAnswer(url) => pick(
+                format!("{url}: not an answer GitHub gives"),
+                format!("{url}: não é uma resposta que o GitHub dá"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppMarked { what, secs } => pick(
+                format!("{what}: throttled for {secs} s"),
+                format!("{what}: limitado por {secs} s"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppWaited { what, secs } => pick(
+                format!("{what}: another run's mint did not finish within {secs} s"),
+                format!("{what}: o mint de outra execução não terminou em {secs} s"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppNotAnswered(repo) => pick(
+                format!("no installation answered for {repo} within the last hour; nothing marked"),
+                format!("nenhuma instalação respondeu por {repo} na última hora; nada marcado"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppRepositoryUrl => pick(
+                "the repository URL is not https://<host>/<owner>/<repo>".into(),
+                "a URL do repositório não é https://<host>/<owner>/<repo>".into(),
             ),
             Msg::About => pick(
                 "LLM-free code graph for agents and people".into(),

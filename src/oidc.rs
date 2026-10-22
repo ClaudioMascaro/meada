@@ -15,12 +15,15 @@
 //! a token, and checks the token: an asymmetric `alg` that fits the key, the signature, `iss`,
 //! `aud`, `exp` (required) and `nbf` with `LEEWAY`, and every configured scope. A missing or invalid token is
 //! a 401 naming the metadata. What passes is a `Grant`: the identities the token's
-//! `identities_claim` lists (`*` for all), which routing checks (403) and lists (404).
+//! `identities_claim` lists, and those `[oidc.groups]` maps the groups of its `groups_claim` to
+//! (#291; `*` from either for all). Routing checks it (403) and lists it (404), and it bounds the
+//! workspace of every answer behind it (#290): a repository outside it is absent. An identity the
+//! server does not serve grants nothing.
 //!
-//! Meada never forwards a token, and no error or stderr line holds one or any of its parts:
-//! the 401 and 403 bodies are fixed, and a refused token is never described.
+//! Meada never forwards a token, and no error or stderr line holds one or any of its parts (a
+//! group, an identity): the 401 and 403 bodies are fixed, and a refused token is never described.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, RwLock, Weak};
@@ -36,6 +39,7 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 use ureq::http::Uri;
 
+use crate::modules::{Shape, agent, reachable};
 use crate::msg::Msg;
 
 /// An answer of the server.
@@ -90,7 +94,10 @@ pub struct File {
     issuer: String,
     public_url: String,
     audience: Option<String>,
-    identities_claim: String,
+    identities_claim: Option<String>,
+    groups_claim: Option<String>,
+    /// `[oidc.groups]`: a group to the identities it grants.
+    groups: Option<HashMap<String, Vec<String>>>,
     scopes: Option<Vec<String>>,
     jwks_refresh_seconds: Option<i64>,
 }
@@ -105,7 +112,9 @@ pub struct Config {
     /// The `aud` every token carries; without it, the resource the path names.
     pub audience: Option<String>,
     /// The claim listing the identities a token may read.
-    pub claim: String,
+    pub claim: Option<String>,
+    /// The claim listing a token's groups, and the identities each group grants.
+    pub groups: Option<(String, HashMap<String, Vec<String>>)>,
     /// The scopes announced and required.
     pub scopes: Vec<String>,
     /// How often the JWKS is fetched again.
@@ -114,7 +123,7 @@ pub struct Config {
 
 impl File {
     pub fn validate(self) -> Result<Config, crate::modules::Problem> {
-        if !reachable(&self.issuer, Shape::Issuer) {
+        if !reachable(&self.issuer, Shape::Path) {
             return Err(("oidc.issuer", Msg::OidcUrl { bare: false }.text()));
         }
         if !reachable(&self.public_url, Shape::Bare) {
@@ -123,8 +132,24 @@ impl File {
         if self.audience.as_deref() == Some("") {
             return Err(("oidc.audience", Msg::OidcEmpty.text()));
         }
-        if self.identities_claim.is_empty() {
+        if self.identities_claim.as_deref() == Some("") {
             return Err(("oidc.identities_claim", Msg::OidcEmpty.text()));
+        }
+        let groups = match (self.groups_claim, self.groups) {
+            (Some(claim), _) if claim.is_empty() => {
+                return Err(("oidc.groups_claim", Msg::OidcEmpty.text()));
+            }
+            (Some(claim), Some(table)) => Some((claim, table)),
+            (Some(_), None) => {
+                return Err(("oidc.groups_claim", Msg::KeyMissing("oidc.groups").text()));
+            }
+            (None, Some(_)) => {
+                return Err(("oidc.groups", Msg::KeyMissing("oidc.groups_claim").text()));
+            }
+            (None, None) => None,
+        };
+        if self.identities_claim.is_none() && groups.is_none() {
+            return Err(("oidc.identities_claim", Msg::OidcNoClaim.text()));
         }
         let scopes = self.scopes.unwrap_or_default();
         for scope in &scopes {
@@ -145,52 +170,17 @@ impl File {
             public_url: self.public_url.trim_end_matches('/').to_string(),
             audience: self.audience,
             claim: self.identities_claim,
+            groups,
             scopes,
             refresh,
         })
     }
 }
 
-/// What an `[oidc]` URL may hold past its host.
-#[derive(Clone, Copy, PartialEq)]
-enum Shape {
-    /// A path (`issuer`).
-    Issuer,
-    /// Nothing (`public_url`).
-    Bare,
-    /// A path and a query (the metadata's `jwks_uri`).
-    Jwks,
-}
-
-/// Whether `url` is an endpoint the module may name: `https`, or `http` on loopback
-/// (`localhost`, `127.0.0.0/8`, `::1`; an IPv4-mapped address is not loopback), with a host, no
-/// user and no fragment, and past its host what `shape` allows.
-fn reachable(url: &str, shape: Shape) -> bool {
-    let Ok(uri) = url.parse::<Uri>() else {
-        return false;
-    };
-    let (Some(authority), Some(host)) = (uri.authority(), uri.host()) else {
-        return false;
-    };
-    if authority.as_str().contains('@') || url.contains('#') {
-        return false;
-    }
-    if uri.query().is_some() && shape != Shape::Jwks {
-        return false;
-    }
-    if shape == Shape::Bare && !matches!(uri.path(), "" | "/") {
-        return false;
-    }
-    match uri.scheme_str() {
-        Some("https") => true,
-        Some("http") => crate::modules::loopback(host),
-        _ => false,
-    }
-}
-
 /// What a token admitted may read.
+#[derive(Clone)]
 pub enum Grant {
-    /// Its claim lists `*`.
+    /// Its claim lists `*`, or one of its groups maps to it.
     All,
     Only(HashSet<String>),
 }
@@ -203,16 +193,33 @@ impl Grant {
         }
     }
 
-    /// The grant of `claim`, an array of identities; anything else grants nothing.
-    fn of(claim: Option<&Value>) -> Self {
-        let listed =
-            (claim.and_then(Value::as_array).into_iter().flatten()).filter_map(Value::as_str);
-        let listed: HashSet<String> = listed.map(str::to_string).collect();
+    /// The grant of `claims` under `config`: the identities its claim lists and those its groups
+    /// map to. A claim that is not an array of strings, and a group the table lacks, grant
+    /// nothing.
+    fn of(claims: &Map<String, Value>, config: &Config) -> Self {
+        let listed = config.claim.iter().flat_map(|claim| strings(claims, claim));
+        let mapped = (config.groups.iter()).flat_map(|(claim, table)| {
+            (strings(claims, claim).filter_map(|group| table.get(group)))
+                .flatten()
+                .map(String::as_str)
+        });
+        let listed: HashSet<String> = listed.chain(mapped).map(str::to_string).collect();
         match listed.contains("*") {
             true => Grant::All,
             false => Grant::Only(listed),
         }
     }
+}
+
+/// The strings of `claims`' array `claim`; none when it is no array or holds anything but
+/// strings, so a malformed claim fails closed.
+fn strings<'a>(
+    claims: &'a Map<String, Value>,
+    claim: &str,
+) -> impl Iterator<Item = &'a str> + use<'a> {
+    let array = claims.get(claim).and_then(Value::as_array);
+    let strings = array.and_then(|a| a.iter().map(Value::as_str).collect::<Option<Vec<_>>>());
+    strings.into_iter().flatten()
 }
 
 /// Why a token is not admitted.
@@ -234,22 +241,6 @@ pub struct Oidc {
     keys: RwLock<Arc<Vec<Jwk>>>,
     /// When an unknown `kid` last made the module fetch the JWKS.
     kid_fetched: Mutex<Option<Instant>>,
-}
-
-/// The client of the issuer: no redirect, no proxy, a bound on each request, and the system's
-/// roots for `https`.
-fn agent(timeout: Duration) -> ureq::Agent {
-    let tls = ureq::tls::TlsConfig::builder()
-        .root_certs(ureq::tls::RootCerts::PlatformVerifier)
-        .build();
-    ureq::Agent::config_builder()
-        .timeout_global(Some(timeout))
-        .max_redirects(0)
-        .http_status_as_error(false)
-        .proxy(None)
-        .tls_config(tls)
-        .build()
-        .into()
 }
 
 /// `GET url`, at most `max` bytes of a success answer; a redirect is no success.
@@ -314,7 +305,7 @@ fn metadata(agent: &ureq::Agent, url: &str, issuer: &str) -> Result<String, Stri
         return Err(Msg::OidcIssuerMismatch(&metadata.issuer).text());
     }
     let jwks_uri = metadata.jwks_uri.unwrap_or_default();
-    match reachable(&jwks_uri, Shape::Jwks) {
+    match reachable(&jwks_uri, Shape::Query) {
         true => Ok(jwks_uri),
         false => Err(Msg::OidcJwksUri(&Msg::OidcJwksUrl.text()).text()),
     }
@@ -585,7 +576,7 @@ impl Oidc {
         {
             return Err(Refusal::Scope);
         }
-        Ok(Grant::of(claims.get(&self.config.claim)))
+        Ok(Grant::of(&claims, &self.config))
     }
 
     fn keys(&self) -> Arc<Vec<Jwk>> {
@@ -637,12 +628,83 @@ mod tests {
 
     use super::*;
 
-    fn section(extra: &str) -> Result<Config, crate::modules::Problem> {
+    /// The section with `issuer`, `public_url` and `rest`.
+    fn bare(rest: &str) -> Result<Config, crate::modules::Problem> {
         let src = format!(
             "issuer = \"https://id.example/realms/agents\"\npublic_url = \
-             \"https://meada.example/\"\nidentities_claim = \"meada_repositories\"\n{extra}"
+             \"https://meada.example/\"\n{rest}"
         );
         toml::from_str::<File>(&src).unwrap().validate()
+    }
+
+    fn section(extra: &str) -> Result<Config, crate::modules::Problem> {
+        bare(&format!(
+            "identities_claim = \"meada_repositories\"\n{extra}"
+        ))
+    }
+
+    #[test]
+    fn the_claims_and_the_groups_table_are_checked_together() {
+        let groups = "[groups]\n\"team-a\" = [\"a\"]\n";
+        let config = bare(&format!("groups_claim = \"groups\"\n{groups}")).unwrap();
+        assert_eq!(config.claim, None);
+        let table = HashMap::from([("team-a".to_string(), vec!["a".to_string()])]);
+        assert_eq!(config.groups, Some(("groups".to_string(), table)));
+        let key = |rest: &str| bare(rest).unwrap_err();
+        let missing = |key: &str| Msg::KeyMissing(key).text();
+        assert_eq!(
+            key("groups_claim = \"groups\"\n"),
+            ("oidc.groups_claim", missing("oidc.groups"))
+        );
+        assert_eq!(key(groups), ("oidc.groups", missing("oidc.groups_claim")));
+        assert_eq!(
+            key(&format!("groups_claim = \"\"\n{groups}")),
+            ("oidc.groups_claim", Msg::OidcEmpty.text())
+        );
+        assert_eq!(
+            key("identities_claim = \"\"\n"),
+            ("oidc.identities_claim", Msg::OidcEmpty.text())
+        );
+        assert_eq!(key(""), ("oidc.identities_claim", Msg::OidcNoClaim.text()));
+    }
+
+    /// What `claims` grants under `[oidc.groups]` mapping `g` to `b` and `p` to `*`: `None` for
+    /// all, else the identities, sorted.
+    fn granted(claims: Value) -> Option<Vec<String>> {
+        let table = HashMap::from([
+            ("g".to_string(), vec!["b".to_string()]),
+            ("p".to_string(), vec!["*".to_string()]),
+        ]);
+        let config = Config {
+            groups: Some(("groups".into(), table)),
+            ..config(None, &[])
+        };
+        match Grant::of(claims.as_object().unwrap(), &config) {
+            Grant::All => None,
+            Grant::Only(identities) => {
+                let mut identities: Vec<String> = identities.into_iter().collect();
+                identities.sort();
+                Some(identities)
+            }
+        }
+    }
+
+    #[test]
+    fn a_grant_is_the_union_of_the_identities_and_what_the_groups_map_to() {
+        use serde_json::json;
+        let only = |identities: &[&str]| Some(identities.iter().map(|s| s.to_string()).collect());
+        assert_eq!(granted(json!({"groups": ["g"]})), only(&["b"]));
+        assert_eq!(granted(json!({"meada_repositories": ["a"]})), only(&["a"]));
+        let both = json!({"meada_repositories": ["a"], "groups": ["g"]});
+        assert_eq!(granted(both), only(&["a", "b"]));
+        assert_eq!(granted(json!({"groups": ["g", "p"]})), None);
+        assert_eq!(granted(json!({"groups": ["unmapped"]})), only(&[]));
+        // Not an array of strings grants nothing, even through its string elements.
+        let shapes = json!({"meada_repositories": "a", "groups": [{"g": 1}, 7, "g"]});
+        assert_eq!(granted(shapes), only(&[]));
+        assert_eq!(granted(json!({"meada_repositories": ["a", 7]})), only(&[]));
+        assert_eq!(granted(json!({"groups": "g"})), only(&[]));
+        assert_eq!(granted(json!({})), only(&[]));
     }
 
     #[test]
@@ -660,7 +722,7 @@ mod tests {
             "http://127.0.0.1:9",
             "http://[::1]:9",
         ] {
-            assert!(reachable(good, Shape::Issuer), "{good}");
+            assert!(reachable(good, Shape::Path), "{good}");
         }
         for bad in [
             "http://id.example",
@@ -676,17 +738,17 @@ mod tests {
             "http://[::ffff:127.0.0.1]",
             "http://localhost:80@evil.com",
         ] {
-            assert!(!reachable(bad, Shape::Issuer), "{bad}");
+            assert!(!reachable(bad, Shape::Path), "{bad}");
         }
         assert!(!reachable("https://meada.example/prefix", Shape::Bare));
         // A `jwks_uri` may carry a query, never a user or a fragment.
-        assert!(reachable("https://id.example/jwks?realm=a", Shape::Jwks));
+        assert!(reachable("https://id.example/jwks?realm=a", Shape::Query));
         for bad in [
             "https://u@id.example/jwks?realm=a",
             "https://id.example/jwks?realm=a#f",
             "http://id.example/jwks?realm=a",
         ] {
-            assert!(!reachable(bad, Shape::Jwks), "{bad}");
+            assert!(!reachable(bad, Shape::Query), "{bad}");
         }
         let key = |extra: &str| section(extra).unwrap_err().0;
         assert_eq!(
@@ -805,7 +867,8 @@ mod tests {
             issuer: ISSUER.into(),
             public_url: PUBLIC.into(),
             audience: audience.map(str::to_string),
-            claim: "meada_repositories".into(),
+            claim: Some("meada_repositories".into()),
+            groups: None,
             scopes: scopes.iter().map(|s| s.to_string()).collect(),
             refresh: Duration::from_secs(3600),
         }

@@ -13,6 +13,8 @@ mod document;
 mod drift_view;
 pub mod engine;
 mod entry;
+#[cfg(feature = "github-app")]
+pub mod github_app;
 mod http;
 mod index;
 #[doc(hidden)]

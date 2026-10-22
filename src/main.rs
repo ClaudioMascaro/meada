@@ -66,6 +66,61 @@ enum Command {
         #[command(subcommand)]
         command: SnapshotCommand,
     },
+    #[cfg(feature = "github-app")]
+    GithubApp {
+        #[command(subcommand)]
+        command: GithubAppCommand,
+    },
+}
+
+/// `meada github-app` (ADR 0013, feature `github-app`).
+#[cfg(feature = "github-app")]
+#[derive(Subcommand)]
+enum GithubAppCommand {
+    Credential {
+        #[arg(long)]
+        workspace: PathBuf,
+        #[arg(value_parser = ["get", "store", "erase"])]
+        action: String,
+    },
+    Throttled {
+        #[arg(long)]
+        workspace: PathBuf,
+        repository: String,
+        #[arg(long, value_name = "SECONDS")]
+        retry_after: Option<u64>,
+    },
+}
+
+/// `meada github-app`: git's answer on stdout, notes on stderr; on a failure every line on
+/// stderr and exit 1, so git tries its next helper.
+#[cfg(feature = "github-app")]
+fn github_app(command: GithubAppCommand) -> ! {
+    let reply = match command {
+        GithubAppCommand::Credential { workspace, action } => {
+            meada::github_app::credential(&workspace, &action, &mut std::io::stdin().lock())
+        }
+        GithubAppCommand::Throttled {
+            workspace,
+            repository,
+            retry_after,
+        } => meada::github_app::throttled(&workspace, &repository, retry_after),
+    };
+    match reply {
+        Ok(reply) => {
+            print!("{}", reply.stdout);
+            for note in &reply.notes {
+                eprintln!("meada: {note}");
+            }
+            std::process::exit(0);
+        }
+        Err(e) => {
+            for line in e.to_string().lines() {
+                eprintln!("meada: {line}");
+            }
+            std::process::exit(1);
+        }
+    }
 }
 
 /// `meada snapshot` (ADR 0012, feature `snapshot`).
@@ -198,6 +253,21 @@ fn main() -> ExitCode {
                 .mut_arg("command", |a| a.help(Msg::SnapshotLockCommand.text()))
         })
     });
+    #[cfg(feature = "github-app")]
+    let matches = matches.mut_subcommand("github-app", |c| {
+        (c.about(Msg::GithubApp.text()))
+            .mut_subcommand("credential", |c| {
+                (c.about(Msg::GithubAppCredential.text()))
+                    .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
+                    .mut_arg("action", |a| a.help(Msg::GithubAppAction.text()))
+            })
+            .mut_subcommand("throttled", |c| {
+                (c.about(Msg::GithubAppThrottled.text()))
+                    .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
+                    .mut_arg("repository", |a| a.help(Msg::GithubAppRepository.text()))
+                    .mut_arg("retry_after", |a| a.help(Msg::GithubAppRetryAfter.text()))
+            })
+    });
     #[cfg(feature = "snapshot")]
     let matches = ["status", "export", "mcp"]
         .into_iter()
@@ -297,6 +367,8 @@ fn main() -> ExitCode {
         Command::Snapshot {
             command: SnapshotCommand::Pull { workspace, every },
         } => pull(&workspace, every),
+        #[cfg(feature = "github-app")]
+        Command::GithubApp { command } => github_app(command),
         // The child's exit code, or 1 with the reason: the lock held elsewhere or lost.
         #[cfg(feature = "refresh-lock")]
         Command::Snapshot {
