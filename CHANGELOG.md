@@ -28,8 +28,23 @@ All notable changes to Meada are recorded here. The format follows
   show [<version>]` prints a version as `[[repository]]` entries. Everything read back is
   checked as hostile input. The new `[workspace]` section, read in every build, takes `source =
   "file"` (the default) or `"store"`, which needs `generation-pointer`, `[snapshot]` and
-  `[generations]` and no `[[repository]]`; until `meada workspace pull`, the commands that read
-  entries refuse it, and the `--generations` commands serve as before.
+  `[generations]` and no `[[repository]]`.
+
+- Applying and pulling workspace versions (spec #293, ADR 0014): `meada workspace apply
+  <version>` (feature `refresh-lock`) moves `{<key_prefix>}:workspace` to a stored version
+  under the refresh lock with a new fence and prints `<id> <fence>`; rolling back is applying
+  an older version. `meada workspace pull` brings the current version under
+  `<index_dir>/workspace/` (the document and a `current` file swapped by rename, never to a
+  lower fence), checking everything it reads as hostile input. With `source = "store"`, `meada
+  index`, `status`, `export` without `--generations` and `snapshot publish` read the pulled
+  version from disk and refuse without one, naming `meada workspace pull`; `meada index` still
+  opens no connection. `meada mcp --listen` without `--generations` refuses such a manifest,
+  naming `--generations`. The generation document gains an optional `workspace` field, the
+  version that produced it (absent with `source = "file"`, part of no id, ignored by older
+  binaries), which a pull checks. `meada snapshot fence recover` also counts the workspace
+  pointer's fence. The refresh job of a managed workspace runs `meada workspace pull`, the fetch
+  of the mirrors, `meada index --workspace` and `meada snapshot publish` under `meada snapshot
+  lock`.
 
 - Management console (spec #293, ADR 0014, feature `ui`, in `cloud`, no crate of its own):
   `meada ui --listen <addr> --workspace <bootstrap manifest>` serves, read only and behind the

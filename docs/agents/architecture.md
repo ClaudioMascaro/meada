@@ -323,6 +323,9 @@ one for the area a change touches.
   first pass measures the tar's size and hash, a second streams it as a multipart upload with
   them as metadata, aborted if they differ), reads each back from metadata, writes the document
   and `current` last; an existing document is verified instead (`verify`) and never rewritten.
+  `Document::workspace`, optional, is the id of the pulled workspace version with `source =
+  "store"` (`Manifest::version`), absent with `source = "file"`, and part of no id: a stored
+  generation keeps the version that first produced it, and older binaries ignore the field.
   The tar is `index.db`, then the mirror under `mirror/` in path order, symbolic links as links.
   `store::Store` is the client `meada snapshot pull` (#273) reuses: object_store's S3 client
   over `Guard`, a reqwest client with no redirect and no proxy that refuses any origin but the
@@ -349,7 +352,8 @@ one for the area a change touches.
   id>/index.db` and `<bundle id>/mirror/`; a pull in progress writes only `<generation
   id>.partial/` and `current.new`. Steps: the store's `current` must be an id and a newline
   (`store_pointer`); `checked` refuses a document before any path is built from it (its
-  generation id, `identity_problem` (`meada_core::manifest`) per identity plus no duplicate and no character
+  generation id, a `workspace` field that is a version id when present
+  (`Msg::SnapshotBadWorkspace`), `identity_problem` (`meada_core::manifest`) per identity plus no duplicate and no character
   a git remote URL cannot hold, each bundle key `repos/<identity>/<bundle id>.tar` under the
   prefix, hash and `HEAD` shapes, the size sum, the generation id derived again); per bundle,
   `Store::download` streams it to a file checked against the document's size and hash, and
@@ -471,6 +475,29 @@ one for the area a change touches.
   `[generations]` in the bootstrap manifest (`Msg::WorkspaceNoSections`), not `source =
   "store"`, so an operator imports before switching. The author without `--author` is
   `cli_author`, `cli:<login>@<host>` (from the environment in a build without `refresh-lock`).
+  `apply` (`meada workspace apply <version>`, feature `refresh-lock`) checks the id first
+  (`Msg::BadVersionArg`), needs `[refresh_lock]` (`operation::sections`), reads and checks the
+  version's document in the store (missing, `Msg::WorkspaceNoVersion` naming its key), then runs
+  under `operation::locked` (holder `workspace apply <author>`) the `APPLY` script: it sets
+  `{<key_prefix>}:workspace` to `{id, fence}` only while the lock holds the token and the
+  operation's fence is above the stored one (decimal text, as `POINT` compares;
+  `Msg::FenceRefused` otherwise); it prints `<id> <fence>`. Rolling back is applying an older
+  version. `pull` (`meada workspace pull`) reads the pointer (`current`; none is
+  `Msg::WorkspaceNoCurrent`, naming `meada workspace apply`) and the document (at most
+  `VERSION_MAX`, `checked`) before anything on disk changes, then, under `<index_dir>/workspace/`
+  (`DIR`) and its `pull.lock` (an advisory lock, one pull at a time), writes `<id>.json` (the
+  document as stored, through `<id>.json.new` and a rename) and swaps `current` (one line `<id>
+  <fence>`, `pull::swap`); a pointer whose fence is below the current file's, or equal with
+  another id, is `Msg::WorkspaceFenceBelow` naming both fences and the file, and the same id and
+  fence is `Pulled::Current` (the id on stdout, `Msg::WorkspaceAlreadyCurrent` on stderr). Only
+  the current version's document and the one it replaced stay; a failure leaves the current
+  file and the documents as they were. `pulled` reads the version the current file names from
+  disk (`pull::pointer_file`, `Msg::WorkspaceCurrentBad` for a malformed one), bounded and
+  checked as a pull checks it, and opens no connection: `Manifest::read_listed` uses it.
+  The refresh job of a managed workspace runs, under `meada snapshot lock`, `meada workspace
+  pull`, the fetch of the mirrors `meada workspace show` lists, `meada index --workspace` and
+  `meada snapshot publish`: `apply` needs the lock, so it cannot run between the pull and the
+  publish, and the whole refresh sees one version.
   `snapshot/lock.rs` (feature `refresh-lock`, which implies `generation-pointer`; crate `nix`,
   Unix only, a `compile_error!` elsewhere) is the refresh lock, section `[refresh_lock]` (`ttl_seconds`, default 300, at
   least 10; `Manifest::read` refuses it without `[generations]`). Keys under the same hash tag:
@@ -520,7 +547,8 @@ one for the area a change touches.
   `Msg::DropCurrent` naming `current`, one with no entry `Msg::DropNotRetained` naming
   `retained`; else its entries leave the list and the id leaves kept, and the next pull deletes
   it; it prints the id.
-  `fence_recover` (`meada snapshot fence recover [--at-least <fence>]`) reads the pointer, every
+  `fence_recover` (`meada snapshot fence recover [--at-least <fence>]`) reads the pointer, the
+  workspace pointer (`versions::current`: `apply` takes its fence from the same counter), every
   `retained` entry and the heartbeat (`{<key_prefix>}:node:<name>`, its `fence` a `u64` or
   null) of every name of `{<key_prefix>}:nodes` scored above now, as hostile input: a malformed
   pointer, entry, node name or heartbeat is a `Msg::FenceNotCounted` line on stderr and does not
@@ -543,11 +571,16 @@ one for the area a change touches.
   `snapshot/versions.rs`). `source = "store"` without `generation-pointer` is an error naming
   the feature (`Msg::WorkspaceStoreNeedsFeature`), without `[snapshot]` or `[generations]` one
   naming them (`modules::needs`), and beside a `[[repository]]` one naming both
-  (`Msg::WorkspaceStoreBeside`); `Manifest::store` records it, with no entries. Until
-  `meada workspace pull` (#302), `Manifest::read_listed` refuses such a manifest naming
-  `[workspace] source` (`Msg::WorkspaceStoreRefused`) where entries are read: `index`,
-  `status`, `export` and `mcp --listen` without `--generations`, and `snapshot publish`; the
-  `--generations` commands take their repositories from the generation and serve as before.
+  (`Msg::WorkspaceStoreBeside`); `Manifest::store` records it, with no entries from `read`.
+  `Manifest::read_listed`, which `index`, `status`, `export` without `--generations` and
+  `snapshot publish` call, reads the entries of the version `meada workspace pull` left under
+  `<index_dir>/workspace/` (`versions::pulled`, from disk, once per read, `Manifest::version`
+  its id), its paths relative to the bootstrap manifest's directory, and goes on as for a
+  file's entries (the checks that need a mirror run in `mirror`); without one it refuses naming
+  `meada workspace pull` (`Msg::WorkspaceNotPulled`). `mcp --listen` without `--generations`
+  refuses such a manifest naming `--generations` (`Msg::WorkspaceStoreRefused`): a managed
+  workspace's nodes serve generations, which take their repositories from the generation.
+  `Manifest::index_dir` is the directory every index lives under.
   `index.rs`: the SQLite schema, the freshness pipeline in `refresh` (with `fresh`, its
   read-only twin for `meada snapshot publish`: the same walk, `packs_of` and stamps, and a file
   whose stat moved but whose hash did not is no difference), and
@@ -1311,7 +1344,8 @@ one for the area a change touches.
   identities of the bootstrap manifest's `[[repository]]` entries only: with `[workspace]
   source = "store"` it lists none until the read routes (#304) bring the current version.
 - `snapshot/versions.rs`: a workspace version document holds at most `VERSION_MAX` (4 MiB);
-  past it the document is refused (on import) or listed as malformed, naming its key.
+  past it the document is refused (on import, apply and pull, and read from
+  `<index_dir>/workspace/`) or listed as malformed, naming its key or file.
 - `render.rs`: a source file an answer reads (`render::source`, for `path:line` and a symbol's
   source) is read only through plain relative parts of its path, through no symbolic link, as a
   regular file of at most `SOURCE_MAX` (16 MiB); anything else renders as unavailable, the path
