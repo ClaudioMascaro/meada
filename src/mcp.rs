@@ -39,7 +39,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 
 use crate::engine::{self, Direction, Engine, Start};
-#[cfg(feature = "snapshot")]
 use crate::msg::Msg;
 use crate::workspace::Manifest;
 
@@ -137,7 +136,7 @@ impl Meada {
                 Ok(dir) => tokio::task::block_in_place(|| Engine::open(&dir)),
                 Err(why) => return self.result(Err(why)),
             },
-            (_, None) => return self.result(Err("the request was not admitted".into())),
+            (_, None) => return self.result(Err(Msg::NotAdmitted.text())),
             (
                 Source::Served {
                     listed,

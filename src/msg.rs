@@ -50,6 +50,8 @@ pub enum Msg<'a> {
     },
     WorkspaceHelp,
     ListenHelp,
+    /// A tool call on a served workspace that reached the server without passing admission.
+    NotAdmitted,
     RepoHelp,
     IgnoredBlock {
         block: &'a str,
@@ -621,6 +623,10 @@ impl Msg<'_> {
                 "Modo servidor: serve por MCP streamable HTTP em host:porta, :porta ou porta \
                  (loopback sem host), com --workspace"
                     .into(),
+            ),
+            Msg::NotAdmitted => pick(
+                "the request was not admitted".into(),
+                "a requisição não foi admitida".into(),
             ),
             Msg::RepoHelp => pick(
                 "Server mode: the identity of the repository to export".into(),

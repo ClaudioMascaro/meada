@@ -542,8 +542,10 @@ fn a_rotated_key_is_picked_up_on_its_first_token() {
 }
 
 /// Behind `/WEB`, a token reads only the repositories its claim lists (#290): listing all four,
-/// each answer reaches a peer, the trace as the golden has it; granting `WEB` alone, no answer
-/// names a peer, a path only a peer holds or a missing peer.
+/// each answer reaches a peer, the trace as the golden has it; granting `WEB` and the gateway,
+/// the trace keeps their link and names nothing of catalog or worker, nor catalog as a missing
+/// peer though the gateway's `meada.toml` names it; granting `WEB` alone, no answer names a
+/// peer, a path only a peer holds or a missing peer.
 #[test]
 fn a_grant_scopes_the_workspace_of_every_answer() {
     let (signing, jwk) = key("k1");
@@ -560,6 +562,22 @@ fn a_grant_scopes_the_workspace_of_every_answer() {
     assert_eq!(full[0], golden());
     for answer in &full[1..] {
         assert!(answer.contains("example.com/chain/gateway"), "{answer}");
+    }
+    let gateway = "example.com/chain/gateway";
+    let partial = traced(&ask(&at, Some(&grant(&[WEB, gateway])), &[], trace()));
+    assert!(
+        partial.contains(&format!("{gateway} src/orders.ts:5 listOrders")),
+        "{partial}"
+    );
+    for leak in [
+        "example.com/chain/catalog",
+        "example.com/chain/worker",
+        "app/api/",
+        "lib/products.ts",
+        "src/jobs.ts",
+        "missing peer",
+    ] {
+        assert!(!partial.contains(leak), "{leak} in: {partial}");
     }
     for answer in answers(&at, &grant(&[WEB])) {
         web_only(&answer);

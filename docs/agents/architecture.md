@@ -12,9 +12,10 @@ where `Repository::index` says it lives, and ATTACHes every **peer** to the firs
 connection as `peer<n>`. Locally the index is the checkout's own `.meada/index.db`. In
 **server mode**, `Engine::open_manifest(manifest, repo)` builds the workspace from the
 **workspace manifest** instead (`workspace::Manifest`: every listed repository, `repo` first,
-then manifest order, nothing discovered; under an OIDC grant only the granted ones) and each index lives at
-`<index_dir>/<identity>/index.db`; `engine::index_workspace` and `engine::status_workspace`
-are `meada index --workspace` and `meada status --workspace`. An engine opened from a
+then manifest order, nothing discovered; under an OIDC grant only the granted ones) and each
+index lives at `<index_dir>/<identity>/index.db`; `engine::index_workspace` and
+`engine::status_workspace` are `meada index --workspace` and `meada status --workspace`. An
+engine opened from a
 manifest opens every index read-only on one connection (`index::open_read`: nothing created,
 `trusted_schema` off and `SQLITE_DBCONFIG_DEFENSIVE` on, since a generation's index comes from
 a store, one read transaction held until the engine drops, so an answer sees each index as one commit left
