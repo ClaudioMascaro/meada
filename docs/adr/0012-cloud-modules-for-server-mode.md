@@ -92,10 +92,14 @@ A **cloud module** is a cargo feature, off by default, plus one section of
 
 - A module connects only to the endpoints the operator configured, inside the operator's
   boundary: the store's `endpoint`, the Valkey `url`, the OIDC `issuer` and the `jwks_uri` its
-  metadata names, plus the credential endpoint of the source `credentials` names (below). No
-  client follows a redirect to another host, with one exception: a Valkey cluster client follows
-  the cluster's `MOVED` and `ASK` to the nodes the cluster announces, always over TLS (the
-  section requires a `rediss` seed when `cluster` is on).
+  metadata names, plus the credential endpoint of the source `credentials` names (below).
+  (Amended 2026-10-22; #289: ADR 0013 adds each `[[github_app]]` block's `api`, the GitHub REST
+  endpoint that lists installations and mints their tokens. On GitHub Enterprise Cloud and
+  github.com it lies outside the operator's boundary, which is accepted because the job's
+  fetches already go to that host.) No client follows a redirect to another host, with one
+  exception: a Valkey cluster client follows the cluster's `MOVED` and `ASK` to the nodes the
+  cluster announces, always over TLS (the section requires a `rediss` seed when `cluster` is
+  on).
 - The store's credentials come from one source, the one `credentials` names; no other is read.
   Besides `static` (keys from the environment or files, below), three sources reach an endpoint
   the operator chose by choosing them, each a recorded exception:

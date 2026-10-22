@@ -20,6 +20,7 @@ mod drift;
 mod freshness;
 mod gateway;
 mod generations;
+mod github_app;
 mod gopkg;
 mod hostile;
 mod index;

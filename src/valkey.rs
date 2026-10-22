@@ -202,7 +202,7 @@ impl Valkey {
 }
 
 /// `text` without the secret, if the text carries it.
-fn scrub(text: &str, secret: Option<&str>) -> String {
+pub(crate) fn scrub(text: &str, secret: Option<&str>) -> String {
     match secret {
         Some(secret) if !secret.is_empty() => text.replace(secret, "***"),
         _ => text.to_string(),
