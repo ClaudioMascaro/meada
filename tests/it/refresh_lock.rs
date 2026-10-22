@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use crate::generations::{Fleet, admin, pointer, prefix, send};
+use crate::generations::{Fleet, admin, pointer, prefix, send, sorted};
 use crate::manifest::{MANIFEST, chain_manifest, run};
 use crate::serving::probe;
 use crate::snapshot::{KEY_ID, append_section, bucket, next_commit, objects, pull};
@@ -611,6 +611,14 @@ pub(crate) fn held_by(fleet: &Fleet, pid: u32) -> String {
     )
 }
 
+/// The members of `{<prefix>}:kept`, sorted.
+pub(crate) fn kept(fleet: &Fleet) -> Vec<String> {
+    let members = redis::cmd("SMEMBERS").arg(key(fleet, "kept")).clone();
+    let mut kept: Vec<String> = members.query(&mut admin(&fleet.valkey)).unwrap();
+    kept.sort();
+    kept
+}
+
 /// Whether neither the lock nor its holder is left.
 pub(crate) fn released(fleet: &Fleet) -> bool {
     let exists = redis::cmd("EXISTS")
@@ -620,9 +628,10 @@ pub(crate) fn released(fleet: &Fleet) -> bool {
     exists.query::<i64>(&mut admin(&fleet.valkey)).unwrap() == 0
 }
 
-/// While `meada snapshot lock` runs a sleeping child, `pointer set` and `fence recover` each
-/// exit 1 naming the holder (host, process, start time, `lock sh`), as a second `lock` does,
-/// and leave the pointer, the retained list and the fence as they were.
+/// While `meada snapshot lock` runs a sleeping child, `pointer set`, `retain` and `drop` and
+/// `fence recover` each exit 1 naming the holder (host, process, start time, `lock sh`), as a
+/// second `lock` does, and leave the pointer, the retained list, the kept set and the fence as
+/// they were.
 #[test]
 fn every_operation_is_refused_while_a_lock_holds_naming_the_holder() {
     let Some(fleet) = fleet("ops_held") else {
@@ -634,13 +643,22 @@ fn every_operation_is_refused_while_a_lock_holds_naming_the_holder() {
     wait_for(&dir.join("ops/started"));
     let state = |fleet: &Fleet| {
         let pointer = pointer(&mut admin(&fleet.valkey), fleet.case);
-        (pointer, get(fleet, "fence"))
+        (pointer, kept(fleet), get(fleet, "fence"))
     };
     let before = state(&fleet);
     let held = held_by(&fleet, child.id());
     let set: &[&str] = &["snapshot", "pointer", "set", &g1, "--workspace", MANIFEST];
+    let retain: &[&str] = &[
+        "snapshot",
+        "pointer",
+        "retain",
+        &g1,
+        "--workspace",
+        MANIFEST,
+    ];
+    let drop: &[&str] = &["snapshot", "pointer", "drop", &g1, "--workspace", MANIFEST];
     let recover: &[&str] = &["snapshot", "fence", "recover", "--workspace", MANIFEST];
-    for args in [set, recover] {
+    for args in [set, retain, drop, recover] {
         let (stdout, stderr, code) = run_in(dir, "en_US.UTF-8", args);
         assert_eq!((code, stdout.as_str()), (Some(1), ""), "{args:?}: {stderr}");
         assert_eq!(stderr, held, "{args:?}");
@@ -695,10 +713,21 @@ fn the_holder_lives_with_the_lock_and_an_operation_leaves_none() {
         MANIFEST,
     ];
     let recover = ["snapshot", "fence", "recover", "--workspace", MANIFEST];
-    let cases: [(&[&str], Option<i32>); 3] = [
+    let retain = [
+        "snapshot",
+        "pointer",
+        "retain",
+        &g1,
+        "--workspace",
+        MANIFEST,
+    ];
+    let drop = ["snapshot", "pointer", "drop", &g1, "--workspace", MANIFEST];
+    let cases: [(&[&str], Option<i32>); 5] = [
         (&set, Some(0)),
         (&not_retained, Some(1)),
         (&recover, Some(0)),
+        (&retain, Some(0)),
+        (&drop, Some(1)),
     ];
     for (args, expected) in cases {
         let (_, stderr, code) = run_in(dir, "en_US.UTF-8", args);
@@ -860,4 +889,107 @@ fn fence_recover_counts_live_heartbeats_and_names_malformed_ones() {
         )
     );
     assert_eq!(get(&fleet, "fence").as_deref(), Some("9"));
+}
+
+/// `pointer retain` of a generation already retained only keeps it; of one outside the list it
+/// appends `<id>:<fence>` at the oldest end with the operation's fence, which `fence recover`
+/// counts; of one the store does not hold, or past the kept maximum, it is refused with nothing
+/// written. `pointer drop` refuses the current generation and one outside the list, naming the
+/// key, and drops a kept one from both keys.
+#[test]
+fn retain_and_drop_change_only_the_retained_list_and_the_kept_set() {
+    let Some(fleet) = fleet("ops_kept") else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let mut valkey = admin(&fleet.valkey);
+    let (retained, kept_key) = (key(&fleet, "retained"), key(&fleet, "kept"));
+    let op = |op: &str, id: &str| {
+        let args = ["snapshot", "pointer", op, id, "--workspace", MANIFEST];
+        run_in(dir, "en_US.UTF-8", &args)
+    };
+    let printed = |id: &str| (format!("{id}\n"), String::new(), Some(0));
+    let refused = |stderr: String| (String::new(), stderr, Some(1));
+    let state = |fleet: &Fleet| {
+        let pointer = pointer(&mut admin(&fleet.valkey), fleet.case);
+        (pointer, kept(fleet), get(fleet, "fence"))
+    };
+    let g1 = locked_publish(dir);
+    next_commit(dir, "chain-web", "second");
+    let g2 = locked_publish(dir);
+
+    // A generation the store does not hold: refused naming its document, before the lock.
+    let zero = "0000000000000000";
+    let before = state(&fleet);
+    let (stdout, stderr, code) = op("retain", zero);
+    assert_eq!((code, stdout.as_str()), (Some(1), ""), "{stderr}");
+    let document = format!("generations/{zero}.json: ");
+    assert!(
+        stderr.starts_with("meada: ") && stderr.contains(&document),
+        "{stderr}"
+    );
+    assert_eq!(state(&fleet), before);
+
+    // Already retained: only kept, and again changes nothing.
+    assert_eq!(op("retain", &g2), printed(&g2));
+    assert_eq!(op("retain", &g2), printed(&g2));
+    assert_eq!(kept(&fleet), std::slice::from_ref(&g2));
+    let list = vec![format!("{g2}:2"), format!("{g1}:1")];
+    assert_eq!(pointer(&mut valkey, fleet.case).1, list);
+
+    // Outside the list: appended at its oldest end with the operation's fence (5: the two
+    // publishes, the two retains, then this one).
+    send(&mut valkey, &["LREM", &retained, "0", &format!("{g1}:1")]);
+    assert_eq!(op("retain", &g1), printed(&g1));
+    let list = vec![format!("{g2}:2"), format!("{g1}:5")];
+    assert_eq!(pointer(&mut valkey, fleet.case).1, list);
+    assert_eq!(kept(&fleet), sorted(&[&g1, &g2]));
+    // `fence recover` counts that entry's fence: above the pointer's and the fence key's.
+    send(&mut valkey, &["SET", &key(&fleet, "fence"), "1"]);
+    let recover = ["snapshot", "fence", "recover", "--workspace", MANIFEST];
+    let recovered = run_in(dir, "en_US.UTF-8", &recover);
+    assert_eq!(recovered, ("5\n".to_string(), String::new(), Some(0)));
+    assert!(released(&fleet));
+
+    // Past the kept maximum (8, here G2 and seven others): refused naming it, nothing written.
+    let filler: Vec<String> = (0..7).map(|n| format!("{n:016x}")).collect();
+    let filler = || filler.iter().map(String::as_str);
+    send(&mut valkey, &["SREM", &kept_key, &g1]);
+    let sadd: Vec<&str> = ["SADD", kept_key.as_str()]
+        .into_iter()
+        .chain(filler())
+        .collect();
+    send(&mut valkey, &sadd);
+    let before = state(&fleet);
+    let full = format!(
+        "meada: {kept_key}: already keeps 8 generations, the most it may: drop one first \
+         (meada snapshot pointer drop)\n"
+    );
+    assert_eq!(op("retain", &g1), refused(full));
+    assert_eq!(state(&fleet).0, before.0);
+    assert_eq!(state(&fleet).1, before.1);
+    assert!(released(&fleet));
+    let srem: Vec<&str> = ["SREM", kept_key.as_str()]
+        .into_iter()
+        .chain(filler())
+        .collect();
+    send(&mut valkey, &srem);
+    send(&mut valkey, &["SADD", &kept_key, &g1]);
+
+    // `drop`: the current generation and one outside the list are refused naming the key.
+    let current = key(&fleet, "current");
+    let before = state(&fleet);
+    let is_current =
+        format!("meada: {current}: generation {g2} is the current one: nothing dropped\n");
+    assert_eq!(op("drop", &g2), refused(is_current));
+    let outside =
+        format!("meada: {retained}: generation {zero} is not retained: nothing dropped\n");
+    assert_eq!(op("drop", zero), refused(outside));
+    assert_eq!(state(&fleet).0, before.0);
+    assert_eq!(state(&fleet).1, before.1);
+    // A kept one leaves both keys.
+    assert_eq!(op("drop", &g1), printed(&g1));
+    assert_eq!(pointer(&mut valkey, fleet.case).1, [format!("{g2}:2")]);
+    assert_eq!(kept(&fleet), std::slice::from_ref(&g2));
+    assert!(released(&fleet));
 }

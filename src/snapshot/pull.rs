@@ -6,11 +6,11 @@
 //!
 //! Without `[generations]` the store's `current` names the generation, and a node keeps it and
 //! the one it replaced. With it (feature `generation-pointer`), Valkey names the current
-//! generation and the retained ones (`generations::read`, every entry checked before the node
-//! changes): the node holds every retained generation and deletes the others, never the current
-//! one or the one it just replaced, and its pointer file carries the fence read with the id. The
-//! current generation is fetched and swapped in first; a retained one that fails after it is a
-//! warning, retried by the next pull, and blocks nothing. A current generation whose fence is
+//! generation and the retained ones (`generations::read`, the whole list, every entry checked
+//! before the node changes): the node holds every retained generation, kept ones included, and
+//! deletes the others, never the current one or the one it just replaced, and its pointer file
+//! carries the fence read with the id. The current generation is fetched and swapped in first; a
+//! retained one that fails after it is a warning, retried by the next pull, and blocks nothing. A current generation whose fence is
 //! below the one in the node's pointer file (a refresh lock's fence lost in Valkey) is an error
 //! that changes nothing; without a pointer file the node takes it whatever its fence.
 //!
@@ -283,10 +283,7 @@ async fn fetch(
 ) -> std::result::Result<(), String> {
     let _ = fs::remove_dir_all(partial);
     fs::create_dir(partial).map_err(io_at(partial))?;
-    let key = config.key(&format!("generations/{id}.json"));
-    let bytes = store.get(&key, DOCUMENT_MAX).await?;
-    let bytes = bytes.ok_or_else(|| Msg::SnapshotObjectBad(&key).text())?;
-    let document = checked(config, id, &key, &bytes)?;
+    let (document, bytes) = stored_document(store, config, id).await?;
     let mut budget = Budget {
         bytes: GENERATION_BYTES_MAX,
         entries: GENERATION_ENTRIES_MAX,
@@ -313,6 +310,19 @@ async fn fetch(
         settle(&dest.join("mirror"), entry).map_err(|why| format!("{}: {why}", entry.identity))?;
     }
     fs::write(partial.join(DOCUMENT), &bytes).map_err(io_at(partial))
+}
+
+/// The document of the generation `id` in the store, checked (`checked`), and its bytes as
+/// stored; a missing or malformed one is an error naming its key.
+pub(super) async fn stored_document(
+    store: &Store,
+    config: &Config,
+    id: &str,
+) -> std::result::Result<(Document, Vec<u8>), String> {
+    let key = config.key(&format!("generations/{id}.json"));
+    let bytes = store.get(&key, DOCUMENT_MAX).await?;
+    let bytes = bytes.ok_or_else(|| Msg::SnapshotObjectBad(&key).text())?;
+    Ok((checked(config, id, &key, &bytes)?, bytes))
 }
 
 /// The document stored at `key` checked as the generation `id`, before any path or key is

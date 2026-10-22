@@ -48,7 +48,8 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `meada::with_reversed_walk`), `items` (open items and their `search` goldens, fixtures
   `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`; with
   `refresh-lock`, the operations' refusals: a malformed id, no `[refresh_lock]`, a generation
-  not retained, a lock held by a named or an unknown holder; without it, no `snapshot pointer`
+  not retained, the current generation dropped, a full kept set, a lock held by a named or an
+  unknown holder; without it, no `snapshot pointer`
   or `snapshot fence`), `mcp`
   (the binary over stdio), `server` (`meada mcp --listen` as a child process over the chain's
   mirrors, through rmcp's streamable HTTP client and plain HTTP requests: the stdio tools and
@@ -68,14 +69,19 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   depending only on the node, the fixed 503, an index naming files outside its mirror),
   `generations` (the generation pointer and pins: a pin answered on every node until it is no
   longer retained, the 404 of a pin not held, `Origin` refused before a pin, every id and fence
-  from Valkey checked, a retained generation that fails to pull, the probe reading Valkey,
+  from Valkey checked, a retained list longer than `keep` plus `KEPT_MAX`, a retained
+  generation that fails to pull, the probe reading Valkey,
   `[generations]` errors, `snapshot pointer set` rolling two nodes back to G1's goldens until
-  the next publish, a generation not retained and malformed ids refused), `refresh_lock`
+  the next publish, a generation not retained and malformed ids refused, a generation kept by
+  `pointer retain` held and pinned on two nodes past `keep` until `pointer drop`), `refresh_lock`
   (`snapshot lock`: the child terminated past the TTL, killed past the grace, stopped when the
   lock changes hands, a SIGTERM reaching it, a stale fence refused, a lost fence stopping a node
   with the recovery named in both languages, `[refresh_lock]` errors; the operations: each
   refused while a lock holds, naming the holder, the holder's fields, TTL, renewal and release,
-  no lock or holder left by an operation, a stuck fleet moving again after `fence recover`, the
+  no lock or holder left by an operation, `retain` and `drop` changing only the retained list
+  and the kept set (already retained, appended with its fence and counted by `fence recover`,
+  not stored, past `KEPT_MAX`, current, not retained), a stuck fleet moving again after `fence
+  recover`, the
   highest recorded fence and the `--at-least` floor, never lowered, live, expired and malformed
   heartbeats written by hand), `oidc` (`[oidc]`
   against an issuer and a JWKS served on loopback: a token admits what its claim lists and leaks

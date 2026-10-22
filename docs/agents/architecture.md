@@ -366,22 +366,26 @@ one for the area a change touches.
   `valkey`; no crate of its own) is the generation pointer, section `[generations]` (`keep`,
   default 3, at least 2; `Manifest::read` refuses it without `[snapshot]` and `[valkey]` through
   `modules::needs`). It owns the Valkey keys, both under the `[valkey]` prefix's hash tag:
-  `{<key_prefix>}:current`, a hash `{id, fence}`, and `{<key_prefix>}:retained`, a list of
-  `<id>:<fence>` newest first, each id once, trimmed to `keep`. `point` runs the one script that
-  writes both (`EVAL`; KEYS current, retained and `{<key_prefix>}:lock`, ARGV id, fence, keep
-  and the refresh lock's token, empty without one): with a token it returns 0 unless the lock
+  `{<key_prefix>}:current`, a hash `{id, fence}`, `{<key_prefix>}:retained`, a list of
+  `<id>:<fence>` newest first, each id once, and `{<key_prefix>}:kept` (`kept`), the set of ids
+  an operator keeps by hand (`meada snapshot pointer retain`), at most `KEPT_MAX`. `point` runs
+  the one script that writes the pointer (`EVAL`; KEYS current, retained, `{<key_prefix>}:lock`
+  and kept, ARGV id, fence, keep and the refresh lock's token, empty without one): with a token it returns 0 unless the lock
   holds it (`Msg::LockNotHeld`) and -1 unless the fence is above `current`'s
   (`Msg::FenceRefused`, naming `{<key_prefix>}:fence` and `meada snapshot fence recover`, as
   `Msg::FenceBelowNode` and `Msg::FenceStuck` do with `--at-least`; the two fences compare
   as decimal text, leading zeros dropped, so none loses precision as a Lua number, and -2 for a
   stored fence that is no decimal); then it removes every entry of the id, pushes
-  `<id>:<fence>`, trims and sets the hash. `publish` connects to Valkey before any upload and
+  `<id>:<fence>`, trims (the oldest entries whose id is not in kept go until at most `keep` of
+  those remain; a kept entry never goes) and sets the hash. `publish` connects to Valkey before any upload and
   calls `point` last, with fence `0` and no token without `[refresh_lock]`, instead of writing
   the store's `current`; `meada snapshot pointer set` (`operation::pointer_set`) calls it with
   its own token and fence to move the pointer to a retained generation, a rollback that the
-  next publish undoes. `read` is the pull's side: `HMGET current id fence` and `LRANGE retained 0
-  keep-1`, every id checked by `is_id` and every fence by `snapshot::fence` before anything
-  else; a missing pointer, an empty list or a malformed entry is an error naming the key. With
+  next publish undoes. `read` is the pull's side: `HMGET current id fence` and the whole
+  retained list (`LRANGE retained 0 keep+KEPT_MAX`), every id checked by `is_id` and every fence
+  by `snapshot::fence` before anything else; a missing pointer, an empty list, a list longer
+  than `keep` plus `KEPT_MAX` (`Msg::GenerationsTooLong`) or a malformed entry is an error
+  naming the key. With
   it, `pull_locked` (through `Source::wanted`) fetches the current generation if the node lacks
   it and swaps the pointer file to `<id> <fence>` as read (a failure there fails the pull and
   changes nothing), then fetches every retained one the node lacks, each failure a warning
@@ -428,10 +432,20 @@ one for the area a change touches.
   a holder naming it and its author, makes one write through a script that checks the token,
   and calls `release` whatever the write did, so it leaves no lock and no holder (a release
   Valkey misses expires with the TTL). `pointer_set` (`meada snapshot pointer set <generation>`)
-  refuses an id outside the first `keep` entries of `retained` (`Msg::PointerNotRetained`), then
+  refuses an id outside `retained` (`Msg::PointerNotRetained`), then
   calls `point` with its token and fence, so the moved pointer's fence is above every node's
   and nodes swap on their next pull; it prints `<id> <fence>`. The rollback holds until the
   next publish moves the pointer past it: to stay back, the operator suspends the refresh job.
+  `pointer_retain` (`meada snapshot pointer retain <generation>`) first reads the generation's
+  document from the store and checks it as a pull does (`pull::stored_document`; missing or
+  malformed, the error names its key, before the lock), then `RETAIN`: an id already kept
+  changes nothing, a kept set already holding `KEPT_MAX` is `Msg::KeptFull`, an id with no
+  entry is appended at the list's oldest end as `<id>:<fence>` with the operation's fence
+  (which `fence recover` counts), and the id joins kept; it prints the id. `pointer_drop`
+  (`meada snapshot pointer drop <generation>`) runs `DROP`: the current id is
+  `Msg::DropCurrent` naming `current`, one with no entry `Msg::DropNotRetained` naming
+  `retained`; else its entries leave the list and the id leaves kept, and the next pull deletes
+  it; it prints the id.
   `fence_recover` (`meada snapshot fence recover [--at-least <fence>]`) reads the pointer, every
   `retained` entry and the heartbeat (`{<key_prefix>}:node:<name>`, its `fence` a `u64` or
   null) of every name of `{<key_prefix>}:nodes` scored above now, as hostile input: a malformed
@@ -1171,6 +1185,10 @@ one for the area a change touches.
   changes nothing. A symbolic link whose target goes through another symbolic link is refused
   even when both stay inside the mirror. A sparse file is refused. The node pointer file holds at
   most `POINTER_MAX` (64 bytes); past it the pointer file is malformed.
+- `snapshot/generations.rs`: `{<key_prefix>}:kept` holds at most `KEPT_MAX` (8) generations,
+  since every node holds every retained generation on disk: `pointer retain` refuses past it,
+  and a pull refuses a retained list longer than `keep` plus `KEPT_MAX`, naming the key and
+  changing nothing.
 - `snapshot.rs`: a generation document holds at most `DOCUMENT_MAX` (16 MiB), in the store and
   as a node holds it, and the store's `current` at most `CURRENT_MAX` (64 bytes); past either
   the object is refused, naming its key or file, and a pull changes nothing.
