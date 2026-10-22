@@ -189,6 +189,9 @@ pub struct Manifest {
     /// `[generations]` is there too.
     #[cfg(feature = "refresh-lock")]
     pub refresh_lock: Option<crate::snapshot::lock::Config>,
+    /// The `[oidc]` section, when the build has the module.
+    #[cfg(feature = "oidc")]
+    pub oidc: Option<crate::oidc::Config>,
 }
 
 /// One `[[repository]]` of a manifest.
@@ -225,6 +228,8 @@ struct ManifestFile {
     generations: Option<crate::snapshot::generations::File>,
     #[cfg(feature = "refresh-lock")]
     refresh_lock: Option<crate::snapshot::lock::File>,
+    #[cfg(feature = "oidc")]
+    oidc: Option<crate::oidc::File>,
 }
 
 /// A `[[repository]]`: `serve` and `resource` take the shapes of `meada.toml`'s, `peer` that
@@ -315,6 +320,9 @@ impl Manifest {
         if refresh_lock.is_some() && generations.is_none() {
             modules::needs(file, &src, "refresh_lock", &["generations"])?;
         }
+        #[cfg(feature = "oidc")]
+        let oidc = (parsed.oidc.map(|o| o.validate()).transpose())
+            .map_err(|(key, problem)| config::error_at(file, &src, key, &problem))?;
         // Each entry's blocks as written, in manifest order: the typed read checked them.
         #[cfg(feature = "snapshot")]
         let mut written = crate::snapshot::entry_blocks(&src).into_iter();
@@ -377,6 +385,8 @@ impl Manifest {
             generations,
             #[cfg(feature = "refresh-lock")]
             refresh_lock,
+            #[cfg(feature = "oidc")]
+            oidc,
         })
     }
 
@@ -443,6 +453,8 @@ impl Manifest {
             generations: None,
             #[cfg(feature = "refresh-lock")]
             refresh_lock: None,
+            #[cfg(feature = "oidc")]
+            oidc: None,
         })
     }
 

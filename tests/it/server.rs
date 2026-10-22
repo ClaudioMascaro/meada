@@ -35,7 +35,7 @@ pub(crate) struct Server {
     child: Child,
     pub(crate) url: String,
     // Kept open, so a later line on stderr does not fail on a closed pipe.
-    _stderr: BufReader<ChildStderr>,
+    stderr: BufReader<ChildStderr>,
 }
 
 impl Server {
@@ -66,11 +66,18 @@ impl Server {
             .unwrap_or_else(|| panic!("first line: {line:?}"))
             .trim_end()
             .to_string();
-        Self {
-            child,
-            url,
-            _stderr: stderr,
-        }
+        Self { child, url, stderr }
+    }
+
+    /// What the server wrote on stderr after its first line, read once it is killed.
+    #[cfg_attr(not(feature = "oidc"), allow(dead_code))]
+    pub(crate) fn stderr(mut self) -> String {
+        use std::io::Read;
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+        let mut rest = String::new();
+        let _ = self.stderr.read_to_string(&mut rest);
+        rest
     }
 
     /// An MCP client of the endpoint at `path`.

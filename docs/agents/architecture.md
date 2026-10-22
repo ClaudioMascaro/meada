@@ -108,7 +108,13 @@ one for the area a change touches.
   connection finish its answer in flight (`graceful_shutdown`), for at most `DRAIN` (25 s; the
   hidden `with_drain_bound` shortens it, `main.rs` reads `MEADA_DRAIN_MS` for it in debug builds only, a second signal ends the wait), then cancels
   rmcp's `cancellation_token` (earlier it would end calls in flight with an error), drops what
-  is left and exits 0 without waiting for the runtime's threads. `main.rs`: clap.
+  is left and exits 0 without waiting for the runtime's threads. Every request goes through
+  `Gate` before routing: in the default build, or with no `[oidc]`, it lets everything through;
+  with `[oidc]` (feature `oidc`) it is `oidc::Oidc::admit`, which answers itself (an `Origin`,
+  the protected resource metadata, a 401) or hands routing a `Pass`, whose grant routing checks
+  at an endpoint (`Pass::refused`, the 403) and filters every 404 listing through
+  (`Pass::reads`). The pin is split from the path before the gate, so a pinned path is admitted
+  as its identity is. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `modules.rs`, `valkey.rs`: the cloud modules (ADR 0012). `modules.rs` is the section table,
   in every build: each module section of `meada.workspace.toml` (`[valkey]`, `[snapshot]`,
@@ -128,6 +134,25 @@ one for the area a change touches.
   reachable` or `valkey: unreachable (<reason>)` after waiting at most `REACH_TIMEOUT`; the
   line is informational and never changes the probe's exit code. With a `ca_file` the client
   trusts that file alone, not the system roots as well (redis-rs replaces them).
+- `oidc.rs` (feature `oidc`; the only place `jsonwebtoken` is used, with RustCrypto as its
+  backend, never aws-lc-rs): server mode as an OAuth 2.1 resource server. `File` is the
+  `[oidc]` section and `File::validate` its `Config` (`issuer` `https` or loopback `http` with no
+  user, query or fragment, `public_url` the same with no path, `identities_claim` and `audience`
+  not empty, scopes RFC 6749 scope-tokens, `jwks_refresh_seconds` at least 60). `Oidc::start`,
+  called by `mcp::Gate::new` before the listener binds, finds the metadata at the URLs the MCP
+  specification tries in order (`metadata_urls`: RFC 8414 and OpenID discovery with the path
+  inserted, then OpenID's appended), checks its `issuer` and `jwks_uri`, reads the JWKS (only
+  signing keys: RSA, or EC on P-256 and P-384) and starts a thread that reads it again every
+  `jwks_refresh_seconds` until the module is dropped; every request goes through ureq with no
+  redirect, no proxy, `FETCH_TIMEOUT` and a cap, and the platform verifier for `https`.
+  `Oidc::admit` refuses an `Origin` with 403, serves the metadata of any path under
+  `.well-known/oauth-protected-resource` (`resource` is `<public_url>/<path>`, percent-encoded),
+  and otherwise reads the one `Authorization: Bearer` header: `ALGORITHMS` only, a cached key
+  that `fits` the header (`kid`, the key's own `alg`, its type and curve), the JWKS fetched again
+  when none does (`refetch`, at most once per `KID_REFRESH_EVERY`), `exp` and `nbf` with
+  `LEEWAY`, `iss`, `aud` against the configured audience or the path's and its identity's
+  resources, then the scopes (403 when one is missing). The grant is `identities_claim` as an
+  array, `*` for all. No token, error text of `jsonwebtoken` or claim value is ever printed.
 - `snapshot.rs`, `snapshot/store.rs`, `snapshot/pull.rs` (feature `snapshot`; the only places
   `object_store`, `reqwest` as a client of Meada's own and `tar` are used): the snapshot store. `File` is the
   `[snapshot]` section and `File::validate` its `Config` (an `https` endpoint, or `http` on
@@ -973,6 +998,13 @@ one for the area a change touches.
   which reads them into memory whole, sees the archive. Past any of them the pull fails and
   changes nothing. A symbolic link whose target goes through another symbolic link is refused
   even when both stay inside the mirror. A sparse file is refused.
+- `oidc.rs`: each metadata and JWKS request takes at most `FETCH_TIMEOUT` (10 seconds), a
+  metadata document at most `METADATA_MAX` (64 KiB) and a JWKS at most `JWKS_MAX` (256 KiB);
+  past any of them the request fails (at start, the start is refused; on a refresh, the cached
+  keys stay). An identity whose path starts with `.well-known/oauth-protected-resource` is
+  unreachable with `[oidc]`, since that path serves the metadata. The `scope` claim is read as a
+  space-separated string; `scp` and arrays are not read. With `audience` unset, the root's 404
+  takes a token whose `aud` is `public_url` itself.
 - `mcp.rs`: the stop signal drains for at most `DRAIN` (25 seconds, no flag, under Kubernetes'
   30-second default grace period); past it the connections left are dropped, an answer still
   waiting on an index lock included, and the exit is 0.

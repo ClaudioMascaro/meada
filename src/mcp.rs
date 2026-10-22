@@ -334,6 +334,81 @@ enum Routes {
     },
 }
 
+/// What admits a request before routing: the OIDC module when the manifest has `[oidc]`
+/// (feature `oidc`), else nothing, the operator's proxy admitting clients (ADR 0011).
+#[derive(Clone)]
+struct Gate {
+    #[cfg(feature = "oidc")]
+    oidc: Option<Arc<crate::oidc::Oidc>>,
+}
+
+/// What a request `Gate` let through may read: every identity, or those its token grants.
+struct Pass {
+    #[cfg(feature = "oidc")]
+    token: Option<(Arc<crate::oidc::Oidc>, crate::oidc::Grant)>,
+}
+
+impl Gate {
+    /// The gate of `manifest`: with `[oidc]`, the issuer's metadata and JWKS read now, a start
+    /// check before the listener binds.
+    fn new(manifest: &Manifest) -> crate::Result<Self> {
+        #[cfg(feature = "oidc")]
+        let oidc = (manifest.oidc.clone().map(crate::oidc::Oidc::start)).transpose()?;
+        #[cfg(not(feature = "oidc"))]
+        let _ = manifest;
+        Ok(Self {
+            #[cfg(feature = "oidc")]
+            oidc,
+        })
+    }
+
+    /// The request's pass to routing, or the answer it gets instead (`Oidc::admit`); `path` is
+    /// the decoded path without its slashes, `identity` the repository it names.
+    fn admit(
+        &self,
+        request: &Request<Incoming>,
+        path: &str,
+        identity: &str,
+    ) -> Result<Pass, Box<Response<BoxBody<Bytes, Infallible>>>> {
+        #[cfg(feature = "oidc")]
+        if let Some(oidc) = &self.oidc {
+            let admit = || oidc.admit(request.headers(), path, identity);
+            let grant = tokio::task::block_in_place(admit)?;
+            let token = Some((oidc.clone(), grant));
+            return Ok(Pass { token });
+        }
+        let _ = (request, path, identity);
+        Ok(Pass {
+            #[cfg(feature = "oidc")]
+            token: None,
+        })
+    }
+}
+
+impl Pass {
+    /// Whether the request may read `identity`.
+    fn reads(&self, identity: &str) -> bool {
+        #[cfg(feature = "oidc")]
+        if let Some((_, grant)) = &self.token {
+            return grant.reads(identity);
+        }
+        let _ = identity;
+        true
+    }
+
+    /// The 403 for `path`, an endpoint of `identity`, when the request may not read it.
+    fn refused(&self, path: &str, identity: &str) -> Option<Response<BoxBody<Bytes, Infallible>>> {
+        #[cfg(feature = "oidc")]
+        if let Some((oidc, grant)) = &self.token
+            && !grant.reads(identity)
+        {
+            return Some(oidc.forbidden(path));
+        }
+        let _ = (path, identity);
+        None
+    }
+}
+
 /// The MCP service of `source`, stateless with JSON responses.
 fn endpoint(source: Source, config: &StreamableHttpServerConfig) -> Endpoint {
     let meada = Meada::new(source);
@@ -353,15 +428,17 @@ fn endpoint(source: Source, config: &StreamableHttpServerConfig) -> Endpoint {
 /// same indexes answers any call. The `Host` header is not checked, since a reverse proxy
 /// forwards its own hostname; a request with an `Origin` header (a browser, as on a DNS
 /// rebinding page) is refused instead, since MCP clients send none. Meada authenticates
-/// nobody: the operator's proxy admits clients. On SIGINT or SIGTERM it stops accepting, lets the
+/// nobody unless the manifest has `[oidc]` (feature `oidc`, `Gate`): by default the operator's
+/// proxy admits clients. On SIGINT or SIGTERM it stops accepting, lets the
 /// answers in flight finish for at most `DRAIN` (a second signal ends the wait), drops what
 /// is left and returns.
 pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
     let address = address(listen)?;
     let listed = Arc::new(engine::served(manifest)?);
+    let gate = Gate::new(&listed)?;
     let served: Vec<String> = listed.entries.iter().map(|l| l.repo.clone()).collect();
     let manifest: Arc<Path> = manifest.into();
-    run(address, move |config| {
+    run(address, gate, move |config| {
         let endpoints: HashMap<String, Endpoint> = (served.iter())
             .map(|identity| {
                 let source = Source::Served {
@@ -384,11 +461,13 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
 pub fn listen_generations(listen: &str, manifest: &Path) -> crate::Result<()> {
     let address = address(listen)?;
     let (local_dir, _) = engine::served_generation(manifest)?;
+    let read = Manifest::read(manifest)?;
     #[cfg(feature = "generation-pointer")]
-    let pins = Manifest::read(manifest)?.generations.is_some();
+    let pins = read.generations.is_some();
     #[cfg(not(feature = "generation-pointer"))]
     let pins = false;
-    run(address, move |config| Routes::Generation {
+    let gate = Gate::new(&read)?;
+    run(address, gate, move |config| Routes::Generation {
         current: crate::snapshot::serve::Current::new(local_dir),
         config: config.clone(),
         pins,
@@ -396,9 +475,10 @@ pub fn listen_generations(listen: &str, manifest: &Path) -> crate::Result<()> {
 }
 
 /// The server over `address` with the endpoints `routes` makes from the transport's
-/// configuration.
+/// configuration, each request through `gate` first.
 fn run(
     address: SocketAddr,
+    gate: Gate,
     routes: impl FnOnce(&StreamableHttpServerConfig) -> Routes,
 ) -> crate::Result<()> {
     let drain = DRAIN_BOUND.get();
@@ -430,12 +510,12 @@ fn run(
                     continue;
                 }
             };
-            let routes = routes.clone();
+            let (routes, gate) = (routes.clone(), gate.clone());
             let mut stopping = stopping.subscribe();
             connections.spawn(async move {
                 let service = service_fn(move |request| {
-                    let routes = routes.clone();
-                    async move { Ok::<_, Infallible>(route(&routes, request).await) }
+                    let (routes, gate) = (routes.clone(), gate.clone());
+                    async move { Ok::<_, Infallible>(route(&routes, &gate, request).await) }
                 });
                 // A connection that breaks ends only itself; the timer is what makes hyper's
                 // header read timeout close one that sends nothing.
@@ -518,9 +598,12 @@ impl Stop {
 /// served, one per line. With pins, `/<identity>@<generation>` (the generation what follows the
 /// last `@`, when it is an id) answers from that generation if the node holds it, and is a 404
 /// naming it, the current one and the held ones if not; every answer then carries its
-/// generation in `Meada-Generation`.
+/// generation in `Meada-Generation`. `gate` answers first: with `[oidc]`, a request it lets
+/// through is refused with 403 at an endpoint its token may not read, and a 404 lists only the
+/// identities the token may read.
 async fn route(
     routes: &Routes,
+    gate: &Gate,
     request: Request<Incoming>,
 ) -> Response<BoxBody<Bytes, Infallible>> {
     let path = percent_decode_str(request.uri().path()).decode_utf8();
@@ -534,10 +617,38 @@ async fn route(
             .body(Full::from(body).boxed())
             .expect("a valid response")
     };
+    // A pin, `<identity>@<generation>`, on a node with pins.
+    #[cfg(feature = "snapshot")]
+    let pin = match routes {
+        Routes::Generation { pins: true, .. } => {
+            (identity.rsplit_once('@')).filter(|(_, id)| crate::snapshot::is_id(id))
+        }
+        _ => None,
+    };
+    // The repository the path names.
+    #[cfg(feature = "snapshot")]
+    let target = pin.map_or(identity, |(identity, _)| identity);
+    #[cfg(not(feature = "snapshot"))]
+    let target = identity;
+    let pass = match gate.admit(&request, identity, target) {
+        Ok(pass) => pass,
+        Err(answer) => return *answer,
+    };
+    let listing = |identities: &mut dyn Iterator<Item = &str>| -> String {
+        (identities.filter(|i| pass.reads(i)))
+            .map(|i| format!("{i}\n"))
+            .collect()
+    };
     match routes {
-        Routes::Listed { endpoints, listing } => match endpoints.get(identity) {
-            Some(endpoint) => endpoint.handle(request).await,
-            None => plain(StatusCode::NOT_FOUND, listing.clone()),
+        Routes::Listed {
+            endpoints,
+            listing: all,
+        } => match endpoints.get(identity) {
+            Some(endpoint) => match pass.refused(identity, identity) {
+                Some(refused) => refused,
+                None => endpoint.handle(request).await,
+            },
+            None => plain(StatusCode::NOT_FOUND, listing(&mut all.lines())),
         },
         #[cfg(feature = "snapshot")]
         Routes::Generation {
@@ -545,11 +656,9 @@ async fn route(
             config,
             pins,
         } => {
-            let pin =
-                (identity.rsplit_once('@')).filter(|(_, id)| *pins && crate::snapshot::is_id(id));
-            let (identity, held) = tokio::task::block_in_place(|| match pin {
-                Some((identity, id)) => (identity, current.pinned(id)),
-                None => (identity, current.get().map(Some)),
+            let held = tokio::task::block_in_place(|| match pin {
+                Some((_, id)) => current.pinned(id),
+                None => current.get().map(Some),
             });
             let named = |mut response: Response<_>, id: &str| {
                 if *pins && let Ok(value) = header::HeaderValue::from_str(id) {
@@ -558,20 +667,21 @@ async fn route(
                 response
             };
             match held.map_err(|e| e.to_string()) {
-                Ok(Some(held)) if held.listed.entries.iter().any(|l| l.repo == identity) => {
+                Ok(Some(held)) if held.listed.entries.iter().any(|l| l.repo == target) => {
+                    if let Some(refused) = pass.refused(identity, target) {
+                        return refused;
+                    }
                     let id = held.id.clone();
                     let source = Source::Generation {
                         held,
-                        identity: identity.into(),
+                        identity: target.into(),
                         named: *pins,
                     };
                     named(endpoint(source, config).handle(request).await, &id)
                 }
                 Ok(Some(held)) => {
-                    let listing = (held.listed.entries.iter())
-                        .map(|l| format!("{}\n", l.repo))
-                        .collect();
-                    named(plain(StatusCode::NOT_FOUND, listing), &held.id)
+                    let mut repos = held.listed.entries.iter().map(|l| l.repo.as_str());
+                    named(plain(StatusCode::NOT_FOUND, listing(&mut repos)), &held.id)
                 }
                 // A pin of a generation the node does not hold.
                 Ok(None) => {

@@ -38,15 +38,15 @@ pub const MODULES: [Module; 6] = [
         feature: "refresh-lock",
         built: cfg!(feature = "refresh-lock"),
     },
-    // The sections below belong to modules not built yet: no build has their feature.
-    Module {
-        section: "sessions",
-        feature: "session-store",
-        built: false,
-    },
     Module {
         section: "oidc",
         feature: "oidc",
+        built: cfg!(feature = "oidc"),
+    },
+    // The section below belongs to a module not built yet: no build has its feature.
+    Module {
+        section: "sessions",
+        feature: "session-store",
         built: false,
     },
 ];
@@ -125,6 +125,17 @@ mod tests {
         assert_eq!(
             err,
             "m.toml:2: [refresh_lock] needs a Meada built with the refresh-lock feature"
+        );
+    }
+
+    #[cfg(not(feature = "oidc"))]
+    #[test]
+    fn the_oidc_section_without_its_feature_names_it() {
+        let src = "index_dir = \"i\"\n\n[oidc]\nissuer = \"https://id.example\"\n";
+        let err = check(Path::new("m.toml"), src).unwrap_err().to_string();
+        assert_eq!(
+            err,
+            "m.toml:3: [oidc] needs a Meada built with the oidc feature"
         );
     }
 

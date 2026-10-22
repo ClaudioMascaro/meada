@@ -94,6 +94,21 @@ All notable changes to Meada are recorded here. The format follows
   fence is above the current one. A node never swaps to a lower fence than its pointer file's;
   a lost fence key is named, with the recovery, by the refused publish, the refused pull and a
   `fence: stuck` line of `meada status --generations`. `meada index` stays offline.
+- Server mode, OIDC (ADR 0012, feature `oidc`, section `[oidc]` with `issuer`, `public_url`,
+  `audience`, `identities_claim`, `scopes` and `jwks_refresh_seconds`, default 3600, at least
+  60): the server becomes an OAuth 2.1 resource server as the MCP authorization specification
+  (2026-07-28) describes. At start it reads the issuer's metadata (its `issuer` checked) and
+  JWKS, with no redirect, no proxy, a 10-second timeout and a size cap, or refuses to start.
+  `/.well-known/oauth-protected-resource/<identity>` (and its pinned form) serves the protected
+  resource metadata without a token. Every other request needs `Authorization: Bearer <JWT>`:
+  an asymmetric algorithm that fits its key, `iss`, `aud` (the configured audience, or the
+  endpoint's URL, which its pins accept too), `exp` and `nbf`, and every configured scope; a
+  missing or invalid token gets 401 with `WWW-Authenticate`, and a valid one whose
+  `identities_claim` does not list the endpoint's identity gets 403. Authentication runs before
+  routing, so a 404 needs a valid token and lists only what it may read. The JWKS is read again
+  every `jwks_refresh_seconds` and on an unknown `kid`, at most once a minute, keeping the cached
+  keys when that fails. No token or part of one reaches stderr or an error; the proxy stays the
+  documented default admission.
 - npm installer (spec #32): cargo-dist builds and publishes an npm package named `meada` with each
   release, at the crate's version, so `npx meada mcp` launches the MCP server and `npx meada
   <command>` runs any command; the release configuration is planned as a dry run on pull requests.
