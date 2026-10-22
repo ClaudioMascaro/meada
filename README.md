@@ -121,6 +121,352 @@ a cada chamada). Cada ligação entre repositórios traz o nível e o motivo (`�
 e o `trace` termina com um rodapé: o nível mais fraco da cadeia, o número de saltos, os
 repositórios envolvidos e os tokens usados.
 
+## Modo servidor
+
+> **Atenção.** Em modo servidor o Meada devolve trechos de código-fonte a quem consegue
+> conectar, e por padrão não autentica ninguém: o proxy reverso do operador admite os clientes
+> (TLS, tokens, SSO, política de rede); o módulo OIDC, abaixo, é a alternativa opt-in. Sem `host`, o servidor escuta só no loopback; escutar além
+> dele é uma escolha explícita do operador, e um proxy mal configurado expõe o código.
+> O Meada não confere o cabeçalho `Host` (um proxy com nome próprio funciona) e responde 403 a
+> qualquer requisição com `Origin` (proteção contra navegadores e DNS rebinding), em qualquer
+> caminho e antes de qualquer outra resposta. O proxy não deve expor o Meada além dos clientes
+> que admite.
+
+O modo servidor roda o Meada uma vez para uma organização: `meada mcp --listen` serve as
+ferramentas por HTTP a partir de espelhos dos repositórios que um manifesto de workspace lista,
+com cada índice fora do checkout. O manifesto `meada.workspace.toml` vive num repositório de
+operações, versionado, e só é lido do caminho que `--workspace` dá:
+
+```toml
+index_dir = "/var/lib/meada"
+
+[[repository]]
+repo = "github.com/acme/web"
+path = "/srv/mirrors/web"
+
+[[repository]]
+repo = "github.com/acme/api"
+path = "/srv/mirrors/api"
+
+[repository.serve]
+hosts = ["api.acme.com"]
+prefix = "/api"
+
+[[repository.resource]]
+kind = "postgres"
+id = "orders"
+role = "write"
+
+[[repository.peer]]
+repo = "github.com/acme/web"
+base_url_env = "WEB_URL"
+```
+
+`index_dir` é obrigatório; `path` é absoluto ou relativo à pasta do manifesto. Os blocos
+`serve`, `resource` e `peer` (o par sem `path`, pois o manifesto localiza todos) são opcionais e
+valem para um espelho sem `meada.toml`: o `meada.toml` do próprio repositório vence, inteiro, e
+os blocos do manifesto são ignorados (o `meada status` os nomeia). Um espelho é um checkout com
+árvore de trabalho; um clone bare não tem o que indexar e é recusado.
+
+- `meada index --workspace <manifesto>` atualiza o índice de cada repositório, em
+  `<index_dir>/<identidade>/index.db`. É o refresh do operador, rodado por um job de fetch ou
+  por um webhook: o Meada nunca busca nem clona, e o servidor só lê. Depois de instalar um
+  binário novo, rode `meada index --workspace` antes de reiniciar o servidor.
+- `meada mcp --listen <endereço> --workspace <manifesto>` serve. O endereço é `host:porta`,
+  `:porta` ou `porta`; o host é um IP ou `localhost`, nunca resolvido, e o padrão é o loopback.
+  A primeira linha do stderr é `listening on http://<host>:<porta>`. SIGINT ou SIGTERM param o
+  servidor: ele deixa de aceitar conexões, termina as respostas em andamento e sai com código 0. A espera tem limite fixo de 25 segundos,
+  abaixo dos 30 s de carência padrão do Kubernetes: passado o limite, as conexões restantes são
+  descartadas e a saída continua sendo 0.
+- Cada repositório é um endpoint, `http://<host>:<porta>/<identidade>` (por exemplo
+  `http://meada.internal:7333/github.com/acme/web`); o cliente configura uma URL por repositório
+  em que trabalha. Qualquer outro caminho responde 404 com a lista das identidades servidas.
+- O transporte HTTP é sem estado, com respostas em JSON: qualquer um de vários servidores sobre
+  os mesmos índices responde a qualquer chamada.
+- O servidor lê o manifesto e o `meada.toml` e o `meada.decisions.toml` de cada espelho uma vez,
+  ao iniciar: mudar esses arquivos pede reiniciar o servidor. Uma mudança de código num espelho
+  pede só `meada index --workspace`; a chamada seguinte já vê o índice novo.
+- `context` imprime `index behind the mirror: run meada index --workspace` quando o arquivo de
+  um trecho mudou depois da indexação. `trace` com `changes: uncommitted` é recusado, pois a
+  árvore de trabalho está na máquina do cliente.
+- `meada status --workspace <manifesto>` mostra o estado de cada índice, e
+  `meada export --workspace <manifesto> --repo <identidade>` imprime o índice de um repositório,
+  por exemplo para alimentar uma base de conhecimento.
+
+### Vários nós
+
+Vários servidores sobre os mesmos índices servem sem módulo de nuvem, desde que o operador
+respeite um único escritor por índice.
+
+- **Layout A, cada nó indexa os próprios espelhos.** Cada nó tem um `index_dir` local e roda
+  `meada index --workspace` sobre os espelhos que busca. É o mais simples, mas os nós divergem:
+  cada um enxerga o commit que buscou, e duas chamadas ao mesmo endpoint podem responder
+  diferente até todos buscarem.
+- **Layout B, um job constrói e os nós recebem.** Um job busca os espelhos e indexa tudo num
+  único commit; os nós recebem os espelhos e os índices prontos e os trocam por `rename`. A
+  reconstrução também usa essa troca (`index.db.new.<pid>` sob `index.db.lock`, renomeado sobre
+  `index.db`), então um leitor vê o índice antigo ou o novo inteiro. Troque um índice por
+  `rename` só enquanto nenhum `meada index` o escreve: o `index.db-journal` vivo de um refresh no
+  lugar seria tomado como journal do arquivo novo.
+- **Sem suporte: `index_dir` em sistema de arquivos de rede (NFS, EFS) compartilhado por um
+  escritor e leitores.** O SQLite não é confiável sobre rede (veja
+  [sqlite.org/useovernet.html](https://sqlite.org/useovernet.html)). Cada nó precisa de um
+  `index_dir` local, ou de um volume que só ele escreve.
+- **Somente leitura.** `index_dir` e os espelhos podem ser somente leitura (um volume preenchido
+  por um init, uma camada de imagem): o servidor não cria nada ali. Um espelho de outro usuário
+  é aceito com `-c safe.directory`, só para os espelhos do manifesto, o que exige git 2.38 ou
+  posterior; no Ubuntu 22.04 e no RHEL 8, com git mais antigo, defina `safe.directory` na
+  configuração do sistema.
+- **Sem sessão.** O transporte é sem estado: nenhuma afinidade de sessão (sticky session) é
+  necessária, e clientes no protocolo 2026-07-28 nem têm sessão.
+- **Proxy reverso.** Encaminhe sem alterar `MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name` e
+  todo cabeçalho `Mcp-Param-*` (SEP-2243: o rmcp rejeita uma requisição cujos cabeçalhos
+  discordam do corpo); o proxy pode rotear por eles. Encaminhe o cabeçalho de resposta
+  `Meada-Generation`. Não adicione `Origin`: o Meada responde
+  403 a qualquer requisição que o traga, e assim uma página de navegador não o chama
+  diretamente. O Meada não confere `Host`, e `--listen` aceita um IP ou `localhost`, nunca um
+  nome que ele resolva.
+- **Prontidão.** Primeiro um passo de init (o `meada index --workspace` ou a cópia dos índices).
+  Depois, uma sonda TCP ou `meada status --workspace <manifesto>` como sonda exec: sai com 0
+  quando todo repositório pode ser servido e com 1 caso contrário, espera no máximo 50 ms por um
+  commit em andamento e conta um índice travado como pronto. `--listen` só abre a porta depois
+  das verificações de início, então uma porta aberta indica índices presentes. O 404 em `/` lista
+  identidades e não é um health check.
+- **Escritor único.** Rode o job de indexação sem sobreposição (por exemplo um CronJob com
+  `concurrencyPolicy: Forbid`). Defina `terminationGracePeriodSeconds` acima do limite de 25 s do
+  SIGTERM e um atraso de `preStop` igual ao tempo que o balanceador leva para tirar o nó do ar.
+
+### Módulos de nuvem
+
+Módulos opt-in, desligados por padrão; cada um é documentado abaixo quando chegar. Um módulo é
+uma feature do cargo mais uma seção de `meada.workspace.toml`; os binários de release são o build
+padrão, sem nenhum, e uma seção num build sem a sua feature é um erro que nomeia a feature. A
+feature `cloud` liga todos de uma vez (`cargo install meada --features cloud`) e, como
+`refresh-lock`, só compila em Unix.
+
+**Snapshot** (feature `snapshot`, `cargo install meada --features snapshot`). Um job indexa e
+publica; os nós recebem o resultado inteiro, em vez de cada um indexar os próprios espelhos.
+Depois de `meada index --workspace`, que continua sem rede, o job roda
+`meada snapshot publish --workspace <manifesto>`. Ele confere, só lendo, que cada índice é igual
+ao seu espelho e que cada espelho está limpo (`git status` sem nada, nem arquivo ignorado), e
+recusa listando cada repositório e o comando `meada index --workspace` que resolve. Então envia
+uma geração: um bundle por repositório (um tar do espelho, `.git` incluído, e do seu
+`index.db`), um documento que os lista com tamanho e hash BLAKE3, e por último o ponteiro
+`current`. A única linha em stdout é o id da geração. Um bundle ou uma geração já guardados não
+são enviados de novo, e nada é escrito na máquina que publica.
+
+```toml
+[snapshot]
+endpoint = "https://s3.us-east-1.amazonaws.com"   # qualquer endpoint compatível com S3
+region = "us-east-1"
+bucket = "exemplo-meada"
+prefix = "prod"                                    # opcional
+path_style = false                                 # true na maioria dos stores self-hosted
+credentials = "static"                             # ou "web-identity", "pod-identity", "instance"
+access_key_id_env = "AWS_ACCESS_KEY_ID"            # padrões; ou as chaves *_file
+secret_access_key_env = "AWS_SECRET_ACCESS_KEY"
+session_token_env = "AWS_SESSION_TOKEN"            # opcional
+local_dir = "/var/lib/meada/generations"           # para o pull e o serviço das gerações
+```
+
+O publish só conecta ao `endpoint`, com TLS fora de loopback, e ao endpoint de credencial da
+fonte escolhida; nenhuma requisição segue um redirecionamento nem passa por proxy. As
+credenciais vêm de uma fonte só, a que `credentials` nomeia: `static` lê a chave e o segredo das
+variáveis ou dos arquivos que a seção nomeia (nunca do manifesto); `web-identity` (IRSA) lê
+`AWS_WEB_IDENTITY_TOKEN_FILE` e `AWS_ROLE_ARN` e troca o token no STS da `region`, por https;
+`pod-identity` (EKS Pod Identity) chama o agente em `AWS_CONTAINER_CREDENTIALS_FULL_URI`, só
+`http://169.254.170.23` ou `http://[fd00:ec2::23]`, com o token de
+`AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`; `instance` usa o serviço de metadados da instância
+(IMDSv2, só por IPv4, `http://169.254.169.254`) e só quando escrito na seção. As credenciais ficam só em
+memória, e nenhum segredo aparece num erro.
+
+Em cada nó, `meada snapshot pull --workspace <manifesto>` lê o ponteiro `current` do store e,
+quando ele nomeia uma geração que o nó ainda não tem, baixa os bundles para `local_dir`, confere
+o tamanho e o hash BLAKE3 de cada um contra o documento, extrai e troca o ponteiro do nó por
+rename. A única linha em stdout é o id da geração atual. `--every <segundos>` repete o pull (e só
+imprime quando o ponteiro muda); um segundo pull no mesmo `local_dir` sai com 0 avisando que já
+há um em andamento. O nó guarda a geração atual e a anterior e apaga as mais antigas.
+
+Tudo o que vem do store é tratado como entrada hostil: ids e identidades são conferidos antes de
+virar caminho; o pull recusa no arquivo um caminho absoluto, um `..`, um link que sai do
+repositório, uma entrada gravada através de um link simbólico e dispositivos ou FIFOs, com tetos
+de bytes e de entradas por geração. O `.git/config` extraído é trocado por um mínimo que o Meada
+escreve (só `[core]` e o `origin` da identidade), `.git/hooks` é apagado, e o `git` do Meada
+roda nesses espelhos sem a configuração do sistema nem a global. Um pull que falha em qualquer
+passo deixa o ponteiro e as gerações guardadas como estavam.
+
+```
+<local_dir>/
+  current                     # "<id da geração> <fence>", fence 0 sem a trava de refresh
+  pull.lock
+  <id da geração>/
+    generation.json           # o documento, como guardado no store
+    <id do bundle>/index.db
+    <id do bundle>/mirror/    # o checkout, .git incluído
+```
+
+Para servir o que o nó recebeu, `meada mcp --listen <endereço> --workspace <manifesto>
+--generations`. O manifesto do nó contribui só com as seções de módulo (`[snapshot]`); os
+repositórios são os que a geração atual registrou, com os espelhos e índices dentro de
+`<local_dir>/<id da geração>/`. Cada chamada lê `<local_dir>/current` e abre o motor sobre a
+geração que ele nomeia: uma chamada já aberta termina na geração em que começou, a seguinte vê a
+nova, e um `meada snapshot pull --every` troca a geração sem reiniciar o servidor (um
+repositório novo numa geração nova ganha o seu endpoint na hora). Nada é escrito por chamada,
+os índices abrem só para leitura e o servidor não abre conexão alguma com o store. Os nós nunca
+rodam `meada index`: quem indexa é o job, e o nó só recebe. Sem geração atual, ou com um índice
+que não está na versão de schema deste binário, o servidor recusa subir e nomeia
+`meada snapshot pull` ou o repositório e a geração.
+
+`meada status --workspace <manifesto> --generations` é a sonda de prontidão do nó. Imprime o id
+da geração atual, os ids guardados e uma linha `store: reachable (current <id>)` ou
+`store: unreachable (<motivo>)`. O código de saída depende só do estado local: 1 sem uma
+geração atual servível (os problemas vão para stderr), 0 do contrário, com o store alcançável
+ou não, de modo que um store fora do ar não tira o nó da rotação. `meada export --workspace
+<manifesto> --repo <identidade> --generations` exporta do mesmo jeito.
+
+**Ponteiro de geração e pins** (feature `generation-pointer`, que inclui `snapshot`;
+`cargo install meada --features generation-pointer`). Com a seção `[generations]`, que exige
+`[snapshot]` e `[valkey]`, o ponteiro da geração atual sai do store e vai para o Valkey, e a
+frota inteira guarda o mesmo conjunto de gerações.
+
+```toml
+[valkey]
+url = "rediss://meada@cache.exemplo.internal:6379"   # TLS fora de loopback
+password_file = "/run/secrets/valkey"                 # ou password_env
+key_prefix = "meada:prod"                             # padrão "meada"
+
+[generations]
+keep = 3                                              # gerações retidas na frota, no mínimo 2
+```
+
+O `meada snapshot publish` termina gravando, num só script, `{<key_prefix>}:current` (um hash
+`{id, fence}`) e `{<key_prefix>}:retained` (uma lista de `<id>:<fence>`, da mais nova para a
+mais antiga, cada id uma vez, cortada em `keep`), e não grava mais o `current` do store; o
+fence é `0` sem a trava de refresh. Cada `meada snapshot pull` lê os dois do Valkey e confere
+cada id (16 caracteres hexadecimais minúsculos) e cada fence (decimal) antes de mexer no nó;
+então baixa toda geração retida que o nó não tem e apaga as que saíram da lista, nunca a atual
+nem a que acabou de substituir. O arquivo de ponteiro do nó leva o fence lido com o id. Uma
+entrada malformada, um ponteiro ausente ou uma lista vazia param o pull com um erro que nomeia
+a chave, e o nó fica como estava. A geração atual é baixada e trocada primeiro: uma geração
+retida que falha depois dela vira um aviso em stderr com o id e a causa, não bloqueia nada, e o
+próximo pull tenta de novo. Use o mesmo `keep` no job e nos nós. `meada status --generations`
+lê a geração atual do Valkey e confere que o store guarda o seu documento; a linha
+`store: unreachable (...)` diz se falhou o Valkey ou o store.
+
+Um run de workflow fixa as commits em que começou com um pin no caminho:
+`/<identidade>@<geração>`, a geração sendo o que vem depois do último `@`, serve a geração
+guardada, em qualquer nó, enquanto ela estiver retida, e `/<identidade>` continua servindo a
+atual. Uma geração que o nó não guarda responde 404 `text/plain` nomeando a geração pedida, a
+atual e as guardadas. Cada resposta HTTP nomeia a sua geração no cabeçalho `Meada-Generation`
+(um 404 nomeia a atual) e cada resultado de ferramenta no `_meta`, `{"meada/generation":
+"<id>"}`: o run lê a geração da primeira resposta e fixa as seguintes nela. As ferramentas, os
+parâmetros e o texto das respostas não mudam. O proxy reverso repassa `Meada-Generation` nas
+respostas. Uma chamada fixada ainda aberta numa geração que a retenção de um pull apaga pode
+falhar no meio.
+
+**Trava de refresh** (feature `refresh-lock`, que inclui `generation-pointer`, só Unix;
+`cargo install meada --features refresh-lock`). Com a seção `[refresh_lock]`, que exige
+`[generations]`, o refresh inteiro roda sob uma trava no Valkey, e cada aquisição ganha um
+fence, de modo que um job sobreposto ou travado nunca troca uma geração nova por uma mais
+antiga.
+
+```toml
+[refresh_lock]
+ttl_seconds = 300                                     # padrão; no mínimo 10
+```
+
+```sh
+meada snapshot lock --workspace ops/meada.workspace.toml -- \
+  sh -c 'git -C api fetch && git -C api reset --hard origin/main &&
+         meada index --workspace ops/meada.workspace.toml &&
+         meada snapshot publish --workspace ops/meada.workspace.toml'
+```
+
+`meada snapshot lock` toma a trava com `SET {<key_prefix>}:lock <token aleatório> NX PX <ttl>`,
+soma um em `{<key_prefix>}:fence` e roda o comando como filho, com `MEADA_REFRESH_LOCK` (o
+token) e `MEADA_REFRESH_FENCE` no ambiente. A trava é renovada a cada terço do TTL (comparar e
+estender) e liberada no fim (comparar e apagar); o código de saída é o do filho (128 mais o
+sinal quando um sinal o encerrou). Uma trava já tomada sai com 1 nomeando a chave, sem rodar
+nada. Quando uma renovação acha outro token, ou nenhuma deu certo por um TTL inteiro, a trava
+está perdida: o grupo de processos do filho recebe SIGTERM (e SIGKILL 10 s depois, se ainda
+estiver vivo), e `lock` sai com 1 dizendo que a perdeu. Um SIGTERM, SIGINT, SIGHUP ou SIGQUIT em `lock`
+chega ao grupo do mesmo jeito; quando o filho termina, o que sobrou no grupo de processos recebe
+SIGKILL (um neto que chama `setsid` sai do grupo e escapa), e no Linux o filho recebe SIGTERM se
+`lock` morrer antes. A indexação continua sem rede: o `meada index` do
+filho não abre conexão alguma.
+
+Com `[refresh_lock]`, `meada snapshot publish` exige as duas variáveis, e antes de cada envio
+confere que a trava ainda guarda o token: se não, para sem enviar mais nada e sem gravar o
+ponteiro. O script do ponteiro só grava quando a trava guarda o token e o fence é maior que o de
+`{<key_prefix>}:current`, numa só operação. Os nós nunca trocam para uma geração de fence menor
+que o do seu arquivo de ponteiro; sem o arquivo, tomam a atual seja qual for o fence. O Meada
+nunca baixa nem apaga `{<key_prefix>}:fence`. Se um flush ou um failover do Valkey o perder, os
+fences seguintes ficam menores que os registrados e a frota para: o publish recusado sai com 1
+nomeando `{<key_prefix>}:fence`, o pull de um nó com fence maior sai com 1 sem trocar, e
+`meada status --generations` nesse nó imprime uma linha `fence: travado: ...` (`fence: stuck: ...` fora do português) com os dois fences
+(o código de saída não muda). Para sair disso, defina `{<key_prefix>}:fence` igual ou acima do
+maior fence registrado (no Valkey ou no `<local_dir>/current` de algum nó), ou apague o
+`<local_dir>/current` do nó, que então toma a geração atual. Desligar `[refresh_lock]` depois
+que os nós gravaram fences acima de 0 também trava a frota, já que sem a trava todo fence é 0:
+apague o `<local_dir>/current` de cada nó.
+
+**OIDC** (feature `oidc`; `cargo install meada --features oidc`). A admissão padrão continua
+sendo o proxy reverso, como diz o aviso no início desta seção; o módulo OIDC é a alternativa
+para quem quer que o próprio Meada confira quem chama. Com a seção `[oidc]`, o servidor vira um
+resource server OAuth 2.1, como a especificação de autorização do MCP (2026-07-28) descreve:
+toda requisição leva `Authorization: Bearer <JWT>` emitido pelo provedor do operador. O Meada
+não emite token, não registra cliente e nunca repassa um token.
+
+```toml
+[oidc]
+issuer = "https://id.exemplo.internal/realms/agentes"
+public_url = "https://meada.exemplo.internal"   # a URL que os clientes usam, atrás do proxy
+audience = "https://meada.exemplo.internal"     # opcional; padrão: a URL canônica do endpoint
+identities_claim = "meada_repositories"
+scopes = ["meada:read"]                          # opcional, anunciado e exigido
+jwks_refresh_seconds = 3600                      # padrão; no mínimo 60
+```
+
+No provedor: um audience igual a `audience` (ou, sem ela, à URL de cada endpoint,
+`<public_url>/<identidade>`); um claim mapper que põe em `identities_claim` a lista das
+identidades que o cliente pode ler (`"*"` libera todas); e client credentials para os agentes
+headless e para o backend de um portal, que pedem o token ao provedor. Uma página no navegador
+não chama o Meada direto: com `[oidc]`, toda requisição com `Origin` recebe 403, em qualquer
+caminho, então um portal chama do seu backend. O proxy repassa sem mudar o `Authorization` e os
+cabeçalhos do SEP-2243 (`MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name`, `Mcp-Param-*`).
+
+Na subida, antes de escutar, o Meada lê os metadados do issuer (RFC 8414 ou OpenID Discovery,
+nos caminhos e na ordem que a especificação do MCP define, conferindo que o `issuer` do
+documento é o configurado) e o JWKS que eles nomeiam; uma falha recusa a subida. `issuer`,
+`public_url` e o `jwks_uri` precisam ser `https` fora de loopback; nenhuma das requisições segue
+um redirecionamento nem passa por proxy, cada uma tem 10 s e um teto de tamanho, e os
+certificados são conferidos contra as raízes do sistema. O JWKS é relido a cada
+`jwks_refresh_seconds` e quando chega um token com um `kid` desconhecido, no máximo uma vez por
+minuto; se a releitura falha, as chaves em cache continuam e o stderr diz isso.
+
+`GET /.well-known/oauth-protected-resource/<identidade>` responde sem token os metadados do
+recurso (RFC 9728): `resource` igual a `<public_url>/<identidade>`, `authorization_servers`
+igual a `[issuer]`, `bearer_methods_supported` igual a `["header"]` e `scopes_supported` quando
+há `scopes`; `/.well-known/oauth-protected-resource/<identidade>@<geração>` responde o mesmo
+com o `resource` fixado. Um token passa com um algoritmo assimétrico (RS256, RS384, RS512,
+ES256, ES384, PS256) que case com a chave, `iss` igual a `issuer`, um `aud` igual a `audience`
+ou, sem ela, à URL de `/<identidade>` (aceita também nos pins, de modo que um token lê o
+repositório em toda geração), `exp` obrigatório e `nbf` respeitado com 60 s de folga, e todo
+escopo configurado no seu `scope`. Um token na query string nunca é lido. O `scope` é lido só
+como string separada por espaços; `scp` e um `scope` em array não são lidos, então, com
+`scopes` definido, um provedor que manda `scp` (o Okta, por exemplo) precisa de um claim mapper
+para `scope`.
+
+Sem token, ou com um token que não passa: 401 com `WWW-Authenticate: Bearer
+resource_metadata="<public_url>/.well-known/oauth-protected-resource/<caminho>"`, mais
+`error="invalid_token"` quando veio um token e `scope` quando configurado. Um token válido cujo
+claim não lista a identidade do endpoint, num pin também: 403 com `error="insufficient_scope"`;
+sem um escopo exigido, o mesmo 403 com `scope`. A autenticação vem antes do roteamento: o 404
+da raiz, de um caminho desconhecido e de uma geração que o nó não guarda exige um token válido
+para aquele caminho (sem `audience`, o da raiz tem `aud` igual a `public_url`) e lista só as
+identidades que ele pode ler. Nenhum token nem pedaço de um token aparece em
+stderr ou num erro.
+
 ## Decisões
 
 Uma ligação ambígua (vários provedores servem a rota) ou uma URL dinâmica (a chamada monta a

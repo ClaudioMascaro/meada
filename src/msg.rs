@@ -14,10 +14,81 @@ pub fn init(lang: Option<&str>) {
     PT.store(lang.is_some_and(|l| l.starts_with("pt")), Ordering::Relaxed);
 }
 
+/// Where an index that cannot be read is fixed (`index::open_read`).
+#[derive(Clone, Copy)]
+pub enum Fix<'a> {
+    /// `meada index --workspace <manifest>`.
+    Index(&'a str),
+    /// A node's generation `id` (`--generations`, feature `snapshot`), held in `dir`
+    /// (`<local_dir>/<id>`): a pull of the generation already current changes nothing, so the
+    /// fix removes `dir` before the pull, or publishes another generation.
+    Generation { id: &'a str, dir: &'a str },
+}
+
 pub enum Msg<'a> {
     NotIndexed,
     OtherVersion,
     Indexed(i64),
+    OtherVersionWorkspace,
+    UnsafeIdentity,
+    LocalIdentity,
+    ListedTwice,
+    NoMirror(&'a str),
+    NotACheckout(&'a str),
+    DubiousOwner(&'a str),
+    IdentityMismatch {
+        found: &'a str,
+        repo: &'a str,
+    },
+    NotListed {
+        repo: &'a str,
+        served: &'a str,
+    },
+    IndexInMirror {
+        index: &'a str,
+        mirror: &'a str,
+    },
+    WorkspaceHelp,
+    ListenHelp,
+    RepoHelp,
+    IgnoredBlock {
+        block: &'a str,
+        repo: &'a str,
+    },
+    IndexMissing {
+        repo: &'a str,
+        fix: Fix<'a>,
+    },
+    IndexOtherVersion {
+        repo: &'a str,
+        fix: Fix<'a>,
+    },
+    StateLocked,
+    #[cfg(feature = "snapshot")]
+    IndexNotRollback(&'a str),
+    #[cfg(feature = "snapshot")]
+    IndexSchemaObject {
+        repo: &'a str,
+        kind: &'a str,
+        name: &'a str,
+    },
+    IndexInterrupted {
+        repo: &'a str,
+        fix: Fix<'a>,
+    },
+    IndexLocked {
+        repo: &'a str,
+        index: &'a str,
+        timeout: std::time::Duration,
+    },
+    IndexNotReplaced {
+        index: &'a str,
+        error: &'a str,
+    },
+    RebuildLock {
+        lock: &'a str,
+        error: &'a str,
+    },
     MissingPeer {
         repo: &'a str,
         named_by: &'a str,
@@ -119,6 +190,230 @@ pub enum Msg<'a> {
     NotLowercase(&'a str),
     NoLeadingSlash(&'a str),
     Empty,
+    NeedsFeature {
+        section: &'a str,
+        feature: &'a str,
+    },
+    #[cfg(feature = "valkey")]
+    ValkeyUrlInvalid,
+    #[cfg(feature = "valkey")]
+    ValkeyUrlPassword,
+    #[cfg(feature = "valkey")]
+    ValkeyUrlPlain,
+    #[cfg(feature = "valkey")]
+    ValkeyUrlInsecure,
+    #[cfg(feature = "valkey")]
+    ValkeyClusterPlain,
+    #[cfg(feature = "valkey")]
+    ValkeyBoth,
+    #[cfg(feature = "valkey")]
+    ValkeyPrefixBraces,
+    #[cfg(feature = "valkey")]
+    ValkeyEnvUnset(&'a str),
+    #[cfg(feature = "valkey")]
+    ValkeyTimeout(u64),
+    #[cfg(feature = "valkey")]
+    ValkeyReachable,
+    #[cfg(feature = "valkey")]
+    ValkeyUnreachable(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotEndpointInvalid,
+    #[cfg(feature = "snapshot")]
+    SnapshotEndpointUser,
+    #[cfg(feature = "snapshot")]
+    SnapshotEndpointPlain,
+    #[cfg(feature = "snapshot")]
+    SnapshotPathStyle,
+    #[cfg(feature = "snapshot")]
+    SnapshotRegion,
+    #[cfg(feature = "snapshot")]
+    SnapshotBucket,
+    #[cfg(feature = "snapshot")]
+    SnapshotPrefix,
+    #[cfg(feature = "snapshot")]
+    SnapshotBoth(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotStaticOnly,
+    #[cfg(feature = "snapshot")]
+    SnapshotEnvUnset(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotNoSection(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotBehind {
+        repo: &'a str,
+        manifest: &'a str,
+    },
+    #[cfg(feature = "snapshot")]
+    SnapshotDirty {
+        repo: &'a str,
+        mirror: &'a str,
+    },
+    #[cfg(feature = "snapshot")]
+    SnapshotPodUrl,
+    #[cfg(feature = "snapshot")]
+    SnapshotRefused(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotObjectBad(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotChanged(&'a str),
+    #[cfg(feature = "snapshot")]
+    Snapshot,
+    #[cfg(feature = "snapshot")]
+    SnapshotPublish,
+    #[cfg(feature = "snapshot")]
+    SnapshotPull,
+    #[cfg(feature = "snapshot")]
+    SnapshotEvery,
+    #[cfg(feature = "snapshot")]
+    SnapshotNoLocalDir(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotPulling(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotNoCurrent(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotBadId(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotBadBundleKey(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotPointerBad(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotNotDocument(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotIdentityChars,
+    #[cfg(feature = "snapshot")]
+    SnapshotBytesCeiling(u64),
+    #[cfg(feature = "snapshot")]
+    SnapshotEntriesCeiling(u64),
+    #[cfg(feature = "snapshot")]
+    SnapshotEntryHeader(u64),
+    #[cfg(feature = "snapshot")]
+    SnapshotEntryPath,
+    #[cfg(feature = "snapshot")]
+    SnapshotEntryNested,
+    #[cfg(feature = "snapshot")]
+    SnapshotEntryLink,
+    #[cfg(feature = "snapshot")]
+    SnapshotEntryThrough,
+    #[cfg(feature = "snapshot")]
+    SnapshotEntrySpecial,
+    #[cfg(feature = "snapshot")]
+    SnapshotNoGit,
+    #[cfg(feature = "snapshot")]
+    SnapshotHead {
+        found: &'a str,
+        head: &'a str,
+    },
+    #[cfg(feature = "snapshot")]
+    SnapshotNoneHeld(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotTimeout(u64),
+    #[cfg(feature = "snapshot")]
+    SnapshotStatusCurrent(Option<&'a str>),
+    #[cfg(feature = "snapshot")]
+    SnapshotStatusHeld(&'a [String]),
+    #[cfg(feature = "snapshot")]
+    SnapshotStoreReachable(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotStoreUnreachable(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    NeedsSections {
+        section: &'a str,
+        needed: &'a [&'a str],
+    },
+    #[cfg(any(feature = "generation-pointer", feature = "oidc"))]
+    AtLeast(i64),
+    #[cfg(feature = "generation-pointer")]
+    GenerationsBadPointer(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    GenerationsBadEntry(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    GenerationsEmpty(&'a str),
+    /// The pointer script refused a fence not above `current`'s (`{<key_prefix>}:fence` lost).
+    #[cfg(feature = "generation-pointer")]
+    FenceRefused {
+        fence: u64,
+        current: &'a str,
+        fence_key: &'a str,
+    },
+    /// A pull that would lower the node's fence.
+    #[cfg(feature = "generation-pointer")]
+    FenceBelowNode {
+        current: &'a str,
+        id: &'a str,
+        fence: u64,
+        held: u64,
+        pointer: &'a str,
+        fence_key: &'a str,
+    },
+    /// `status --generations` on a node whose fence is above Valkey's.
+    #[cfg(feature = "generation-pointer")]
+    FenceStuck {
+        held: u64,
+        pointer: &'a str,
+        fence: u64,
+        current: &'a str,
+        fence_key: &'a str,
+    },
+    /// The lock no longer holds a publish's token.
+    #[cfg(feature = "generation-pointer")]
+    LockNotHeld(&'a str),
+    #[cfg(feature = "refresh-lock")]
+    LockHeld(&'a str),
+    #[cfg(feature = "refresh-lock")]
+    LockLost(&'a str),
+    #[cfg(feature = "refresh-lock")]
+    LockBadFence(&'a str),
+    #[cfg(feature = "refresh-lock")]
+    LockNoSection(&'a str),
+    #[cfg(feature = "refresh-lock")]
+    LockEnv,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotLock,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotLockCommand,
+    #[cfg(feature = "snapshot")]
+    GenerationNotHeld(&'a str),
+    /// An `[oidc]` URL that is not `https` (or `http` on loopback) with a host and no user,
+    /// query or fragment; with `bare`, no path either.
+    #[cfg(feature = "oidc")]
+    OidcUrl {
+        bare: bool,
+    },
+    /// A `jwks_uri` that is not `https` (or `http` on loopback) with a host and no user or
+    /// fragment.
+    #[cfg(feature = "oidc")]
+    OidcJwksUrl,
+    #[cfg(feature = "oidc")]
+    OidcEmpty,
+    /// A configured scope holding a character no RFC 6749 scope-token carries.
+    #[cfg(feature = "oidc")]
+    OidcScope {
+        scope: &'a str,
+        bad: char,
+    },
+    /// None of the issuer's metadata documents could be used: each URL tried with why.
+    #[cfg(feature = "oidc")]
+    OidcMetadata(&'a str),
+    #[cfg(feature = "oidc")]
+    OidcIssuerMismatch(&'a str),
+    #[cfg(feature = "oidc")]
+    OidcJwksUri(&'a str),
+    #[cfg(feature = "oidc")]
+    OidcJwks {
+        url: &'a str,
+        why: &'a str,
+    },
+    #[cfg(feature = "oidc")]
+    OidcJwksNoKey,
+    #[cfg(feature = "oidc")]
+    OidcRefreshFailed(&'a str),
+    #[cfg(feature = "snapshot")]
+    SnapshotRetainedSkipped {
+        id: &'a str,
+        why: &'a str,
+    },
+    #[cfg(feature = "snapshot")]
+    GenerationsHelp,
     About,
     Index,
     Status,
@@ -207,6 +502,185 @@ impl Msg<'_> {
             Msg::Indexed(n) => pick(
                 format!("indexed, {n} files"),
                 format!("indexado, {n} arquivos"),
+            ),
+            Msg::OtherVersionWorkspace => pick(
+                "indexed by another version; rebuilt by meada index --workspace".into(),
+                "indexado por outra versão; reconstruído por meada index --workspace".into(),
+            ),
+            Msg::UnsafeIdentity => pick(
+                "not a repository identity: a segment is empty, `.` or `..`".into(),
+                "não é uma identidade de repositório: um segmento está vazio ou é `.` ou `..`"
+                    .into(),
+            ),
+            Msg::LocalIdentity => pick(
+                "a local identity: server mode serves repositories by their remote".into(),
+                "uma identidade local: o modo servidor serve repositórios pelo remoto".into(),
+            ),
+            Msg::ListedTwice => pick("listed twice".into(), "listado duas vezes".into()),
+            Msg::NoMirror(path) => pick(
+                format!("`{path}` does not exist"),
+                format!("`{path}` não existe"),
+            ),
+            Msg::NotACheckout(path) => pick(
+                format!("`{path}` is not the root of a checkout with a working tree"),
+                format!("`{path}` não é a raiz de um checkout com árvore de trabalho"),
+            ),
+            Msg::DubiousOwner(path) => pick(
+                format!(
+                    "git refuses `{path}`, which another user owns: Meada needs git 2.38 or \
+                     later to read it, or `safe.directory` set in the system git configuration"
+                ),
+                format!(
+                    "o git recusa `{path}`, que pertence a outro usuário: o Meada precisa do git \
+                     2.38 ou posterior para lê-lo, ou de `safe.directory` na configuração de \
+                     sistema do git"
+                ),
+            ),
+            Msg::IdentityMismatch { found, repo } => pick(
+                format!("the mirror's remote is `{found}`, not `{repo}`"),
+                format!("o remoto do espelho é `{found}`, não `{repo}`"),
+            ),
+            Msg::NotListed { repo, served } => pick(
+                format!("`{repo}` is not listed in the workspace manifest; it serves {served}"),
+                format!("`{repo}` não está listado no manifesto do workspace; ele serve {served}"),
+            ),
+            Msg::ListenHelp => pick(
+                "Server mode: serve over MCP streamable HTTP at host:port, :port or port \
+                 (loopback without a host), with --workspace"
+                    .into(),
+                "Modo servidor: serve por MCP streamable HTTP em host:porta, :porta ou porta \
+                 (loopback sem host), com --workspace"
+                    .into(),
+            ),
+            Msg::RepoHelp => pick(
+                "Server mode: the identity of the repository to export".into(),
+                "Modo servidor: a identidade do repositório a exportar".into(),
+            ),
+            Msg::IgnoredBlock { block, repo } => pick(
+                format!(
+                    "manifest block ignored: {block} of {repo}, whose mirror has its own meada.toml"
+                ),
+                format!(
+                    "bloco do manifesto ignorado: {block} de {repo}, cujo espelho tem seu próprio \
+                     meada.toml"
+                ),
+            ),
+            Msg::IndexMissing { repo, fix } => match fix {
+                Fix::Index(manifest) => pick(
+                    format!("{repo}: not indexed; run meada index --workspace {manifest}"),
+                    format!("{repo}: não indexado; rode meada index --workspace {manifest}"),
+                ),
+                Fix::Generation { id, dir } => pick(
+                    format!(
+                        "{repo}: no index in generation {id}; remove {dir} and run meada snapshot \
+                         pull again, or publish a new generation"
+                    ),
+                    format!(
+                        "{repo}: sem índice na geração {id}; remova {dir} e rode meada snapshot \
+                         pull de novo, ou publique uma nova geração"
+                    ),
+                ),
+            },
+            Msg::IndexOtherVersion { repo, fix } => match fix {
+                Fix::Index(manifest) => pick(
+                    format!(
+                        "{repo}: indexed by another version; run meada index --workspace \
+                         {manifest}"
+                    ),
+                    format!(
+                        "{repo}: indexado por outra versão; rode meada index --workspace \
+                         {manifest}"
+                    ),
+                ),
+                Fix::Generation { id, .. } => pick(
+                    format!(
+                        "{repo}: indexed by another version in generation {id}; publish a \
+                         generation from this build, then run meada snapshot pull"
+                    ),
+                    format!(
+                        "{repo}: indexado por outra versão na geração {id}; publique uma geração \
+                         deste build e rode meada snapshot pull"
+                    ),
+                ),
+            },
+            Msg::IndexInterrupted { repo, fix } => match fix {
+                Fix::Index(manifest) => pick(
+                    format!(
+                        "{repo}: its index holds an interrupted commit; run meada index \
+                         --workspace {manifest}"
+                    ),
+                    format!(
+                        "{repo}: seu índice guarda um commit interrompido; rode meada index \
+                         --workspace {manifest}"
+                    ),
+                ),
+                Fix::Generation { id, dir } => pick(
+                    format!(
+                        "{repo}: its index in generation {id} holds an interrupted commit; \
+                         remove {dir} and run meada snapshot pull again, or publish a new \
+                         generation"
+                    ),
+                    format!(
+                        "{repo}: seu índice na geração {id} guarda um commit interrompido; \
+                         remova {dir} e rode meada snapshot pull de novo, ou publique uma nova \
+                         geração"
+                    ),
+                ),
+            },
+            #[cfg(feature = "snapshot")]
+            Msg::IndexNotRollback(repo) => pick(
+                format!("{repo}: index.db: not a database in rollback journal mode"),
+                format!("{repo}: index.db: não é um banco em modo rollback journal"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::IndexSchemaObject { repo, kind, name } => pick(
+                format!(
+                    "{repo}: index.db: the {kind} {name} is not one this build's schema creates"
+                ),
+                format!(
+                    "{repo}: index.db: o {kind} {name} não é um dos que o esquema deste build cria"
+                ),
+            ),
+            Msg::StateLocked => pick(
+                "locked by a commit in progress past the busy timeout".into(),
+                "travado por um commit em andamento além do tempo de espera".into(),
+            ),
+            Msg::IndexLocked {
+                repo,
+                index,
+                timeout,
+            } => pick(
+                format!(
+                    "{repo}: the index `{index}` stayed locked by a commit in progress for \
+                     longer than {timeout:?}"
+                ),
+                format!(
+                    "{repo}: o índice `{index}` ficou travado por um commit em andamento por \
+                     mais de {timeout:?}"
+                ),
+            ),
+            Msg::IndexNotReplaced { index, error } => pick(
+                format!(
+                    "the index `{index}` could not be replaced by its rebuild ({error}); it is \
+                     left as it was"
+                ),
+                format!(
+                    "o índice `{index}` não pôde ser substituído pela reconstrução ({error}); \
+                     ficou como estava"
+                ),
+            ),
+            Msg::RebuildLock { lock, error } => pick(
+                format!("cannot take the rebuild lock `{lock}`: {error}"),
+                format!("não foi possível pegar a trava de reconstrução `{lock}`: {error}"),
+            ),
+            Msg::IndexInMirror { index, mirror } => pick(
+                format!("its index directory `{index}` would be inside the mirror `{mirror}`"),
+                format!("seu diretório de índice `{index}` ficaria dentro do espelho `{mirror}`"),
+            ),
+            Msg::WorkspaceHelp => pick(
+                "Server mode: every repository the workspace manifest at this path lists".into(),
+                "Modo servidor: todo repositório que o manifesto do workspace neste caminho lista"
+                    .into(),
             ),
             Msg::MissingPeer { repo, named_by } => pick(
                 format!("missing peer: {repo}, named by {named_by}"),
@@ -356,6 +830,588 @@ impl Msg<'_> {
                 format!("`{value}` deve começar com `/`"),
             ),
             Msg::Empty => pick("is empty".into(), "está vazio".into()),
+            Msg::NeedsFeature { section, feature } => pick(
+                format!("[{section}] needs a Meada built with the {feature} feature"),
+                format!("[{section}] exige um Meada compilado com a feature {feature}"),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyUrlInvalid => pick(
+                "is not a redis:// or rediss:// URL".into(),
+                "não é uma URL redis:// ou rediss://".into(),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyUrlPassword => pick(
+                "carries a password: name it in password_env or password_file".into(),
+                "traz uma senha: nomeie-a em password_env ou password_file".into(),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyUrlPlain => pick(
+                "must be a rediss:// URL: TLS is required unless the host is loopback".into(),
+                "deve ser uma URL rediss://: TLS é obrigatório, salvo em loopback".into(),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyUrlInsecure => pick(
+                "must verify the server certificate: no #insecure".into(),
+                "deve verificar o certificado do servidor: sem #insecure".into(),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyClusterPlain => pick(
+                "needs a rediss:// url: the nodes a cluster announces are reached over TLS".into(),
+                "exige uma url rediss://: os nós que um cluster anuncia são alcançados por TLS".into(),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyBoth => pick(
+                "is set together with password_env: use one of the two".into(),
+                "está junto de password_env: use um dos dois".into(),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyPrefixBraces => pick(
+                "must not contain `{` or `}`".into(),
+                "não pode conter `{` nem `}`".into(),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyEnvUnset(var) => pick(
+                format!("the variable {var} is not set"),
+                format!("a variável {var} não está definida"),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyTimeout(ms) => pick(
+                format!("no answer within {ms} ms"),
+                format!("sem resposta em {ms} ms"),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyReachable => pick("valkey: reachable".into(), "valkey: alcançável".into()),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyUnreachable(reason) => pick(
+                format!("valkey: unreachable ({reason})"),
+                format!("valkey: inalcançável ({reason})"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEndpointInvalid => pick(
+                "is not an http:// or https:// URL with a host and nothing after it".into(),
+                "não é uma URL http:// ou https:// com um host e nada depois dele".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEndpointUser => pick(
+                "carries a user or a password: credentials come from the credential keys".into(),
+                "traz um usuário ou uma senha: as credenciais vêm das chaves de credencial".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEndpointPlain => pick(
+                "must be an https:// URL: TLS is required unless the host is loopback".into(),
+                "deve ser uma URL https://: TLS é obrigatório, salvo em loopback".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotPathStyle => pick(
+                "must be true for an http://, IP or localhost endpoint: the bucket cannot go in \
+                 front of that host"
+                    .into(),
+                "deve ser true para um endpoint http://, IP ou localhost: o bucket não pode ir à \
+                 frente desse host"
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotRegion => pick(
+                "must be lowercase letters, digits and `-`".into(),
+                "deve ter só letras minúsculas, dígitos e `-`".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotBucket => pick(
+                "must be 3 to 63 lowercase letters, digits, `.` and `-`, starting and ending with \
+                 a letter or a digit"
+                    .into(),
+                "deve ter de 3 a 63 letras minúsculas, dígitos, `.` e `-`, começando e \
+                 terminando com letra ou dígito"
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotPrefix => pick(
+                "must be `/`-separated segments, none of them empty, `.` or `..`".into(),
+                "deve ter segmentos separados por `/`, nenhum vazio, `.` ou `..`".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotBoth(other) => pick(
+                format!("is set together with {other}: use one of the two"),
+                format!("está junto de {other}: use um dos dois"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotStaticOnly => pick(
+                "is read only with credentials = \"static\"".into(),
+                "só é lida com credentials = \"static\"".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEnvUnset(var) => pick(
+                format!("the variable {var} is not set"),
+                format!("a variável {var} não está definida"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotNoSection(manifest) => pick(
+                format!("{manifest} has no [snapshot] section"),
+                format!("{manifest} não tem a seção [snapshot]"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotBehind { repo, manifest } => pick(
+                format!(
+                    "{repo}: its index differs from the mirror; run meada index --workspace \
+                     {manifest}"
+                ),
+                format!(
+                    "{repo}: seu índice difere do espelho; rode meada index --workspace {manifest}"
+                ),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotDirty { repo, mirror } => pick(
+                format!(
+                    "{repo}: the mirror {mirror} is not clean: git status lists changed, \
+                     untracked or ignored files"
+                ),
+                format!(
+                    "{repo}: o espelho {mirror} não está limpo: git status lista arquivos \
+                     alterados, não rastreados ou ignorados"
+                ),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotPodUrl => pick(
+                "AWS_CONTAINER_CREDENTIALS_FULL_URI must name the Pod Identity agent, \
+                 http://169.254.170.23 or http://[fd00:ec2::23]"
+                    .into(),
+                "AWS_CONTAINER_CREDENTIALS_FULL_URI deve apontar para o agente do Pod Identity, \
+                 http://169.254.170.23 ou http://[fd00:ec2::23]"
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotRefused(origin) => pick(
+                format!("refused a request to {origin}: not a configured endpoint"),
+                format!("recusada uma requisição a {origin}: não é um endpoint configurado"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotObjectBad(key) => pick(
+                format!("{key}: not stored with the size and hash it records"),
+                format!("{key}: não está guardado com o tamanho e o hash que registra"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotChanged(repo) => pick(
+                format!("{repo}: the mirror or its index changed while it was published"),
+                format!("{repo}: o espelho ou seu índice mudou durante a publicação"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::Snapshot => pick(
+                "Server mode: the snapshot store of generations (ADR 0012).".into(),
+                "Modo servidor: o armazenamento de gerações (ADR 0012).".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotPublish => pick(
+                "Upload the workspace as a generation, once every index equals its mirror."
+                    .into(),
+                "Envia o workspace como uma geração, quando cada índice equivale ao seu espelho."
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotPull => pick(
+                "Fetch the store's current generation into local_dir, verify it and make it the \
+                 node's current one."
+                    .into(),
+                "Baixa a geração atual do store em local_dir, verifica-a e a torna a atual do nó."
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEvery => pick(
+                "Pull again every this many seconds.".into(),
+                "Repete o pull a cada tantos segundos.".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotNoLocalDir(manifest) => pick(
+                format!("{manifest}: `snapshot.local_dir` is not set: the pull writes there"),
+                format!("{manifest}: `snapshot.local_dir` não está definido: o pull grava lá"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotPulling(dir) => pick(
+                format!("a pull is running in {dir}"),
+                format!("um pull está em andamento em {dir}"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotNoCurrent(key) => pick(
+                format!("{key}: not found: no generation is published there"),
+                format!("{key}: não encontrado: nenhuma geração foi publicada lá"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotBadId(key) => pick(
+                format!("{key}: does not hold an id of 16 lowercase hex characters"),
+                format!("{key}: não contém um id de 16 caracteres hexadecimais minúsculos"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotBadBundleKey(key) => pick(
+                format!(
+                    "the bundle key `{key}` is not repos/<identity>/<id>.tar under the prefix, \
+                     with an id of 16 lowercase hex characters"
+                ),
+                format!(
+                    "a chave de bundle `{key}` não é repos/<identidade>/<id>.tar sob o prefixo, \
+                     com um id de 16 caracteres hexadecimais minúsculos"
+                ),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotPointerBad(path) => pick(
+                format!(
+                    "{path}: not `<generation id> <fence>`; delete it to take the store's \
+                     current generation"
+                ),
+                format!(
+                    "{path}: não é `<id da geração> <fence>`; apague-o para receber a geração \
+                     atual do store"
+                ),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotNotDocument(key) => pick(
+                format!("{key}: not the generation document of its id"),
+                format!("{key}: não é o documento de geração do seu id"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotIdentityChars => pick(
+                "not a repository identity: it holds whitespace, a quote, a backslash or a \
+                 control character"
+                    .into(),
+                "não é uma identidade de repositório: contém espaço, aspas, barra invertida ou \
+                 caractere de controle"
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotBytesCeiling(max) => pick(
+                format!("past the ceiling of {max} bytes per generation"),
+                format!("acima do teto de {max} bytes por geração"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEntriesCeiling(max) => pick(
+                format!("past the ceiling of {max} archive entries per generation"),
+                format!("acima do teto de {max} entradas de arquivo por geração"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEntryHeader(max) => pick(
+                format!("a long name or a pax header past the ceiling of {max} bytes"),
+                format!("um nome longo ou um cabeçalho pax acima do teto de {max} bytes"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEntryNested => pick(
+                "a nested repository: a `.git` below the mirror's own, or under its `.git/modules`"
+                    .into(),
+                "um repositório aninhado: um `.git` abaixo do próprio do espelho, ou sob o seu \
+                 `.git/modules`"
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEntryPath => pick(
+                "an absolute path, a `.` or `..` component, or a path other than index.db first \
+                 and the mirror under mirror/"
+                    .into(),
+                "um caminho absoluto, um componente `.` ou `..`, ou um caminho que não é \
+                 index.db primeiro e o espelho sob mirror/"
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEntryLink => pick(
+                "a link whose target leaves the repository directory".into(),
+                "um link cujo alvo sai do diretório do repositório".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEntryThrough => pick(
+                "written through a symbolic link or over an earlier entry".into(),
+                "gravada através de um link simbólico ou sobre uma entrada anterior".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotEntrySpecial => pick(
+                "a device, a FIFO or another special file".into(),
+                "um dispositivo, um FIFO ou outro arquivo especial".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotNoGit => pick(
+                "the mirror has no .git directory".into(),
+                "o espelho não tem um diretório .git".into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotHead { found, head } => pick(
+                format!("the mirror's HEAD is {found}, not the document's {head}"),
+                format!("o HEAD do espelho é {found}, não o {head} do documento"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotNoneHeld(dir) => pick(
+                format!("{dir} holds no generation: run meada snapshot pull"),
+                format!("{dir} não guarda nenhuma geração: rode meada snapshot pull"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotTimeout(ms) => pick(
+                format!("no answer within {ms} ms"),
+                format!("sem resposta em {ms} ms"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotStatusCurrent(id) => pick(
+                format!("current: {}", id.unwrap_or("none")),
+                format!("atual: {}", id.unwrap_or("nenhuma")),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotStatusHeld(ids) => match ids.is_empty() {
+                true => pick("held: none".into(), "retidas: nenhuma".into()),
+                false => pick(
+                    format!("held: {}", ids.join(" ")),
+                    format!("retidas: {}", ids.join(" ")),
+                ),
+            },
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotStoreReachable(id) => pick(
+                format!("store: reachable (current {id})"),
+                format!("store: alcançável (atual {id})"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotStoreUnreachable(reason) => pick(
+                format!("store: unreachable ({reason})"),
+                format!("store: inalcançável ({reason})"),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::NeedsSections { section, needed } => {
+                let needed: Vec<String> = needed.iter().map(|s| format!("[{s}]")).collect();
+                pick(
+                    format!("[{section}] needs {}", needed.join(" and ")),
+                    format!("[{section}] exige {}", needed.join(" e ")),
+                )
+            }
+            #[cfg(any(feature = "generation-pointer", feature = "oidc"))]
+            Msg::AtLeast(min) => pick(
+                format!("must be at least {min}"),
+                format!("deve ser pelo menos {min}"),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::GenerationsBadPointer(key) => pick(
+                format!(
+                    "{key}: not a hash of `id`, a generation id of 16 lowercase hex characters, \
+                     and `fence`, a decimal fence"
+                ),
+                format!(
+                    "{key}: não é um hash de `id`, um id de geração de 16 caracteres hexadecimais \
+                     minúsculos, e `fence`, um fence decimal"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::GenerationsBadEntry(key) => pick(
+                format!(
+                    "{key}: an entry is not `<generation id>:<fence>`, an id of 16 lowercase hex \
+                     characters and a decimal fence"
+                ),
+                format!(
+                    "{key}: uma entrada não é `<id da geração>:<fence>`, um id de 16 caracteres \
+                     hexadecimais minúsculos e um fence decimal"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::GenerationsEmpty(key) => pick(
+                format!("{key}: empty: no generation is retained there"),
+                format!("{key}: vazia: nenhuma geração está retida lá"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotRetainedSkipped { id, why } => pick(
+                format!("retained generation {id} not pulled, the next pull retries: {why}"),
+                format!("geração retida {id} não baixada, o próximo pull tenta de novo: {why}"),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::FenceRefused {
+                fence,
+                current,
+                fence_key,
+            } => pick(
+                format!(
+                    "{current}: refused fence {fence}, not above the fence it holds: \
+                     {fence_key} was lowered or lost; set {fence_key} at or above the highest \
+                     fence recorded (in {current} or in a node's <local_dir>/current), or delete \
+                     a node's <local_dir>/current so it takes the current generation whatever \
+                     its fence"
+                ),
+                format!(
+                    "{current}: recusado o fence {fence}, não maior que o que ele guarda: \
+                     {fence_key} foi rebaixado ou perdido; defina {fence_key} igual ou acima do \
+                     maior fence registrado (em {current} ou no <local_dir>/current de um nó), \
+                     ou apague o <local_dir>/current de um nó para que ele tome a geração atual \
+                     seja qual for o fence"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::FenceBelowNode {
+                current,
+                id,
+                fence,
+                held,
+                pointer,
+                fence_key,
+            } => pick(
+                format!(
+                    "{current}: generation {id} has fence {fence}, below fence {held} in \
+                     {pointer}: not swapped; set {fence_key} at or above {held} and publish \
+                     again, or delete {pointer} (with [refresh_lock] turned off every fence is \
+                     0, so only deleting it helps)"
+                ),
+                format!(
+                    "{current}: a geração {id} tem fence {fence}, abaixo do fence {held} em \
+                     {pointer}: não trocada; defina {fence_key} igual ou acima de {held} e \
+                     publique de novo, ou apague {pointer} (com [refresh_lock] desligado todo \
+                     fence é 0, e só apagá-lo resolve)"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::FenceStuck {
+                held,
+                pointer,
+                fence,
+                current,
+                fence_key,
+            } => pick(
+                format!(
+                    "fence: stuck: {held} in {pointer} is above {fence} in {current}; set \
+                     {fence_key} at or above {held} and publish again, or delete {pointer}"
+                ),
+                format!(
+                    "fence: travado: {held} em {pointer} está acima de {fence} em {current}; \
+                     defina {fence_key} igual ou acima de {held} e publique de novo, ou apague \
+                     {pointer}"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::LockNotHeld(key) => pick(
+                format!(
+                    "{key}: the refresh lock no longer holds this job's token: nothing more \
+                     uploaded and no pointer written"
+                ),
+                format!(
+                    "{key}: o lock de refresh não guarda mais o token deste job: nada mais \
+                     enviado e nenhum ponteiro gravado"
+                ),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::LockHeld(key) => pick(
+                format!("{key}: held by another refresh: nothing run"),
+                format!("{key}: em posse de outro refresh: nada executado"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::LockLost(key) => pick(
+                format!("{key}: the refresh lock was lost: the command was terminated"),
+                format!("{key}: o lock de refresh foi perdido: o comando foi encerrado"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::LockBadFence(key) => pick(
+                format!(
+                    "{key}: not a positive decimal fence: set it at or above the highest fence \
+                     recorded"
+                ),
+                format!(
+                    "{key}: não é um fence decimal positivo: defina-o igual ou acima do maior \
+                     fence registrado"
+                ),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::LockNoSection(manifest) => pick(
+                format!("{manifest}: no [refresh_lock] section: the lock has no TTL"),
+                format!("{manifest}: sem seção [refresh_lock]: o lock não tem TTL"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::LockEnv => pick(
+                "[refresh_lock] needs MEADA_REFRESH_LOCK and MEADA_REFRESH_FENCE: run publish \
+                 under meada snapshot lock"
+                    .into(),
+                "[refresh_lock] exige MEADA_REFRESH_LOCK e MEADA_REFRESH_FENCE: rode o publish \
+                 sob meada snapshot lock"
+                    .into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotLock => pick(
+                "Take the workspace's refresh lock, run the command as its child and release \
+                 the lock."
+                    .into(),
+                "Toma o lock de refresh do workspace, roda o comando como filho e libera o lock."
+                    .into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotLockCommand => pick(
+                "The refresh to run: fetch, meada index --workspace, meada snapshot publish."
+                    .into(),
+                "O refresh a rodar: fetch, meada index --workspace, meada snapshot publish."
+                    .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::GenerationNotHeld(id) => pick(
+                format!("generation {id} is not held here"),
+                format!("a geração {id} não está retida aqui"),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcUrl { bare: false } => pick(
+                "must be an https:// URL with a host and no user, query or fragment (http:// \
+                 only on loopback)"
+                    .into(),
+                "deve ser uma URL https:// com um host e sem usuário, query ou fragmento \
+                 (http:// só em loopback)"
+                    .into(),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcUrl { bare: true } => pick(
+                "must be an https:// URL with a host and nothing after it (http:// only on \
+                 loopback)"
+                    .into(),
+                "deve ser uma URL https:// com um host e nada depois dele (http:// só em \
+                 loopback)"
+                    .into(),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcJwksUrl => pick(
+                "must be an https:// URL with a host and no user or fragment (http:// only on \
+                 loopback)"
+                    .into(),
+                "deve ser uma URL https:// com um host e sem usuário ou fragmento (http:// só \
+                 em loopback)"
+                    .into(),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcEmpty => pick("must not be empty".into(), "não pode ser vazio".into()),
+            #[cfg(feature = "oidc")]
+            Msg::OidcScope { scope, bad } => pick(
+                format!("{scope:?} holds {bad:?}, which a scope cannot carry (RFC 6749)"),
+                format!("{scope:?} contém {bad:?}, que um escopo não pode ter (RFC 6749)"),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcMetadata(tried) => pick(
+                format!("oidc: the issuer's metadata could not be read: {tried}"),
+                format!("oidc: os metadados do issuer não puderam ser lidos: {tried}"),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcIssuerMismatch(found) => pick(
+                format!("names the issuer {found:?}, not the configured one"),
+                format!("nomeia o issuer {found:?}, não o configurado"),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcJwksUri(why) => pick(
+                format!("its jwks_uri {why}"),
+                format!("o seu jwks_uri {why}"),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcJwks { url, why } => pick(
+                format!("oidc: the JWKS at {url} could not be read: {why}"),
+                format!("oidc: o JWKS em {url} não pôde ser lido: {why}"),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcJwksNoKey => pick(
+                "it holds no signing key Meada accepts (RSA, or EC on P-256 or P-384)".into(),
+                "ele não tem nenhuma chave de assinatura que o Meada aceite (RSA, ou EC em P-256 \
+                 ou P-384)"
+                    .into(),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcRefreshFailed(why) => pick(
+                format!("meada: {why}; keeping the cached keys"),
+                format!("meada: {why}; as chaves em cache continuam"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::GenerationsHelp => pick(
+                "Use the generation `meada snapshot pull` made current on this node, with \
+                 the --workspace manifest's [snapshot] section"
+                    .into(),
+                "Usa a geração que `meada snapshot pull` tornou atual neste nó, com a seção \
+                 [snapshot] do manifesto de --workspace"
+                    .into(),
+            ),
             Msg::About => pick(
                 "LLM-free code graph for agents and people".into(),
                 "Grafo de código sem LLM para agentes e pessoas".into(),

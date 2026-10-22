@@ -74,6 +74,8 @@ fn config_errors_follow_lang() {
     }
 }
 
+/// The default build's help: a feature's subcommand (`meada snapshot`) is absent from it.
+#[cfg(not(feature = "snapshot"))]
 #[test]
 fn help_follows_lang() {
     let repo = fixture_repo("cli_help", "ts-basic", None);

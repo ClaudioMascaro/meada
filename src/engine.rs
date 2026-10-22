@@ -1,7 +1,6 @@
 //! The query engine: opens a workspace from a directory and answers over its indexes.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
@@ -9,15 +8,15 @@ use rusqlite::Connection;
 use crate::contract::{self, ContractKind, Hit, KINDS, Level, Link, Role, Search, View};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
 use crate::entry::{self, EntryPoint};
-use crate::index::{Export, State, Symbol};
+use crate::index::{Export, State, Symbol, schema};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
-use crate::msg::Msg;
+use crate::msg::{Fix, Msg};
 use crate::render::{
     DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, mark, rank, section, unresolved,
 };
 use crate::shape::{self, Shape};
 pub use crate::trace::{Direction, Start};
-use crate::workspace::{Missing, Repository, Workspace};
+use crate::workspace::{Manifest, Missing, Repository, Workspace};
 use crate::{Result, decisions, document, drift_view, index, items, render, repo, trace};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
@@ -30,33 +29,96 @@ pub struct Engine {
     workspace: Workspace,
     root: PathBuf,
     identity: String,
+    /// Opened from a manifest (server mode): every index read-only, never refreshed.
+    read_only: bool,
 }
 
 impl Engine {
     /// Opens the workspace of the repository that contains `dir`. Every repository's index
     /// lives inside its own `.meada/`; every query refreshes them first.
     pub fn open(dir: &Path) -> Result<Self> {
-        let workspace = Workspace::discover(dir)?;
-        if workspace.repos.len() > MAX_PEERS + 1 {
-            // ponytail: one connection attaches every peer, so a workspace reads at most 10
-            // peers; batched ATTACH (detach one batch of peers, attach the next) lifts it.
-            return Err(Msg::TooManyRepos {
-                found: workspace.repos.len(),
-                max: MAX_PEERS + 1,
-            }
-            .text()
-            .into());
-        }
-        // Opening creates a missing index, or recreates one of another schema, before it is
+        Self::over(Workspace::discover(dir)?)
+    }
+
+    /// Opens the workspace the manifest at `manifest` lists (server mode, ADR 0011), `repo`
+    /// first, for one answer: every index lives under the manifest's `index_dir`, keyed by
+    /// identity, and is opened read-only. Nothing is stat'ed, refreshed, created or written;
+    /// only `meada index --workspace` writes. One read transaction lasts as long as the engine,
+    /// so open one per answer: it reads each index as one commit left it, and a commit waits
+    /// for it. A missing or unreadable index, or one a commit in progress locks past the busy
+    /// timeout, is an error naming the repository (`index::open_read`).
+    pub fn open_manifest(manifest: &Path, repo: &str) -> Result<Self> {
+        let shown = manifest.display().to_string();
+        Self::read(
+            Manifest::read(manifest)?.workspace(repo)?,
+            Fix::Index(&shown),
+        )
+    }
+
+    /// `open_manifest` over `listed`, the manifest at `manifest` as `served` read it when the
+    /// server started: only `repo`'s mirror is checked again (`Repository::recheck`), and every
+    /// index is opened as `open_manifest` opens it. A call of `meada mcp --listen`.
+    pub(crate) fn open_listed(listed: &Manifest, repo: &str, manifest: &Path) -> Result<Self> {
+        let workspace = listed.clone().workspace(repo)?;
+        (workspace.repos[0].recheck()).map_err(|problem| format!("{repo}: {problem}"))?;
+        Self::read(workspace, Fix::Index(&manifest.display().to_string()))
+    }
+
+    /// `open_manifest` over the generation `held` (`--generations`, feature `snapshot`), `repo`
+    /// first, for one answer: the repositories, mirrors and indexes are the ones the generation
+    /// recorded and every index opens read-only. Nothing is read before the indexes; the
+    /// mirrors are not touched with `git`, since the pull checked them. A call of `meada mcp
+    /// --listen --generations` answers from the generation its request was routed by.
+    #[cfg(feature = "snapshot")]
+    pub(crate) fn open_held(held: &crate::snapshot::serve::Held, repo: &str) -> Result<Self> {
+        let dir = held.dir.display().to_string();
+        let fix = Fix::Generation {
+            id: &held.id,
+            dir: &dir,
+        };
+        Self::read(held.listed.clone().workspace(repo)?, fix)
+    }
+
+    /// `open_held` over the generation current in the `local_dir` of the node manifest at
+    /// `manifest` (`meada export --generations`).
+    #[cfg(feature = "snapshot")]
+    pub fn open_node(manifest: &Path, repo: &str) -> Result<Self> {
+        let (_, local) = crate::snapshot::serve::node(manifest)?;
+        repo::isolate(&local);
+        Self::open_held(&crate::snapshot::serve::held(&local)?, repo)
+    }
+
+    /// Opens every index of `workspace` read-only; `fix` says where an index that cannot be
+    /// read is fixed.
+    fn read(workspace: Workspace, fix: Fix) -> Result<Self> {
+        fits(&workspace)?;
+        let repos: Vec<(&Path, &str)> = (workspace.repos.iter())
+            .map(|r| (r.index.as_path(), r.identity.as_str()))
+            .collect();
+        let db = index::open_read(&repos, fix)?;
+        let here = &workspace.repos[0];
+        Ok(Self {
+            db,
+            root: here.root.clone(),
+            identity: here.identity.clone(),
+            workspace,
+            read_only: true,
+        })
+    }
+
+    /// Opens every index of `workspace` where its repository says it lives
+    /// (`Repository::index`).
+    fn over(workspace: Workspace) -> Result<Self> {
+        fits(&workspace)?;
+        // Opening builds a missing index, or rebuilds one of another schema, before it is
         // attached.
         for peer in &workspace.repos[1..] {
-            index::open(&peer.root)?;
+            index::open(&peer.index, &peer.root, &peer.identity, &peer.config.serve)?;
         }
         let here = &workspace.repos[0];
-        let db = index::open(&here.root)?;
+        let db = index::open(&here.index, &here.root, &here.identity, &here.config.serve)?;
         for (n, peer) in workspace.repos.iter().enumerate().skip(1) {
-            let path = index::path(&peer.root);
-            let path = path.to_str().ok_or("index path is not UTF-8")?;
+            let path = peer.index.to_str().ok_or("index path is not UTF-8")?;
             db.execute(&format!("ATTACH DATABASE ?1 AS peer{n}"), [path])?;
         }
         Ok(Self {
@@ -64,16 +126,21 @@ impl Engine {
             root: here.root.clone(),
             identity: here.identity.clone(),
             workspace,
+            read_only: false,
         })
     }
 
     /// Brings every index of the workspace up to date with the files on disk (ADR 0004), with
     /// no watcher: only files whose mtime or size changed are hashed. Each repository is
     /// refreshed on its own, through its own connection; links are derived from the stored
-    /// contracts at query time, so links that touch a changed file follow it.
+    /// contracts at query time, so links that touch a changed file follow it. Does nothing on
+    /// an engine opened from a manifest: there the operator's `meada index` refreshes.
     pub fn refresh(&self) -> Result<()> {
+        if self.read_only {
+            return Ok(());
+        }
         for peer in &self.workspace.repos[1..] {
-            let db = index::open(&peer.root)?;
+            let db = index::open(&peer.index, &peer.root, &peer.identity, &peer.config.serve)?;
             index::refresh(&db, &peer.root, &peer.identity, &peer.config.serve)?;
         }
         let here = &self.workspace.repos[0];
@@ -635,7 +702,8 @@ impl Engine {
     /// line's range names).
     pub fn context(&self, symbol: &str, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
-        self.context_fresh(symbol, budget, true)
+        // A read-only engine never refreshes, so it has nothing to retry with.
+        self.context_fresh(symbol, budget, !self.read_only)
     }
 
     fn context_fresh(&self, symbol: &str, budget: Option<usize>, retry: bool) -> Result<String> {
@@ -685,7 +753,10 @@ impl Engine {
         let text = span_text(&repo.root, export, symbol_found);
         if text.is_none() && retry {
             // The file changed without its mtime or size showing it: hash it again.
-            index::forget(&index::open(&repo.root)?, &symbol_found.span.path)?;
+            index::forget(
+                &index::open(&repo.index, &repo.root, &repo.identity, &repo.config.serve)?,
+                &symbol_found.span.path,
+            )?;
             self.refresh()?;
             return self.context_fresh(symbol, budget, false);
         }
@@ -710,11 +781,13 @@ impl Engine {
         let community = format!("community: {community}");
         // Without the span text there is no span: the note is a line of the tail, kept in its
         // output position and ahead of the callers, so the cut never rewrites it.
-        let unavailable = text.is_none().then(|| {
-            format!(
+        // In server mode nothing refreshes, so the file moved ahead of the index (ADR 0011).
+        let unavailable = text.is_none().then(|| match self.read_only {
+            true => "index behind the mirror: run meada index --workspace".to_string(),
+            false => format!(
                 "(span text unavailable: {} changed since indexing)",
                 symbol_found.span.path
-            )
+            ),
         });
         let span = text.map(|(_, span)| span).unwrap_or_default();
         let mut tail = Vec::from_iter(unavailable);
@@ -889,8 +962,7 @@ fn span_text(root: &Path, export: &Export, symbol: &Symbol) -> Option<(usize, Ve
         .iter()
         .find(|f| f.path == *path)
         .map(|f| &f.hash);
-    let text = fs::read(root.join(path))
-        .ok()
+    let text = render::source(root, path)
         .filter(|src| indexed.is_some_and(|h| blake3::hash(src).to_hex().as_str() == h.as_str()));
     let src = text?;
     let span = src.get(symbol.span.start as usize..symbol.span.end as usize)?;
@@ -968,38 +1040,260 @@ fn line(identity: &str, files: &mut Files, symbol: &Symbol, name: &str) -> Strin
 /// are; otherwise it reports the states and no decision.
 pub fn status(dir: &Path) -> Result<String> {
     let workspace = Workspace::discover(dir)?;
-    let here = &workspace.repos[0].root;
+    let here = workspace.repos[0].root.clone();
     let indexed =
-        |m: &crate::workspace::Repository| matches!(index::state(&m.root), State::Indexed { .. });
+        (workspace.repos.iter()).all(|m| matches!(index::state(&m.index), State::Indexed { .. }));
     // A failure to open or refresh drops the decision and status lines, not the whole status.
-    let engine = workspace
-        .repos
-        .iter()
-        .all(indexed)
-        .then(|| Engine::open(dir));
-    let (evaluations, status_lines) = match engine {
+    let report = match indexed.then(|| Engine::open(dir)) {
         Some(Ok(engine)) => engine.status_report().unwrap_or_default(),
         _ => Default::default(),
     };
-    let mut lines = Vec::new();
-    for (n, m) in workspace.repos.iter().enumerate() {
-        let state = match index::state(&m.root) {
-            State::Missing => Msg::NotIndexed.text(),
-            State::OtherSchema => Msg::OtherVersion.text(),
-            State::Indexed { files } => Msg::Indexed(files).text(),
+    let heads = (workspace.repos.iter()).map(|m| {
+        let state = state_text(index::state(&m.index), Msg::OtherVersion);
+        let line = format!("{} ({}) {state}", m.identity, relative(&here, &m.root));
+        (m.identity.clone(), line)
+    });
+    Ok(status_lines(heads, report, &workspace.missing))
+}
+
+/// `status` in server mode (ADR 0011): every repository the manifest at `manifest` lists, in
+/// manifest order, with its `path` as the manifest writes it and its index state, or why it
+/// cannot be served; then every peer a `meada.toml` names that the manifest does not list, and
+/// every entry block a mirror's own `meada.toml` overrides. The decision and status lines come,
+/// as locally, only when every repository is indexed at the current schema. It only reads, as
+/// `Engine::open_manifest` does.
+pub fn status_workspace(manifest: &Path) -> Result<String> {
+    let listed = Manifest::read(manifest)?;
+    let shown = manifest.display().to_string();
+    let missing = listed.missing();
+    // Informational: the exit code of the probe depends on local state only.
+    #[cfg(feature = "valkey")]
+    let valkey = (listed.valkey.as_ref())
+        .map(|config| crate::valkey::status_line(config) + "\n")
+        .unwrap_or_default();
+    #[cfg(not(feature = "valkey"))]
+    let valkey = String::new();
+    let ignored: String = (listed.entries.iter())
+        .flat_map(|l| l.ignored.iter().map(|block| (block, &l.repo)))
+        .map(|(block, repo)| Msg::IgnoredBlock { block, repo }.text() + "\n")
+        .collect();
+    let rows: Vec<_> = (listed.entries.iter())
+        .map(|l| {
+            let index = (l.repository.as_ref())
+                .map(|r| r.index.clone())
+                .map_err(String::clone);
+            (l.repo.clone(), l.path.clone(), index)
+        })
+        .collect();
+    let indexed = (rows.iter()).all(|(_, _, index)| {
+        matches!(
+            index.as_ref().map(|i| index::state(i)),
+            Ok(State::Indexed { .. })
+        )
+    });
+    let first = rows.first().map(|(repo, _, _)| repo.clone());
+    let report = match (indexed, first) {
+        (true, Some(first)) => (listed.workspace(&first))
+            .and_then(|workspace| Engine::read(workspace, Fix::Index(&shown)))
+            .and_then(|engine| engine.status_report())
+            .unwrap_or_default(),
+        _ => Default::default(),
+    };
+    let heads = rows.into_iter().map(|(repo, path, index)| {
+        let state = match index {
+            Ok(index) => state_text(index::state(&index), Msg::OtherVersionWorkspace),
+            Err(problem) => problem,
         };
-        lines.push(format!(
-            "{} ({}) {state}",
-            m.identity,
-            relative(here, &m.root)
-        ));
-        for e in evaluations.iter().filter(|e| e.repository == m.identity) {
+        let line = format!("{repo} ({path}) {state}");
+        (repo, line)
+    });
+    Ok(status_lines(heads, report, &missing) + &ignored + &valkey)
+}
+
+/// `meada index --workspace` (ADR 0011): refreshes every repository the manifest at `manifest`
+/// lists into its index under `index_dir`, one transaction each, creating or rebuilding a
+/// missing index or one of another schema. Returns the problems, one `<repo>: <problem>` per
+/// repository that could not be refreshed, in manifest order; one does not stop the others.
+pub fn index_workspace(manifest: &Path) -> Result<Vec<String>> {
+    let listed = Manifest::read(manifest)?;
+    let refresh = |r: &Repository| {
+        let db = index::open(&r.index, &r.root, &r.identity, &r.config.serve)?;
+        index::refresh(&db, &r.root, &r.identity, &r.config.serve)
+    };
+    Ok((listed.entries.iter())
+        .filter_map(|l| {
+            let problem = match &l.repository {
+                Ok(r) => refresh(r).err()?.to_string(),
+                Err(problem) => problem.clone(),
+            };
+            Some(format!("{}: {problem}", l.repo))
+        })
+        .collect())
+}
+
+/// The manifest at `manifest` as `meada mcp --listen` serves it, once every repository is
+/// servable: its mirror is a checkout of the identity listed and its index opens read-only at
+/// the current schema version. Otherwise every problem, one per line, each index problem naming
+/// `meada index --workspace`. It only reads.
+pub fn served(manifest: &Path) -> Result<Manifest> {
+    let listed = Manifest::read(manifest)?;
+    let shown = manifest.display().to_string();
+    let problems: Vec<String> = (listed.entries.iter())
+        .filter_map(|l| match &l.repository {
+            Ok(r) => (index::open_read(&[(&r.index, &r.identity)], Fix::Index(&shown)))
+                .err()
+                .map(|e| e.to_string()),
+            Err(problem) => Some(format!("{}: {problem}", l.repo)),
+        })
+        .collect();
+    if !problems.is_empty() {
+        return Err(problems.join("\n").into());
+    }
+    // The whole workspace opens too: what a call opens, whichever repository it names.
+    let first = (listed.entries.first()).ok_or_else(|| format!("{shown}: no repository listed"))?;
+    Engine::open_listed(&listed, &first.repo, manifest)?;
+    Ok(listed)
+}
+
+/// How long the readiness probe waits for a commit in progress: a writer must not stall it.
+pub const PROBE_BUSY: std::time::Duration = std::time::Duration::from_millis(50);
+
+/// Whether a node can serve, for `status --workspace` (exit 0 or 1): `served` passes, or it fails
+/// only because an index is locked by a commit in progress (the file exists and the running
+/// server answers once the lock clears). Run it under `with_busy_timeout(PROBE_BUSY, ..)`.
+pub fn ready(manifest: &Path) -> bool {
+    if served(manifest).is_ok() {
+        return true;
+    }
+    let Ok(listed) = Manifest::read(manifest) else {
+        return false;
+    };
+    let states: Vec<_> = (listed.entries.iter())
+        .map(|l| l.repository.as_ref().map(|r| index::state(&r.index)))
+        .collect();
+    (states.iter()).any(|s| matches!(s, Ok(State::Locked)))
+        && (states.iter()).all(|s| matches!(s, Ok(State::Indexed { .. } | State::Locked)))
+}
+
+/// The start check of `meada mcp --listen --generations` (feature `snapshot`) and the predicate
+/// `status --generations` exits on: the node holds a current generation (otherwise the error
+/// names `meada snapshot pull`), every mirror of it is a checkout of the identity recorded, every
+/// index opens read-only at this build's schema version and the whole workspace opens. Every
+/// problem, one per line. It only reads, and asks the store nothing. Returns the node's
+/// `local_dir` and the identities the generation serves.
+#[cfg(feature = "snapshot")]
+pub fn served_generation(manifest: &Path) -> Result<(PathBuf, Vec<String>)> {
+    let (_, local) = crate::snapshot::serve::node(manifest)?;
+    repo::isolate(&local);
+    let held = crate::snapshot::serve::held(&local)?;
+    let dir = held.dir.display().to_string();
+    let fix = Fix::Generation {
+        id: &held.id,
+        dir: &dir,
+    };
+    let problems: Vec<String> = (held.listed.entries.iter())
+        .filter_map(|l| {
+            let r = l.repository.as_ref().ok()?;
+            repo::trust(&r.root);
+            match r.recheck() {
+                Err(problem) => Some(format!("{}: {problem}", l.repo)),
+                Ok(()) => (index::open_read(&[(&r.index, &r.identity)], fix))
+                    .and_then(|_| index::vet(&r.index, &r.identity, fix))
+                    .err()
+                    .map(|e| e.to_string()),
+            }
+        })
+        .collect();
+    if !problems.is_empty() {
+        return Err(problems.join("\n").into());
+    }
+    let first = (held.listed.entries.first())
+        .ok_or_else(|| format!("{}: no repository listed", local.display()))?;
+    Engine::open_held(&held, &first.repo)?;
+    let served = held.listed.entries.iter().map(|l| l.repo.clone());
+    Ok((local, served.collect()))
+}
+
+/// `status` for a node that serves generations (feature `snapshot`): the id of its current
+/// generation, the ids it holds and whether the store answers, with the id the store holds (with
+/// `[generations]`, the id Valkey holds, once the store holds its document). The store and
+/// Valkey are informational: whether the node can serve is `served_generation`, local state only.
+#[cfg(feature = "snapshot")]
+pub fn status_generations(manifest: &Path) -> Result<String> {
+    use crate::snapshot::{pull, serve};
+    let (config, local) = serve::node(manifest)?;
+    let node = pull::current(&local).ok().flatten();
+    let current = node.as_ref().map(|(id, _)| id.clone());
+    // With `[generations]` the current id is Valkey's, and the store holds no `current`. A
+    // node fence above Valkey's is the stuck case (`{<key_prefix>}:fence` lost), named.
+    #[cfg(feature = "generation-pointer")]
+    let (reached, stuck) = match Manifest::read(manifest)? {
+        Manifest {
+            generations: Some(_),
+            valkey: Some(valkey),
+            ..
+        } => {
+            let reached = serve::reach_pointer(&config, &valkey);
+            let stuck = match (&reached, &node) {
+                (Ok((_, fence)), Some((_, held))) if held > fence => {
+                    let pointer = local.join(pull::POINTER).display().to_string();
+                    Some(
+                        Msg::FenceStuck {
+                            held: *held,
+                            pointer: &pointer,
+                            fence: *fence,
+                            current: &valkey.key("current", true),
+                            fence_key: &valkey.key("fence", true),
+                        }
+                        .text(),
+                    )
+                }
+                _ => None,
+            };
+            (reached.map(|(id, _)| id), stuck)
+        }
+        _ => (serve::reach(&config), None),
+    };
+    #[cfg(not(feature = "generation-pointer"))]
+    let (reached, stuck) = (serve::reach(&config), None::<String>);
+    let store = match reached {
+        Ok(id) => Msg::SnapshotStoreReachable(&id).text(),
+        Err(reason) => Msg::SnapshotStoreUnreachable(&reason).text(),
+    };
+    let current = Msg::SnapshotStatusCurrent(current.as_deref()).text();
+    let held = Msg::SnapshotStatusHeld(&serve::ids(&local)).text();
+    let stuck = stuck.map(|line| format!("{line}\n")).unwrap_or_default();
+    Ok(format!("{current}\n{held}\n{store}\n{stuck}"))
+}
+
+/// An index state as `status` shows it, `other` for an index of another schema.
+fn state_text(state: State, other: Msg) -> String {
+    match state {
+        State::Missing => Msg::NotIndexed.text(),
+        State::OtherSchema => other.text(),
+        State::Locked => Msg::StateLocked.text(),
+        State::Indexed { files } => Msg::Indexed(files).text(),
+    }
+}
+
+/// `status`'s text: each repository's line, by identity in workspace order, followed by its
+/// decisions that are stale or waiting and its status lines (`Engine::status_report`, empty
+/// when it did not run), then the missing peers.
+fn status_lines(
+    heads: impl Iterator<Item = (String, String)>,
+    (evaluations, status_lines): (Vec<Evaluation>, Vec<Vec<String>>),
+    missing: &[Missing],
+) -> String {
+    let mut lines = Vec::new();
+    for (n, (identity, head)) in heads.enumerate() {
+        lines.push(head);
+        for e in evaluations.iter().filter(|e| e.repository == identity) {
             lines.extend(e.lines().map(|l| format!("  {l}")));
         }
         lines.extend((status_lines.get(n).into_iter().flatten()).map(|l| format!("  {l}")));
     }
-    lines.extend(workspace.missing.iter().map(Missing::text));
-    Ok(lines.iter().map(|l| format!("{l}\n")).collect())
+    lines.extend(missing.iter().map(Missing::text));
+    lines.iter().map(|l| format!("{l}\n")).collect()
 }
 
 /// The `kind` words of `search` the engine answers itself: the first two come before the kinds'
@@ -1023,13 +1317,19 @@ pub(crate) fn kind_words() -> impl Iterator<Item = &'static str> {
         .chain(WORDS_AFTER)
 }
 
-/// The schema a workspace repository's index is attached as.
-fn schema(n: usize) -> String {
-    if n == 0 {
-        "main".into()
-    } else {
-        format!("peer{n}")
+/// Refuses a workspace larger than one connection attaches.
+fn fits(workspace: &Workspace) -> Result<()> {
+    if workspace.repos.len() > MAX_PEERS + 1 {
+        // ponytail: one connection attaches every peer, so a workspace reads at most 10
+        // peers; batched ATTACH (detach one batch of peers, attach the next) lifts it.
+        return Err(Msg::TooManyRepos {
+            found: workspace.repos.len(),
+            max: MAX_PEERS + 1,
+        }
+        .text()
+        .into());
     }
+    Ok(())
 }
 
 /// `to` as a path from `from`, with `/` separators: `.`, `../api`.

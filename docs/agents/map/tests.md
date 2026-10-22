@@ -33,7 +33,7 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `freshness` moves a `mod`, declares the orphan, adds a module, drops the `[[bin]]`, edits a
   `pub use`, moves an item between files and renames a package, and
   exports it with the walk reversed), `xlang` (a TypeScript and a Python repository linked both ways, over HTTP
-  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files), `index` (export, schema rebuild, writes only in `.meada/`), `self_index` (a copy of this repository's tracked files, indexed in about 6 s in debug: no call from `src/` reaches `tests/fixtures/`, and `Resolver.call` has an `exact` caller), `hostile` (per pack, repositories of pathological files sized past the limits of Known ceilings: deep nesting, long chains, wide files and manifests, values traced through chains and lattices of constants, wrappers, parameters and return values; each indexed on a thread with a small stack within a time budget, so a recursion with no limit aborts the run and a loop with none fails it; `--nocapture` names each case as it starts), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
+  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files), `index` (export, schema rebuild, writes only in `.meada/`), `self_index` (a copy of this repository's tracked files, indexed in about 6 s in debug: no call from `src/` reaches `tests/fixtures/`, and `Resolver.call` has an `exact` caller), `hostile` (per pack, repositories of pathological files sized past the limits of Known ceilings: deep nesting, long chains, wide files and manifests, values traced through chains and lattices of constants, wrappers, parameters and return values; each indexed on a thread with a small stack within a time budget, so a recursion with no limit aborts the run and a loop with none fails it; `--nocapture` names each case as it starts), `query` (search/context), `workspace` (peers, status, config errors), `manifest` (server mode's workspace manifest: `index`, `status` and `export --repo` with `--workspace`, the refused entries, manifest errors, entry blocks configuring mirrors with no `meada.toml` and ignored under one, decisions replayed, reads that write nothing and see the index until `meada index` refreshes it, nothing written into a mirror, refreshed equals cold), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export
   carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a channel handler's process, a cycle, an
@@ -47,7 +47,31 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   every repository's communities and processes, and the chain's export byte-identical under
   `meada::with_reversed_walk`), `items` (open items and their `search` goldens, fixtures
   `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`), `mcp`
-  (the binary over stdio), `resources` (resource `search`, `context`, `trace` start and `status`
+  (the binary over stdio), `server` (`meada mcp --listen` as a child process over the chain's
+  mirrors, through rmcp's streamable HTTP client and plain HTTP requests: the stdio tools and
+  `trace` byte for byte, the 404 listing, the `uncommitted` refusal, the behind line before and
+  after `meada index`, two stateless servers answering alternate calls, the refused start, and
+  `Origin` refused with 403 before the 404 listing), `snapshot` (the first of the five cloud
+  module modules, ADR 0012, each built with its feature; a test that needs Valkey or an
+  S3-compatible server, `MEADA_TEST_VALKEY_URL` or `MEADA_TEST_S3_ENDPOINT`, prints why and
+  skips without it, or fails with `MEADA_TEST_SERVICES_REQUIRED=1`; here `snapshot publish`
+  and `snapshot pull`: a republish or a second machine uploads nothing, the refused publish, no
+  secret in an authentication failure, no redirect followed, `[snapshot]` errors, a pull that
+  keeps the previous generation, corrupted and hostile generations (bundles, tar entries, ids,
+  identities, index schemas, a pointer and a document past their bounds) changing nothing, a
+  pulled mirror that runs nothing its bundle configured, a nested repository refused),
+  `serving` (`mcp --listen --generations`, `status --generations` and `export --generations`:
+  the chain goldens from a pulled generation, a swap between two calls, the probe and the start
+  depending only on the node, the fixed 503, an index naming files outside its mirror),
+  `generations` (the generation pointer and pins: a pin answered on every node until it is no
+  longer retained, the 404 of a pin not held, `Origin` refused before a pin, every id and fence
+  from Valkey checked, a retained generation that fails to pull, the probe reading Valkey,
+  `[generations]` errors), `refresh_lock` (`snapshot lock`: the child terminated past the TTL,
+  killed past the grace, stopped when the lock changes hands, a SIGTERM reaching it, a stale
+  fence refused, a lost fence stopping a node, `[refresh_lock]` errors), `oidc` (`[oidc]`
+  against an issuer and a JWKS served on loopback: a token admits what its claim lists and leaks
+  nowhere, a rotated key, an oversized JWKS refusing the start, a pinned path admitted as its
+  identity), `resources` (resource `search`, `context`, `trace` start and `status`
   over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
   fixture: kafkajs forms, fan-out, same-repository links, an unrelated `send`; amqplib queues,
   publishes through a binding of another repository, the empty exchange, queues named like the

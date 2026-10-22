@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
 
 use crate::Result;
 
@@ -13,6 +14,18 @@ pub fn root(dir: &Path) -> Result<PathBuf> {
     }
 }
 
+/// Whether `dir` is the top level of a checkout with a working tree: not a bare clone, not a
+/// directory inside a checkout, not a directory outside git.
+pub fn is_checkout(dir: &Path) -> bool {
+    let (Some(top), Ok(dir)) = (
+        git(dir, &["rev-parse", "--show-toplevel"]),
+        dir.canonicalize(),
+    ) else {
+        return false;
+    };
+    Path::new(&top).canonicalize().is_ok_and(|top| top == dir)
+}
+
 /// The normalized `origin` remote, or `local/<root directory name>` without one.
 pub fn identity(root: &Path) -> String {
     match git(root, &["remote", "get-url", "origin"]) {
@@ -22,6 +35,25 @@ pub fn identity(root: &Path) -> String {
             format!("local/{name}")
         }
     }
+}
+
+/// The commit `HEAD` names in the checkout at `root`.
+pub fn head(root: &Path) -> Result<String> {
+    Ok(run(root, &["rev-parse", "--verify", "HEAD"])?
+        .trim()
+        .to_string())
+}
+
+/// What `git status` lists in the checkout at `root`, changed, untracked and ignored files
+/// alike: empty for a clean mirror. It writes nothing, not even the index's stat cache. With
+/// `submodules` false (a mirror pulled from a store) it does not descend into a submodule,
+/// whose configuration git would run.
+pub fn unclean(root: &Path, submodules: bool) -> Result<String> {
+    let mut args = vec!["--no-optional-locks", "status", "--porcelain", "--ignored"];
+    if !submodules {
+        args.push("--ignore-submodules=all");
+    }
+    run(root, &args)
 }
 
 /// Lower-cased host and path, with no scheme, user, port or `.git` suffix, so the SSH and
@@ -135,9 +167,79 @@ pub fn uncommitted(root: &Path) -> Result<Vec<(String, Change)>> {
     Ok(changes)
 }
 
+/// The mirrors a server-mode manifest lists, which `git` may read although another user owns
+/// them (ADR 0011). Empty locally: nothing there is trusted.
+static TRUSTED: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+
+/// Trusts the mirror at `path` for the `git` calls Meada makes in it: they pass
+/// `-c safe.directory=<path>`. Only for a path the manifest lists, never `*`.
+pub fn trust(path: &Path) {
+    if let Ok(real) = path.canonicalize() {
+        let mut trusted = TRUSTED.lock().unwrap_or_else(|e| e.into_inner());
+        if !trusted.contains(&real) {
+            trusted.push(real);
+        }
+    }
+}
+
+/// The directories holding mirrors pulled from a store (`meada snapshot pull`, ADR 0012):
+/// hostile input, read with no system or global git configuration.
+static ISOLATED: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+
+/// Every `git` call Meada makes in a directory under `dir` runs with `GIT_CONFIG_NOSYSTEM=1`
+/// and no global configuration, so only the repository's own configuration (the minimal one
+/// the pull wrote) applies, and with `core.fsmonitor=false`, so no fsmonitor runs either.
+pub fn isolate(dir: &Path) {
+    if let Ok(real) = dir.canonicalize() {
+        let mut isolated = ISOLATED.lock().unwrap_or_else(|e| e.into_inner());
+        if !isolated.contains(&real) {
+            isolated.push(real);
+        }
+    }
+}
+
+/// `git` in `dir`: the one place every call goes through, so the one place `safe.directory`
+/// and the isolation of pulled mirrors are added.
+fn command(dir: &Path) -> Command {
+    let mut git = Command::new("git");
+    let real = dir.canonicalize().ok();
+    let isolated = ISOLATED.lock().unwrap_or_else(|e| e.into_inner());
+    if (real.as_ref()).is_some_and(|real| isolated.iter().any(|d| real.starts_with(d))) {
+        let null = if cfg!(windows) { "NUL" } else { "/dev/null" };
+        git.env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", null)
+            .args(["-c", "core.fsmonitor=false"]);
+    }
+    drop(isolated);
+    let trusted = TRUSTED.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(real) = real.filter(|real| trusted.contains(real)) {
+        let mut option = std::ffi::OsString::from("safe.directory=");
+        option.push(real);
+        git.arg("-c").arg(option);
+    }
+    git.arg("-C").arg(dir);
+    git
+}
+
+/// Whether `git` in the trusted mirror `dir` still refuses it for its owner: before git 2.38 it
+/// ignores `safe.directory` given on the command line.
+pub fn refused_as_dubious(dir: &Path) -> bool {
+    let trusted = dir
+        .canonicalize()
+        .is_ok_and(|real| (TRUSTED.lock().unwrap_or_else(|e| e.into_inner())).contains(&real));
+    trusted
+        && (command(dir).args(["rev-parse", "--show-toplevel"]).output())
+            .is_ok_and(|out| is_dubious(&String::from_utf8_lossy(&out.stderr)))
+}
+
+/// Whether `stderr` is git's refusal of a directory another user owns.
+fn is_dubious(stderr: &str) -> bool {
+    stderr.contains("dubious ownership")
+}
+
 /// `git` in `dir`, its standard output, or its error output as the error.
 fn run(dir: &Path, args: &[&str]) -> Result<String> {
-    let out = Command::new("git").arg("-C").arg(dir).args(args).output()?;
+    let out = command(dir).args(args).output()?;
     if !out.status.success() {
         return Err(format!(
             "git {}: {}",
@@ -156,7 +258,68 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{normalize_remote, relative};
+    use super::{command, is_dubious, isolate, normalize_remote, relative, trust};
+
+    #[test]
+    fn git_refusal_of_another_owner_is_recognized() {
+        let stderr = "fatal: detected dubious ownership in repository at '/srv/web'\n\
+                      To add an exception for this directory, call:\n";
+        assert!(is_dubious(stderr));
+        assert!(!is_dubious("fatal: not a git repository\n"));
+    }
+
+    #[test]
+    fn only_a_trusted_mirror_gets_safe_directory() {
+        let dir = std::env::temp_dir().join(format!("meada-trust-{}", std::process::id()));
+        let (listed, other) = (dir.join("listed"), dir.join("other"));
+        std::fs::create_dir_all(&listed).unwrap();
+        std::fs::create_dir_all(&other).unwrap();
+        let args = |dir: &std::path::Path| -> Vec<String> {
+            let git = command(dir);
+            (git.get_args())
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect()
+        };
+        assert_eq!(args(&listed)[0], "-C");
+        trust(&listed);
+        let real = listed.canonicalize().unwrap();
+        let option = format!("safe.directory={}", real.display());
+        assert_eq!(args(&listed)[..2], ["-c".to_string(), option]);
+        assert_eq!(args(&other)[0], "-C");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn git_under_an_isolated_directory_reads_no_system_or_global_configuration() {
+        let dir = std::env::temp_dir().join(format!("meada-isolate-{}", std::process::id()));
+        let (pulled, other) = (dir.join("pulled"), dir.join("other"));
+        std::fs::create_dir_all(pulled.join("mirror")).unwrap();
+        std::fs::create_dir_all(&other).unwrap();
+        let envs = |dir: &std::path::Path| -> Vec<(String, String)> {
+            let git = command(dir);
+            let mut envs: Vec<_> = (git.get_envs())
+                .map(|(k, v)| {
+                    let v = v.map(|v| v.to_string_lossy().into_owned());
+                    (k.to_string_lossy().into_owned(), v.unwrap_or_default())
+                })
+                .collect();
+            envs.sort();
+            envs
+        };
+        assert!(envs(&other).is_empty());
+        isolate(&pulled);
+        let null = if cfg!(windows) { "NUL" } else { "/dev/null" };
+        let expected = [
+            ("GIT_CONFIG_GLOBAL".to_string(), null.to_string()),
+            ("GIT_CONFIG_NOSYSTEM".to_string(), "1".to_string()),
+        ];
+        assert_eq!(envs(&pulled.join("mirror")), expected);
+        let git = command(&pulled.join("mirror"));
+        let args: Vec<_> = git.get_args().map(|a| a.to_string_lossy()).collect();
+        assert_eq!(args[..2], ["-c", "core.fsmonitor=false"]);
+        assert!(envs(&other).is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn a_relative_path_folds_against_its_directory() {

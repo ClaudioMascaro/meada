@@ -44,8 +44,39 @@ _Avoid_: cluster, module, component
 **Server mode**:
 Meada run once for an organisation: `meada mcp --listen` serves the tools over HTTP from mirrors
 of the repositories that a workspace manifest lists, each index outside its checkout, refreshed
-by `meada index` rather than on every query (ADR 0011).
+by `meada index` rather than on every query (ADR 0011). With the snapshot module, nodes do not
+run `meada index`: they serve generations a job published (ADR 0012).
 _Avoid_: hosted mode, cloud, daemon
+
+**Cloud module**:
+An opt-in part of server mode for a deployment on several nodes: a cargo feature, off by
+default, plus one section of the workspace manifest (the snapshot store, the generation
+pointer, the refresh lock, OIDC). A build without the feature carries none of its crates, and with no section a build behaves as the default one (ADR 0012).
+_Avoid_: plugin, extension, cloud mode
+
+**Generation**:
+The workspace's mirrors and indexes at one commit each, published by one job and served whole
+by every node: one bundle per repository, never merged, named by a 16-hex id derived from the
+commits, the schema version, the binary version and the entries' blocks (ADR 0012). A client
+pins one with `/<identity>@<generation>`.
+_Avoid_: snapshot, version, release
+
+**Snapshot store**:
+The S3-compatible bucket and prefix the operator configures, where `meada snapshot publish`
+uploads generations and from which `meada snapshot pull` downloads them onto a node.
+_Avoid_: cache, registry, artifact store
+
+**Refresh lock**:
+The lock in Valkey that `meada snapshot lock` holds while the operator's refresh (fetch, `meada
+index`, `meada snapshot publish`) runs as its child, so one refresh of a workspace runs at a
+time (ADR 0012).
+_Avoid_: mutex, lease, job lock
+
+**Fence**:
+The number each acquisition of the refresh lock gets, one above the last. The pointer in Valkey
+moves only to a higher fence and a node's never to a lower one, so a stalled job never replaces
+a newer generation; without the lock every fence is `0`.
+_Avoid_: epoch, version, fencing number
 
 ### Across repositories
 
@@ -62,8 +93,9 @@ _Avoid_: group, monorepo, organization
 **Workspace manifest**:
 The versioned `meada.workspace.toml` in an operator's ops repository that lists, for server
 mode, the repositories of the workspace (remote identity and local path), the index directory,
-and the `[serve]` and `[[resource]]` of repositories with no `meada.toml`. A repository's own
-`meada.toml` wins over it. It is never read locally.
+and the `[serve]`, `[[resource]]` and `[[peer]]` (`repo` and `base_url_env`, no `path`) of
+repositories with no `meada.toml`. A repository's own `meada.toml` wins over it whole. It is
+never read locally.
 _Avoid_: group config, central repository, global configuration
 
 **Provider**:

@@ -16,19 +16,26 @@ mod entry;
 mod http;
 mod index;
 #[doc(hidden)]
-pub use index::with_reversed_walk;
+pub use index::{with_busy_timeout, with_reversed_walk};
 mod items;
 mod lang;
 mod literals;
 pub mod mcp;
+mod modules;
 pub mod msg;
+#[cfg(feature = "oidc")]
+mod oidc;
 mod package;
 mod render;
 pub mod repo;
 mod resolve;
 mod resource;
 mod shape;
+#[cfg(feature = "snapshot")]
+pub mod snapshot;
 mod trace;
+#[cfg(feature = "valkey")]
+mod valkey;
 mod workspace;
 mod zod;
 

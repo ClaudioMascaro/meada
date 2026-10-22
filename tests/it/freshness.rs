@@ -684,12 +684,12 @@ fn channels_follow_an_edited_topic_constant() {
     }
 }
 
-type Chain = (PathBuf, PathBuf, PathBuf);
+pub(crate) type Chain = (PathBuf, PathBuf, PathBuf);
 
 /// Edits, adds and deletes files in each repository of the chain: the web adds a consumer and
 /// deletes the file of two others, the gateway moves a route to another method, the catalog
 /// deletes a route its peers link to and edits the end of its cycle.
-fn edit_chain((web, gateway, catalog): &Chain) {
+pub(crate) fn edit_chain((web, gateway, catalog): &Chain) {
     let replace = |path: PathBuf, from: &str, to: &str| {
         let src = fs::read_to_string(&path).unwrap();
         assert!(src.contains(from), "{from} in {}", path.display());

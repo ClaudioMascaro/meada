@@ -8,6 +8,108 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Server mode (spec #259, ADR 0011): `meada mcp --listen <addr> --workspace <manifest>` serves
+  the three tools over MCP streamable HTTP, one endpoint per repository at `/<identity>`, from
+  mirrors that a workspace manifest (`meada.workspace.toml`) lists. Each index lives under the
+  manifest's `index_dir` and is refreshed by command (`meada index --workspace`, run by the
+  operator's fetch job or webhook), never by the server, which only reads; `meada status
+  --workspace` and `meada export --workspace --repo` read the same manifest. SIGINT and SIGTERM
+  stop the server after the answers in flight, within 25 seconds. Meada authenticates nobody: a reverse proxy admits
+  the clients. A request carrying `Origin` gets 403 on every path, before any listing.
+- Server mode, cloud modules (ADR 0012): the manifest's module sections are tied to cargo
+  features that are off by default, so a section in a build without its feature is an error
+  naming the file, the line, the section and the feature. The first module is the shared Valkey
+  connection (internal feature `valkey`, section `[valkey]`: TLS outside loopback, an AUTH/RBAC
+  user, the password only from an environment variable or a file, standalone or cluster, every
+  key under `key_prefix`); `meada status --workspace` says whether Valkey is reachable and its
+  exit code does not depend on it. The release binaries stay the default build. The `cloud`
+  feature enables every module at once (Unix only, as `refresh-lock` is).
+- Server mode, snapshot store (ADR 0012, feature `snapshot`, section `[snapshot]`): `meada
+  snapshot publish --workspace <manifest>` checks, reading only, that every index equals its
+  mirror and every mirror is clean, then uploads the workspace to an S3-compatible bucket as a
+  generation (one tar bundle per repository, its mirror and `index.db`, a generation document
+  with each bundle's size and BLAKE3 hash, then the `current` pointer) and prints its id. Ids
+  derive from the commits, the schema and binary versions and the entries' blocks, so a
+  republish or a second machine at the same commits uploads nothing. Credentials come from one
+  source (`static` keys from variables or files, `web-identity`, `pod-identity` or `instance`),
+  TLS is required outside loopback, and no request follows a redirect. `meada index` stays
+  offline.
+- Server mode, snapshot store pull (ADR 0012, feature `snapshot`): `meada snapshot pull
+  --workspace <manifest>` fetches the store's current generation into the section's
+  `local_dir`, checks every bundle's size and BLAKE3 hash against the generation document,
+  extracts it as hostile input (ids and identities checked before they become paths; no
+  absolute path, `..`, escaping link, write through a symbolic link or special file; byte and
+  entry ceilings), replaces each mirror's `.git/config` with a minimal one and removes its
+  `.git/hooks`, and swaps the node's pointer file (`<local_dir>/current`, `<generation id>
+  <fence>`) by rename, keeping the current and the previous generation. Meada's `git` calls on
+  pulled mirrors read no system or global configuration. One pull runs at a time per
+  `local_dir`; `--every <seconds>` repeats it. A failed pull changes nothing. A pull refuses an
+  `index.db` that is not in rollback journal mode or holds any schema object (a view, a
+  trigger, a table or an index) other than the ones this build creates, naming the repository
+  and the object.
+- Server mode, serving generations (ADR 0012, feature `snapshot`): `meada mcp --listen <addr>
+  --workspace <manifest> --generations` serves the generation `<local_dir>/current` names; each
+  request reads the pointer file, reads a generation's document and mirror configuration once
+  (each `meada.toml` and `meada.decisions.toml` at most 1 MiB), and the call opens the engine
+  over the generation its request was routed by (read-only, defensive, nothing written per
+  call), so a call open before a swap finishes on its generation and the next one sees the
+  new. A source path from an index renders only inside its mirror, through no symbolic link,
+  from a regular file of at most 16 MiB; any other shows as unavailable. A node with no
+  servable generation answers 503 with the body `no servable generation`, the reason on
+  stderr. The node's manifest contributes only its module
+  sections, nodes never run `meada index`, and the server refuses to start without a servable
+  current generation (naming `meada snapshot pull`, or the repository and generation of an
+  index at another schema version or with a schema object this build does not create). A
+  missing or interrupted index names the generation's directory to remove before pulling
+  again. `meada status --workspace <manifest> --generations` prints
+  the current id, the held ids and `store: reachable` or `store: unreachable (<reason>)`, and
+  exits 1 only without a servable current generation, whatever the store; `meada export
+  --workspace <manifest> --repo <identity> --generations` exports from it. The flag is absent
+  from the default build.
+- Server mode, generation pointer and pins (ADR 0012, feature `generation-pointer`, section
+  `[generations]` with `keep`, at least 2; it needs `[snapshot]` and `[valkey]`): `meada
+  snapshot publish` ends by writing the current generation and the retained ones to Valkey in
+  one script (`{<key_prefix>}:current`, a hash `{id, fence}`, and `{<key_prefix>}:retained`, a
+  list of `<id>:<fence>` newest first, each id once, trimmed to `keep`; fence `0` without the
+  refresh lock) instead of the store's `current`, and `meada snapshot pull` reads them there:
+  every id and fence is checked before the node changes (a malformed entry, a missing pointer or
+  an empty list is an error naming the key), the current generation is downloaded and swapped in
+  first, then every retained one the node lacks (one that fails is a warning naming it, which
+  blocks nothing and the next pull retries), the others are deleted but for the current one and
+  the one just replaced, and the node's pointer file carries the fence read with the id. `meada
+  status --generations` reads the current id from Valkey and checks the store holds its
+  document. `meada mcp --listen --generations`
+  then serves `/<identity>@<generation>` from a held generation, a 404 naming the requested,
+  the current and the held generations otherwise, and `/<identity>` keeps serving the current
+  one. Every answer names its generation in a `Meada-Generation` header and every tool result
+  in `_meta` (`meada/generation`); tools, schemas and text output are unchanged.
+- Server mode, refresh lock (ADR 0012, feature `refresh-lock`, section `[refresh_lock]` with
+  `ttl_seconds`, default 300, at least 10; it needs `[generations]`): `meada snapshot lock
+  --workspace <manifest> -- <command>` takes `{<key_prefix>}:lock` in Valkey, gets the next
+  fence from `{<key_prefix>}:fence`, runs the refresh as its child with `MEADA_REFRESH_LOCK`
+  and `MEADA_REFRESH_FENCE`, renews the lock every third of the TTL and releases it, exiting
+  with the child's code. A lock already held exits 1 running nothing; a lock lost (another
+  token, or no renewal for a whole TTL) terminates the child's process group and exits 1.
+  `meada snapshot publish` then needs both variables, stops before any upload once the lock no
+  longer holds its token, and the pointer script writes only while the lock holds it and the
+  fence is above the current one. A node never swaps to a lower fence than its pointer file's;
+  a lost fence key is named, with the recovery, by the refused publish, the refused pull and a
+  `fence: stuck` line of `meada status --generations`. `meada index` stays offline.
+- Server mode, OIDC (ADR 0012, feature `oidc`, section `[oidc]` with `issuer`, `public_url`,
+  `audience`, `identities_claim`, `scopes` and `jwks_refresh_seconds`, default 3600, at least
+  60): the server becomes an OAuth 2.1 resource server as the MCP authorization specification
+  (2026-07-28) describes. At start it reads the issuer's metadata (its `issuer` checked) and
+  JWKS, with no redirect, no proxy, a 10-second timeout and a size cap, or refuses to start.
+  `/.well-known/oauth-protected-resource/<identity>` (and its pinned form) serves the protected
+  resource metadata without a token. Every other request needs `Authorization: Bearer <JWT>`:
+  an asymmetric algorithm that fits its key, `iss`, `aud` (the configured audience, or the
+  endpoint's URL, which its pins accept too), `exp` and `nbf`, and every configured scope; a
+  missing or invalid token gets 401 with `WWW-Authenticate`, and a valid one whose
+  `identities_claim` does not list the endpoint's identity gets 403. Authentication runs before
+  routing, so a 404 needs a valid token and lists only what it may read. The JWKS is read again
+  every `jwks_refresh_seconds` and on an unknown `kid`, at most once a minute, keeping the cached
+  keys when that fails. No token or part of one reaches stderr or an error; the proxy stays the
+  documented default admission.
 - npm installer (spec #32): cargo-dist builds and publishes an npm package named `meada` with each
   release, at the crate's version, so `npx meada mcp` launches the MCP server and `npx meada
   <command>` runs any command; the release configuration is planned as a dry run on pull requests.

@@ -60,13 +60,21 @@ cargo test
 
 ## Before you open the PR
 
-These three commands are the ones CI runs (`fmt`, `clippy`, `test`), and all three must pass:
+These three commands are the ones CI runs on the default build (`fmt`, `clippy`, `test`), and
+all three must pass:
 
 ```sh
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo test
 ```
+
+A change under a cloud module's feature `<f>` (ADR 0012) also runs
+`cargo clippy --all-targets --features <f> -- -D warnings` and `cargo test --features <f>`. CI
+also has the `cloud` job: it checks that the default build carries no module crate and runs
+clippy and the tests with `--all-features`, against a Valkey and an S3-compatible server (the
+tests that need them read `MEADA_TEST_VALKEY_URL` and `MEADA_TEST_S3_ENDPOINT`, and without
+them say so and skip).
 
 If the change touches behavior, include the test that covers it.
 

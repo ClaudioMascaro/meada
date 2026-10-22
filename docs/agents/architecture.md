@@ -8,12 +8,72 @@ list below. Terms are `GLOSSARY.md`'s; decisions are in `docs/adr/`.
 ## Flow
 
 `Engine::open(dir)` finds the **workspace**, creates or recreates each **repository**'s **index**
-in its own `.meada/index.db`, and ATTACHes every **peer** to the first repository's connection
-as `peer<n>`. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` first, then
+where `Repository::index` says it lives, and ATTACHes every **peer** to the first repository's
+connection as `peer<n>`. Locally the index is the checkout's own `.meada/index.db`. In
+**server mode**, `Engine::open_manifest(manifest, repo)` builds the workspace from the
+**workspace manifest** instead (`workspace::Manifest`: every listed repository, `repo` first,
+then manifest order, nothing discovered) and each index lives at
+`<index_dir>/<identity>/index.db`; `engine::index_workspace` and `engine::status_workspace`
+are `meada index --workspace` and `meada status --workspace`. An engine opened from a
+manifest opens every index read-only on one connection (`index::open_read`: nothing created,
+`trusted_schema` off and `SQLITE_DBCONFIG_DEFENSIVE` on, since a generation's index comes from
+a store, one read transaction held until the engine drops, so an answer sees each index as one commit left
+it and a commit waits for the answer, both up to a busy timeout) and its `refresh()` does
+nothing, so only `meada index --workspace` writes; `open_manifest` is also what `meada export --workspace --repo`
+opens. With the snapshot module (feature `snapshot`, `--generations`), `Engine::open_held`
+builds the workspace from a generation the node holds instead
+(`snapshot::serve::held` reads the pointer file and the generation document, and
+`Manifest::of_generation` turns it into the same `Manifest`: per entry the mirror at
+`<generation id>/<bundle id>/mirror`, the index beside it, the mirror's own `meada.toml` whole or
+else the blocks the document recorded, each read up to `config::GENERATION_CONFIG_MAX`; no
+`git` runs, the pull checked each mirror) and opens it read-only as `open_manifest` does, one
+engine per call. The server keeps the last generation read (`serve::Current`, one `Arc<Held>`:
+a generation's directory never changes once renamed into place), so a request reads only the
+pointer file until it names another id, and the request's route hands the `Held` it routed by
+to the call (`Source::Generation`): a swap between two calls changes the generation and one
+during a call does not, and a call still answering keeps its own `Arc` once the server moved
+on. The node's manifest contributes only its module
+sections. `engine::served_generation` is its start check and the predicate `status
+--generations` exits on (current generation present, every mirror rechecked, every index at the
+schema version and holding exactly this build's schema objects, `index::vet`, the whole
+workspace opens), `engine::status_generations` its text (the node's
+current and held ids, and the store's current id with a short timeout, which never changes the
+exit code), and `Engine::open_node` what `export --generations` opens. An index that cannot be
+read in a generation names the generation and its fix (`msg::Fix`), not `meada index`: a
+publish from this build for another schema version, else removing `<local_dir>/<id>` before
+`meada snapshot pull` (a pull of the generation already current changes nothing) or a new
+generation. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` first, then
 reads each index through `index::export`, adds the contracts each `meada.toml` declares
 (`ContractKind::declare`), derives **links** from both, and renders.
-Nothing outside `.meada/` is written. Everything the engine returns is sorted: the same files
-give byte-identical output.
+Nothing outside the index's directory (`.meada/`, or `index_dir` in server mode) is written.
+Server mode also runs on `index_dir` and mirrors mounted read-only, possibly owned by another
+user: the open creates no file there (no `index.db.lock`, only a rebuild takes it; no
+`.gitignore`; no journal), and a hot journal that only a write could roll back is reported as the
+interrupted-commit error naming `meada index --workspace`. The open is SQLite's plain read-only
+one, not the `immutable=1` URI. Trade-off: `immutable` skips locking and change detection, so it
+would also skip the shared lock that makes a commit in progress wait for readers and readers for
+a commit, and it would ignore a hot journal, serving a half-written file; it is safe only for
+files that never change in place. A plain read-only open takes a shared `fcntl` lock, which works
+on a read-only mount (the test locks directories `0555` and files `0444`) and keeps the busy
+timeout and the interrupted error working. `meada index --workspace` refreshes an index of the
+current schema in place, in one transaction (only a rebuild renames), so a server reading with
+`immutable=1` while it runs would take no shared lock and not see the hot journal, and could
+serve half-written pages. `immutable` would be safe only for an index that arrives whole and is
+never refreshed in place on that node; that is why the plain read-only open stays.
+For a mirror another user owns, `git` refuses it (`safe.directory`); `repo::command` is the one
+place Meada runs `git`, and it adds `-c safe.directory=<mirror>` for the paths `Manifest::read`
+registered with `repo::trust`: the manifest's mirrors only, in server mode only, never `*`. Git
+honours `safe.directory` from the command line only from 2.38 (Ubuntu 22.04's 2.34 and RHEL 8's
+2.31 ignore it on purpose), so a mirror owned by another user needs git 2.38 or later, or
+`safe.directory` in the system configuration; on an older git the start check fails closed with
+an error naming the mirror and that minimum (`Msg::DubiousOwner`).
+Server mode reads the **workspace manifest**, and each mirror's `meada.toml` and
+`meada.decisions.toml`, once at start (`engine::served`, which refuses to start unless every
+repository can be served), so a change to those files needs a restart, while a code change in a
+mirror needs only `meada index --workspace`. It refuses `trace` with `changes: uncommitted`, and
+`context` prints `index behind the mirror: run meada index --workspace` for a span whose file
+changed since indexing.
+Everything the engine returns is sorted: the same files give byte-identical output.
 
 ## Modules (`src/`)
 
@@ -27,16 +87,232 @@ one for the area a change touches.
   `entry.rs`: entry points (spec #31), found when an index is written.
   `drift_view.rs`: how `context`, `search` and `status` show `Link::drift`; it reads no kind (the
   stored links, the exports' consumer shapes, the calls and the seam's `parts`).
-  `render.rs`: token budget and line helpers. `mcp.rs`: three read-only tools over the client's
-  first `file://` root, or the server's cwd without roots (also for an answer with no local root);
-  a client that fails or does not answer `roots/list` within `ROOTS_TIMEOUT` (5 s) gets the last
-  root it sent, else a tool error.
-  `main.rs`: clap.
+  `render.rs`: token budget and line helpers. `mcp.rs`: three read-only tools, one definition over
+  two transports: stdio, about the client's first `file://` root or the server's cwd without
+  roots (also for an answer with no local root; a client that fails or does not answer
+  `roots/list` within `ROOTS_TIMEOUT`, 5 s, gets the last root it sent, else a tool error),
+  and in server mode streamable HTTP (`meada mcp --listen`,
+  stateless, JSON responses on a hyper listener), one endpoint per repository of the manifest at `/<identity>`, a 404
+  listing the identities served elsewhere (with `--generations`, `listen_generations` makes
+  the endpoint per request from the current generation's identities, so a pull that adds a
+  repository needs no restart, and a node with no readable generation answers 503 with the fixed body `no servable generation`, the problem on stderr; no `Host` check). A request carrying `Origin` gets 403
+  before anything else, on every path and in every build (`mcp::browser`, called first in
+  `route`): no listing, pin 404 or 503 reaches a browser. With `[generations]` on the node
+  (`Routes::Generation { pins: true }`) the routing rule is: the decoded path, a trailing slash
+  stripped, is `/<identity>@<generation>` when what follows its last `@` is an id
+  (`snapshot::is_id`); that generation is served from `<local_dir>/<generation>/`
+  (`Current::pinned`) when the node holds it, and is a 404 (`text/plain`: the requested
+  generation, `current: <id>` and `held: <ids>`) when it does not; any other path routes as
+  without pins, against the current generation. Every answer then carries `Meada-Generation:
+  <id>` (the generation it was routed by; a 404 the current one or the held pin, a 503 none),
+  and every `CallToolResult` `_meta` `{"meada/generation": "<id>"}` (`Meada::result`, tool
+  errors included); tool names, schemas and text do not change. `listen` runs every start check (`engine::served`, the predicate `status --workspace` exits on) before it binds, so an open port means indexes present (the probe counts an index locked by a commit in progress as ready, after a 50 ms wait), then installs the SIGINT and SIGTERM
+  handlers before it prints the address, then on a signal drops the listener and lets each
+  connection finish its answer in flight (`graceful_shutdown`), for at most `DRAIN` (25 s; the
+  hidden `with_drain_bound` shortens it, `main.rs` reads `MEADA_DRAIN_MS` for it in debug builds only, a second signal ends the wait), then cancels
+  rmcp's `cancellation_token` (earlier it would end calls in flight with an error), drops what
+  is left and exits 0 without waiting for the runtime's threads. Every request goes through
+  `Gate` before routing, after the `Origin` check: in the default build, or with no `[oidc]`, it
+  lets everything through; with `[oidc]` (feature `oidc`) it is `oidc::Oidc::admit`, which
+  answers itself (the protected resource metadata, a 401) or hands routing a `Pass`, whose grant routing checks
+  at an endpoint (`Pass::refused`, the 403) and filters every 404 listing through
+  (`Pass::reads`). The pin is split from the path before the gate, so a pinned path is admitted
+  as its identity is. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
+- `modules.rs`, `valkey.rs`: the cloud modules (ADR 0012). `modules.rs` is the section table,
+  in every build: each module section of `meada.workspace.toml` (`[valkey]`, `[snapshot]`,
+  `[generations]`, `[refresh_lock]`, `[oidc]`) with the cargo feature that owns it and
+  whether this build has it. `Manifest::read` checks it before the typed parse, so a
+  section whose feature is missing is an error naming the file, the line, the section and the
+  feature, and a section the table lacks stays an unknown key. A module ticket adds its row and
+  sets `built` to `cfg!(feature = ..)`. The `cloud` feature turns on every module at once and,
+  as `refresh-lock` is, is Unix only. `modules.rs` also holds what the modules share, each
+  behind the features that use it: `Problem` (a section key and its message) and `validated`,
+  which turns one into the `file:line` error; `at_least` (an optional integer with a default
+  and a minimum, `Msg::AtLeast`); `loopback` (`localhost`, `127.0.0.0/8` or `::1`, the one
+  host test of every `http` exception); `Secret` (a variable or a file, at most one of the pair,
+  and `read_secret`, a bounded regular file whose error names only the file); `block_on` (a
+  current-thread runtime shut down without waiting) and `within` (a `status` line's bounded
+  wait). `valkey.rs` (feature `valkey`, internal; the only place
+  the `redis` crate is used) is the one Valkey client the modules share: `File` is the
+  `[valkey]` section, `File::validate` turns it into a `Config` (no password in the URL, `rediss`
+  outside loopback, at most one of `password_env` and `password_file`, no `{` or `}` in
+  `key_prefix`; each problem names its key), and `Valkey::connect` opens a connection manager or
+  a cluster connection, reading the password from the variable or the file only when it
+  connects. Every key goes through `Config::key(name, tagged)`: `<key_prefix>:<name>`, or
+  `{<key_prefix>}:<name>` for the keys one script touches together (pointer, lock, fence). An
+  error from the client has the password scrubbed. `status --workspace` prints `valkey:
+  reachable` or `valkey: unreachable (<reason>)` after waiting at most `PING_TIMEOUT`; the
+  line is informational and never changes the probe's exit code. With a `ca_file` the client
+  trusts that file alone, not the system roots as well (redis-rs replaces them).
+- `oidc.rs` (feature `oidc`; the only place `jsonwebtoken` is used, with RustCrypto as its
+  backend, never aws-lc-rs): server mode as an OAuth 2.1 resource server. `File` is the
+  `[oidc]` section and `File::validate` its `Config` (`issuer` `https` or loopback `http` with no
+  user, query or fragment, `public_url` the same with no path, `identities_claim` and `audience`
+  not empty, scopes RFC 6749 scope-tokens, `jwks_refresh_seconds` at least 60). `Oidc::start`,
+  called by `mcp::Gate::new` before the listener binds, finds the metadata at the URLs the MCP
+  specification tries in order (`metadata_urls`: RFC 8414 and OpenID discovery with the path
+  inserted, then OpenID's appended, passing over a document that does not parse or names
+  another issuer), checks its `jwks_uri` (which may carry a query), reads the JWKS (only
+  signing keys: RSA, or EC on P-256 and P-384) and starts a thread that reads it again every
+  `jwks_refresh_seconds` until the module is dropped; every request goes through ureq with no
+  redirect, no proxy, `FETCH_TIMEOUT` and a cap, and the platform verifier for `https`.
+  `Oidc::admit` (reached only without `Origin`, which `mcp::route` refuses first) serves the
+  metadata of any path under
+  `.well-known/oauth-protected-resource` (`resource` is `<public_url>/<path>`, percent-encoded),
+  and otherwise reads the one `Authorization: Bearer` header (another scheme counts as no
+  token): `ALGORITHMS` only, no `crit`, a cached key that `fits` the header (`kid` when both
+  carry one, the key's own `alg`, its type and curve), the JWKS fetched again
+  when none does (`refetch`, at most once per `KID_REFRESH_EVERY`), `exp` and `nbf` with
+  `LEEWAY`, `iss`, `aud` against the configured audience or the path's and its identity's
+  resources, then the scopes (403 when one is missing). The grant is `identities_claim` as an
+  array, `*` for all. No token, error text of `jsonwebtoken` or claim value is ever printed.
+- `snapshot.rs`, `snapshot/store.rs`, `snapshot/pull.rs` (feature `snapshot`; the only places
+  `object_store`, `reqwest` as a client of Meada's own and `tar` are used): the snapshot store. `File` is the
+  `[snapshot]` section and `File::validate` its `Config` (an `https` endpoint, or `http` on
+  loopback, with no user or path, and `path_style` for an `http`, IP or `localhost` one;
+  `region`, `bucket` and `prefix` shapes; one credential source,
+  the static keys only with `static`, at most one of each `*_env`/`*_file` pair). `bundle_id`
+  and `generation_id` are the ids of ADR 0012 (`is_id` their shape); `entry_blocks` gives each
+  manifest entry's blocks as canonical JSON (`Listed::blocks`). `publish` is `meada snapshot
+  publish`: per repository `index::open_read` plus `index::fresh`, `repo::unclean` and
+  `repo::head`, every problem listed; then `store_generation` uploads the missing bundles (a
+  first pass measures the tar's size and hash, a second streams it as a multipart upload with
+  them as metadata, aborted if they differ), reads each back from metadata, writes the document
+  and `current` last; an existing document is verified instead (`verify`) and never rewritten.
+  The tar is `index.db`, then the mirror under `mirror/` in path order, symbolic links as links.
+  `store::Store` is the client `meada snapshot pull` (#273) reuses: object_store's S3 client
+  over `Guard`, a reqwest client with no redirect and no proxy that refuses any origin but the
+  bucket's and the chosen credential source's (STS in `region`, the Pod Identity agent, IMDSv2),
+  whose TLS is `store::tls` (rustls with ring and the system's roots, handed to a reqwest built
+  with `rustls-no-provider`; object_store signs with ring too). Ring is the only rustls provider
+  in any build (ureq brings it, and redis reads it as the process default): a second one, as
+  object_store's `aws` feature would add with aws-lc-rs, makes rustls panic on the first TLS
+  connection of a build with both modules;
+  credentials come only from that source (static ones built from the variables or files, the
+  others through object_store's providers given exactly those inputs, IMDSv2 over IPv4 only),
+  stay in memory and are scrubbed from every error: the static secret is replaced, and an S3
+  error body loses its `CanonicalRequest`, `StringToSign` and their `*Bytes` echoes. The
+  secret files are read through `modules::read_secret`, as `valkey.rs` reads its own. Each
+  bundle keeps its `open_read` connection, the read transaction its freshness check ran in,
+  until its upload ends. Every object carries `meada-size` and `meada-blake3` metadata.
+  `snapshot/pull.rs` is `meada snapshot pull` (`pull`, once; `main.rs` loops for `--every`),
+  which treats everything it reads from the store as hostile. Under `local_dir`: `current`
+  (the node pointer file, one line `<generation id> <fence>\n`, fence `0` from the store's
+  pointer and the fence read with the id from Valkey with `[generations]`; `pull::current`
+  reads it and checks the id and the fence), `pull.lock` (an advisory lock taken with
+  `try_lock`: a second pull returns `Pulled::Running`), and per held generation `<generation
+  id>/` with `generation.json` (the document as stored) and per repository `<bundle
+  id>/index.db` and `<bundle id>/mirror/`; a pull in progress writes only `<generation
+  id>.partial/` and `current.new`. Steps: the store's `current` must be an id and a newline
+  (`store_pointer`); `checked` refuses a document before any path is built from it (its
+  generation id, `workspace::identity_problem` per identity plus no duplicate and no character
+  a git remote URL cannot hold, each bundle key `repos/<identity>/<bundle id>.tar` under the
+  prefix, hash and `HEAD` shapes, the size sum, the generation id derived again); per bundle,
+  `Store::download` streams it to a file checked against the document's size and hash, and
+  `extract` checks every entry itself (no `unpack`: `index.db` first, then only `mirror/`; only
+  normal components; regular files created `create_new`, `0644` or `0755`; directories made
+  without following a link; symbolic links only to relative targets that fold inside the
+  mirror, and after the last entry none through another link; hard links only to an earlier
+  regular file of the mirror; no nested repository, that is no `.git` component, in any case,
+  below the mirror's own `.git` and nothing under its `.git/modules`, since git runs a
+  submodule's own configuration when `git status` descends into it; any other type refused);
+  `index::vet` requires the extracted `index.db` to hold exactly the schema objects this build
+  creates (type, name, table and SQL against a fresh in-memory index: no view, trigger, table
+  or index more, none altered) and its header to name the rollback journal (bytes 18 and 19
+  both 1, so no read-only open makes `-wal` or `-shm` files), naming the repository and the
+  object;
+  `settle` replaces `.git/config` with `[core]` and the identity's `origin`, removes `hooks`,
+  `commondir` and `objects/info/alternates`, and checks the checkout, identity, `HEAD` and a
+  clean `git status` that does not descend into submodules (`repo::unclean(_, false)`; the
+  publish check on the operator's own mirrors keeps descending). `repo::isolate(local_dir)`
+  makes every `git` call under it run with `GIT_CONFIG_NOSYSTEM=1`, `GIT_CONFIG_GLOBAL` set to
+  the null device and `-c core.fsmonitor=false`. Then the partial
+  directory is renamed to `<generation id>/`, `current.new` is written, synced and renamed over
+  `current`, and every id-named directory but the new current and the one just replaced is
+  deleted. A failure removes the partial directory and leaves the pointer and every held
+  generation as they were.
+  `snapshot/serve.rs` is what serving reads from a node (`--generations`): `node` (the
+  manifest's `[snapshot]` section and `local_dir`), `held` (the current generation: the
+  pointer file through `pull::current`, then `generation.json`, bounded and checked as the
+  generation's own), `Current` (the last generation `held` read, kept while the pointer names
+  it; `Current::pinned` keeps one `Held` per pinned id, read once while held and dropped once
+  `ids` no longer lists it, so what it keeps is bounded by what the node holds; a read that fails
+  because a pull deleted the directory after the listing is `None`, the pin's 404, through
+  `unless_gone`), `ids` (the generations held) and `reach` (the store's current id within `CURRENT_ID_TIMEOUT`, two
+  seconds, for the probe; with `[generations]`, `reach_pointer`: Valkey's current id, then a
+  HEAD of its document in the store, within the same bound, the reason prefixed `valkey:` or
+  `store:`). It only reads; the pull is the only writer of `local_dir`. A pinned call still open
+  on a generation that a pull's retention deletes may fail mid-call: the pull does not wait for
+  what the server is still reading.
+  `snapshot/generations.rs` (feature `generation-pointer`, which implies `snapshot` and
+  `valkey`; no crate of its own) is the generation pointer, section `[generations]` (`keep`,
+  default 3, at least 2; `Manifest::read` refuses it without `[snapshot]` and `[valkey]` through
+  `modules::needs`). It owns the Valkey keys, both under the `[valkey]` prefix's hash tag:
+  `{<key_prefix>}:current`, a hash `{id, fence}`, and `{<key_prefix>}:retained`, a list of
+  `<id>:<fence>` newest first, each id once, trimmed to `keep`. `point` runs the one script that
+  writes both (`EVAL`; KEYS current, retained and `{<key_prefix>}:lock`, ARGV id, fence, keep
+  and the refresh lock's token, empty without one): with a token it returns 0 unless the lock
+  holds it (`Msg::LockNotHeld`) and -1 unless the fence is above `current`'s
+  (`Msg::FenceRefused`, naming `{<key_prefix>}:fence` and the recovery; the two fences compare
+  as decimal text, leading zeros dropped, so none loses precision as a Lua number, and -2 for a
+  stored fence that is no decimal); then it removes every entry of the id, pushes
+  `<id>:<fence>`, trims and sets the hash. `publish` connects to Valkey before any upload and
+  calls `point` last, with fence `0` and no token without `[refresh_lock]`, instead of writing
+  the store's `current`. `read` is the pull's side: `HMGET current id fence` and `LRANGE retained 0
+  keep-1`, every id checked by `is_id` and every fence by `snapshot::fence` before anything
+  else; a missing pointer, an empty list or a malformed entry is an error naming the key. With
+  it, `pull_locked` (through `Source::wanted`) fetches the current generation if the node lacks
+  it and swaps the pointer file to `<id> <fence>` as read (a failure there fails the pull and
+  changes nothing), then fetches every retained one the node lacks, each failure a warning
+  (`Msg::SnapshotRetainedSkipped`, naming the id and the cause, on stderr) that blocks nothing
+  and that the next pull retries, then deletes every held id outside the current, the retained
+  and the one just replaced. A pull that re-fetched the current generation (its directory gone)
+  reports `Pulled::Swapped`, so `--every` prints its id. Before any fetch, a current generation
+  whose fence is below the one in the node pointer file fails the pull with
+  `Msg::FenceBelowNode` and changes nothing; with no pointer file the node takes it whatever
+  its fence. `engine::status_generations` adds a `fence: stuck: ...` line (`Msg::FenceStuck`)
+  when the node's fence is above the one `reach_pointer` read, with no effect on the exit code.
+  `snapshot/lock.rs` (feature `refresh-lock`, which implies `generation-pointer`; crate `nix`,
+  Unix only, a `compile_error!` elsewhere) is the refresh lock, section `[refresh_lock]` (`ttl_seconds`, default 300, at
+  least 10; `Manifest::read` refuses it without `[generations]`). Keys under the same hash tag:
+  `{<key_prefix>}:lock` and `{<key_prefix>}:fence`, which Meada only `INCR`s. `run` is `meada
+  snapshot lock`: `SET lock <token> NX PX <ttl>` (a token of 16 bytes of `/dev/urandom` in hex;
+  a lock already held is `Msg::LockHeld`, nothing run; a `SET` that errs releases the token
+  anyway, since the server may have taken it), `INCR fence` (a result that is not a
+  positive `u64` is `Msg::LockBadFence`), then the child, spawned on the main thread in a
+  process group of its own (`process_group(0)`) with `MEADA_REFRESH_LOCK` and
+  `MEADA_REFRESH_FENCE`; on Linux its `pre_exec` arms `PR_SET_PDEATHSIG` (SIGTERM) and refuses
+  to run if `lock` already died, the crate's one `unsafe`. A thread waits for the child; the
+  `select!` loop renews every `ttl/3` (`RENEW`, compare-and-extend, each try bounded by the next
+  deadline and polled as a branch of its own, so no signal or exit waits for Valkey), counts a renewal from the instant before it was sent, and calls the lock lost when
+  a renewal finds another token or none succeeded for a whole TTL. Lost, or a SIGTERM, SIGINT,
+  SIGHUP or SIGQUIT to `lock`: SIGTERM to the group, SIGKILL after `KILL_GRACE` (10 s). Once the child exits, the
+  group gets SIGKILL (nothing is left in it; a grandchild that calls `setsid` escapes), `RELEASE` (compare-and-delete) runs within `RELEASE_TIMEOUT`,
+  and `run` returns the child's code (128 plus the signal) or `Msg::LockLost`. `from_env` is
+  `publish`'s side: with `[refresh_lock]` it needs both variables (`Msg::LockEnv`), `holds` (`GET
+  lock` equals the token) runs before each bundle upload and before the document's (a token
+  with no `[generations]` is an error, never a pass), and the
+  token and fence go to `point`.
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
-  `index.rs`: the SQLite schema, the freshness pipeline in `refresh`, and `export`. `lang/`: the
+  `workspace.rs` also reads the workspace manifest (`Manifest`) and refuses the entries server
+  mode cannot serve; an entry's `[repository.serve]`, `[[repository.resource]]` and
+  `[[repository.peer]]` reuse `config.rs`'s shapes (the peer without `path`) and are the
+  configuration of a mirror with no `meada.toml`. A mirror's own `meada.toml` wins whole: the
+  entry's blocks are ignored, not merged, and `Listed::ignored` names them for `status`.
+  `index.rs`: the SQLite schema, the freshness pipeline in `refresh` (with `fresh`, its
+  read-only twin for `meada snapshot publish`: the same walk, `packs_of` and stamps, and a file
+  whose stat moved but whose hash did not is no difference), and
+  `export`; `open` and `state` take the index's path, `<root>/.meada/index.db` locally (`path`,
+  with a `.gitignore` of `*`) or `<index_dir>/<identity>/index.db` in server mode (no
+  `.gitignore`). A rebuild (a missing index, or one of another schema) is a rename under the
+  rebuild lock: `open` builds the whole new index in `index.db.new.<pid>` while it holds
+  `index.db.lock` and renames it over `index.db`, so a reader sees the old index or the new
+  one, never a missing or empty file; `refresh` stays one transaction in place. An operator
+  renames an index in (built elsewhere) only while no `meada index` writes that index, one
+  writer per index: a refresh's live `index.db-journal` would be taken for the new file's. `lang/`: the
   language adapter and the TS/JS, Python, Rust and Go packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`: `Code::origins`, the one origin question, with three evidence policies
   (`Values`, `Constants` for the TypeScript forms, `Declarations` for Go's typed clients and
@@ -570,13 +846,18 @@ one for the area a change touches.
   `src/bin/`. TS/JS declares none.
 - New **config key**: add the field to `Config`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
-- New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/it/mcp.rs`: the tool list
-  (descriptions plus parameter schemas) must stay within 1,000 tokens.
+- New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/it/mcp.rs` and
+  `tests/it/server.rs`: the tool list (descriptions plus parameter schemas) must stay within
+  1,000 tokens. A tool is added once for both transports: the `#[tool_router]` of `Meada` serves
+  stdio and every HTTP endpoint.
 - New **CLI text**: a `Msg` variant with both languages; command descriptions are set at runtime
   in `main.rs` from `Msg`.
 
 ## Invariants the code relies on
 
+- Server mode writes nothing: the engine opens every index read-only, `refresh()` does nothing,
+  and the HTTP listener opens no outbound connection. Only `meada index --workspace` writes, and
+  only under `index_dir`.
 - Determinism: all export lists are sorted, hashes are BLAKE3, no clock or random value reaches
   an answer. A refreshed index must equal a cold index of the same files (`tests/it/freshness.rs`),
   communities and processes included: `refresh` recomputes both at its end from the stored calls
@@ -591,7 +872,7 @@ one for the area a change touches.
   (`the_stored_format_matches_its_golden`) fails on any change to them until `MEADA_BLESS=1`
   rewrites the golden, which changes the version; no number is kept by hand, so two branches
   that change the format conflict only in the golden. An index with another version, or an
-  unreadable one, is deleted and rebuilt, and `status` says so. One whose stored facts do not
+  unreadable one, is rebuilt beside it and renamed over it, and `status` says so. One whose stored facts do not
   parse is rebuilt by the first refresh that reads them (when a file changed), which `status`
   cannot tell.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
@@ -723,6 +1004,39 @@ one for the area a change touches.
 
 ## Known ceilings
 
+- `snapshot/pull.rs`: a generation's bundles hold at most `GENERATION_BYTES_MAX` (256 GiB)
+  together, as the document records their sizes (checked before any download) and as the
+  regular files extracted from them add up; at most `GENERATION_ENTRIES_MAX` (4,000,000) archive
+  entries together; and each GNU long name or link, or pax header, at most
+  `HEADER_EXTENSION_MAX` (64 KiB), which a scan of the headers checks before the tar crate,
+  which reads them into memory whole, sees the archive. Past any of them the pull fails and
+  changes nothing. A symbolic link whose target goes through another symbolic link is refused
+  even when both stay inside the mirror. A sparse file is refused. The node pointer file holds at
+  most `POINTER_MAX` (64 bytes); past it the pointer file is malformed.
+- `snapshot.rs`: a generation document holds at most `DOCUMENT_MAX` (16 MiB), in the store and
+  as a node holds it, and the store's `current` at most `CURRENT_MAX` (64 bytes); past either
+  the object is refused, naming its key or file, and a pull changes nothing.
+- `snapshot/store.rs`: a credential file (key id, secret, token) holds at most `SECRET_MAX`
+  (16 KiB); past it the file is refused, naming it.
+- `valkey.rs`: `password_file` holds at most `PASSWORD_MAX` (4096 bytes) and `ca_file` at most
+  `CA_MAX` (1 MiB); past either the connection fails, naming the file.
+- `oidc.rs`: each metadata and JWKS request takes at most `FETCH_TIMEOUT` (10 seconds), a
+  metadata document at most `METADATA_MAX` (64 KiB) and a JWKS at most `JWKS_MAX` (256 KiB);
+  past any of them the request fails (at start, the start is refused; on a refresh, the cached
+  keys stay). An identity whose path starts with `.well-known/oauth-protected-resource` is
+  unreachable with `[oidc]`, since that path serves the metadata. The `scope` claim is read as a
+  space-separated string; `scp` and arrays are not read. With `audience` unset, the root's 404
+  takes a token whose `aud` is `public_url` itself. The caps are inclusive: a body of exactly
+  the cap is read. The `oidc` build carries `rsa`, whose RUSTSEC-2023-0071 (Marvin timing) hits
+  private-key operations; Meada only verifies with public keys, so it does not apply.
+- `mcp.rs`: the stop signal drains for at most `DRAIN` (25 seconds, no flag, under Kubernetes'
+  30-second default grace period); past it the connections left are dropped, an answer still
+  waiting on an index lock included, and the exit is 0.
+- `render.rs`: a source file an answer reads (`render::source`, for `path:line` and a symbol's
+  source) is read only through plain relative parts of its path, through no symbolic link, as a
+  regular file of at most `SOURCE_MAX` (16 MiB); anything else renders as unavailable, the path
+  without its line, as a missing file does. An answer keeps each file it reads, so several
+  large files add up.
 - `engine.rs`: one connection attaches every peer, so a workspace reads at most 10 peers
   (`MAX_PEERS`, SQLite's attach limit). `search` scans every symbol.
 - `index.rs`: every contract is extracted again and every call resolved again on any change
@@ -739,7 +1053,9 @@ one for the area a change touches.
   directory and an `internal/` package are no different from any other directory of the provider;
   a `replace` to an absolute directory leaves the module outside.
 - `workspace.rs`: a sibling with an invalid `meada.toml` or `meada.decisions.toml` is skipped
-  silently.
+  silently. In a pulled generation, a mirror's `meada.toml` and `meada.decisions.toml` are read
+  only as regular files of at most `GENERATION_CONFIG_MAX` (1 MiB, `config.rs`); past it the
+  generation is not servable, the error naming the file.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the
   first by site; the target names no site.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is

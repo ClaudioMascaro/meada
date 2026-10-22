@@ -30,7 +30,8 @@ design points the slices need.
 1. **Server mode lives in the binary, behind a flag.** `meada mcp --listen <addr>` serves the
    same three tools over MCP streamable HTTP (rmcp's `transport-streamable-http-server`),
    bound to the loopback interface by default. Authentication belongs to the operator's reverse
-   proxy in this phase.
+   proxy in this phase. (Amended 2026-10-21; ADR 0012: the proxy stays the default, and the
+   opt-in OIDC module is the alternative inside Meada.)
 2. **A workspace manifest, read in server mode only.** A versioned file in an ops repository
    lists the repositories (remote identity and local path), plus the `[serve]` and
    `[[resource]]` declarations of those with no `meada.toml`. A repository's own `meada.toml`
@@ -45,7 +46,7 @@ design points the slices need.
 ### Server mode
 
 Server mode is `meada mcp --listen <addr>` and `meada index`, each given the workspace manifest
-with `--workspace <path>` (other commands: see Open). Without that flag every command behaves as
+with `--workspace <path>`; `meada status` and `meada export` take it too (see Open). Without that flag every command behaves as
 before: the stdio server, discovery and freshness on demand are unchanged.
 
 ### Where source may go (invariant 2)
@@ -58,21 +59,33 @@ before: the stdio server, discovery and freshness on demand are unchanged.
 - Meada does no authentication in this phase: the reverse proxy admits clients (TLS, tokens,
   SSO, network policy). rmcp's `auth` feature is the later option to weigh when an operator
   needs Meada itself to check credentials (in rmcp 3.5.1 its OAuth support is mostly the
-  client's side), and that needs its own decision.
+  client's side), and that needs its own decision. (Amended 2026-10-21; ADR 0012: the opt-in
+  OIDC module validates a bearer JWT inside Meada, as an OAuth resource server; the reverse
+  proxy stays the documented default admission.)
 - Nothing else changes: no account, no telemetry, no key, and indexing still never calls a model
-  or the network. Accepting connections opens no outbound one.
+  or the network. Accepting connections opens no outbound one. (Amended 2026-10-21; ADR 0012:
+  unless an opt-in cloud module is configured, and then only to its configured endpoints.)
 
 ### Naming the repository
 
 - A remote client names the repository it asks about in the endpoint path: the repository's
   identity is the path, as in `http://meada.internal:7333/github.com/acme/web`. Each repository
   is one MCP endpoint, so a client configures one URL per repository it works on, and the tools
-  and their descriptions do not change (ADR 0008 is untouched).
+  and their descriptions do not change (ADR 0008 is untouched). (Amended 2026-10-21; ADR 0012:
+  with the generation pointer module, `/<identity>@<generation>` pins a generation the node
+  holds, the generation being what follows the last `@`, while `/<identity>` serves the current
+  one.)
 - The named repository plays the part of the repository where Meada runs: `search`, `context`
   and `trace` answer from it, across the workspace.
 - A request that names no repository, or one the manifest does not list, is refused with HTTP
   404, and the body lists the identities the server serves. There is no default repository: a
-  default would answer about the wrong repository without saying so.
+  default would answer about the wrong repository without saying so. (Amended 2026-10-21;
+  ADR 0012: a pin naming a generation the node does not hold is a 404 too, naming the requested
+  generation, the current one and the held ones. With the OIDC module a 401 precedes any 404: a
+  caller without a valid token learns no identity or generation, and a valid token's 404 lists
+  only what it may read. The protected resource metadata,
+  `/.well-known/oauth-protected-resource/<identity>` and its pinned form, is served with that
+  module, without a token.)
 - `trace` with `changes: uncommitted` is refused in server mode: the working tree it would diff
   is on the client's machine, not the mirror's. The stdio server keeps it.
 
@@ -137,6 +150,9 @@ before: the stdio server, discovery and freshness on demand are unchanged.
   the repository with in `[[peer]] repo`.
 - An identity whose segments would leave `index_dir` (`..`, an empty segment) is refused.
 - Invariant 3 holds unchanged: `index_dir` is Meada's own index directory in server mode.
+- An index built elsewhere may be renamed over `<index_dir>/<identity>/index.db` only while no
+  `meada index` writes that index: one writer per index, which the operator keeps. (Amended
+  2026-10-21; #265: a refresh's live journal would otherwise be taken for the new file's.)
 
 ### Refresh by command
 
@@ -175,7 +191,9 @@ mirrors are kept clean by the operator's job.
   of PRs to keep in sync, and repositories the organisation does not control stay out.
 - **Authentication inside Meada now** (rmcp `auth`, a bearer token flag, mTLS). The operator's
   proxy already does it, and credentials checked by Meada are a security surface of its own,
-  with a decision of its own. Left for later.
+  with a decision of its own. Left for later. (Amended 2026-10-21; ADR 0012 is that decision:
+  the opt-in OIDC module validates a bearer JWT inside Meada, as an OAuth resource server, and
+  the reverse proxy stays the default.)
 - **Binding every interface by default.** Serves source to the network by accident.
 - **The repository in a header.** Not every MCP client lets a configuration set headers, and
   a proxy may drop them; a path is visible in every log and routable by the proxy.
@@ -204,7 +222,9 @@ mirrors are kept clean by the operator's job.
 - **Meada fetching mirrors itself.** Puts the network in Meada (invariant 4).
 - **A snapshot of the whole workspace per refresh.** Needs one database or a generation scheme
   across indexes (invariant 5); per-repository consistency suffices while links derive at query
-  time.
+  time. (Amended 2026-10-21; ADR 0012: the snapshot module adopts it as opt-in, for several
+  nodes serving the same commits. A generation is stored as one bundle per repository, never
+  merged, so invariant 5 holds.)
 - **Bare clones as mirrors.** Reading blobs from the object store is a second walk to keep
   equal to the first.
 
@@ -231,12 +251,16 @@ mirrors are kept clean by the operator's job.
 
 ### Open
 
+Both points were closed by spec #259 (the manifest slice, #261):
+
 - **`base_url_env` for a repository with no `meada.toml`.** The manifest makes every listed
   repository part of the workspace, so `[[peer]]` is not needed for membership, but the
   variable names that tell Meada which peer a call built from them goes to come only from a
-  consumer's `[[peer]]` entries. Triage gave the manifest `[serve]` and `[[resource]]` only.
-  Whether a manifest entry may carry `[[repository.peer]]` for this is left to the manifest
-  slice or a later amendment.
-- **Which local commands take `--workspace`.** `meada index` and `meada mcp --listen` do.
-  `meada export` (for the knowledge-base feed on the server) and `meada status` need it too,
-  with a way to name one repository; the flag's shape for them is left to the manifest slice.
+  consumer's `[[peer]]` entries. Closed: a manifest entry may carry `[[repository.peer]]` with
+  `repo` and `base_url_env` only, the shape of `meada.toml`'s `[[peer]]` without `path`. A
+  `path` there is an error: the manifest already locates every repository, and membership comes
+  from the manifest, not from peers. Like `serve` and `resource`, the block is ignored when the
+  mirror has its own `meada.toml`.
+- **Which local commands take `--workspace`.** Closed: `meada index`, `meada status`,
+  `meada export` (with `--repo <identity>`, required, since server mode has no "here") and
+  `meada mcp` (with `--listen`; either flag alone is an error). `meada decide` never takes it.

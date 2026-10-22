@@ -1,6 +1,7 @@
 //! `meada.toml`: what a repository consumes from its peers (`[[peer]]`), the hosts it serves on
 //! (`[serve]`) and the resources it reads or writes (`[[resource]]`, spec #19). Errors name the
-//! file, the line and the key.
+//! file, the line and the key. A workspace manifest entry reuses these shapes for a mirror with
+//! no `meada.toml` (`workspace::Manifest`, ADR 0011).
 
 use std::fs;
 use std::ops::Range;
@@ -13,7 +14,7 @@ use toml::de::{DeTable, DeValue};
 use crate::msg::Msg;
 use crate::{Result, qualify};
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default, rename = "peer")]
@@ -24,7 +25,7 @@ pub struct Config {
     pub resources: Vec<Resource>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Peer {
     /// The peer's repository identity.
@@ -36,7 +37,7 @@ pub struct Peer {
     pub base_url_env: Vec<String>,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Serve {
     #[serde(default)]
@@ -58,7 +59,7 @@ pub struct Serve {
 }
 
 /// A `[serve]` table that is present: `declared` is set.
-fn declared<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Serve, D::Error> {
+pub(crate) fn declared<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Serve, D::Error> {
     let serve = Serve::deserialize(d)?;
     Ok(Serve {
         declared: true,
@@ -141,7 +142,7 @@ fn gateway_key<'de, D: serde::Deserializer<'de>>(
 }
 
 /// A shared thing the repository reads or writes, such as a database table or a bucket.
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Resource {
     /// A lowercase identifier with no meaning to Meada: `postgres`, `s3-bucket`.
@@ -203,24 +204,122 @@ impl Config {
 
 /// `<root>/meada.toml`, or an empty configuration when the file does not exist.
 pub fn load(root: &Path) -> Result<Config> {
-    read(root, "meada.toml")
+    Ok(load_own(root)?.unwrap_or_default())
 }
 
-/// `<root>/<name>` parsed as `T`, or `T::default()` when the file does not exist. A parse error
-/// names the file, the line and the key; `meada.decisions.toml` is read the same way.
-pub(crate) fn read<T: DeserializeOwned + Default>(root: &Path, name: &str) -> Result<T> {
+/// `<root>/meada.toml`, or `None` when the file does not exist.
+pub fn load_own(root: &Path) -> Result<Option<Config>> {
+    read_own(root, "meada.toml")
+}
+
+/// `<root>/<name>` parsed as `T`, or `None` when the file does not exist. A parse error names
+/// the file, the line and the key; `meada.decisions.toml` is read the same way.
+fn read_own<T: DeserializeOwned>(root: &Path, name: &str) -> Result<Option<T>> {
+    read_own_up_to(root, name, None)
+}
+
+/// The most a mirror's `meada.toml` or `meada.decisions.toml` holds in a pulled generation
+/// (ADR 0012), whose files are hostile; a larger one fails the generation, naming the file.
+#[cfg(feature = "snapshot")]
+// ponytail: a flat 1 MiB, as `lang::MAX_BYTES`; real ones are a few kilobytes.
+pub(crate) const GENERATION_CONFIG_MAX: u64 = 1 << 20;
+
+/// `read_own`, reading at most `max` bytes (`read_bounded`) when it is set.
+pub(crate) fn read_own_up_to<T: DeserializeOwned>(
+    root: &Path,
+    name: &str,
+    max: Option<u64>,
+) -> Result<Option<T>> {
     let file = root.join(name);
-    let src = match fs::read_to_string(&file) {
-        Ok(src) => src,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(T::default()),
-        Err(e) => return Err(format!("{}: {e}", file.display()).into()),
+    match text(&file, max)? {
+        Some(src) => parse(&file, &src, name).map(Some),
+        None => Ok(None),
+    }
+}
+
+/// The text of `file`, `None` when it does not exist; with `max`, read as `read_bounded` reads,
+/// a regular file of at most `max` bytes.
+pub(crate) fn text(file: &Path, max: Option<u64>) -> Result<Option<String>> {
+    let missing = |e: &std::io::Error| e.kind() == std::io::ErrorKind::NotFound;
+    let Some(max) = max else {
+        return match fs::read_to_string(file) {
+            Ok(src) => Ok(Some(src)),
+            Err(e) if missing(&e) => Ok(None),
+            Err(e) => Err(format!("{}: {e}", file.display()).into()),
+        };
     };
-    toml::from_str(&src).map_err(|e| {
+    if fs::metadata(file).is_err_and(|e| missing(&e)) {
+        return Ok(None);
+    }
+    let bytes = read_bounded(file, max)?;
+    let src = String::from_utf8(bytes)
+        .map_err(|_| format!("{}: {}", file.display(), std::io::ErrorKind::InvalidData))?;
+    Ok(Some(src))
+}
+
+/// `src`, the content of `file`, parsed as `T`; an error names the file, the line and the key,
+/// `name` being the kind of file the key belongs to (`meada.toml`, `meada.workspace.toml`).
+pub(crate) fn parse<T: DeserializeOwned>(file: &Path, src: &str, name: &str) -> Result<T> {
+    toml::from_str(src).map_err(|e| {
         let at = e.span().map_or(0, |s| s.start);
-        let line = src[..at.min(src.len())].matches('\n').count() + 1;
-        let what = describe(&src, at, e.message(), name);
+        let line = line_of(src, at);
+        let what = describe(src, at, e.message(), name);
         format!("{}:{line}: {what}", file.display()).into()
     })
+}
+
+/// The 1-based line of the byte offset `at` in `src`.
+pub(crate) fn line_of(src: &str, at: usize) -> usize {
+    src[..at.min(src.len())].matches('\n').count() + 1
+}
+
+/// An error about the dotted `key` of `src`, the content of `file`, as `parse` words one: the
+/// file, the line of the key (of its table when the key is absent, its default being the
+/// problem; of the file when neither is there), the key and the message.
+#[cfg(any(feature = "valkey", feature = "snapshot", feature = "oidc"))]
+pub(crate) fn error_at(
+    file: &Path,
+    src: &str,
+    key: &str,
+    message: &str,
+) -> Box<dyn std::error::Error> {
+    let mut keys = Vec::new();
+    if let Ok(table) = DeTable::parse(src) {
+        flatten(table.get_ref(), "", &mut keys);
+    }
+    let start = |key: &str| {
+        let found = keys.iter().find(|(name, _, _)| name == key);
+        found.map(|(_, span, _)| span.start)
+    };
+    let at = start(key)
+        .or_else(|| start(crate::parent(key)))
+        .unwrap_or(0);
+    format!(
+        "{}:{}: `{key}`: {message}",
+        file.display(),
+        line_of(src, at)
+    )
+    .into()
+}
+
+/// The content of the regular file `path` a cloud module's section names (a secret, a CA), at
+/// most `max` bytes. What is not a regular file is refused before it is opened: a FIFO would
+/// block the open for ever.
+pub(crate) fn read_bounded(path: &Path, max: u64) -> std::result::Result<Vec<u8>, String> {
+    use std::io::Read;
+    let problem = |e: std::io::Error| format!("{}: {}", path.display(), e.kind());
+    if !fs::metadata(path).map_err(problem)?.is_file() {
+        return Err(format!("{}: not a regular file", path.display()));
+    }
+    let mut bytes = Vec::new();
+    let file = fs::File::open(path).map_err(problem)?;
+    file.take(max + 1)
+        .read_to_end(&mut bytes)
+        .map_err(problem)?;
+    match bytes.len() as u64 > max {
+        true => Err(format!("{}: larger than {max} bytes", path.display())),
+        false => Ok(bytes),
+    }
 }
 
 /// The error message with the dotted key it is about.
