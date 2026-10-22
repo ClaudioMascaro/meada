@@ -139,7 +139,9 @@ the spec fixes the details the slices build.
 - With `[oidc]`, the console validates a bearer JWT with the nodes' module and its own audience.
   A subject in an `operator_groups` group, or whose `operator_claim` is `true`, is an operator;
   every other admitted subject is a viewer. Operators are managed in the identity provider, not
-  in Meada.
+  in Meada. (Amended 2026-10-22; #294: ADR 0015 adds the team operator, a subject one of whose
+  groups owns an entry of the current workspace version that its grant reads, who may change
+  that group's entries and nothing else; this ADR's operator is the global operator.)
 - A viewer reads every view and writes nothing. A write from a viewer, and any write while
   `operations` is off, is a 403; the front end hides what the role cannot do, but the API is what
   refuses.
@@ -304,7 +306,9 @@ the spec fixes the details the slices build.
   so the console shows the lock and the last publish.
 - **Several workspaces per fleet.** Needs roles per workspace, a switcher and one key prefix per
   workspace; left to #294. A deployment has one bootstrap manifest, one key prefix and one
-  current version.
+  current version. (Amended 2026-10-22; #294: ADR 0015 keeps one workspace per deployment, with
+  several workspaces per fleet and multi-tenant isolation out of scope, and lets teams own the
+  entries of the one workspace instead.)
 
 ## Consequences
 
