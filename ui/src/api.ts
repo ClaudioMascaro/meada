@@ -24,7 +24,13 @@ export class ApiError extends Error {
 }
 
 async function read<T>(response: Response): Promise<T> {
-  if (response.ok) return response.json() as Promise<T>;
+  if (response.ok) {
+    return JSON.parse(await response.text(), (_key: string, value: unknown, context?: { source?: string }) => {
+      if (typeof value !== 'number' || !Number.isInteger(value) || Number.isSafeInteger(value)) return value;
+      if (context?.source === undefined) throw new RangeError('This browser cannot preserve large JSON integers');
+      return context.source;
+    }) as T;
+  }
   const body = await response.json().catch(() => null) as { error?: { code?: string; message?: string } } | null;
   throw new ApiError(response.status, body?.error?.code ?? 'http', body?.error?.message ?? `HTTP ${response.status}`);
 }

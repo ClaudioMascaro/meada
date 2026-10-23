@@ -12,6 +12,15 @@ test('anonymous configuration and viewer session need no token or cookies', asyn
   for (const [, options] of fetch.mock.calls) expect(options.credentials).toBe('omit');
 });
 
+test('operational reads preserve u64 fences and sizes above the JavaScript integer range', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+    '{"fence":18446744073709551615,"size":9007199254740993,"safe":42}',
+    { headers: { 'Content-Type': 'application/json' } },
+  )));
+  const api = new Api(new Auth({ version: '0.1.0', operations: false, public_url: location.origin }));
+  expect(await api.request('fleet')).toEqual({ fence: '18446744073709551615', size: '9007199254740993', safe: 42 });
+});
+
 test('a 401 starts another login; API errors retain the server catalog message', async () => {
   const auth = new Auth({ version: '0.1.0', operations: true, public_url: location.origin, issuer: 'https://issuer.example' });
   const login = vi.spyOn(auth, 'login').mockResolvedValue();

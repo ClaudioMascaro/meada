@@ -29,6 +29,11 @@ All notable changes to Meada are recorded here. The format follows
   without starting services in CI. Optional `snapshot.ca_file` augments the system TLS roots
   with a bounded, validated PEM file for private-CA stores (#280).
 
+- Operational console pages for fleet diagnostics and recoveries, store bundles and retention,
+  repository provenance, GitHub App cache expiry and throttling, and OIDC admission checks.
+  Missing sections are named explicitly. The token check clears its field after each request.
+  Large fences retain their exact decimal values, and tables scroll within mobile viewports.
+
 - Static management console frontend (spec #293, ADR 0014): Vite, React and strict TypeScript
   with the shared WebAssembly core, Brazilian Portuguese and English navigation, configuration,
   session and bootstrap manifest pages. OIDC sign-in uses authorization code with PKCE S256;
