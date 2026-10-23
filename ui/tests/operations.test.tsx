@@ -9,6 +9,7 @@ import { operationsCopy } from '../src/operations-i18n';
 import fleet from './fixtures/fleet.json';
 import fixtures from './fixtures/operational.json';
 import config from './fixtures/config.json';
+import session from './fixtures/session.json';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 const host = document.createElement('div');
@@ -21,7 +22,7 @@ test.each(['en', 'pt-BR'] as const)('the five operational pages label every keyb
     const data = kind === 'fleet' ? fleet : fixtures[kind];
     const fetch = vi.fn().mockResolvedValue(Response.json(data));
     vi.stubGlobal('fetch', fetch);
-    await act(() => root.render(<OperationalPage kind={kind} api={new Api(new Auth(config))} locale={locale} />));
+    await act(() => root.render(<OperationalPage kind={kind} api={new Api(new Auth(config))} locale={locale} config={config} session={{ ...session, role: 'viewer' }} />));
     await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
     await waitFor(() => expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe(operationsCopy[locale][kind]));
     await waitFor(() => expect(queryAllByRole(host, 'table').length).toBeGreaterThan(0));
@@ -42,7 +43,7 @@ test.each([200, 400])('the named token-check form clears the pasted token after 
   const fetch = vi.fn().mockResolvedValueOnce(Response.json(fixtures.admission)).mockReturnValueOnce(pending);
   vi.stubGlobal('fetch', fetch);
   const api = new Api(new Auth(config));
-  await act(() => root.render(<OperationalPage kind="admission" api={api} locale="en" />));
+  await act(() => root.render(<OperationalPage kind="admission" api={api} locale="en" config={config} session={{ ...session, role: 'viewer' }} />));
   const form = await waitFor(() => getByRole(host, 'form', { name: operationsCopy.en.checkToken }));
   const input = getByRole(host, 'textbox', { name: operationsCopy.en.token }) as HTMLTextAreaElement;
   const pasted = 'pasted.jwt.secret-42';
@@ -54,7 +55,7 @@ test.each([200, 400])('the named token-check form clears the pasted token after 
   } : { error: { code: 'bad_request', message: 'Invalid token check body' } }, { status })));
   expect(input.value).toBe('');
   expect(host.textContent).not.toContain(pasted);
-  await act(() => root.render(<OperationalPage kind="admission" api={api} locale="pt-BR" />));
+  await act(() => root.render(<OperationalPage kind="admission" api={api} locale="pt-BR" config={config} session={{ ...session, role: 'viewer' }} />));
   expect((getByRole(host, 'textbox', { name: operationsCopy['pt-BR'].token }) as HTMLTextAreaElement).value).toBe('');
   expect(localStorage.length).toBe(0);
   expect(sessionStorage.length).toBe(0);

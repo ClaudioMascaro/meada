@@ -16,6 +16,10 @@ All notable changes to Meada are recorded here. The format follows
   existing size cap. Recovery ignores malformed heartbeats and includes workspace fences.
   Managed status uses one workspace version for its report and readiness exit code.
 
+- Fleet and store operators can set, retain and drop generations and recover a stuck fence
+  after confirming the exact CLI command. Viewer sessions and disabled operations expose no
+  actions; keyboard cancellation sends no write, and CLI refusals preserve the lock holder.
+
 - Console frontend distribution (issue #313): the cloud image includes the static UI at
   `/usr/share/meada/ui`, built with pinned Node and wasm-pack from the npm lockfile. The
   container release workflow also attaches `meada-ui-<version>.tar.gz` with the same files

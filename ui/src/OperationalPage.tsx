@@ -2,6 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ApiError } from './api';
 import type { Api } from './api';
+import type { Config, Session } from './api';
+import { ConfirmDialog } from './ConfirmDialog';
+import { ActionControls, RecoveryControl } from './ActionControls';
+import { canOperate, pointerActions } from './actions';
+import type { Operation } from './actions';
+import { actionsCopy } from './actions-i18n';
+import type { ActionButtonsProps } from './ActionControls';
 import { copy } from './i18n';
 import type { Language } from './i18n';
 import { checkModel, credentialsModel, fleetModel, missingSections, repositoriesModel, storeModel } from './operations';
@@ -11,11 +18,13 @@ import type { OperationsCopy } from './operations-i18n';
 import './operations.css';
 
 export type OperationalKind = 'fleet' | 'store' | 'repositories' | 'credentials' | 'admission';
-interface Props { kind: OperationalKind; api: Api; locale: Language }
+interface Props { kind: OperationalKind; api: Api; locale: Language; config: Config; session: Session }
+interface Access { config: Config; session: Session; file: string }
+interface Actions extends ActionButtonsProps { access?: Access }
 
 function isMissing(data: object): data is Missing { return 'requires' in data; }
 
-function Read<T extends object>({ kind, api, locale, children }: Props & { children: (data: T) => ReactNode }) {
+function Read<T extends object>({ kind, api, locale, children, revision }: Pick<Props, 'kind' | 'api' | 'locale'> & { revision: number; children: (data: T) => ReactNode }) {
   const [data, setData] = useState<T | Missing>();
   const [problem, setProblem] = useState<unknown>();
   const [attempt, setAttempt] = useState(0);
@@ -32,7 +41,7 @@ function Read<T extends object>({ kind, api, locale, children }: Props & { child
       else setProblem(error);
     });
     return () => controller.abort();
-  }, [kind, api, attempt]);
+  }, [kind, api, attempt, revision]);
   return <>
     <div className="operation-heading"><h1>{t[kind]}</h1>
       <button type="button" className="secondary" onClick={() => setAttempt(value => value + 1)}>{problem ? common.retry : t.refresh}</button>
@@ -60,7 +69,7 @@ function Commands({ commands }: { commands: string[] }) {
   return commands.length ? <ul className="recovery-commands">{commands.map(command => <li key={command}><code>{command}</code></li>)}</ul> : null;
 }
 
-function FleetView({ data, t }: { data: Fleet; t: OperationsCopy }) {
+function FleetView({ data, t, actions }: { data: Fleet; t: OperationsCopy; actions: Actions }) {
   const model = fleetModel(data, t);
   const holder = data.holder;
   return <>
@@ -71,10 +80,17 @@ function FleetView({ data, t }: { data: Fleet; t: OperationsCopy }) {
       [t.started, holder?.started ?? t.none], [t.ttl, String(holder?.ttl_ms ?? t.none)],
       [t.lastPublish, data.last_publish ? <><code>{data.last_publish.generation}</code> / {data.last_publish.modified ?? t.unknown}</> : t.none],
     ]} />
-    {model.recoveries.length > 0 && <section className="error"><h2>{t.stuckFleet}</h2><Commands commands={model.recoveries} /></section>}
+    {model.recoveries.length > 0 && <section className="error"><h2>{t.stuckFleet}</h2><Commands commands={model.recoveries} />
+      {actions.access && <RecoveryControl {...actions} file={actions.access.file} identity={t.fleet} />}</section>}
     <Table label={t.nodes} t={t} headers={[t.name, t.generation, t.fence, t.held, t.readiness, t.version, t.time, t.workspace, t.recovery]}
-      rows={model.nodes.map(node => [node.name, <code>{node.generation}</code>, node.fence, <code>{node.held}</code>, node.readiness, node.version, node.time, <code>{node.workspace}</code>, <Commands commands={node.recoveries} />])} />
-    <Table label={t.retention} t={t} headers={[t.generation, t.fence, t.retention]} rows={model.retained.map(row => [<code>{row.id}</code>, row.fence, row.retention])} />
+      rows={model.nodes.map(node => [node.name, <code>{node.generation}</code>, node.fence, <code>{node.held}</code>, node.readiness, node.version, node.time, <code>{node.workspace}</code>, <><Commands commands={node.recoveries} />
+        {node.recoveries.length > 0 && actions.access && <RecoveryControl {...actions} file={actions.access.file} identity={node.name} />}</>])} />
+    <Table label={t.retention} t={t} headers={[t.generation, t.fence, t.retention, ...actions.access ? [actions.t.actions] : []]} rows={model.retained.map(row => {
+      const retained = data.retained.find(entry => entry.id === row.id)!;
+      const access = actions.access;
+      return [<code>{row.id}</code>, row.fence, row.retention, ...access ? [<ActionControls {...actions} identity={row.id}
+        operations={pointerActions({ ...retained, retained: true, current: data.pointer?.id === row.id }, access.session, access.config, access.file)} />] : []];
+    })} />
     {model.malformed.length > 0 && <Table label={t.malformed} t={t} headers={[t.name, t.reason]} rows={model.malformed.map(row => [row.name, row.reason])} />}
   </>;
 }
@@ -92,7 +108,7 @@ function Bundles({ row, t }: { row: Generation; t: OperationsCopy }) {
   </section>;
 }
 
-function StoreView({ data, api, t, locale }: { data: Store; api: Api; t: OperationsCopy; locale: Language }) {
+function StoreView({ data, api, t, locale, actions }: { data: Store; api: Api; t: OperationsCopy; locale: Language; actions: Actions }) {
   const [selected, setSelected] = useState<Generation>();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<unknown>();
@@ -108,9 +124,10 @@ function StoreView({ data, api, t, locale }: { data: Store; api: Api; t: Operati
       [t.pointer, data.pointer ? <code>{data.pointer.id} ({t.fence}: {data.pointer.fence})</code> : t.none],
       [t.retention, data.retained.map(row => `${row.id} (${row.fence})`).join(', ') || t.none],
     ]} />
-    <Table label={t.generations} t={t} headers={[t.generation, t.retention, t.modified, t.reason, t.inspect]}
+    <Table label={t.generations} t={t} headers={[t.generation, t.retention, t.modified, t.reason, t.inspect, ...actions.access ? [actions.t.actions] : []]}
       rows={model.generations.map(row => [<code>{row.id}</code>, row.retention.join(', ') || t.none, row.modified ?? t.unknown, row.malformed ?? t.none,
-        <button type="button" className="secondary" disabled={busy} aria-label={`${t.inspect} ${row.id}`} onClick={() => { void inspect(row.id); }}>{t.inspect}</button>])} />
+        <button type="button" className="secondary" disabled={busy} aria-label={`${t.inspect} ${row.id}`} onClick={() => { void inspect(row.id); }}>{t.inspect}</button>,
+        ...actions.access ? [<ActionControls {...actions} identity={row.id} operations={pointerActions(row, actions.access.session, actions.access.config, actions.access.file)} />] : []])} />
     {busy && <p role="status">{copy[locale].loading}</p>}
     {problem != null && <p className="error" role="alert">{problem instanceof ApiError ? problem.message : copy[locale].loadError}</p>}
     {selected && <Bundles row={selected} t={t} />}
@@ -174,14 +191,60 @@ function AdmissionView({ data, api, t, locale }: { data: Admission; api: Api; t:
   </>;
 }
 
-export function OperationalPage({ kind, api, locale }: Props) {
+export function OperationalPage({ kind, api, locale, config, session }: Props) {
   const t = operationsCopy[locale];
-  const props = { kind, api, locale };
-  switch (kind) {
-    case 'fleet': return <Read<Fleet> key={kind} {...props}>{data => <FleetView data={data} t={t} />}</Read>;
-    case 'store': return <Read<Store> key={kind} {...props}>{data => <StoreView data={data} api={api} t={t} locale={locale} />}</Read>;
-    case 'repositories': return <Read<Repositories> key={kind} {...props}>{data => <RepositoriesView data={data} t={t} />}</Read>;
-    case 'credentials': return <Read<Credentials> key={kind} {...props}>{data => <CredentialsView data={data} t={t} />}</Read>;
-    case 'admission': return <Read<Admission> key={kind} {...props}>{data => <AdmissionView data={data} api={api} t={t} locale={locale} />}</Read>;
+  const a = actionsCopy[locale];
+  const [file, setFile] = useState<string>();
+  const [manifestProblem, setManifestProblem] = useState(false);
+  const [pending, setPending] = useState<Operation>();
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string>();
+  const [result, setResult] = useState<string>();
+  const [reloadProblem, setReloadProblem] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const eligible = canOperate(session, config) && (kind === 'fleet' || kind === 'store');
+  useEffect(() => {
+    let current = true;
+    setFile(undefined); setManifestProblem(false);
+    if (eligible) api.manifest().then(value => { if (current) setFile(value.file); })
+      .catch(() => { if (current) setManifestProblem(true); });
+    return () => { current = false; };
+  }, [api, eligible]);
+  async function confirm() {
+    if (!pending || busy || !eligible) return;
+    setBusy(true); setProblem(undefined);
+    let line: string;
+    try {
+      const response = await api.request<{ result: string }>(pending.route, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pending.body),
+      });
+      line = response.result;
+    } catch (error) {
+      setProblem(error instanceof ApiError ? error.message : copy[locale].loadError); setBusy(false); return;
+    }
+    setResult(line); setPending(undefined); setRevision(value => value + 1); setReloadProblem(false);
+    if (kind !== 'fleet') {
+      try { await api.request<Fleet>('fleet'); } catch { setReloadProblem(true); }
+    }
+    setBusy(false);
   }
+  const actions: Actions = { t: a, busy, onOpen: operation => { setPending(operation); setProblem(undefined); },
+    access: eligible && file !== undefined ? { config, session, file } : undefined };
+  const props = { kind, api, locale, revision };
+  let page: ReactNode;
+  switch (kind) {
+    case 'fleet': page = <Read<Fleet> key={kind} {...props}>{data => <FleetView data={data} t={t} actions={actions} />}</Read>; break;
+    case 'store': page = <Read<Store> key={kind} {...props}>{data => <StoreView data={data} api={api} t={t} locale={locale} actions={actions} />}</Read>; break;
+    case 'repositories': page = <Read<Repositories> key={kind} {...props}>{data => <RepositoriesView data={data} t={t} />}</Read>; break;
+    case 'credentials': page = <Read<Credentials> key={kind} {...props}>{data => <CredentialsView data={data} t={t} />}</Read>; break;
+    case 'admission': page = <Read<Admission> key={kind} {...props}>{data => <AdmissionView data={data} api={api} t={t} locale={locale} />}</Read>; break;
+  }
+  return <>
+    {result && <p className="notice" role="status">{result}</p>}
+    {reloadProblem && <p className="error" role="alert">{a.reloadError}</p>}
+    {manifestProblem && <p className="error" role="alert">{a.manifestError}</p>}
+    {page}
+    {pending && eligible && <ConfirmDialog title={a[pending.action]} command={pending.command} confirmLabel={a.confirm} cancelLabel={a.cancel}
+      busy={busy} error={problem} onConfirm={() => { void confirm(); }} onCancel={() => setPending(undefined)} />}
+  </>;
 }

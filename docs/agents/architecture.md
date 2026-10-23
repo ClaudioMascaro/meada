@@ -154,6 +154,12 @@ page and a current-generation load reads again. `graph-i18n.ts` holds this area'
 Missing modules name their sections, errors remain local to the page, and the pasted token
 exists only in the uncontrolled field and its request body, cleared on completion.
 The API reader preserves large JSON integers as decimal strings instead of rounding fences.
+`actions.ts` offers generation operations only to an operator while operations are enabled;
+`ActionControls.tsx` displays their CLI commands and the optional fence floor without rounding
+u64 values. `ConfirmDialog.tsx` uses a native modal dialog with labelled controls, Escape
+cancellation and focus restoration. `OperationalPage.tsx` freezes the confirmed payload,
+shows CLI results and refusals unchanged and reloads the fleet after success. A generation
+pointer rollback lasts until the next publish, as every set control explains.
 Vitest exercises the built WASM and the public client, view-model and DOM
 seams, without a browser end-to-end suite.
 
