@@ -81,7 +81,7 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
       : path === '/manifest' ? manifest ? <ManifestPage manifest={manifest} t={t} /> : <p role="status">{t.loading}</p>
       : path === '/playground' ? <PlaygroundPage api={api} locale={locale} />
       : path === '/graph' ? <GraphPage api={api} locale={locale} />
-      : operational ? session ? <OperationalPage kind={operational} api={api} locale={locale} /> : <p role="status">{t.loading}</p>
+      : operational ? session ? <OperationalPage key={operational} kind={operational} api={api} locale={locale} config={config} session={session} /> : <p role="status">{t.loading}</p>
       : <h1>{t.notFound}</h1>}
   </Shell>;
 }

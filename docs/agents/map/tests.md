@@ -12,6 +12,12 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   retention/bundle metadata, repository provenance, cached credential lifetime and token-check
   outcomes. `operations.test.tsx` exercises the five pages through their DOM and HTTP client,
   including bilingual accessible controls and the pasted token's lifetime.
+- `ui/tests/actions.test.ts` checks the operator/operations gates, eligible generation actions,
+  shell-quoted commands and exact u64 recovery floors. `action-pages.test.tsx` exercises those
+  actions through the DOM and HTTP client: no write before confirmation or after Escape,
+  named holder refusals, successful writes followed by fleet reload, missing bootstrap reads,
+  and bilingual keyboard controls. `ConfirmDialog.test.tsx` checks focus restoration,
+  cancellation and the busy state through the native dialog's DOM boundary.
 - Test modules of `tests/it/` by subject: `docs` (the repository map against the code:
   `ponytail:` limits in Known ceilings, entry point kinds and process marks in their lists),
   `conformance` (pack; for Python also its HTTP providers and consumers

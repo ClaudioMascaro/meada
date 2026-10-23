@@ -6,3 +6,11 @@
 .token-check label { font-weight: 600; }
 .token-check p { margin: 0; color: var(--muted); }
 .token-check textarea { width: 100%; min-height: 7rem; resize: vertical; font: inherit; border: 1px solid #aab7b2; border-radius: 4px; padding: .75rem; background: #fff; color: inherit; caret-color: var(--accent); }
+.action-list { display: grid; gap: 1rem; min-width: 15rem; }
+.action-list code { display: block; margin-top: .5rem; }
+.action-list p { margin: .5rem 0 0; }
+.fence-recovery { display: grid; gap: .5rem; margin-top: 1rem; color: #25302f; min-width: 14rem; }
+.fence-recovery label { font-size: .85rem; }
+.fence-recovery p { margin: 0; }
+.fence-recovery code { overflow-wrap: anywhere; }
+.fence-recovery input { width: 100%; padding: .5rem; font: inherit; border: 1px solid #aab7b2; border-radius: 4px; }
