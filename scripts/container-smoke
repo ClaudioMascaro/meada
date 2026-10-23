@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import tarfile
 import tempfile
 import time
 import tomllib
@@ -24,7 +25,10 @@ def run(*args, **kwargs):
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("image")
 parser.add_argument("--cloud", action="store_true")
+parser.add_argument("--ui-tarball", type=Path)
 args = parser.parse_args()
+if args.ui_tarball and not args.cloud:
+    parser.error("--ui-tarball requires --cloud")
 image = args.image
 root = Path(__file__).resolve().parent.parent
 version = tomllib.loads((root / "Cargo.toml").read_text())["workspace"]["package"]["version"]
@@ -45,6 +49,14 @@ snapshot = subprocess.run(["docker", "run", "--rm", image, "snapshot", "--help"]
 assert (snapshot.returncode == 0) == args.cloud, snapshot
 if not args.cloud:
     assert snapshot.returncode == 2 and "snapshot" in snapshot.stderr, snapshot
+ui = subprocess.run(["docker", "run", "--rm", image, "ui", "--help"],
+                    text=True, capture_output=True)
+assert (ui.returncode == 0) == args.cloud, ui
+if not args.cloud:
+    assert ui.returncode == 2 and "ui" in ui.stderr, ui
+frontend = subprocess.run(["docker", "run", "--rm", "--entrypoint", "test", image,
+                           "-d", "/usr/share/meada/ui"], capture_output=True)
+assert (frontend.returncode == 0) == args.cloud, "only the cloud image carries the frontend"
 
 with tempfile.TemporaryDirectory(prefix="meada-container-") as name:
     data = Path(name)
@@ -101,3 +113,54 @@ with tempfile.TemporaryDirectory(prefix="meada-container-") as name:
     finally:
         subprocess.run(["docker", "logs", container], check=False)
         run("docker", "rm", "--force", container)
+
+    if args.cloud:
+        public_url = "http://127.0.0.1:7334"
+        manifest.write_text(manifest.read_text() + '\n[ui]\ndir = "/usr/share/meada/ui"\n'
+                            f'public_url = "{public_url}"\n')
+        container = run("docker", "run", "--detach", "--read-only", *mounts,
+                        "--mount", f"type=bind,src={indexes},dst=/var/lib/meada,readonly",
+                        "--publish", "127.0.0.1::7334", image,
+                        "ui", "--listen", "0.0.0.0:7334", *workspace).strip()
+        try:
+            port = run("docker", "port", container, "7334/tcp").strip().rsplit(":", 1)[1]
+            deadline = time.monotonic() + 30
+
+            def get(path):
+                request = urllib.request.Request(f"http://127.0.0.1:{port}{path}",
+                                                 headers={"Host": "127.0.0.1:7334"})
+                while True:
+                    try:
+                        with client.open(request, timeout=2) as response:
+                            return response.read()
+                    except urllib.error.HTTPError as error:
+                        raise RuntimeError(error.read().decode()) from error
+                    except (urllib.error.URLError, TimeoutError):
+                        if time.monotonic() >= deadline:
+                            raise
+                        time.sleep(0.1)
+
+            frontend = data / "ui"
+            run("docker", "cp", f"{container}:/usr/share/meada/ui", str(frontend))
+            assert get("/") == (frontend / "index.html").read_bytes()
+            assert json.loads(get("/meada-ui.json")) == {"version": version}
+            configuration = json.loads(get("/api/v1/config"))
+            assert configuration["version"] == version, configuration
+            assert configuration["public_url"] == public_url, configuration
+            if args.ui_tarball:
+                prefix = f"meada-ui-{version}/"
+                expected = {path.relative_to(frontend).as_posix(): path.read_bytes()
+                            for path in frontend.rglob("*") if path.is_file()}
+                with tarfile.open(args.ui_tarball, "r:gz") as archive:
+                    members = archive.getmembers()
+                    assert all(member.name == prefix[:-1] or member.name.startswith(prefix)
+                               for member in members), "one versioned directory required"
+                    assert all(member.isdir() or member.isfile() for member in members)
+                    actual = {member.name[len(prefix):]: archive.extractfile(member).read()
+                              for member in members if member.isfile()}
+                assert sorted(actual) == sorted(expected), "archive and image file lists differ"
+                assert actual == expected, "archive and image file contents differ"
+            print(f"{image}: console HTTP, version and frontend files passed")
+        finally:
+            subprocess.run(["docker", "logs", container], check=False)
+            run("docker", "rm", "--force", container)
