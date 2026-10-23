@@ -537,12 +537,16 @@ impl Console {
         let counter = counter
             .map(|text| fence(&text).ok_or_else(|| vk("malformed fence counter".into())))
             .transpose()?;
+        let workspace = crate::snapshot::versions::current(valkey, config)
+            .await
+            .map_err(vk)?;
         let highest = retention["retained"]
             .as_array()
             .into_iter()
             .flatten()
             .filter_map(|row| row["fence"].as_u64())
             .chain(retention["pointer"]["fence"].as_u64())
+            .chain(workspace.map(|(_, fence)| fence))
             .chain(heartbeats.iter().filter_map(|beat| beat.fence))
             .max()
             .unwrap_or(0);

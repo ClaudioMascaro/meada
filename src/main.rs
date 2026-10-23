@@ -568,9 +568,9 @@ fn main() -> ExitCode {
             workspace: Some(manifest),
             ..
         } => meada::with_busy_timeout(engine::PROBE_BUSY, || {
-            engine::status_workspace(&manifest).map(|status| {
+            engine::probe_workspace(&manifest).map(|(status, ready)| {
                 print!("{status}");
-                unready = !engine::ready(&manifest);
+                unready = !ready;
             })
         }),
         Command::Status {

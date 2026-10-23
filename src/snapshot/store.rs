@@ -362,6 +362,25 @@ impl Store {
         put.map(drop).map_err(|e| self.scrub(e))
     }
 
+    /// Creates an immutable object, returning false when another writer stored it first.
+    #[cfg(feature = "generation-pointer")]
+    pub async fn create(&self, key: &str, bytes: Vec<u8>) -> Result<bool, String> {
+        let options = PutOptions {
+            mode: object_store::PutMode::Create,
+            attributes: Stored::of(&bytes).attributes(),
+            ..PutOptions::default()
+        };
+        match self
+            .s3
+            .put_opts(&Self::key(key)?, bytes.into(), options)
+            .await
+        {
+            Ok(_) => Ok(true),
+            Err(object_store::Error::AlreadyExists { .. }) => Ok(false),
+            Err(e) => Err(self.scrub(e)),
+        }
+    }
+
     /// A multipart upload to `key` of an object of the size and hash `stored` says, its parts
     /// written by the caller (at most `PART` bytes held per part, `IN_FLIGHT` parts at once).
     pub async fn upload(&self, key: &str, stored: &Stored) -> Result<Upload<'_>, String> {

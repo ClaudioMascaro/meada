@@ -641,6 +641,8 @@ Fixed constants:
 
 ## Status
 
+The console offers OIDC-authenticated operator actions for the pointer, fence recovery and workspace versions, sharing the CLI lock and checks. Operations are off by default and every attempt leaves one audit line.
+
 Version 0.1, the first. It indexes TypeScript and JavaScript repositories (`.ts`, `.tsx`, `.js`,
 `.jsx`, `.mjs`, `.cjs`) and Python ones (`.py`), reads the Rust code (`.rs`) of the
 repository's crates (each `Cargo.toml` with a `[package]`, in any directory, each crate

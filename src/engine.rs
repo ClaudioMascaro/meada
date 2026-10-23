@@ -1031,6 +1031,19 @@ pub fn status(dir: &Path) -> Result<String> {
 /// `Engine::open_manifest` does.
 pub fn status_workspace(manifest: &Path) -> Result<String> {
     let listed = Manifest::read_listed(manifest)?;
+    Ok(status_listed(&listed, manifest))
+}
+
+/// The status report and readiness from the same managed workspace version, read once.
+pub fn probe_workspace(manifest: &Path) -> Result<(String, bool)> {
+    let listed = Manifest::read_listed(manifest)?;
+    Ok((
+        status_listed(&listed, manifest),
+        ready_listed(&listed, manifest),
+    ))
+}
+
+fn status_listed(listed: &Manifest, manifest: &Path) -> String {
     let shown = manifest.display().to_string();
     let missing = listed.missing();
     // Informational: the exit code of the probe depends on local state only.
@@ -1060,7 +1073,7 @@ pub fn status_workspace(manifest: &Path) -> Result<String> {
     });
     let first = rows.first().map(|(repo, _, _)| repo.clone());
     let report = match (indexed, first) {
-        (true, Some(first)) => (listed.workspace(&first, &|_| true))
+        (true, Some(first)) => (listed.clone().workspace(&first, &|_| true))
             .and_then(|workspace| Engine::read(workspace, Fix::Index(&shown)))
             .and_then(|engine| engine.status_report())
             .unwrap_or_default(),
@@ -1074,7 +1087,7 @@ pub fn status_workspace(manifest: &Path) -> Result<String> {
         let line = format!("{repo} ({path}) {state}");
         (repo, line)
     });
-    Ok(status_lines(heads, report, &missing) + &ignored + &valkey)
+    status_lines(heads, report, &missing) + &ignored + &valkey
 }
 
 /// `meada index --workspace` (ADR 0011): refreshes every repository the manifest at `manifest`
@@ -1116,6 +1129,11 @@ pub fn index_workspace(manifest: &Path) -> Result<Vec<String>> {
 /// `meada index --workspace`. It only reads.
 pub fn served(manifest: &Path) -> Result<Manifest> {
     let listed = Manifest::read_listed(manifest)?;
+    check_served(&listed, manifest)?;
+    Ok(listed)
+}
+
+fn check_served(listed: &Manifest, manifest: &Path) -> Result<()> {
     let shown = manifest.display().to_string();
     let problems: Vec<String> = (listed.entries.iter())
         .filter_map(|l| match &l.repository {
@@ -1130,8 +1148,8 @@ pub fn served(manifest: &Path) -> Result<Manifest> {
     }
     // The whole workspace opens too: what a call opens, whichever repository it names.
     let first = (listed.entries.first()).ok_or_else(|| format!("{shown}: no repository listed"))?;
-    Engine::open_listed(&listed, &first.repo, manifest, &|_| true)?;
-    Ok(listed)
+    Engine::open_listed(listed, &first.repo, manifest, &|_| true)?;
+    Ok(())
 }
 
 /// How long the readiness probe waits for a commit in progress: a writer must not stall it.
@@ -1141,12 +1159,13 @@ pub const PROBE_BUSY: std::time::Duration = std::time::Duration::from_millis(50)
 /// only because an index is locked by a commit in progress (the file exists and the running
 /// server answers once the lock clears). Run it under `with_busy_timeout(PROBE_BUSY, ..)`.
 pub fn ready(manifest: &Path) -> bool {
-    if served(manifest).is_ok() {
+    Manifest::read_listed(manifest).is_ok_and(|listed| ready_listed(&listed, manifest))
+}
+
+fn ready_listed(listed: &Manifest, manifest: &Path) -> bool {
+    if check_served(listed, manifest).is_ok() {
         return true;
     }
-    let Ok(listed) = Manifest::read_listed(manifest) else {
-        return false;
-    };
     let states: Vec<_> = (listed.entries.iter())
         .map(|l| l.repository.as_ref().map(|r| index::state(&r.index)))
         .collect();

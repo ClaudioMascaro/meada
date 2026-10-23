@@ -145,7 +145,7 @@ async fn put(
 }
 
 /// A checked heartbeat, safe to use in a fleet diagnostic or a generation lookup.
-#[cfg(feature = "ui")]
+#[cfg(any(feature = "ui", feature = "refresh-lock"))]
 #[derive(serde::Deserialize, serde::Serialize)]
 pub(crate) struct Heartbeat {
     pub name: String,
@@ -158,6 +158,24 @@ pub(crate) struct Heartbeat {
     pub ready: bool,
     pub version: String,
     pub time: String,
+}
+
+/// The complete heartbeat of this checked node name. A partial JSON object is never a source
+/// of a fence, even when the field it happens to hold is a valid unsigned decimal.
+#[cfg(any(feature = "ui", feature = "refresh-lock"))]
+pub(super) fn checked(name: &str, bytes: &[u8]) -> Option<Heartbeat> {
+    serde_json::from_slice::<Heartbeat>(bytes)
+        .ok()
+        .filter(|beat| {
+            is_node_name(name)
+                && beat.name == name
+                && beat.generation.as_deref().is_none_or(super::is_id)
+                && beat.generation.is_some() == beat.fence.is_some()
+                && beat.held.iter().all(|id| super::is_id(id))
+                && super::versions::is_time(&beat.time)
+                && !beat.version.is_empty()
+                && !beat.version.chars().any(char::is_control)
+        })
 }
 
 /// Live, well-formed heartbeats and malformed names/documents. Invalid names never form keys.
@@ -188,17 +206,7 @@ pub(crate) async fn read(
         let key = config.key(&format!("node:{name}"), true);
         let bytes: Option<Vec<u8>> = valkey.query(cmd("GET").arg(&key)).await?;
         let Some(bytes) = bytes else { continue };
-        let beat = serde_json::from_slice::<Heartbeat>(&bytes)
-            .ok()
-            .filter(|beat| {
-                beat.name == name
-                    && beat.generation.as_deref().is_none_or(super::is_id)
-                    && beat.generation.is_some() == beat.fence.is_some()
-                    && beat.held.iter().all(|id| super::is_id(id))
-                    && super::versions::is_time(&beat.time)
-                    && !beat.version.is_empty()
-                    && !beat.version.chars().any(char::is_control)
-            });
+        let beat = checked(&name, &bytes);
         match beat {
             Some(beat) => valid.push(beat),
             None => malformed.push(json!({"name": name, "reason": Msg::HeartbeatBad(&key).text()})),

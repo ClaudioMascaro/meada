@@ -83,7 +83,7 @@ pub fn pointer_set(manifest: &Path, id: &str, author: &str) -> crate::Result<Str
     generation_arg(id)?;
     locked(
         &sections(manifest)?,
-        &format!("pointer set {author}"),
+        &format!("pointer set {}", author.escape_debug()),
         async |valkey, config, keep, held| {
             let retained = generations::keys(config).1;
             let range = cmd("LRANGE").arg(&retained).arg(0).arg(-1).clone();
@@ -147,7 +147,7 @@ pub fn pointer_retain(manifest: &Path, id: &str, author: &str) -> crate::Result<
     crate::modules::block_on(check)??;
     locked(
         &sections,
-        &format!("pointer retain {author}"),
+        &format!("pointer retain {}", author.escape_debug()),
         async |valkey, config, _, held| {
             let (lock, retained, kept) = (
                 config.key("lock", true),
@@ -212,7 +212,7 @@ pub fn pointer_drop(manifest: &Path, id: &str, author: &str) -> crate::Result<St
     generation_arg(id)?;
     locked(
         &sections(manifest)?,
-        &format!("pointer drop {author}"),
+        &format!("pointer drop {}", author.escape_debug()),
         async |valkey, config, _, held| {
             let lock = config.key("lock", true);
             let ((current, retained), kept) =
@@ -250,8 +250,8 @@ return ARGV[2]
 ";
 
 /// `meada snapshot fence recover [--at-least <fence>]`: raises `{<key_prefix>}:fence` to the
-/// highest fence recorded (the pointer, every retained entry, every live heartbeat) or to
-/// `at_least` when higher, never lowering it. The fence it leaves, and a line for each record
+/// highest fence recorded (generation and workspace pointers, every retained entry, every valid
+/// live heartbeat) or to `at_least` when higher, never lowering it. The fence it leaves, and a line for each record
 /// it could not read, which does not count.
 pub fn fence_recover(
     manifest: &Path,
@@ -266,7 +266,7 @@ pub fn fence_recover(
     };
     locked(
         &sections(manifest)?,
-        &format!("fence recover {author}"),
+        &format!("fence recover {}", author.escape_debug()),
         async |valkey, config, _, held| {
             let mut skipped = Vec::new();
             let highest = recorded(valkey, config, &mut skipped).await?.max(floor);
@@ -351,49 +351,10 @@ async fn recorded(
             (valkey.query(&get).await).map_err(|e| format!("{key}: {e}"))?;
         // A name whose key expired has no heartbeat: nothing to count.
         let Some(beat) = beat else { continue };
-        match heartbeat_fence(&beat) {
-            Some(fence) => fences.extend(fence),
+        match super::heartbeat::checked(name, &beat) {
+            Some(beat) => fences.extend(beat.fence),
             None => skip(Msg::HeartbeatBad(&key).text()),
         }
     }
     Ok(fences.into_iter().max().unwrap_or(0))
-}
-
-/// The fence of a heartbeat, a JSON object whose `fence` is a `u64` or null (a node with no
-/// pointer file); `None` for anything else.
-fn heartbeat_fence(beat: &[u8]) -> Option<Option<u64>> {
-    let beat: serde_json::Value = serde_json::from_slice(beat).ok()?;
-    match beat.as_object()?.get("fence")? {
-        serde_json::Value::Null => Some(None),
-        fence => fence.as_u64().map(Some),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_heartbeat_s_fence_is_a_u64_or_null() {
-        assert_eq!(heartbeat_fence(br#"{"name":"a","fence":7}"#), Some(Some(7)));
-        assert_eq!(heartbeat_fence(br#"{"fence":null}"#), Some(None));
-        for bad in [
-            &br#"{"fence":"7"}"#[..],
-            br#"{"fence":-1}"#,
-            br#"{"fence":1e3}"#,
-            br#"{"fence":18446744073709551616}"#,
-            br#"{"name":"a"}"#,
-            br#"[7]"#,
-            b"7",
-            b"{",
-            &[0xff, 0xfe],
-        ] {
-            assert_eq!(
-                heartbeat_fence(bad),
-                None,
-                "{}",
-                String::from_utf8_lossy(bad)
-            );
-        }
-    }
 }

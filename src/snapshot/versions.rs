@@ -22,7 +22,7 @@ use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
 use meada_core::ids::workspace_version_id;
-use meada_core::manifest::{EntryFile, validate, validate_entries};
+use meada_core::manifest::{EntryFile, validate, validate_import};
 use redis::cmd;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as Json};
@@ -140,38 +140,92 @@ pub fn import(
             others.map(|k| crate::config::error_at(file, &src, k, &not_imported).to_string()),
         );
     }
-    let entries = validate_entries(&shown, &src).map_err(|problems| {
-        let named = |p: String| match p.starts_with(&shown) {
-            true => p,
-            false => format!("{shown}: {p}"),
-        };
-        problems
-            .into_iter()
-            .map(named)
-            .collect::<Vec<_>>()
-            .join("\n")
-    })?;
-    let (id, repositories) = versioned(&entries, entry_blocks(&src));
-    let version = Version {
-        id: id.clone(),
+    let version =
+        prepared(&shown, &src, message, author).map_err(|problems| problems.join("\n"))?;
+    let run = async {
+        let store = Store::connect(&sections.snapshot)?;
+        store_version(&store, &sections.snapshot, &version).await
+    };
+    Ok(crate::modules::block_on(run)??)
+}
+
+/// The same text preparation for CLI import and HTTP save, before either opens a connection.
+fn prepared(file: &str, src: &str, message: &str, author: &str) -> Result<Version, Vec<String>> {
+    let entries = validate_import(file, src)?;
+    let (id, repositories) = versioned(&entries, entry_blocks(src));
+    Ok(Version {
+        id,
         author: author.to_string(),
         time: rfc3339(now()),
         message: message.to_string(),
         repositories,
-    };
-    let key = version_key(&sections.snapshot, &id);
-    let run = async {
-        let store = Store::connect(&sections.snapshot)?;
-        if let Some((first, _)) = stored(&store, &key, &id).await? {
-            return Ok(Some(first));
+    })
+}
+
+async fn store_version(
+    store: &Store,
+    snapshot: &Config,
+    version: &Version,
+) -> Result<Imported, String> {
+    let id = version.id.clone();
+    let key = version_key(snapshot, &id);
+    if let Some((first, _)) = stored(store, &key, &id).await? {
+        return Ok(Imported {
+            id,
+            first: Some(first),
+        });
+    }
+    let mut text = serde_json::to_vec_pretty(version).map_err(|e| e.to_string())?;
+    text.push(b'\n');
+    if text.len() as u64 > VERSION_MAX {
+        return Err(Msg::WorkspaceVersionTooLarge {
+            key: &key,
+            max: VERSION_MAX,
         }
-        let mut text = serde_json::to_vec_pretty(&version).map_err(|e| e.to_string())?;
-        text.push(b'\n');
-        store.put(&key, text).await?;
-        Ok::<_, String>(None)
+        .text());
+    }
+    let first = if store.create(&key, text).await? {
+        None
+    } else {
+        Some(
+            stored(store, &key, &id)
+                .await?
+                .ok_or_else(|| Msg::WorkspaceNotVersion(&key).text())?
+                .0,
+        )
     };
-    let first = crate::modules::block_on(run)??;
     Ok(Imported { id, first })
+}
+
+/// A text validation refusal is different from a lock/store refusal at the HTTP boundary.
+#[cfg(all(feature = "ui", feature = "refresh-lock"))]
+pub(crate) enum SaveError {
+    Invalid(Vec<String>),
+    Refused(String),
+}
+
+/// The console's save is CLI import's text preparation and storage under the refresh lock.
+/// CLI import deliberately remains available with generation-pointer alone and takes no lock.
+#[cfg(all(feature = "ui", feature = "refresh-lock"))]
+pub(crate) fn save(
+    manifest: &Path,
+    src: &str,
+    message: &str,
+    author: &str,
+) -> Result<Imported, SaveError> {
+    let version = prepared("entries", src, message, author).map_err(SaveError::Invalid)?;
+    let sections =
+        super::operation::sections(manifest).map_err(|e| SaveError::Refused(e.to_string()))?;
+    let snapshot = sections.snapshot.clone();
+    let holds = format!("workspace save {}", author.escape_debug());
+    super::operation::locked(&sections, &holds, async move |valkey, config, _, held| {
+        super::lock::holds(valkey, config, &held.token).await?;
+        let store = Store::connect(&snapshot)?;
+        let imported = store_version(&store, &snapshot, &version).await?;
+        super::lock::holds(valkey, config, &held.token).await?;
+        Ok(imported)
+    })
+    .map_err(|e| SaveError::Refused(e.to_string()))
 }
 
 /// One entry of a version document: `repo` and `path`, then the entry's blocks.
@@ -402,7 +456,7 @@ pub fn apply(manifest: &Path, id: &str, author: &str) -> crate::Result<String> {
     crate::modules::block_on(check)??;
     super::operation::locked(
         &sections,
-        &format!("workspace apply {author}"),
+        &format!("workspace apply {}", author.escape_debug()),
         async |valkey, config, _, held| {
             let (lock, pointer) = (config.key("lock", true), pointer_key(config));
             let mut script = cmd("EVAL");
