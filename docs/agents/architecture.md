@@ -163,6 +163,22 @@ pointer rollback lasts until the next publish, as every set control explains.
 Vitest exercises the built WASM and the public client, view-model and DOM
 seams, without a browser end-to-end suite.
 
+## Deployment profiles
+
+`deploy/compose/compose.yaml` supplies local and generations nodes; the explicit
+`compose.console.yaml` overlay adds the cloud console, its initial pull and companion, its own
+bootstrap/data volume and its own TLS proxy route. `deploy/helm/meada/` follows the same split:
+`console.enabled` is false by default, with a separate ConfigMap, Deployment, Service and
+optional Ingress when enabled. Neither profile mounts a node's data into the console. The
+console's public assets, config and PKCE callback reach its listener before OIDC admission;
+its proxy preserves Host, Origin and Authorization. MCP keeps its separate admission rules.
+
+Managed writers pull the workspace before the external fetch, index and publish, inside one
+refresh lock. Seeding and applying the first version are explicit operator actions. The fetch
+list/script and mirror provisioning still belong to the operator: applying a new identity or
+path does not clone it. `scripts/compose-check` and `scripts/helm-check` check the rendered
+configuration, module dependencies, storage, selectors and refresh order.
+
 ## Modules (`src/`)
 
 Each line names what a module owns; the file in `map/` it points to has the detail. Read the

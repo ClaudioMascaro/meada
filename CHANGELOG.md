@@ -8,6 +8,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Opt-in console profiles for Compose and Helm (issue #314), with their own bootstrap,
+  snapshot storage, pull companion and proxy or Ingress. Managed refresh pulls the workspace,
+  fetches operator-provisioned mirrors, indexes and publishes under one lock; the initial seed
+  and apply remain explicit. The console stays disabled by default. Brazilian Portuguese,
+  English and Spanish guides cover admission, PKCE, operations and fenced recovery.
+
 - Console operator writes (spec #293): verified groups or a boolean claim grant the operator
   role and the whole fleet view. Fenced pointer changes, fence recovery, workspace save and
   apply share the CLI operations, with authorization before uploads and one escaped audit
@@ -110,8 +116,8 @@ All notable changes to Meada are recorded here. The format follows
   lock`.
 
 - Management console (spec #293, ADR 0014, feature `ui`, in `cloud`, no crate of its own):
-  `meada ui --listen <addr> --workspace <bootstrap manifest>` serves, read only and behind the
-  operator's reverse proxy, the front end's files from the new `[ui]` section's `dir` and a JSON
+  `meada ui --listen <addr> --workspace <bootstrap manifest>` serves, behind the operator's
+  reverse proxy, the front end's files from the new `[ui]` section's `dir` and a JSON
   API under `/api/v1/` with `config`, `session` and `manifest` (the manifest as loaded, never a
   secret's value, the module sections this build has, and the errors of the file as it now
   stands on disk). Each request passes a `Host` check and an `Origin` check (a write needs the
@@ -126,7 +132,8 @@ All notable changes to Meada are recorded here. The format follows
   nodes' own OIDC module (401 with `WWW-Authenticate`, 403 for a missing scope); the static
   files and `config` need no token, and `config` adds the issuer, the new required `[ui]
   client_id`, the scopes and the audience for the browser's authorization code flow with PKCE.
-  Every admitted subject is a viewer (`session`). `GET /api/v1/admission` shows the issuer's
+  Admitted subjects are viewers unless a configured verified group or boolean claim grants
+  the operator role (`session`). `GET /api/v1/admission` shows the issuer's
   metadata, the JWKS cache (key ids, last read, a failed refresh with its reason) and the groups
   table; `POST /api/v1/admission/check` answers a pasted token's outcome per check and the
   identities its grant admits, from the cached keys only, holding the token for that request
