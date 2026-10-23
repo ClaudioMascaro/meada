@@ -5,6 +5,8 @@
 //! with `MEADA_TEST_SERVICES_REQUIRED=1` they fail.
 #![cfg(feature = "snapshot")]
 
+mod tls;
+
 use std::fs;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};

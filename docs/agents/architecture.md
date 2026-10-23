@@ -370,7 +370,8 @@ one for the area a change touches.
   `store::Store` is the client `meada snapshot pull` (#273) reuses: object_store's S3 client
   over `Guard`, a reqwest client with no redirect and no proxy that refuses any origin but the
   bucket's and the chosen credential source's (STS in `region`, the Pod Identity agent, IMDSv2),
-  whose TLS is `store::tls` (rustls with ring and the system's roots, handed to a reqwest built
+  whose TLS is `store::tls` (rustls with ring and the system's roots, optionally augmented by
+  the manifest-relative `snapshot.ca_file` PEM certificates, handed to a reqwest built
   with `rustls-no-provider`; object_store signs with ring too). Ring is the only rustls provider
   in any build (ureq brings it, and redis reads it as the process default): a second one, as
   object_store's `aws` feature would add with aws-lc-rs, makes rustls panic on the first TLS
@@ -1351,7 +1352,8 @@ one for the area a change touches.
   as a node holds it, and the store's `current` at most `CURRENT_MAX` (64 bytes); past either
   the object is refused, naming its key or file, and a pull changes nothing.
 - `snapshot/store.rs`: a credential file (key id, secret, token) holds at most `SECRET_MAX`
-  (16 KiB); past it the file is refused, naming it.
+  (16 KiB), and `ca_file` at most `CA_MAX` (1 MiB); past either the file is refused, naming it.
+  An empty CA file or invalid certificate is also refused before connecting.
 - `valkey.rs`: `password_file` holds at most `PASSWORD_MAX` (4096 bytes) and `ca_file` at most
   `CA_MAX` (1 MiB); past either the connection fails, naming the file.
 - `oidc.rs`: each metadata and JWKS request takes at most `FETCH_TIMEOUT` (10 seconds), a

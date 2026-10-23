@@ -728,6 +728,7 @@ mod tests {
             credentials: Credentials::Instance,
             local_dir: None,
             node_name: None,
+            ca_file: None,
         }
     }
 

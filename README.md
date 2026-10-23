@@ -204,6 +204,9 @@ os blocos do manifesto são ignorados (o `meada status` os nomeia). Um espelho �
 
 ### Vários nós
 
+O [exemplo Docker Compose](deploy/compose/README.md) oferece os dois layouts abaixo, com dois
+nós, TLS e admissão por token no proxy.
+
 Vários servidores sobre os mesmos índices servem sem módulo de nuvem, desde que o operador
 respeite um único escritor por índice.
 
@@ -271,6 +274,7 @@ region = "us-east-1"
 bucket = "exemplo-meada"
 prefix = "prod"                                    # opcional
 path_style = false                                 # true na maioria dos stores self-hosted
+# ca_file = "ca.pem"                              # CA privada opcional, relativa ao manifesto
 credentials = "static"                             # ou "web-identity", "pod-identity", "instance"
 access_key_id_env = "AWS_ACCESS_KEY_ID"            # padrões; ou as chaves *_file
 secret_access_key_env = "AWS_SECRET_ACCESS_KEY"
@@ -288,6 +292,9 @@ variáveis ou dos arquivos que a seção nomeia (nunca do manifesto); `web-ident
 `AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`; `instance` usa o serviço de metadados da instância
 (IMDSv2, só por IPv4, `http://169.254.169.254`) e só quando escrito na seção. As credenciais ficam só em
 memória, e nenhum segredo aparece num erro.
+
+`ca_file` acrescenta certificados PEM às raízes de confiança do sistema. O arquivo tem no
+máximo 1 MiB; certificados inválidos ou um arquivo vazio são recusados, nomeando o arquivo.
 
 Em cada nó, `meada snapshot pull --workspace <manifesto>` lê o ponteiro `current` do store e,
 quando ele nomeia uma geração que o nó ainda não tem, baixa os bundles para `local_dir`, confere
