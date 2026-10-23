@@ -1,5 +1,5 @@
 //! The deterministic core of Meada (ADR 0014): the schema of a workspace manifest's entries and
-//! the checks its text decides (`manifest`), the ids with their patterns (`ids`), the export's
+//! the checks its text decides (`manifest`), the ids with their patterns (`ids`), workspace entry diffs (`workspace`), the export's
 //! types (`export`), shapes and their drift (`shape`, `drift`), and the answers of `search`,
 //! `context` and `trace` with the token budget they share (`search`, `context`, `trace`,
 //! `render`). The `meada` binary and the console's front end, compiled to WebAssembly, share it.
@@ -19,6 +19,7 @@ pub mod shape;
 pub mod trace;
 #[cfg(feature = "wasm-bindgen")]
 mod wasm;
+pub mod workspace;
 
 /// `name` under the dotted `scope`: `outer.inner`, or `name` alone at the top.
 pub fn qualify(scope: &str, name: &str) -> String {

@@ -7,6 +7,7 @@ import { loadCore } from './core';
 import { ConfigPage, ManifestPage, SessionPage, Shell, routes } from './pages';
 import { PlaygroundPage } from './PlaygroundPage';
 import { GraphPage } from './GraphPage';
+import { WorkspacePage } from './WorkspacePage';
 import { OperationalPage } from './OperationalPage';
 
 export function App({ api, config, initialLanguage }: { api: Api; config: Config; initialLanguage: Language }) {
@@ -79,6 +80,7 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
         api.auth.clear(); setSession(undefined); setSignedOut(true);
       } : undefined} /> : <p role="status">{t.loading}</p>
       : path === '/manifest' ? manifest ? <ManifestPage manifest={manifest} t={t} /> : <p role="status">{t.loading}</p>
+      : path === '/workspace' ? session ? <WorkspacePage api={api} locale={locale} session={session} config={config} /> : <p role="status">{t.loading}</p>
       : path === '/playground' ? <PlaygroundPage api={api} locale={locale} />
       : path === '/graph' ? <GraphPage api={api} locale={locale} />
       : operational ? session ? <OperationalPage key={operational} kind={operational} api={api} locale={locale} config={config} session={session} /> : <p role="status">{t.loading}</p>

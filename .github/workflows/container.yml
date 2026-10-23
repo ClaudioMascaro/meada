@@ -14,6 +14,7 @@ on:
       - .github/workflows/container.yml
       - scripts/container-smoke
       - scripts/ui-tarball
+      - tests/fixtures/workspace-validation.json
       - ui/**
       - meada-core/**
       - Cargo.toml

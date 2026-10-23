@@ -86,7 +86,8 @@ The repository is a Cargo workspace (ADR 0014): the `meada` binary's crate at th
 share. Both take one version from the workspace, and `meada` depends on `meada-core` at exactly
 it. `meada-core` has no rusqlite, tree-sitter, filesystem, process or network code and no async
 runtime; it builds for `wasm32-unknown-unknown`, its `wasm-bindgen` feature (never the binary's)
-exporting `init`, `validate`, `workspaceVersionId` and `parseExport`. CI's `core` job builds it
+exporting `init`, `validate`, `workspaceVersionId`, `workspaceDiff`, `entriesText` and
+`parseExport`. CI's `core` job builds it
 with wasm-pack and checks both trees.
 
 - `meada-core/src/manifest.rs`: a workspace manifest's `[[repository]]` (`EntryFile`,
@@ -96,10 +97,16 @@ with wasm-pack and checks both trees.
   (an identity listed twice); `validate`, a workspace text's entries or its problems as the CLI
   prints them (a text holding only `[[repository]]` entries). `validate_import(file, src)`
   validates entries while ignoring other top-level keys, with CLI import's file prefix on
-  identity errors; CLI and HTTP import preparation share it, independently of the WASM binding.
+  identity errors; CLI, HTTP and WASM import validation share it, preserving empty workspaces and ignored
+  bootstrap sections.
 - `meada-core/src/ids.rs`: `bundle_id`, `generation_id` (ADR 0012), `workspace_version_id`
   (ADR 0014: the canonical JSON of the entries, `{"blocks","path","repo"}` in manifest order),
   `is_id`, `fence`, `entry_blocks`.
+- `meada-core/src/workspace.rs`: `diff(file, before, after)` validates through `validate_import`
+  and lists added/removed/changed identities and changed dotted keys in manifest order. Array
+  tables retain each field's row position and absence; common entries reordered relative to
+  one another report the `repository` array key. Formatting is ignored. `entries_text` is the
+  pure JSON-repositories-to-TOML conversion shared with `snapshot::versions` and WASM.
 - `meada-core/src/msg.rs`: the messages of those checks and the language flag the binary's
   `msg.rs` reads too; `meada-core/src/http.rs`: `normalize_path` and `PARAM`, which the HTTP
   kind re-exports. `qualify` and `parent` (dotted names) live in its `lib.rs`.
@@ -160,6 +167,15 @@ u64 values. `ConfirmDialog.tsx` uses a native modal dialog with labelled control
 cancellation and focus restoration. `OperationalPage.tsx` freezes the confirmed payload,
 shows CLI results and refusals unchanged and reloads the fleet after success. A generation
 pointer rollback lasts until the next publish, as every set control explains.
+`WorkspacePage.tsx` reads workspace versions and their current fence, caches selected details
+and compares them with the core's `workspaceDiff`. `workspace.ts` owns the editor projection
+and captured save/apply payloads and commands; `workspace-i18n.ts` owns its pt-BR/en copy.
+Every edit validates through WASM `validate_import`; JSON entries become TOML through the
+same `entries_text` as `workspace show`. Saves require a message, accepted saves read the
+immutable first metadata independently of read refresh failures, and older applies are labelled
+as rollback for the next refresh. The shared confirmation dialog sends nothing before acceptance.
+The frontend container stage copies the one shared validation fixture because TypeScript also
+checks its tests; Rust/default stages gain no frontend input.
 Vitest exercises the built WASM and the public client, view-model and DOM
 seams, without a browser end-to-end suite.
 

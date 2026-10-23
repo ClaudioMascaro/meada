@@ -8,6 +8,7 @@ export const routes = [
   { path: '/config', label: 'config' },
   { path: '/session', label: 'session' },
   { path: '/manifest', label: 'manifest' },
+  { path: '/workspace', label: 'workspace' },
   { path: '/playground', label: 'playground' },
   { path: '/graph', label: 'graph' },
   { path: '/fleet', label: 'fleet' },

@@ -273,3 +273,53 @@ fn status_reports_and_probes_the_same_pulled_workspace_after_a_concurrent_swap()
     let (_, _, code) = on_bootstrap(dir, &["status"]);
     assert_eq!(code, Some(1));
 }
+
+/// The one fixture table is also read by Vitest through the actual WebAssembly bundle.
+#[test]
+fn workspace_import_and_wasm_share_every_validation_fixture() {
+    #[derive(serde::Deserialize)]
+    struct Case {
+        name: String,
+        file: String,
+        text: String,
+        errors: std::collections::BTreeMap<String, Vec<String>>,
+    }
+    let cases: Vec<Case> =
+        serde_json::from_str(include_str!("../../fixtures/workspace-validation.json")).unwrap();
+    let Some(fleet) = Fleet::new("workspace_validation_table", 3) else {
+        return;
+    };
+    for case in cases {
+        std::fs::write(fleet.dir.join(&case.file), &case.text).unwrap();
+        for (locale, lang) in [("pt-BR", "pt_BR.UTF-8"), ("en", "en_US.UTF-8")] {
+            let (stdout, stderr, code) = meada_in(
+                &fleet.dir,
+                lang,
+                &[
+                    "workspace",
+                    "import",
+                    &case.file,
+                    "--message",
+                    "shared table",
+                    "--author",
+                    "fixture",
+                    "--workspace",
+                    MANIFEST,
+                ],
+            );
+            let errors = &case.errors[locale];
+            if errors.is_empty() {
+                assert_eq!(code, Some(0), "{} {locale}: {stderr}", case.name);
+                assert!(meada_core::ids::is_id(stdout.trim()), "{stdout}");
+            } else {
+                assert_eq!(code, Some(1), "{} {locale}: {stdout}; {stderr}", case.name);
+                assert_eq!(
+                    stderr,
+                    format!("meada: {}\n", errors.join("\n")),
+                    "{} {locale}",
+                    case.name
+                );
+            }
+        }
+    }
+}
