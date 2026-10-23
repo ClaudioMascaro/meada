@@ -1,0 +1,24 @@
+.workspace-heading { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
+.workspace-heading button { flex: none; }
+.workspace-current { display: block; color: var(--accent); font-size: .8rem; }
+.workspace-selectors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+.workspace-selectors label { display: grid; gap: .5rem; }
+.workspace-selectors select { width: 100%; min-width: 0; }
+.workspace-label { display: block; margin: 1.5rem 0 .5rem; font-weight: 600; }
+.workspace-text { width: 100%; min-height: 16rem; padding: 1rem; resize: vertical; border: 1px solid #aab7b2; border-radius: 4px; background: #fff; color: inherit; font: .85rem/1.65 "SFMono-Regular", Consolas, monospace; caret-color: var(--accent); tab-size: 2; }
+.workspace-text[readonly] { background: #edf0eb; }
+.workspace-diff { overflow: auto; margin-top: 1.5rem; }
+.workspace-diff h3 { font-size: .9rem; font-weight: 600; margin: 1rem 0 .5rem; }
+@media (max-width: 720px) {
+  .workspace-heading { display: block; }
+  .workspace-selectors { grid-template-columns: 1fr; }
+}
+.workspace-editor { margin-top: 2.5rem; border-top: 1px solid var(--line); }
+.workspace-editor input { width: 100%; padding: .65rem; border: 1px solid #aab7b2; border-radius: 4px; background: #fff; color: inherit; font: inherit; caret-color: var(--accent); }
+.workspace-editor .error { white-space: pre-wrap; }
+.workspace-apply { min-width: 15rem; }
+.workspace-apply p { margin: .6rem 0 0; }
+
+.workspace-versions-table { min-width: 52rem; }
+.workspace-versions-table td:first-child code, .workspace-versions-table time { white-space: nowrap; }
+.workspace-diff h4 { font-size: .85rem; font-weight: 600; margin: 1rem 0 .5rem; }

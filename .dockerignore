@@ -13,6 +13,8 @@
 !tests/
 !tests/golden/
 !tests/golden/schema.txt
+!tests/fixtures/
+!tests/fixtures/workspace-validation.json
 !ui/
 !ui/package.json
 !ui/package-lock.json

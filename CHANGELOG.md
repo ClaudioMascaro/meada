@@ -8,6 +8,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Workspace editor and version history (issue #310): viewers compare any two immutable
+  versions; operators validate entries and review a local WASM diff before confirming save
+  or apply. Rollbacks name the next refresh, existing saves show their first author/message,
+  and CLI import and WASM share one bilingual validation fixture table and the same validator.
+
 - Opt-in console profiles for Compose and Helm (issue #314), with their own bootstrap,
   snapshot storage, pull companion and proxy or Ingress. Managed refresh pulls the workspace,
   fetches operator-provisioned mirrors, indexes and publishes under one lock; the initial seed

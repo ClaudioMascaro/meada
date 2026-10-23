@@ -1,0 +1,107 @@
+[
+  {
+    "name": "valid entry",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n",
+    "errors": {
+      "en": [],
+      "pt-BR": []
+    }
+  },
+  {
+    "name": "empty workspace",
+    "file": "entries",
+    "text": "",
+    "errors": {
+      "en": [],
+      "pt-BR": []
+    }
+  },
+  {
+    "name": "ignored bootstrap sections",
+    "file": "entries",
+    "text": "index_dir = \"/srv\"\n[snapshot]\nbucket = \"ignored\"\n[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n",
+    "errors": {
+      "en": [],
+      "pt-BR": []
+    }
+  },
+  {
+    "name": "missing identity",
+    "file": "entries",
+    "text": "[[repository]]\npath = \"x\"\n",
+    "errors": {
+      "en": [
+        "entries:1: `repository.repo` is missing"
+      ],
+      "pt-BR": [
+        "entries:1: falta `repository.repo`"
+      ]
+    }
+  },
+  {
+    "name": "unknown entry key",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nbranch = \"main\"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.branch` is not a meada.workspace.toml key"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.branch` não é uma chave do meada.workspace.toml"
+      ]
+    }
+  },
+  {
+    "name": "invalid gateway prefix",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n[repository.serve]\nprefix = \"edge\"\n",
+    "errors": {
+      "en": [
+        "entries:5: `repository.serve.prefix`: `edge` must start with `/`"
+      ],
+      "pt-BR": [
+        "entries:5: `repository.serve.prefix`: `edge` deve começar com `/`"
+      ]
+    }
+  },
+  {
+    "name": "local identity",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"local/x\"\npath = \"x\"\n",
+    "errors": {
+      "en": [
+        "entries: local/x: a local identity: server mode serves repositories by their remote"
+      ],
+      "pt-BR": [
+        "entries: local/x: uma identidade local: o modo servidor serve repositórios pelo remoto"
+      ]
+    }
+  },
+  {
+    "name": "duplicate identity",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n",
+    "errors": {
+      "en": [
+        "entries: a.com/x: listed twice"
+      ],
+      "pt-BR": [
+        "entries: a.com/x: listado duas vezes"
+      ]
+    }
+  },
+  {
+    "name": "unsafe identity",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/../x\"\npath = \"x\"\n",
+    "errors": {
+      "en": [
+        "entries: a.com/../x: not a repository identity: a segment is empty, `.` or `..`"
+      ],
+      "pt-BR": [
+        "entries: a.com/../x: não é uma identidade de repositório: um segmento está vazio ou é `.` ou `..`"
+      ]
+    }
+  }
+]

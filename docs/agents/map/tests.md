@@ -384,3 +384,13 @@ missing through a reply barrier, but only one conditionally creates the immutabl
 the other reports the first author, time and message. A local workspace-pointer swap during
 status's informational Valkey probe proves the report and readiness exit code share one
 managed workspace read. CLI import is also checked with `generation-pointer` alone.
+
+## Workspace editor and shared validation (#310)
+
+`meada-core/tests/workspace.rs` exercises the public diff seam: entry/key order, unchanged
+versions, nested keys, reordered entries and absent fields moving between array-table rows.
+`tests/fixtures/workspace-validation.json` is the single pt-BR/English validation table used
+by the real WASM in `ui/tests/core.test.ts` and the binary `workspace import` in
+`tests/it/generations/imports.rs` with generation-pointer and real configured store services.
+`ui/tests/workspace.test.ts` checks local editor validation/diff and captured commands;
+`ui/tests/WorkspacePage.test.tsx` covers the labelled versions/editor/diff DOM and HTTP boundary.

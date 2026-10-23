@@ -23,6 +23,7 @@ use std::path::{Path, PathBuf};
 
 use meada_core::ids::workspace_version_id;
 use meada_core::manifest::{EntryFile, validate, validate_import};
+use meada_core::workspace::entries_text;
 use redis::cmd;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as Json};
@@ -281,13 +282,6 @@ fn checked(key: &str, id: &str, bytes: &[u8]) -> Result<(Version, String), Strin
         return Err(not());
     }
     Ok((version, text))
-}
-
-/// A document's entries as `[[repository]]` tables, `None` when they are not TOML tables.
-fn entries_text(repositories: &[Json]) -> Option<String> {
-    let entries = toml::Value::try_from(repositories).ok()?;
-    let table = toml::Table::from_iter([("repository".to_string(), entries)]);
-    toml::to_string(&table).ok()
 }
 
 /// Whether `text` is a time as a version records it: `YYYY-MM-DDTHH:MM:SSZ`.

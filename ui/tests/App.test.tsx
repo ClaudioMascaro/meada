@@ -47,3 +47,18 @@ test('the shell opens playground and graph without another session or export req
   expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe('Code graph');
   expect(fetch).toHaveBeenCalledTimes(1);
 });
+
+test('the shell opens workspace versions and returns to config when its modules are absent', async () => {
+  history.replaceState(null, '', '/config');
+  const fetch = vi.fn(async (url: string) => Response.json(url === '/api/v1/session' ? session : { requires: ['snapshot', 'generations'] }));
+  vi.stubGlobal('fetch', fetch);
+  await act(() => root.render(<App api={new Api(new Auth(config))} config={config} initialLanguage="en" />));
+  await waitFor(() => expect(host.textContent).toContain(session.subject));
+  await act(() => fireEvent.click(getByRole(host, 'link', { name: 'Workspace' })));
+  expect(location.pathname).toBe('/workspace');
+  await waitFor(() => expect(host.textContent).toContain('[snapshot]'));
+  expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe('Workspace versions');
+  await act(() => fireEvent.click(getByRole(host, 'link', { name: copy.en.config })));
+  expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe(copy.en.config);
+  expect(fetch).toHaveBeenCalledTimes(3);
+});
