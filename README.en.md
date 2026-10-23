@@ -204,6 +204,9 @@ refused.
 
 ### Several nodes
 
+The [Docker Compose example](deploy/compose/README.en.md) provides both layouts below, with two
+nodes, TLS and token admission at the proxy.
+
 Several servers over the same indexes work with no cloud module, provided the operator keeps
 to one writer per index.
 
@@ -268,6 +271,7 @@ region = "us-east-1"
 bucket = "example-meada"
 prefix = "prod"                                    # optional
 path_style = false                                 # true for most self-hosted stores
+# ca_file = "ca.pem"                              # optional private CA, relative to the manifest
 credentials = "static"                             # or "web-identity", "pod-identity", "instance"
 access_key_id_env = "AWS_ACCESS_KEY_ID"            # defaults shown; or the *_file keys
 secret_access_key_env = "AWS_SECRET_ACCESS_KEY"
@@ -285,6 +289,9 @@ secret from the variables or files the section names (never from the manifest); 
 with the token in `AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`; `instance` uses the instance
 metadata service (IMDSv2 over IPv4 only, `http://169.254.169.254`), and only when the section says so.
 Credentials stay in memory, and no secret appears in an error.
+
+`ca_file` adds PEM certificates to the system trust roots. The file holds at most 1 MiB;
+invalid certificates and an empty file are refused, naming the file.
 
 On each node, `meada snapshot pull --workspace <manifest>` reads the store's `current` pointer
 and, when it names a generation the node lacks, downloads its bundles into `local_dir`, checks

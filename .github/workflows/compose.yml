@@ -1,0 +1,24 @@
+name: Compose configuration
+
+on:
+  pull_request:
+    paths:
+      - deploy/compose/**
+      - .github/workflows/compose.yml
+
+permissions:
+  contents: read
+
+jobs:
+  config:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        profile: [local, generations]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate the selected profile without starting services
+        working-directory: deploy/compose
+        env:
+          PROFILE: ${{ matrix.profile }}
+        run: docker compose --env-file .env.example --profile "$PROFILE" config -q

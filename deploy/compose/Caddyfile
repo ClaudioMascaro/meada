@@ -1,0 +1,12 @@
+https://localhost {
+	tls internal
+	@admitted header Authorization "Bearer {$MEADA_TOKEN}"
+	handle @admitted {
+		reverse_proxy backend-one:7333 backend-two:7333 {
+			lb_policy round_robin
+		}
+	}
+	handle {
+		respond "Unauthorized" 401
+	}
+}

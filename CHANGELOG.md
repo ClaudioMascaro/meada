@@ -22,6 +22,13 @@ All notable changes to Meada are recorded here. The format follows
   tables. A repository export is checked by the shared WebAssembly core and reused across
   graph views in the browser.
 
+- Docker Compose examples for two default-image nodes with independent indexes and cloud-image
+  nodes sharing retained generations. Caddy admits bearer tokens over TLS; internal Valkey and
+  RustFS use a private CA. Index, publish and pull jobs have separate writable volumes, while
+  servers read their manifests and data through read-only mounts. Both profiles are checked
+  without starting services in CI. Optional `snapshot.ca_file` augments the system TLS roots
+  with a bounded, validated PEM file for private-CA stores (#280).
+
 - Static management console frontend (spec #293, ADR 0014): Vite, React and strict TypeScript
   with the shared WebAssembly core, Brazilian Portuguese and English navigation, configuration,
   session and bootstrap manifest pages. OIDC sign-in uses authorization code with PKCE S256;

@@ -1,0 +1,318 @@
+name: meada
+
+x-server: &server
+  image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}
+  command: [mcp, --listen, "0.0.0.0:7333", --workspace, /etc/meada/meada.workspace.toml]
+  read_only: true
+  restart: unless-stopped
+  stop_grace_period: 30s
+  mem_limit: 512m
+  cpus: 1.0
+  healthcheck:
+    test: [CMD, meada, status, --workspace, /etc/meada/meada.workspace.toml]
+    interval: 5s
+    timeout: 3s
+    retries: 12
+
+x-indexer: &indexer
+  image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}
+  profiles: [local]
+  entrypoint: [sh, /etc/meada/refresh.sh]
+  environment:
+    REPOSITORIES: ${REPOSITORIES:-https://github.com/claudiomascaro/meada.git}
+  mem_limit: 1g
+  cpus: 1.0
+  depends_on:
+    init-local:
+      condition: service_completed_successfully
+
+x-cloud: &cloud
+  image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}-cloud
+  profiles: [generations]
+  environment: &cloud-env
+    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in .env}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in .env}
+    VALKEY_PASSWORD: ${VALKEY_PASSWORD:?Set VALKEY_PASSWORD in .env}
+  mem_limit: 512m
+  cpus: 1.0
+
+x-cloud-node: &cloud-node
+  <<: [*server, *cloud]
+  image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}-cloud
+  profiles: [generations]
+  environment: *cloud-env
+  command: [mcp, --listen, "0.0.0.0:7333", --generations, --workspace, /etc/meada/meada.workspace.toml]
+  healthcheck:
+    test: [CMD, meada, status, --generations, --workspace, /etc/meada/meada.workspace.toml]
+    interval: 5s
+    timeout: 3s
+    retries: 12
+
+services:
+  proxy:
+    image: caddy:2.11.7-alpine
+    ports:
+      - "127.0.0.1:${MEADA_PORT:-8443}:443"
+    environment:
+      MEADA_TOKEN: ${MEADA_TOKEN:?Set MEADA_TOKEN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - proxy-data:/data
+      - proxy-config:/config
+    restart: unless-stopped
+    mem_limit: 128m
+
+  init-local:
+    image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}
+    profiles: [local]
+    user: "0:0"
+    entrypoint: [sh, -ec]
+    command: ["chown -R 10001:10001 /mirrors-one /mirrors-two /indexes-one /indexes-two"]
+    volumes:
+      - local-mirrors-one:/mirrors-one
+      - local-mirrors-two:/mirrors-two
+      - local-indexes-one:/indexes-one
+      - local-indexes-two:/indexes-two
+    mem_limit: 64m
+
+  local-indexer-one:
+    <<: *indexer
+    volumes:
+      - ./local.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - ./fetch.sh:/etc/meada/fetch.sh:ro
+      - ./refresh.sh:/etc/meada/refresh.sh:ro
+      - local-mirrors-one:/srv/mirrors
+      - local-indexes-one:/var/lib/meada
+
+  local-indexer-two:
+    <<: *indexer
+    volumes:
+      - ./local.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - ./fetch.sh:/etc/meada/fetch.sh:ro
+      - ./refresh.sh:/etc/meada/refresh.sh:ro
+      - local-mirrors-two:/srv/mirrors
+      - local-indexes-two:/var/lib/meada
+
+  local-one:
+    <<: *server
+    profiles: [local]
+    depends_on:
+      local-indexer-one:
+        condition: service_completed_successfully
+    volumes:
+      - ./local.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - local-mirrors-one:/srv/mirrors:ro
+      - local-indexes-one:/var/lib/meada:ro
+    networks:
+      default:
+        aliases: [backend-one]
+
+  local-two:
+    <<: *server
+    profiles: [local]
+    depends_on:
+      local-indexer-two:
+        condition: service_completed_successfully
+    volumes:
+      - ./local.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - local-mirrors-two:/srv/mirrors:ro
+      - local-indexes-two:/var/lib/meada:ro
+    networks:
+      default:
+        aliases: [backend-two]
+
+  certificates:
+    image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}
+    profiles: [generations]
+    user: "0:0"
+    entrypoint: [sh, /etc/meada/certificates.sh]
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:?Set VALKEY_PASSWORD in .env}
+    read_only: true
+    tmpfs: [/tmp]
+    volumes:
+      - ./certificates.sh:/etc/meada/certificates.sh:ro
+      - ca:/ca
+      - valkey-tls:/valkey
+      - store-tls:/store
+      - valkey-data:/valkey-data
+      - store-data:/store-data
+      - job-mirrors:/job-mirrors
+      - job-indexes:/job-indexes
+      - node-one:/node-one
+      - node-two:/node-two
+    mem_limit: 128m
+
+  valkey:
+    image: valkey/valkey:7.2-alpine
+    profiles: [generations]
+    user: "10001:10001"
+    command: [valkey-server, --port, "0", --tls-port, "6379", --tls-cert-file, /tls/cert.pem, --tls-key-file, /tls/key.pem, --tls-ca-cert-file, /ca/ca.pem, --tls-auth-clients, "no", --aclfile, /tls/users.acl, --appendonly, "yes"]
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:?Set VALKEY_PASSWORD in .env}
+    depends_on:
+      certificates:
+        condition: service_completed_successfully
+    volumes:
+      - ca:/ca:ro
+      - valkey-tls:/tls:ro
+      - valkey-data:/data
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$VALKEY_PASSWORD" valkey-cli --tls --cacert /ca/ca.pem --user meada ping | grep -q PONG']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    mem_limit: 256m
+
+  store:
+    image: rustfs/rustfs:1.0.1
+    profiles: [generations]
+    user: "10001:10001"
+    environment:
+      RUSTFS_ACCESS_KEY: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in .env}
+      RUSTFS_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in .env}
+      RUSTFS_TLS_PATH: /tls
+      RUSTFS_CONSOLE_ENABLE: "false"
+    depends_on:
+      certificates:
+        condition: service_completed_successfully
+    volumes:
+      - store-data:/data
+      - store-tls:/tls:ro
+    restart: unless-stopped
+    mem_limit: 768m
+    cpus: 1.0
+
+  bucket:
+    image: amazon/aws-cli:2.38.3
+    profiles: [generations]
+    entrypoint: [sh, -ec]
+    command:
+      - 'until aws --endpoint-url https://store:9000 s3api head-bucket --bucket meada-compose 2>/dev/null || aws --endpoint-url https://store:9000 s3api create-bucket --bucket meada-compose; do sleep 2; done'
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in .env}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in .env}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_CA_BUNDLE: /ca/ca.pem
+    depends_on:
+      store:
+        condition: service_started
+    volumes:
+      - ca:/ca:ro
+    mem_limit: 256m
+
+  generation-indexer:
+    <<: *cloud
+    entrypoint: [sh, /etc/meada/index-loop.sh]
+    environment:
+      <<: *cloud-env
+      REPOSITORIES: ${REPOSITORIES:-https://github.com/claudiomascaro/meada.git}
+      REFRESH_SECONDS: ${REFRESH_SECONDS:-300}
+      PUBLISH: "1"
+    depends_on:
+      bucket:
+        condition: service_completed_successfully
+      valkey:
+        condition: service_healthy
+    volumes:
+      - ./generations.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - ./fetch.sh:/etc/meada/fetch.sh:ro
+      - ./refresh.sh:/etc/meada/refresh.sh:ro
+      - ./index-loop.sh:/etc/meada/index-loop.sh:ro
+      - ca:/etc/meada/ca:ro
+      - job-mirrors:/srv/mirrors
+      - job-indexes:/var/lib/meada/indexes
+    restart: unless-stopped
+    stop_grace_period: 30s
+    mem_limit: 1g
+
+  first-pull-one: &first-pull
+    <<: *cloud
+    hostname: node-one
+    entrypoint: [sh, /etc/meada/first-pull.sh]
+    depends_on:
+      generation-indexer:
+        condition: service_started
+    volumes:
+      - ./generations.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - ./first-pull.sh:/etc/meada/first-pull.sh:ro
+      - ca:/etc/meada/ca:ro
+      - node-one:/var/lib/meada/generations
+
+  first-pull-two:
+    <<: *first-pull
+    hostname: node-two
+    volumes:
+      - ./generations.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - ./first-pull.sh:/etc/meada/first-pull.sh:ro
+      - ca:/etc/meada/ca:ro
+      - node-two:/var/lib/meada/generations
+
+  pull-one: &pull
+    <<: *cloud
+    hostname: node-one
+    command: [snapshot, pull, --every, "30", --workspace, /etc/meada/meada.workspace.toml]
+    depends_on:
+      first-pull-one:
+        condition: service_completed_successfully
+    volumes:
+      - ./generations.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - ca:/etc/meada/ca:ro
+      - node-one:/var/lib/meada/generations
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  pull-two:
+    <<: *pull
+    hostname: node-two
+    depends_on:
+      first-pull-two:
+        condition: service_completed_successfully
+    volumes:
+      - ./generations.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - ca:/etc/meada/ca:ro
+      - node-two:/var/lib/meada/generations
+
+  generation-one:
+    <<: *cloud-node
+    depends_on:
+      first-pull-one:
+        condition: service_completed_successfully
+    volumes:
+      - ./generations.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - ca:/etc/meada/ca:ro
+      - node-one:/var/lib/meada/generations:ro
+    networks:
+      default:
+        aliases: [backend-one]
+
+  generation-two:
+    <<: *cloud-node
+    depends_on:
+      first-pull-two:
+        condition: service_completed_successfully
+    volumes:
+      - ./generations.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - ca:/etc/meada/ca:ro
+      - node-two:/var/lib/meada/generations:ro
+    networks:
+      default:
+        aliases: [backend-two]
+
+volumes:
+  proxy-data:
+  proxy-config:
+  local-mirrors-one:
+  local-mirrors-two:
+  local-indexes-one:
+  local-indexes-two:
+  ca:
+  valkey-tls:
+  store-tls:
+  valkey-data:
+  store-data:
+  job-mirrors:
+  job-indexes:
+  node-one:
+  node-two:

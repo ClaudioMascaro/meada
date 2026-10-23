@@ -66,6 +66,7 @@ pub struct File {
     session_token_file: Option<String>,
     local_dir: Option<String>,
     node_name: Option<String>,
+    ca_file: Option<String>,
 }
 
 /// Where the store's credentials come from: one source, the one the section names.
@@ -113,6 +114,8 @@ pub struct Config {
     /// The name of this node's heartbeat (#298), checked against the node name pattern; the
     /// host name in lowercase when unset.
     pub node_name: Option<String>,
+    /// Additional PEM trust roots for a private-CA store, relative to the manifest.
+    pub ca_file: Option<PathBuf>,
 }
 
 impl File {
@@ -206,6 +209,7 @@ impl File {
             credentials,
             local_dir: self.local_dir.map(|d| base.join(d)),
             node_name: self.node_name,
+            ca_file: self.ca_file.map(|file| base.join(file)),
         })
     }
 }
@@ -694,6 +698,7 @@ mod tests {
         assert!(!config.path_style);
         assert_eq!(config.local_dir, None);
         assert_eq!(config.node_name, None);
+        assert_eq!(config.ca_file, None);
         let env = |v: &str| Secret::Env(v.into());
         assert_eq!(
             config.credentials,
@@ -708,13 +713,14 @@ mod tests {
         let config = section(&format!(
             "{REQUIRED}prefix = \"prod/a\"\npath_style = true\naccess_key_id_env = \"K\"\n\
              secret_access_key_file = \"secret\"\nsession_token_file = \"/run/token\"\n\
-             local_dir = \"generations\"\nnode_name = \"meada-node-0\""
+             local_dir = \"generations\"\nnode_name = \"meada-node-0\"\nca_file = \"ca.pem\""
         ))
         .unwrap();
         assert_eq!(config.node_name.as_deref(), Some("meada-node-0"));
         assert_eq!(config.key("current"), "prod/a/current");
         assert!(config.path_style);
         assert_eq!(config.local_dir, Some("/etc/meada/generations".into()));
+        assert_eq!(config.ca_file, Some("/etc/meada/ca.pem".into()));
         assert_eq!(
             config.credentials,
             Credentials::Static {

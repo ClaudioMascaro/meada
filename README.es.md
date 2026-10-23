@@ -211,6 +211,9 @@ Un espejo es un checkout con árbol de trabajo; un clon bare no tiene qué index
 
 ### Varios nodos
 
+El [ejemplo Docker Compose](deploy/compose/README.es.md) ofrece los dos layouts siguientes, con
+dos nodos, TLS y admisión por token en el proxy.
+
 Varios servidores sobre los mismos índices funcionan sin módulo de nube, siempre que el
 operador respete un único escritor por índice.
 
@@ -278,6 +281,7 @@ region = "us-east-1"
 bucket = "ejemplo-meada"
 prefix = "prod"                                    # opcional
 path_style = false                                 # true en la mayoría de los stores self-hosted
+# ca_file = "ca.pem"                              # CA privada opcional, relativa al manifiesto
 credentials = "static"                             # o "web-identity", "pod-identity", "instance"
 access_key_id_env = "AWS_ACCESS_KEY_ID"            # valores por defecto; o las claves *_file
 secret_access_key_env = "AWS_SECRET_ACCESS_KEY"
@@ -295,6 +299,9 @@ con STS en la `region`, por https; `pod-identity` (EKS Pod Identity) llama al ag
 con el token de `AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`; `instance` usa el servicio de metadatos
 de la instancia (IMDSv2, solo por IPv4, `http://169.254.169.254`), y solo cuando la sección lo indica. Las
 credenciales quedan solo en memoria, y ningún secreto aparece en un error.
+
+`ca_file` añade certificados PEM a las raíces de confianza del sistema. El archivo tiene como
+máximo 1 MiB; los certificados inválidos y un archivo vacío se rechazan, nombrando el archivo.
 
 En cada nodo, `meada snapshot pull --workspace <manifiesto>` lee el puntero `current` del store
 y, cuando nombra una generación que el nodo no tiene, descarga sus bundles en `local_dir`,
