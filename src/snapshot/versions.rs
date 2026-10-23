@@ -84,7 +84,7 @@ pub fn pointer_key(valkey: &valkey::Config) -> String {
 }
 
 /// The key of the version `id` in the store.
-fn version_key(snapshot: &Config, id: &str) -> String {
+pub(crate) fn version_key(snapshot: &Config, id: &str) -> String {
     snapshot.key(&format!("workspaces/{id}.json"))
 }
 
@@ -200,7 +200,11 @@ fn versioned(entries: &[EntryFile], blocks: Vec<Json>) -> (String, Vec<Json>) {
 
 /// The version stored at `key`, checked as the version `id` (`checked`), with its entries in the
 /// `[[repository]]` shape; `None` when there is none.
-async fn stored(store: &Store, key: &str, id: &str) -> Result<Option<(Version, String)>, String> {
+pub(crate) async fn stored(
+    store: &Store,
+    key: &str,
+    id: &str,
+) -> Result<Option<(Version, String)>, String> {
     match store.get(key, VERSION_MAX).await? {
         Some(bytes) => checked(key, id, &bytes).map(Some),
         None => Ok(None),
@@ -233,7 +237,7 @@ fn entries_text(repositories: &[Json]) -> Option<String> {
 }
 
 /// Whether `text` is a time as a version records it: `YYYY-MM-DDTHH:MM:SSZ`.
-fn is_time(text: &str) -> bool {
+pub(crate) fn is_time(text: &str) -> bool {
     let shape = "dddd-dd-ddTdd:dd:ddZ";
     text.len() == shape.len()
         && (text.bytes().zip(shape.bytes())).all(|(b, s)| {
@@ -293,22 +297,7 @@ pub fn list(manifest: &Path) -> crate::Result<Listing> {
         let valkey = Valkey::connect(&sections.valkey).await?;
         let current = current(&valkey, &sections.valkey).await?;
         let store = Store::connect(&sections.snapshot)?;
-        let prefix = sections.snapshot.key("workspaces");
-        let (mut versions, mut malformed) = (Vec::new(), Vec::new());
-        for key in store.list(&prefix).await? {
-            let name = key.rsplit('/').next().unwrap_or(&key);
-            let id = name.strip_suffix(".json").filter(|id| is_id(id));
-            let Some(id) = id else {
-                malformed.push(Msg::WorkspaceNotVersion(&shown(&key)).text());
-                continue;
-            };
-            match stored(&store, &key, id).await {
-                Ok(Some((version, _))) => versions.push(version),
-                Ok(None) => {}
-                Err(problem) => malformed.push(shown(&problem)),
-            }
-        }
-        versions.sort_by(|a, b| (&b.time, &a.id).cmp(&(&a.time, &b.id)));
+        let (versions, malformed) = documents(&store, &sections.snapshot).await?;
         let no_current = || Msg::WorkspaceNoCurrent(&pointer_key(&sections.valkey)).text();
         Ok::<_, String>(Listing {
             versions,
@@ -317,6 +306,32 @@ pub fn list(manifest: &Path) -> crate::Result<Listing> {
         })
     };
     Ok(crate::modules::block_on(run)??)
+}
+
+/// Every stored workspace version, checked and newest first, shared by the CLI and console.
+pub(crate) async fn documents(
+    store: &Store,
+    snapshot: &Config,
+) -> Result<(Vec<Version>, Vec<String>), String> {
+    let prefix = snapshot.key("workspaces");
+    let (mut versions, mut malformed) = (Vec::new(), Vec::new());
+    for key in store.list(&prefix).await? {
+        let id = key
+            .strip_prefix(&format!("{prefix}/"))
+            .and_then(|name| name.strip_suffix(".json"))
+            .filter(|id| is_id(id));
+        let Some(id) = id else {
+            malformed.push(Msg::WorkspaceNotVersion(&shown(&key)).text());
+            continue;
+        };
+        match stored(store, &key, id).await {
+            Ok(Some((version, _))) => versions.push(version),
+            Ok(None) => {}
+            Err(problem) => malformed.push(shown(&problem)),
+        }
+    }
+    versions.sort_by(|a, b| (&b.time, &a.id).cmp(&(&a.time, &b.id)));
+    Ok((versions, malformed))
 }
 
 /// `meada workspace show [<version>] --workspace <manifest>`: the version `version`, or the

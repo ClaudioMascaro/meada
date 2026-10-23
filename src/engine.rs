@@ -1085,7 +1085,19 @@ pub fn index_workspace(manifest: &Path) -> Result<Vec<String>> {
     let listed = Manifest::read_listed(manifest)?;
     let refresh = |r: &Repository| {
         let db = index::open(&r.index, &r.root, &r.identity, &r.config.serve)?;
-        index::refresh(&db, &r.root, &r.identity, &r.config.serve)
+        let before = repo::head(&r.root).ok();
+        index::refresh(&db, &r.root, &r.identity, &r.config.serve)?;
+        // Keep provenance on the same read snapshot while another indexing pass may write.
+        db.execute_batch("BEGIN")?;
+        let fresh = index::fresh(&db, &r.root, &r.identity, &r.config.serve)?;
+        let head = repo::head(&r.root)
+            .ok()
+            .filter(|head| Some(head) == before.as_ref());
+        let clean = repo::unclean(&r.root, true).is_ok_and(|changes| changes.is_empty());
+        let recorded =
+            index::record_commit(&db, &r.index, head.as_deref().filter(|_| clean && fresh));
+        db.execute_batch("ROLLBACK")?;
+        recorded
     };
     Ok((listed.entries.iter())
         .filter_map(|l| {

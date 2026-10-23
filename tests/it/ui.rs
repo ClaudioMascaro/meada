@@ -22,6 +22,8 @@ mod oidc;
 /// The playground and the exports over the chain fixture, from `index_dir` or a pulled generation.
 pub(super) mod playground;
 
+mod reads;
+
 /// The console's own origin in every bootstrap manifest here.
 const PUBLIC: &str = "http://localhost:7999";
 

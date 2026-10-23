@@ -144,6 +144,69 @@ async fn put(
     valkey.query::<i64>(&script).await.map(drop)
 }
 
+/// A checked heartbeat, safe to use in a fleet diagnostic or a generation lookup.
+#[cfg(feature = "ui")]
+#[derive(serde::Deserialize, serde::Serialize)]
+pub(crate) struct Heartbeat {
+    pub name: String,
+    // Require both nullable fields to be present; serde otherwise accepts a missing Option.
+    #[serde(deserialize_with = "serde::Deserialize::deserialize")]
+    pub generation: Option<String>,
+    #[serde(deserialize_with = "serde::Deserialize::deserialize")]
+    pub fence: Option<u64>,
+    pub held: Vec<String>,
+    pub ready: bool,
+    pub version: String,
+    pub time: String,
+}
+
+/// Live, well-formed heartbeats and malformed names/documents. Invalid names never form keys.
+#[cfg(feature = "ui")]
+pub(crate) async fn read(
+    valkey: &Valkey,
+    config: &valkey::Config,
+) -> std::result::Result<(Vec<Heartbeat>, Vec<serde_json::Value>), String> {
+    use serde_json::json;
+    let nodes = config.key("nodes", true);
+    // Scores are written against Valkey's own clock, including when a node's clock is skewed.
+    let time: (u64, u64) = valkey.query(&cmd("TIME")).await?;
+    let names: Vec<Vec<u8>> = valkey
+        .query(
+            cmd("ZRANGEBYSCORE")
+                .arg(&nodes)
+                .arg(format!("({}", time.0))
+                .arg("+inf"),
+        )
+        .await?;
+    let (mut valid, mut malformed) = (Vec::new(), Vec::new());
+    for bytes in names {
+        let name = String::from_utf8_lossy(&bytes).to_string();
+        if !is_node_name(&name) {
+            malformed.push(json!({"name": name, "reason": "not a node name"}));
+            continue;
+        }
+        let key = config.key(&format!("node:{name}"), true);
+        let bytes: Option<Vec<u8>> = valkey.query(cmd("GET").arg(&key)).await?;
+        let Some(bytes) = bytes else { continue };
+        let beat = serde_json::from_slice::<Heartbeat>(&bytes)
+            .ok()
+            .filter(|beat| {
+                beat.name == name
+                    && beat.generation.as_deref().is_none_or(super::is_id)
+                    && beat.generation.is_some() == beat.fence.is_some()
+                    && beat.held.iter().all(|id| super::is_id(id))
+                    && super::versions::is_time(&beat.time)
+                    && !beat.version.is_empty()
+                    && !beat.version.chars().any(char::is_control)
+            });
+        match beat {
+            Some(beat) => valid.push(beat),
+            None => malformed.push(json!({"name": name, "reason": Msg::HeartbeatBad(&key).text()})),
+        }
+    }
+    Ok((valid, malformed))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

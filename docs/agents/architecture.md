@@ -293,8 +293,39 @@ one for the area a change touches.
   without the `[[repository]]` entries outside its grant and with only the file and line of an
   error whose text could name one; `admission/check` reads `{"token": ...}` (the one body the
   console reads, `CHECK_MAX`) and answers each check's outcome and the identities, of the
-  manifest's entries, that both the token's grant and the session's admit; the token lives
+  file's entries or the checked current workspace version's entries for `source = "store"`,
+  that both the token's grant and the session's admit; the token lives
   only for that request, and a body that does not parse is a fixed 400, never serde's text.
+  Operational reads live in `ui/read.rs`: `GET fleet` reads the checked pointer/retained/kept
+  state (`generations::inspect`), live heartbeats (`heartbeat::read`), holder and remaining
+  lock TTL, and fence counter from Valkey; workspace ids come from generation documents and
+  last publish from the current document's modification time in the store. Malformed
+  heartbeats are shown with fixed reasons, never used for a key or diagnostic. The two stuck
+  cases name `meada snapshot fence recover`, and a stuck node also names deleting its own
+  `<local_dir>/current`. `GET store` lists every generation document name and fully reads
+  current/retained documents only; `store/generations/<id>` reads one. Both use the pull's
+  checked document reader, with validated ids, bundle keys, identities, hashes and blocks.
+  `GET workspace`, `workspace/versions` and `workspace/versions/<id>` read the optional
+  Valkey pointer and checked versions from the store (`versions::stored`, `documents`, the
+  listing shared with the CLI), newest first, malformed documents listed as such. Repository
+  entries and nested peers are bounded by `Session::reads`; malformed reasons cannot name
+  hidden repositories. `GET repositories` lists commits per live served generation, schema
+  versions from the console's own held indexes, unknown elsewhere; without snapshot it
+  compares read-only index freshness and optional indexed commit with mirror `HEAD`.
+  `index_workspace` atomically records an optional `index.commit.json` beside each index
+  after a clean indexing pass; its commit is accepted only while its fingerprint of the
+  index's existing metadata and file/document/manifest hashes matches. Older indexes,
+  interrupted writes and stale sidecars give an unknown commit; the SQLite schema is unchanged.
+  `GET credentials` uses `github_app::inspect` to read installations, token expiry and
+  throttle expiry times from Valkey only, filtering owners by the granted workspace identities;
+  expiry is extracted beside the token in Valkey, so no token or private key is read by the
+  console. All operational service reads share a two-second request deadline and report
+  the service that failed; permit waits share that deadline. At most `READERS_MAX` operational
+  readers run at once, and a worker retains its permit until blocking I/O actually finishes,
+  even after its request timed out. The managed-workspace identities of `admission/check` use
+  this same worker and deadline boundary, including the store connection and runtime teardown.
+  Config/session/manifest use no such permit. Missing module sections are explicit `requires`
+  responses; without `[generations]` there is no per-node fleet view.
   The playground and the exports (#305) answer in process from what the console holds
   (`Holds`), never from a node: with `[snapshot]`, the generations its own `meada snapshot pull`
   (an init pull and a `pull --every` companion on a `local_dir` of its own) keeps, read per
@@ -1385,9 +1416,11 @@ one for the area a change touches.
   is read up to `CHECK_MAX` (16 KiB), and a playground query's up to `QUERY_MAX` (16 KiB); past
   either the answer is a 413. Without `[snapshot]` the playground and the exports serve the
   `[[repository]]` entries as read at start (a mirror missing then stays unservable until a
-  restart, as on a node). The token check lists the
-  identities of the bootstrap manifest's `[[repository]]` entries only: with `[workspace]
-  source = "store"` it lists none until the read routes (#304) bring the current version.
+  restart, as on a node). Operational service reads and managed-workspace token checks share
+  a two-second request bound, including the wait for one of `READERS_MAX` (4) workers;
+  timed-out workers retain their slots until I/O completes, so overload starts no additional
+  work. `index.rs` reads optional `index.commit.json` up to
+  `PROVENANCE_MAX` (4 KiB); anything larger has no trusted indexed commit.
 - `snapshot/versions.rs`: a workspace version document holds at most `VERSION_MAX` (4 MiB);
   past it the document is refused (on import, apply and pull, and read from
   `<index_dir>/workspace/`) or listed as malformed, naming its key or file.

@@ -143,6 +143,7 @@ pub(crate) fn assert_nothing_else_written(dir: &Path, indexed: &[&str]) {
         assert!(
             [
                 "index.db",
+                "index.commit.json",
                 "index.db.lock",
                 "index.db-journal",
                 "index.db-wal",

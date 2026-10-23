@@ -409,7 +409,7 @@ pub enum Msg<'a> {
     #[cfg(feature = "refresh-lock")]
     FenceNotCounted(&'a str),
     /// A heartbeat key whose value is no heartbeat.
-    #[cfg(feature = "refresh-lock")]
+    #[cfg(feature = "generation-pointer")]
     HeartbeatBad(&'a str),
     /// The host name is no node name, and `[snapshot] node_name` is not set.
     #[cfg(feature = "generation-pointer")]
@@ -622,6 +622,9 @@ pub enum Msg<'a> {
     /// An `/api/v1/` path with no route.
     #[cfg(feature = "ui")]
     UiNoRoute,
+    /// A complete operational read, including permit wait and blocking I/O, timed out.
+    #[cfg(feature = "ui")]
+    UiReadTimeout(u64),
     About,
     Index,
     Status,
@@ -1633,7 +1636,7 @@ impl Msg<'_> {
                 format!("{problem}: not counted"),
                 format!("{problem}: não contado"),
             ),
-            #[cfg(feature = "refresh-lock")]
+            #[cfg(feature = "generation-pointer")]
             Msg::HeartbeatBad(key) => pick(
                 format!("{key}: not a heartbeat, a JSON object whose fence is a decimal or null"),
                 format!(
@@ -2099,6 +2102,11 @@ impl Msg<'_> {
             Msg::UiNoRoute => pick(
                 "no API route at this path".into(),
                 "nenhuma rota da API neste caminho".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiReadTimeout(ms) => pick(
+                format!("no answer within {ms} ms"),
+                format!("sem resposta em {ms} ms"),
             ),
             Msg::About => pick(
                 "LLM-free code graph for agents and people".into(),

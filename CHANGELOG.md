@@ -36,6 +36,15 @@ All notable changes to Meada are recorded here. The format follows
   from a lockfile and writes the matching Meada version into `meada-ui.json`. Cargo builds
   remain independent of Node.
 
+- Console operational reads (spec #293, ADR 0014): fleet heartbeats, pointer, retention and
+  kept marks, lock holder/TTL, fence diagnostics and recoveries, store documents and bundle
+  metadata, managed workspace versions, repository commits/schema versions and GitHub App
+  cache expiry/throttle state. Service reads share a two-second deadline, malformed records
+  are checked before use, repository and nested peer identities follow the viewer's grant,
+  and credentials never leave Valkey. The token check now reads identities from the current
+  managed workspace. Server-mode indexing records optional commit provenance beside the index,
+  validated against its contents without changing the SQLite schema.
+
 - Node heartbeat (spec #293, ADR 0014, feature `generation-pointer`): with `[generations]`,
   every round of `meada snapshot pull --every <seconds>` ends by writing the node's state into
   Valkey, whether the round swapped, changed nothing or failed: `{<key_prefix>}:node:<name>`, a
