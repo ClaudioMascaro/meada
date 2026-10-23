@@ -18,6 +18,10 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   named holder refusals, successful writes followed by fleet reload, missing bootstrap reads,
   and bilingual keyboard controls. `ConfirmDialog.test.tsx` checks focus restoration,
   cancellation and the busy state through the native dialog's DOM boundary.
+- `scripts/compose-check` checks the local, generations and explicit console profiles without
+  starting them, including parsed bootstraps, independent console storage and proxy admission.
+  `scripts/helm-check` covers default and enabled console resources, optional Ingress, private
+  CA and OIDC values, negative module/operation combinations and managed refresh ordering.
 - Test modules of `tests/it/` by subject: `docs` (the repository map against the code:
   `ponytail:` limits in Known ceilings, entry point kinds and process marks in their lists),
   `conformance` (pack; for Python also its HTTP providers and consumers
@@ -81,7 +85,10 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   secret in an authentication failure, no redirect followed, `[snapshot]` errors, a pull that
   keeps the previous generation, corrupted and hostile generations (bundles, tar entries, ids,
   identities, index schemas, a pointer and a document past their bounds) changing nothing, a
-  pulled mirror that runs nothing its bundle configured, a nested repository refused),
+  pulled mirror that runs nothing its bundle configured, a nested repository refused;
+  `snapshot/tls.rs` runs binary publish/pull through a TLS front of the local store with a
+  private CA, refusing absent, wrong, empty, invalid and oversized CA files without exposing
+  fixture secrets),
   `serving` (`mcp --listen --generations`, `status --generations` and `export --generations`:
   the chain goldens from a pulled generation, a swap between two calls, the probe and the start
   depending only on the node, the fixed 503, an index naming files outside its mirror, the same goldens, header and `_meta` from a node whose companion writes heartbeats),
