@@ -17,8 +17,9 @@ def render(*args):
     return [item for item in yaml.safe_load_all(text) if item]
 
 
-def resource(items, kind):
-    return next(item for item in items if item["kind"] == kind)
+def resource(items, kind, console=False):
+    return next(item for item in items if item["kind"] == kind
+                and (item["metadata"].get("labels", {}).get("app.kubernetes.io/component") == "console") == console)
 
 
 def pod(items):
@@ -98,3 +99,61 @@ for arguments, problem in [
     failed = subprocess.run(["helm", "template", "check", str(CHART), *arguments], capture_output=True, text=True)
     assert failed.returncode and problem in failed.stderr
 print("helm-check: default, generations, OIDC, web identity and private CA contracts passed")
+
+console_profile = render("-f", str(CHART / "values-console.yaml"))
+console_deployments = [item for item in console_profile if item["kind"] == "Deployment"
+                       and item["spec"]["template"]["metadata"]["labels"].get("app.kubernetes.io/component") == "console"]
+assert len(console_deployments) == 1
+console_pod = console_deployments[0]["spec"]["template"]["spec"]
+assert console_pod["initContainers"][0]["args"][:2] == ["snapshot", "pull"]
+assert console_pod["containers"][0]["args"][:2] == ["ui", "--listen"]
+assert console_pod["containers"][1]["args"][:2] == ["snapshot", "pull"]
+
+for profile in [default, generations]:
+    assert not any(item["metadata"].get("labels", {}).get("app.kubernetes.io/component") == "console" for item in profile)
+console_config = tomllib.loads(resource(console_profile, "ConfigMap", console=True)["data"]["meada.workspace.toml"])
+job_config = tomllib.loads(manifest(console_profile))
+assert console_config["workspace"]["source"] == job_config["workspace"]["source"] == "store"
+assert "repository" not in console_config and "repository" not in job_config
+assert console_config["snapshot"]["local_dir"] != job_config["snapshot"]["local_dir"]
+assert console_config["ui"]["dir"] == "/usr/share/meada/ui"
+assert not console_config["ui"]["operations"]
+assert console_config["ui"]["operator_groups"] == ["meada-operators"]
+for section in ["oidc", "valkey", "generations", "refresh_lock"]:
+    assert console_config[section] == job_config[section]
+assert console_pod["containers"][0]["readinessProbe"]["tcpSocket"]["port"] == "ui"
+assert console_pod["volumes"][0]["configMap"]["name"] == resource(console_profile, "ConfigMap", console=True)["metadata"]["name"]
+assert console_pod["volumes"][1] == {"name": "data", "emptyDir": {}}
+assert console_pod["containers"][1]["args"][2] == "--every"
+console_service = resource(console_profile, "Service", console=True)
+assert console_service["spec"]["selector"]["app.kubernetes.io/component"] == "console"
+console_ingress = resource(console_profile, "Ingress", console=True)
+assert not console_ingress["metadata"].get("annotations")
+assert console_ingress["spec"]["rules"][0]["http"]["paths"][0]["backend"]["service"] == {
+    "name": console_service["metadata"]["name"], "port": {"name": "ui"}}
+refresh = resource(console_profile, "CronJob")["spec"]["jobTemplate"]["spec"]["template"]["spec"]["containers"][0]["args"]
+assert refresh[:2] == ["snapshot", "lock"]
+steps = refresh[-1].split(" && ")
+assert [step.split()[:3] for step in steps] == [["meada", "workspace", "pull"], ["/bin/sh", "/etc/meada/fetch.sh"],
+    ["meada", "index", "--workspace"], ["meada", "snapshot", "publish"]]
+claim = render("-f", str(CHART / "values-console.yaml"), "--set-json", "console.operatorGroups=[]",
+               "--set", "console.operatorClaim=meada_operator", "--set", "console.operations=true", "--set", "tls.caConfigMap=private-ca")
+claim_config = tomllib.loads(resource(claim, "ConfigMap", console=True)["data"]["meada.workspace.toml"])
+assert claim_config["ui"]["operator_claim"] == "meada_operator" and claim_config["ui"]["operations"]
+assert "operator_groups" not in claim_config["ui"]
+assert claim_config["snapshot"]["ca_file"] == claim_config["valkey"]["ca_file"] == "/etc/meada-ca/ca.crt"
+for arguments, problem in [
+    (["--set", "console.enabled=true"], "console requires"),
+    (["--set", "workspace.source=store"], "refreshLock"),
+    (["-f", str(CHART / "values-console.yaml"), "--set", "modules.oidc.enabled=false"], "modules.oidc"),
+    (["-f", str(CHART / "values-console.yaml"), "--set", "console.operatorClaim=admin"], "choose"),
+    (["-f", str(CHART / "values-console.yaml"), "--set-json", "console.operatorGroups=[]", "--set", "console.operations=true"], "selector"),
+]:
+    failed = subprocess.run(["helm", "template", "check", str(CHART), *arguments], capture_output=True, text=True)
+    assert failed.returncode and problem in failed.stderr
+print("helm-check: console isolation, managed refresh, OIDC selectors and routes passed")
+for profile in [generations, console_profile]:
+    for deployment in [item for item in profile if item["kind"] == "Deployment"]:
+        spec = deployment["spec"]["template"]["spec"]
+        names = [container["name"] for container in spec["initContainers"] + spec["containers"]]
+        assert len(names) == len(set(names)), "Kubernetes requires unique names across init containers and containers"

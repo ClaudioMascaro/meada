@@ -28,7 +28,7 @@ spec:
       {{- end }}
       initContainers:
         {{- if .Values.modules.snapshot.enabled }}
-        - name: pull
+        - name: pull-initial
           image: {{ include "meada.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ["snapshot", "pull", "--workspace", "/etc/meada/meada.workspace.toml"]

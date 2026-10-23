@@ -83,3 +83,66 @@ deben pasar a `G2`. Añada `@G1` a la misma ruta (`/.../meada@G1`): debe seguir 
 fijado en esa URL debe mantener el mismo grafo tras la actualización. Una generación fuera de
 retención devuelve 404 con la actual y las conservadas. El ejemplo no publica artefactos:
 la publicación de imágenes sigue vinculada al workflow de release.
+
+## Consola de gestión opcional
+
+El overlay de la consola usa la imagen cloud y requiere el perfil `generations`. Sin el overlay,
+no se inicia ningún servicio, puerto ni volumen de la consola. Este ejemplo admite un viewer
+local por loopback, con operaciones desactivadas. Configure OIDC o admisión propia en el proxy
+antes del acceso remoto; una consola accesible fuera de esa admisión expone el grafo.
+
+Ejecute desde el directorio del ejemplo con `.env` configurado. Edite `console.repositories.toml`
+para el seed inicial, `REPOSITORIES` para fetch, y `job.workspace.toml` y
+`console.workspace.toml` con el mismo store, Valkey, prefijos y CA de los nodos. El seed es una
+acción explícita del operador, realizada una vez; el despliegue nunca reaplica versiones:
+
+```sh
+compose_console() {
+  docker compose -f compose.yaml -f compose.console.yaml --profile generations --profile console "$@"
+}
+compose_console config -q
+compose_console up -d bucket valkey
+VERSION=$(compose_console run --rm --entrypoint meada generation-indexer workspace import \
+  /etc/meada/repositories.toml --message "Initial managed workspace" --workspace /etc/meada/meada.workspace.toml)
+compose_console run --rm --entrypoint meada generation-indexer workspace apply "$VERSION" \
+  --workspace /etc/meada/meada.workspace.toml
+compose_console up -d
+compose_console logs -f generation-indexer console-first-pull console-pull console
+```
+
+El writer usa `[workspace] source = "store"`. El loop mantiene **una** `snapshot lock` durante
+`workspace pull`, fetch externo, `index` y `snapshot publish`. Fetch sigue usando
+`REPOSITORIES`, sin derivar URLs ni rutas arbitrarias del editor. Al añadir un repositorio o
+cambiar su ruta, ajuste esa lista, las credenciales y el mirror antes del refresh;
+un mirror ausente impide publish sin avanzar el pointer. Aplicar una versión prepara el
+próximo refresh; llega a la generación tras publish y pull. Detenga el writer para mantener un
+rollback de generación después del próximo refresh.
+
+La consola tiene bootstrap, `index_dir`, `local_dir`, volumen y `node_name = "console"` propios.
+El pull inicial termina antes del arranque; un companion `snapshot pull --every 30` actualiza
+solo ese volumen y escribe su heartbeat. Los dos nodos mantienen volúmenes e identidades separados.
+`snapshot.ca_file` añade raíces a las del sistema; `valkey.ca_file` usa solo las del archivo.
+
+La ruta TLS propia `https://localhost:8444` no usa el bearer estático del puerto MCP 8443.
+Caddy conserva `Host`, `Origin` y `Authorization`. Assets, `/api/v1/config` y `/auth/callback`
+deben llegar al backend antes del login PKCE:
+
+```sh
+compose_console cp console-proxy:/data/caddy/pki/authorities/local/root.crt ./console-ca.crt
+curl --cacert console-ca.crt https://localhost:8444/api/v1/config
+curl --cacert console-ca.crt https://localhost:8444/auth/callback
+```
+
+Para OIDC, descomente y ajuste la política en `console.workspace.toml`: issuer, claims, grupos
+y scopes iguales a los nodos; `[oidc] public_url`/audience describen MCP. `[ui] public_url`,
+`client_id` y `audience` son propios de la consola. Registre un cliente público sin secreto,
+Authorization Code con PKCE S256 y el redirect URI exacto `https://localhost:8444/auth/callback`.
+El navegador debe acceder al discovery y token endpoint del issuer con CORS para ese origen;
+intercambia el código directamente con el issuer. La API protegida exige su bearer.
+Para operaciones, active `operations = true` y elija `operator_groups` u `operator_claim`,
+solo una opción; los grupos requieren `oidc.groups_claim`. El claim debe ser booleano true.
+
+El smoke local usa un viewer por loopback, sin simular un IdP. OIDC y sus rechazos están
+cubiertos por pruebas HTTP/Rust; el perfil OIDC del chart pasa lint/template. Valide con
+`python3 ../../scripts/compose-check` desde este directorio. Detenga con `compose_console down`;
+`down -v` también borra los datos y requiere un nuevo seed.

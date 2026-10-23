@@ -1,0 +1,6 @@
+https://localhost {
+	tls internal
+	# Browser assets, config and callback must reach Meada before OIDC login.
+	# Meada checks Host, Origin and Authorization; keep all three unchanged.
+	reverse_proxy console:7334
+}

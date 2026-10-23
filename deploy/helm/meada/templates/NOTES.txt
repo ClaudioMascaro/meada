@@ -5,7 +5,7 @@ Configure admission in your Ingress or auth proxy before exposing this service.
 Without OIDC, a misconfigured Ingress exposes the source graph.
 {{- end }}
 Preserve MCP-Protocol-Version, MCP-Session-Id, Mcp-Method, Mcp-Name and Mcp-Param-*.
-Return Meada-Generation unchanged. Never add Origin.
+Return Meada-Generation unchanged. Never add Origin to MCP requests.
 
 For local inspection:
   kubectl --namespace {{ .Release.Namespace }} port-forward service/{{ include "meada.name" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
@@ -13,4 +13,13 @@ For local inspection:
 {{- if .Values.modules.snapshot.enabled }}
 The store and Valkey are external dependencies. Configure TLS endpoints and credential Secrets.
 The first generation must be published before the initial pull can finish.
+{{- end }}
+
+{{- if .Values.console.enabled }}
+The console is separate: forward Host, Origin and Authorization unchanged.
+Leave assets, /api/v1/config and /auth/callback reachable before OIDC login.
+Register {{ .Values.console.publicUrl }}/auth/callback for the public PKCE S256 client.
+The console has its own bootstrap and local storage; its pod hostname names its heartbeat.
+Seed/apply the managed workspace explicitly before the first refresh; deployment never reapplies a seed.
+workspace.fetch remains operator-owned, including new repositories and mirror paths.
 {{- end }}

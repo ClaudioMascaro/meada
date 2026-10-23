@@ -1,0 +1,74 @@
+{{- if .Values.console.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "meada.consoleName" . }}
+  labels:
+    {{- include "meada.consoleLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.console.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "meada.consoleLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "meada.consoleLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/console-config.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "meada.account" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: pull-initial
+          image: {{ include "meada.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["snapshot", "pull", "--workspace", "/etc/meada/meada.workspace.toml"]
+          env: {{ include "meada.env" . | nindent 12 }}
+          volumeMounts: {{ include "meada.mounts" . | nindent 12 }}
+          resources: {{ toYaml .Values.console.resources | nindent 12 }}
+      containers:
+        - name: console
+          image: {{ include "meada.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["ui", "--listen", {{ printf "0.0.0.0:%v" .Values.console.listen | quote }}, "--workspace", "/etc/meada/meada.workspace.toml"]
+          ports:
+            - name: ui
+              containerPort: {{ .Values.console.listen }}
+          readinessProbe:
+            tcpSocket:
+              port: ui
+            periodSeconds: {{ .Values.readiness.periodSeconds }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", {{ .Values.preStop.sleepSeconds | quote }}]
+          env: {{ include "meada.env" . | nindent 12 }}
+          volumeMounts: {{ include "meada.mounts" . | nindent 12 }}
+          resources: {{ toYaml .Values.console.resources | nindent 12 }}
+        - name: pull
+          image: {{ include "meada.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["snapshot", "pull", "--every", {{ .Values.modules.generations.pullEverySeconds | quote }}, "--workspace", "/etc/meada/meada.workspace.toml"]
+          env: {{ include "meada.env" . | nindent 12 }}
+          volumeMounts: {{ include "meada.mounts" . | nindent 12 }}
+          resources: {{ toYaml .Values.console.resources | nindent 12 }}
+      volumes: {{ include "meada.consoleVolumes" . | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{ toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
