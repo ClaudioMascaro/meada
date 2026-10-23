@@ -9,6 +9,8 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+#[cfg(feature = "ui")]
+use object_store::ObjectStoreExt;
 use object_store::aws::{AmazonS3, AmazonS3Builder, AmazonS3ConfigKey, AwsCredential};
 use object_store::client::{
     HttpClient, HttpConnector, HttpError, HttpErrorKind, HttpRequest, HttpResponse, HttpService,
@@ -263,6 +265,16 @@ impl Store {
         }
     }
 
+    /// The object's modification time as RFC 3339, used for the console's last publish.
+    #[cfg(feature = "ui")]
+    pub async fn modified(&self, key: &str) -> Result<Option<String>, String> {
+        match self.s3.head(&Self::key(key)?).await {
+            Ok(meta) => Ok(Some(meta.last_modified.to_rfc3339())),
+            Err(object_store::Error::NotFound { .. }) => Ok(None),
+            Err(e) => Err(self.scrub(e)),
+        }
+    }
+
     /// The object at `key`, at most `max` bytes, checked against the size and hash it is stored
     /// with; `None` when there is none.
     pub async fn get(&self, key: &str, max: u64) -> Result<Option<Vec<u8>>, String> {
@@ -329,7 +341,6 @@ impl Store {
 
     /// The keys of the objects directly under `prefix` (`<prefix>/<name>`), sorted. They are
     /// hostile: a caller checks each name before using it.
-    #[cfg(feature = "generation-pointer")]
     pub async fn list(&self, prefix: &str) -> Result<Vec<String>, String> {
         let listed = self.s3.list_with_delimiter(Some(&Self::key(prefix)?)).await;
         let listed = listed.map_err(|e| self.scrub(e))?;

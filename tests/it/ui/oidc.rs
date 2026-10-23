@@ -413,7 +413,13 @@ fn a_viewer_s_grant_bounds_every_view() {
     let (signing, jwk) = key("k1");
     let issuer = Issuer::new(set(&[&jwk]));
     let base = issuer.base.clone();
-    let (dir, console) = console("ui_oidc_grant", &issuer);
+    const UNLISTED: &str = "private.example/team/hidden";
+    let nested = head(&base).replace(
+        "path = \"../web\"\n",
+        &format!("path = \"../web\"\n[[repository.peer]]\nrepo = \"{UNLISTED}\"\n"),
+    );
+    let dir = console_dir("ui_oidc_grant", Some(VERSION), &nested, &ui_oidc());
+    let console = start(&dir, "127.0.0.1:0");
     let es256 = |claims: &Value| sign(&signing, "k1", Algorithm::ES256, claims);
     let web = es256(&claims(&base, &[WEB]));
     let gateway = es256(&edited(&base, |c| {
@@ -444,6 +450,11 @@ fn a_viewer_s_grant_bounds_every_view() {
     );
     assert_eq!(manifest["modules"].as_array().unwrap().len(), 7);
     assert!(!manifest.to_string().contains("../gateway"));
+    assert_eq!(manifest["manifest"]["repository"][0]["peer"], json!([]));
+    assert_eq!(
+        entries(&all).1["manifest"]["repository"][0]["peer"][0]["repo"],
+        UNLISTED
+    );
     assert_eq!(entries(&gateway).0, [GATEWAY]);
     assert_eq!(entries(&all).0, [WEB, GATEWAY]);
 
@@ -460,6 +471,20 @@ fn a_viewer_s_grant_bounds_every_view() {
     let position = line.split(": ").next().unwrap();
     assert_eq!(errors(&web), json!([position]));
     assert_eq!(errors(&gateway), whole);
+    let broken_peer = nested.replace(
+        &format!("repo = \"{UNLISTED}\"\n"),
+        &format!("repo = \"{UNLISTED}\"\nbase_url_env = \"{UNLISTED}\"\n"),
+    );
+    write_manifest(&dir, &broken_peer, &ui_oidc());
+    let whole = errors(&all);
+    assert!(whole.to_string().contains(UNLISTED), "{whole}");
+    let positions: Vec<_> = whole
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|line| line.as_str().unwrap().split(": ").next().unwrap())
+        .collect();
+    assert_eq!(errors(&web), json!(positions));
 
     assert_leaks_nothing(&console.stderr(), &[&web, &gateway, &all]);
 }
@@ -545,4 +570,142 @@ fn without_oidc_the_admission_routes_are_absent() {
         "{\"token\": \"x\"}",
     );
     assert_eq!(reply.status, 404);
+}
+
+/// Managed workspaces have no bootstrap entries: every operational view and the token check
+/// must use their checked current workspace, including nested peers and credential owners.
+#[cfg(feature = "generation-pointer")]
+#[test]
+fn managed_workspace_reads_and_admission_check_obey_viewer_grants() {
+    use crate::generations::{Fleet, admin, import, prefix, send as seed};
+    use crate::snapshot::{KEY_ID, bucket, put_stored};
+    use std::fs;
+    let Some(fleet) = Fleet::new("ui_managed_grant", 3) else {
+        return;
+    };
+    let (encoding, jwk) = key("managed");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let source = fs::read_to_string(fleet.dir.join(MANIFEST)).unwrap();
+    let with_peer = source.replace(
+        "path = \"../chain-web\"",
+        &format!("path = \"../chain-web\"\n[[repository.peer]]\nrepo = \"{GATEWAY}\""),
+    );
+    fs::write(fleet.dir.join("ops/entries.toml"), &with_peer).unwrap();
+    let (version, _) = import(&fleet.dir, "ops/entries.toml", "managed grant", "alice");
+    let generation = fleet.publish();
+    let s3 = bucket(&fleet.endpoint, &fleet.bucket);
+    let key = format!("prod/meada/generations/{generation}.json");
+    let mut document: Value = serde_json::from_slice(&crate::snapshot::get(&s3, &key)).unwrap();
+    document["repositories"][0]["blocks"] = json!({"peer": [{"repo": GATEWAY}]});
+    put_stored(&s3, &key, &serde_json::to_vec(&document).unwrap());
+    let sections = source.split_once("[snapshot]").unwrap().1;
+    let bootstrap = format!(
+        "index_dir = \"../console-indexes\"\n[workspace]\nsource = \"store\"\n[snapshot]{sections}\n{}\n[ui]\n{}",
+        oidc(&issuer.base),
+        ui_oidc()
+    );
+    #[cfg(feature = "github-app")]
+    let bootstrap = format!(
+        "{bootstrap}\n[[github_app]]\nhost = \"example.com\"\napi = \"http://127.0.0.1:9\"\napp_id = 1\nprivate_key_file = \"absent-private-key.pem\"\n"
+    );
+    fs::write(fleet.dir.join("ops/console.toml"), bootstrap).unwrap();
+    super::front_end(&fleet.dir, Some(VERSION));
+    let mut valkey = admin(&fleet.valkey);
+    let prefix = format!("{{{}}}", prefix(fleet.case));
+    seed(
+        &mut valkey,
+        &[
+            "HSET",
+            &format!("{prefix}:workspace"),
+            "id",
+            &version,
+            "fence",
+            "7",
+        ],
+    );
+    #[cfg(feature = "github-app")]
+    seed(
+        &mut valkey,
+        &[
+            "HSET",
+            &format!(
+                "{}:github-app:example.com:app:1:installations",
+                crate::generations::prefix(fleet.case)
+            ),
+            "chain",
+            "11",
+            "private-owner",
+            "22",
+        ],
+    );
+    let console = Server::start_command(
+        &fleet.dir,
+        "ui",
+        &["--listen", "127.0.0.1:0", "--workspace", "ops/console.toml"],
+        &[("MEADA_TEST_S3_KEY", KEY_ID)],
+    );
+    let token = sign(
+        &encoding,
+        "managed",
+        Algorithm::ES256,
+        &claims(&issuer.base, &[WEB]),
+    );
+    for route in [
+        "workspace".to_string(),
+        "workspace/versions".to_string(),
+        format!("workspace/versions/{version}"),
+        "store".to_string(),
+        format!("store/generations/{generation}"),
+        "repositories".to_string(),
+    ] {
+        let reply = ask(&console, &format!("/api/v1/{route}"), &token);
+        assert_eq!(reply.status, 200, "{route}: {}", reply.body);
+        assert!(!reply.body.contains(GATEWAY), "{route}: {}", reply.body);
+        assert!(
+            !reply.body.contains("example.com/chain/catalog"),
+            "{route}: {}",
+            reply.body
+        );
+    }
+    #[cfg(feature = "github-app")]
+    {
+        let credentials = ask(&console, "/api/v1/credentials", &token).json();
+        let installations = credentials["apps"][0]["installations"].as_array().unwrap();
+        assert_eq!(installations.len(), 1);
+        assert_eq!(installations[0]["owner"], "chain");
+        assert_eq!(installations[0]["id"], 11);
+        assert!(!credentials.to_string().contains("private-owner"));
+        let all = sign(
+            &encoding,
+            "managed",
+            Algorithm::ES256,
+            &claims(&issuer.base, &["*"]),
+        );
+        assert_eq!(
+            ask(&console, "/api/v1/credentials", &all).json()["apps"][0]["installations"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+    }
+    let pasted = sign(
+        &encoding,
+        "managed",
+        Algorithm::ES256,
+        &edited(&issuer.base, |c| c["aud"] = json!(format!("{NODES}/{WEB}"))),
+    );
+    let checked = check(&console, &token, &pasted);
+    assert_eq!(checked.status, 200, "{}", checked.body);
+    assert_eq!(checked.json()["checks"]["audience"], true);
+    assert_eq!(checked.json()["identities"], json!([WEB]));
+    assert_eq!(
+        ask(
+            &console,
+            "/api/v1/workspace/versions/../../etc/passwd",
+            &token
+        )
+        .status,
+        404
+    );
 }

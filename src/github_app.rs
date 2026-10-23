@@ -818,6 +818,62 @@ pub fn throttled(manifest: &Path, url: &str, retry_after: Option<u64>) -> crate:
     Ok(reply)
 }
 
+/// Cached installations and their expiry/throttle state. This reads Valkey only, never a key
+/// or GitHub, and extracts the expiry beside the token before returning anything to its caller.
+#[cfg(feature = "ui")]
+pub(crate) async fn inspect(
+    valkey: &Valkey,
+    config: &valkey::Config,
+    apps: &[Config],
+    reads_owner: &impl Fn(&str, &str) -> bool,
+) -> Result<serde_json::Value, String> {
+    use serde_json::json;
+    let mut found = Vec::new();
+    for app in apps {
+        let key = |name: &str| config.key(&format!("github-app:{}:{name}", app.host), false);
+        let installations: Vec<(String, String)> = valkey
+            .query(cmd("HGETALL").arg(key(&format!("app:{}:installations", app.app_id))))
+            .await?;
+        let throttle: i64 = valkey
+            .query(cmd("EXPIRETIME").arg(key(&format!("app:{}:throttled", app.app_id))))
+            .await?;
+        let now = now();
+        let mut entries = Vec::new();
+        let mut malformed = throttle == -1;
+        for (owner, id) in installations {
+            if !reads_owner(&app.host, &owner) {
+                continue;
+            }
+            // An owner/id read from the cache must not add a key segment.
+            let owner_ok = !owner.is_empty()
+                && owner
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-');
+            let Some(id) = meada_core::ids::fence(&id).filter(|id| *id > 0 && owner_ok) else {
+                malformed = true;
+                continue;
+            };
+            let cached = key(&format!("installation:{id}:token"));
+            // The token never leaves Valkey: the read retains the decimal expiry alone.
+            let expires: Option<String> = valkey.query(cmd("EVAL").arg("local v=redis.call('GET',KEYS[1]); if v then return string.match(v,'^(%d+) ') end; return false").arg(1).arg(&cached)).await?;
+            let expires = expires.as_deref().and_then(meada_core::ids::fence);
+            let throttle: i64 = valkey
+                .query(cmd("EXPIRETIME").arg(key(&format!("installation:{id}:throttled"))))
+                .await?;
+            malformed |= throttle == -1;
+            entries.push(json!({"owner": owner, "id": id, "cached": expires.is_some(), "expires": expires, "remaining_seconds": expires.map(|e| e.saturating_sub(now)), "throttled_until": u64::try_from(throttle).ok()}));
+        }
+        entries.sort_by(|a, b| {
+            a["owner"]
+                .as_str()
+                .cmp(&b["owner"].as_str())
+                .then(a["id"].as_u64().cmp(&b["id"].as_u64()))
+        });
+        found.push(json!({"host": app.host, "app_id": app.app_id, "installations": entries, "malformed": malformed, "throttled_until": u64::try_from(throttle).ok()}));
+    }
+    Ok(json!({"apps": found}))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

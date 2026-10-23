@@ -212,6 +212,46 @@ fn listed(key: &str, entries: &[Vec<u8>], max: u64) -> Result<Vec<String>, Strin
     Ok(ids)
 }
 
+/// Retention state for an operational read, including each retained fence and kept mark.
+/// A deployment with no publish yet has no current pointer and an empty retained set.
+#[cfg(feature = "ui")]
+pub(crate) async fn inspect(
+    valkey: &Valkey,
+    config: &valkey::Config,
+    keep: u64,
+) -> Result<serde_json::Value, String> {
+    use serde_json::json;
+    let (current, retained) = keys(config);
+    let fields: Vec<Option<Vec<u8>>> = valkey
+        .query(cmd("HMGET").arg(&current).arg("id").arg("fence"))
+        .await?;
+    let current = match fields.as_slice() {
+        [None, None] => None,
+        _ => Some(pointer(&current, &fields)?),
+    };
+    let entries: Vec<Vec<u8>> = valkey
+        .query(cmd("LRANGE").arg(&retained).arg(0).arg(keep + KEPT_MAX))
+        .await?;
+    if !entries.is_empty() {
+        listed(&retained, &entries, keep + KEPT_MAX)?;
+    }
+    let kept_key = kept(config);
+    let kept: Vec<String> = valkey.query(cmd("SMEMBERS").arg(&kept_key)).await?;
+    if kept.len() as u64 > KEPT_MAX || kept.iter().any(|id| !is_id(id)) {
+        return Err(Msg::GenerationsBadEntry(&kept_key).text());
+    }
+    let retained: Vec<_> = entries
+        .iter()
+        .filter_map(|entry| {
+            let (id, f) = std::str::from_utf8(entry).ok()?.split_once(':')?;
+            Some(json!({"id": id, "fence": fence(f)?, "kept": kept.iter().any(|k| k == id)}))
+        })
+        .collect();
+    Ok(
+        json!({"pointer": current.map(|(id, fence)| json!({"id": id, "fence": fence})), "retained": retained}),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

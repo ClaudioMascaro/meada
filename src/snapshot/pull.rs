@@ -322,9 +322,23 @@ async fn fetch(
     fs::write(partial.join(DOCUMENT), &bytes).map_err(io_at(partial))
 }
 
+/// The store's optional current generation id, checked before a caller builds any key.
+#[cfg(feature = "ui")]
+pub(crate) async fn store_current(
+    store: &Store,
+    config: &Config,
+) -> std::result::Result<Option<String>, String> {
+    let key = config.key("current");
+    store
+        .get(&key, super::CURRENT_MAX)
+        .await?
+        .map(|bytes| store_pointer(&key, &bytes))
+        .transpose()
+}
+
 /// The document of the generation `id` in the store, checked (`checked`), and its bytes as
 /// stored; a missing or malformed one is an error naming its key.
-pub(super) async fn stored_document(
+pub(crate) async fn stored_document(
     store: &Store,
     config: &Config,
     id: &str,
@@ -375,6 +389,14 @@ fn checked(
         if let Some(problem) = problem {
             return Err(format!("{key}: {}: {problem}", identity.escape_debug()));
         }
+        let mut fields = entry.blocks.as_object().cloned().ok_or_else(not)?;
+        if fields.contains_key("repo") || fields.contains_key("path") {
+            return Err(not());
+        }
+        fields.insert("repo".into(), identity.into());
+        fields.insert("path".into(), "".into());
+        serde_json::from_value::<meada_core::manifest::EntryFile>(fields.into())
+            .map_err(|_| not())?;
         let prefix = config.key(&format!("repos/{identity}/"));
         let bundle = (entry.bundle.strip_prefix(&prefix))
             .and_then(|name| name.strip_suffix(".tar"))

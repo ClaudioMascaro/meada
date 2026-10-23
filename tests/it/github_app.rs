@@ -563,3 +563,76 @@ fn mcp_listen_over_a_manifest_with_github_app_makes_no_request() {
     drop(server);
     assert_eq!(api.with(|s| s.requests), 0);
 }
+
+/// The console inspects only cached state: no private key read and no request to GitHub.
+#[cfg(feature = "ui")]
+#[test]
+fn console_reads_installation_expiry_and_throttle_without_secrets_or_api_calls() {
+    use crate::ui::{front_end, get, ui_section};
+    let Some(valkey) = service() else { return };
+    let case = "ui_credential_cache";
+    let api = Api::new();
+    api.install(1, 11, "Acme");
+    let dir = manifest(case, &valkey, &api.base, &[1]);
+    let secret = token(&api, &dir, "acme/web.git");
+    throttled(&api, &dir, "acme/web.git", Some("60"));
+    front_end(&dir, Some(env!("CARGO_PKG_VERSION")));
+    let file = dir.join("meada.workspace.toml");
+    let text = fs::read_to_string(&file).unwrap();
+    // A missing private key is harmless to the read route: it must never open it.
+    let text = text.replace(
+        fixture("app1.pem").to_str().unwrap(),
+        "/does/not/exist/private-key.pem",
+    );
+    fs::write(
+        &file,
+        format!("{text}\n[ui]\n{}", ui_section().replace("../ui", "ui")),
+    )
+    .unwrap();
+    let before = api.with(|state| (state.requests, state.minted.clone(), state.jwts.clone()));
+    let console = crate::server::Server::start_command(
+        &dir,
+        "ui",
+        &[
+            "--listen",
+            "127.0.0.1:0",
+            "--workspace",
+            "meada.workspace.toml",
+        ],
+        &[],
+    );
+    let reply = get(&console, "/api/v1/credentials");
+    assert_eq!(reply.status, 200, "{}", reply.body);
+    let document = reply.json();
+    assert_eq!(document["apps"][0]["host"], HOST);
+    let installation = &document["apps"][0]["installations"][0];
+    assert_eq!(installation["owner"], "acme");
+    assert_eq!(installation["id"], 11);
+    assert_eq!(installation["cached"], true);
+    assert_eq!(installation["expires"], EXPIRES);
+    assert!(installation["remaining_seconds"].as_u64().unwrap() > 0);
+    assert!(
+        installation["throttled_until"].as_u64().unwrap() > jsonwebtoken::get_current_timestamp()
+    );
+    assert!(!reply.body.contains(&secret));
+    assert!(!reply.body.contains("PRIVATE KEY"));
+    assert_eq!(
+        before,
+        api.with(|state| (state.requests, state.minted.clone(), state.jwts.clone()))
+    );
+    let key = format!(
+        "{}:github-app:{HOST}:installation:11:throttled",
+        prefix(case)
+    );
+    let mut connection = admin(&valkey);
+    let _: () = redis::cmd("PEXPIRE")
+        .arg(&key)
+        .arg(400)
+        .query(&mut connection)
+        .unwrap();
+    assert_eq!(ttl(&mut connection, case, "installation:11:throttled"), 0);
+    let imminent = get(&console, "/api/v1/credentials").json();
+    assert!(imminent["apps"][0]["installations"][0]["throttled_until"].is_u64());
+    let stderr = console.stderr();
+    assert!(!stderr.contains(&secret));
+}

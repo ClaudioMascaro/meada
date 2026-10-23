@@ -147,7 +147,15 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   uncommitted` refused with the node's text, an unknown repository and an unheld generation a
   404, a body over `QUERY_MAX` a 413, malformed JSON, an unknown tool, arguments not the tool's
   or an unknown key a fixed 400, a query without the console's `Origin` or with a foreign one
-  a 403; with `oidc`, in `ui/oidc.rs`, against the `oidc`
+  a 403; in `ui/reads.rs`, local repository freshness and commit provenance, unknown commits
+  for absent, oversized or stale sidecars; explicit missing modules; four blocked readers
+  timing out without releasing worker permits early, bounded overload and independent basic
+  routes; non-regular credentials refused before open; with `generation-pointer`,
+  two pull companions and the console's own companion, the live fleet, generation/workspace
+  documents, retention and kept marks, modification time, schemas from held copies, malformed
+  names/ids/fences excluded from diagnostics and both stuck recoveries; with `github-app`,
+  the cached installation/token-expiry/throttle view against the module's loopback API without
+  any additional API request or private key read; with `oidc`, in `ui/oidc.rs`, against the `oidc`
   module's loopback issuer, which logs every request: no token, an expired one, the nodes'
   audience, another issuer and `HS256` get 401 with `WWW-Authenticate`, a missing scope 403, a
   valid token the viewer's `session`; static files and `config` (the issuer, `client_id`, the
@@ -161,7 +169,9 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   exports under a grant, the goldens for `*`, a `WEB`-only trace and export with no peer
   outside the grant, the repositories outside it the 404 of one not served, a 401 without a
   token; the admission routes
-  absent without `[oidc]`; no token, claim value or identity on stderr), `resources` (resource `search`, `context`, `trace` start and `status`
+  absent without `[oidc]`; manifest peers and error text bounded even for an unlisted peer;
+  managed workspace views and nested peers bounded by grants, the
+  token check using current workspace identities; no token, claim value or identity on stderr), `resources` (resource `search`, `context`, `trace` start and `status`
   over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
   fixture: kafkajs forms, fan-out, same-repository links, an unrelated `send`; amqplib queues,
   publishes through a binding of another repository, the empty exchange, queues named like the

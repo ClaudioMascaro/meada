@@ -153,6 +153,78 @@ pub fn state(path: &Path) -> State {
     }
 }
 
+/// Fingerprint of the content a server-mode indexing pass recorded, excluding mutable stats.
+fn provenance_fingerprint(db: &Connection) -> Result<String> {
+    let mut hash = blake3::Hasher::new();
+    for query in [
+        "SELECT identity, configs FROM meta ORDER BY identity",
+        "SELECT path, hash FROM files ORDER BY path",
+        "SELECT path, hash FROM documents ORDER BY path",
+        "SELECT path, hash FROM manifests ORDER BY path",
+    ] {
+        hash.update(query.as_bytes());
+        let mut statement = db.prepare(query)?;
+        let rows = statement.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+        for row in rows {
+            let bytes = serde_json::to_vec(&row?)?;
+            hash.update(&bytes);
+        }
+    }
+    Ok(hash.finalize().to_hex().to_string())
+}
+
+/// Optional provenance of server-mode indexing, beside the index. The schema stays unchanged;
+/// a crash or an older index leaves no trustworthy commit rather than guessing one.
+pub(crate) fn record_commit(db: &Connection, index: &Path, head: Option<&str>) -> Result<()> {
+    let file = index.with_extension("commit.json");
+    let Some(head) = head else {
+        if file.exists() {
+            fs::remove_file(&file)?;
+        }
+        return Ok(());
+    };
+    let bytes = serde_json::to_vec(
+        &serde_json::json!({"head": head, "fingerprint": provenance_fingerprint(db)?}),
+    )?;
+    let temporary = file.with_extension(format!("json.new.{}", std::process::id()));
+    fs::write(&temporary, bytes)?;
+    fs::rename(&temporary, &file)?;
+    Ok(())
+}
+
+// ponytail: the optional provenance sidecar contains two hashes only; a longer document is
+// untrusted and has no indexed commit.
+#[cfg(feature = "ui")]
+const PROVENANCE_MAX: u64 = 4096;
+
+/// The schema and optional indexed commit, read without creating files. A sidecar is accepted
+/// only when its fingerprint still matches the index, including after a crash/rebuild.
+#[cfg(feature = "ui")]
+pub(crate) fn provenance(index: &Path) -> Result<(i32, Option<String>)> {
+    let db = read_only(index)?;
+    db.execute_batch("BEGIN")?;
+    let schema = db.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    let commit = (|| {
+        let bytes =
+            crate::config::read_bounded(&index.with_extension("commit.json"), PROVENANCE_MAX)
+                .ok()?;
+        let written: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+        let head = written["head"].as_str()?;
+        if ![40, 64].contains(&head.len())
+            || !head
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+        {
+            return None;
+        }
+        (written["fingerprint"].as_str()? == provenance_fingerprint(&db).ok()?)
+            .then(|| head.to_string())
+    })();
+    Ok((schema, commit))
+}
+
 /// How long a read waits for a commit in progress on an index before it fails (ADR 0011).
 const BUSY_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -998,7 +1070,6 @@ fn configs_digest(mut digest: blake3::Hasher, manifest_rows: &[(String, String)]
 /// stat moved but whose content did not (one a refresh would only stamp again, such as a file
 /// indexed within `RACY` of its last write) is no difference. `meada snapshot publish`
 /// (ADR 0012) runs it on an index opened with `open_read`.
-#[cfg(feature = "snapshot")]
 pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Result<bool> {
     let now = SystemTime::now();
     let meta = (db.query_row("SELECT identity, configs FROM meta", [], |r| {

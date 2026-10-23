@@ -35,6 +35,8 @@ use crate::modules::{self, Problem, Shape};
 use crate::msg::Msg;
 use crate::workspace::Manifest;
 
+mod read;
+
 type Answer = Response<BoxBody<Bytes, Infallible>>;
 
 /// A request's body as the console read it: empty except for the token check's and the
@@ -157,15 +159,18 @@ pub(crate) fn validated(
 struct Console {
     /// The bootstrap manifest's path.
     file: PathBuf,
+    /// The validated bootstrap as loaded, never secret values.
+    bootstrap: Manifest,
+    /// Operational reads own a permit until all their blocking work finishes.
+    readers: Arc<tokio::sync::Semaphore>,
+    #[cfg(feature = "github-app")]
+    apps: Vec<crate::github_app::Config>,
     ui: Config,
     /// `[ui] dir`, resolved: no file outside it is served.
     root: PathBuf,
     /// The bootstrap manifest as loaded at start, a JSON table. It names secrets' variables and
     /// files only: a section holds no secret (ADR 0012).
     loaded: Value,
-    /// The identities of the manifest's `[[repository]]` entries, in manifest order.
-    #[cfg(feature = "oidc")]
-    served: Vec<String>,
     /// The content security policy of every answer.
     csp: header::HeaderValue,
     /// The nodes' OIDC module, with `[oidc]`: the console's admission.
@@ -190,6 +195,7 @@ enum Holds {
 
 /// Who asks: the admitted subject (none behind the proxy), always a viewer for now (operators
 /// come with #307), and what the request may read.
+#[derive(Clone)]
 struct Session {
     subject: Option<String>,
     /// The token's grant; none behind the proxy, where every identity is read.
@@ -324,11 +330,13 @@ impl Console {
         let holds = Holds::Listed(Box::new(read.clone()));
         Ok(Self {
             file: file.to_path_buf(),
+            bootstrap: read.clone(),
+            readers: Arc::new(tokio::sync::Semaphore::new(read::READERS_MAX)),
+            #[cfg(feature = "github-app")]
+            apps: Manifest::github_apps(file)?.1,
             ui,
             root,
             loaded: serde_json::to_value(table)?,
-            #[cfg(feature = "oidc")]
-            served: read.entries.iter().map(|e| e.repo.clone()).collect(),
             csp: header::HeaderValue::from_str(&csp(issuer))?,
             #[cfg(feature = "oidc")]
             oidc,
@@ -337,7 +345,7 @@ impl Console {
     }
 
     /// The answer to `request`, the listener bound at `bound`.
-    fn answer(&self, bound: SocketAddr, request: &Request<Body>) -> Answer {
+    fn answer(self: &Arc<Self>, bound: SocketAddr, request: &Request<Body>) -> Answer {
         let mut answer = self.checked(bound, request);
         let headers = answer.headers_mut();
         headers.insert("x-content-type-options", "nosniff".parse().unwrap());
@@ -346,7 +354,7 @@ impl Console {
         answer
     }
 
-    fn checked(&self, bound: SocketAddr, request: &Request<Body>) -> Answer {
+    fn checked(self: &Arc<Self>, bound: SocketAddr, request: &Request<Body>) -> Answer {
         let headers = request.headers();
         let host = headers.get(header::HOST).and_then(|h| h.to_str().ok());
         if !host.is_some_and(|host| self.hosts(host, bound)) {
@@ -425,7 +433,7 @@ impl Console {
     }
 
     /// The API's answer at `/api/v1/<route>` to `session`.
-    fn api(&self, request: &Request<Body>, route: &str, session: &Session) -> Answer {
+    fn api(self: &Arc<Self>, request: &Request<Body>, route: &str, session: &Session) -> Answer {
         let method = request.method();
         let read = matches!(*method, Method::GET | Method::HEAD);
         // An identity holds slashes: everything between `repositories/` and the last `/export`.
@@ -437,6 +445,9 @@ impl Console {
         }
         if route == "query" && *method == Method::POST {
             return self.query(request.body(), session);
+        }
+        if read && let Some(answer) = self.operational(route, session) {
+            return answer;
         }
         let document = match route {
             "config" if read => Some(self.config()),
@@ -491,7 +502,7 @@ impl Console {
         let mut loaded = self.loaded.clone();
         if !session.whole() {
             if let Some(Value::Array(entries)) = loaded.get_mut("repository") {
-                entries.retain(|e| e["repo"].as_str().is_some_and(|r| session.reads(r)));
+                read::filter_entries(entries, "repo", session);
             }
             let on_disk = fs::read_to_string(&self.file).ok();
             let on_disk = on_disk.and_then(|src| toml::from_str::<toml::Table>(&src).ok());
@@ -527,7 +538,7 @@ impl Console {
     /// keys only, and the identities its grant admits among those served that `session` reads.
     /// The token lives only for this request.
     #[cfg(feature = "oidc")]
-    fn check(&self, oidc: &crate::oidc::Oidc, body: &Body, session: &Session) -> Answer {
+    fn check(self: &Arc<Self>, oidc: &crate::oidc::Oidc, body: &Body, session: &Session) -> Answer {
         #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
         struct Pasted {
@@ -549,7 +560,11 @@ impl Console {
                 &Msg::UiCheckBody.text(),
             );
         };
-        let served: Vec<&str> = self.served.iter().map(String::as_str).collect();
+        let identities = match self.served_identities() {
+            Ok(identities) => identities,
+            Err(message) => return error(StatusCode::SERVICE_UNAVAILABLE, "unavailable", &message),
+        };
+        let served: Vec<&str> = identities.iter().map(String::as_str).collect();
         let checked = oidc.check(&pasted.token, &served);
         let identities = checked.grant.map(|grant| {
             (served.iter())
@@ -751,10 +766,19 @@ fn origin(url: &str) -> &str {
     &url[..end]
 }
 
-/// The `repo` of each `[[repository]]` entry of `manifest`, a manifest as a JSON table.
+/// Repository and peer identities of `manifest`, including peers it does not list as entries.
 fn identities(manifest: &Value) -> impl Iterator<Item = &str> {
     let entries = manifest.get("repository").and_then(Value::as_array);
-    (entries.into_iter().flatten()).filter_map(|e| e.get("repo").and_then(Value::as_str))
+    (entries.into_iter().flatten()).flat_map(|entry| {
+        let own = entry.get("repo").and_then(Value::as_str);
+        let peers = entry
+            .get("peer")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|peer| peer.get("repo").and_then(Value::as_str));
+        own.into_iter().chain(peers)
+    })
 }
 
 /// The position of the manifest error `line` about `file`: `<file>:<line>`, its text left out.
