@@ -92,3 +92,19 @@ test('the callback exchanges no code when the provider returned an error', async
   expect(sessionStorage.length).toBe(0);
   expect(fetch).not.toHaveBeenCalled();
 });
+test('login preserves issuer query parameters while replacing client OAuth parameters', async () => {
+  const redirected = vi.fn();
+  const auth = new Auth(config, redirected);
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({
+    ...metadata,
+    authorization_endpoint: 'https://identity.example/authorize?tenant=agents&tenant=second&prompt=login&client_id=old&state=old&state=duplicate&response_type=token',
+  })));
+  await auth.login();
+  const url = new URL(redirected.mock.calls[0]![0]);
+  expect(url.searchParams.getAll('tenant')).toEqual(['agents', 'second']);
+  expect(url.searchParams.get('prompt')).toBe('login');
+  expect(url.searchParams.getAll('client_id')).toEqual(['meada-console']);
+  expect(url.searchParams.getAll('state')).toEqual([sessionStorage.getItem('meada.pkce.state')]);
+  expect(url.searchParams.getAll('response_type')).toEqual(['code']);
+  expect(url.searchParams.get('code_challenge_method')).toBe('S256');
+});

@@ -720,3 +720,46 @@ fn save_validation_audits_a_fixed_refusal_without_editor_token_text() {
         assert!(!stderr.contains(secret), "{stderr}");
     }
 }
+
+/// All u64 floors retain their transport shape; unusable counters are operational conflicts,
+/// with the CLI catalog message, and leave a subsequent valid recovery usable.
+#[test]
+fn fence_recover_refuses_unusable_u64_floors_as_operational_conflicts() {
+    let Some(fleet) = Fleet::new("ui_write_ceiling", 2) else {
+        return;
+    };
+    fleet.publish();
+    let (encoding, jwk) = key("write");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let (_, console) = start_operator(&fleet, &issuer);
+    let token = operator(&encoding, &issuer, SUBJECT);
+    let before = ask(&console, "/api/v1/fleet", &token).json()["fence"].clone();
+    for floor in [
+        json!(9223372036854775807u64),
+        json!(9223372036854775808u64),
+        json!(u64::MAX),
+        json!("18446744073709551615"),
+    ] {
+        let reply = post(&console, "fence/recover", &token, json!({"at_least":floor}));
+        assert_eq!(reply.status, 409, "{}", reply.body);
+        assert_eq!(reply.json()["error"]["code"], "conflict");
+        assert!(
+            reply.json()["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("maximum usable fence is 9223372036854775806")
+        );
+        assert_eq!(
+            ask(&console, "/api/v1/fleet", &token).json()["fence"],
+            before
+        );
+    }
+    let recovered = post(
+        &console,
+        "fence/recover",
+        &token,
+        json!({"at_least":"9007199254740993"}),
+    );
+    assert_eq!(recovered.status, 200, "{}", recovered.body);
+    assert_eq!(recovered.json(), json!({"result":"9007199254740993"}));
+}

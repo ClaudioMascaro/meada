@@ -146,7 +146,8 @@ image, and attaches it to the published release. cargo-dist's default binary art
 in their separate release workflow.
 
 `src/api.ts` owns the same-origin `/api/v1/` client; `auth.ts` owns OIDC discovery, PKCE and the
-memory-only bearer. Only the pending redirect's verifier and state enter sessionStorage, and
+memory-only bearer. Authorization redirects retain the issuer endpoint's query parameters and
+replace generated OAuth keys through `URL.searchParams.set`. Only the pending redirect's verifier and state enter sessionStorage, and
 both are removed on callback. `main.tsx` handles `/auth/callback` before rendering the shell;
 `App.tsx` keeps page navigation in process so changing pages does not discard the bearer.
 `pages.tsx` provides semantic navigation and the configuration, session and bootstrap manifest
@@ -348,8 +349,9 @@ one for the area a change touches.
   `manifest` answers the file as loaded at start (a TOML table as JSON: secrets' variable and
   file names only), the module table with what this build has, and the errors of the file as it
   now stands on disk, read again per request, for a session that does not read everything
-  without the `[[repository]]` entries outside its grant and with only the file and line of an
-  error whose text could name one; `admission/check` reads `{"token": ...}` (`CHECK_MAX`) and answers each check's outcome and the identities, of the
+  without the `[[repository]]` entries, nested peers or OIDC group identities outside its grant
+  (group wildcards remain visible), and with only the file and line of an error whose text
+  could name one, including an identity known only through groups; `admission/check` reads `{"token": ...}` (`CHECK_MAX`) and answers each check's outcome and the identities, of the
   file's entries or the checked current workspace version's entries for `source = "store"`,
   that both the token's grant and the session's admit; the token lives
   only for that request, and a body that does not parse is a fixed 400, never serde's text.
@@ -594,8 +596,10 @@ one for the area a change touches.
   Valkey does not answer within `WRITE_TIMEOUT` (two seconds, the bound the probe waits for
   Valkey), is one stderr warning for the round (`Msg::HeartbeatNotWritten`, the key and the
   scrubbed reason): the round's outcome, the pointer file, the exit code and the readiness do
-  not change. `fence recover` reads these keys through the same complete
-  `heartbeat::checked` validator as the console: malformed documents never contribute fences.
+  not change. `heartbeat::read`, shared by recovery and the console, selects live names with
+  Valkey `TIME`, reads their keys and applies the complete `heartbeat::checked` validator.
+  Malformed names never form keys and malformed documents never contribute fences;
+  `Malformed` supplies the CLI warnings and console rows.
   `snapshot/versions.rs` (feature `generation-pointer`, ADR 0014) holds the workspace
   versions: the `[[repository]]` entries of a workspace as immutable documents in the store, at
   `workspaces/<version id>.json` under `[snapshot] prefix` (`Version`: `id`, `author`, `time`
@@ -661,8 +665,13 @@ one for the area a change touches.
   the same TTL, in one script; else the holder's fields, so a lock already held is
   `Msg::LockHeld` naming its host, process, start time and what holds it, or an unknown holder
   for a lock without one, every field escaped; a token of 16 bytes of `/dev/urandom` in hex; a
-  script that errs releases the token anyway, since the server may have taken it), then `INCR
-  fence` (a result that is not a positive `u64` is `Msg::LockBadFence`). `RENEW` extends the
+  script that errs releases the token anyway, since the server may have taken it), then
+  `INCREMENT`: under the same token, compare the counter as decimal text against the caller's
+  ceiling and issue native `INCR` once, returning `GET` to preserve precision beyond 2^53.
+  The signed INCR ceiling is `LAST_FENCE` (9223372036854775807); recovery reserves one more
+  acquisition for publishing, so its own acquisition cannot exceed 9223372036854775806.
+  A ceiling refusal is `Msg::FenceLimit`; a result that is not a positive `u64` is
+  `Msg::LockBadFence`. Wire values and recorded fences remain full `u64`. `RENEW` extends the
   holder with the lock and `RELEASE` deletes both, each only while the lock holds the token.
   `run` is `meada snapshot lock`: `acquire`, then the child, spawned on the main thread in a
   process group of its own (`process_group(0)`) with `MEADA_REFRESH_LOCK` and
@@ -701,11 +710,15 @@ one for the area a change touches.
   `fence_recover` (`meada snapshot fence recover [--at-least <fence>]`) reads the pointer, the
   workspace pointer (`versions::current`: `apply` takes its fence from the same counter), every
   `retained` entry and the heartbeat (`{<key_prefix>}:node:<name>`, its `fence` a `u64` or
-  null) of every name of `{<key_prefix>}:nodes` scored above now, as hostile input: a malformed
+  null) of every name of `{<key_prefix>}:nodes` scored above Valkey's `TIME`, as hostile input: a malformed
   pointer, entry, node name or heartbeat is a `Msg::FenceNotCounted` line on stderr and does not
-  count, a name whose key expired is skipped. `RAISE` sets `fence` to the highest of those and
-  the floor only when that is above the stored one (decimal text, as `POINT` compares); it
-  prints the fence it leaves, which counts the operation's own `INCR`.
+  count, a name whose key expired is skipped. The floor and recorded maximum are checked
+  against `LAST_FENCE - 1` before acquisition; records are read again under the lock to cover
+  a publisher between the preflight and acquisition. `RAISE` checks the token and ceiling and
+  sets `fence` to the highest of those and the floor only when above the stored one (decimal
+  text, as `POINT` compares); it prints the fence it leaves, including its own `INCR`.
+  Recovery refuses a counter already at that ceiling without consuming the last acquisition;
+  it never lowers or clamps fences. The next locked publish can still use `LAST_FENCE`.
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.

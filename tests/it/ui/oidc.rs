@@ -418,7 +418,8 @@ fn a_viewer_s_grant_bounds_every_view() {
         "path = \"../web\"\n",
         &format!("path = \"../web\"\n[[repository.peer]]\nrepo = \"{UNLISTED}\"\n"),
     );
-    let dir = console_dir("ui_oidc_grant", Some(VERSION), &nested, &ui_oidc());
+    let ui = ui_oidc() + "operator_claim = \"operator\"\n";
+    let dir = console_dir("ui_oidc_grant", Some(VERSION), &nested, &ui);
     let console = start(&dir, "127.0.0.1:0");
     let es256 = |claims: &Value| sign(&signing, "k1", Algorithm::ES256, claims);
     let web = es256(&claims(&base, &[WEB]));
@@ -427,6 +428,8 @@ fn a_viewer_s_grant_bounds_every_view() {
         c["groups"] = json!(["team-gw"]);
     }));
     let all = es256(&edited(&base, |c| c["meada_repositories"] = json!(["*"])));
+
+    let operator = es256(&edited(&base, |c| c["operator"] = json!(true)));
 
     let entries = |token: &str| {
         let manifest = ask(&console, "/api/v1/manifest", token).json();
@@ -450,6 +453,17 @@ fn a_viewer_s_grant_bounds_every_view() {
     );
     assert_eq!(manifest["modules"].as_array().unwrap().len(), 7);
     assert!(!manifest.to_string().contains("../gateway"));
+    assert!(!manifest.to_string().contains(GATEWAY), "{manifest}");
+    assert_eq!(
+        manifest["manifest"]["oidc"]["groups"]["team-web"],
+        json!([WEB])
+    );
+    for token in [&all, &operator] {
+        assert_eq!(
+            entries(token).1["manifest"]["oidc"]["groups"]["team-gw"],
+            json!([GATEWAY])
+        );
+    }
     assert_eq!(manifest["manifest"]["repository"][0]["peer"], json!([]));
     assert_eq!(
         entries(&all).1["manifest"]["repository"][0]["peer"][0]["repo"],
@@ -487,6 +501,37 @@ fn a_viewer_s_grant_bounds_every_view() {
     assert_eq!(errors(&web), json!(positions));
 
     assert_leaks_nothing(&console.stderr(), &[&web, &gateway, &all]);
+}
+
+/// An identity known only through a groups mapping is still hidden in on-disk errors.
+#[test]
+fn manifest_errors_hide_identities_known_only_through_groups() {
+    const HIDDEN: &str = "private.example/group/hidden";
+    let (signing, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let source = head(&issuer.base) + &format!("\"team-hidden\" = [\"{HIDDEN}\"]\n");
+    let dir = console_dir("ui_oidc_group_error", Some(VERSION), &source, &ui_oidc());
+    let console = start(&dir, "127.0.0.1:0");
+    let token = |ids: &[&str]| sign(&signing, "k1", Algorithm::ES256, &claims(&issuer.base, ids));
+    let broken = source.replace(
+        "path = \"../web\"\n",
+        &format!("path = \"../web\"\nserve = \"{HIDDEN}\"\n"),
+    );
+    write_manifest(&dir, &broken, &ui_oidc());
+    let whole = ask(&console, "/api/v1/manifest", &token(&["*"])).json();
+    assert!(whole["errors"].to_string().contains(HIDDEN), "{whole}");
+    let restricted = ask(&console, "/api/v1/manifest", &token(&[WEB])).json();
+    assert!(!restricted.to_string().contains(HIDDEN), "{restricted}");
+    assert!(!restricted["errors"].as_array().unwrap().is_empty());
+
+    // A new on-disk group may have the wrong scalar shape, so it never reached loaded state.
+    const NEW: &str = "private.example/group/new";
+    let broken = source.replace(&format!("[\"{HIDDEN}\"]"), &format!("\"{NEW}\""));
+    write_manifest(&dir, &broken, &ui_oidc());
+    let whole = ask(&console, "/api/v1/manifest", &token(&["*"])).json();
+    assert!(whole["errors"].to_string().contains(NEW), "{whole}");
+    let restricted = ask(&console, "/api/v1/manifest", &token(&[WEB])).json();
+    assert!(!restricted.to_string().contains(NEW), "{restricted}");
 }
 
 /// The playground and the exports (#305) bounded by the viewer's grant, as a node bounds a call

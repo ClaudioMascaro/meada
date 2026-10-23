@@ -6,6 +6,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Console manifest groups and validation errors respect the viewer's grant; PKCE redirects
+  retain issuer query parameters while replacing generated OAuth keys.
+- Fence recovery shares the fleet reader's Valkey clock and complete heartbeat validation,
+  and refuses counters that would prevent the next native INCR acquisition. Exact u64
+  transport remains supported, with bilingual operational refusals at the signed ceiling.
+
 ### Added
 
 - Workspace editor and version history (issue #310): viewers compare any two immutable

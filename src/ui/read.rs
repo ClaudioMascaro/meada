@@ -530,6 +530,10 @@ impl Console {
             .await
             .map_err(vk)?;
         let (heartbeats, malformed) = heartbeat::read(valkey, config).await.map_err(vk)?;
+        let malformed: Vec<_> = malformed
+            .iter()
+            .map(|problem| problem.row(config))
+            .collect();
         let counter: Option<String> = valkey
             .query(cmd("GET").arg(config.key("fence", true)))
             .await
