@@ -6,11 +6,11 @@
 //!
 //! Without `[generations]` the store's `current` names the generation, and a node keeps it and
 //! the one it replaced. With it (feature `generation-pointer`), Valkey names the current
-//! generation and the retained ones (`generations::read`, every entry checked before the node
-//! changes): the node holds every retained generation and deletes the others, never the current
-//! one or the one it just replaced, and its pointer file carries the fence read with the id. The
-//! current generation is fetched and swapped in first; a retained one that fails after it is a
-//! warning, retried by the next pull, and blocks nothing. A current generation whose fence is
+//! generation and the retained ones (`generations::read`, the whole list, every entry checked
+//! before the node changes): the node holds every retained generation, kept ones included, and
+//! deletes the others, never the current one or the one it just replaced, and its pointer file
+//! carries the fence read with the id. The current generation is fetched and swapped in first; a
+//! retained one that fails after it is a warning, retried by the next pull, and blocks nothing. A current generation whose fence is
 //! below the one in the node's pointer file (a refresh lock's fence lost in Valkey) is an error
 //! that changes nothing; without a pointer file the node takes it whatever its fence.
 //!
@@ -65,13 +65,23 @@ pub enum Pulled {
 /// The generation id and fence `<local_dir>/current` names, `None` when there is none. The id
 /// is checked against the id shape before it becomes part of a path.
 pub fn current(local_dir: &Path) -> std::result::Result<Option<(String, u64)>, String> {
-    let path = local_dir.join(POINTER);
-    if fs::symlink_metadata(&path).is_err_and(|e| e.kind() == io::ErrorKind::NotFound) {
+    pointer_file(&local_dir.join(POINTER), |shown| {
+        Msg::SnapshotPointerBad(shown).text()
+    })
+}
+
+/// The id and fence the pointer file `path` names (one line, `<id> <fence>`), `None` when there
+/// is none; anything else is the error `bad` gives for the path shown.
+pub(super) fn pointer_file(
+    path: &Path,
+    bad: impl Fn(&str) -> String,
+) -> std::result::Result<Option<(String, u64)>, String> {
+    if fs::symlink_metadata(path).is_err_and(|e| e.kind() == io::ErrorKind::NotFound) {
         return Ok(None);
     }
     let shown = path.display().to_string();
-    let bad = || Msg::SnapshotPointerBad(&shown).text();
-    let bytes = crate::config::read_bounded(&path, POINTER_MAX).map_err(|_| bad())?;
+    let bad = || bad(&shown);
+    let bytes = crate::config::read_bounded(path, POINTER_MAX).map_err(|_| bad())?;
     let text = String::from_utf8(bytes).map_err(|_| bad())?;
     let (id, fence) = (text.strip_suffix('\n'))
         .and_then(|line| line.split_once(' '))
@@ -257,7 +267,7 @@ fn clear(local: &Path, doomed: impl Fn(&str) -> bool) {
 }
 
 /// `current.new` written with `<id> <fence>` and renamed over the pointer file.
-fn swap(local: &Path, id: &str, fence: u64) -> std::result::Result<(), String> {
+pub(super) fn swap(local: &Path, id: &str, fence: u64) -> std::result::Result<(), String> {
     let new = local.join("current.new");
     let at = io_at(&new);
     let mut file = File::create(&new).map_err(&at)?;
@@ -267,7 +277,7 @@ fn swap(local: &Path, id: &str, fence: u64) -> std::result::Result<(), String> {
     fs::rename(&new, local.join(POINTER)).map_err(at)
 }
 
-fn io_at(path: &Path) -> impl Fn(io::Error) -> String + use<> {
+pub(super) fn io_at(path: &Path) -> impl Fn(io::Error) -> String + use<> {
     let shown = path.display().to_string();
     move |e| format!("{shown}: {e}")
 }
@@ -283,10 +293,7 @@ async fn fetch(
 ) -> std::result::Result<(), String> {
     let _ = fs::remove_dir_all(partial);
     fs::create_dir(partial).map_err(io_at(partial))?;
-    let key = config.key(&format!("generations/{id}.json"));
-    let bytes = store.get(&key, DOCUMENT_MAX).await?;
-    let bytes = bytes.ok_or_else(|| Msg::SnapshotObjectBad(&key).text())?;
-    let document = checked(config, id, &key, &bytes)?;
+    let (document, bytes) = stored_document(store, config, id).await?;
     let mut budget = Budget {
         bytes: GENERATION_BYTES_MAX,
         entries: GENERATION_ENTRIES_MAX,
@@ -315,6 +322,33 @@ async fn fetch(
     fs::write(partial.join(DOCUMENT), &bytes).map_err(io_at(partial))
 }
 
+/// The store's optional current generation id, checked before a caller builds any key.
+#[cfg(feature = "ui")]
+pub(crate) async fn store_current(
+    store: &Store,
+    config: &Config,
+) -> std::result::Result<Option<String>, String> {
+    let key = config.key("current");
+    store
+        .get(&key, super::CURRENT_MAX)
+        .await?
+        .map(|bytes| store_pointer(&key, &bytes))
+        .transpose()
+}
+
+/// The document of the generation `id` in the store, checked (`checked`), and its bytes as
+/// stored; a missing or malformed one is an error naming its key.
+pub(crate) async fn stored_document(
+    store: &Store,
+    config: &Config,
+    id: &str,
+) -> std::result::Result<(Document, Vec<u8>), String> {
+    let key = config.key(&format!("generations/{id}.json"));
+    let bytes = store.get(&key, DOCUMENT_MAX).await?;
+    let bytes = bytes.ok_or_else(|| Msg::SnapshotObjectBad(&key).text())?;
+    Ok((checked(config, id, &key, &bytes)?, bytes))
+}
+
 /// The document stored at `key` checked as the generation `id`, before any path or key is
 /// built from it: every identity passes the manifest's rules (`identity_problem`, none listed
 /// twice) and holds nothing a git remote URL cannot; every bundle key is `repos/<identity>/<bundle
@@ -332,6 +366,14 @@ fn checked(
     if document.generation != id {
         return Err(not());
     }
+    if let Some(version) = document.workspace.as_deref().filter(|v| !is_id(v)) {
+        let version = version.escape_debug().to_string();
+        return Err(Msg::SnapshotBadWorkspace {
+            key,
+            version: &version,
+        }
+        .text());
+    }
     let hex = |text: &str, lens: &[usize]| {
         lens.contains(&text.len()) && text.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
     };
@@ -347,6 +389,14 @@ fn checked(
         if let Some(problem) = problem {
             return Err(format!("{key}: {}: {problem}", identity.escape_debug()));
         }
+        let mut fields = entry.blocks.as_object().cloned().ok_or_else(not)?;
+        if fields.contains_key("repo") || fields.contains_key("path") {
+            return Err(not());
+        }
+        fields.insert("repo".into(), identity.into());
+        fields.insert("path".into(), "".into());
+        serde_json::from_value::<meada_core::manifest::EntryFile>(fields.into())
+            .map_err(|_| not())?;
         let prefix = config.key(&format!("repos/{identity}/"));
         let bundle = (entry.bundle.strip_prefix(&prefix))
             .and_then(|name| name.strip_suffix(".tar"))
@@ -699,6 +749,8 @@ mod tests {
             path_style: false,
             credentials: Credentials::Instance,
             local_dir: None,
+            node_name: None,
+            ca_file: None,
         }
     }
 

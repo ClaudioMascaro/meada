@@ -1,0 +1,11 @@
+image:
+  cloud: true
+modules:
+  snapshot:
+    enabled: true
+  valkey:
+    enabled: true
+  generations:
+    enabled: true
+  refreshLock:
+    enabled: true

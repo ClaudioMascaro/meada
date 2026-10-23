@@ -19,7 +19,7 @@ pub struct Module {
     pub built: bool,
 }
 
-pub const MODULES: [Module; 6] = [
+pub const MODULES: [Module; 7] = [
     Module {
         section: "valkey",
         feature: "valkey",
@@ -49,6 +49,11 @@ pub const MODULES: [Module; 6] = [
         section: "github_app",
         feature: "github-app",
         built: cfg!(feature = "github-app"),
+    },
+    Module {
+        section: "ui",
+        feature: "ui",
+        built: cfg!(feature = "ui"),
     },
 ];
 
@@ -97,7 +102,12 @@ fn located(file: &Path, src: &str, at: usize, what: &str) -> Box<dyn std::error:
 }
 
 /// A problem with a key of a module section: its dotted name and the message.
-#[cfg(any(feature = "valkey", feature = "snapshot", feature = "oidc"))]
+#[cfg(any(
+    feature = "valkey",
+    feature = "snapshot",
+    feature = "oidc",
+    feature = "ui"
+))]
 pub type Problem = (&'static str, String);
 
 /// `section` of `src`, the content of `file`, checked by `validate` when the manifest has it; a
@@ -229,7 +239,12 @@ pub fn agent(timeout: std::time::Duration) -> ureq::Agent {
 /// Whether `host`, as a URL names it (an IPv6 address with or without its brackets), is
 /// loopback: `localhost`, `127.0.0.0/8` or `::1`. A name that only starts like one, and an
 /// IPv4-mapped address, are not.
-#[cfg(any(feature = "valkey", feature = "snapshot", feature = "oidc"))]
+#[cfg(any(
+    feature = "valkey",
+    feature = "snapshot",
+    feature = "oidc",
+    feature = "ui"
+))]
 pub fn loopback(host: &str) -> bool {
     let ip = (host.strip_prefix('[').and_then(|h| h.strip_suffix(']'))).unwrap_or(host);
     host == "localhost"
@@ -239,12 +254,13 @@ pub fn loopback(host: &str) -> bool {
 }
 
 /// What a module's endpoint URL may hold past its host.
-#[cfg(any(feature = "oidc", feature = "github-app"))]
+#[cfg(any(feature = "oidc", feature = "github-app", feature = "ui"))]
 #[derive(Clone, Copy, PartialEq)]
 pub enum Shape {
     /// A path (`[oidc]` `issuer`, `[[github_app]]` `api`).
+    #[cfg(any(feature = "oidc", feature = "github-app"))]
     Path,
-    /// Nothing (`[oidc]` `public_url`).
+    /// Nothing (`[oidc]` and `[ui]` `public_url`).
     Bare,
     /// A path and a query (the OIDC metadata's `jwks_uri`).
     Query,
@@ -253,7 +269,7 @@ pub enum Shape {
 /// Whether `url` is an endpoint a module may name: `https`, or `http` on loopback
 /// (`localhost`, `127.0.0.0/8`, `::1`; an IPv4-mapped address is not loopback), with a host, no
 /// user and no fragment, and past its host what `shape` allows.
-#[cfg(any(feature = "oidc", feature = "github-app"))]
+#[cfg(any(feature = "oidc", feature = "github-app", feature = "ui"))]
 pub fn reachable(url: &str, shape: Shape) -> bool {
     let Ok(uri) = url.parse::<ureq::http::Uri>() else {
         return false;
@@ -275,6 +291,31 @@ pub fn reachable(url: &str, shape: Shape) -> bool {
         Some("http") => loopback(host),
         _ => false,
     }
+}
+
+/// The seconds since the Unix epoch.
+#[cfg(any(feature = "generation-pointer", feature = "oidc"))]
+pub fn now() -> u64 {
+    let since = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
+    since.map_or(0, |d| d.as_secs())
+}
+
+/// `secs` since the epoch in RFC 3339, UTC, to the second (the civil date by Howard Hinnant's
+/// algorithm, years starting in March).
+#[cfg(any(feature = "generation-pointer", all(feature = "oidc", feature = "ui")))]
+pub fn rfc3339(secs: u64) -> String {
+    let (days, day) = ((secs / 86_400) as i64, secs % 86_400);
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    let (h, min, s) = (day / 3600, day % 3600 / 60, day % 60);
+    format!("{y:04}-{m:02}-{d:02}T{h:02}:{min:02}:{s:02}Z")
 }
 
 #[cfg(test)]
@@ -318,6 +359,17 @@ mod tests {
         assert_eq!(
             err,
             "m.toml:3: [oidc] needs a Meada built with the oidc feature"
+        );
+    }
+
+    #[cfg(not(feature = "ui"))]
+    #[test]
+    fn the_ui_section_without_its_feature_names_it() {
+        let src = "index_dir = \"i\"\n[ui]\ndir = \"ui\"\n";
+        let err = check(Path::new("m.toml"), src).unwrap_err().to_string();
+        assert_eq!(
+            err,
+            "m.toml:2: [ui] needs a Meada built with the ui feature"
         );
     }
 

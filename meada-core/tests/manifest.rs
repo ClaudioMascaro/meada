@@ -1,0 +1,101 @@
+//! A workspace text's validation at the crate's public seam: the errors the CLI prints for the
+//! same text, naming the file, the line and the dotted key, or the entry.
+
+use meada_core::manifest::{validate, validate_entries};
+
+const FILE: &str = "ops/meada.workspace.toml";
+
+fn problems(src: &str) -> Vec<String> {
+    validate(FILE, src).err().unwrap_or_default()
+}
+
+#[test]
+fn a_valid_workspace_gives_its_entries_in_order() {
+    let src = "[[repository]]\nrepo = \"example.com/acme/web\"\npath = \"../web\"\n\
+               [repository.serve]\nprefix = \"/shop/\"\n\
+               [[repository]]\nrepo = \"example.com/acme/api\"\npath = \"api\"\n\
+               [[repository.peer]]\nrepo = \"example.com/acme/web\"\nbase_url_env = [\"WEB\"]\n";
+    let entries = validate(FILE, src).unwrap_or_else(|e| panic!("{e:?}"));
+    let repos: Vec<&str> = entries.iter().map(|e| e.repo.as_str()).collect();
+    assert_eq!(repos, ["example.com/acme/web", "example.com/acme/api"]);
+    assert_eq!(entries[0].serve.prefix.as_deref(), Some("/shop"));
+    assert_eq!(
+        entries[1].blocks(),
+        ["[[repository.peer]] example.com/acme/web"]
+    );
+    assert!(validate(FILE, "").unwrap().is_empty());
+}
+
+#[test]
+fn a_text_error_names_the_file_the_line_and_the_key() {
+    for (src, error) in [
+        (
+            "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nbranch = \"main\"\n",
+            "ops/meada.workspace.toml:4: `repository.branch` is not a meada.workspace.toml key",
+        ),
+        (
+            "[[repository]]\npath = \"x\"\n",
+            "ops/meada.workspace.toml:1: `repository.repo` is missing",
+        ),
+        (
+            "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n[[repository.peer]]\n\
+             repo = \"a.com/y\"\npath = \"../y\"\n",
+            "ops/meada.workspace.toml:6: `repository.peer.path` is not a meada.workspace.toml key",
+        ),
+        (
+            "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n[repository.serve]\n\
+             prefix = \"edge\"\n",
+            "ops/meada.workspace.toml:5: `repository.serve.prefix`: `edge` must start with `/`",
+        ),
+        (
+            "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n[[repository.resource]]\n\
+             kind = \"Postgres\"\nid = \"orders\"\nrole = \"read\"\n",
+            "ops/meada.workspace.toml:5: `repository.resource.kind`: `Postgres` is not a \
+             lowercase identifier (ASCII letters, digits and hyphens, starting with a letter)",
+        ),
+        // A workspace's text holds its entries alone.
+        (
+            "index_dir = \"/srv\"\n",
+            "ops/meada.workspace.toml:1: `index_dir` is not a meada.workspace.toml key",
+        ),
+    ] {
+        assert_eq!(problems(src), [error], "{src}");
+    }
+}
+
+#[test]
+fn every_entry_whose_identity_cannot_be_served_is_named() {
+    let src = "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n\
+               [[repository]]\nrepo = \"local/y\"\npath = \"y\"\n\
+               [[repository]]\nrepo = \"a.com/../z\"\npath = \"z\"\n\
+               [[repository]]\nrepo = \"a.com/x\"\npath = \"x2\"\n";
+    assert_eq!(
+        problems(src),
+        [
+            "local/y: a local identity: server mode serves repositories by their remote",
+            "a.com/../z: not a repository identity: a segment is empty, `.` or `..`",
+            "a.com/x: listed twice",
+        ]
+    );
+}
+
+/// A whole manifest's `[[repository]]` entries, its other keys and sections unread, checked as a
+/// workspace's text is (`meada workspace import`).
+#[test]
+fn a_manifest_s_entries_are_validated_alone() {
+    let src = "index_dir = \"/srv\"\n\n[snapshot]\nbucket = \"b\"\n\n\
+               [[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n";
+    let entries = validate_entries(FILE, src).unwrap_or_else(|e| panic!("{e:?}"));
+    assert_eq!(entries.len(), 1);
+    let src = "index_dir = \"/srv\"\n\n[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n\
+               [[repository.peer]]\nrepo = \"a.com/y\"\npath = \"../y\"\n";
+    assert_eq!(
+        validate_entries(FILE, src).err().unwrap_or_default(),
+        ["ops/meada.workspace.toml:8: `repository.peer.path` is not a meada.workspace.toml key"]
+    );
+    let src = "index_dir = \"/srv\"\n\n[[repository]]\nrepo = \"local/x\"\npath = \"x\"\n";
+    assert_eq!(
+        validate_entries(FILE, src).err().unwrap_or_default(),
+        ["local/x: a local identity: server mode serves repositories by their remote"]
+    );
+}

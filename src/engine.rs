@@ -1,23 +1,23 @@
 //! The query engine: opens a workspace from a directory and answers over its indexes.
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
 use crate::contract::{self, ContractKind, Hit, KINDS, Level, Link, Role, Search, View};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
-use crate::entry::{self, EntryPoint};
 use crate::index::{Export, State, Symbol, schema};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::{Fix, Msg};
 use crate::render::{
     DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, mark, rank, section, unresolved,
 };
-use crate::shape::{self, Shape};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Manifest, Missing, Repository, Workspace};
 use crate::{Result, decisions, document, drift_view, index, items, render, repo, trace};
+use meada_core::context::{self, shape_lines};
+use meada_core::search;
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
 const MAX_PEERS: usize = 10;
@@ -50,7 +50,7 @@ impl Engine {
     pub fn open_manifest(manifest: &Path, repo: &str) -> Result<Self> {
         let shown = manifest.display().to_string();
         Self::read(
-            Manifest::read(manifest)?.workspace(repo, &|_| true)?,
+            Manifest::read_listed(manifest)?.workspace(repo, &|_| true)?,
             Fix::Index(&shown),
         )
     }
@@ -177,7 +177,7 @@ impl Engine {
         export.processes = processes;
         export.links = links.collect();
         export.stale_decisions = evaluations.swap_remove(0).stale;
-        Ok(serde_json::to_string_pretty(&export)? + "\n")
+        Ok(export.written().write()?)
     }
 
     /// The index content of every repository of the workspace, with the contracts its
@@ -255,7 +255,7 @@ impl Engine {
         let (links, evaluations) = self.links_and_decisions(&exports);
         let repos = &self.workspace.repos;
         let entries = drift_view::entries(repos, &exports, &links);
-        let drift = drift_view::counts(repos, &entries);
+        let drift = drift_view::counts(repos.len(), &entries);
         let lines = (repos.iter().zip(&exports).zip(drift))
             .map(|((repo, export), drift)| {
                 let mut lines: Vec<String> = (contract::KINDS.iter())
@@ -382,7 +382,7 @@ impl Engine {
             let exports = self.exports()?;
             let links = self.links(&exports);
             let hits = own.own_search(&exports, &links, &query.to_lowercase());
-            return Ok(hits_answer(query, hits, budget));
+            return Ok(search::answer(query, hits, budget));
         }
         if kind == Some("drift") {
             return self.search_drift(query, budget);
@@ -486,7 +486,7 @@ impl Engine {
                 hits.push((r, format!("{contract} {site}"), line));
             }
         }
-        Ok(hits_answer(query, hits, budget))
+        Ok(search::answer(query, hits, budget))
     }
 
     /// The documents read (spec #21) whose path or `info.title` matches `query`, one line each,
@@ -517,7 +517,7 @@ impl Engine {
                 hits.push((r, format!("{} {}", repo.identity, doc.path), line));
             }
         }
-        Ok(hits_answer(query, hits, budget))
+        Ok(search::answer(query, hits, budget))
     }
 
     /// The drift (spec #23) whose route path or missing field path matches `query`, one line
@@ -528,8 +528,8 @@ impl Engine {
         let exports = self.exports()?;
         let links = self.links(&exports);
         let entries = drift_view::entries(&self.workspace.repos, &exports, &links);
-        let hits = drift_view::matches(&self.workspace.repos, &entries, &query.to_lowercase());
-        Ok(hits_answer(query, hits, budget))
+        let hits = drift_view::matches(&entries, &query.to_lowercase());
+        Ok(search::answer(query, hits, budget))
     }
 
     /// The communities (spec #31) whose name matches `query`, one line each, as `<repository>
@@ -549,7 +549,7 @@ impl Engine {
                 hits.push((r, format!("{repository} {}", c.name), line));
             }
         }
-        Ok(hits_answer(query, hits, budget))
+        Ok(search::answer(query, hits, budget))
     }
 
     /// The processes (spec #31) whose entry point's label matches `query`, one line each, as
@@ -569,7 +569,7 @@ impl Engine {
                 hits.push((r, e.identity.clone(), line));
             }
         }
-        Ok(hits_answer(query, hits, budget))
+        Ok(search::answer(query, hits, budget))
     }
 
     /// The open items of `kind` whose enclosing symbol or call expression matches `query`.
@@ -601,7 +601,7 @@ impl Engine {
             );
             hits.push((r, item.id, line));
         }
-        Ok(hits_answer(query, hits, budget))
+        Ok(search::answer(query, hits, budget))
     }
 
     /// The resource, channel or route `contract`: one line per provider and consumer across the
@@ -731,7 +731,7 @@ impl Engine {
             if view.follows_drift() {
                 let links = self.links(&exports);
                 let entries = drift_view::entries(repos, &exports, &links);
-                lines.extend(drift_view::consumers(repos, &entries, contract));
+                lines.extend(drift_view::consumers(&entries, contract));
             }
             return Ok(render::budgeted(&lines, budget));
         }
@@ -816,43 +816,22 @@ impl Engine {
         ));
         let graph = trace::Graph::new(&self.workspace, &exports, &links);
         let found = graph.processes_of(&symbol_found.id);
-        let bytes = |lines: &[String]| lines.iter().map(|l| render::line_bytes(l)).sum::<usize>();
-        let cap = render::bytes(budget.unwrap_or(render::DEFAULT_BUDGET));
-        let head = [header, community];
-        // An answer that fits is cut nowhere, with every process named.
-        let full = processes_line(&found, repos, usize::MAX);
-        let whole: Vec<String> = (head.iter().cloned())
-            .chain([full])
-            .chain(span.iter().cloned())
-            .chain(tail.iter().cloned())
+        let processes = (found.iter())
+            .map(|&(n, e)| context::Process {
+                repository: &repos[n].identity,
+                kind: e.kind,
+                label: &e.label,
+                identity: &e.identity,
+            })
             .collect();
-        if bytes(&whole) <= cap {
-            return Ok(render::budgeted(&whole, budget));
-        }
-        // Otherwise the cut order, from the last to give up: header, community, the processes
-        // line (its summary, then the entries that fit), the sections after the span, the span
-        // text. The processes line may take what the head leaves less the widest note the final
-        // cut can write, so that cut never reaches it.
-        let total = head.len() + 1 + span.len() + 1 + tail.len();
-        let widest = render::note(total, total, budget.unwrap_or(render::DEFAULT_BUDGET));
-        let room = cap.saturating_sub(bytes(&head) + 1 + widest.len());
-        let processes = processes_line(&found, repos, room);
-        let left = cap.saturating_sub(bytes(&head) + render::line_bytes(&processes));
-        // The span gives up first: it keeps the lines the tail leaves, then its own note. With no
-        // room even for the note it is left out, and the agent reads it from the lines the
-        // header's range names.
-        let span_room = left.saturating_sub(bytes(&tail));
-        let (_, span) = render::cut(&span, span_room, budget.unwrap_or(render::DEFAULT_BUDGET));
-        let span = if span.len() > span_room {
-            String::new()
-        } else {
-            span
+        let symbol = context::Symbol {
+            header,
+            community,
+            processes,
+            span,
+            tail,
         };
-        let mut lines = Vec::from(head);
-        lines.push(processes);
-        lines.extend(span.lines().map(str::to_string));
-        lines.extend(tail);
-        Ok(render::budgeted(&lines, budget))
+        Ok(symbol.answer(budget))
     }
 }
 
@@ -939,29 +918,6 @@ fn contracts(
         return lines;
     }
     section("contracts", lines)
-}
-
-/// What a route's response (or a channel's payload: `what`) carries, after its `provides` line:
-/// the fields and the parts left open, each line naming where the shape comes from.
-fn shape_lines(identity: &str, shape: &Shape, what: &str) -> Vec<String> {
-    let at = shape.source.at();
-    let list = |paths: &BTreeSet<String>| {
-        let paths: Vec<&str> = paths.iter().map(|p| shape::shown(p)).collect();
-        paths.join(", ")
-    };
-    let fields = list(&shape.fields);
-    let mut lines = vec![
-        format!("{identity} {at} {what} fields: {fields}")
-            .trim_end()
-            .to_string(),
-    ];
-    if !shape.open.is_empty() {
-        lines.push(format!(
-            "{identity} {at} {what} open: {}",
-            list(&shape.open)
-        ));
-    }
-    lines
 }
 
 /// The span's first line in its file and its lines, or `None` when its file under `root` no
@@ -1074,7 +1030,20 @@ pub fn status(dir: &Path) -> Result<String> {
 /// as locally, only when every repository is indexed at the current schema. It only reads, as
 /// `Engine::open_manifest` does.
 pub fn status_workspace(manifest: &Path) -> Result<String> {
-    let listed = Manifest::read(manifest)?;
+    let listed = Manifest::read_listed(manifest)?;
+    Ok(status_listed(&listed, manifest))
+}
+
+/// The status report and readiness from the same managed workspace version, read once.
+pub fn probe_workspace(manifest: &Path) -> Result<(String, bool)> {
+    let listed = Manifest::read_listed(manifest)?;
+    Ok((
+        status_listed(&listed, manifest),
+        ready_listed(&listed, manifest),
+    ))
+}
+
+fn status_listed(listed: &Manifest, manifest: &Path) -> String {
     let shown = manifest.display().to_string();
     let missing = listed.missing();
     // Informational: the exit code of the probe depends on local state only.
@@ -1104,7 +1073,7 @@ pub fn status_workspace(manifest: &Path) -> Result<String> {
     });
     let first = rows.first().map(|(repo, _, _)| repo.clone());
     let report = match (indexed, first) {
-        (true, Some(first)) => (listed.workspace(&first, &|_| true))
+        (true, Some(first)) => (listed.clone().workspace(&first, &|_| true))
             .and_then(|workspace| Engine::read(workspace, Fix::Index(&shown)))
             .and_then(|engine| engine.status_report())
             .unwrap_or_default(),
@@ -1118,7 +1087,7 @@ pub fn status_workspace(manifest: &Path) -> Result<String> {
         let line = format!("{repo} ({path}) {state}");
         (repo, line)
     });
-    Ok(status_lines(heads, report, &missing) + &ignored + &valkey)
+    status_lines(heads, report, &missing) + &ignored + &valkey
 }
 
 /// `meada index --workspace` (ADR 0011): refreshes every repository the manifest at `manifest`
@@ -1126,10 +1095,22 @@ pub fn status_workspace(manifest: &Path) -> Result<String> {
 /// missing index or one of another schema. Returns the problems, one `<repo>: <problem>` per
 /// repository that could not be refreshed, in manifest order; one does not stop the others.
 pub fn index_workspace(manifest: &Path) -> Result<Vec<String>> {
-    let listed = Manifest::read(manifest)?;
+    let listed = Manifest::read_listed(manifest)?;
     let refresh = |r: &Repository| {
         let db = index::open(&r.index, &r.root, &r.identity, &r.config.serve)?;
-        index::refresh(&db, &r.root, &r.identity, &r.config.serve)
+        let before = repo::head(&r.root).ok();
+        index::refresh(&db, &r.root, &r.identity, &r.config.serve)?;
+        // Keep provenance on the same read snapshot while another indexing pass may write.
+        db.execute_batch("BEGIN")?;
+        let fresh = index::fresh(&db, &r.root, &r.identity, &r.config.serve)?;
+        let head = repo::head(&r.root)
+            .ok()
+            .filter(|head| Some(head) == before.as_ref());
+        let clean = repo::unclean(&r.root, true).is_ok_and(|changes| changes.is_empty());
+        let recorded =
+            index::record_commit(&db, &r.index, head.as_deref().filter(|_| clean && fresh));
+        db.execute_batch("ROLLBACK")?;
+        recorded
     };
     Ok((listed.entries.iter())
         .filter_map(|l| {
@@ -1147,7 +1128,12 @@ pub fn index_workspace(manifest: &Path) -> Result<Vec<String>> {
 /// the current schema version. Otherwise every problem, one per line, each index problem naming
 /// `meada index --workspace`. It only reads.
 pub fn served(manifest: &Path) -> Result<Manifest> {
-    let listed = Manifest::read(manifest)?;
+    let listed = Manifest::read_listed(manifest)?;
+    check_served(&listed, manifest)?;
+    Ok(listed)
+}
+
+fn check_served(listed: &Manifest, manifest: &Path) -> Result<()> {
     let shown = manifest.display().to_string();
     let problems: Vec<String> = (listed.entries.iter())
         .filter_map(|l| match &l.repository {
@@ -1162,8 +1148,8 @@ pub fn served(manifest: &Path) -> Result<Manifest> {
     }
     // The whole workspace opens too: what a call opens, whichever repository it names.
     let first = (listed.entries.first()).ok_or_else(|| format!("{shown}: no repository listed"))?;
-    Engine::open_listed(&listed, &first.repo, manifest, &|_| true)?;
-    Ok(listed)
+    Engine::open_listed(listed, &first.repo, manifest, &|_| true)?;
+    Ok(())
 }
 
 /// How long the readiness probe waits for a commit in progress: a writer must not stall it.
@@ -1173,12 +1159,13 @@ pub const PROBE_BUSY: std::time::Duration = std::time::Duration::from_millis(50)
 /// only because an index is locked by a commit in progress (the file exists and the running
 /// server answers once the lock clears). Run it under `with_busy_timeout(PROBE_BUSY, ..)`.
 pub fn ready(manifest: &Path) -> bool {
-    if served(manifest).is_ok() {
+    Manifest::read_listed(manifest).is_ok_and(|listed| ready_listed(&listed, manifest))
+}
+
+fn ready_listed(listed: &Manifest, manifest: &Path) -> bool {
+    if check_served(listed, manifest).is_ok() {
         return true;
     }
-    let Ok(listed) = Manifest::read(manifest) else {
-        return false;
-    };
     let states: Vec<_> = (listed.entries.iter())
         .map(|l| l.repository.as_ref().map(|r| index::state(&r.index)))
         .collect();
@@ -1359,78 +1346,6 @@ fn relative(from: &Path, to: &Path) -> String {
     } else {
         parts.join("/")
     }
-}
-
-/// `processes: none`, or `processes: <n> (<k> <kind>, ...; <r> repositories)` for the processes
-/// `found`, a summary present whenever there is one, then `: ` and the entries that fit in
-/// `room` bytes, in order, and `, +<m> more` for the rest. When not even the first entry fits
-/// the summary stands alone. An entry is `<label> (<repository>)`, or its `process::` identity
-/// when another process of the same repository has the same label.
-fn processes_line(found: &[(usize, &EntryPoint)], repos: &[Repository], room: usize) -> String {
-    if found.is_empty() {
-        return "processes: none".into();
-    }
-    let kinds: Vec<String> = (entry::EntryKind::ALL.iter())
-        .filter_map(|k| {
-            let n = found.iter().filter(|(_, e)| e.kind == *k).count();
-            (n > 0).then(|| format!("{n} {}", k.name()))
-        })
-        .collect();
-    let repositories = (found.iter().map(|(n, _)| n).collect::<HashSet<_>>()).len();
-    let summary = format!(
-        "processes: {} ({}; {repositories} {})",
-        found.len(),
-        kinds.join(", "),
-        if repositories == 1 {
-            "repository"
-        } else {
-            "repositories"
-        }
-    );
-    let entries: Vec<String> = (found.iter())
-        .map(|&(n, e)| {
-            let same = found.iter().filter(|(m, o)| *m == n && o.label == e.label);
-            match same.count() {
-                1 => format!("{} ({})", e.label, repos[n].identity),
-                _ => format!("process::{}", e.identity),
-            }
-        })
-        .collect();
-    let mut kept = Vec::new();
-    // The length of the summary and the entries kept, joined.
-    let mut used = summary.len() + ": ".len();
-    for (i, entry) in entries.iter().enumerate() {
-        let len = used + if kept.is_empty() { 0 } else { ", ".len() } + entry.len();
-        let rest = entries.len() - i - 1;
-        let more = if rest > 0 {
-            format!(", +{rest} more").len()
-        } else {
-            0
-        };
-        if len + more > room {
-            break;
-        }
-        kept.push(entry.clone());
-        used = len;
-    }
-    if kept.is_empty() {
-        return summary;
-    }
-    let rest = entries.len() - kept.len();
-    if rest > 0 {
-        kept.push(format!("+{rest} more"));
-    }
-    format!("{summary}: {}", kept.join(", "))
-}
-
-/// The `hits` `(rank, tie-break key, line)` sorted and cut at `budget`, or the answer for none.
-fn hits_answer(query: &str, mut hits: Vec<Hit>, budget: Option<usize>) -> String {
-    hits.sort();
-    if hits.is_empty() {
-        return format!("no matches for `{query}`\n");
-    }
-    let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
-    render::budgeted(&lines, budget)
 }
 
 #[cfg(test)]

@@ -1,0 +1,24 @@
+{
+  "nodes": [
+    {
+      "name": "node-a",
+      "heartbeat": {
+        "name": "node-a", "generation": "aaaaaaaaaaaaaaaa", "fence": 15,
+        "held": ["aaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbb"], "ready": true,
+        "version": "0.1.0", "time": "2026-10-22T20:00:00Z"
+      },
+      "workspace": "cccccccccccccccc",
+      "stuck": { "kind": "node", "recoveries": ["meada snapshot fence recover", "delete this node's <local_dir>/current"] }
+    }
+  ],
+  "malformed": [{ "name": "bad/node", "reason": "invalid node name" }],
+  "pointer": { "id": "bbbbbbbbbbbbbbbb", "fence": 10 },
+  "retained": [
+    { "id": "bbbbbbbbbbbbbbbb", "fence": 10, "kept": false },
+    { "id": "aaaaaaaaaaaaaaaa", "fence": 15, "kept": true }
+  ],
+  "holder": { "host": "indexer", "pid": "42", "started": "2026-10-22T20:00:00Z", "holds": "refresh", "ttl_ms": 240000 },
+  "fence": 9, "highest_fence": 15,
+  "stuck": { "kind": "fleet", "recoveries": ["meada snapshot fence recover"] },
+  "last_publish": { "generation": "bbbbbbbbbbbbbbbb", "modified": "2026-10-22T19:59:00Z" }
+}

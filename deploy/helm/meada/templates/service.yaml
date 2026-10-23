@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "meada.name" . }}
+  labels:
+    {{- include "meada.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "meada.serverLabels" . | nindent 4 }}
+  ports:
+    - name: mcp
+      port: {{ .Values.service.port }}
+      targetPort: mcp

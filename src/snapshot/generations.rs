@@ -5,20 +5,27 @@
 //! one set and a workflow run can pin one (`/<identity>@<generation>`, `mcp::route`).
 //!
 //! Keys, under the `[valkey]` key prefix and its hash tag (one slot in cluster mode):
-//! `{<key_prefix>}:current`, a hash `{id, fence}`, and `{<key_prefix>}:retained`, a list of
-//! `<id>:<fence>` newest first, each id once, trimmed to `keep`. Everything read back is hostile:
-//! each id and fence is checked before it becomes part of a path, a key or a comparison.
+//! `{<key_prefix>}:current`, a hash `{id, fence}`, `{<key_prefix>}:retained`, a list of
+//! `<id>:<fence>` newest first, each id once, trimmed to `keep` entries that are not kept, and
+//! `{<key_prefix>}:kept`, the set of generation ids an operator keeps by hand (`meada snapshot
+//! pointer retain`), which the trim never removes. Everything read back is hostile: each id and
+//! fence is checked before it becomes part of a path, a key or a comparison.
 
 use redis::cmd;
 use serde::Deserialize;
 
 use super::{fence, is_id};
+pub(crate) use crate::modules::{now, rfc3339};
 use crate::msg::Msg;
 use crate::valkey::{self, Valkey};
 
 /// The fewest generations `keep` may retain: the current one and the one it replaced.
 const KEEP_MIN: i64 = 2;
 const KEEP_DEFAULT: i64 = 3;
+// ponytail: the most generations `{<key_prefix>}:kept` may hold: every node holds every retained
+// generation on disk, so `retain` refuses past it and a pull refuses a retained list longer than
+// `keep` plus it.
+pub const KEPT_MAX: u64 = 8;
 
 /// The `[generations]` section as written.
 #[derive(Deserialize)]
@@ -46,12 +53,18 @@ pub fn keys(valkey: &valkey::Config) -> (String, String) {
     (valkey.key("current", true), valkey.key("retained", true))
 }
 
-/// The pointer script. KEYS: current, retained, lock. ARGV: id, fence, keep, lock token (empty
-/// for none). With a token it returns 0 unless the lock holds it, and -1 unless the fence is
+/// The kept set, `{<key_prefix>}:kept`.
+pub fn kept(valkey: &valkey::Config) -> String {
+    valkey.key("kept", true)
+}
+
+/// The pointer script. KEYS: current, retained, lock, kept. ARGV: id, fence, keep, lock token
+/// (empty for none). With a token it returns 0 unless the lock holds it, and -1 unless the fence is
 /// above the one `current` holds (compared as decimal text, so no fence loses precision as a
 /// Lua number; -2 when that one is no decimal). Then it removes every entry of the id from the
-/// list before pushing it, so the list holds each id once, trims the list to `keep` and sets
-/// the hash, all at once. Without a token (no `[refresh_lock]`) the fence is `0` and nothing
+/// list before pushing it, so the list holds each id once, removes the oldest entries whose id is
+/// not kept until at most `keep` of those remain (never a kept one) and sets the hash, all at
+/// once. Without a token (no `[refresh_lock]`) the fence is `0` and nothing
 /// is checked.
 const POINT: &str = r"
 if ARGV[4] ~= '' then
@@ -77,7 +90,15 @@ for _, entry in ipairs(redis.call('LRANGE', KEYS[2], 0, -1)) do
   end
 end
 redis.call('LPUSH', KEYS[2], mine .. ARGV[2])
-redis.call('LTRIM', KEYS[2], 0, tonumber(ARGV[3]) - 1)
+local unkept = 0
+for _, entry in ipairs(redis.call('LRANGE', KEYS[2], 0, -1)) do
+  if redis.call('SISMEMBER', KEYS[4], string.match(entry, '^[^:]*')) == 0 then
+    unkept = unkept + 1
+    if unkept > tonumber(ARGV[3]) then
+      redis.call('LREM', KEYS[2], -1, entry)
+    end
+  end
+end
 redis.call('HSET', KEYS[1], 'id', ARGV[1], 'fence', ARGV[2])
 return 1
 ";
@@ -97,12 +118,8 @@ pub async fn point(
     let (current, retained) = keys(config);
     let lock = config.key("lock", true);
     let mut script = cmd("EVAL");
-    script
-        .arg(POINT)
-        .arg(3)
-        .arg(&current)
-        .arg(&retained)
-        .arg(&lock);
+    script.arg(POINT).arg(4).arg(&current).arg(&retained);
+    script.arg(&lock).arg(kept(config));
     script.arg(id).arg(fence).arg(keep).arg(token.unwrap_or(""));
     let wrote = valkey.query::<i64>(&script).await;
     match wrote.map_err(|e| format!("{current}, {retained}: {e}"))? {
@@ -124,22 +141,25 @@ pub struct Pointer {
     /// The current generation and its fence.
     pub id: String,
     pub fence: u64,
-    /// The retained generations, newest first, each once, at most `keep`.
+    /// The retained generations, newest first, each once, at most `keep` plus `KEPT_MAX`.
     pub retained: Vec<String>,
 }
 
-/// The pointer and the first `keep` retained generations, every id and fence checked. A missing
-/// pointer, an empty list or a malformed entry is an error naming its key.
+/// The pointer and every retained generation, every id and fence checked. A missing pointer, an
+/// empty list, a list longer than `keep` plus `KEPT_MAX` or a malformed entry is an error naming
+/// its key.
 pub async fn read(valkey: &Valkey, config: &valkey::Config, keep: u64) -> Result<Pointer, String> {
     let (id, fence) = current(valkey, config).await?;
     let retained = keys(config).1;
-    let range = cmd("LRANGE").arg(&retained).arg(0).arg(keep - 1).clone();
+    let max = keep + KEPT_MAX;
+    // One entry past the most allowed, to tell a list that is too long.
+    let range = cmd("LRANGE").arg(&retained).arg(0).arg(max).clone();
     let entries: Vec<Vec<u8>> =
         (valkey.query(&range).await).map_err(|e| format!("{retained}: {e}"))?;
     Ok(Pointer {
         id,
         fence,
-        retained: listed(&retained, &entries)?,
+        retained: listed(&retained, &entries, max)?,
     })
 }
 
@@ -154,7 +174,7 @@ pub async fn current(valkey: &Valkey, config: &valkey::Config) -> Result<(String
 }
 
 /// The hash `{<key_prefix>}:current` (`key`), as `HMGET key id fence` returns it.
-fn pointer(key: &str, fields: &[Option<Vec<u8>>]) -> Result<(String, u64), String> {
+pub(super) fn pointer(key: &str, fields: &[Option<Vec<u8>>]) -> Result<(String, u64), String> {
     let text = |bytes: &[u8]| std::str::from_utf8(bytes).ok().map(str::to_string);
     match fields {
         [None, None] => Err(Msg::SnapshotNoCurrent(key).text()),
@@ -170,10 +190,13 @@ fn pointer(key: &str, fields: &[Option<Vec<u8>>]) -> Result<(String, u64), Strin
 }
 
 /// The ids of the list `{<key_prefix>}:retained` (`key`), each entry `<id>:<fence>`, in order and
-/// each once.
-fn listed(key: &str, entries: &[Vec<u8>]) -> Result<Vec<String>, String> {
+/// each once, at most `max` entries.
+fn listed(key: &str, entries: &[Vec<u8>], max: u64) -> Result<Vec<String>, String> {
     if entries.is_empty() {
         return Err(Msg::GenerationsEmpty(key).text());
+    }
+    if entries.len() as u64 > max {
+        return Err(Msg::GenerationsTooLong { key, max }.text());
     }
     let mut ids: Vec<String> = Vec::new();
     for entry in entries {
@@ -189,6 +212,46 @@ fn listed(key: &str, entries: &[Vec<u8>]) -> Result<Vec<String>, String> {
     Ok(ids)
 }
 
+/// Retention state for an operational read, including each retained fence and kept mark.
+/// A deployment with no publish yet has no current pointer and an empty retained set.
+#[cfg(feature = "ui")]
+pub(crate) async fn inspect(
+    valkey: &Valkey,
+    config: &valkey::Config,
+    keep: u64,
+) -> Result<serde_json::Value, String> {
+    use serde_json::json;
+    let (current, retained) = keys(config);
+    let fields: Vec<Option<Vec<u8>>> = valkey
+        .query(cmd("HMGET").arg(&current).arg("id").arg("fence"))
+        .await?;
+    let current = match fields.as_slice() {
+        [None, None] => None,
+        _ => Some(pointer(&current, &fields)?),
+    };
+    let entries: Vec<Vec<u8>> = valkey
+        .query(cmd("LRANGE").arg(&retained).arg(0).arg(keep + KEPT_MAX))
+        .await?;
+    if !entries.is_empty() {
+        listed(&retained, &entries, keep + KEPT_MAX)?;
+    }
+    let kept_key = kept(config);
+    let kept: Vec<String> = valkey.query(cmd("SMEMBERS").arg(&kept_key)).await?;
+    if kept.len() as u64 > KEPT_MAX || kept.iter().any(|id| !is_id(id)) {
+        return Err(Msg::GenerationsBadEntry(&kept_key).text());
+    }
+    let retained: Vec<_> = entries
+        .iter()
+        .filter_map(|entry| {
+            let (id, f) = std::str::from_utf8(entry).ok()?.split_once(':')?;
+            Some(json!({"id": id, "fence": fence(f)?, "kept": kept.iter().any(|k| k == id)}))
+        })
+        .collect();
+    Ok(
+        json!({"pointer": current.map(|(id, fence)| json!({"id": id, "fence": fence})), "retained": retained}),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -197,6 +260,14 @@ mod tests {
     const LIST: &str = "{meada}:retained";
     const A: &str = "000000000000000a";
     const B: &str = "000000000000000b";
+
+    #[test]
+    fn a_start_time_is_rfc_3339_in_utc_to_the_second() {
+        assert_eq!(rfc3339(0), "1970-01-01T00:00:00Z");
+        assert_eq!(rfc3339(951_825_599), "2000-02-29T11:59:59Z");
+        assert_eq!(rfc3339(1_792_627_199), "2026-10-21T23:59:59Z");
+        assert_eq!(rfc3339(4_107_542_400), "2100-03-01T00:00:00Z");
+    }
 
     fn fields(id: Option<&str>, fence: Option<&str>) -> Vec<Option<Vec<u8>>> {
         vec![id.map(|s| s.into()), fence.map(|s| s.into())]
@@ -210,7 +281,7 @@ mod tests {
 
     fn bad_entry(entry: &[u8]) {
         let entries = [format!("{A}:1").into_bytes(), entry.to_vec()];
-        let e = listed(LIST, &entries).unwrap_err();
+        let e = listed(LIST, &entries, 9).unwrap_err();
         assert!(e.starts_with(&format!("{LIST}: ")), "{e}");
     }
 
@@ -309,16 +380,29 @@ mod tests {
         let entries = [format!("{B}:2"), format!("{A}:1"), format!("{B}:0")];
         let entries: Vec<Vec<u8>> = entries.into_iter().map(String::into_bytes).collect();
         assert_eq!(
-            listed(LIST, &entries),
+            listed(LIST, &entries, 3),
             Ok(vec![B.to_string(), A.to_string()])
         );
     }
 
     #[test]
     fn an_empty_list_names_its_key() {
-        let e = listed(LIST, &[]).unwrap_err();
+        let e = listed(LIST, &[], 9).unwrap_err();
         assert!(
             e.starts_with(&format!("{LIST}: ")) && e.contains("empty"),
+            "{e}"
+        );
+    }
+
+    #[test]
+    fn a_list_longer_than_its_most_names_its_key_and_the_most() {
+        let entries = [format!("{A}:1"), format!("{B}:0")];
+        let entries: Vec<Vec<u8>> = entries.into_iter().map(String::into_bytes).collect();
+        assert_eq!(listed(LIST, &entries, 2).unwrap().len(), 2);
+        let e = listed(LIST, &entries, 1).unwrap_err();
+        assert_eq!(e, Msg::GenerationsTooLong { key: LIST, max: 1 }.text());
+        assert!(
+            e.starts_with(&format!("{LIST}: ")) && e.contains(" 1 "),
             "{e}"
         );
     }
@@ -387,6 +471,44 @@ mod tests {
             .query::<i64>(cmd("DEL").arg(&current).arg(&retained))
             .await
             .unwrap();
+    }
+
+    /// With two kept generations and `keep = 2`, the trim leaves both kept ones and exactly the
+    /// two newest unkept ones, and `read` gives them all.
+    #[tokio::test(flavor = "current_thread")]
+    async fn the_trim_never_removes_a_kept_generation() {
+        let Some(url) = crate::valkey::tests::service() else {
+            return;
+        };
+        let pid = std::process::id();
+        let toml = format!("url = \"{url}\"\nkey_prefix = \"meada:test-kept-{pid}\"");
+        let config: valkey::File = toml::from_str(&toml).unwrap();
+        let config = config.validate(std::path::Path::new("/")).unwrap();
+        let valkey = Valkey::connect(&config).await.unwrap();
+        let (current, retained) = keys(&config);
+        let del = cmd("DEL")
+            .arg(&current)
+            .arg(&retained)
+            .arg(kept(&config))
+            .clone();
+        valkey.query::<i64>(&del).await.unwrap();
+        let (c, d, e) = ("000000000000000c", "000000000000000d", "000000000000000e");
+        for id in [A, B] {
+            point(&valkey, &config, 2, id, None, 0).await.unwrap();
+        }
+        let sadd = cmd("SADD").arg(kept(&config)).arg(A).arg(B).clone();
+        valkey.query::<i64>(&sadd).await.unwrap();
+        for id in [c, d, e] {
+            point(&valkey, &config, 2, id, None, 0).await.unwrap();
+        }
+        let list: Vec<String> = valkey
+            .query(cmd("LRANGE").arg(&retained).arg(0).arg(-1))
+            .await
+            .unwrap();
+        assert_eq!(list, [e, d, B, A].map(|id| format!("{id}:0")));
+        let read = read(&valkey, &config, 2).await.unwrap();
+        assert_eq!(read.retained, [e, d, B, A]);
+        valkey.query::<i64>(&del).await.unwrap();
     }
 
     /// With a token, the script writes only while the lock holds it and the fence is above the

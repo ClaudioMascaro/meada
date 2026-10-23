@@ -1,0 +1,25 @@
+# Operator must seed/apply the workspace and publish before init pull can finish.
+image:
+  cloud: true
+workspace:
+  source: store
+modules:
+  snapshot:
+    enabled: true
+  valkey:
+    enabled: true
+  generations:
+    enabled: true
+  refreshLock:
+    enabled: true
+  oidc:
+    enabled: true
+    groupsClaim: groups
+    groups:
+      meada-readers: [github.com/claudiomascaro/meada]
+      meada-operators: ["*"]
+console:
+  enabled: true
+  operatorGroups: [meada-operators]
+  ingress:
+    enabled: true

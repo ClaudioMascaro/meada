@@ -5,6 +5,8 @@
 //! with `MEADA_TEST_SERVICES_REQUIRED=1` they fail.
 #![cfg(feature = "snapshot")]
 
+mod tls;
+
 use std::fs;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
@@ -133,7 +135,7 @@ pub(crate) fn objects(s3: &AmazonS3, prefix: &str) -> Vec<ObjectMeta> {
     })
 }
 
-fn get(s3: &AmazonS3, key: &str) -> Vec<u8> {
+pub(crate) fn get(s3: &AmazonS3, key: &str) -> Vec<u8> {
     block_on(async {
         s3.get(&Key::from(key))
             .await
@@ -145,12 +147,12 @@ fn get(s3: &AmazonS3, key: &str) -> Vec<u8> {
     })
 }
 
-fn put(s3: &AmazonS3, key: &str, bytes: &[u8]) {
+pub(crate) fn put(s3: &AmazonS3, key: &str, bytes: &[u8]) {
     block_on(s3.put(&Key::from(key), bytes.to_vec().into())).unwrap();
 }
 
 /// The `meada-size` and `meada-blake3` metadata of the object at `key`.
-fn metadata(s3: &AmazonS3, key: &str) -> (u64, String) {
+pub(crate) fn metadata(s3: &AmazonS3, key: &str) -> (u64, String) {
     let options = GetOptions {
         head: true,
         ..GetOptions::default()
@@ -700,7 +702,7 @@ fn pull_takes_the_published_generation_and_keeps_the_previous_one() {
 }
 
 /// Puts `bytes` at `key` with the metadata Meada stores every object with.
-fn put_stored(s3: &AmazonS3, key: &str, bytes: &[u8]) {
+pub(crate) fn put_stored(s3: &AmazonS3, key: &str, bytes: &[u8]) {
     let mut attributes = Attributes::new();
     let size = bytes.len().to_string();
     let hash = blake3::hash(bytes).to_hex().to_string();

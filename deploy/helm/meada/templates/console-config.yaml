@@ -1,0 +1,28 @@
+{{- if .Values.console.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "meada.consoleName" . }}
+  labels:
+    {{- include "meada.consoleLabels" . | nindent 4 }}
+data:
+  meada.workspace.toml: |
+    index_dir = "/data/console/indexes"
+
+    [workspace]
+    source = "store"
+    {{- include "meada.modules" (dict "Values" .Values "localDir" "/data/console/generations") | nindent 4 }}
+
+    [ui]
+    dir = "/usr/share/meada/ui"
+    public_url = {{ .Values.console.publicUrl | toJson }}
+    client_id = {{ .Values.console.clientId | toJson }}
+    audience = {{ .Values.console.audience | toJson }}
+    operations = {{ .Values.console.operations }}
+    {{- with .Values.console.operatorGroups }}
+    operator_groups = {{ . | toJson }}
+    {{- end }}
+    {{- with .Values.console.operatorClaim }}
+    operator_claim = {{ . | toJson }}
+    {{- end }}
+{{- end }}

@@ -8,6 +8,9 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
+#[cfg(feature = "snapshot")]
+pub(crate) use meada_core::manifest::identity_problem;
+use meada_core::manifest::{EntryFile, entry_problems};
 use serde::Deserialize;
 
 use crate::config::{self, Config};
@@ -175,6 +178,8 @@ impl Workspace {
 #[derive(Clone)]
 pub struct Manifest {
     pub entries: Vec<Listed>,
+    /// Where every index lives (a pulled generation's directory for `of_generation`).
+    pub index_dir: PathBuf,
     /// The `[valkey]` section, when the build has the module.
     #[cfg(feature = "valkey")]
     pub valkey: Option<crate::valkey::Config>,
@@ -192,6 +197,16 @@ pub struct Manifest {
     /// The `[oidc]` section, when the build has the module.
     #[cfg(feature = "oidc")]
     pub oidc: Option<crate::oidc::Config>,
+    /// The `[ui]` section, when the build has the module (ADR 0014).
+    #[cfg(feature = "ui")]
+    pub ui: Option<crate::ui::Config>,
+    /// `[workspace] source = "store"` (ADR 0014): the repositories come from the current
+    /// workspace version: `entries` is empty, or with `read_listed` the pulled version's.
+    #[cfg(feature = "generation-pointer")]
+    pub store: bool,
+    /// With `read_listed` and `source = "store"`, the id of the pulled version read.
+    #[cfg(feature = "generation-pointer")]
+    pub version: Option<String>,
 }
 
 /// One `[[repository]]` of a manifest.
@@ -230,59 +245,43 @@ struct ManifestFile {
     refresh_lock: Option<crate::snapshot::lock::File>,
     #[cfg(feature = "oidc")]
     oidc: Option<crate::oidc::File>,
+    #[cfg(feature = "ui")]
+    ui: Option<crate::ui::File>,
     #[cfg(feature = "github-app")]
     #[serde(default, rename = "github_app")]
     github_apps: Vec<crate::github_app::File>,
+    workspace: Option<WorkspaceFile>,
 }
 
-/// A `[[repository]]`: `serve` and `resource` take the shapes of `meada.toml`'s, `peer` that
-/// of its `[[peer]]` without `path` (the manifest locates every repository).
+/// The `[workspace]` section (ADR 0014), read in every build: where the repositories come from.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct EntryFile {
-    repo: String,
-    path: String,
-    #[serde(default, deserialize_with = "config::declared")]
-    serve: config::Serve,
-    #[serde(default, rename = "resource")]
-    resources: Vec<config::Resource>,
-    #[serde(default, rename = "peer")]
-    peers: Vec<EntryPeer>,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct EntryPeer {
-    repo: String,
+struct WorkspaceFile {
     #[serde(default)]
-    base_url_env: Vec<String>,
+    source: Source,
 }
 
-impl EntryFile {
-    /// Its blocks, as `Listed::ignored` names them.
-    fn blocks(&self) -> Vec<String> {
-        let serve = self
-            .serve
-            .declared
-            .then(|| "[repository.serve]".to_string());
-        let resources =
-            (self.resources.iter()).map(|r| format!("[[repository.resource]] {} {}", r.kind, r.id));
-        let peers = (self.peers.iter()).map(|p| format!("[[repository.peer]] {}", p.repo));
-        serve.into_iter().chain(resources).chain(peers).collect()
-    }
+#[derive(Deserialize, Default, PartialEq)]
+#[serde(rename_all = "lowercase")]
+enum Source {
+    /// The file's own `[[repository]]` entries.
+    #[default]
+    File,
+    /// The current workspace version in the snapshot store.
+    Store,
+}
 
-    /// Its blocks as the configuration of a mirror with no `meada.toml`.
-    fn config(self) -> Config {
-        let peers = self.peers.into_iter().map(|p| config::Peer {
-            repo: p.repo,
-            path: None,
-            base_url_env: p.base_url_env,
-        });
-        Config {
-            peers: peers.collect(),
-            serve: self.serve,
-            resources: self.resources,
-        }
+/// An entry's blocks as the configuration of a mirror with no `meada.toml`.
+fn config_of(entry: EntryFile) -> Config {
+    let peers = entry.peers.into_iter().map(|p| config::Peer {
+        repo: p.repo,
+        path: None,
+        base_url_env: p.base_url_env,
+    });
+    Config {
+        peers: peers.collect(),
+        serve: entry.serve,
+        resources: entry.resources,
     }
 }
 
@@ -290,9 +289,16 @@ impl Manifest {
     /// The manifest at `file`; `index_dir` and each `path` are absolute or relative to its
     /// directory. A parse error names the file, the line and the key, as `meada.toml`'s do.
     pub fn read(file: &Path) -> Result<Self> {
+        Self::read_from(file, false)
+    }
+
+    /// `read`, and with `pulled` and `source = "store"` the entries of the workspace version
+    /// pulled under `<index_dir>/workspace/` (`versions::pulled`), read from disk.
+    fn read_from(file: &Path, pulled: bool) -> Result<Self> {
         let src = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
         modules::check(file, &src)?;
-        let parsed: ManifestFile = config::parse(file, &src, "meada.workspace.toml")?;
+        #[cfg_attr(not(feature = "generation-pointer"), allow(unused_mut))]
+        let mut parsed: ManifestFile = config::parse(file, &src, "meada.workspace.toml")?;
         let Some(index_dir) = parsed.index_dir else {
             let missing = Msg::KeyMissing("index_dir").text();
             return Err(format!("{}: {missing}", file.display()).into());
@@ -321,23 +327,67 @@ impl Manifest {
         }
         #[cfg(feature = "oidc")]
         let oidc = modules::validated(file, &src, parsed.oidc, |o| o.validate())?;
+        #[cfg(feature = "ui")]
+        let ui = crate::ui::validated(file, &src, base, parsed.ui)?;
         // The `[[github_app]]` blocks are checked, `[valkey]` among their needs; only
         // `github_apps` keeps them.
         #[cfg(feature = "github-app")]
         crate::github_app::validated(file, &src, base, parsed.github_apps, valkey.is_some())?;
+        let store = parsed.workspace.is_some_and(|w| w.source == Source::Store);
+        #[cfg(not(feature = "generation-pointer"))]
+        if store {
+            let needs = Msg::WorkspaceStoreNeedsFeature.text();
+            return Err(config::error_at(file, &src, "workspace.source", &needs));
+        }
+        #[cfg(feature = "generation-pointer")]
+        if store {
+            let missing = [
+                ("snapshot", snapshot.is_none()),
+                ("generations", generations.is_none()),
+            ];
+            let missing: Vec<&str> = (missing.iter()).filter(|m| m.1).map(|m| m.0).collect();
+            modules::needs(file, &src, "workspace", &missing)?;
+            if !parsed.repositories.is_empty() {
+                let beside = Msg::WorkspaceStoreBeside.text();
+                return Err(config::error_at(file, &src, "repository", &beside));
+            }
+        }
+        let index_dir = base.join(index_dir);
+        #[cfg(feature = "snapshot")]
+        #[cfg_attr(not(feature = "generation-pointer"), allow(unused_mut))]
+        let mut entries_src = src;
+        #[cfg(feature = "generation-pointer")]
+        let mut version = None;
+        #[cfg(feature = "generation-pointer")]
+        if store && pulled {
+            let dir = index_dir.join(crate::snapshot::versions::DIR);
+            let not_pulled = || {
+                let (manifest, dir) = (file.display().to_string(), dir.display().to_string());
+                Msg::WorkspaceNotPulled {
+                    manifest: &manifest,
+                    dir: &dir,
+                }
+                .text()
+            };
+            let (id, repositories, text) =
+                crate::snapshot::versions::pulled(&dir)?.ok_or_else(not_pulled)?;
+            parsed.repositories = repositories;
+            entries_src = text;
+            version = Some(id);
+        }
+        #[cfg(not(feature = "generation-pointer"))]
+        let _ = pulled;
         // Each entry's blocks as written, in manifest order: the typed read checked them.
         #[cfg(feature = "snapshot")]
-        let mut written = crate::snapshot::entry_blocks(&src).into_iter();
-        let index_dir = base.join(index_dir);
+        let mut written = crate::snapshot::entry_blocks(&entries_src).into_iter();
         // Before any `git` call: a mirror another user owns is read all the same (ADR 0011).
         (parsed.repositories.iter()).for_each(|e| repo::trust(&base.join(&e.path)));
-        let mut seen = HashSet::new();
-        let mut entries: Vec<Listed> = (parsed.repositories.into_iter())
-            .map(|e| {
-                let twice = !seen.insert(e.repo.clone());
+        let problems = entry_problems(parsed.repositories.iter().map(|e| e.repo.as_str()));
+        let mut entries: Vec<Listed> = (parsed.repositories.into_iter().zip(problems))
+            .map(|(e, problem)| {
                 let (repo, path, blocks) = (e.repo.clone(), e.path.clone(), e.blocks());
                 let (repository, ignored) =
-                    match mirror(&index_dir, &base.join(&path), &repo, twice, e.config()) {
+                    match mirror(&index_dir, &base.join(&path), &repo, problem, config_of(e)) {
                         Ok((repository, true)) => (Ok(repository), blocks),
                         Ok((repository, false)) => (Ok(repository), Vec::new()),
                         Err(problem) => (Err(problem), Vec::new()),
@@ -379,6 +429,7 @@ impl Manifest {
         }
         Ok(Self {
             entries,
+            index_dir,
             #[cfg(feature = "valkey")]
             valkey,
             #[cfg(feature = "snapshot")]
@@ -389,7 +440,21 @@ impl Manifest {
             refresh_lock,
             #[cfg(feature = "oidc")]
             oidc,
+            #[cfg(feature = "ui")]
+            ui,
+            #[cfg(feature = "generation-pointer")]
+            store,
+            #[cfg(feature = "generation-pointer")]
+            version,
         })
+    }
+
+    /// `read` for a command that reads the repositories (`index`, `status`, `export` and
+    /// `snapshot publish`): with `[workspace] source = "store"` they are the workspace version
+    /// `meada workspace pull` left under `<index_dir>/workspace/`, read once from disk, their
+    /// paths relative to `file`'s directory; without one it is refused, naming the pull.
+    pub fn read_listed(file: &Path) -> Result<Self> {
+        Self::read_from(file, true)
     }
 
     /// The `[valkey]` section and the `[[github_app]]` blocks of the manifest at `file`,
@@ -449,7 +514,7 @@ impl Manifest {
             let own = config::read_own_up_to(&root, "meada.toml", max);
             let (config, ignored) = match own.map_err(|e| bad(e.to_string()))? {
                 Some(own) => (own, blocks),
-                None => (file.config(), Vec::new()),
+                None => (config_of(file), Vec::new()),
             };
             entries.push(Listed {
                 repo: repo.to_string(),
@@ -468,6 +533,7 @@ impl Manifest {
         }
         Ok(Self {
             entries,
+            index_dir: dir.to_path_buf(),
             #[cfg(feature = "valkey")]
             valkey: None,
             snapshot: None,
@@ -477,6 +543,12 @@ impl Manifest {
             refresh_lock: None,
             #[cfg(feature = "oidc")]
             oidc: None,
+            #[cfg(feature = "ui")]
+            ui: None,
+            #[cfg(feature = "generation-pointer")]
+            store: false,
+            #[cfg(feature = "generation-pointer")]
+            version: None,
         })
     }
 
@@ -566,36 +638,19 @@ fn resolved(path: &Path) -> PathBuf {
     })
 }
 
-/// Why `repo` cannot be the identity of a served repository, checked before any path is built
-/// from it: a segment that would leave the directory it is joined to (empty, `.` or `..`), or a
-/// `local/` identity. A manifest entry and a generation document (`meada snapshot pull`) share
-/// it; each also refuses an identity listed twice.
-pub(crate) fn identity_problem(repo: &str) -> Option<String> {
-    if repo.split('/').any(|s| matches!(s, "" | "." | "..")) {
-        return Some(Msg::UnsafeIdentity.text());
-    }
-    if repo.starts_with("local/") {
-        return Some(Msg::LocalIdentity.text());
-    }
-    None
-}
-
 /// The repository a manifest entry lists as `repo` at `path`, its index under `index_dir`, or
-/// why it cannot be served. `twice` when an earlier entry names the same identity. Its
-/// configuration is its own `meada.toml`, whole, or the entry's blocks (`listed`) when it has
-/// none; the flag says it has one.
+/// why it cannot be served: first the `problem` its identity alone decides (`entry_problems`),
+/// then the mirror's. Its configuration is its own `meada.toml`, whole, or the entry's blocks
+/// (`listed`) when it has none; the flag says it has one.
 fn mirror(
     index_dir: &Path,
     path: &Path,
     repo: &str,
-    twice: bool,
+    problem: Option<String>,
     listed: Config,
 ) -> std::result::Result<(Repository, bool), String> {
-    if let Some(problem) = identity_problem(repo) {
+    if let Some(problem) = problem {
         return Err(problem);
-    }
-    if twice {
-        return Err(Msg::ListedTwice.text());
     }
     let shown = path.display().to_string();
     if !path.exists() {

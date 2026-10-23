@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Validate Compose profiles without starting services or printing credentials."""
+
+import json
+import pathlib
+import subprocess
+import tomllib
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+DEPLOY = ROOT / "deploy/compose"
+
+
+def render(profile, console=False):
+    command = ["docker", "compose", "--env-file", ".env.example", "-f", "compose.yaml"]
+    if console:
+        command += ["-f", "compose.console.yaml", "--profile", "console"]
+    command += ["--profile", profile, "config", "--format", "json"]
+    return json.loads(subprocess.check_output(command, cwd=DEPLOY, text=True))
+
+
+local = render("local")
+generations = render("generations")
+for profile in [local, generations]:
+    assert not any("console" in name for name in profile["services"])
+console = render("generations", console=True)["services"]
+assert console["console"]["command"][:2] == ["ui", "--listen"]
+print("compose-check: local, generations and console profiles passed")
+
+for name in ["console", "console-first-pull", "console-pull"]:
+    service = console[name]
+    assert service["image"].endswith("-cloud")
+    data = next(mount for mount in service["volumes"] if mount["target"] == "/var/lib/meada/console")
+    assert data["source"] == "console-data"
+    assert all(mount.get("source") not in {"node-one", "node-two", "job-indexes"} for mount in service["volumes"])
+assert console["console"]["depends_on"]["console-first-pull"]["condition"] == "service_completed_successfully"
+assert console["console-pull"]["command"][:4] == ["snapshot", "pull", "--every", "30"]
+assert console["console-proxy"]["ports"][0]["host_ip"] == "127.0.0.1"
+assert "environment" not in console["console-proxy"]
+assert all("ports" not in console[name] for name in ["console", "console-pull", "console-first-pull"])
+writer = console["generation-indexer"]
+mounts = {mount["target"]: pathlib.Path(mount["source"]).name for mount in writer["volumes"] if mount["type"] == "bind"}
+assert mounts["/etc/meada/meada.workspace.toml"] == "job.workspace.toml"
+assert mounts["/etc/meada/refresh.sh"] == "managed-refresh.sh"
+node_bootstrap = tomllib.loads((DEPLOY / "generations.workspace.toml").read_text())
+console_bootstrap = tomllib.loads((DEPLOY / "console.workspace.toml").read_text())
+job_bootstrap = tomllib.loads((DEPLOY / "job.workspace.toml").read_text())
+for bootstrap in [console_bootstrap, job_bootstrap]:
+    assert bootstrap["workspace"]["source"] == "store" and "repository" not in bootstrap
+    for section in ["valkey", "generations", "refresh_lock"]:
+        assert bootstrap[section] == node_bootstrap[section]
+    for key in ["endpoint", "region", "bucket", "prefix", "credentials", "ca_file"]:
+        assert bootstrap["snapshot"][key] == node_bootstrap["snapshot"][key]
+assert console_bootstrap["snapshot"]["local_dir"] != node_bootstrap["snapshot"]["local_dir"]
+assert console_bootstrap["ui"]["public_url"] == "https://localhost:8444"
+assert not console_bootstrap["ui"]["operations"]
+assert console_bootstrap["ui"]["dir"] == "/usr/share/meada/ui"
+seed = tomllib.loads((DEPLOY / "console.repositories.toml").read_text())
+assert seed["repository"] == node_bootstrap["repository"]
+print("compose-check: isolated storage, managed writer and public console proxy contracts passed")

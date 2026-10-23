@@ -50,10 +50,20 @@ impl Server {
 
     /// `meada mcp <args>` in `dir`, with more environment variables.
     pub(crate) fn start_args(dir: &Path, args: &[&str], env: &[(&str, &str)]) -> Self {
+        Self::start_command(dir, "mcp", args, env)
+    }
+
+    /// `meada <command> <args>` in `dir`, a listener (`mcp`, or `ui` with feature `ui`).
+    pub(crate) fn start_command(
+        dir: &Path,
+        command: &str,
+        args: &[&str],
+        env: &[(&str, &str)],
+    ) -> Self {
         let mut child = Command::new(env!("CARGO_BIN_EXE_meada"))
             .envs(env.iter().copied())
             .current_dir(dir)
-            .arg("mcp")
+            .arg(command)
             .args(args)
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
@@ -97,7 +107,7 @@ impl Drop for Server {
 
 /// SIGTERM to `server`.
 #[cfg(unix)]
-fn terminate(server: &Server) {
+pub(crate) fn terminate(server: &Server) {
     let kill = Command::new("kill")
         .args(["-TERM", &server.child.id().to_string()])
         .status()
@@ -107,7 +117,7 @@ fn terminate(server: &Server) {
 
 /// The exit code of `server` if it exits within `wait`.
 #[cfg(unix)]
-fn exit_within(server: &mut Server, wait: Duration) -> Option<Option<i32>> {
+pub(crate) fn exit_within(server: &mut Server, wait: Duration) -> Option<Option<i32>> {
     let start = Instant::now();
     while start.elapsed() < wait {
         if let Some(status) = server.child.try_wait().unwrap() {

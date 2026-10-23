@@ -111,9 +111,60 @@ fn a_pulled_generation_answers_as_the_chain_goldens_have_it() {
     else {
         return;
     };
-    for (manifest, local) in &nodes {
+    answer_the_goldens(&dir, &first, &nodes);
+}
+
+/// A node whose companion writes heartbeats answers as the chain's goldens have it, with the
+/// same `Meada-Generation` header and `_meta` (#298).
+#[cfg(feature = "generation-pointer")]
+#[test]
+fn a_node_whose_companion_writes_heartbeats_answers_the_same() {
+    use crate::generations::{Companion, Fleet, admin};
+    let Some(fleet) = Fleet::new("serving_heartbeat", 3) else {
+        return;
+    };
+    let first = fleet.publish();
+    let (node, local) = fleet.node("one");
+    assert_eq!(fleet.pull(&node), first);
+    let companion = Companion::start(&fleet.dir, &node, &[]);
+    let name = format!("{{{}}}:node:", crate::generations::prefix(fleet.case));
+    let mut valkey = admin(&fleet.valkey);
+    let key = loop {
+        let keys: Vec<String> = redis::cmd("KEYS")
+            .arg(format!("{name}*"))
+            .query(&mut valkey)
+            .unwrap();
+        if let Some(key) = keys.into_iter().next() {
+            break key;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    };
+    answer_the_goldens(&fleet.dir, &first, &[(node.clone(), local.clone())]);
+    // Heartbeats were written all the while, and the server named the generation.
+    assert!(
+        redis::cmd("EXISTS")
+            .arg(&key)
+            .query::<bool>(&mut valkey)
+            .unwrap()
+    );
+    let server = serve(&fleet.dir, &node);
+    let (_, _, named, _) = crate::generations::get(&server.url);
+    assert_eq!(named.as_deref(), Some(first.as_str()));
+    block_on(async {
+        let client = server.client(&format!("/{WEB}")).await;
+        let from = serde_json::json!({"from": "dashboard"});
+        let trace = client.call_tool(call("trace", from)).await.unwrap();
+        let named = crate::generations::meta(&trace);
+        assert_eq!(named.as_deref(), Some(first.as_str()));
+        client.cancel().await.unwrap();
+    });
+    companion.stop();
+}
+
+fn answer_the_goldens(dir: &Path, first: &str, nodes: &[(String, PathBuf)]) {
+    for (manifest, local) in nodes {
         let before = contents(local);
-        let server = serve(&dir, manifest);
+        let server = serve(dir, manifest);
         // No path names a repository but the ones the generation recorded.
         let listing: String = CHAIN.iter().map(|(repo, _)| format!("{repo}\n")).collect();
         let (status, _, body) = get(&server.url);
@@ -140,11 +191,11 @@ fn a_pulled_generation_answers_as_the_chain_goldens_have_it() {
                 repo,
                 "--generations",
             ];
-            let (export, stderr, code) = run_args(&dir, &args);
+            let (export, stderr, code) = run_args(dir, &args);
             assert_eq!((code, stderr.as_str()), (Some(0), ""), "{manifest} {repo}");
             assert_golden(&format!("{path}.export.json"), &export);
         }
-        let (status, stderr, code) = probe(&dir, manifest);
+        let (status, stderr, code) = probe(dir, manifest);
         assert_eq!((code, stderr.as_str()), (Some(0), ""), "{status}");
         assert!(
             status.starts_with(&format!("current: {first}\n")),

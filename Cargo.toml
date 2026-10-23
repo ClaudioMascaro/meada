@@ -1,10 +1,22 @@
-[package]
-name = "meada"
+# The binary's crate at the root, and `meada-core` (ADR 0014): one version for both, `meada`
+# depending on `meada-core` at exactly that version; `meada-core` is published first.
+[workspace]
+members = [".", "meada-core"]
+default-members = [".", "meada-core"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
-description = "LLM-free code graph that links repositories through the contracts they share, served over MCP"
 license = "Apache-2.0"
 repository = "https://github.com/ClaudioMascaro/meada"
+
+[package]
+name = "meada"
+version.workspace = true
+edition.workspace = true
+description = "LLM-free code graph that links repositories through the contracts they share, served over MCP"
+license.workspace = true
+repository.workspace = true
 readme = "README.md"
 keywords = ["code-graph", "mcp", "tree-sitter", "cross-repo", "code-intelligence"]
 categories = ["development-tools", "command-line-utilities"]
@@ -24,6 +36,8 @@ http-body-util = "0.1.3"
 hyper = { version = "1.9.0", features = ["server", "http1"] }
 hyper-util = { version = "0.1.21", features = ["tokio"] }
 ignore = "0.4.33"
+# At the workspace's version, exactly: bump both together.
+meada-core = { path = "meada-core", version = "=0.1.0" }
 # The OIDC module's JWT validation (ADR 0012), only behind `oidc`, and the GitHub App module's
 # JWT signing (ADR 0013), only behind `github-app`: RustCrypto as its backend, since the other,
 # aws-lc-rs, would be a second rustls provider beside ring. PEM reading (`use_pem`) only with
@@ -87,9 +101,9 @@ yaml-rust2 = { version = "0.13.0", default-features = false }
 
 # The refresh lock's child supervision (`meada snapshot lock`), only behind `refresh-lock` and
 # Unix only: a signal to the child's process group and, on Linux, the signal the child gets when
-# `lock` dies.
+# `lock` dies; the host name and the login the lock's holder names.
 [target.'cfg(unix)'.dependencies]
-nix = { version = "=0.31.3", optional = true, default-features = false, features = ["signal"] }
+nix = { version = "=0.31.3", optional = true, default-features = false, features = ["signal", "hostname", "user"] }
 
 # Cloud modules (ADR 0012), all off by default: a build without a feature carries none of its
 # crates. `valkey` is internal, enabled through the modules that need it.
@@ -104,18 +118,22 @@ snapshot = [
     "dep:rustls",
     "dep:rustls-platform-verifier",
 ]
-# The current and retained generations in Valkey, and pins (`[generations]`). No crate of its own.
-generation-pointer = ["snapshot", "valkey"]
+# The current and retained generations in Valkey, and pins (`[generations]`); `nix` names the host
+# in the heartbeat.
+generation-pointer = ["snapshot", "valkey", "dep:nix"]
 # The refresh lock and its fencing tokens (`[refresh_lock]`, `meada snapshot lock`).
-refresh-lock = ["generation-pointer", "dep:nix"]
+refresh-lock = ["generation-pointer"]
 # Meada as an OAuth resource server (`[oidc]`): the issuer's metadata and JWKS come through the
 # binary's own ureq client, which then verifies certificates against the system's roots.
 oidc = ["dep:jsonwebtoken", "ureq/platform-verifier"]
 # git's credential helper with GitHub App installation tokens (`[[github_app]]`, ADR 0013): the
 # App's JWT signed from its PEM key, its REST calls through the binary's own ureq client.
 github-app = ["valkey", "dep:jsonwebtoken", "jsonwebtoken/use_pem", "ureq/platform-verifier"]
+# The management console (`[ui]`, `meada ui`, ADR 0014): the node's hyper listener and
+# serde_json. No crate of its own.
+ui = []
 # Every cloud module at once (ADR 0012). Unix only, since `refresh-lock` is.
-cloud = ["snapshot", "generation-pointer", "refresh-lock", "oidc", "github-app"]
+cloud = ["snapshot", "generation-pointer", "refresh-lock", "oidc", "github-app", "ui"]
 
 # `cargo test` runs the example's own tests too.
 [[example]]

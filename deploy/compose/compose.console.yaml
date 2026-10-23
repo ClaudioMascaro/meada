@@ -1,0 +1,89 @@
+# Opt in with both --profile generations and --profile console.
+x-console: &console
+  image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}-cloud
+  profiles: [console]
+  hostname: console
+  environment:
+    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in .env}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in .env}
+    VALKEY_PASSWORD: ${VALKEY_PASSWORD:?Set VALKEY_PASSWORD in .env}
+  mem_limit: 512m
+  cpus: 1.0
+  read_only: true
+
+services:
+  generation-indexer:
+    volumes:
+      - ./job.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - ./console.repositories.toml:/etc/meada/repositories.toml:ro
+      - ./managed-refresh.sh:/etc/meada/refresh.sh:ro
+
+  init-console:
+    image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}
+    profiles: [console]
+    user: "0:0"
+    entrypoint: [sh, -ec]
+    command: ["chown 10001:10001 /var/lib/meada/console"]
+    volumes:
+      - console-data:/var/lib/meada/console
+    mem_limit: 64m
+
+  console-first-pull:
+    <<: *console
+    entrypoint: [sh, /etc/meada/first-pull.sh]
+    depends_on:
+      init-console:
+        condition: service_completed_successfully
+      generation-indexer:
+        condition: service_started
+    volumes:
+      - ./console.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - ./first-pull.sh:/etc/meada/first-pull.sh:ro
+      - ca:/etc/meada/ca:ro
+      - console-data:/var/lib/meada/console
+
+  console-pull:
+    <<: *console
+    command: [snapshot, pull, --every, "30", --workspace, /etc/meada/meada.workspace.toml]
+    depends_on:
+      console-first-pull:
+        condition: service_completed_successfully
+    volumes:
+      - ./console.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - ca:/etc/meada/ca:ro
+      - console-data:/var/lib/meada/console
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  console:
+    <<: *console
+    command: [ui, --listen, "0.0.0.0:7334", --workspace, /etc/meada/meada.workspace.toml]
+    depends_on:
+      console-first-pull:
+        condition: service_completed_successfully
+    volumes:
+      - ./console.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - ca:/etc/meada/ca:ro
+      - console-data:/var/lib/meada/console:ro
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  console-proxy:
+    image: caddy:2.11.7-alpine
+    profiles: [console]
+    ports:
+      - "127.0.0.1:8444:443"
+    depends_on:
+      console:
+        condition: service_started
+    volumes:
+      - ./Caddyfile.console:/etc/caddy/Caddyfile:ro
+      - console-proxy-data:/data
+      - console-proxy-config:/config
+    restart: unless-stopped
+    mem_limit: 128m
+
+volumes:
+  console-data:
+  console-proxy-data:
+  console-proxy-config:

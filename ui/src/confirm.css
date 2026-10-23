@@ -1,0 +1,5 @@
+.confirmation { width: min(38rem, calc(100% - 2rem)); padding: 1.5rem; border: 1px solid var(--line); border-radius: 8px; color: #25302f; background: #fff; }
+.confirmation::backdrop { background: rgb(20 38 31 / 55%); }
+.confirmation h2 { margin: 0 0 1rem; font-size: 1.25rem; }
+.confirmation pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 1rem; background: #edf0eb; }
+.confirmation-buttons { display: flex; justify-content: end; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }

@@ -203,29 +203,7 @@ impl Decision {
     }
 }
 
-/// Why a decision does not apply. A decision that waits on a missing peer has none: it is
-/// neither applied nor stale.
-#[derive(Serialize, Clone, Copy, PartialEq, Eq, Debug)]
-#[serde(rename_all = "kebab-case")]
-pub enum Cause {
-    /// No call with the decision's `call` id is in the repository.
-    CallGone,
-    /// The call is there, but the core resolves it on its own or it is no item of the
-    /// decision's kind: nothing is left to decide.
-    ItemNotOpen,
-    /// No repository of the workspace serves the target's contract.
-    TargetGone,
-    /// The target is served, but is not among the candidates of the ambiguous link.
-    NotCandidate,
-}
-
-/// A decision that does not apply.
-#[derive(Serialize, Debug)]
-pub struct Stale {
-    pub call: String,
-    pub target: String,
-    pub cause: Cause,
-}
+pub use meada_core::export::{Cause, Stale};
 
 /// A decision whose target repository is a peer the workspace names and cannot find.
 #[derive(Debug)]

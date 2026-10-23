@@ -233,14 +233,51 @@ enum Refusal {
     Scope,
 }
 
-/// The module of a running server: its section, the issuer's `jwks_uri` and the cached keys.
+/// The module of a running server: its section, the issuer's metadata and `jwks_uri`, and the
+/// cached keys.
 pub struct Oidc {
     config: Config,
+    /// The issuer's metadata document, as read at start.
+    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    issuer_metadata: Value,
     jwks_uri: String,
     agent: ureq::Agent,
     keys: RwLock<Arc<Vec<Jwk>>>,
     /// When an unknown `kid` last made the module fetch the JWKS.
     kid_fetched: Mutex<Option<Instant>>,
+    /// When the JWKS was last read, and the refresh that failed since.
+    fetched: Mutex<Fetched>,
+}
+
+/// When the cached JWKS was read (seconds since the epoch), and the last refresh that failed
+/// after it, with its time and why.
+#[cfg_attr(not(feature = "ui"), allow(dead_code))]
+struct Fetched {
+    at: u64,
+    failed: Option<(u64, String)>,
+}
+
+/// A console's admission (ADR 0014): what a token admitted may read, and who it names.
+#[cfg(feature = "ui")]
+pub struct Admitted {
+    /// The token's `sub`, when it has one.
+    pub subject: Option<String>,
+    pub grant: Grant,
+    /// The console role derived only from verified groups or a strict boolean claim.
+    pub operator: bool,
+}
+
+/// Each check of a pasted token (ADR 0014): `None` where it could not be made, since the
+/// signature did not pass.
+#[cfg(feature = "ui")]
+pub struct Checked {
+    pub signature: bool,
+    pub issuer: Option<bool>,
+    pub audience: Option<bool>,
+    pub lifetime: Option<bool>,
+    pub scopes: Option<bool>,
+    /// What the token may read when every check passes.
+    pub grant: Option<Grant>,
 }
 
 /// `GET url`, at most `max` bytes of a success answer; a redirect is no success.
@@ -278,35 +315,36 @@ fn metadata_urls(issuer: &str) -> Vec<String> {
     urls
 }
 
-/// The `jwks_uri` of the first metadata document of `issuer` that can be used: it must name
-/// `issuer` (RFC 8414) and an endpoint the module may reach. A document that cannot is passed
-/// over as an unanswered one is, and each is named in the error when none can.
-fn discover(agent: &ureq::Agent, issuer: &str) -> Result<String, String> {
+/// The `jwks_uri` of the first metadata document of `issuer` that can be used, and the document:
+/// it must name `issuer` (RFC 8414) and an endpoint the module may reach. A document that cannot
+/// is passed over as an unanswered one is, and each is named in the error when none can.
+fn discover(agent: &ureq::Agent, issuer: &str) -> Result<(String, Value), String> {
     let mut tried = Vec::new();
     for url in metadata_urls(issuer) {
         match metadata(agent, &url, issuer) {
-            Ok(jwks_uri) => return Ok(jwks_uri),
+            Ok(found) => return Ok(found),
             Err(why) => tried.push(format!("{url}: {why}")),
         }
     }
     Err(Msg::OidcMetadata(&tried.join("; ")).text())
 }
 
-/// The `jwks_uri` of the metadata document at `url`, or why it cannot be used.
-fn metadata(agent: &ureq::Agent, url: &str, issuer: &str) -> Result<String, String> {
+/// The `jwks_uri` of the metadata document at `url`, and the document, or why it cannot be used.
+fn metadata(agent: &ureq::Agent, url: &str, issuer: &str) -> Result<(String, Value), String> {
     #[derive(Deserialize)]
     struct Metadata {
         issuer: String,
         jwks_uri: Option<String>,
     }
     let body = get(agent, url, METADATA_MAX)?;
-    let metadata: Metadata = serde_json::from_slice(&body).map_err(|e| e.to_string())?;
+    let document: Value = serde_json::from_slice(&body).map_err(|e| e.to_string())?;
+    let metadata = Metadata::deserialize(&document).map_err(|e| e.to_string())?;
     if metadata.issuer != issuer {
         return Err(Msg::OidcIssuerMismatch(&metadata.issuer).text());
     }
     let jwks_uri = metadata.jwks_uri.unwrap_or_default();
     match reachable(&jwks_uri, Shape::Query) {
-        true => Ok(jwks_uri),
+        true => Ok((jwks_uri, document)),
         false => Err(Msg::OidcJwksUri(&Msg::OidcJwksUrl.text()).text()),
     }
 }
@@ -320,7 +358,12 @@ fn jwks(agent: &ureq::Agent, url: &str) -> Result<Vec<Jwk>, String> {
     }
     let fail = |why: String| Msg::OidcJwks { url, why: &why }.text();
     let body = get(agent, url, JWKS_MAX).map_err(fail)?;
-    let set: Set = serde_json::from_slice(&body).map_err(|e| fail(e.to_string()))?;
+    // Only where the document fails, never what it holds: a failed refresh is shown (ADR 0014).
+    let shape = |e: serde_json::Error| {
+        let (line, column) = (e.line(), e.column());
+        fail(Msg::OidcJwksShape { line, column }.text())
+    };
+    let set: Set = serde_json::from_slice(&body).map_err(shape)?;
     let keys: Vec<Jwk> = (set.keys.into_iter())
         .filter_map(|key| serde_json::from_value::<Jwk>(key).ok())
         .filter(signs)
@@ -396,6 +439,23 @@ fn bearer(headers: &HeaderMap) -> Result<Option<&str>, Refusal> {
     }
 }
 
+/// The header of `token` when it may be checked: an algorithm of `ALGORITHMS`, and no `crit`,
+/// which names extensions the token needs understood (RFC 7515 §4.1.11): none is.
+fn signing(token: &str) -> Option<Header> {
+    let header = jsonwebtoken::decode_header(token).ok()?;
+    (ALGORITHMS.contains(&header.alg) && header.crit.is_none()).then_some(header)
+}
+
+/// Whether `claims`' `aud`, a string or an array, holds one of `audiences`.
+fn addressed(claims: &Map<String, Value>, audiences: &[String]) -> bool {
+    let aud = match claims.get("aud") {
+        Some(Value::String(aud)) => vec![aud.as_str()],
+        Some(Value::Array(auds)) => auds.iter().filter_map(Value::as_str).collect(),
+        _ => Vec::new(),
+    };
+    aud.iter().any(|aud| audiences.iter().any(|a| a == aud))
+}
+
 /// A response with a fixed body.
 fn reply(status: StatusCode, kind: &str, body: String) -> Reply {
     Response::builder()
@@ -410,9 +470,13 @@ impl Oidc {
     /// fetches the JWKS again every `config.refresh` while the module lives.
     pub fn start(config: Config) -> crate::Result<Arc<Self>> {
         let agent = agent(FETCH_TIMEOUT);
-        let jwks_uri = discover(&agent, &config.issuer)?;
+        let (jwks_uri, issuer_metadata) = discover(&agent, &config.issuer)?;
         let keys = jwks(&agent, &jwks_uri)?;
-        let oidc = Arc::new(Self::new(config, agent, jwks_uri, keys));
+        let oidc = Self::new(config, agent, jwks_uri, keys);
+        let oidc = Arc::new(Self {
+            issuer_metadata,
+            ..oidc
+        });
         let (module, every) = (Arc::downgrade(&oidc), oidc.config.refresh);
         std::thread::spawn(move || refresh_every(module, every));
         Ok(oidc)
@@ -423,8 +487,13 @@ impl Oidc {
             config,
             jwks_uri,
             agent,
+            issuer_metadata: Value::Null,
             keys: RwLock::new(Arc::new(keys)),
             kid_fetched: Mutex::new(None),
+            fetched: Mutex::new(Fetched {
+                at: crate::modules::now(),
+                failed: None,
+            }),
         }
     }
 
@@ -463,7 +532,7 @@ impl Oidc {
 
     /// The 403 for a valid token whose claim does not list the identity `path` names.
     pub fn forbidden(&self, path: &str) -> Reply {
-        let challenge = self.challenge(path, Some("insufficient_scope"), false);
+        let challenge = self.challenge(Some(path), Some("insufficient_scope"), false);
         self.challenged(StatusCode::FORBIDDEN, challenge)
     }
 
@@ -473,7 +542,7 @@ impl Oidc {
             Refusal::Invalid => (StatusCode::UNAUTHORIZED, Some("invalid_token")),
             Refusal::Scope => (StatusCode::FORBIDDEN, Some("insufficient_scope")),
         };
-        self.challenged(status, self.challenge(path, error, true))
+        self.challenged(status, self.challenge(Some(path), error, true))
     }
 
     fn challenged(&self, status: StatusCode, challenge: String) -> Reply {
@@ -490,22 +559,27 @@ impl Oidc {
         response
     }
 
-    /// `WWW-Authenticate` for `path`: the error, the metadata URL and, with `scope`, the
-    /// configured scopes.
-    fn challenge(&self, path: &str, error: Option<&str>, scope: bool) -> String {
+    /// `WWW-Authenticate` for `path`: the error, the metadata URL (none without a path: the
+    /// console serves no metadata) and, with `scope`, the configured scopes.
+    fn challenge(&self, path: Option<&str>, error: Option<&str>, scope: bool) -> String {
         let mut parts = Vec::new();
         if let Some(error) = error {
             parts.push(format!("error=\"{error}\""));
         }
-        let metadata = self.resource(&format!("{METADATA_PATH}/{path}"));
-        parts.push(format!(
-            "resource_metadata=\"{}\"",
-            metadata.trim_end_matches('/')
-        ));
+        if let Some(path) = path {
+            let metadata = self.resource(&format!("{METADATA_PATH}/{path}"));
+            parts.push(format!(
+                "resource_metadata=\"{}\"",
+                metadata.trim_end_matches('/')
+            ));
+        }
         if scope && !self.config.scopes.is_empty() {
             parts.push(format!("scope=\"{}\"", self.config.scopes.join(" ")));
         }
-        format!("Bearer {}", parts.join(", "))
+        match parts.is_empty() {
+            true => "Bearer".into(),
+            false => format!("Bearer {}", parts.join(", ")),
+        }
     }
 
     /// The URL of the resource at `path`: `<public_url>/<path>`, the path percent-encoded.
@@ -530,53 +604,193 @@ impl Oidc {
         reply(StatusCode::OK, "application/json", document.to_string())
     }
 
-    /// The grant of `token` if it passes: an algorithm of `ALGORITHMS`, signed by a cached key
+    /// The grant of `token` if it passes (`verified`).
+    fn verify(&self, token: &str, audiences: &[String]) -> Result<Grant, Refusal> {
+        let claims = self.verified(token, audiences)?;
+        Ok(Grant::of(&claims, &self.config))
+    }
+
+    /// The claims of `token` if it passes: an algorithm of `ALGORITHMS`, signed by a cached key
     /// that fits it (the JWKS fetched again once when none does), `exp` and `nbf`, `iss`, an
     /// `aud` among `audiences`, and every configured scope.
-    fn verify(&self, token: &str, audiences: &[String]) -> Result<Grant, Refusal> {
-        let header = jsonwebtoken::decode_header(token).map_err(|_| Refusal::Invalid)?;
-        // `crit` names extensions the token needs understood (RFC 7515 §4.1.11): none is.
-        if !ALGORITHMS.contains(&header.alg) || header.crit.is_some() {
-            return Err(Refusal::Invalid);
-        }
+    fn verified(&self, token: &str, audiences: &[String]) -> Result<Map<String, Value>, Refusal> {
+        let header = signing(token).ok_or(Refusal::Invalid)?;
         if !self.keys().iter().any(|key| fits(key, &header)) {
             self.refetch();
         }
+        let claims = self.signed(token, &header, true).ok_or(Refusal::Invalid)?;
+        if !self.issued(&claims) || !addressed(&claims, audiences) {
+            return Err(Refusal::Invalid);
+        }
+        if !self.scoped(&claims) {
+            return Err(Refusal::Scope);
+        }
+        Ok(claims)
+    }
+
+    /// The claims of `token`, whose header is `header`, if a cached key that fits it signed it;
+    /// with `lifetime`, also `exp` (required) and `nbf` with `LEEWAY`.
+    fn signed(&self, token: &str, header: &Header, lifetime: bool) -> Option<Map<String, Value>> {
         let mut validation = Validation::new(header.alg);
         validation.leeway = LEEWAY;
-        validation.validate_nbf = true;
-        // Checked below, against the claims as signed.
+        validation.validate_nbf = lifetime;
+        validation.validate_exp = lifetime;
+        if !lifetime {
+            validation.required_spec_claims.clear();
+        }
+        // Checked by `verified`, against the claims as signed.
         validation.validate_aud = false;
-        let claims = (self.keys().iter())
-            .filter(|key| fits(key, &header))
+        (self.keys().iter())
+            .filter(|key| fits(key, header))
             .filter_map(|key| DecodingKey::from_jwk(key).ok())
             .find_map(|key| {
                 jsonwebtoken::decode::<Map<String, Value>>(token, &key, &validation).ok()
             })
-            .ok_or(Refusal::Invalid)?
-            .claims;
-        let issued = claims.get("iss").and_then(Value::as_str) == Some(&self.config.issuer);
-        let aud = match claims.get("aud") {
-            Some(Value::String(aud)) => vec![aud.as_str()],
-            Some(Value::Array(auds)) => auds.iter().filter_map(Value::as_str).collect(),
-            _ => Vec::new(),
-        };
-        let addressed = aud.iter().any(|aud| audiences.iter().any(|a| a == aud));
-        if !issued || !addressed {
-            return Err(Refusal::Invalid);
-        }
+            .map(|data| data.claims)
+    }
+
+    fn issued(&self, claims: &Map<String, Value>) -> bool {
+        claims.get("iss").and_then(Value::as_str) == Some(&self.config.issuer)
+    }
+
+    /// Whether `claims`' `scope` holds every configured scope.
+    fn scoped(&self, claims: &Map<String, Value>) -> bool {
         let granted: HashSet<&str> = (claims.get("scope").and_then(Value::as_str))
             .map(|s| s.split(' ').collect())
             .unwrap_or_default();
-        if !self
-            .config
-            .scopes
-            .iter()
-            .all(|s| granted.contains(s.as_str()))
-        {
-            return Err(Refusal::Scope);
+        (self.config.scopes.iter()).all(|s| granted.contains(s.as_str()))
+    }
+
+    /// The console's admission (ADR 0014): `headers`' bearer token checked as `verified` checks
+    /// it, its audience `audience`. Otherwise the status and `WWW-Authenticate` refusing it: 401
+    /// for a missing or invalid token (`error="invalid_token"` when one was sent), 403 for a
+    /// missing scope; no `resource_metadata`, since the console serves none.
+    #[cfg(feature = "ui")]
+    pub fn admit_console(
+        &self,
+        headers: &HeaderMap,
+        audience: &str,
+        operator_groups: Option<&[String]>,
+        operator_claim: Option<&str>,
+    ) -> Result<Admitted, (StatusCode, String)> {
+        let refused = match bearer(headers) {
+            Ok(Some(token)) => match self.verified(token, &[audience.to_string()]) {
+                Ok(claims) => {
+                    let subject = claims.get("sub").and_then(Value::as_str);
+                    let operator = operator_claim
+                        .is_some_and(|name| claims.get(name) == Some(&Value::Bool(true)))
+                        || operator_groups.is_some_and(|operators| {
+                            self.config.groups.as_ref().is_some_and(|(claim, _)| {
+                                claims
+                                    .get(claim)
+                                    .and_then(Value::as_array)
+                                    .is_some_and(|groups| {
+                                        groups.iter().filter_map(Value::as_str).any(|group| {
+                                            operators.iter().any(|operator| operator == group)
+                                        })
+                                    })
+                            })
+                        });
+                    return Ok(Admitted {
+                        subject: subject.map(str::to_string),
+                        grant: Grant::of(&claims, &self.config),
+                        operator,
+                    });
+                }
+                Err(refusal) => refusal,
+            },
+            Ok(None) => Refusal::Missing,
+            Err(refusal) => refusal,
+        };
+        let (status, error) = match refused {
+            Refusal::Missing => (StatusCode::UNAUTHORIZED, None),
+            Refusal::Invalid => (StatusCode::UNAUTHORIZED, Some("invalid_token")),
+            Refusal::Scope => (StatusCode::FORBIDDEN, Some("insufficient_scope")),
+        };
+        Err((status, self.challenge(None, error, true)))
+    }
+
+    /// Each check of a pasted `token` as a node makes it (ADR 0014), against the cached keys
+    /// only: an unknown `kid` fetches nothing, so the check sends no request anywhere. Its
+    /// audience is a node's: `[oidc] audience`, else the resource of the root or of an identity
+    /// of `served`.
+    #[cfg(feature = "ui")]
+    pub fn check(&self, token: &str, served: &[&str]) -> Checked {
+        let failed = Checked {
+            signature: false,
+            issuer: None,
+            audience: None,
+            lifetime: None,
+            scopes: None,
+            grant: None,
+        };
+        let Some(header) = signing(token) else {
+            return failed;
+        };
+        let Some(claims) = self.signed(token, &header, false) else {
+            return failed;
+        };
+        let audiences: Vec<String> = match &self.config.audience {
+            Some(audience) => vec![audience.clone()],
+            None => (std::iter::once(""))
+                .chain(served.iter().copied())
+                .map(|path| self.resource(path))
+                .collect(),
+        };
+        let issuer = self.issued(&claims);
+        let audience = addressed(&claims, &audiences);
+        let lifetime = self.signed(token, &header, true).is_some();
+        let scopes = self.scoped(&claims);
+        let passes = issuer && audience && lifetime && scopes;
+        Checked {
+            signature: true,
+            issuer: Some(issuer),
+            audience: Some(audience),
+            lifetime: Some(lifetime),
+            scopes: Some(scopes),
+            grant: passes.then(|| Grant::of(&claims, &self.config)),
         }
-        Ok(Grant::of(&claims, &self.config))
+    }
+
+    /// The state an operator explains a 401 or a 403 with (ADR 0014): the issuer, its metadata,
+    /// the JWKS cache (the cached key ids, the last read, a refresh that failed since, with why)
+    /// and the groups table, each group's identities those `reads` admits (`*` kept: it names
+    /// none).
+    #[cfg(feature = "ui")]
+    pub fn admission(&self, reads: &dyn Fn(&str) -> bool) -> Value {
+        let kids: Vec<Option<String>> = (self.keys().iter())
+            .map(|key| key.common.key_id.clone())
+            .collect();
+        let fetched = self.fetched.lock().unwrap_or_else(|e| e.into_inner());
+        let failed = (fetched.failed.as_ref()).map(
+            |(at, why)| serde_json::json!({"time": crate::modules::rfc3339(*at), "reason": why}),
+        );
+        let groups: Option<Map<String, Value>> = (self.config.groups.as_ref()).map(|(_, table)| {
+            (table.iter())
+                .map(|(group, identities)| {
+                    let shown = identities.iter().filter(|i| *i == "*" || reads(i));
+                    (group.clone(), shown.cloned().collect::<Vec<_>>().into())
+                })
+                .collect()
+        });
+        serde_json::json!({
+            "issuer": self.config.issuer,
+            "metadata": self.issuer_metadata,
+            "jwks_uri": self.jwks_uri,
+            "keys": kids,
+            "refreshed": crate::modules::rfc3339(fetched.at),
+            "failed": failed,
+            "identities_claim": self.config.claim,
+            "groups_claim": self.config.groups.as_ref().map(|(claim, _)| claim),
+            "groups": groups,
+            "scopes": self.config.scopes,
+        })
+    }
+
+    /// The issuer and the scopes the console's browser logs in with (ADR 0014).
+    #[cfg(feature = "ui")]
+    pub fn login(&self) -> (&str, &[String]) {
+        (&self.config.issuer, &self.config.scopes)
     }
 
     fn keys(&self) -> Arc<Vec<Jwk>> {
@@ -600,9 +814,21 @@ impl Oidc {
     /// Fetches the JWKS again: the new keys replace the cached ones, and a failure keeps them
     /// and says so on stderr.
     fn refresh(&self) {
-        match jwks(&self.agent, &self.jwks_uri) {
-            Ok(keys) => *self.keys.write().unwrap_or_else(|e| e.into_inner()) = Arc::new(keys),
-            Err(why) => eprintln!("{}", Msg::OidcRefreshFailed(&why).text()),
+        let fetched = jwks(&self.agent, &self.jwks_uri);
+        let mut state = self.fetched.lock().unwrap_or_else(|e| e.into_inner());
+        let now = crate::modules::now();
+        match fetched {
+            Ok(keys) => {
+                *self.keys.write().unwrap_or_else(|e| e.into_inner()) = Arc::new(keys);
+                *state = Fetched {
+                    at: now,
+                    failed: None,
+                };
+            }
+            Err(why) => {
+                eprintln!("{}", Msg::OidcRefreshFailed(&why).text());
+                state.failed = Some((now, why));
+            }
         }
     }
 }

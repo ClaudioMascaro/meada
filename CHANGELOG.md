@@ -6,7 +6,168 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Console manifest groups and validation errors respect the viewer's grant; PKCE redirects
+  retain issuer query parameters while replacing generated OAuth keys.
+- Fence recovery shares the fleet reader's Valkey clock and complete heartbeat validation,
+  and refuses counters that would prevent the next native INCR acquisition. Exact u64
+  transport remains supported, with bilingual operational refusals at the signed ceiling.
+
 ### Added
+
+- Workspace editor and version history (issue #310): viewers compare any two immutable
+  versions; operators validate entries and review a local WASM diff before confirming save
+  or apply. Rollbacks name the next refresh, existing saves show their first author/message,
+  and CLI import and WASM share one bilingual validation fixture table and the same validator.
+
+- Opt-in console profiles for Compose and Helm (issue #314), with their own bootstrap,
+  snapshot storage, pull companion and proxy or Ingress. Managed refresh pulls the workspace,
+  fetches operator-provisioned mirrors, indexes and publishes under one lock; the initial seed
+  and apply remain explicit. The console stays disabled by default. Brazilian Portuguese,
+  English and Spanish guides cover admission, PKCE, operations and fenced recovery.
+
+- Console operator writes (spec #293): verified groups or a boolean claim grant the operator
+  role and the whole fleet view. Fenced pointer changes, fence recovery, workspace save and
+  apply share the CLI operations, with authorization before uploads and one escaped audit
+  line per accepted or refused write. Entry validation is shared with CLI import, concurrent
+  imports preserve the first version's metadata, and serialized versions respect the reader's
+  existing size cap. Recovery ignores malformed heartbeats and includes workspace fences.
+  Managed status uses one workspace version for its report and readiness exit code.
+
+- Fleet and store operators can set, retain and drop generations and recover a stuck fence
+  after confirming the exact CLI command. Viewer sessions and disabled operations expose no
+  actions; keyboard cancellation sends no write, and CLI refusals preserve the lock holder.
+
+- Console frontend distribution (issue #313): the cloud image includes the static UI at
+  `/usr/share/meada/ui`, built with pinned Node and wasm-pack from the npm lockfile. The
+  container release workflow also attaches `meada-ui-<version>.tar.gz` with the same files
+  under one versioned directory, for Cargo installations with `ui`. Default images, Cargo
+  builds and cargo-dist's binary artifacts remain independent of the frontend.
+
+- Multi-arch OCI images (issue #279): `ghcr.io/claudiomascaro/meada:<version>` and `latest`
+  for the default build, `<version>-cloud` and `latest-cloud` for every cloud module, on
+  Linux amd64 and arm64. Prereleases get version tags only. The Debian bookworm-slim runtime
+  includes git and CA roots, runs without root and has no default command or embedded data.
+  A separate release workflow builds both variants from source with the lockfile; its pull
+  request check builds the default amd64 image and searches it over HTTP. The base is refreshed
+  only with a Meada release.
+
+- Console query playground and code graph views (spec #293): run the read-only MCP tools
+  against a repository and held generation, preserving their answer text, and inspect
+  communities, contracts, cross-repository links, shape drift and decisions through accessible
+  tables. A repository export is checked by the shared WebAssembly core and reused across
+  graph views in the browser.
+
+- Docker Compose examples for two default-image nodes with independent indexes and cloud-image
+  nodes sharing retained generations. Caddy admits bearer tokens over TLS; internal Valkey and
+  RustFS use a private CA. Index, publish and pull jobs have separate writable volumes, while
+  servers read their manifests and data through read-only mounts. Both profiles are checked
+  without starting services in CI. Optional `snapshot.ca_file` augments the system TLS roots
+  with a bounded, validated PEM file for private-CA stores (#280).
+
+- Operational console pages for fleet diagnostics and recoveries, store bundles and retention,
+  repository provenance, GitHub App cache expiry and throttling, and OIDC admission checks.
+  Missing sections are named explicitly. The token check clears its field after each request.
+  Large fences retain their exact decimal values, and tables scroll within mobile viewports.
+
+- Static management console frontend (spec #293, ADR 0014): Vite, React and strict TypeScript
+  with the shared WebAssembly core, Brazilian Portuguese and English navigation, configuration,
+  session and bootstrap manifest pages. OIDC sign-in uses authorization code with PKCE S256;
+  bearer tokens stay in memory. The standalone frontend gate pins Node and wasm-pack, installs
+  from a lockfile and writes the matching Meada version into `meada-ui.json`. Cargo builds
+  remain independent of Node.
+
+- Console operational reads (spec #293, ADR 0014): fleet heartbeats, pointer, retention and
+  kept marks, lock holder/TTL, fence diagnostics and recoveries, store documents and bundle
+  metadata, managed workspace versions, repository commits/schema versions and GitHub App
+  cache expiry/throttle state. Service reads share a two-second deadline, malformed records
+  are checked before use, repository and nested peer identities follow the viewer's grant,
+  and credentials never leave Valkey. The token check now reads identities from the current
+  managed workspace. Server-mode indexing records optional commit provenance beside the index,
+  validated against its contents without changing the SQLite schema.
+
+- Helm chart for module-free nodes and generations, with local readiness, fenced refresh jobs,
+  external TLS services, OIDC values and OCI release publishing (#281).
+
+- Node heartbeat (spec #293, ADR 0014, feature `generation-pointer`): with `[generations]`,
+  every round of `meada snapshot pull --every <seconds>` ends by writing the node's state into
+  Valkey, whether the round swapped, changed nothing or failed: `{<key_prefix>}:node:<name>`, a
+  JSON document (`name`, `generation`, `fence`, `held`, `ready`, `version`, `time`) living three
+  periods, and the name in the sorted set `{<key_prefix>}:nodes`, scored by the expiry in Unix
+  seconds, from which the same script removes every expired name. A single `pull` and a node
+  without `[generations]` write none. A write that fails is one warning for the round and
+  changes nothing else. The new optional `[snapshot] node_name` names the node (the host name
+  in lowercase by default), checked against the node name pattern; names must be unique.
+
+- Workspace versions (spec #293, ADR 0014, feature `generation-pointer`): the `[[repository]]`
+  entries of a workspace stored as immutable documents in the snapshot store,
+  `workspaces/<version id>.json` (id, author, time, message, entries in manifest order), the id
+  derived from the entries alone. `meada workspace import <file> --message <text> [--author
+  <name>] --workspace <bootstrap manifest>` validates the file's entries before any connection
+  and stores a version, or answers the one already stored; `meada workspace list` prints the
+  versions newest first, the current one (`{<key_prefix>}:workspace`) marked; `meada workspace
+  show [<version>]` prints a version as `[[repository]]` entries. Everything read back is
+  checked as hostile input. The new `[workspace]` section, read in every build, takes `source =
+  "file"` (the default) or `"store"`, which needs `generation-pointer`, `[snapshot]` and
+  `[generations]` and no `[[repository]]`.
+
+- Applying and pulling workspace versions (spec #293, ADR 0014): `meada workspace apply
+  <version>` (feature `refresh-lock`) moves `{<key_prefix>}:workspace` to a stored version
+  under the refresh lock with a new fence and prints `<id> <fence>`; rolling back is applying
+  an older version. `meada workspace pull` brings the current version under
+  `<index_dir>/workspace/` (the document and a `current` file swapped by rename, never to a
+  lower fence), checking everything it reads as hostile input. With `source = "store"`, `meada
+  index`, `status`, `export` without `--generations` and `snapshot publish` read the pulled
+  version from disk and refuse without one, naming `meada workspace pull`; `meada index` still
+  opens no connection. `meada mcp --listen` without `--generations` refuses such a manifest,
+  naming `--generations`. The generation document gains an optional `workspace` field, the
+  version that produced it (absent with `source = "file"`, part of no id, ignored by older
+  binaries), which a pull checks. `meada snapshot fence recover` also counts the workspace
+  pointer's fence. The refresh job of a managed workspace runs `meada workspace pull`, the fetch
+  of the mirrors, `meada index --workspace` and `meada snapshot publish` under `meada snapshot
+  lock`.
+
+- Management console (spec #293, ADR 0014, feature `ui`, in `cloud`, no crate of its own):
+  `meada ui --listen <addr> --workspace <bootstrap manifest>` serves, behind the operator's
+  reverse proxy, the front end's files from the new `[ui]` section's `dir` and a JSON
+  API under `/api/v1/` with `config`, `session` and `manifest` (the manifest as loaded, never a
+  secret's value, the module sections this build has, and the errors of the file as it now
+  stands on disk). Each request passes a `Host` check and an `Origin` check (a write needs the
+  console's own `Origin`) before routing; no answer sets a cookie or a CORS header. Static files
+  are served from a fixed extension table, with `nosniff`, `no-referrer` and a fixed content
+  security policy, and no path leaves `[ui] dir`. The start is refused, every problem listed,
+  for `[ui]` errors, a missing `[ui] dir` and front end files built for another version
+  (`meada-ui.json`). Serving nodes do not change.
+
+- Console admission with `[oidc]` (spec #293, ADR 0014, features `ui` and `oidc`): the console
+  is a resource server like the nodes, admitting a bearer token for `[ui] audience` with the
+  nodes' own OIDC module (401 with `WWW-Authenticate`, 403 for a missing scope); the static
+  files and `config` need no token, and `config` adds the issuer, the new required `[ui]
+  client_id`, the scopes and the audience for the browser's authorization code flow with PKCE.
+  Admitted subjects are viewers unless a configured verified group or boolean claim grants
+  the operator role (`session`). `GET /api/v1/admission` shows the issuer's
+  metadata, the JWKS cache (key ids, last read, a failed refresh with its reason) and the groups
+  table; `POST /api/v1/admission/check` answers a pasted token's outcome per check and the
+  identities its grant admits, from the cached keys only, holding the token for that request
+  alone (body capped at 16 KiB). The token's grant bounds every view as it bounds a node's
+  answers. The start is refused when the issuer's metadata or JWKS cannot be read. A JWKS that
+  is not a key set is now reported by line and column, never by its content, on nodes too.
+
+- Console playground and exports (spec #293, ADR 0014, feature `ui`): `POST /api/v1/query`
+  takes `{"repository", "generation", "tool", "arguments"}` (`search`, `context` or `trace`,
+  the arguments as the MCP tool takes them; body capped at 16 KiB) and answers `{"text",
+  "generation"}`, the text the node's tool answers byte for byte; `GET
+  /api/v1/repositories/<identity>/export?generation=<id>` answers the bytes `meada export`
+  prints. The console answers both in process and never calls a node: with `[snapshot]`, from
+  the generations its own `meada snapshot pull` keeps in its `local_dir` (the current one by
+  default, a retained one when named, `generation` its id); without it, from the indexes under
+  `index_dir` of the repositories its manifest lists (`generation` null). It starts without a
+  servable generation or index: the two routes then answer a 503 naming `meada snapshot pull`
+  or `meada index --workspace`, and the next request after it answers with no restart. An
+  unknown repository, one outside the viewer's grant and a generation not held are 404s, the
+  last naming the held ones; peers outside the grant are left out of the answer, as on a node;
+  `trace` with `changes: uncommitted` is refused with the node's text.
 
 - Server mode (spec #259, ADR 0011): `meada mcp --listen <addr> --workspace <manifest>` serves
   the three tools over MCP streamable HTTP, one endpoint per repository at `/<identity>`, from
@@ -126,6 +287,29 @@ All notable changes to Meada are recorded here. The format follows
   failed with 403 or 429, marks the installation that served it; a 403 or 429 to the module's
   own calls marks its installation or App the same way. No private key, JWT or token reaches
   stderr or an error. `meada mcp --listen` never calls GitHub.
+- Server mode, pointer and fence operations (ADR 0014, #299, feature `refresh-lock`, needing
+  `[refresh_lock]`): `meada snapshot pointer set <generation> --workspace <manifest>` moves the
+  Valkey pointer to a retained generation (a rollback, or forward again) with a fence above
+  every node's, so nodes swap on their next pull; the rollback holds until the next publish.
+  `meada snapshot fence recover [--at-least <fence>] --workspace <manifest>` raises
+  `{<key_prefix>}:fence` to the highest fence recorded in the pointer, the retained list and
+  every live heartbeat, or to the floor given, never lowering it; what it cannot read is named
+  on stderr and not counted. Each takes the refresh lock itself and releases it. The lock now
+  has a holder, `{<key_prefix>}:holder` (host, process, start time and what holds it), written,
+  renewed and deleted with it, and every refusal of a held lock names it. The messages for a
+  refused, lowered or stuck fence name `meada snapshot fence recover` instead of setting the
+  fence key by hand.
+- Retained generations kept by hand (ADR 0014, #300, feature `refresh-lock`): `meada snapshot
+  pointer retain <generation> --workspace <manifest>` keeps a generation whose document the
+  store holds on every node, outside the `keep` trim, in the new set `{<key_prefix>}:kept`
+  (appended at the retained list's oldest end with the operation's fence when it was not
+  retained); `meada snapshot pointer drop <generation> --workspace <manifest>` frees a
+  generation that is not current, kept or not, and the next pull deletes it. Each prints the id
+  and takes the refresh lock itself. The kept set holds at most `KEPT_MAX` (8) generations. The
+  pointer script now trims only entries that are not kept, down to `keep` of them, and every
+  pull holds the whole retained list (at most `keep` plus `KEPT_MAX` entries, refused past it),
+  so a pin on a kept generation answers until it is dropped; `pointer set` accepts any retained
+  generation.
 - npm installer (spec #32): cargo-dist builds and publishes an npm package named `meada` with each
   release, at the crate's version, so `npx meada mcp` launches the MCP server and `npx meada
   <command>` runs any command; the release configuration is planned as a dry run on pull requests.
@@ -405,6 +589,21 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- The repository is a Cargo workspace (ADR 0014, #296): beside the `meada` binary, the library
+  crate `meada-core` holds the schema of a workspace manifest's `[[repository]]` entries with
+  every check their text decides, the bundle and generation ids of ADR 0012 and the new
+  workspace version id. It builds for WebAssembly (feature `wasm-bindgen`, which the binary never
+  enables) for the management console's front end. Both crates share one version, and
+  `meada-core` is published to crates.io before `meada`, so `cargo install meada` keeps
+  working. Nothing a user sees changes: every message, golden and dependency of the default
+  build is what it was.
+- `meada-core` also holds the export's types, the results of `search`, `context` and `trace`
+  with their text answers and the token budget, and shape drift (ADR 0009) as `context`,
+  `search` and `status` show it (#297): the binary writes every export and renders every answer
+  through them. Its `wasm-bindgen` feature exports `parseExport`, which reads an export into
+  those types and writes it again, or names the field that does not fit. Every export, `search`,
+  `context` and `trace` golden is what it was, and an export read and written again is the same
+  bytes.
 - The default model of the `decisions` decider is now `typesafe/jev-1.14` (was `typesafe/jev-1.13`);
   `MEADA_DECIDER_MODEL` still overrides it. The request and answer shapes are unchanged.
 

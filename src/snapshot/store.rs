@@ -9,6 +9,8 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+#[cfg(feature = "ui")]
+use object_store::ObjectStoreExt;
 use object_store::aws::{AmazonS3, AmazonS3Builder, AmazonS3ConfigKey, AwsCredential};
 use object_store::client::{
     HttpClient, HttpConnector, HttpError, HttpErrorKind, HttpRequest, HttpResponse, HttpService,
@@ -30,6 +32,8 @@ const HASH: &str = "meada-blake3";
 // ponytail: the most a credential file (a key id, a secret, a token) may hold; past it the file
 // is refused, naming it.
 const SECRET_MAX: u64 = 16 * 1024;
+// ponytail: like Valkey's private CA, a PEM trust file holds at most 1 MiB.
+const CA_MAX: u64 = 1 << 20;
 /// Each part of a bundle's multipart upload, and how many are in flight at once.
 pub const PART: usize = 8 << 20;
 const IN_FLIGHT: usize = 2;
@@ -209,7 +213,7 @@ impl Store {
             }
         }
         let client = reqwest::Client::builder()
-            .use_preconfigured_tls(tls()?)
+            .use_preconfigured_tls(tls(config.ca_file.as_deref())?)
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
             .connect_timeout(Duration::from_secs(10))
@@ -256,6 +260,16 @@ impl Store {
             Ok(got) => Stored::read(&got.attributes, got.meta.size)
                 .map(Some)
                 .ok_or_else(|| Msg::SnapshotObjectBad(key).text()),
+            Err(object_store::Error::NotFound { .. }) => Ok(None),
+            Err(e) => Err(self.scrub(e)),
+        }
+    }
+
+    /// The object's modification time as RFC 3339, used for the console's last publish.
+    #[cfg(feature = "ui")]
+    pub async fn modified(&self, key: &str) -> Result<Option<String>, String> {
+        match self.s3.head(&Self::key(key)?).await {
+            Ok(meta) => Ok(Some(meta.last_modified.to_rfc3339())),
             Err(object_store::Error::NotFound { .. }) => Ok(None),
             Err(e) => Err(self.scrub(e)),
         }
@@ -325,6 +339,18 @@ impl Store {
         (found == *expected).then_some(()).ok_or_else(bad)
     }
 
+    /// The keys of the objects directly under `prefix` (`<prefix>/<name>`), sorted. They are
+    /// hostile: a caller checks each name before using it.
+    pub async fn list(&self, prefix: &str) -> Result<Vec<String>, String> {
+        let listed = self.s3.list_with_delimiter(Some(&Self::key(prefix)?)).await;
+        let listed = listed.map_err(|e| self.scrub(e))?;
+        let mut keys: Vec<String> = (listed.objects.into_iter())
+            .map(|o| o.location.to_string())
+            .collect();
+        keys.sort();
+        Ok(keys)
+    }
+
     /// Stores `bytes` at `key` with their size and hash.
     pub async fn put(&self, key: &str, bytes: Vec<u8>) -> Result<(), String> {
         let options = PutOptions {
@@ -334,6 +360,25 @@ impl Store {
         let payload = PutPayload::from(bytes);
         let put = self.s3.put_opts(&Self::key(key)?, payload, options).await;
         put.map(drop).map_err(|e| self.scrub(e))
+    }
+
+    /// Creates an immutable object, returning false when another writer stored it first.
+    #[cfg(feature = "generation-pointer")]
+    pub async fn create(&self, key: &str, bytes: Vec<u8>) -> Result<bool, String> {
+        let options = PutOptions {
+            mode: object_store::PutMode::Create,
+            attributes: Stored::of(&bytes).attributes(),
+            ..PutOptions::default()
+        };
+        match self
+            .s3
+            .put_opts(&Self::key(key)?, bytes.into(), options)
+            .await
+        {
+            Ok(_) => Ok(true),
+            Err(object_store::Error::AlreadyExists { .. }) => Ok(false),
+            Err(e) => Err(self.scrub(e)),
+        }
     }
 
     /// A multipart upload to `key` of an object of the size and hash `stored` says, its parts
@@ -381,16 +426,43 @@ impl Upload<'_> {
 }
 
 /// The store client's TLS: rustls with ring, the one provider every build carries (no process
-/// default is read or installed), certificates checked against the system's roots, HTTP/2 or
-/// HTTP/1.1 offered.
-fn tls() -> Result<rustls::ClientConfig, String> {
+/// default is read or installed), system roots augmented by the optional private CA, HTTP/2
+/// or HTTP/1.1 offered. Credential endpoints retain their system trust roots too.
+fn tls(ca_file: Option<&Path>) -> Result<rustls::ClientConfig, String> {
+    use rustls::pki_types::{CertificateDer, pem::PemObject};
     use rustls_platform_verifier::BuilderVerifierExt;
     let provider = Arc::new(rustls::crypto::ring::default_provider());
-    let mut config = (rustls::ClientConfig::builder_with_provider(provider))
+    let builder = rustls::ClientConfig::builder_with_provider(Arc::clone(&provider))
         .with_safe_default_protocol_versions()
-        .and_then(|builder| builder.with_platform_verifier())
-        .map_err(|e| e.to_string())?
-        .with_no_client_auth();
+        .map_err(|e| e.to_string())?;
+    let builder = match ca_file {
+        Some(file) => {
+            let invalid = || {
+                format!(
+                    "{}: {}",
+                    file.display(),
+                    rustls::Error::InvalidCertificate(rustls::CertificateError::BadEncoding)
+                )
+            };
+            let pem = read_utf8(file, CA_MAX)?;
+            let roots = CertificateDer::pem_slice_iter(pem.as_bytes())
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| invalid())?;
+            if roots.is_empty() {
+                return Err(invalid());
+            }
+            let verifier =
+                rustls_platform_verifier::Verifier::new_with_extra_roots(roots, provider)
+                    .map_err(|e| format!("{}: {e}", file.display()))?;
+            builder
+                .dangerous()
+                .with_custom_certificate_verifier(Arc::new(verifier))
+        }
+        None => builder
+            .with_platform_verifier()
+            .map_err(|e| e.to_string())?,
+    };
+    let mut config = builder.with_no_client_auth();
     config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
     Ok(config)
 }
@@ -507,6 +579,8 @@ mod tests {
                 token: Secret::Env("MEADA_TEST_TLS_NO_TOKEN".into()),
             },
             local_dir: None,
+            node_name: None,
+            ca_file: None,
         };
         let store = Store::connect(&config).unwrap();
         let runtime = tokio::runtime::Builder::new_current_thread()

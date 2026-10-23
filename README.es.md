@@ -12,7 +12,7 @@ indexación usa un LLM.
 
 ## Instalación
 
-Elige una de cuatro formas.
+Elige una de cinco formas.
 
 - **Cargo**: `cargo install meada`.
 - **Binario listo**: descarga el archivo de tu sistema desde los
@@ -22,6 +22,23 @@ Elige una de cuatro formas.
   `curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ClaudioMascaro/meada/releases/latest/download/meada-installer.sh | sh`.
 - **npm**: `npx meada <comando>` descarga el binario listo de tu plataforma y lo ejecuta, sin
   instalar nada antes.
+- **Contenedor**: `ghcr.io/claudiomascaro/meada:<versión>` para el build predeterminado, o
+  `<versión>-cloud` con todos los módulos cloud, ambos para Linux amd64 y arm64. `latest` y
+  `latest-cloud` siguen la última release estable; las prereleases solo tienen tags de versión.
+  La base Debian bookworm-slim (git y certificados CA) solo se actualiza con una release de Meada.
+  La imagen se ejecuta sin root y no define comando: pasa los argumentos explícitamente, por
+  ejemplo `docker run --rm ghcr.io/claudiomascaro/meada:latest --version`. Para servir,
+  monta el manifiesto, los espejos y los índices, y pasa
+  `mcp --listen 0.0.0.0:7333 --workspace /etc/meada/meada.workspace.toml`, siguiendo
+  [Modo servidor](#modo-servidor) y su configuración de admisión.
+
+Para la consola, ejecuta `cargo install meada --features ui`, descarga
+`meada-ui-<versión>.tar.gz` de la misma release y descomprímelo. Apunta `[ui] dir` en el
+manifiesto al directorio `meada-ui-<versión>/` extraído. La consola rechaza iniciar con una UI
+de otra versión e indica ambas versiones. La imagen `-cloud` ya incluye estos archivos en
+`/usr/share/meada/ui`; la imagen predeterminada y los binarios listos siguen sin la UI.
+Node solo es necesario para compilar el frontend desde los fuentes, nunca para instalar
+mediante Cargo o ejecutar la consola.
 
 ## Configuración
 
@@ -133,7 +150,7 @@ de saltos, los repositorios involucrados y los tokens usados.
 > conectarse, y por defecto no autentica a nadie: el proxy inverso del operador admite a los
 > clientes (TLS, tokens, SSO, política de red); el módulo OIDC, abajo, es la alternativa opt-in. Sin host, el servidor escucha solo en el loopback; escuchar
 > más allá es una elección explícita del operador, y un proxy mal configurado expone el código.
-> Meada no revisa el encabezado `Host` (un proxy con nombre propio funciona) y responde 403 a
+> El servidor MCP no revisa el encabezado `Host` (un proxy con nombre propio funciona) y responde 403 a
 > cualquier solicitud con `Origin` (protección contra navegadores y DNS rebinding), en
 > cualquier ruta y antes de cualquier otra respuesta. El proxy no debe exponer Meada más allá
 > de los clientes que admite.
@@ -202,6 +219,11 @@ Un espejo es un checkout con árbol de trabajo; un clon bare no tiene qué index
 
 ### Varios nodos
 
+El [ejemplo Docker Compose](deploy/compose/README.es.md) ofrece los dos layouts siguientes, con
+dos nodos, TLS y admisión por token en el proxy.
+
+El [chart Helm](deploy/helm/meada/README.es.md) configura init, readiness, drain y el perfil de generaciones en Kubernetes.
+
 Varios servidores sobre los mismos índices funcionan sin módulo de nube, siempre que el
 operador respete un único escritor por índice.
 
@@ -230,7 +252,7 @@ operador respete un único escritor por índice.
   encabezado `Mcp-Param-*` (SEP-2243: rmcp rechaza una petición cuyos encabezados discrepan del
   cuerpo); el proxy puede enrutar por ellos. Reenvíe el encabezado de respuesta
   `Meada-Generation`. No añada `Origin`: Meada responde 403 a toda
-  petición que lo lleve, así una página de navegador no puede llamarlo directamente. Meada no
+  petición que lo lleve, así una página de navegador no puede llamarlo directamente. El servidor MCP no
   comprueba `Host`, y `--listen` acepta una IP o `localhost`, nunca un nombre que resuelva.
 - **Disponibilidad.** Primero un paso de init (`meada index --workspace` o la copia de los
   índices). Luego una sonda TCP, o `meada status --workspace <manifiesto>` como sonda exec: sale
@@ -245,7 +267,7 @@ operador respete un único escritor por índice.
 
 ### Módulos de nube
 
-Módulos opt-in, desactivados por defecto; cada uno se documenta abajo cuando llegue. Un módulo
+Módulos opt-in, desactivados por defecto y documentados abajo. Un módulo
 es una feature de cargo más una sección de `meada.workspace.toml`; los binarios de release son el
 build por defecto, sin ninguno, y una sección en un build sin su feature es un error que nombra la
 feature. La feature `cloud` los activa todos a la vez (`cargo install meada --features cloud`) y,
@@ -269,6 +291,7 @@ region = "us-east-1"
 bucket = "ejemplo-meada"
 prefix = "prod"                                    # opcional
 path_style = false                                 # true en la mayoría de los stores self-hosted
+# ca_file = "ca.pem"                              # CA privada opcional, relativa al manifiesto
 credentials = "static"                             # o "web-identity", "pod-identity", "instance"
 access_key_id_env = "AWS_ACCESS_KEY_ID"            # valores por defecto; o las claves *_file
 secret_access_key_env = "AWS_SECRET_ACCESS_KEY"
@@ -286,6 +309,9 @@ con STS en la `region`, por https; `pod-identity` (EKS Pod Identity) llama al ag
 con el token de `AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`; `instance` usa el servicio de metadatos
 de la instancia (IMDSv2, solo por IPv4, `http://169.254.169.254`), y solo cuando la sección lo indica. Las
 credenciales quedan solo en memoria, y ningún secreto aparece en un error.
+
+`ca_file` añade certificados PEM a las raíces de confianza del sistema. El archivo tiene como
+máximo 1 MiB; los certificados inválidos y un archivo vacío se rechazan, nombrando el archivo.
 
 En cada nodo, `meada snapshot pull --workspace <manifiesto>` lee el puntero `current` del store
 y, cuando nombra una generación que el nodo no tiene, descarga sus bundles en `local_dir`,
@@ -414,10 +440,15 @@ actual sea cual sea su fence. Meada nunca baja ni borra `{<key_prefix>}:fence`. 
 failover de Valkey lo pierde, los fences siguientes quedan por debajo de los registrados y la
 flota se detiene: el publish rechazado sale con 1 nombrando `{<key_prefix>}:fence`, el pull de un
 nodo con fence mayor sale con 1 sin cambiar, y `meada status --generations` en ese nodo imprime
-una línea `fence: stuck: ...` con los dos fences (su código de salida no cambia). Para salir de
-ahí, defina `{<key_prefix>}:fence` igual o por encima del mayor fence registrado (en Valkey o en
-el `<local_dir>/current` de algún nodo), o borre el `<local_dir>/current` del nodo, que entonces
-toma la generación actual. Apagar `[refresh_lock]` después de que los nodos registraron fences
+una línea `fence: stuck: ...` con los dos fences (su código de salida no cambia). Ejecute
+`meada snapshot fence recover --workspace <manifiesto>`: bajo el lock, eleva el contador hasta
+el mayor fence del pointer, las generaciones retenidas, el workspace y los heartbeats válidos,
+usando el reloj de Valkey para seleccionar los nodos vivos. El siguiente publish usa un fence
+mayor y desbloquea los nodos. `INCR` de Valkey tiene un límite de 9223372036854775807; la
+recuperación rechaza pisos o fences registrados superiores a 9223372036854775806 y no consume
+la última adquisición disponible. La lectura y el transporte siguen aceptando fences `u64` exactos. Para un nodo aislado cuyo fence
+no aparece en un heartbeat válido, páselo como `--at-least <fence>`, o borre su
+`<local_dir>/current` para que tome la generación actual. Apagar `[refresh_lock]` después de que los nodos registraron fences
 por encima de 0 también detiene la flota, ya que sin el candado todo fence es 0: borre el
 `<local_dir>/current` de cada nodo.
 
@@ -447,7 +478,7 @@ En el proveedor: un audience igual a `audience` (o, sin ella, a la URL de cada e
 `<public_url>/<identidad>`); un claim mapper que pone en `identities_claim` la lista de
 identidades que el cliente puede leer (`"*"` las permite todas), o en `groups_claim` sus grupos; y
 client credentials para los agentes headless y para el backend de un portal, que piden su token al
-proveedor. Una página en el navegador no puede llamar a Meada directamente: con `[oidc]`, toda
+proveedor. Una página en el navegador no puede llamar al servidor MCP directamente: con `[oidc]`, toda
 solicitud con `Origin` recibe 403, en cualquier ruta, así que un portal llama desde su backend. El
 proxy reenvía sin cambios `Authorization` y los encabezados del SEP-2243 (`MCP-Protocol-Version`,
 `Mcp-Method`, `Mcp-Name`, `Mcp-Param-*`).
@@ -561,6 +592,190 @@ GET.
 En GitHub.com y GitHub Enterprise Cloud, `api` queda fuera de la frontera del operador; se acepta
 porque los fetches del job ya van a ese host (ADR 0013).
 
+#### Consola de administración
+
+La consola usa la feature `ui` (incluida en `cloud`) y escucha en un proceso propio.
+Configure la admisión en el proxy inverso antes de exponerla: sin `[oidc]`, el proxy admite
+los clientes, y una consola accesible más allá de esa admisión expone el grafo de código.
+Las operaciones requieren `[oidc]` y `operations = true`. El proxy conserva `Host`, `Origin`
+y `Authorization`; la consola acepta solo su Host público y, cuando existe, su propio Origin.
+
+La consola tiene su manifiesto de bootstrap, separado de los manifiestos y directorios de
+los nodos. Contiene las secciones de módulos; las entradas de repositorios vienen del
+workspace administrado:
+
+```toml
+index_dir = "/var/lib/meada/console/indexes"
+
+[workspace]
+source = "store"
+
+[snapshot]
+endpoint = "https://store.exemplo.internal"
+region = "us-east-1"
+bucket = "meada"
+prefix = "production"
+path_style = true
+credentials = "static"
+access_key_id_env = "AWS_ACCESS_KEY_ID"
+secret_access_key_env = "AWS_SECRET_ACCESS_KEY"
+local_dir = "/var/lib/meada/console/generations"
+node_name = "meada-console-0"
+# ca_file = "/run/secrets/ca.crt"
+
+[valkey]
+url = "rediss://meada@cache.exemplo.internal:6379"
+key_prefix = "meada"
+password_env = "MEADA_VALKEY_PASSWORD"
+# ca_file = "/run/secrets/ca.crt"
+
+[generations]
+keep = 3
+
+[refresh_lock]
+ttl_seconds = 300
+
+[oidc]
+issuer = "https://id.exemplo.internal/realms/agentes"
+public_url = "https://mcp.exemplo.internal"
+audience = "https://mcp.exemplo.internal"
+identities_claim = "meada_repositories"
+groups_claim = "groups"
+scopes = ["meada:read"]
+
+[oidc.groups]
+"meada-readers" = ["github.exemplo.internal/acme/api"]
+"meada-operators" = ["*"]
+
+[[github_app]]
+host = "github.com"
+api = "https://api.github.com"
+app_id = 123456
+private_key_env = "MEADA_GITHUB_APP_KEY"
+
+[ui]
+dir = "/usr/share/meada/ui"
+public_url = "https://console.exemplo.internal"
+client_id = "meada-console"
+audience = "https://console.exemplo.internal"
+operations = false
+operator_groups = ["meada-operators"]
+# operator_claim = "meada_operator"
+```
+
+El `[oidc]` del bootstrap reproduce la política de los nodos, con la URL pública y el audience
+del MCP; `[ui]` usa el origen y el audience propios de la consola.
+
+Exporte las credenciales en el entorno del proceso o use los archivos de secretos
+correspondientes. `snapshot.ca_file` añade una CA privada a las raíces del sistema;
+`valkey.ca_file` usa solo las raíces de ese archivo.
+El ejemplo incluye todos los módulos; omita `[[github_app]]` si el job no usa Apps. La consola
+lee solo el estado de la caché de ese módulo, sin abrir la clave privada ni consultar GitHub.
+Tampoco llama a los nodos: el playground y las exportaciones usan los índices de su propio pull.
+
+Inicialice primero el workspace administrado, como se describe abajo. Después de que el job
+publique la primera generación, haga el pull inicial y mantenga un companion en el `local_dir`
+propio de la consola. Ese directorio no se comparte con los nodos. Ejecute el companion y la
+consola en procesos separados:
+
+```sh
+meada snapshot pull --workspace /etc/meada/console.workspace.toml
+meada snapshot pull --every 30 --workspace /etc/meada/console.workspace.toml
+# Run in a separate process, alongside the pull companion.
+meada ui --listen 0.0.0.0:7334 --workspace /etc/meada/console.workspace.toml
+```
+
+Registre en el issuer un cliente público, sin secreto de cliente, con Authorization Code y
+PKCE S256, el audience configurado y el redirect URI exacto
+`https://console.exemplo.internal/auth/callback`. El navegador debe acceder a los metadatos
+y al endpoint de token del issuer, con CORS para el origen de la consola. El intercambio del
+código ocurre directamente entre navegador e issuer. El bearer queda solo en memoria; state
+y verifier temporales quedan en sessionStorage hasta que el callback los elimina. Recargar
+la página reinicia el flujo de inicio de sesión.
+
+Cada `snapshot pull --every` publica un heartbeat con generación, fence, generaciones locales,
+preparación, versión y hora. `snapshot.node_name` debe ser único entre nodos y consola, con
+hasta 63 letras minúsculas, dígitos, puntos o guiones; si se omite, usa el hostname válido.
+Los nombres de pods sirven para ello. Un nodo sin heartbeat no aparece en la flota; los
+heartbeats malformados aparecen por separado y no participan en los diagnósticos. Las páginas
+muestran la flota, el store y su retención, los commits y schemas servidos, la caché de Apps
+y la admisión. Las secciones ausentes se nombran explícitamente.
+
+Con OIDC, los lectores ven solo las identidades admitidas por el token. Un grupo de
+`ui.operator_groups`, o un claim de `ui.operator_claim` cuyo valor sea el booleano JSON `true`,
+confiere el papel de operador. Elija solo una de esas dos claves; los operadores ven toda la
+flota. Habilite `operations = true` para los cuatro endpoints HTTP de escritura. Cada acción
+muestra su comando CLI y exige confirmación; un rechazo muestra el mensaje del CLI, incluido
+el titular de un lock ocupado. Una línea de auditoría en stderr registra cada operación
+aceptada o rechazada sin tokens ni bodies.
+
+Las mismas operaciones siguen disponibles en el CLI:
+
+```sh
+meada snapshot pointer set <generation> --workspace /etc/meada/console.workspace.toml
+meada snapshot pointer retain <generation> --workspace /etc/meada/console.workspace.toml
+meada snapshot pointer drop <generation> --workspace /etc/meada/console.workspace.toml
+meada snapshot fence recover --workspace /etc/meada/console.workspace.toml
+meada snapshot fence recover --at-least <fence> --workspace /etc/meada/console.workspace.toml
+```
+
+`set` selecciona una generación retenida. El rollback dura hasta que el siguiente publish
+mueva el pointer; suspenda el job para permanecer en la generación anterior. `retain` mantiene
+una generación en el conjunto kept, de hasta ocho generaciones que el trim no elimina, y
+`drop` la libera (la actual no puede eliminarse). `fence recover` eleva el contador hasta el
+mayor fence registrado, o hasta el mínimo opcional, bajo el lock. El siguiente publish usa un
+fence mayor y desbloquea los nodos. Para un nodo aislado cuyo fence no aparece en un heartbeat
+válido, pase ese fence como `--at-least`, o elimine su `local_dir/current` para que tome la
+generación actual. No edite el contador manualmente.
+
+El workspace administrado separa las entradas de repositorios de los módulos locales.
+Prepare un archivo con `[[repository]]`, usando las rutas de los mirrors del job, e importe
+una versión inmutable:
+
+```toml
+[[repository]]
+repo = "github.exemplo.internal/acme/api"
+path = "/var/lib/meada/mirrors/api"
+```
+
+```sh
+meada workspace import repositories.toml --message "Add API repository" --workspace /etc/meada/job.workspace.toml
+meada workspace list --workspace /etc/meada/job.workspace.toml
+meada workspace show <version> --workspace /etc/meada/job.workspace.toml
+meada workspace apply <version> --workspace /etc/meada/job.workspace.toml
+meada workspace pull --workspace /etc/meada/job.workspace.toml
+```
+
+El import valida las mismas entradas que el editor de la consola; reimportar el mismo contenido
+conserva el id y los metadatos de la primera escritura. `apply` mueve el pointer del workspace
+bajo el lock, sin publicar una generación. `pull` instala esa versión localmente; los comandos
+siguientes la leen sin abrir conexiones durante la indexación. El job tiene su propio bootstrap,
+`index_dir`, mirrors y `local_dir`; comparte con los nodos y la consola solo las secciones de
+módulos que apuntan al mismo store y Valkey. Ejecute todo su refresh bajo un único lock, con
+el fetch fuera de Meada:
+
+```sh
+meada snapshot lock --workspace /etc/meada/job.workspace.toml -- sh -ec '
+  meada workspace pull --workspace /etc/meada/job.workspace.toml
+  ./fetch-mirrors.sh
+  meada index --workspace /etc/meada/job.workspace.toml
+  meada snapshot publish --workspace /etc/meada/job.workspace.toml
+'
+```
+
+La generación publicada registra la versión del workspace que la originó. Aplicar una versión
+anterior prepara el siguiente refresh; los nodos siguen sirviendo la generación que guardan
+hasta otro publish y pull. El editor permite validar, comparar, guardar una versión y
+aplicarla por separado.
+
+La imagen `ghcr.io/claudiomascaro/meada:<versión>-cloud` incluye el frontend en
+`/usr/share/meada/ui`. Para instalar con Cargo, use `cargo install meada --features cloud`,
+descargue `meada-ui-<versión>.tar.gz` de la misma release, extráigalo y apunte `[ui] dir`
+al directorio extraído. La versión de `meada-ui.json` debe coincidir con el binario; un frontend
+de otra versión impide el inicio. Los perfiles de consola de [Compose](deploy/compose/) y
+[Helm](deploy/helm/meada/) están deshabilitados por defecto y tienen bootstrap, admisión y
+almacenamiento propios.
+
 ## Decisiones
 
 Un enlace ambiguo (varios proveedores sirven la ruta) o una URL dinámica (la llamada arma la URL
@@ -632,6 +847,18 @@ Constantes fijas:
   tolerancia de 0,01.
 
 ## Estado
+
+El modo servidor incluye la consola de administración, heartbeats y recuperación de la
+flota, retención de generaciones y workspace administrado mediante módulos opt-in. La
+consola ofrece editor, diff, playground y grafo; [Compose](deploy/compose/) y
+[Helm](deploy/helm/meada/) incluyen perfiles de despliegue. La admisión y las operaciones
+se describen arriba.
+
+La consola ofrece operaciones autenticadas por OIDC para operadores: pointer, recuperación
+de fence y versiones del workspace, con el mismo lock y las mismas comprobaciones del CLI.
+Las operaciones están desactivadas por defecto y cada intento genera una línea de
+auditoría. El grant también limita los grupos y errores del manifiesto; el login conserva los
+parámetros del issuer y la recuperación respeta el reloj y el límite del contador de Valkey.
 
 Versión 0.1, la primera. Indexa repositorios TypeScript y JavaScript (`.ts`, `.tsx`, `.js`,
 `.jsx`, `.mjs`, `.cjs`) y Python (`.py`), lee el código Rust (`.rs`) de los crates del

@@ -1,0 +1,121 @@
+# Admission: configure your Ingress or auth proxy before exposing this service.
+# Without OIDC it admits clients; a misconfigured Ingress exposes the source graph.
+# With modules.oidc.enabled, pass Authorization through to Meada unchanged.
+replicaCount: 2
+image:
+  repository: ghcr.io/claudiomascaro/meada
+  tag: ""
+  cloud: false
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+listen: 7333
+terminationGracePeriodSeconds: 40
+preStop:
+  sleepSeconds: 5
+readiness:
+  type: exec
+  periodSeconds: 10
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+service:
+  port: 7333
+ingress:
+  enabled: false
+  className: ""
+  # Controller-specific admission is the operator's responsibility. Forward Authorization,
+  # MCP-Protocol-Version, MCP-Session-Id, Mcp-Method, Mcp-Name and Mcp-Param-*;
+  # return Meada-Generation; never add Origin.
+  # Traefik: keep those headers out of customRequestHeaders/customResponseHeaders in any
+  # Headers middleware, where values replace headers and an empty value removes them.
+  # https://doc.traefik.io/traefik/middlewares/http/headers/
+  # HAProxy Kubernetes Ingress: do not rewrite them with haproxy.org/request-set-header
+  # or haproxy.org/response-set-header, and do not inject Origin in controller snippets.
+  # https://github.com/haproxytech/kubernetes-ingress/blob/master/documentation/annotations.md
+  annotations: {}
+  host: meada.example.internal
+  tls: []
+workspace:
+  source: file
+  repositories: |
+    [[repository]]
+    repo = "github.com/claudiomascaro/meada"
+    path = "/data/mirrors/meada"
+  # Runs outside Meada. Fetch and index finish before a module-free node starts.
+  fetch: |
+    set -eu
+    mkdir -p /data/mirrors
+    if [ ! -d /data/mirrors/meada/.git ]; then
+      git clone --depth 1 https://github.com/ClaudioMascaro/meada.git /data/mirrors/meada
+    else
+      git -C /data/mirrors/meada fetch --depth 1 origin HEAD
+      git -C /data/mirrors/meada checkout --detach FETCH_HEAD
+    fi
+  gitCredentialsSecret: ""
+# Mounted as ca.crt: snapshot adds these roots to platform trust; Valkey uses only these roots.
+tls:
+  caSecret: ""
+  caConfigMap: ""
+modules:
+  snapshot:
+    enabled: false
+    endpoint: https://store.example.internal
+    region: us-east-1
+    bucket: meada
+    prefix: production/meada
+    pathStyle: true
+    credentials: static
+    credentialsSecret: meada-store
+  valkey:
+    enabled: false
+    url: rediss://meada@valkey.example.internal:6379
+    keyPrefix: meada
+    cluster: false
+    credentialsSecret: meada-valkey
+  generations:
+    enabled: false
+    keep: 3
+    pullEverySeconds: 30
+  refreshLock:
+    enabled: false
+    ttlSeconds: 300
+  oidc:
+    enabled: false
+    issuer: https://id.example.internal/realms/agents
+    publicUrl: https://meada.example.internal
+    audience: ""
+    identitiesClaim: meada_repositories
+    groupsClaim: ""
+    groups: {}
+    scopes: []
+cronJob:
+  schedule: "*/10 * * * *"
+  resources: {}
+
+# Separate management console, disabled unless explicitly enabled.
+# Preserve browser Host, Origin and Authorization. With OIDC, assets, config and
+# /auth/callback remain public so the browser can complete PKCE login.
+console:
+  enabled: false
+  replicaCount: 1
+  listen: 7334
+  publicUrl: https://console.example.internal
+  clientId: meada-console
+  audience: https://console.example.internal
+  operations: false
+  operatorGroups: []
+  operatorClaim: ""
+  resources: {}
+  service:
+    port: 7334
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: console.example.internal
+    tls: []

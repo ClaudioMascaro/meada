@@ -80,6 +80,54 @@ jobs:
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo test --locked --all-features
 
+  # The standalone frontend gate (ADR 0014). Rust contributors need neither Node nor wasm-pack.
+  # Keep the core dependency boundaries here beside its browser build.
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: rustup target add wasm32-unknown-unknown
+      - name: meada-core carries none of the binary's crates
+        shell: bash
+        run: |
+          crates=$(cargo tree --locked -p meada-core -e normal --all-features --target all --prefix none --format '{p}' | cut -d' ' -f1 | sort -u)
+          forbidden=$(grep -xE 'rusqlite|libsqlite3-sys|tree-sitter.*|tokio|async-std|smol|async-executor|object_store|reqwest|redis|ureq|nix|hyper' <<<"$crates" || true)
+          if [ -n "$forbidden" ]; then echo "meada-core lists: $forbidden"; exit 1; fi
+      - name: No build of the binary carries wasm-bindgen
+        shell: bash
+        run: |
+          if cargo tree --locked -p meada -e normal --all-features --target all --prefix none --format '{p}' | cut -d' ' -f1 | grep -qx wasm-bindgen; then
+            echo "meada lists wasm-bindgen"; exit 1
+          fi
+      - run: cargo build --locked -p meada-core --target wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: |
+          version=v0.15.0
+          sha256=c09f971ecaed9a2efc80fdcea7a00ef6b53c7fadc8c57d1f61b53a6aa66b668a
+          archive=$RUNNER_TEMP/wasm-pack.tar.gz
+          curl -sSfL -o "$archive" "https://github.com/wasm-bindgen/wasm-pack/releases/download/$version/wasm-pack-$version-x86_64-unknown-linux-musl.tar.gz"
+          echo "$sha256  $archive" | sha256sum -c -
+          mkdir "$RUNNER_TEMP/wasm-pack"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/wasm-pack"
+          install -m 755 "$(find "$RUNNER_TEMP/wasm-pack" -type f -name wasm-pack)" "$HOME/.cargo/bin/"
+          wasm-pack --version
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ui/.nvmrc
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm ci
+        working-directory: ui
+      - run: npm run wasm
+        working-directory: ui
+      - run: npm run build
+        working-directory: ui
+      - run: npm run check:version
+        working-directory: ui
+      - run: npm test
+        working-directory: ui
+
   docs:
     runs-on: ubuntu-24.04
     steps:

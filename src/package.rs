@@ -270,18 +270,6 @@ fn contract(ecosystem: &dyn Ecosystem, name: &str) -> String {
 /// Whether `ecosystem` is npm's, the one a package of the export names only when it is not: the
 /// export's compatibility rule, since the `ecosystem` field did not exist when npm was the only
 /// one and the goldens leave it out.
-fn is_npm(ecosystem: &&'static dyn Ecosystem) -> bool {
-    ecosystem.name() == Npm.name()
-}
-
-/// The export's `ecosystem` field: the ecosystem's name.
-fn serialize_name<S: serde::Serializer>(
-    ecosystem: &&'static dyn Ecosystem,
-    s: S,
-) -> Result<S::Ok, S::Error> {
-    s.serialize_str(ecosystem.name())
-}
-
 /// Whether the file at `path` is one the manifests table holds: a manifest of an ecosystem or
 /// a `tsconfig.json`.
 pub fn is_manifest(path: &str) -> bool {
@@ -383,23 +371,30 @@ pub struct Manifest {
 }
 
 /// A package a repository provides (`meada export`).
-#[derive(Serialize)]
 pub struct Package {
     pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
     pub repository: String,
     /// The directory of the manifest, relative to the repository root: `.` for the root.
     pub directory: String,
-    /// Its ecosystem, shown only when it is not npm's.
-    #[serde(skip_serializing_if = "is_npm", serialize_with = "serialize_name")]
     ecosystem: &'static dyn Ecosystem,
     /// The path of the manifest.
-    #[serde(skip)]
     pub manifest: String,
 }
 
 impl Package {
+    /// The package as `meada export` writes it: its ecosystem named only when it is not npm's.
+    pub(crate) fn written(self) -> meada_core::export::Package {
+        let ecosystem = self.ecosystem.name();
+        meada_core::export::Package {
+            name: self.name,
+            version: self.version,
+            repository: self.repository,
+            directory: self.directory,
+            ecosystem: (ecosystem != Npm.name()).then(|| ecosystem.to_string()),
+        }
+    }
+
     /// The site of its manifest, which a dependency entry's link names as its provider.
     pub fn site(&self) -> String {
         site(&self.repository, &self.manifest)
@@ -426,42 +421,7 @@ pub struct ExportedShape {
     pub shape: Shape,
 }
 
-/// What resolved an import in a provider: the declared field or rule that named the entry, or
-/// `OutDir` when the output-to-source mapping found the file. For an `ambiguous` import, the
-/// field or rule whose entry could not be followed to a source file. A PyPI import is named by
-/// the module it imports: the distribution's own name (`ModuleName`) or one of its top-level
-/// modules (`TopLevel`); a Rust `use` by the crate's name (`CrateName`); a Go import by the module path it starts with (`ModulePath`).
-#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub enum How {
-    Exports,
-    Types,
-    Module,
-    Main,
-    Path,
-    OutDir,
-    ModuleName,
-    TopLevel,
-    CrateName,
-    ModulePath,
-}
-
-impl How {
-    pub fn name(self) -> &'static str {
-        match self {
-            How::Exports => "exports",
-            How::Types => "types",
-            How::Module => "module",
-            How::Main => "main",
-            How::Path => "path",
-            How::OutDir => "outDir",
-            How::ModuleName => "module name",
-            How::TopLevel => "top-level module",
-            How::CrateName => "crate name",
-            How::ModulePath => "module path",
-        }
-    }
-}
+pub use meada_core::export::How;
 
 /// Where a call through a package import resolves in one provider of the package.
 pub struct Hop {
@@ -474,32 +434,7 @@ pub struct Hop {
     pub level: Level,
 }
 
-/// An import resolved into a package of the workspace (`meada export`).
-#[derive(Serialize)]
-pub struct Import {
-    /// The call through the imported binding.
-    pub site: String,
-    pub specifier: String,
-    /// What the call names of the import.
-    pub name: String,
-    pub level: Level,
-    pub how: How,
-    pub target: String,
-}
-
-/// A dependency entry that names a package of the workspace (`meada export`).
-#[derive(Serialize)]
-pub struct Dependency {
-    /// The path of the manifest holding the entry.
-    pub manifest: String,
-    pub field: String,
-    pub name: String,
-    /// Cargo only: the key the entry renames the package to.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub alias: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub range: Option<String>,
-}
+pub use meada_core::export::{Dependency, Import};
 
 /// The two `compilerOptions` of a `tsconfig.json` that map build output back to source, as
 /// written. `extends` is not followed.
@@ -1510,7 +1445,7 @@ impl ContractKind for Packages {
                 None => p.name.clone(),
             };
             let n = entries.get(p.site().as_str()).copied().unwrap_or(0);
-            let name = match is_npm(&p.ecosystem) {
+            let name = match p.ecosystem.name() == Npm.name() {
                 true => name,
                 false => format!("{name} ({})", p.ecosystem.name()),
             };

@@ -14,7 +14,10 @@ connection as `peer<n>`. Locally the index is the checkout's own `.meada/index.d
 **workspace manifest** instead (`workspace::Manifest`: every listed repository, `repo` first,
 then manifest order, nothing discovered; under an OIDC grant only the granted ones) and each
 index lives at `<index_dir>/<identity>/index.db`; `engine::index_workspace` and
-`engine::status_workspace` are `meada index --workspace` and `meada status --workspace`. An
+`engine::probe_workspace` are `meada index --workspace` and `meada status --workspace`.
+The status report and readiness share one `Manifest::read_listed`, including a managed version
+swap during the informational Valkey probe; `ready` also reuses one listed manifest across
+its normal and locked-index checks. An
 engine opened from a
 manifest opens every index read-only on one connection (`index::open_read`: nothing created,
 `trusted_schema` off and `SQLITE_DBCONFIG_DEFENSIVE` on, since a generation's index comes from
@@ -76,19 +79,139 @@ mirror needs only `meada index --workspace`. It refuses `trace` with `changes: u
 changed since indexing.
 Everything the engine returns is sorted: the same files give byte-identical output.
 
+## Crates
+
+The repository is a Cargo workspace (ADR 0014): the `meada` binary's crate at the root (`src/`,
+`tests/`), and `meada-core/`, the deterministic part the binary and the console's front end
+share. Both take one version from the workspace, and `meada` depends on `meada-core` at exactly
+it. `meada-core` has no rusqlite, tree-sitter, filesystem, process or network code and no async
+runtime; it builds for `wasm32-unknown-unknown`, its `wasm-bindgen` feature (never the binary's)
+exporting `init`, `validate`, `workspaceVersionId`, `workspaceDiff`, `entriesText` and
+`parseExport`. CI's `core` job builds it
+with wasm-pack and checks both trees.
+
+- `meada-core/src/manifest.rs`: a workspace manifest's `[[repository]]` (`EntryFile`,
+  `EntryPeer`) and the `[serve]` and `[[resource]]` shapes `meada.toml` shares (`Serve`,
+  `Resource`, `Role`, `declared`, `gateway_path`); `parse` and `error_at`, the errors naming
+  the file, the line and the dotted key (`line_of`); `identity_problem` and `entry_problems`
+  (an identity listed twice); `validate`, a workspace text's entries or its problems as the CLI
+  prints them (a text holding only `[[repository]]` entries). `validate_import(file, src)`
+  validates entries while ignoring other top-level keys, with CLI import's file prefix on
+  identity errors; CLI, HTTP and WASM import validation share it, preserving empty workspaces and ignored
+  bootstrap sections.
+- `meada-core/src/ids.rs`: `bundle_id`, `generation_id` (ADR 0012), `workspace_version_id`
+  (ADR 0014: the canonical JSON of the entries, `{"blocks","path","repo"}` in manifest order),
+  `is_id`, `fence`, `entry_blocks`.
+- `meada-core/src/workspace.rs`: `diff(file, before, after)` validates through `validate_import`
+  and lists added/removed/changed identities and changed dotted keys in manifest order. Array
+  tables retain each field's row position and absence; common entries reordered relative to
+  one another report the `repository` array key. Formatting is ignored. `entries_text` is the
+  pure JSON-repositories-to-TOML conversion shared with `snapshot::versions` and WASM.
+- `meada-core/src/msg.rs`: the messages of those checks and the language flag the binary's
+  `msg.rs` reads too; `meada-core/src/http.rs`: `normalize_path` and `PARAM`, which the HTTP
+  kind re-exports. `qualify` and `parent` (dotted names) live in its `lib.rs`.
+- `meada-core/src/export.rs`: the export's types as `meada export` writes them (`Export` and
+  every piece, `Level`, `Link`, `Process` with its `Step`, `Via` and `Mark`, `Stale`, `Cause`,
+  `EntryKind`, `Format`, `How`), `Serialize` and `Deserialize`, so a parsed export written again
+  (`Export::write`) is the same bytes; `parse` reads one or names the field that does not fit
+  (`calls[3].span: missing field ...`), which `parseExport` exports to the browser. The binary
+  re-exports the shared pieces where they lived (`index`, `contract`, `package`, `decisions`,
+  `community`, `entry`, `document`) and keeps its own `Export`, `Provider`, `Consumer`,
+  `Document` and `Package` with what only the build needs, turned into these by
+  `index::Export::written`.
+- `meada-core/src/shape.rs`: shapes and shape drift (ADR 0009: `Drift`, `{missing, unchecked}`,
+  `shape::drift`), which the binary reaches as `crate::shape`. `drift.rs`: how `context`,
+  `search` and `status` show a link's drift (`consumers`, `matches`, `counts`, over the `Entry`s
+  the binary's `drift_view.rs` places).
+- `meada-core/src/render.rs`: the token budget and line helpers every answer shares (`budgeted`,
+  `cut`, `note`, `tokens`, `label`, `callee`, `mark`, `rank`, `section`); `search.rs` (`Hit`,
+  `answer`), `context.rs` (`Symbol::answer`, its cut order and `processes_line`, `shape_lines`)
+  and `trace.rs` (`Row`, `Chain::answer` with the footer): the results of `search`, `context`
+  and `trace` and their text answers. The engine walks the indexes and places each line (a
+  `path:line` reads the file); these assemble and cut the answer.
+
+## Console frontend (`ui/`)
+
+The static console (ADR 0014) is a separate Vite/React/strict TypeScript build. `npm ci`,
+`npm run wasm`, `npm run build`, `npm run check:version` and `npm test` run inside `ui/`, with
+Node pinned by `.nvmrc` and wasm-pack by `scripts/wasm.mjs`. Cargo never invokes them. The
+WASM bundle builds from `meada-core` into ignored `ui/wasm/`; Vite puts content-hashed scripts,
+styles and WASM under `dist/assets/`, with `meada-ui.json` carrying the workspace version.
+
+`Dockerfile` builds the frontend in a pinned build-platform stage. Only its `cloud` target
+copies `dist/` to `/usr/share/meada/ui`; the default `runtime` target skips Node entirely.
+`scripts/ui-tarball` packages that directory from the cloud image under one versioned root.
+The container workflow checks both images, compares the archive's files and bytes with the
+image, and attaches it to the published release. cargo-dist's default binary artifacts stay
+in their separate release workflow.
+
+`src/api.ts` owns the same-origin `/api/v1/` client; `auth.ts` owns OIDC discovery, PKCE and the
+memory-only bearer. Authorization redirects retain the issuer endpoint's query parameters and
+replace generated OAuth keys through `URL.searchParams.set`. Only the pending redirect's verifier and state enter sessionStorage, and
+both are removed on callback. `main.tsx` handles `/auth/callback` before rendering the shell;
+`App.tsx` keeps page navigation in process so changing pages does not discard the bearer.
+`pages.tsx` provides semantic navigation and the configuration, session and bootstrap manifest
+views, with view models in `models.ts` and navigation copy in `i18n.ts`. `PlaygroundPage.tsx`
+sends the MCP-shaped query that `playground.ts` builds, displaying the answer unchanged.
+`GraphPage.tsx` fetches an export through `Api.export`, and `graph.ts` checks it with WASM
+`parseExport` before deriving communities, contracts, cross-repository links, drift and
+applied/stale decisions. View changes are local; explicit generation exports are cached in the
+page and a current-generation load reads again. `graph-i18n.ts` holds this area's pt-BR/en copy.
+`OperationalPage.tsx` reads the fleet, store, repositories, credentials and admission routes;
+`operations.ts` projects their checked DTOs, with bilingual copy in `operations-i18n.ts`.
+Missing modules name their sections, errors remain local to the page, and the pasted token
+exists only in the uncontrolled field and its request body, cleared on completion.
+The API reader preserves large JSON integers as decimal strings instead of rounding fences.
+`actions.ts` offers generation operations only to an operator while operations are enabled;
+`ActionControls.tsx` displays their CLI commands and the optional fence floor without rounding
+u64 values. `ConfirmDialog.tsx` uses a native modal dialog with labelled controls, Escape
+cancellation and focus restoration. `OperationalPage.tsx` freezes the confirmed payload,
+shows CLI results and refusals unchanged and reloads the fleet after success. A generation
+pointer rollback lasts until the next publish, as every set control explains.
+`WorkspacePage.tsx` reads workspace versions and their current fence, caches selected details
+and compares them with the core's `workspaceDiff`. `workspace.ts` owns the editor projection
+and captured save/apply payloads and commands; `workspace-i18n.ts` owns its pt-BR/en copy.
+Every edit validates through WASM `validate_import`; JSON entries become TOML through the
+same `entries_text` as `workspace show`. Saves require a message, accepted saves read the
+immutable first metadata independently of read refresh failures, and older applies are labelled
+as rollback for the next refresh. The shared confirmation dialog sends nothing before acceptance.
+The frontend container stage copies the one shared validation fixture because TypeScript also
+checks its tests; Rust/default stages gain no frontend input.
+Vitest exercises the built WASM and the public client, view-model and DOM
+seams, without a browser end-to-end suite.
+
+## Deployment profiles
+
+`deploy/compose/compose.yaml` supplies local and generations nodes; the explicit
+`compose.console.yaml` overlay adds the cloud console, its initial pull and companion, its own
+bootstrap/data volume and its own TLS proxy route. `deploy/helm/meada/` follows the same split:
+`console.enabled` is false by default, with a separate ConfigMap, Deployment, Service and
+optional Ingress when enabled. Neither profile mounts a node's data into the console. The
+console's public assets, config and PKCE callback reach its listener before OIDC admission;
+its proxy preserves Host, Origin and Authorization. MCP keeps its separate admission rules.
+
+Managed writers pull the workspace before the external fetch, index and publish, inside one
+refresh lock. Seeding and applying the first version are explicit operator actions. The fetch
+list/script and mirror provisioning still belong to the operator: applying a new identity or
+path does not clone it. `scripts/compose-check` and `scripts/helm-check` check the rendered
+configuration, module dependencies, storage, selectors and refresh order.
+
 ## Modules (`src/`)
 
 Each line names what a module owns; the file in `map/` it points to has the detail. Read the
 one for the area a change touches.
 
 - `engine.rs`: `Engine`, the one query seam (`open`, `refresh`, `export`, `search`, `context`,
-  `trace`, open items, decisions, `status`); it renders `search` and `context`. `items.rs`: open
-  items, derived in one place. `trace.rs`: the `Graph`, the walk, the chain footer and the
-  process walk (`Graph::process`, the step list `trace` renders and the export carries).
+  `trace`, open items, decisions, `status`); it builds the results of `search` and `context`,
+  which `meada-core` renders. `items.rs`: open items, derived in one place. `trace.rs`: the
+  `Graph`, the walk and the process walk (`Graph::process`, the step list `trace` renders and the
+  export carries); `meada-core`'s `trace.rs` closes the chain with its footer.
   `entry.rs`: entry points (spec #31), found when an index is written.
-  `drift_view.rs`: how `context`, `search` and `status` show `Link::drift`; it reads no kind (the
-  stored links, the exports' consumer shapes, the calls and the seam's `parts`).
-  `render.rs`: token budget and line helpers. `mcp.rs`: three read-only tools, one definition over
+  `drift_view.rs`: places the links `context`, `search` and `status` show with their drift
+  (`entries`); it reads no kind (the stored links, the exports' consumer shapes, the calls and the
+  seam's `parts`), and `meada-core`'s `drift.rs` turns them into lines.
+  `render.rs`: the source files an answer reads (`Files`, `source`), re-exporting
+  `meada-core`'s budget and line helpers. `mcp.rs`: three read-only tools, one definition over
   two transports: stdio, about the client's first `file://` root or the server's cwd without
   roots (also for an answer with no local root; a client that fails or does not answer
   `roots/list` within `ROOTS_TIMEOUT`, 5 s, gets the last root it sent, else a tool error),
@@ -123,11 +246,13 @@ one for the area a change touches.
   `Pass::reads`, which drops every entry outside the grant before the missing peers are
   computed, so no answer names one, even as missing (#290); a call with no `Pass` is a tool
   error. The pin is split from the path before the gate, so a pinned path is admitted
-  as its identity is. `main.rs`: clap.
+  as its identity is. The serving loop (bind, the address line, `Stop`, the drain) is
+  `mcp::serve_http`, generic over what answers a request: the node's `run` hands it `route`
+  over `Routes` and `Gate`, the console (`ui.rs`) its own answer. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `modules.rs`, `valkey.rs`: the cloud modules (ADR 0012). `modules.rs` is the section table,
   in every build: each module section of `meada.workspace.toml` (`[valkey]`, `[snapshot]`,
-  `[generations]`, `[refresh_lock]`, `[oidc]`, `[[github_app]]`) with the cargo feature that
+  `[generations]`, `[refresh_lock]`, `[oidc]`, `[[github_app]]`, `[ui]`) with the cargo feature that
   owns it and whether this build has it. `Manifest::read` checks it before the typed parse, so a
   section whose feature is missing is an error naming the file, the line, the section and the
   feature, and a section the table lacks stays an unknown key. A module ticket adds its row and
@@ -181,7 +306,129 @@ one for the area a change touches.
   request) is the union of `identities_claim` and what `[oidc.groups]` maps the groups of
   `groups_claim` to, a claim counting only as an array of strings, `*` from either for all;
   routing checks it and it bounds the workspace of each answer (`mcp.rs`). No token, error text
-  of `jsonwebtoken` or claim value is ever printed.
+  of `jsonwebtoken` or claim value is ever printed. With feature `ui`, the console reaches the
+  same checks through `admit_console` (one audience, `[ui] audience`; a `Bearer` challenge with
+  no `resource_metadata`), `check` (a pasted token's outcome per check, signature, issuer,
+  audience as a node checks it, lifetime and scopes, and its grant when every check passes,
+  against the cached keys only, so it never fetches) and `admission` (the issuer's metadata as
+  read at start, the cached key ids, the last read and a refresh that failed since, with its
+  reason and never the answer's body, and the groups table bounded by the caller's grant).
+- `ui.rs` (feature `ui`, no crate of its own; `cloud` enables it): the management console's
+  process (ADR 0014), `meada ui --listen <addr> --workspace <bootstrap manifest>`,
+  on the node's listener (`mcp::serve_http`, `mcp::address`, the same drain); never a node's
+  route, never an MCP server. `File` is `[ui]` and `validated` lists every problem of it at
+  once (`dir` and `public_url` required, `public_url` `https` or loopback `http` with nothing
+  past the host through `modules::reachable`; `audience` defaults to `public_url`; `client_id`,
+  `operations` defaults to false and requires `[oidc]` plus one operator key when true;
+  `operator_groups` and `operator_claim` are mutually exclusive and require `[oidc]`, and the
+  groups key also requires `oidc.groups_claim`). `Console::start` refuses, listing every problem: a manifest error, no `[ui]`, `[oidc]`
+  without `[ui] client_id`, `[oidc]` whose issuer's metadata or JWKS cannot be read
+  (`Oidc::start`, as a node), a `[ui] dir` that is not a directory, and the version check:
+  `meada-ui.json` at the root of `[ui] dir` must be `{"version": "<this Meada version>"}`, and
+  a missing, oversized (`VERSION_MAX`) or unreadable file counts as another version, both
+  versions named. Each request goes, in order, through the `Host` check (403 unless `Host` is
+  `public_url`'s host and port, or the bound address on loopback), the `Origin` check (403 for
+  an `Origin` other than `public_url`, and for a write, any method but `GET` and `HEAD`, without
+  one), admission (`Console::admit`), then routing; the 403 bodies are fixed text. Admission:
+  behind the operator's proxy every request is a viewer's that reads everything; with `[oidc]`
+  (feature `oidc`) a bearer token for `[ui] audience` through the nodes' module
+  (`Oidc::admit_console`), a 401 with `WWW-Authenticate: Bearer` (and `error="invalid_token"`
+  when a token was sent) or a 403 for a missing scope, both as JSON errors. The static files
+  and `config` need no token, since the browser needs them to log in. A verified subject in
+  `operator_groups`, or with the top-level `operator_claim` equal to JSON boolean true, is an
+  operator; string `"true"` is a viewer. `Session::reads` and `whole` let operators see the
+  entire fleet regardless of grant. The request's `Session` carries the token's grant, and
+  `Session::reads` is the one check every view of a repository goes through, as #290 bounds a
+  node's answers: a repository outside the grant is absent, state that belongs to no repository
+  is shown whole, a `*` grant reads everything; the read routes (#304) and the playground
+  (#305) bound theirs through it. `/api/v1/` is the JSON API (`config`, `session`, `manifest`,
+  and with `[oidc]` `admission` and `POST admission/check`; errors `{"error": {"code",
+  "message"}}`, an unknown path a 404 in that shape, as the admission routes are without
+  `[oidc]`); `config` adds, with `[oidc]`, the issuer, `client_id`, the scopes and the audience
+  the browser's authorization code flow with PKCE needs; `session` is the subject and role;
+  `manifest` answers the file as loaded at start (a TOML table as JSON: secrets' variable and
+  file names only), the module table with what this build has, and the errors of the file as it
+  now stands on disk, read again per request, for a session that does not read everything
+  without the `[[repository]]` entries, nested peers or OIDC group identities outside its grant
+  (group wildcards remain visible), and with only the file and line of an error whose text
+  could name one, including an identity known only through groups; `admission/check` reads `{"token": ...}` (`CHECK_MAX`) and answers each check's outcome and the identities, of the
+  file's entries or the checked current workspace version's entries for `source = "store"`,
+  that both the token's grant and the session's admit; the token lives
+  only for that request, and a body that does not parse is a fixed 400, never serde's text.
+  `ui/write.rs` owns four POST routes, all disabled unless `operations` is true and the
+  admitted operator has a nonempty subject. Host, Origin, admission and role are checked before
+  reading any body, carrying that same session into routing. `pointer` takes `{action,
+  generation}` (`set`, `retain`, `drop`) and calls `snapshot::operation::pointer_set`,
+  `pointer_retain` or `pointer_drop`; `fence/recover` takes `{at_least?}` (u64 or checked decimal
+  string) and calls `fence_recover`; `workspace/versions` takes `{entries, message}` and calls
+  `versions::save`; `workspace/apply` takes `{version}` and calls `versions::apply`. These
+  owner functions keep the CLI checks, refresh lock and holder (operation plus escaped subject),
+  with the admitted subject as author. Success is 200 `{result: "<CLI line>"}`; operational
+  refusals are 409 with the CLI message; entry validation is 422 with CLI line/key diagnostics;
+  malformed JSON, extra keys or malformed ids/fences are safe fixed 400s; caps are 413s. Every
+  accepted or refused write logs one stderr line `ui: <subject> <action> <arguments>: <outcome>`,
+  with controls escaped throughout. Pre-authentication refusals use absent subject `-` and safe
+  fixed arguments, never body or token text. Save validation keeps its full CLI diagnostics in
+  the 422 response but logs only the fixed outcome `workspace entries failed validation`, so
+  invalid identities cannot copy editor contents into stderr. No route releases locks or
+  triggers refresh.
+  Operational reads live in `ui/read.rs`: `GET fleet` reads the checked pointer/retained/kept
+  state (`generations::inspect`), live heartbeats (`heartbeat::read`), holder and remaining
+  lock TTL, and fence counter from Valkey; workspace ids come from generation documents and
+  last publish from the current document's modification time in the store. Malformed
+  heartbeats are shown with fixed reasons, never used for a key or diagnostic. The two stuck
+  cases name `meada snapshot fence recover`; the fleet maximum includes the current workspace
+  pointer's fence, and a stuck node also names deleting its own
+  `<local_dir>/current`. `GET store` lists every generation document name and fully reads
+  current/retained documents only; `store/generations/<id>` reads one. Both use the pull's
+  checked document reader, with validated ids, bundle keys, identities, hashes and blocks.
+  `GET workspace`, `workspace/versions` and `workspace/versions/<id>` read the optional
+  Valkey pointer and checked versions from the store (`versions::stored`, `documents`, the
+  listing shared with the CLI), newest first, malformed documents listed as such. Repository
+  entries and nested peers are bounded by `Session::reads`; malformed reasons cannot name
+  hidden repositories. `GET repositories` lists commits per live served generation, schema
+  versions from the console's own held indexes, unknown elsewhere; without snapshot it
+  compares read-only index freshness and optional indexed commit with mirror `HEAD`.
+  `index_workspace` atomically records an optional `index.commit.json` beside each index
+  after a clean indexing pass; its commit is accepted only while its fingerprint of the
+  index's existing metadata and file/document/manifest hashes matches. Older indexes,
+  interrupted writes and stale sidecars give an unknown commit; the SQLite schema is unchanged.
+  `GET credentials` uses `github_app::inspect` to read installations, token expiry and
+  throttle expiry times from Valkey only, filtering owners by the granted workspace identities;
+  expiry is extracted beside the token in Valkey, so no token or private key is read by the
+  console. All operational service reads share a two-second request deadline and report
+  the service that failed; permit waits share that deadline. At most `READERS_MAX` operational
+  readers run at once, and a worker retains its permit until blocking I/O actually finishes,
+  even after its request timed out. The managed-workspace identities of `admission/check` use
+  this same worker and deadline boundary, including the store connection and runtime teardown.
+  Config/session/manifest use no such permit. Missing module sections are explicit `requires`
+  responses; without `[generations]` there is no per-node fleet view.
+  The playground and the exports (#305) answer in process from what the console holds
+  (`Holds`), never from a node: with `[snapshot]`, the generations its own `meada snapshot pull`
+  (an init pull and a `pull --every` companion on a `local_dir` of its own) keeps, read per
+  request as `--generations` serving reads them (`serve::Current`, `Engine::open_held`), the one
+  `<local_dir>/current` names by default; without it, the bootstrap manifest's `[[repository]]`
+  entries as read at start, each index under `index_dir`, as `meada mcp --listen --workspace`
+  opens them (`Engine::open_listed`). `POST query` reads `{"repository", "generation", "tool",
+  "arguments"}` (`QUERY_MAX`), the arguments as the MCP tool takes them and checked by the
+  tools' own code (`mcp::served_call`, so `trace` with `changes: uncommitted` is refused with
+  the node's text), and answers `{"text", "generation"}` (`generation` null without
+  `[snapshot]`); `GET repositories/<identity>/export?generation=<id>` answers the bytes
+  `meada export` prints, the identity being everything between `repositories/` and the last
+  `/export`. Both open one engine per request whose workspace holds only what `Session::reads`
+  admits (peers outside the grant dropped before the answer is built); a repository outside
+  the grant is the 404 of one not served, a generation not held a 404 naming the held ones, and
+  nothing servable yet (no pull, no index) a 503 naming `meada snapshot pull` or `meada index
+  --workspace`, every other view answering, and the next request after the pull or the index
+  answering with no restart. A tool error is a 422 with the node's text.
+  Every other path is a file of `[ui] dir`: percent-decoded, a 404 for a
+  `..`, `.` or empty segment, a NUL or a backslash, a resolved path (symbolic links followed)
+  outside the canonical `[ui] dir`, or an extension outside the fixed table (`content_type`); a
+  path that names no file, a directory included (none is listed), answers `index.html` unless it
+  is under `/api/`. Files under `assets/` are cacheable for a year and immutable, every other one
+  `no-cache`. Every answer carries `nosniff`, `Referrer-Policy: no-referrer` and the content
+  security policy (`csp`, whose `connect-src` adds the issuer's origin with `[oidc]`); none sets
+  a cookie or an `Access-Control-*` header.
 - `github_app.rs` (feature `github-app`, which needs `valkey`; `jsonwebtoken` with `use_pem`
   only here): git's credential helper for the indexing job (ADR 0013). `File` is one
   `[[github_app]]` block and `validated` checks them all (`host` a git host name, lowercase; `api`
@@ -217,17 +464,22 @@ one for the area a change touches.
   `region`, `bucket` and `prefix` shapes; one credential source,
   the static keys only with `static`, at most one of each `*_env`/`*_file` pair). `bundle_id`
   and `generation_id` are the ids of ADR 0012 (`is_id` their shape); `entry_blocks` gives each
-  manifest entry's blocks as canonical JSON (`Listed::blocks`). `publish` is `meada snapshot
+  manifest entry's blocks as canonical JSON (`Listed::blocks`); all four, and `fence`, are
+  `meada_core::ids`'s, re-exported. `publish` is `meada snapshot
   publish`: per repository `index::open_read` plus `index::fresh`, `repo::unclean` and
   `repo::head`, every problem listed; then `store_generation` uploads the missing bundles (a
   first pass measures the tar's size and hash, a second streams it as a multipart upload with
   them as metadata, aborted if they differ), reads each back from metadata, writes the document
   and `current` last; an existing document is verified instead (`verify`) and never rewritten.
+  `Document::workspace`, optional, is the id of the pulled workspace version with `source =
+  "store"` (`Manifest::version`), absent with `source = "file"`, and part of no id: a stored
+  generation keeps the version that first produced it, and older binaries ignore the field.
   The tar is `index.db`, then the mirror under `mirror/` in path order, symbolic links as links.
   `store::Store` is the client `meada snapshot pull` (#273) reuses: object_store's S3 client
   over `Guard`, a reqwest client with no redirect and no proxy that refuses any origin but the
   bucket's and the chosen credential source's (STS in `region`, the Pod Identity agent, IMDSv2),
-  whose TLS is `store::tls` (rustls with ring and the system's roots, handed to a reqwest built
+  whose TLS is `store::tls` (rustls with ring and the system's roots, optionally augmented by
+  the manifest-relative `snapshot.ca_file` PEM certificates, handed to a reqwest built
   with `rustls-no-provider`; object_store signs with ring too). Ring is the only rustls provider
   in any build (ureq brings it, and redis reads it as the process default): a second one, as
   object_store's `aws` feature would add with aws-lc-rs, makes rustls panic on the first TLS
@@ -249,7 +501,8 @@ one for the area a change touches.
   id>/index.db` and `<bundle id>/mirror/`; a pull in progress writes only `<generation
   id>.partial/` and `current.new`. Steps: the store's `current` must be an id and a newline
   (`store_pointer`); `checked` refuses a document before any path is built from it (its
-  generation id, `workspace::identity_problem` per identity plus no duplicate and no character
+  generation id, a `workspace` field that is a version id when present
+  (`Msg::SnapshotBadWorkspace`), `identity_problem` (`meada_core::manifest`) per identity plus no duplicate and no character
   a git remote URL cannot hold, each bundle key `repos/<identity>/<bundle id>.tar` under the
   prefix, hash and `HEAD` shapes, the size sum, the generation id derived again); per bundle,
   `Store::download` streams it to a file checked against the document's size and hash, and
@@ -292,19 +545,26 @@ one for the area a change touches.
   `valkey`; no crate of its own) is the generation pointer, section `[generations]` (`keep`,
   default 3, at least 2; `Manifest::read` refuses it without `[snapshot]` and `[valkey]` through
   `modules::needs`). It owns the Valkey keys, both under the `[valkey]` prefix's hash tag:
-  `{<key_prefix>}:current`, a hash `{id, fence}`, and `{<key_prefix>}:retained`, a list of
-  `<id>:<fence>` newest first, each id once, trimmed to `keep`. `point` runs the one script that
-  writes both (`EVAL`; KEYS current, retained and `{<key_prefix>}:lock`, ARGV id, fence, keep
-  and the refresh lock's token, empty without one): with a token it returns 0 unless the lock
+  `{<key_prefix>}:current`, a hash `{id, fence}`, `{<key_prefix>}:retained`, a list of
+  `<id>:<fence>` newest first, each id once, and `{<key_prefix>}:kept` (`kept`), the set of ids
+  an operator keeps by hand (`meada snapshot pointer retain`), at most `KEPT_MAX`. `point` runs
+  the one script that writes the pointer (`EVAL`; KEYS current, retained, `{<key_prefix>}:lock`
+  and kept, ARGV id, fence, keep and the refresh lock's token, empty without one): with a token it returns 0 unless the lock
   holds it (`Msg::LockNotHeld`) and -1 unless the fence is above `current`'s
-  (`Msg::FenceRefused`, naming `{<key_prefix>}:fence` and the recovery; the two fences compare
+  (`Msg::FenceRefused`, naming `{<key_prefix>}:fence` and `meada snapshot fence recover`, as
+  `Msg::FenceBelowNode` and `Msg::FenceStuck` do with `--at-least`; the two fences compare
   as decimal text, leading zeros dropped, so none loses precision as a Lua number, and -2 for a
   stored fence that is no decimal); then it removes every entry of the id, pushes
-  `<id>:<fence>`, trims and sets the hash. `publish` connects to Valkey before any upload and
+  `<id>:<fence>`, trims (the oldest entries whose id is not in kept go until at most `keep` of
+  those remain; a kept entry never goes) and sets the hash. `publish` connects to Valkey before any upload and
   calls `point` last, with fence `0` and no token without `[refresh_lock]`, instead of writing
-  the store's `current`. `read` is the pull's side: `HMGET current id fence` and `LRANGE retained 0
-  keep-1`, every id checked by `is_id` and every fence by `snapshot::fence` before anything
-  else; a missing pointer, an empty list or a malformed entry is an error naming the key. With
+  the store's `current`; `meada snapshot pointer set` (`operation::pointer_set`) calls it with
+  its own token and fence to move the pointer to a retained generation, a rollback that the
+  next publish undoes. `read` is the pull's side: `HMGET current id fence` and the whole
+  retained list (`LRANGE retained 0 keep+KEPT_MAX`), every id checked by `is_id` and every fence
+  by `snapshot::fence` before anything else; a missing pointer, an empty list, a list longer
+  than `keep` plus `KEPT_MAX` (`Msg::GenerationsTooLong`) or a malformed entry is an error
+  naming the key. With
   it, `pull_locked` (through `Source::wanted`) fetches the current generation if the node lacks
   it and swaps the pointer file to `<id> <fence>` as read (a failure there fails the pull and
   changes nothing), then fetches every retained one the node lacks, each failure a warning
@@ -316,14 +576,104 @@ one for the area a change touches.
   `Msg::FenceBelowNode` and changes nothing; with no pointer file the node takes it whatever
   its fence. `engine::status_generations` adds a `fence: stuck: ...` line (`Msg::FenceStuck`)
   when the node's fence is above the one `reach_pointer` read, with no effect on the exit code.
+  `snapshot/heartbeat.rs` (feature `generation-pointer`, crate `nix` for the host name; ADR
+  0014) is the node heartbeat. `main.rs`'s `pull` loop calls `heartbeat::beat` at the end of
+  every round of `pull --every` (never of a single pull), whether the round swapped, changed
+  nothing or failed, and `heartbeat::check` once before the loop: with `[generations]`, a host
+  name that is no node name, with no `[snapshot] node_name`, refuses to start
+  (`Msg::NodeNameHost`, naming `[snapshot] node_name`). Without `[generations]` neither runs
+  and no connection opens. The key `{<key_prefix>}:node:<name>` holds a JSON object (`name`;
+  `generation` and `fence`, from the node pointer file, null without one; `held`, `serve::ids`;
+  `ready`, `engine::served_generation` succeeding, the predicate `status --generations` exits
+  on; `version`; `time`, RFC 3339 UTC to the second), and the `WRITE` script sets it with a TTL
+  of three `--every` periods, adds the name to `{<key_prefix>}:nodes` scored by the expiry in
+  Unix seconds by Valkey's own clock (`TIME`), and removes every name whose score is at or
+  below now, so the set never keeps the names of pods long gone and the console lists nodes
+  without scanning. `[snapshot] node_name` (`snapshot::is_node_name`: lowercase letters,
+  digits, `.` and `-`, 1 to 63 characters; an error naming the file, the line and the key
+  otherwise) defaults to the host name in lowercase; names must be unique, as pod names are,
+  since two nodes with one name overwrite each other's heartbeat. A write that fails, or that
+  Valkey does not answer within `WRITE_TIMEOUT` (two seconds, the bound the probe waits for
+  Valkey), is one stderr warning for the round (`Msg::HeartbeatNotWritten`, the key and the
+  scrubbed reason): the round's outcome, the pointer file, the exit code and the readiness do
+  not change. `heartbeat::read`, shared by recovery and the console, selects live names with
+  Valkey `TIME`, reads their keys and applies the complete `heartbeat::checked` validator.
+  Malformed names never form keys and malformed documents never contribute fences;
+  `Malformed` supplies the CLI warnings and console rows.
+  `snapshot/versions.rs` (feature `generation-pointer`, ADR 0014) holds the workspace
+  versions: the `[[repository]]` entries of a workspace as immutable documents in the store, at
+  `workspaces/<version id>.json` under `[snapshot] prefix` (`Version`: `id`, `author`, `time`
+  in RFC 3339 UTC, `message`, and `repositories` in manifest order, each entry its `repo` and
+  `path` as written plus its blocks as `entry_blocks` gives them), stored with the size and
+  hash metadata every object carries and never rewritten. The id is
+  `meada_core::ids::workspace_version_id` of the entries alone. The current version is
+  `{<key_prefix>}:workspace`, a hash `{id, fence}` under the pointer's hash tag (`pointer_key`,
+  read by `current`, moved by `meada workspace apply`, #302). `import` (`meada workspace import
+  <file> --message <text> [--author <name>] --workspace <bootstrap manifest>`) reads the file's
+  `[[repository]]` entries through `meada_core::manifest::validate_import`, names each other
+  top-level key on stderr as not imported (`Msg::WorkspaceNotImported`), and validates before
+  `Store::connect`; entries whose document is stored upload nothing and answer it with its first
+  author and message (`Msg::WorkspaceStored`). Shared `store_version` checks the serialized
+  document against `VERSION_MAX`, then `Store::create` uses conditional create with size/hash
+  metadata: concurrent imports preserve the first author, time and message, and a losing
+  writer reads the checked original. HTTP `save` shares the preparation and storage under the
+  refresh lock; CLI `import` requires only `generation-pointer` and takes no refresh lock.
+  `list` reads and checks the pointer first (a malformed one, `Msg::WorkspaceBadPointer`, refuses the listing), then every object under
+  `workspaces/` (`Store::list`), sorted newest first by time, then id; a name that is not an id,
+  or a document that fails `checked`, is a `!` line. `show [<version>]` checks the argument
+  first (`Msg::BadVersionArg`), takes the current version without one
+  (`Msg::WorkspaceNoCurrent`, naming `meada workspace apply`) and prints the entries as
+  `[[repository]]` tables, which `import` reads back to the same id. `checked` treats a
+  document as hostile: at most `VERSION_MAX`, its id the one its key names, its time's shape,
+  its entries rendered as `[[repository]]` text and validated as a workspace's
+  (`meada_core::manifest::validate`), and the id derived from them again. The commands need
+  `[generations]` in the bootstrap manifest (`Msg::WorkspaceNoSections`), not `source =
+  "store"`, so an operator imports before switching. The author without `--author` is
+  `cli_author`, `cli:<login>@<host>` (from the environment in a build without `refresh-lock`).
+  `apply` (`meada workspace apply <version>`, feature `refresh-lock`) checks the id first
+  (`Msg::BadVersionArg`), needs `[refresh_lock]` (`operation::sections`), reads and checks the
+  version's document in the store (missing, `Msg::WorkspaceNoVersion` naming its key), then runs
+  under `operation::locked` (holder `workspace apply <author>`) the `APPLY` script: it sets
+  `{<key_prefix>}:workspace` to `{id, fence}` only while the lock holds the token and the
+  operation's fence is above the stored one (decimal text, as `POINT` compares;
+  `Msg::FenceRefused` otherwise); it prints `<id> <fence>`. Rolling back is applying an older
+  version. `pull` (`meada workspace pull`) reads the pointer (`current`; none is
+  `Msg::WorkspaceNoCurrent`, naming `meada workspace apply`) and the document (at most
+  `VERSION_MAX`, `checked`) before anything on disk changes, then, under `<index_dir>/workspace/`
+  (`DIR`) and its `pull.lock` (an advisory lock, one pull at a time), writes `<id>.json` (the
+  document as stored, through `<id>.json.new` and a rename) and swaps `current` (one line `<id>
+  <fence>`, `pull::swap`); a pointer whose fence is below the current file's, or equal with
+  another id, is `Msg::WorkspaceFenceBelow` naming both fences and the file, and the same id and
+  fence is `Pulled::Current` (the id on stdout, `Msg::WorkspaceAlreadyCurrent` on stderr). Only
+  the current version's document and the one it replaced stay; a failure leaves the current
+  file and the documents as they were. `pulled` reads the version the current file names from
+  disk (`pull::pointer_file`, `Msg::WorkspaceCurrentBad` for a malformed one), bounded and
+  checked as a pull checks it, and opens no connection: `Manifest::read_listed` uses it.
+  The refresh job of a managed workspace runs, under `meada snapshot lock`, `meada workspace
+  pull`, the fetch of the mirrors `meada workspace show` lists, `meada index --workspace` and
+  `meada snapshot publish`: `apply` needs the lock, so it cannot run between the pull and the
+  publish, and the whole refresh sees one version.
   `snapshot/lock.rs` (feature `refresh-lock`, which implies `generation-pointer`; crate `nix`,
   Unix only, a `compile_error!` elsewhere) is the refresh lock, section `[refresh_lock]` (`ttl_seconds`, default 300, at
   least 10; `Manifest::read` refuses it without `[generations]`). Keys under the same hash tag:
-  `{<key_prefix>}:lock` and `{<key_prefix>}:fence`, which Meada only `INCR`s. `run` is `meada
-  snapshot lock`: `SET lock <token> NX PX <ttl>` (a token of 16 bytes of `/dev/urandom` in hex;
-  a lock already held is `Msg::LockHeld`, nothing run; a `SET` that errs releases the token
-  anyway, since the server may have taken it), `INCR fence` (a result that is not a
-  positive `u64` is `Msg::LockBadFence`), then the child, spawned on the main thread in a
+  `{<key_prefix>}:lock`, `{<key_prefix>}:fence`, which Meada only `INCR`s and `fence recover`
+  raises, never lowers, and `{<key_prefix>}:holder`, a hash beside the lock with its TTL
+  (`host`, the lowercased host name; `pid`; `started`, RFC
+  3339 in UTC to the second; `holds`: `lock <program>`, the child's program without its
+  arguments, or `<operation> cli:<login>@<host>`). `acquire` is shared by `lock` and the
+  operations: `TAKE` (`SET lock <token> NX PX <ttl>` and, when taken, the holder written with
+  the same TTL, in one script; else the holder's fields, so a lock already held is
+  `Msg::LockHeld` naming its host, process, start time and what holds it, or an unknown holder
+  for a lock without one, every field escaped; a token of 16 bytes of `/dev/urandom` in hex; a
+  script that errs releases the token anyway, since the server may have taken it), then
+  `INCREMENT`: under the same token, compare the counter as decimal text against the caller's
+  ceiling and issue native `INCR` once, returning `GET` to preserve precision beyond 2^53.
+  The signed INCR ceiling is `LAST_FENCE` (9223372036854775807); recovery reserves one more
+  acquisition for publishing, so its own acquisition cannot exceed 9223372036854775806.
+  A ceiling refusal is `Msg::FenceLimit`; a result that is not a positive `u64` is
+  `Msg::LockBadFence`. Wire values and recorded fences remain full `u64`. `RENEW` extends the
+  holder with the lock and `RELEASE` deletes both, each only while the lock holds the token.
+  `run` is `meada snapshot lock`: `acquire`, then the child, spawned on the main thread in a
   process group of its own (`process_group(0)`) with `MEADA_REFRESH_LOCK` and
   `MEADA_REFRESH_FENCE`; on Linux its `pre_exec` arms `PR_SET_PDEATHSIG` (SIGTERM) and refuses
   to run if `lock` already died, the crate's one `unsafe`. A thread waits for the child; the
@@ -337,14 +687,64 @@ one for the area a change touches.
   lock` equals the token) runs before each bundle upload and before the document's (a token
   with no `[generations]` is an error, never a pass), and the
   token and fence go to `point`.
+  `snapshot/operation.rs` (feature `refresh-lock`, ADR 0014) holds the operations, which the
+  console calls in process too: each checks its arguments first (an id by `is_id`, a fence by
+  `snapshot::fence`), needs `[refresh_lock]` (`Msg::LockNoSection`), runs under `acquire` with
+  a holder naming it and its author, makes one write through a script that checks the token,
+  and calls `release` whatever the write did, so it leaves no lock and no holder (a release
+  Valkey misses expires with the TTL). `pointer_set` (`meada snapshot pointer set <generation>`)
+  refuses an id outside `retained` (`Msg::PointerNotRetained`), then
+  calls `point` with its token and fence, so the moved pointer's fence is above every node's
+  and nodes swap on their next pull; it prints `<id> <fence>`. The rollback holds until the
+  next publish moves the pointer past it: to stay back, the operator suspends the refresh job.
+  `pointer_retain` (`meada snapshot pointer retain <generation>`) first reads the generation's
+  document from the store and checks it as a pull does (`pull::stored_document`; missing or
+  malformed, the error names its key, before the lock), then `RETAIN`: an id already kept
+  changes nothing, a kept set already holding `KEPT_MAX` is `Msg::KeptFull`, an id with no
+  entry is appended at the list's oldest end as `<id>:<fence>` with the operation's fence
+  (which `fence recover` counts), and the id joins kept; it prints the id. `pointer_drop`
+  (`meada snapshot pointer drop <generation>`) runs `DROP`: the current id is
+  `Msg::DropCurrent` naming `current`, one with no entry `Msg::DropNotRetained` naming
+  `retained`; else its entries leave the list and the id leaves kept, and the next pull deletes
+  it; it prints the id.
+  `fence_recover` (`meada snapshot fence recover [--at-least <fence>]`) reads the pointer, the
+  workspace pointer (`versions::current`: `apply` takes its fence from the same counter), every
+  `retained` entry and the heartbeat (`{<key_prefix>}:node:<name>`, its `fence` a `u64` or
+  null) of every name of `{<key_prefix>}:nodes` scored above Valkey's `TIME`, as hostile input: a malformed
+  pointer, entry, node name or heartbeat is a `Msg::FenceNotCounted` line on stderr and does not
+  count, a name whose key expired is skipped. The floor and recorded maximum are checked
+  against `LAST_FENCE - 1` before acquisition; records are read again under the lock to cover
+  a publisher between the preflight and acquisition. `RAISE` checks the token and ceiling and
+  sets `fence` to the highest of those and the floor only when above the stored one (decimal
+  text, as `POINT` compares); it prints the fence it leaves, including its own `INCR`.
+  Recovery refuses a counter already at that ceiling without consuming the last acquisition;
+  it never lowers or clamps fences. The next locked publish can still use `LAST_FENCE`.
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
   `workspace.rs` also reads the workspace manifest (`Manifest`) and refuses the entries server
   mode cannot serve; an entry's `[repository.serve]`, `[[repository.resource]]` and
   `[[repository.peer]]` reuse `config.rs`'s shapes (the peer without `path`) and are the
-  configuration of a mirror with no `meada.toml`. A mirror's own `meada.toml` wins whole: the
+  configuration of a mirror with no `meada.toml`. The entry's schema, those shapes and every
+  check the text decides (identities included, `entry_problems`) are `meada_core::manifest`'s;
+  `mirror` keeps the checks that need the mirror, after them. A mirror's own `meada.toml` wins whole: the
   entry's blocks are ignored, not merged, and `Listed::ignored` names them for `status`.
+  The file `--workspace` names is the bootstrap manifest: its `[workspace]` section, read in
+  every build, has `source`, `"file"` (the default, and what a file without the section means:
+  its own `[[repository]]` entries) or `"store"` (the current workspace version,
+  `snapshot/versions.rs`). `source = "store"` without `generation-pointer` is an error naming
+  the feature (`Msg::WorkspaceStoreNeedsFeature`), without `[snapshot]` or `[generations]` one
+  naming them (`modules::needs`), and beside a `[[repository]]` one naming both
+  (`Msg::WorkspaceStoreBeside`); `Manifest::store` records it, with no entries from `read`.
+  `Manifest::read_listed`, which `index`, `status`, `export` without `--generations` and
+  `snapshot publish` call, reads the entries of the version `meada workspace pull` left under
+  `<index_dir>/workspace/` (`versions::pulled`, from disk, once per read, `Manifest::version`
+  its id), its paths relative to the bootstrap manifest's directory, and goes on as for a
+  file's entries (the checks that need a mirror run in `mirror`); without one it refuses naming
+  `meada workspace pull` (`Msg::WorkspaceNotPulled`). `mcp --listen` without `--generations`
+  refuses such a manifest naming `--generations` (`Msg::WorkspaceStoreRefused`): a managed
+  workspace's nodes serve generations, which take their repositories from the generation.
+  `Manifest::index_dir` is the directory every index lives under.
   `index.rs`: the SQLite schema, the freshness pipeline in `refresh` (with `fresh`, its
   read-only twin for `meada snapshot publish`: the same walk, `packs_of` and stamps, and a file
   whose stat moved but whose hash did not is no difference), and
@@ -376,8 +776,8 @@ one for the area a change touches.
   contracts (specs #22, #24, #30 and #25), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
   [map/contracts.md](map/contracts.md).
-- `document/`, `shape.rs`, `literals.rs`, `zod.rs`: OpenAPI and AsyncAPI provider documents, the
-  shape a contract carries, and the shapes read from a handler's returned literals and zod
+- `document/`, `literals.rs`, `zod.rs` (and `meada-core`'s `shape.rs`): OpenAPI and AsyncAPI
+  provider documents, the shape a contract carries, and the shapes read from a handler's returned literals and zod
   schemas (`lang/ts/types.rs` finds the schema a `z.infer` annotation names). Detail:
   [map/documents.md](map/documents.md).
 
@@ -742,7 +1142,7 @@ one for the area a change touches.
   consumer)`, which `http::drift` runs over the workspace's links in
   `Engine::links_and_decisions`, after the decisions replay, setting `Link::drift`: `trace`
   (`Row::link`), the export and every other reader of links see the same value;
-  `drift_view.rs` renders it for `context` (a route's consumers that read fields, with their
+  `drift_view.rs` places it and `meada-core`'s `drift.rs` renders it for `context` (a route's consumers that read fields, with their
   drift), `search` (kind `drift`) and `status` (a count per repository): it computes no drift
   of its own and reads no kind: it reads `Link::drift`, the exports' consumer shapes (which
   consumers read fields), their calls (where each consumer is) and the seam's `parts` (the part
@@ -889,7 +1289,9 @@ one for the area a change touches.
   `src/bin/`. TS/JS declares none.
 - New **config key**: add the field to `Config`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
-- New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/it/mcp.rs` and
+- New **MCP tool**: `mcp.rs`, one `Engine` method that builds the tool's result, its result
+  type and text answer in a module of `meada-core` beside `search.rs`, `context.rs` and
+  `trace.rs` (no file, index or process access there), and watch `tests/it/mcp.rs` and
   `tests/it/server.rs`: the tool list (descriptions plus parameter schemas) must stay within
   1,000 tokens. A tool is added once for both transports: the `#[tool_router]` of `Meada` serves
   stdio and every HTTP endpoint.
@@ -970,8 +1372,29 @@ one for the area a change touches.
   repository is never inferred. A file its pack leaves out
   (`Layout::members`) resolves nothing and has no symbol, call or `files` row in the export.
 
+## Deployment (`deploy/`)
+
+- `deploy/helm/meada/` renders a module-free, two-node Deployment by default. Its init
+  container fetches mirrors outside Meada and indexes its own `emptyDir` before MCP starts.
+  `values-generations.yaml` enables the cloud image, an initial pull and pull companion per
+  pod, plus a `Forbid` refresh CronJob with separate mirrors and indexes under the refresh lock.
+- The chart's ConfigMap owns the workspace manifest. Disabled modules emit no TOML section;
+  external store and Valkey endpoints require TLS, credentials come from Secrets or platform
+  identity, and the optional Ingress leaves admission and header forwarding to the controller.
+- `scripts/helm-check` checks public renders with Helm and parses the resulting TOML. The
+  Helm workflow runs it without a cluster; a local kind smoke checks MCP search after install.
+
 ## Tests (`tests/`)
 
+- `meada-core/tests/` tests that crate at its public seam, and `cargo test` runs them with the
+  binary's (both crates are default members): `ids.rs`, the bundle and generation ids against
+  their canonical texts (the cases the `snapshot` module held), `is_id`, `fence`,
+  `entry_blocks`, and the workspace version id (its canonical text, the same for the same
+  entries however written, changed by a swap, a path or a block); `manifest.rs`, `validate`
+  (the entries in order, text errors with file, line and dotted key, every unservable identity
+  named); `export.rs`, every `*.export.json` golden read with `export::parse` and written
+  again byte for byte, and `parse` refusing a missing field or one of the wrong type, naming it.
+  The binary's manifest errors stay in `tests/it/manifest.rs`.
 - The integration tests are one binary, `tests/it/main.rs`, so `cargo test` links it once: a
   module per subject (`tests/it/<subject>.rs`) and the harness in `tests/it/common/`. A new
   subject is a file there and its `mod` line in `main.rs` (`every_file_here_is_a_module` checks
@@ -1056,11 +1479,16 @@ one for the area a change touches.
   changes nothing. A symbolic link whose target goes through another symbolic link is refused
   even when both stay inside the mirror. A sparse file is refused. The node pointer file holds at
   most `POINTER_MAX` (64 bytes); past it the pointer file is malformed.
+- `snapshot/generations.rs`: `{<key_prefix>}:kept` holds at most `KEPT_MAX` (8) generations,
+  since every node holds every retained generation on disk: `pointer retain` refuses past it,
+  and a pull refuses a retained list longer than `keep` plus `KEPT_MAX`, naming the key and
+  changing nothing.
 - `snapshot.rs`: a generation document holds at most `DOCUMENT_MAX` (16 MiB), in the store and
   as a node holds it, and the store's `current` at most `CURRENT_MAX` (64 bytes); past either
   the object is refused, naming its key or file, and a pull changes nothing.
 - `snapshot/store.rs`: a credential file (key id, secret, token) holds at most `SECRET_MAX`
-  (16 KiB); past it the file is refused, naming it.
+  (16 KiB), and `ca_file` at most `CA_MAX` (1 MiB); past either the file is refused, naming it.
+  An empty CA file or invalid certificate is also refused before connecting.
 - `valkey.rs`: `password_file` holds at most `PASSWORD_MAX` (4096 bytes) and `ca_file` at most
   `CA_MAX` (1 MiB); past either the connection fails, naming the file.
 - `oidc.rs`: each metadata and JWKS request takes at most `FETCH_TIMEOUT` (10 seconds), a
@@ -1087,6 +1515,23 @@ one for the area a change touches.
 - `mcp.rs`: the stop signal drains for at most `DRAIN` (25 seconds, no flag, under Kubernetes'
   30-second default grace period); past it the connections left are dropped, an answer still
   waiting on an index lock included, and the exit is 0.
+- `ui.rs`: `meada-ui.json` is read up to `VERSION_MAX` (4 KiB); a larger file counts as front
+  end files built for another version, and the console refuses to start. A token check's body
+  is read up to `CHECK_MAX` (16 KiB), and a playground query's up to `QUERY_MAX` (16 KiB); past
+  either the answer is a 413. Without `[snapshot]` the playground and the exports serve the
+  `[[repository]]` entries as read at start (a mirror missing then stays unservable until a
+  restart, as on a node). Operational service reads and managed-workspace token checks share
+  a two-second request bound, including the wait for one of `READERS_MAX` (4) workers;
+  timed-out workers retain their slots until I/O completes, so overload starts no additional
+  work. `index.rs` reads optional `index.commit.json` up to
+  `PROVENANCE_MAX` (4 KiB); anything larger has no trusted indexed commit.
+- `ui/write.rs`: `POINTER_MAX`, `FENCE_MAX` and `APPLY_MAX` bound their respective POST bodies
+  to 1 KiB; `SAVE_MAX` bounds a version save's JSON body to 4 MiB. Over-cap authorized uploads
+  get 413 before any operation; unauthorized uploads are never consumed.
+- `snapshot/versions.rs`: a workspace version document holds at most `VERSION_MAX` (4 MiB),
+  checked both before immutable creation and while reading;
+  past it the document is refused (on import, apply and pull, and read from
+  `<index_dir>/workspace/`) or listed as malformed, naming its key or file.
 - `render.rs`: a source file an answer reads (`render::source`, for `path:line` and a symbol's
   source) is read only through plain relative parts of its path, through no symbolic link, as a
   regular file of at most `SOURCE_MAX` (16 MiB); anything else renders as unavailable, the path

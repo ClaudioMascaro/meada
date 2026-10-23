@@ -1,18 +1,18 @@
 //! `meada.toml`: what a repository consumes from its peers (`[[peer]]`), the hosts it serves on
 //! (`[serve]`) and the resources it reads or writes (`[[resource]]`, spec #19). Errors name the
 //! file, the line and the key. A workspace manifest entry reuses these shapes for a mirror with
-//! no `meada.toml` (`workspace::Manifest`, ADR 0011).
+//! no `meada.toml` (`workspace::Manifest`, ADR 0011). The shapes and the text's checks are
+//! `meada_core::manifest`'s; this module reads the files.
 
 use std::fs;
-use std::ops::Range;
 use std::path::Path;
 
-use serde::de::{DeserializeOwned, Error as _};
-use serde::{Deserialize, Deserializer};
-use toml::de::{DeTable, DeValue};
+use serde::Deserialize;
+use serde::de::DeserializeOwned;
 
-use crate::msg::Msg;
-use crate::{Result, qualify};
+pub use meada_core::manifest::{Resource, Serve, declared, gateway_path, line_of};
+
+use crate::Result;
 
 #[derive(Deserialize, Default, Clone)]
 #[serde(deny_unknown_fields)]
@@ -35,163 +35,6 @@ pub struct Peer {
     /// Variables this repository reads the peer's base URL from. Meada never reads their values.
     #[serde(default)]
     pub base_url_env: Vec<String>,
-}
-
-#[derive(Deserialize, Default, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct Serve {
-    #[serde(default)]
-    pub hosts: Vec<String>,
-    /// What a gateway adds in front of every path this repository serves.
-    #[serde(default, deserialize_with = "gateway_key")]
-    pub prefix: Option<String>,
-    /// What a gateway removes from the start of every path this repository serves.
-    #[serde(default, deserialize_with = "gateway_key")]
-    pub strip: Option<String>,
-    /// Documents (spec #21) besides those found by file name, repository-relative. One that
-    /// `.gitignore` ignores is read all the same.
-    #[serde(default, deserialize_with = "repo_paths")]
-    pub documents: Vec<String>,
-    /// Whether `meada.toml` has a `[serve]` table, even an empty one: only then are the
-    /// repository's documents provider sources (spec #21).
-    #[serde(skip)]
-    pub declared: bool,
-}
-
-/// A `[serve]` table that is present: `declared` is set.
-pub(crate) fn declared<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Serve, D::Error> {
-    let serve = Serve::deserialize(d)?;
-    Ok(Serve {
-        declared: true,
-        ..serve
-    })
-}
-
-impl Serve {
-    /// The path a gateway serves a route at, with the reason (see `gateway_path`), for the
-    /// repository's `[serve]` prefix and strip.
-    pub fn gateway_path(&self, code_path: &str) -> Option<(String, String)> {
-        gateway_path(self.prefix.as_deref(), self.strip.as_deref(), code_path)
-    }
-}
-
-/// The path a gateway serves a route at, with the reason: `prefix` followed by the route's
-/// `code_path` without `strip` (only when it starts with `strip`, whole segments). `None`
-/// when no rewrite applies. Code routes use the `[serve]` pair; the routes of a document
-/// (spec #21) use the path of a `servers` URL as the prefix and the `[serve]` strip.
-pub fn gateway_path(
-    prefix: Option<&str>,
-    strip: Option<&str>,
-    code_path: &str,
-) -> Option<(String, String)> {
-    let prefix = prefix.filter(|p| !p.is_empty());
-    let strip = strip.filter(|s| !s.is_empty());
-    let stripped = strip.and_then(|s| {
-        let rest = code_path.strip_prefix(s)?;
-        (rest.is_empty() || rest.starts_with('/')).then_some((s, rest))
-    });
-    let rest = stripped.map_or(code_path, |(_, rest)| rest);
-    let path = format!("{}{rest}", prefix.unwrap_or(""));
-    let path = if path.is_empty() { "/".into() } else { path };
-    let reasons: Vec<String> = [
-        prefix.map(|p| format!("gateway prefix {p}")),
-        stripped.map(|(s, _)| format!("gateway strip {s}")),
-    ]
-    .into_iter()
-    .flatten()
-    .collect();
-    (!reasons.is_empty() && path != code_path).then(|| (path, reasons.join(", ")))
-}
-
-/// Repository-relative paths: none may be absolute or climb out with `..`. `.` segments and
-/// doubled `/` are dropped.
-fn repo_paths<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Vec<String>, D::Error> {
-    let mut paths = Vec::new();
-    for path in Vec::<String>::deserialize(d)? {
-        let segments: Vec<&str> = path.split('/').collect();
-        if path.starts_with('/') || segments.contains(&"..") {
-            return Err(D::Error::custom(Msg::NotInRepository(&path).text()));
-        }
-        paths.push(
-            segments
-                .into_iter()
-                .filter(|s| !matches!(*s, "" | "."))
-                .collect::<Vec<_>>()
-                .join("/"),
-        );
-    }
-    Ok(paths)
-}
-
-/// A `[serve]` rewrite: it must start with `/`, and is normalized like a path with its
-/// trailing `/` dropped; `/` alone is no rewrite.
-fn gateway_key<'de, D: serde::Deserializer<'de>>(
-    d: D,
-) -> std::result::Result<Option<String>, D::Error> {
-    let Some(value) = Option::<String>::deserialize(d)? else {
-        return Ok(None);
-    };
-    if !value.starts_with('/') {
-        return Err(serde::de::Error::custom(Msg::NoLeadingSlash(&value).text()));
-    }
-    Ok(Some(
-        crate::http::normalize_path(&value)
-            .trim_end_matches('/')
-            .into(),
-    ))
-}
-
-/// A shared thing the repository reads or writes, such as a database table or a bucket.
-#[derive(Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct Resource {
-    /// A lowercase identifier with no meaning to Meada: `postgres`, `s3-bucket`.
-    #[serde(deserialize_with = "kind")]
-    pub kind: String,
-    #[serde(deserialize_with = "not_empty")]
-    pub id: String,
-    pub role: Role,
-    /// The symbols that do the access, as `<path>::<qualified name>` of this repository.
-    #[serde(default)]
-    pub via: Vec<String>,
-}
-
-#[derive(Deserialize, Clone, Copy, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub enum Role {
-    Read,
-    Write,
-    ReadWrite,
-}
-
-impl Role {
-    pub fn writes(self) -> bool {
-        self != Role::Read
-    }
-
-    pub fn reads(self) -> bool {
-        self != Role::Write
-    }
-}
-
-/// Lowercase ASCII letters, digits and hyphens, starting with a letter.
-fn kind<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<String, D::Error> {
-    let kind = String::deserialize(d)?;
-    let mut chars = kind.chars();
-    let valid = chars.next().is_some_and(|c| c.is_ascii_lowercase())
-        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
-    match valid {
-        true => Ok(kind),
-        false => Err(D::Error::custom(Msg::NotLowercase(&kind).text())),
-    }
-}
-
-fn not_empty<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<String, D::Error> {
-    let value = String::deserialize(d)?;
-    match value.is_empty() {
-        true => Err(D::Error::custom(Msg::Empty.text())),
-        false => Ok(value),
-    }
 }
 
 impl Config {
@@ -260,46 +103,22 @@ pub(crate) fn text(file: &Path, max: Option<u64>) -> Result<Option<String>> {
 /// `src`, the content of `file`, parsed as `T`; an error names the file, the line and the key,
 /// `name` being the kind of file the key belongs to (`meada.toml`, `meada.workspace.toml`).
 pub(crate) fn parse<T: DeserializeOwned>(file: &Path, src: &str, name: &str) -> Result<T> {
-    toml::from_str(src).map_err(|e| {
-        let at = e.span().map_or(0, |s| s.start);
-        let line = line_of(src, at);
-        let what = describe(src, at, e.message(), name);
-        format!("{}:{line}: {what}", file.display()).into()
-    })
+    Ok(meada_core::manifest::parse(
+        &file.display().to_string(),
+        src,
+        name,
+    )?)
 }
 
-/// The 1-based line of the byte offset `at` in `src`.
-pub(crate) fn line_of(src: &str, at: usize) -> usize {
-    src[..at.min(src.len())].matches('\n').count() + 1
-}
-
-/// An error about the dotted `key` of `src`, the content of `file`, as `parse` words one: the
-/// file, the line of the key (of its table when the key is absent, its default being the
-/// problem; of the file when neither is there), the key and the message.
-#[cfg(any(feature = "valkey", feature = "snapshot", feature = "oidc"))]
+/// An error about the dotted `key` of `src`, the content of `file`, as `parse` words one
+/// (`meada_core::manifest::error_at`).
 pub(crate) fn error_at(
     file: &Path,
     src: &str,
     key: &str,
     message: &str,
 ) -> Box<dyn std::error::Error> {
-    let mut keys = Vec::new();
-    if let Ok(table) = DeTable::parse(src) {
-        flatten(table.get_ref(), "", &mut keys);
-    }
-    let start = |key: &str| {
-        let found = keys.iter().find(|(name, _, _)| name == key);
-        found.map(|(_, span, _)| span.start)
-    };
-    let at = start(key)
-        .or_else(|| start(crate::parent(key)))
-        .unwrap_or(0);
-    format!(
-        "{}:{}: `{key}`: {message}",
-        file.display(),
-        line_of(src, at)
-    )
-    .into()
+    meada_core::manifest::error_at(&file.display().to_string(), src, key, message).into()
 }
 
 /// The content of the regular file `path` a cloud module's section names (a secret, a CA), at
@@ -319,53 +138,6 @@ pub(crate) fn read_bounded(path: &Path, max: u64) -> std::result::Result<Vec<u8>
     match bytes.len() as u64 > max {
         true => Err(format!("{}: larger than {max} bytes", path.display())),
         false => Ok(bytes),
-    }
-}
-
-/// The error message with the dotted key it is about.
-fn describe(src: &str, at: usize, message: &str, file: &str) -> String {
-    // A syntax error leaves no table to find the key in.
-    let Ok(table) = DeTable::parse(src) else {
-        return message.to_string();
-    };
-    let mut keys = Vec::new();
-    flatten(table.get_ref(), "", &mut keys);
-    // Parents come before their children, so the last key around `at` is the innermost.
-    let around = keys
-        .iter()
-        .rfind(|(_, key, value)| key.contains(&at) || value.contains(&at))
-        .map(|(name, _, _)| name.as_str());
-    let field = message
-        .split('`')
-        .nth(1)
-        .filter(|_| message.starts_with("unknown field") || message.starts_with("missing field"));
-    match (field, around) {
-        (Some(field), parent) if message.starts_with("missing field") => {
-            Msg::KeyMissing(&qualify(parent.unwrap_or(""), field)).text()
-        }
-        (Some(_), Some(key)) => Msg::KeyUnknown { key, file }.text(),
-        (_, Some(key)) => format!("`{key}`: {message}"),
-        (_, None) => message.to_string(),
-    }
-}
-
-/// Every key of `table` with its dotted name, key span and value span; a table's keys follow
-/// the table itself.
-fn flatten(table: &DeTable, prefix: &str, out: &mut Vec<(String, Range<usize>, Range<usize>)>) {
-    for (key, value) in table.iter() {
-        let name = qualify(prefix, key.get_ref());
-        out.push((name.clone(), key.span(), value.span()));
-        match value.get_ref() {
-            DeValue::Table(inner) => flatten(inner, &name, out),
-            DeValue::Array(items) => {
-                for item in items.iter() {
-                    if let DeValue::Table(inner) = item.get_ref() {
-                        flatten(inner, &name, out);
-                    }
-                }
-            }
-            _ => {}
-        }
     }
 }
 

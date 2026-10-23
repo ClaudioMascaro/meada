@@ -1,0 +1,20 @@
+{{- include "meada.validate" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "meada.name" . }}
+  labels:
+    {{- include "meada.labels" . | nindent 4 }}
+data:
+  fetch.sh: |
+    {{- .Values.workspace.fetch | nindent 4 }}
+  meada.workspace.toml: |
+    index_dir = "/data/indexes"
+    {{- if eq .Values.workspace.source "store" }}
+
+    [workspace]
+    source = "store"
+    {{- else }}
+    {{- .Values.workspace.repositories | nindent 4 }}
+    {{- end }}
+    {{- include "meada.modules" (dict "Values" .Values "localDir" "/data/generations") | nindent 4 }}

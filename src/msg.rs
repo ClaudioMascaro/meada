@@ -1,17 +1,14 @@
 //! The CLI's message catalog: pt-BR and English, one match arm per message. The language comes
 //! from `LANG` (ADR 0008): pt-BR when it starts with `pt`, English otherwise. Only the CLI calls
-//! `init`, so the MCP server and the library tests stay in English.
-
-use std::sync::atomic::{AtomicBool, Ordering};
+//! `init`, so the MCP server and the library tests stay in English. The messages of the checks
+//! `meada-core` holds are its catalog's, and the language is its flag: `init` sets it for both.
 
 use crate::decisions::Cause;
 use crate::document::Format;
 
-static PT: AtomicBool = AtomicBool::new(false);
-
 /// Picks the language from the value of `LANG`; `None` is English.
 pub fn init(lang: Option<&str>) {
-    PT.store(lang.is_some_and(|l| l.starts_with("pt")), Ordering::Relaxed);
+    meada_core::msg::init(lang);
 }
 
 /// Where an index that cannot be read is fixed (`index::open_read`).
@@ -30,8 +27,7 @@ pub enum Msg<'a> {
     OtherVersion,
     Indexed(i64),
     OtherVersionWorkspace,
-    UnsafeIdentity,
-    LocalIdentity,
+    /// `meada_core::msg::Msg::ListedTwice`.
     ListedTwice,
     NoMirror(&'a str),
     NotACheckout(&'a str),
@@ -183,14 +179,9 @@ pub enum Msg<'a> {
         path: &'a str,
         reference: &'a str,
     },
+    /// `meada_core::msg::Msg::KeyMissing`.
     KeyMissing(&'a str),
-    NotInRepository(&'a str),
-    KeyUnknown {
-        key: &'a str,
-        file: &'a str,
-    },
-    NotLowercase(&'a str),
-    NoLeadingSlash(&'a str),
+    /// `meada_core::msg::Msg::Empty`.
     Empty,
     NeedsFeature {
         section: &'a str,
@@ -230,6 +221,8 @@ pub enum Msg<'a> {
     SnapshotRegion,
     #[cfg(feature = "snapshot")]
     SnapshotBucket,
+    #[cfg(feature = "snapshot")]
+    SnapshotNodeName,
     #[cfg(feature = "snapshot")]
     SnapshotPrefix,
     #[cfg(feature = "snapshot")]
@@ -280,6 +273,12 @@ pub enum Msg<'a> {
     SnapshotPointerBad(&'a str),
     #[cfg(feature = "snapshot")]
     SnapshotNotDocument(&'a str),
+    /// A generation document (`key`) whose `workspace` field is not a version id.
+    #[cfg(feature = "snapshot")]
+    SnapshotBadWorkspace {
+        key: &'a str,
+        version: &'a str,
+    },
     #[cfg(feature = "snapshot")]
     SnapshotIdentityChars,
     #[cfg(feature = "snapshot")]
@@ -334,6 +333,12 @@ pub enum Msg<'a> {
     GenerationsBadEntry(&'a str),
     #[cfg(feature = "generation-pointer")]
     GenerationsEmpty(&'a str),
+    /// A retained list (`key`) longer than `keep` plus the kept maximum (`max`).
+    #[cfg(feature = "generation-pointer")]
+    GenerationsTooLong {
+        key: &'a str,
+        max: u64,
+    },
     /// The pointer script refused a fence not above `current`'s (`{<key_prefix>}:fence` lost).
     #[cfg(feature = "generation-pointer")]
     FenceRefused {
@@ -363,8 +368,88 @@ pub enum Msg<'a> {
     /// The lock no longer holds a publish's token.
     #[cfg(feature = "generation-pointer")]
     LockNotHeld(&'a str),
+    /// The lock already held, and its holder's host, pid, start time and what holds it (`None`
+    /// for a lock with no holder).
     #[cfg(feature = "refresh-lock")]
-    LockHeld(&'a str),
+    LockHeld {
+        key: &'a str,
+        holder: Option<[&'a str; 4]>,
+    },
+    /// `pointer set` of a generation outside the retained list `key`.
+    #[cfg(feature = "refresh-lock")]
+    PointerNotRetained {
+        id: &'a str,
+        key: &'a str,
+    },
+    /// `pointer retain` past the kept maximum `max` of the kept set `key`.
+    #[cfg(feature = "refresh-lock")]
+    KeptFull {
+        key: &'a str,
+        max: u64,
+    },
+    /// `pointer drop` of the current generation, which the pointer `key` names.
+    #[cfg(feature = "refresh-lock")]
+    DropCurrent {
+        id: &'a str,
+        key: &'a str,
+    },
+    /// `pointer drop` of a generation outside the retained list `key`.
+    #[cfg(feature = "refresh-lock")]
+    DropNotRetained {
+        id: &'a str,
+        key: &'a str,
+    },
+    /// A generation id on the command line that is not one.
+    #[cfg(feature = "refresh-lock")]
+    BadGenerationArg(&'a str),
+    /// `--at-least` that is not a decimal fence.
+    #[cfg(feature = "refresh-lock")]
+    BadFenceArg(&'a str),
+    /// An operation would leave no usable fence under Valkey's signed INCR ceiling.
+    #[cfg(feature = "refresh-lock")]
+    FenceLimit {
+        key: &'a str,
+        max: u64,
+    },
+    /// What `fence recover` read and could not count: the problem, named.
+    #[cfg(feature = "refresh-lock")]
+    FenceNotCounted(&'a str),
+    /// A heartbeat key whose value is no heartbeat.
+    #[cfg(feature = "generation-pointer")]
+    HeartbeatBad(&'a str),
+    /// The host name is no node name, and `[snapshot] node_name` is not set.
+    #[cfg(feature = "generation-pointer")]
+    NodeNameHost(&'a str),
+    /// A round's heartbeat that could not be written: the key and why.
+    #[cfg(feature = "generation-pointer")]
+    HeartbeatNotWritten {
+        key: &'a str,
+        reason: &'a str,
+    },
+    /// A member of the node set (`key`) that is not a node name, shown escaped.
+    #[cfg(feature = "refresh-lock")]
+    NodeNameBad {
+        key: &'a str,
+        name: &'a str,
+    },
+    #[cfg(feature = "refresh-lock")]
+    SnapshotPointer,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotPointerSet,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotPointerGeneration,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotPointerRetain,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotPointerRetainGeneration,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotPointerDrop,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotFence,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotFenceRecover,
+    #[cfg(feature = "refresh-lock")]
+    SnapshotFenceAtLeast,
     #[cfg(feature = "refresh-lock")]
     LockLost(&'a str),
     #[cfg(feature = "refresh-lock")]
@@ -379,9 +464,9 @@ pub enum Msg<'a> {
     SnapshotLockCommand,
     #[cfg(feature = "snapshot")]
     GenerationNotHeld(&'a str),
-    /// An `[oidc]` URL that is not `https` (or `http` on loopback) with a host and no user,
-    /// query or fragment; with `bare`, no path either.
-    #[cfg(feature = "oidc")]
+    /// An `[oidc]` URL, or `[ui] public_url`, that is not `https` (or `http` on loopback) with
+    /// a host and no user, query or fragment; with `bare`, no path either.
+    #[cfg(any(feature = "oidc", feature = "ui"))]
     OidcUrl {
         bare: bool,
     },
@@ -414,6 +499,12 @@ pub enum Msg<'a> {
     },
     #[cfg(feature = "oidc")]
     OidcJwksNoKey,
+    /// A JWKS that is not that JSON document: where it fails, never what it holds.
+    #[cfg(feature = "oidc")]
+    OidcJwksShape {
+        line: usize,
+        column: usize,
+    },
     #[cfg(feature = "oidc")]
     OidcRefreshFailed(&'a str),
     #[cfg(feature = "snapshot")]
@@ -489,6 +580,78 @@ pub enum Msg<'a> {
     GithubAppNotAnswered(&'a str),
     #[cfg(feature = "github-app")]
     GithubAppRepositoryUrl,
+    /// `meada ui` (feature `ui`, ADR 0014).
+    #[cfg(feature = "ui")]
+    Ui,
+    #[cfg(feature = "ui")]
+    UiListenHelp,
+    #[cfg(feature = "ui")]
+    UiWorkspaceHelp,
+    /// A bootstrap manifest given to `meada ui` without `[ui]`.
+    #[cfg(feature = "ui")]
+    UiNoSection,
+    /// A request to the console with no valid bearer token (feature `oidc`).
+    #[cfg(all(feature = "ui", feature = "oidc"))]
+    UiUnauthorized,
+    /// A valid token to the console without every configured scope.
+    #[cfg(all(feature = "ui", feature = "oidc"))]
+    UiScope,
+    /// A token check whose body is no `{"token": "<JWT>"}`.
+    #[cfg(all(feature = "ui", feature = "oidc"))]
+    UiCheckBody,
+    /// A request body past its route's cap, in bytes.
+    #[cfg(feature = "ui")]
+    UiTooLarge(usize),
+    /// A playground query whose body is not a query of one of the tools.
+    #[cfg(feature = "ui")]
+    UiQueryBody,
+    /// A repository the console does not serve, or one outside the viewer's grant.
+    #[cfg(feature = "ui")]
+    UiNoRepository(&'a str),
+    /// A generation the console does not hold, and the ones it holds.
+    #[cfg(feature = "ui")]
+    UiNotHeld {
+        id: &'a str,
+        held: &'a [String],
+    },
+    /// `[ui] dir` that is not a directory.
+    #[cfg(feature = "ui")]
+    UiDirMissing(&'a str),
+    /// `[ui] dir` whose `meada-ui.json` names `found` (`None`: missing, oversized or
+    /// unreadable) instead of this build's version.
+    #[cfg(feature = "ui")]
+    UiVersion {
+        dir: &'a str,
+        found: Option<&'a str>,
+        expected: &'a str,
+    },
+    /// An `/api/v1/` path with no route.
+    #[cfg(feature = "ui")]
+    UiNoRoute,
+    /// A complete operational read, including permit wait and blocking I/O, timed out.
+    #[cfg(feature = "ui")]
+    UiReadTimeout(u64),
+    /// Console operator configuration requires OIDC.
+    #[cfg(feature = "ui")]
+    UiNeedsOidc,
+    /// Enabled writes require one operator admission key.
+    #[cfg(feature = "ui")]
+    UiOperatorNeeded,
+    /// Mutually exclusive console operator keys.
+    #[cfg(feature = "ui")]
+    UiOperatorBoth,
+    /// A refused operation before admission or body consumption.
+    #[cfg(feature = "ui")]
+    UiWritesDisabled,
+    /// A write needs an admitted operator with an authenticated subject.
+    #[cfg(feature = "ui")]
+    UiOperatorRequired,
+    /// A fixed audit refusal that never records invalid editor identities or text.
+    #[cfg(feature = "ui")]
+    UiEntriesInvalid,
+    /// A fixed body error that never echoes untrusted JSON.
+    #[cfg(feature = "ui")]
+    UiWriteBody,
     About,
     Index,
     Status,
@@ -562,11 +725,97 @@ pub enum Msg<'a> {
         message: Option<&'a str>,
     },
     AnswerNoChoices,
+    /// `[workspace] source = "store"` in a build without `generation-pointer`.
+    #[cfg(not(feature = "generation-pointer"))]
+    WorkspaceStoreNeedsFeature,
+    /// `[[repository]]` entries beside `[workspace] source = "store"`.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceStoreBeside,
+    /// `meada mcp --listen` without `--generations`, given a `source = "store"` manifest.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceStoreRefused(&'a str),
+    /// A command that reads the pulled workspace version, with none under `dir`.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceNotPulled {
+        manifest: &'a str,
+        dir: &'a str,
+    },
+    /// The pulled version's current file (`<index_dir>/workspace/current`), malformed.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceCurrentBad(&'a str),
+    /// A pull whose pointer's fence is not above the current file's.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceFenceBelow {
+        key: &'a str,
+        id: &'a str,
+        fence: u64,
+        held: u64,
+        file: &'a str,
+        fence_key: &'a str,
+    },
+    /// `meada workspace pull` when the current file already names the pointer's version.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceAlreadyCurrent(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    WorkspacePull,
+    #[cfg(feature = "refresh-lock")]
+    WorkspaceApply,
+    #[cfg(feature = "refresh-lock")]
+    WorkspaceApplyVersion,
+    #[cfg(feature = "generation-pointer")]
+    Workspace,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceImport,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceList,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceShow,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceImportFile,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceImportMessage,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceImportAuthor,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceShowVersion,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceBootstrapHelp,
+    /// A bootstrap manifest given to `meada workspace` without `[generations]`.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceNoSections(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    BadVersionArg(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceNoCurrent(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceBadPointer(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceNotVersion(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceNoVersion(&'a str),
+    /// A serialized import that its bounded reader could not read back.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceVersionTooLarge {
+        key: &'a str,
+        max: u64,
+    },
+    /// A key or section of an imported file that is not a `[[repository]]` entry.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceNotImported,
+    /// An import whose entries are stored already: the version as first stored.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceStored {
+        id: &'a str,
+        author: &'a str,
+        time: &'a str,
+        message: &'a str,
+    },
 }
 
 impl Msg<'_> {
     pub fn text(&self) -> String {
-        let pt = PT.load(Ordering::Relaxed);
+        use meada_core::msg::Msg as Core;
+        let pt = meada_core::msg::pt();
         let pick = |en: String, pt_br: String| if pt { pt_br } else { en };
         match self {
             Msg::NotIndexed => pick("not indexed".into(), "não indexado".into()),
@@ -582,16 +831,7 @@ impl Msg<'_> {
                 "indexed by another version; rebuilt by meada index --workspace".into(),
                 "indexado por outra versão; reconstruído por meada index --workspace".into(),
             ),
-            Msg::UnsafeIdentity => pick(
-                "not a repository identity: a segment is empty, `.` or `..`".into(),
-                "não é uma identidade de repositório: um segmento está vazio ou é `.` ou `..`"
-                    .into(),
-            ),
-            Msg::LocalIdentity => pick(
-                "a local identity: server mode serves repositories by their remote".into(),
-                "uma identidade local: o modo servidor serve repositórios pelo remoto".into(),
-            ),
-            Msg::ListedTwice => pick("listed twice".into(), "listado duas vezes".into()),
+            Msg::ListedTwice => Core::ListedTwice.text(),
             Msg::NoMirror(path) => pick(
                 format!("`{path}` does not exist"),
                 format!("`{path}` não existe"),
@@ -885,30 +1125,8 @@ impl Msg<'_> {
                 format!("{path}: external path item reference {reference} not followed, its routes are not read"),
                 format!("{path}: referência externa de path item {reference} não seguida, suas rotas não são lidas"),
             ),
-            Msg::KeyMissing(key) => pick(format!("`{key}` is missing"), format!("falta `{key}`")),
-            Msg::NotInRepository(path) => pick(
-                format!("`{path}` is not a path inside the repository"),
-                format!("`{path}` não é um caminho dentro do repositório"),
-            ),
-            Msg::KeyUnknown { key, file } => pick(
-                format!("`{key}` is not a {file} key"),
-                format!("`{key}` não é uma chave do {file}"),
-            ),
-            Msg::NotLowercase(value) => pick(
-                format!(
-                    "`{value}` is not a lowercase identifier \
-                     (ASCII letters, digits and hyphens, starting with a letter)"
-                ),
-                format!(
-                    "`{value}` não é um identificador em minúsculas \
-                     (letras ASCII, dígitos e hífens, começando por uma letra)"
-                ),
-            ),
-            Msg::NoLeadingSlash(value) => pick(
-                format!("`{value}` must start with `/`"),
-                format!("`{value}` deve começar com `/`"),
-            ),
-            Msg::Empty => pick("is empty".into(), "está vazio".into()),
+            Msg::KeyMissing(key) => Core::KeyMissing(key).text(),
+            Msg::Empty => Core::Empty.text(),
             Msg::NeedsFeature { section, feature } => pick(
                 format!("[{section}] needs a Meada built with the {feature} feature"),
                 format!("[{section}] exige um Meada compilado com a feature {feature}"),
@@ -1002,6 +1220,11 @@ impl Msg<'_> {
                 "deve ter de 3 a 63 letras minúsculas, dígitos, `.` e `-`, começando e \
                  terminando com letra ou dígito"
                     .into(),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotNodeName => pick(
+                "must be 1 to 63 lowercase letters, digits, `.` and `-`".into(),
+                "deve ter de 1 a 63 letras minúsculas, dígitos, `.` e `-`".into(),
             ),
             #[cfg(feature = "snapshot")]
             Msg::SnapshotPrefix => pick(
@@ -1146,6 +1369,17 @@ impl Msg<'_> {
                 format!("{key}: não é o documento de geração do seu id"),
             ),
             #[cfg(feature = "snapshot")]
+            Msg::SnapshotBadWorkspace { key, version } => pick(
+                format!(
+                    "{key}: `workspace` {version}: not a workspace version id of 16 lowercase \
+                     hex characters"
+                ),
+                format!(
+                    "{key}: `workspace` {version}: não é um id de versão do workspace de 16 \
+                     caracteres hexadecimais minúsculos"
+                ),
+            ),
+            #[cfg(feature = "snapshot")]
             Msg::SnapshotIdentityChars => pick(
                 "not a repository identity: it holds whitespace, a quote, a backslash or a \
                  control character"
@@ -1284,6 +1518,19 @@ impl Msg<'_> {
                 format!("{key}: empty: no generation is retained there"),
                 format!("{key}: vazia: nenhuma geração está retida lá"),
             ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::GenerationsTooLong { key, max } => pick(
+                format!(
+                    "{key}: holds more than {max} entries, `keep` plus the {kept} kept \
+                     generations allowed",
+                    kept = crate::snapshot::generations::KEPT_MAX
+                ),
+                format!(
+                    "{key}: tem mais de {max} entradas, `keep` mais as {kept} gerações mantidas \
+                     permitidas",
+                    kept = crate::snapshot::generations::KEPT_MAX
+                ),
+            ),
             #[cfg(feature = "snapshot")]
             Msg::SnapshotRetainedSkipped { id, why } => pick(
                 format!("retained generation {id} not pulled, the next pull retries: {why}"),
@@ -1297,16 +1544,16 @@ impl Msg<'_> {
             } => pick(
                 format!(
                     "{current}: refused fence {fence}, not above the fence it holds: \
-                     {fence_key} was lowered or lost; set {fence_key} at or above the highest \
-                     fence recorded (in {current} or in a node's <local_dir>/current), or delete \
-                     a node's <local_dir>/current so it takes the current generation whatever \
-                     its fence"
+                     {fence_key} was lowered or lost; raise it with meada snapshot fence recover \
+                     (--at-least for a fence read in a node's <local_dir>/current), or delete a \
+                     node's <local_dir>/current so it takes the current generation whatever its \
+                     fence"
                 ),
                 format!(
                     "{current}: recusado o fence {fence}, não maior que o que ele guarda: \
-                     {fence_key} foi rebaixado ou perdido; defina {fence_key} igual ou acima do \
-                     maior fence registrado (em {current} ou no <local_dir>/current de um nó), \
-                     ou apague o <local_dir>/current de um nó para que ele tome a geração atual \
+                     {fence_key} foi rebaixado ou perdido; eleve-o com meada snapshot fence \
+                     recover (--at-least para um fence lido no <local_dir>/current de um nó), ou \
+                     apague o <local_dir>/current de um nó para que ele tome a geração atual \
                      seja qual for o fence"
                 ),
             ),
@@ -1321,15 +1568,15 @@ impl Msg<'_> {
             } => pick(
                 format!(
                     "{current}: generation {id} has fence {fence}, below fence {held} in \
-                     {pointer}: not swapped; set {fence_key} at or above {held} and publish \
-                     again, or delete {pointer} (with [refresh_lock] turned off every fence is \
-                     0, so only deleting it helps)"
+                     {pointer}: not swapped; raise {fence_key} with meada snapshot fence recover \
+                     --at-least {held} and publish again, or delete {pointer} (with \
+                     [refresh_lock] turned off every fence is 0, so only deleting it helps)"
                 ),
                 format!(
                     "{current}: a geração {id} tem fence {fence}, abaixo do fence {held} em \
-                     {pointer}: não trocada; defina {fence_key} igual ou acima de {held} e \
-                     publique de novo, ou apague {pointer} (com [refresh_lock] desligado todo \
-                     fence é 0, e só apagá-lo resolve)"
+                     {pointer}: não trocada; eleve {fence_key} com meada snapshot fence recover \
+                     --at-least {held} e publique de novo, ou apague {pointer} (com \
+                     [refresh_lock] desligado todo fence é 0, e só apagá-lo resolve)"
                 ),
             ),
             #[cfg(feature = "generation-pointer")]
@@ -1341,13 +1588,14 @@ impl Msg<'_> {
                 fence_key,
             } => pick(
                 format!(
-                    "fence: stuck: {held} in {pointer} is above {fence} in {current}; set \
-                     {fence_key} at or above {held} and publish again, or delete {pointer}"
+                    "fence: stuck: {held} in {pointer} is above {fence} in {current}; raise \
+                     {fence_key} with meada snapshot fence recover --at-least {held} and publish \
+                     again, or delete {pointer}"
                 ),
                 format!(
                     "fence: travado: {held} em {pointer} está acima de {fence} em {current}; \
-                     defina {fence_key} igual ou acima de {held} e publique de novo, ou apague \
-                     {pointer}"
+                     eleve {fence_key} com meada snapshot fence recover --at-least {held} e \
+                     publique de novo, ou apague {pointer}"
                 ),
             ),
             #[cfg(feature = "generation-pointer")]
@@ -1362,9 +1610,152 @@ impl Msg<'_> {
                 ),
             ),
             #[cfg(feature = "refresh-lock")]
-            Msg::LockHeld(key) => pick(
-                format!("{key}: held by another refresh: nothing run"),
-                format!("{key}: em posse de outro refresh: nada executado"),
+            Msg::LockHeld {
+                key,
+                holder: Some([host, pid, started, holds]),
+            } => pick(
+                format!(
+                    "{key}: held by host {host}, process {pid}, since {started}, for {holds}: \
+                     nothing run"
+                ),
+                format!(
+                    "{key}: em posse do host {host}, processo {pid}, desde {started}, para \
+                     {holds}: nada executado"
+                ),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::LockHeld { key, holder: None } => pick(
+                format!("{key}: held by an unknown holder: nothing run"),
+                format!("{key}: em posse de um detentor desconhecido: nada executado"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::PointerNotRetained { id, key } => pick(
+                format!("{key}: generation {id} is not retained: the pointer did not move"),
+                format!("{key}: a geração {id} não está retida: o ponteiro não se moveu"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::KeptFull { key, max } => pick(
+                format!(
+                    "{key}: already keeps {max} generations, the most it may: drop one first \
+                     (meada snapshot pointer drop)"
+                ),
+                format!(
+                    "{key}: já mantém {max} gerações, o máximo permitido: remova uma antes \
+                     (meada snapshot pointer drop)"
+                ),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::DropCurrent { id, key } => pick(
+                format!("{key}: generation {id} is the current one: nothing dropped"),
+                format!("{key}: a geração {id} é a atual: nada removido"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::DropNotRetained { id, key } => pick(
+                format!("{key}: generation {id} is not retained: nothing dropped"),
+                format!("{key}: a geração {id} não está retida: nada removido"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::BadGenerationArg(text) => pick(
+                format!("{text}: not a generation id of 16 lowercase hex characters"),
+                format!("{text}: não é um id de geração de 16 caracteres hexadecimais minúsculos"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::BadFenceArg(text) => pick(
+                format!("--at-least {text}: not a decimal fence"),
+                format!("--at-least {text}: não é um fence decimal"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::FenceLimit { key, max } => pick(
+                format!("{key}: operation would exhaust the fence counter; the maximum usable fence is {max} (Valkey INCR limit)"),
+                format!("{key}: a operação esgotaria o contador de fences; o maior fence utilizável é {max} (limite de INCR do Valkey)"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::FenceNotCounted(problem) => pick(
+                format!("{problem}: not counted"),
+                format!("{problem}: não contado"),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::HeartbeatBad(key) => pick(
+                format!("{key}: not a heartbeat, a JSON object whose fence is a decimal or null"),
+                format!(
+                    "{key}: não é um heartbeat, um objeto JSON cujo fence é um decimal ou null"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::NodeNameHost(host) => pick(
+                format!(
+                    "the host name \"{host}\" is not a node name (lowercase letters, digits, . and \
+                     -, 1 to 63 characters): set [snapshot] node_name"
+                ),
+                format!(
+                    "o nome do host \"{host}\" não é um nome de nó (letras minúsculas, dígitos, . e \
+                     -, de 1 a 63 caracteres): defina [snapshot] node_name"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::HeartbeatNotWritten { key, reason } => pick(
+                format!("heartbeat not written to {key}: {reason}"),
+                format!("heartbeat não gravado em {key}: {reason}"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::NodeNameBad { key, name } => pick(
+                format!(
+                    "{key}: \"{name}\" is not a node name (lowercase letters, digits, . and -, 1 \
+                     to 63 characters)"
+                ),
+                format!(
+                    "{key}: \"{name}\" não é um nome de nó (letras minúsculas, dígitos, . e -, \
+                     de 1 a 63 caracteres)"
+                ),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotPointer => pick(
+                "Move the workspace's generation pointer under the refresh lock.".into(),
+                "Move o ponteiro de geração do workspace sob o lock de refresh.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotPointerSet => pick(
+                "Point the fleet at a retained generation: a rollback, or forward again.".into(),
+                "Aponta a frota para uma geração retida: um rollback, ou adiante de novo.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotPointerGeneration => pick(
+                "The generation id, one of the retained set.".into(),
+                "O id da geração, um dos retidos.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotPointerRetain => pick(
+                "Keep a generation on every node, outside the keep trim, until it is dropped."
+                    .into(),
+                "Mantém uma geração em todo nó, fora do corte de keep, até ser removida.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotPointerRetainGeneration => pick(
+                "The generation id, one whose document the store holds.".into(),
+                "O id da geração, uma cujo documento o store guarda.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotPointerDrop => pick(
+                "Stop retaining a generation that is not current; the next pull deletes it."
+                    .into(),
+                "Deixa de reter uma geração que não é a atual; o próximo pull a apaga.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotFence => pick(
+                "Recover the refresh lock's fence under the lock.".into(),
+                "Recupera o fence do lock de refresh sob o lock.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotFenceRecover => pick(
+                "Raise the fence to the highest one recorded in Valkey, never lowering it."
+                    .into(),
+                "Eleva o fence ao maior registrado no Valkey, sem nunca baixá-lo.".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::SnapshotFenceAtLeast => pick(
+                "A floor for the fence, such as one read in a node's <local_dir>/current."
+                    .into(),
+                "Um piso para o fence, como um lido no <local_dir>/current de um nó.".into(),
             ),
             #[cfg(feature = "refresh-lock")]
             Msg::LockLost(key) => pick(
@@ -1416,7 +1807,7 @@ impl Msg<'_> {
                 format!("generation {id} is not held here"),
                 format!("a geração {id} não está retida aqui"),
             ),
-            #[cfg(feature = "oidc")]
+            #[cfg(any(feature = "oidc", feature = "ui"))]
             Msg::OidcUrl { bare: false } => pick(
                 "must be an https:// URL with a host and no user, query or fragment (http:// \
                  only on loopback)"
@@ -1425,7 +1816,7 @@ impl Msg<'_> {
                  (http:// só em loopback)"
                     .into(),
             ),
-            #[cfg(feature = "oidc")]
+            #[cfg(any(feature = "oidc", feature = "ui"))]
             Msg::OidcUrl { bare: true } => pick(
                 "must be an https:// URL with a host and nothing after it (http:// only on \
                  loopback)"
@@ -1481,6 +1872,11 @@ impl Msg<'_> {
                 "ele não tem nenhuma chave de assinatura que o Meada aceite (RSA, ou EC em P-256 \
                  ou P-384)"
                     .into(),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcJwksShape { line, column } => pick(
+                format!("it is not a JSON Web Key Set (line {line}, column {column})"),
+                format!("ele não é um JSON Web Key Set (linha {line}, coluna {column})"),
             ),
             #[cfg(feature = "oidc")]
             Msg::OidcRefreshFailed(why) => pick(
@@ -1634,6 +2030,153 @@ impl Msg<'_> {
             Msg::GithubAppRepositoryUrl => pick(
                 "the repository URL is not https://<host>/<owner>/<repo>".into(),
                 "a URL do repositório não é https://<host>/<owner>/<repo>".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::Ui => pick(
+                "Serve the management console, read only, at host:port, :port or port (loopback \
+                 without a host)."
+                    .into(),
+                "Serve o console de gestão, só leitura, em host:porta, :porta ou porta (loopback \
+                 sem host)."
+                    .into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiListenHelp => pick(
+                "Where the console listens: host:port, :port or port (loopback without a host)"
+                    .into(),
+                "Onde o console escuta: host:porta, :porta ou porta (loopback sem host)".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiWorkspaceHelp => pick(
+                "The bootstrap manifest, with its [ui] section".into(),
+                "O manifesto de bootstrap, com a seção [ui]".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiNoSection => pick(
+                "the bootstrap manifest has no [ui] section".into(),
+                "o manifesto de bootstrap não tem seção [ui]".into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "oidc"))]
+            Msg::UiUnauthorized => pick(
+                "a valid bearer token from the issuer is needed".into(),
+                "é preciso um bearer token válido do issuer".into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "oidc"))]
+            Msg::UiScope => pick(
+                "the token lacks a scope the console requires".into(),
+                "o token não tem um escopo que o console exige".into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "oidc"))]
+            Msg::UiCheckBody => pick(
+                "the body must be {\"token\": \"<JWT>\"}".into(),
+                "o corpo deve ser {\"token\": \"<JWT>\"}".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiTooLarge(max) => pick(
+                format!("the body is over {max} bytes"),
+                format!("o corpo passa de {max} bytes"),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiQueryBody => pick(
+                "the body must be {\"repository\", \"generation\", \"tool\", \"arguments\"}, the \
+                 tool search, context or trace and the arguments its own"
+                    .into(),
+                "o corpo deve ser {\"repository\", \"generation\", \"tool\", \"arguments\"}, a \
+                 ferramenta search, context ou trace e os argumentos os dela"
+                    .into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiNoRepository(repo) => pick(
+                format!("`{repo}` is not a repository this console serves"),
+                format!("`{repo}` não é um repositório que este console serve"),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiNotHeld { id, held } => {
+                let held = match held.is_empty() {
+                    true => None,
+                    false => Some(held.join(" ")),
+                };
+                pick(
+                    format!(
+                        "generation {id} is not held here; held: {}",
+                        held.as_deref().unwrap_or("none")
+                    ),
+                    format!(
+                        "a geração {id} não está retida aqui; retidas: {}",
+                        held.as_deref().unwrap_or("nenhuma")
+                    ),
+                )
+            }
+            #[cfg(feature = "ui")]
+            Msg::UiDirMissing(dir) => pick(
+                format!("`{dir}` is not a directory"),
+                format!("`{dir}` não é um diretório"),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiVersion {
+                dir,
+                found: Some(found),
+                expected,
+            } => pick(
+                format!("`{dir}` holds files built for Meada {found}, not {expected}"),
+                format!("`{dir}` tem arquivos feitos para o Meada {found}, não {expected}"),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiVersion {
+                dir,
+                found: None,
+                expected,
+            } => pick(
+                format!(
+                    "`{dir}` has no readable meada-ui.json naming its version; this is \
+                     Meada {expected}"
+                ),
+                format!(
+                    "`{dir}` não tem um meada-ui.json legível com a versão; este é o \
+                     Meada {expected}"
+                ),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiNoRoute => pick(
+                "no API route at this path".into(),
+                "nenhuma rota da API neste caminho".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiReadTimeout(ms) => pick(
+                format!("no answer within {ms} ms"),
+                format!("sem resposta em {ms} ms"),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiNeedsOidc => pick("requires [oidc]".into(), "exige [oidc]".into()),
+            #[cfg(feature = "ui")]
+            Msg::UiOperatorNeeded => pick(
+                "set `ui.operator_groups` or `ui.operator_claim`".into(),
+                "defina `ui.operator_groups` ou `ui.operator_claim`".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiOperatorBoth => pick(
+                "set either `ui.operator_groups` or `ui.operator_claim`, not both".into(),
+                "defina `ui.operator_groups` ou `ui.operator_claim`, apenas um".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiWritesDisabled => pick(
+                "console writes are disabled by `ui.operations`".into(),
+                "as escritas da console estão desativadas por `ui.operations`".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiOperatorRequired => pick(
+                "console writes require an authenticated operator with a subject".into(),
+                "as escritas da console exigem um operador autenticado com subject".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiEntriesInvalid => pick(
+                "workspace entries failed validation".into(),
+                "as entradas do workspace falharam na validação".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiWriteBody => pick(
+                "not a valid console operation body".into(),
+                "body inválido para uma operação da console".into(),
             ),
             Msg::About => pick(
                 "LLM-free code graph for agents and people".into(),
@@ -1884,6 +2427,211 @@ impl Msg<'_> {
             Msg::AnswerNoChoices => pick(
                 "unreadable: no choices".into(),
                 "ilegível: nenhuma escolha em `choices`".into(),
+            ),
+            #[cfg(not(feature = "generation-pointer"))]
+            Msg::WorkspaceStoreNeedsFeature => pick(
+                "\"store\" needs a Meada built with the generation-pointer feature".into(),
+                "\"store\" exige um Meada compilado com a feature generation-pointer".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceStoreBeside => pick(
+                "[[repository]] entries beside [workspace] source = \"store\": the repositories \
+                 come from the current workspace version"
+                    .into(),
+                "entradas [[repository]] ao lado de [workspace] source = \"store\": os \
+                 repositórios vêm da versão atual do workspace"
+                    .into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceStoreRefused(manifest) => pick(
+                format!(
+                    "{manifest}: [workspace] source = \"store\": a managed workspace's nodes \
+                     serve generations: run meada mcp --listen with --generations"
+                ),
+                format!(
+                    "{manifest}: [workspace] source = \"store\": os nós de um workspace \
+                     gerenciado servem gerações: rode meada mcp --listen com --generations"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceNotPulled { manifest, dir } => pick(
+                format!(
+                    "{manifest}: [workspace] source = \"store\": no workspace version pulled \
+                     in {dir}: run `meada workspace pull` first"
+                ),
+                format!(
+                    "{manifest}: [workspace] source = \"store\": nenhuma versão do workspace \
+                     baixada em {dir}: rode `meada workspace pull` antes"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceCurrentBad(path) => pick(
+                format!(
+                    "{path}: not `<workspace version id> <fence>`; delete it and run `meada \
+                     workspace pull`"
+                ),
+                format!(
+                    "{path}: não é `<id da versão do workspace> <fence>`; apague-o e rode \
+                     `meada workspace pull`"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceFenceBelow {
+                key,
+                id,
+                fence,
+                held,
+                file,
+                fence_key,
+            } => pick(
+                format!(
+                    "{key}: workspace version {id} has fence {fence}, not above fence {held} \
+                     in {file}: not swapped; raise {fence_key} with meada snapshot fence \
+                     recover --at-least {held} and apply again, or delete {file}"
+                ),
+                format!(
+                    "{key}: a versão do workspace {id} tem fence {fence}, não maior que o \
+                     fence {held} em {file}: não trocada; eleve {fence_key} com meada snapshot \
+                     fence recover --at-least {held} e aplique de novo, ou apague {file}"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceAlreadyCurrent(id) => pick(
+                format!("{id}: already the current workspace version: nothing changed"),
+                format!("{id}: já é a versão atual do workspace: nada mudou"),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspacePull => pick(
+                "Bring the current workspace version onto this machine, under index_dir".into(),
+                "Traz a versão atual do workspace para esta máquina, sob o index_dir".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::WorkspaceApply => pick(
+                "Make a stored workspace version the current one, under the refresh lock".into(),
+                "Torna atual uma versão guardada do workspace, sob o lock de refresh".into(),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::WorkspaceApplyVersion => pick(
+                "The workspace version id to apply".into(),
+                "O id da versão do workspace a aplicar".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::Workspace => pick(
+                "Manage the workspace versions in the snapshot store".into(),
+                "Gerencia as versões do workspace no store de snapshots".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceImport => pick(
+                "Store the [[repository]] entries of a manifest file as a workspace version and \
+                 print its id"
+                    .into(),
+                "Guarda as entradas [[repository]] de um manifesto como uma versão do workspace \
+                 e imprime seu id"
+                    .into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceList => pick(
+                "List the workspace versions, newest first, the current one marked".into(),
+                "Lista as versões do workspace, da mais nova à mais antiga, marcando a atual"
+                    .into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceShow => pick(
+                "Print a workspace version as [[repository]] entries".into(),
+                "Imprime uma versão do workspace como entradas [[repository]]".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceImportFile => pick(
+                "The manifest file whose [[repository]] entries are imported".into(),
+                "O manifesto cujas entradas [[repository]] são importadas".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceImportMessage => pick(
+                "Why the workspace changes".into(),
+                "Por que o workspace muda".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceImportAuthor => pick(
+                "The version's author (cli:<login>@<host> by default)".into(),
+                "O autor da versão (cli:<login>@<host> por padrão)".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceShowVersion => pick(
+                "The workspace version id (the current one by default)".into(),
+                "O id da versão do workspace (a atual por padrão)".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceBootstrapHelp => pick(
+                "The bootstrap manifest, with its [snapshot] and [generations] sections".into(),
+                "O manifesto de bootstrap, com as seções [snapshot] e [generations]".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceNoSections(manifest) => pick(
+                format!(
+                    "{manifest}: no [generations] section: workspace versions need [snapshot] \
+                     and [generations]"
+                ),
+                format!(
+                    "{manifest}: sem seção [generations]: versões do workspace exigem [snapshot] \
+                     e [generations]"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::BadVersionArg(text) => pick(
+                format!("{text}: not a workspace version id of 16 lowercase hex characters"),
+                format!(
+                    "{text}: não é um id de versão do workspace de 16 caracteres hexadecimais \
+                     minúsculos"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceNoCurrent(key) => pick(
+                format!("{key}: no workspace version is current: apply one with `meada workspace apply`"),
+                format!(
+                    "{key}: nenhuma versão do workspace é a atual: aplique uma com `meada \
+                     workspace apply`"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceBadPointer(key) => pick(
+                format!(
+                    "{key}: not a hash of `id`, a workspace version id of 16 lowercase hex \
+                     characters, and `fence`, a decimal fence"
+                ),
+                format!(
+                    "{key}: não é um hash de `id`, um id de versão do workspace de 16 caracteres \
+                     hexadecimais minúsculos, e `fence`, um fence decimal"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceNotVersion(key) => pick(
+                format!("{key}: malformed: not the workspace version document of its id"),
+                format!("{key}: malformado: não é o documento da versão do workspace do seu id"),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceNoVersion(key) => pick(
+                format!("{key}: no such workspace version in the store"),
+                format!("{key}: essa versão do workspace não está no store"),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceVersionTooLarge { key, max } => pick(
+                format!("{key}: workspace version exceeds {max} bytes: nothing stored"),
+                format!("{key}: versão do workspace excede {max} bytes: nada guardado"),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceNotImported => pick(
+                "not imported: a workspace version holds only [[repository]] entries".into(),
+                "não importado: uma versão do workspace só guarda entradas [[repository]]".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceStored {
+                id,
+                author,
+                time,
+                message,
+            } => pick(
+                format!("{id} is stored already, by {author} at {time}: {message}"),
+                format!("{id} já está guardada, por {author} em {time}: {message}"),
             ),
         }
     }

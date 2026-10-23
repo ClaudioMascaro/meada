@@ -13,7 +13,8 @@ modules updates it.
   functions (`kind_of`, `unresolved`, `shown`, `typed`, `label`, `parts`, `place`, `serves`,
   `entry`, `searched`) are what the rest of the crate calls. A kind's helpers are private to its
   file; the few that stay `pub` are named under their kind (`http::contract`,
-  `normalize_path` and `PARAM` for the config and the documents; `channel::contract` for
+  `normalize_path` and `PARAM` for the config and the documents, both `meada_core::http`'s,
+  re-exported; `channel::contract` for
   the documents; the `package` readers the index writer calls). `KINDS`, `Level`, `Link`, `Names`, `Role`. A `Found` carries its `role` (`Provider`,
   `Consumer`, `Binding`, `Publish` or `Import`),
   stored in `contracts.role`; the site does not imply it (a channel producer is a `Site::Call`, a channel

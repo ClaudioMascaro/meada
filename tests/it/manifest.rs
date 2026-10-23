@@ -143,6 +143,7 @@ pub(crate) fn assert_nothing_else_written(dir: &Path, indexed: &[&str]) {
         assert!(
             [
                 "index.db",
+                "index.commit.json",
                 "index.db.lock",
                 "index.db-journal",
                 "index.db-wal",
@@ -412,6 +413,13 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
             "meada: ops/meada.workspace.toml:2: [oidc] needs a Meada built with the oidc feature\n",
         ));
     }
+    // `ui` needs no `valkey` either.
+    if !cfg!(feature = "ui") {
+        cases.push((
+            "index_dir = \"../indexes\"\n\n\n\n[ui]\ndir = \"ui\"\n",
+            "meada: ops/meada.workspace.toml:5: [ui] needs a Meada built with the ui feature\n",
+        ));
+    }
     for (toml, expected) in cases {
         write_manifest(&dir, toml);
         for command in ["index", "status"] {
@@ -440,6 +448,102 @@ fn a_snapshot_section_without_its_feature_is_an_error_naming_the_feature() {
              feature\n",
             "{command}"
         );
+    }
+}
+
+/// The 1-based line of the first `found` in `text`.
+#[cfg(feature = "generation-pointer")]
+pub(crate) fn line_of(text: &str, found: &str) -> usize {
+    text[..text.find(found).unwrap()].matches('\n').count() + 1
+}
+
+/// `[workspace]` (ADR 0014) is read in every build: an unknown key and an unknown source name the
+/// file, the line and the key; without `generation-pointer`, `source = "store"` names the
+/// feature. `source = "file"` is the file as before.
+#[test]
+fn the_workspace_section_is_read_in_every_build() {
+    let dir = mirrors("manifest_workspace_section");
+    let mut cases = vec![
+        (
+            "index_dir = \"../indexes\"\n\n[workspace]\nsource = \"git\"\n",
+            "meada: ops/meada.workspace.toml:4: `workspace.source`: unknown variant `git`, \
+             expected `file` or `store`\n",
+        ),
+        (
+            "index_dir = \"../indexes\"\n\n[workspace]\nrepositories = \"store\"\n",
+            "meada: ops/meada.workspace.toml:4: `workspace.repositories` is not a \
+             meada.workspace.toml key\n",
+        ),
+    ];
+    if !cfg!(feature = "generation-pointer") {
+        cases.push((
+            "index_dir = \"../indexes\"\n\n[workspace]\n\nsource = \"store\"\n",
+            "meada: ops/meada.workspace.toml:5: `workspace.source`: \"store\" needs a Meada built \
+             with the generation-pointer feature\n",
+        ));
+    }
+    for (toml, expected) in cases {
+        write_manifest(&dir, toml);
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {toml}");
+            assert_eq!(stderr, expected, "{command}: {toml}");
+        }
+    }
+    let dir = chain_manifest("manifest_workspace_file");
+    let manifest = dir.join(MANIFEST);
+    let toml = fs::read_to_string(&manifest).unwrap() + "\n[workspace]\nsource = \"file\"\n";
+    fs::write(&manifest, toml).unwrap();
+    let (_, stderr, ok) = run(&dir, "index");
+    assert!(ok, "{stderr}");
+    let (stdout, stderr, ok) = run(&dir, "status");
+    assert!(ok, "{stderr}");
+    for (repo, _) in CHAIN {
+        assert!(stdout.contains(repo), "{stdout}");
+    }
+}
+
+/// `source = "store"` with the feature: without `[snapshot]` or `[generations]` the error names
+/// them, and beside a `[[repository]]` it names both.
+#[cfg(feature = "generation-pointer")]
+#[test]
+fn a_store_source_needs_its_sections_and_no_repository_entry() {
+    let dir = mirrors("manifest_workspace_store");
+    let valkey = "\n[valkey]\nurl = \"redis://127.0.0.1:6390\"\n";
+    let snapshot = crate::snapshot::section("http://127.0.0.1:9", "nowhere");
+    let store = "\n[workspace]\nsource = \"store\"\n";
+    let entry = "\n[[repository]]\nrepo = \"example.com/chain/web\"\npath = \"../chain-web\"\n";
+    let head = "index_dir = \"../indexes\"\n";
+    let sections = format!("{snapshot}{valkey}\n[generations]\nkeep = 3\n");
+    let cases = [
+        (
+            format!("{head}{store}"),
+            "[workspace]",
+            "[workspace] needs [snapshot] and [generations]",
+        ),
+        (
+            format!("{head}{snapshot}{store}"),
+            "[workspace]",
+            "[workspace] needs [generations]",
+        ),
+        (
+            format!("{head}{sections}{store}{entry}"),
+            "[[repository]]",
+            "`repository`: [[repository]] entries beside [workspace] source = \"store\": the \
+             repositories come from the current workspace version",
+        ),
+    ];
+    for (toml, at, problem) in cases {
+        write_manifest(&dir, &toml);
+        let expected = format!(
+            "meada: ops/meada.workspace.toml:{}: {problem}\n",
+            line_of(&toml, at)
+        );
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {toml}");
+            assert_eq!(stderr, expected, "{command}: {toml}");
+        }
     }
 }
 
@@ -1048,4 +1152,33 @@ fn status_probe_answers_fast_and_ready_while_a_writer_holds_an_index() {
         "{status}"
     );
     writer.execute_batch("ROLLBACK").unwrap();
+}
+
+/// `[snapshot] node_name` (#298): a configured name is checked against the node name pattern, and
+/// each failure names the file, the line and the key.
+#[cfg(feature = "snapshot")]
+#[test]
+fn a_bad_node_name_names_the_file_the_line_and_the_key() {
+    let dir = mirrors("manifest_node_name");
+    let head = format!(
+        "index_dir = \"../indexes\"\n{}",
+        crate::snapshot::section("http://127.0.0.1:9", "b-1")
+    );
+    for name in ["Upper", "a_b", "", &"a".repeat(64)] {
+        let toml = format!("{head}node_name = \"{name}\"\n");
+        write_manifest(&dir, &toml);
+        let line = toml[..toml.find("node_name").unwrap()]
+            .matches('\n')
+            .count()
+            + 1;
+        let expected = format!(
+            "meada: ops/meada.workspace.toml:{line}: `snapshot.node_name`: must be 1 to 63 \
+             lowercase letters, digits, `.` and `-`\n"
+        );
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {name:?}");
+            assert_eq!(stderr, expected, "{command}: {name:?}");
+        }
+    }
 }

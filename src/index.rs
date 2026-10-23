@@ -11,21 +11,22 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use ignore::WalkBuilder;
 use rusqlite::config::DbConfig;
 use rusqlite::{Connection, ErrorCode, OpenFlags, OptionalExtension, Transaction, params};
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 
 use crate::Result;
 use crate::community::{self, Community};
 use crate::config::Serve;
 use crate::contract::{self, Level, Link, Names, Role, Site};
 use crate::decisions::Stale;
-use crate::document::{self, Format, Summary};
+use crate::document::{self, Summary};
 use crate::entry::{self, EntryKind, EntryPoint};
 use crate::lang::{self, Facts};
 use crate::msg::{Fix, Msg};
 use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package};
 use crate::resolve::{Code, Exported, Resolution, Resolver, Target};
 use crate::shape::{Shape, Want};
-use crate::trace::Process;
+pub(crate) use meada_core::export as written;
+pub(crate) use meada_core::export::{Binding, CallSite, File, Process, Publish, Span, Symbol};
 
 /// The stored format's version, derived from its golden (`tests/golden/schema.txt`, kept by the
 /// unit test `the_stored_format_matches_its_golden`): re-blessing it after a change to `SCHEMA`,
@@ -150,6 +151,78 @@ pub fn state(path: &Path) -> State {
         Ok(files) => State::Indexed { files },
         Err(e) => failed(e),
     }
+}
+
+/// Fingerprint of the content a server-mode indexing pass recorded, excluding mutable stats.
+fn provenance_fingerprint(db: &Connection) -> Result<String> {
+    let mut hash = blake3::Hasher::new();
+    for query in [
+        "SELECT identity, configs FROM meta ORDER BY identity",
+        "SELECT path, hash FROM files ORDER BY path",
+        "SELECT path, hash FROM documents ORDER BY path",
+        "SELECT path, hash FROM manifests ORDER BY path",
+    ] {
+        hash.update(query.as_bytes());
+        let mut statement = db.prepare(query)?;
+        let rows = statement.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+        for row in rows {
+            let bytes = serde_json::to_vec(&row?)?;
+            hash.update(&bytes);
+        }
+    }
+    Ok(hash.finalize().to_hex().to_string())
+}
+
+/// Optional provenance of server-mode indexing, beside the index. The schema stays unchanged;
+/// a crash or an older index leaves no trustworthy commit rather than guessing one.
+pub(crate) fn record_commit(db: &Connection, index: &Path, head: Option<&str>) -> Result<()> {
+    let file = index.with_extension("commit.json");
+    let Some(head) = head else {
+        if file.exists() {
+            fs::remove_file(&file)?;
+        }
+        return Ok(());
+    };
+    let bytes = serde_json::to_vec(
+        &serde_json::json!({"head": head, "fingerprint": provenance_fingerprint(db)?}),
+    )?;
+    let temporary = file.with_extension(format!("json.new.{}", std::process::id()));
+    fs::write(&temporary, bytes)?;
+    fs::rename(&temporary, &file)?;
+    Ok(())
+}
+
+// ponytail: the optional provenance sidecar contains two hashes only; a longer document is
+// untrusted and has no indexed commit.
+#[cfg(feature = "ui")]
+const PROVENANCE_MAX: u64 = 4096;
+
+/// The schema and optional indexed commit, read without creating files. A sidecar is accepted
+/// only when its fingerprint still matches the index, including after a crash/rebuild.
+#[cfg(feature = "ui")]
+pub(crate) fn provenance(index: &Path) -> Result<(i32, Option<String>)> {
+    let db = read_only(index)?;
+    db.execute_batch("BEGIN")?;
+    let schema = db.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    let commit = (|| {
+        let bytes =
+            crate::config::read_bounded(&index.with_extension("commit.json"), PROVENANCE_MAX)
+                .ok()?;
+        let written: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+        let head = written["head"].as_str()?;
+        if ![40, 64].contains(&head.len())
+            || !head
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+        {
+            return None;
+        }
+        (written["fingerprint"].as_str()? == provenance_fingerprint(&db).ok()?)
+            .then(|| head.to_string())
+    })();
+    Ok((schema, commit))
 }
 
 /// How long a read waits for a commit in progress on an index before it fails (ADR 0011).
@@ -997,7 +1070,6 @@ fn configs_digest(mut digest: blake3::Hasher, manifest_rows: &[(String, String)]
 /// stat moved but whose content did not (one a refresh would only stamp again, such as a file
 /// indexed within `RACY` of its last write) is no difference. `meada snapshot publish`
 /// (ADR 0012) runs it on an index opened with `open_read`.
-#[cfg(feature = "snapshot")]
 pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Result<bool> {
     let now = SystemTime::now();
     let meta = (db.query_row("SELECT identity, configs FROM meta", [], |r| {
@@ -1417,12 +1489,12 @@ fn relative(root: &Path, path: &Path) -> Option<String> {
     Some(parts?.join("/"))
 }
 
-#[derive(Serialize)]
+/// One repository's index content, as the engine builds on it: what the export writes
+/// (`written`), and what only the build needs.
 #[cfg_attr(test, derive(Default))]
 pub(crate) struct Export {
     pub(crate) repository: String,
     /// Where the repository stands in the workspace; set by the engine, never stored or shown.
-    #[serde(skip)]
     pub(crate) root: PathBuf,
     pub(crate) files: Vec<File>,
     pub(crate) symbols: Vec<Symbol>,
@@ -1430,62 +1502,44 @@ pub(crate) struct Export {
     pub(crate) providers: Vec<Provider>,
     pub(crate) consumers: Vec<Consumer>,
     /// The RabbitMQ bindings the repository declares (spec #20), neither side of a channel.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) bindings: Vec<Binding>,
     /// The provider documents (spec #21), in path order; those read are exported, with
     /// their contracts.
-    #[serde(
-        serialize_with = "documents_read",
-        skip_serializing_if = "no_document_read"
-    )]
     pub(crate) documents: Vec<Document>,
     /// The RabbitMQ publishes to a named exchange (spec #20), producers of the queues the
     /// bindings route them to.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) publishes: Vec<Publish>,
     /// The `package.json` files read (spec #22), in path order. Not exported as such:
     /// `Package::declare` turns the named ones into `packages` and providers, and
     /// `package::consume` the dependency entries that name a package of the workspace into
     /// `dependencies` and consumers.
-    #[serde(skip)]
     pub(crate) manifests: Vec<Manifest>,
     /// The `tsconfig.json` files read (spec #22), in path order: `package::import` maps a
     /// package's build output back to source through them.
-    #[serde(skip)]
     pub(crate) tsconfigs: Vec<Config>,
     /// The packages the repository provides, by name, then directory.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) packages: Vec<Package>,
     /// The dependency entries naming a package of the workspace, by manifest, field, name.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) dependencies: Vec<Dependency>,
     /// The calls through a binding imported from a bare specifier, by site. Not exported:
     /// `package::import` resolves those that name a package of the workspace.
-    #[serde(skip)]
     pub(crate) import_calls: Vec<ImportCall>,
     /// What each file exports (the `exports` table), sorted, for `package::import`.
-    #[serde(skip)]
     pub(crate) exported: Vec<Exported>,
     /// The shapes kept for what each file exports (`shape` rows, issue #175), for
     /// `package::shapes`.
-    #[serde(skip)]
     pub(crate) shapes: Vec<package::ExportedShape>,
     /// The imports resolved into a package of the workspace, by call site, then target.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) imports: Vec<Import>,
     /// The repository's communities (spec #31), by name, each with its sorted members.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) communities: Vec<Community>,
     pub(crate) links: Vec<Link>,
     /// The repository's entry points (spec #31), sorted by identity. Not exported as such:
     /// `processes` is what the export shows.
-    #[serde(skip)]
     pub(crate) entry_points: Vec<EntryPoint>,
     /// The process of each entry point, in entry point order (`meada export` only).
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) processes: Vec<Process>,
     /// The repository's decisions that do not apply, each with its cause (`meada export` only).
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) stale_decisions: Vec<Stale>,
 }
 
@@ -1502,6 +1556,55 @@ pub(crate) fn sort_consumers(consumers: &mut [Consumer]) {
 }
 
 impl Export {
+    /// What `meada export` writes of it: the documents read, each with its contracts, and every
+    /// side and package without what only the build needs.
+    pub(crate) fn written(self) -> written::Export {
+        written::Export {
+            repository: self.repository,
+            files: self.files,
+            symbols: self.symbols,
+            calls: self.calls,
+            providers: (self.providers.into_iter())
+                .map(|p| written::Provider {
+                    contract: p.contract,
+                    site: p.site,
+                    gateway: p.gateway,
+                    shape: p.shape,
+                })
+                .collect(),
+            consumers: (self.consumers.into_iter())
+                .map(|c| written::Consumer {
+                    contract: c.contract,
+                    site: c.site,
+                    via: c.via,
+                    shape: c.shape,
+                })
+                .collect(),
+            bindings: self.bindings,
+            documents: (self.documents.into_iter())
+                .filter_map(|d| {
+                    let contracts = (d.summary.routes.iter().map(|r| r.contract()))
+                        .chain(d.summary.channels.iter().map(|s| s.contract()))
+                        .collect();
+                    Some(written::Document {
+                        path: d.path,
+                        format: d.summary.format?,
+                        version: d.summary.version,
+                        contracts,
+                    })
+                })
+                .collect(),
+            publishes: self.publishes,
+            packages: self.packages.into_iter().map(Package::written).collect(),
+            dependencies: self.dependencies,
+            imports: self.imports,
+            communities: self.communities,
+            links: self.links,
+            processes: self.processes,
+            stale_decisions: self.stale_decisions,
+        }
+    }
+
     /// The repository by identity and root, as `Ecosystem::reaches` takes it.
     pub(crate) fn place(&self) -> (&str, &Path) {
         (&self.repository, &self.root)
@@ -1523,96 +1626,27 @@ pub(crate) struct Document {
     pub(crate) summary: Summary,
 }
 
-/// A document read, as `meada export` shows it: path, format, version and its contracts,
-/// sorted.
-impl Serialize for Document {
-    fn serialize<S: Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
-        #[derive(Serialize)]
-        struct Shown<'a> {
-            path: &'a str,
-            format: &'a Option<Format>,
-            version: &'a Option<String>,
-            contracts: BTreeSet<String>,
-        }
-        Shown {
-            path: &self.path,
-            format: &self.summary.format,
-            version: &self.summary.version,
-            contracts: (self.summary.routes.iter().map(|r| r.contract()))
-                .chain(self.summary.channels.iter().map(|s| s.contract()))
-                .collect(),
-        }
-        .serialize(s)
-    }
-}
-
-fn documents_read<S: Serializer>(
-    documents: &[Document],
-    s: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    s.collect_seq(documents.iter().filter(|d| d.summary.format.is_some()))
-}
-
-fn no_document_read(documents: &[Document]) -> bool {
-    documents.iter().all(|d| d.summary.format.is_none())
-}
-
-#[derive(Serialize)]
-pub(crate) struct File {
-    pub(crate) path: String,
-    pub(crate) hash: String,
-}
-
-#[derive(Serialize)]
-pub(crate) struct Span {
-    pub(crate) path: String,
-    pub(crate) start: i64,
-    pub(crate) end: i64,
-}
-
-#[derive(Serialize)]
-pub(crate) struct Symbol {
-    pub(crate) id: String,
-    pub(crate) span: Span,
-}
-
-#[derive(Serialize)]
-pub(crate) struct CallSite {
-    pub(crate) id: String,
-    pub(crate) caller: String,
-    pub(crate) target: Option<String>,
-    pub(crate) level: Option<Level>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub(crate) candidates: Vec<String>,
-    pub(crate) span: Span,
-}
-
 /// The provider side of a contract: a symbol that serves it, a file, a repository, the call
 /// that produces to a channel, or a route or channel side only a document lists
 /// (`<repository>::<document>::<METHOD> <path>`, or `... <broker> send <name>`).
-#[derive(Serialize, Default)]
+#[derive(Default)]
 pub(crate) struct Provider {
     pub(crate) contract: String,
     pub(crate) site: String,
     /// The path a gateway serves the route at, when `[serve]` rewrites it (`meada export`).
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) gateway: Option<String>,
     /// What the route's response or the channel's messages carry: from the first document by
     /// path that gives one, else from the code (`contracts.shape`).
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) shape: Option<Shape>,
     /// Every path a gateway serves the route at, with the reason for the rewrite: the
     /// `[serve]` form first. `Http::declare` fills it; matching goes through
     /// `http::gateway_contracts`.
-    #[serde(skip)]
     pub(crate) gateways: Vec<Gateway>,
     /// The hosts the repository serves on, lower case: `[serve] hosts` and the host of every
     /// `servers` URL of its documents. `Http::declare` fills it; `link` matches a URL's host
     /// against it.
-    #[serde(skip)]
     pub(crate) hosts: Vec<String>,
     /// The `version` of a package's manifest, for `package::link`.
-    #[serde(skip)]
     pub(crate) version: Option<String>,
 }
 
@@ -1623,34 +1657,11 @@ pub(crate) struct Gateway {
     pub(crate) reason: String,
 }
 
-/// A queue bound to an exchange by a pattern: the call `site` (a call site) that binds the
-/// queue channel `contract`. A publish to the exchange reaches the queue when the pattern
-/// matches its routing key.
-#[derive(Serialize)]
-pub(crate) struct Binding {
-    pub(crate) contract: String,
-    pub(crate) exchange: String,
-    pub(crate) pattern: String,
-    pub(crate) site: String,
-}
-
-/// A publish to the named exchange `exchange` with the routing key `key`, at the call `site`.
-/// It is no channel's side by itself: it produces to every queue a binding of `exchange`
-/// whose pattern matches `key` routes it to, and to no other (a publish to the empty exchange
-/// is a plain producer of the queue its key names).
-#[derive(Serialize)]
-pub(crate) struct Publish {
-    pub(crate) exchange: String,
-    pub(crate) key: String,
-    pub(crate) site: String,
-}
-
 /// The consumer side of a contract: a call site that uses it, or the symbol that reads a
 /// resource or handles a channel; `contract` is `None` while an HTTP call is unresolved. `via` says
 /// how it names the provider's repository, such as `host:api.example.com` or `env:API_URL`.
 /// An unresolved one also keeps what could be read of its URL (see `Found`); the export leaves
 /// that out.
-#[derive(Serialize)]
 pub(crate) struct Consumer {
     pub(crate) contract: Option<String>,
     pub(crate) site: String,
@@ -1658,15 +1669,11 @@ pub(crate) struct Consumer {
     /// What the messages a channel handler receives carry, from the first document by path
     /// that lists the side (`Channel::declare`); for an HTTP call, the fields it reads from
     /// the parsed response (`contracts.shape`, spec #23).
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) shape: Option<Shape>,
-    #[serde(skip)]
     pub(crate) method: Option<String>,
-    #[serde(skip)]
     pub(crate) fragments: Vec<String>,
     /// For a call through a package import, where it resolves in each provider of the package
     /// (`package::import`); `Packages::link` turns them into links.
-    #[serde(skip)]
     pub(crate) hops: Vec<Hop>,
 }
 

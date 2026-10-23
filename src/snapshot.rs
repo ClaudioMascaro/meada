@@ -7,18 +7,25 @@
 //! Store layout under `prefix`: `repos/<identity>/<bundle id>.tar` (an uncompressed tar of
 //! `index.db`, then the mirror under `mirror/`, `.git` included), `generations/<generation
 //! id>.json` (the `Document`) and `current` (the current generation id and a newline; with
-//! `[generations]` the pointer lives in Valkey instead, `generations`). Every object carries its
-//! size and BLAKE3 hash as metadata (`store::Stored`).
+//! `[generations]` the pointer lives in Valkey instead, `generations`), and with it the workspace
+//! versions, `workspaces/<version id>.json` (`versions`). Every object carries its size and
+//! BLAKE3 hash as metadata (`store::Stored`).
 
 #[cfg(feature = "generation-pointer")]
 pub mod generations;
+#[cfg(feature = "generation-pointer")]
+pub mod heartbeat;
 #[cfg(feature = "refresh-lock")]
 pub mod lock;
+#[cfg(feature = "refresh-lock")]
+pub mod operation;
 #[cfg(all(feature = "refresh-lock", not(unix)))]
 compile_error!("the refresh-lock feature is Unix only");
 pub mod pull;
 pub mod serve;
 pub mod store;
+#[cfg(feature = "generation-pointer")]
+pub mod versions;
 
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -58,6 +65,8 @@ pub struct File {
     session_token_env: Option<String>,
     session_token_file: Option<String>,
     local_dir: Option<String>,
+    node_name: Option<String>,
+    ca_file: Option<String>,
 }
 
 /// Where the store's credentials come from: one source, the one the section names.
@@ -102,6 +111,11 @@ pub struct Config {
     pub credentials: Credentials,
     /// Where nodes keep the generations they pull (#273, #274).
     pub local_dir: Option<PathBuf>,
+    /// The name of this node's heartbeat (#298), checked against the node name pattern; the
+    /// host name in lowercase when unset.
+    pub node_name: Option<String>,
+    /// Additional PEM trust roots for a private-CA store, relative to the manifest.
+    pub ca_file: Option<PathBuf>,
 }
 
 impl File {
@@ -128,6 +142,9 @@ impl File {
                 .any(|s| matches!(s, "" | "." | "..") || s.contains(['\\', '*', '?']))
         {
             return Err(("snapshot.prefix", Msg::SnapshotPrefix.text()));
+        }
+        if (self.node_name.as_deref()).is_some_and(|name| !is_node_name(name)) {
+            return Err(("snapshot.node_name", Msg::SnapshotNodeName.text()));
         }
         let pairs = [
             (
@@ -191,8 +208,16 @@ impl File {
             path_style: self.path_style,
             credentials,
             local_dir: self.local_dir.map(|d| base.join(d)),
+            node_name: self.node_name,
+            ca_file: self.ca_file.map(|file| base.join(file)),
         })
     }
+}
+
+/// Whether `name` is a node name: lowercase letters, digits, `.` and `-`, 1 to 63 characters.
+pub(crate) fn is_node_name(name: &str) -> bool {
+    (1..=63).contains(&name.len())
+        && (name.bytes()).all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'.' | b'-'))
 }
 
 /// Why `url` is no store endpoint: an `https` URL, or `http` when the host is loopback
@@ -232,92 +257,19 @@ impl Config {
     }
 }
 
-/// The first 16 hex characters of the BLAKE3 hash of `text`: an id (`^[0-9a-f]{16}$`).
-fn id(text: &str) -> String {
-    blake3::hash(text.as_bytes()).to_hex()[..16].to_string()
-}
-
-/// Whether `text` has the shape of an id: what anything read from the store, a pointer or
-/// Valkey is checked against before it becomes part of a path or a key.
-pub fn is_id(text: &str) -> bool {
-    text.len() == 16 && text.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
-}
-
-/// A fence written as decimal digits, as a pointer file or Valkey holds it: nothing but ASCII
-/// digits, at least one, within a `u64`.
-pub fn fence(text: &str) -> Option<u64> {
-    let digits = !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit());
-    digits.then(|| text.parse().ok()).flatten()
-}
-
-/// The bundle id of one repository: its identity, its `HEAD` commit, the schema version, the
-/// binary version and its entry blocks (`blocks`, canonical JSON). The same inputs give the
-/// same id on any machine. No input holds a newline: the identity and the commit are single
-/// tokens, and JSON escapes its own.
-pub fn bundle_id(identity: &str, head: &str, schema: i32, binary: &str, blocks: &str) -> String {
-    id(&format!(
-        "meada bundle\nidentity {identity}\nhead {head}\nschema {schema}\nbinary {binary}\n\
-         blocks {blocks}\n"
-    ))
-}
-
-/// The generation id of a workspace: the sorted lines `<identity> <bundle id>`.
-pub fn generation_id(bundles: &[(&str, &str)]) -> String {
-    let mut lines: Vec<String> = (bundles.iter())
-        .map(|(identity, bundle)| format!("{identity} {bundle}\n"))
-        .collect();
-    lines.sort();
-    id(&lines.concat())
-}
-
-/// Each `[[repository]]` of the manifest text `src`, in order, as its blocks were written
-/// (every key but `repo` and `path`), as JSON with every table's keys sorted: TOML's spellings
-/// of one value give one text.
-pub fn entry_blocks(src: &str) -> Vec<serde_json::Value> {
-    let Ok(table) = toml::from_str::<toml::Table>(src) else {
-        return Vec::new();
-    };
-    let Some(toml::Value::Array(entries)) = table.get("repository") else {
-        return Vec::new();
-    };
-    (entries.iter())
-        .map(|entry| {
-            let mut entry = entry.clone();
-            if let toml::Value::Table(table) = &mut entry {
-                table.remove("repo");
-                table.remove("path");
-            }
-            canonical(&entry)
-        })
-        .collect()
-}
-
-fn canonical(value: &toml::Value) -> serde_json::Value {
-    use serde_json::Value as Json;
-    match value {
-        toml::Value::String(s) => Json::String(s.clone()),
-        toml::Value::Integer(i) => Json::from(*i),
-        toml::Value::Float(f) => Json::from(*f),
-        toml::Value::Boolean(b) => Json::Bool(*b),
-        toml::Value::Datetime(d) => Json::String(d.to_string()),
-        toml::Value::Array(items) => Json::Array(items.iter().map(canonical).collect()),
-        toml::Value::Table(table) => {
-            let mut keys: Vec<_> = table.iter().collect();
-            keys.sort_by_key(|(key, _)| *key);
-            // Inserted in key order, so sorted whether or not the map keeps insertion order.
-            Json::Object(
-                keys.into_iter()
-                    .map(|(k, v)| (k.clone(), canonical(v)))
-                    .collect(),
-            )
-        }
-    }
-}
+// The ids of ADR 0012, their shape, the fence and the entries' canonical blocks are
+// `meada_core::ids`'s.
+pub use meada_core::ids::{bundle_id, entry_blocks, fence, generation_id, is_id};
 
 /// A generation document (`generations/<id>.json`), never rewritten once stored.
 #[derive(Serialize, Deserialize)]
 pub struct Document {
     pub generation: String,
+    /// The workspace version that produced the generation (`source = "store"`, ADR 0014),
+    /// absent with `source = "file"`. Not part of any id; a document stored keeps the version
+    /// that first produced it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace: Option<String>,
     /// In manifest order.
     pub repositories: Vec<Entry>,
 }
@@ -356,7 +308,7 @@ struct Bundle {
 /// (`index::fresh`), is missing or is of another schema, and any mirror that is not clean; a
 /// failure before the last write leaves the pointer as it was.
 pub fn publish(manifest: &Path) -> Result<String> {
-    let listed = Manifest::read(manifest)?;
+    let listed = Manifest::read_listed(manifest)?;
     let shown = manifest.display().to_string();
     let Some(config) = listed.snapshot.clone() else {
         return Err(Msg::SnapshotNoSection(&shown).text().into());
@@ -448,7 +400,13 @@ pub fn publish(manifest: &Path) -> Result<String> {
         #[cfg(feature = "refresh-lock")]
         held,
     };
-    crate::modules::block_on(store_generation(&config, &generation, bundles, pointer))??;
+    // The pulled workspace version with `source = "store"`; never part of an id.
+    #[cfg(feature = "generation-pointer")]
+    let workspace = listed.version.clone();
+    #[cfg(not(feature = "generation-pointer"))]
+    let workspace = None;
+    let stored = store_generation(&config, &generation, workspace, bundles, pointer);
+    crate::modules::block_on(stored)??;
     Ok(generation)
 }
 
@@ -469,10 +427,13 @@ struct Pointer {
     held: Option<lock::Held>,
 }
 
-/// Stores the generation `generation` of `bundles`, then points `pointer` at it.
+/// Stores the generation `generation` of `bundles`, its document naming the workspace version
+/// `workspace` when one produced it, then points `pointer` at it. A document already stored is
+/// verified and kept as it is, with the version that first produced it.
 async fn store_generation(
     config: &Config,
     generation: &str,
+    workspace: Option<String>,
     bundles: Vec<Bundle>,
     #[cfg_attr(not(feature = "generation-pointer"), allow(unused_variables))] pointer: Pointer,
 ) -> std::result::Result<(), String> {
@@ -525,6 +486,7 @@ async fn store_generation(
             }
             let document_text = Document {
                 generation: generation.to_string(),
+                workspace,
                 repositories,
             };
             let mut text = serde_json::to_vec_pretty(&document_text).map_err(|e| e.to_string())?;
@@ -735,6 +697,8 @@ mod tests {
         assert_eq!(config.prefix, "");
         assert!(!config.path_style);
         assert_eq!(config.local_dir, None);
+        assert_eq!(config.node_name, None);
+        assert_eq!(config.ca_file, None);
         let env = |v: &str| Secret::Env(v.into());
         assert_eq!(
             config.credentials,
@@ -749,12 +713,14 @@ mod tests {
         let config = section(&format!(
             "{REQUIRED}prefix = \"prod/a\"\npath_style = true\naccess_key_id_env = \"K\"\n\
              secret_access_key_file = \"secret\"\nsession_token_file = \"/run/token\"\n\
-             local_dir = \"generations\""
+             local_dir = \"generations\"\nnode_name = \"meada-node-0\"\nca_file = \"ca.pem\""
         ))
         .unwrap();
+        assert_eq!(config.node_name.as_deref(), Some("meada-node-0"));
         assert_eq!(config.key("current"), "prod/a/current");
         assert!(config.path_style);
         assert_eq!(config.local_dir, Some("/etc/meada/generations".into()));
+        assert_eq!(config.ca_file, Some("/etc/meada/ca.pem".into()));
         assert_eq!(
             config.credentials,
             Credentials::Static {
@@ -770,6 +736,16 @@ mod tests {
         ] {
             let toml = format!("{REQUIRED}credentials = \"{source}\"");
             assert_eq!(section(&toml).unwrap().credentials, credentials);
+        }
+    }
+
+    #[test]
+    fn a_node_name_is_lowercase_letters_digits_dots_and_dashes() {
+        for good in ["a", "meada-node-0", "node.example.com", &"a".repeat(63)] {
+            assert!(is_node_name(good), "{good}");
+        }
+        for bad in ["", "Upper", "a_b", "a b", "../x", "a:b", &"a".repeat(64)] {
+            assert!(!is_node_name(bad), "{bad}");
         }
     }
 
@@ -794,6 +770,19 @@ mod tests {
             (REQUIRED.replace("meada-store", "Meada"), "snapshot.bucket"),
             (REQUIRED.replace("meada-store", "ab"), "snapshot.bucket"),
             (REQUIRED.replace("meada-store", "-ab"), "snapshot.bucket"),
+            (
+                format!("{REQUIRED}node_name = \"Upper\""),
+                "snapshot.node_name",
+            ),
+            (
+                format!("{REQUIRED}node_name = \"a_b\""),
+                "snapshot.node_name",
+            ),
+            (format!("{REQUIRED}node_name = \"\""), "snapshot.node_name"),
+            (
+                format!("{REQUIRED}node_name = \"{}\"", "a".repeat(64)),
+                "snapshot.node_name",
+            ),
             (format!("{REQUIRED}prefix = \"/prod\""), "snapshot.prefix"),
             (format!("{REQUIRED}prefix = \"a/../b\""), "snapshot.prefix"),
             (format!("{REQUIRED}prefix = \"a//b\""), "snapshot.prefix"),
@@ -839,123 +828,5 @@ mod tests {
             assert_eq!(found, "snapshot.path_style", "{endpoint}");
         }
         assert!(section(&with("https://s3.example.internal:8443/")).is_ok());
-    }
-
-    /// Ids of a fixed input, against the canonical texts written out here: any change to the
-    /// format shows.
-    #[test]
-    fn same_inputs_give_the_same_ids_on_any_machine() {
-        let short = |text: &str| blake3::hash(text.as_bytes()).to_hex()[..16].to_string();
-        let blocks = r#"{"serve":{"documents":["openapi.yaml"]}}"#;
-        let head = "0123456789abcdef0123456789abcdef01234567";
-        let bundle = bundle_id("example.com/acme/web", head, 7, "0.1.0", blocks);
-        let text = "meada bundle\nidentity example.com/acme/web\n\
-                    head 0123456789abcdef0123456789abcdef01234567\nschema 7\nbinary 0.1.0\n\
-                    blocks {\"serve\":{\"documents\":[\"openapi.yaml\"]}}\n";
-        assert_eq!(bundle, short(text));
-        assert!(is_id(&bundle), "{bundle}");
-        let api = ("example.com/acme/api", "0000000000000000");
-        let generation = generation_id(&[("example.com/acme/web", &bundle), api]);
-        let lines =
-            format!("example.com/acme/api 0000000000000000\nexample.com/acme/web {bundle}\n");
-        assert_eq!(generation, short(&lines));
-        // The order the repositories come in is no input.
-        assert_eq!(
-            generation,
-            generation_id(&[api, ("example.com/acme/web", &bundle)])
-        );
-    }
-
-    fn base() -> String {
-        bundle_id("example.com/acme/web", "aaaa", 7, "0.1.0", "{}")
-    }
-
-    #[test]
-    fn another_identity_changes_the_bundle_id() {
-        assert_ne!(
-            base(),
-            bundle_id("example.com/acme/api", "aaaa", 7, "0.1.0", "{}")
-        );
-    }
-
-    #[test]
-    fn another_head_changes_the_bundle_id() {
-        assert_ne!(
-            base(),
-            bundle_id("example.com/acme/web", "bbbb", 7, "0.1.0", "{}")
-        );
-    }
-
-    #[test]
-    fn another_schema_version_changes_the_bundle_id() {
-        assert_ne!(
-            base(),
-            bundle_id("example.com/acme/web", "aaaa", 9, "0.1.0", "{}")
-        );
-    }
-
-    #[test]
-    fn another_binary_version_changes_the_bundle_id() {
-        assert_ne!(
-            base(),
-            bundle_id("example.com/acme/web", "aaaa", 7, "0.2.0", "{}")
-        );
-    }
-
-    #[test]
-    fn other_entry_blocks_change_the_bundle_id() {
-        let blocks = "{\"peer\":[{\"repo\":\"example.com/acme/api\"}]}";
-        assert_ne!(
-            base(),
-            bundle_id("example.com/acme/web", "aaaa", 7, "0.1.0", blocks)
-        );
-    }
-
-    #[test]
-    fn another_bundle_id_or_identity_changes_the_generation_id() {
-        let generation = generation_id(&[("example.com/acme/web", "1111111111111111")]);
-        assert_ne!(
-            generation,
-            generation_id(&[("example.com/acme/web", "2222222222222222")])
-        );
-        assert_ne!(
-            generation,
-            generation_id(&[("example.com/acme/api", "1111111111111111")])
-        );
-        let two = [
-            ("example.com/acme/web", "1111111111111111"),
-            ("example.com/acme/api", "1111111111111111"),
-        ];
-        assert_ne!(generation, generation_id(&two));
-    }
-
-    #[test]
-    fn entry_blocks_leave_out_repo_and_path_and_sort_their_keys() {
-        let a = "index_dir = \"i\"\n[[repository]]\nrepo = \"example.com/acme/web\"\npath = \"../web\"\n\
-                 [repository.serve]\ndomains = [\"web.example.com\"]\ndocuments = [\"openapi.yaml\"]\n\
-                 [[repository]]\nrepo = \"example.com/acme/api\"\npath = \"api\"\n";
-        let b = "index_dir = \"j\"\n[[repository]]\npath = \"/srv/web\"\n\
-                 serve = { documents = ['openapi.yaml'], domains = ['web.example.com'] }\n\
-                 repo = \"example.com/acme/web\"\n\
-                 [[repository]]\nrepo = \"example.com/acme/api\"\npath = \"/srv/api\"\n";
-        let (a, b) = (entry_blocks(a), entry_blocks(b));
-        assert_eq!(a, b);
-        assert_eq!(
-            serde_json::to_string(&a).unwrap(),
-            "[{\"serve\":{\"documents\":[\"openapi.yaml\"],\"domains\":[\"web.example.com\"]}},{}]"
-        );
-    }
-
-    #[test]
-    fn ids_have_the_shared_shape() {
-        assert!(is_id("0123456789abcdef"));
-        for bad in [
-            "0123456789ABCDEF",
-            "0123456789abcde",
-            "../../../../etc/",
-            "",
-        ] {
-            assert!(!is_id(bad), "{bad}");
-        }
     }
 }

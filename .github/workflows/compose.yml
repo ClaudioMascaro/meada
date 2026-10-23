@@ -1,0 +1,19 @@
+name: Compose configuration
+
+on:
+  pull_request:
+    paths:
+      - deploy/compose/**
+      - .github/workflows/compose.yml
+      - scripts/compose-check
+
+permissions:
+  contents: read
+
+jobs:
+  config:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate local, generations and console profiles without starting services
+        run: python3 scripts/compose-check

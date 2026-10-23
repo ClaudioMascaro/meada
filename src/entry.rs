@@ -13,43 +13,7 @@ use crate::contract::{self, Names, Role};
 use crate::lang::{Def, Facts, Kind};
 use crate::resolve::{Exported, scope_of};
 
-/// What kind of door an entry point is. A new kind adds a variant, its `name` and `parse`
-/// arms and its finder in `find`; the walk and the export need nothing else.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum EntryKind {
-    /// A route an HTTP handler serves.
-    Route,
-    /// An exported function or method nothing in its repository calls.
-    Export,
-    /// A channel a consumer handler consumes, one entry point per channel.
-    Channel,
-    /// A program's start, as its language pack declares it (`Facts::programs`).
-    Program,
-}
-
-impl EntryKind {
-    /// Every kind, in the order a symbol's process summary lists them.
-    pub const ALL: [EntryKind; 4] = [
-        EntryKind::Route,
-        EntryKind::Export,
-        EntryKind::Channel,
-        EntryKind::Program,
-    ];
-
-    /// The name the index stores and the export shows.
-    pub fn name(self) -> &'static str {
-        match self {
-            EntryKind::Route => "route",
-            EntryKind::Export => "export",
-            EntryKind::Channel => "channel",
-            EntryKind::Program => "program",
-        }
-    }
-
-    pub fn parse(name: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|k| k.name() == name)
-    }
-}
+pub use meada_core::export::EntryKind;
 
 /// One entry point: its identity, kind and label (what names its process), and the `site`
 /// the process starts from, a symbol or a code file of the repository.

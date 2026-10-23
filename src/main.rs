@@ -71,6 +71,126 @@ enum Command {
         #[command(subcommand)]
         command: GithubAppCommand,
     },
+    #[cfg(feature = "ui")]
+    Ui {
+        #[arg(long)]
+        listen: String,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    #[cfg(feature = "generation-pointer")]
+    Workspace {
+        #[command(subcommand)]
+        command: WorkspaceCommand,
+    },
+}
+
+/// `meada workspace` (ADR 0014, feature `generation-pointer`).
+#[cfg(feature = "generation-pointer")]
+#[derive(Subcommand)]
+enum WorkspaceCommand {
+    Import {
+        file: PathBuf,
+        #[arg(long)]
+        message: String,
+        #[arg(long)]
+        author: Option<String>,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    List {
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Show {
+        version: Option<String>,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    #[cfg(feature = "refresh-lock")]
+    Apply {
+        version: String,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Pull {
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+}
+
+/// `meada workspace`: the answer on stdout (an id, the listing, the entries), notes on stderr;
+/// on a failure every line on stderr and exit 1.
+#[cfg(feature = "generation-pointer")]
+fn workspace(command: WorkspaceCommand) -> ! {
+    use meada::snapshot::versions;
+    let mut notes = Vec::new();
+    let answer = match command {
+        WorkspaceCommand::Import {
+            file,
+            message,
+            author,
+            workspace,
+        } => {
+            let author = author.unwrap_or_else(versions::cli_author);
+            (versions::import(&workspace, &file, &message, &author, &mut notes)).map(|imported| {
+                if let Some(first) = &imported.first {
+                    let (author, message) = (
+                        versions::shown(&first.author),
+                        versions::shown(&first.message),
+                    );
+                    let stored = Msg::WorkspaceStored {
+                        id: &first.id,
+                        author: &author,
+                        time: &first.time,
+                        message: &message,
+                    };
+                    notes.push(stored.text());
+                }
+                format!("{}\n", imported.id)
+            })
+        }
+        WorkspaceCommand::List { workspace } => versions::list(&workspace).map(|listing| {
+            if let Err(none) = &listing.current {
+                notes.push(none.clone());
+            }
+            listing.text()
+        }),
+        WorkspaceCommand::Show { version, workspace } => {
+            versions::show(&workspace, version.as_deref())
+        }
+        #[cfg(feature = "refresh-lock")]
+        WorkspaceCommand::Apply { version, workspace } => {
+            let author = versions::cli_author();
+            versions::apply(&workspace, &version, &author).map(|state| format!("{state}\n"))
+        }
+        // The id on stdout either way; that nothing changed on stderr.
+        WorkspaceCommand::Pull { workspace } => versions::pull(&workspace).map(|pulled| {
+            let id = match pulled {
+                versions::Pulled::Swapped(id) => id,
+                versions::Pulled::Current(id) => {
+                    notes.push(Msg::WorkspaceAlreadyCurrent(&id).text());
+                    id
+                }
+            };
+            format!("{id}\n")
+        }),
+    };
+    for line in notes.iter().flat_map(|n| n.lines()) {
+        eprintln!("meada: {line}");
+    }
+    match answer {
+        Ok(text) => {
+            print!("{text}");
+            std::process::exit(0);
+        }
+        Err(e) => {
+            for line in e.to_string().lines() {
+                eprintln!("meada: {line}");
+            }
+            std::process::exit(1);
+        }
+    }
 }
 
 /// `meada github-app` (ADR 0013, feature `github-app`).
@@ -144,6 +264,49 @@ enum SnapshotCommand {
         #[arg(last = true, required = true, value_name = "COMMAND")]
         command: Vec<std::ffi::OsString>,
     },
+    #[cfg(feature = "refresh-lock")]
+    Pointer {
+        #[command(subcommand)]
+        command: PointerCommand,
+    },
+    #[cfg(feature = "refresh-lock")]
+    Fence {
+        #[command(subcommand)]
+        command: FenceCommand,
+    },
+}
+
+/// `meada snapshot pointer` (ADR 0014, feature `refresh-lock`).
+#[cfg(feature = "refresh-lock")]
+#[derive(Subcommand)]
+enum PointerCommand {
+    Set {
+        generation: String,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Retain {
+        generation: String,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Drop {
+        generation: String,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+}
+
+/// `meada snapshot fence` (ADR 0014, feature `refresh-lock`).
+#[cfg(feature = "refresh-lock")]
+#[derive(Subcommand)]
+enum FenceCommand {
+    Recover {
+        #[arg(long, value_name = "FENCE")]
+        at_least: Option<String>,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
 }
 
 /// `meada snapshot pull`: the generation id on stdout when the pointer file moved, or once
@@ -152,6 +315,16 @@ enum SnapshotCommand {
 #[cfg(feature = "snapshot")]
 fn pull(manifest: &Path, every: Option<u64>) -> ! {
     use meada::snapshot::pull::Pulled;
+    // A host name that is no node name refuses to start; a round never refuses.
+    #[cfg(feature = "generation-pointer")]
+    if every.is_some()
+        && let Err(e) = meada::snapshot::heartbeat::check(manifest)
+    {
+        for line in e.to_string().lines() {
+            eprintln!("meada: {line}");
+        }
+        std::process::exit(1);
+    }
     loop {
         let pulled = meada::snapshot::pull::pull(manifest).map(|(pulled, warnings)| {
             for line in warnings.iter().flat_map(|w| w.lines()) {
@@ -181,22 +354,29 @@ fn pull(manifest: &Path, every: Option<u64>) -> ! {
         let Some(seconds) = every else {
             std::process::exit(0);
         };
+        #[cfg(feature = "generation-pointer")]
+        if let Some(warning) = meada::snapshot::heartbeat::beat(manifest, seconds) {
+            for line in warning.lines() {
+                eprintln!("meada: {line}");
+            }
+        }
         std::thread::sleep(std::time::Duration::from_secs(seconds));
     }
 }
 
-/// `meada mcp --listen`. In debug builds `MEADA_DRAIN_MS` shortens the drain bound (a knob for
-/// tests and not documented; a release binary has no way to shorten the bound).
-fn listen_at(listen: &str, manifest: &Path) -> meada::Result<()> {
+/// `serve`, a listener (`meada mcp --listen`, `meada ui`). In debug builds `MEADA_DRAIN_MS`
+/// shortens the drain bound (a knob for tests and not documented; a release binary has no way
+/// to shorten the bound).
+fn drained(serve: impl FnOnce() -> meada::Result<()>) -> meada::Result<()> {
     #[cfg(debug_assertions)]
     if let Some(bound) = std::env::var("MEADA_DRAIN_MS")
         .ok()
         .and_then(|ms| ms.parse().ok())
         .map(std::time::Duration::from_millis)
     {
-        return meada::mcp::with_drain_bound(bound, || meada::mcp::listen(listen, manifest));
+        return meada::mcp::with_drain_bound(bound, serve);
     }
-    meada::mcp::listen(listen, manifest)
+    serve()
 }
 
 fn main() -> ExitCode {
@@ -252,6 +432,28 @@ fn main() -> ExitCode {
                 .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
                 .mut_arg("command", |a| a.help(Msg::SnapshotLockCommand.text()))
         })
+        .mut_subcommand("pointer", |c| {
+            fn sub(c: clap::Command, about: Msg<'static>, id: Msg<'static>) -> clap::Command {
+                (c.about(about.text()))
+                    .mut_arg("generation", |a| a.help(id.text()))
+                    .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
+            }
+            let id = || Msg::SnapshotPointerGeneration;
+            (c.about(Msg::SnapshotPointer.text()))
+                .mut_subcommand("set", |c| sub(c, Msg::SnapshotPointerSet, id()))
+                .mut_subcommand("retain", |c| {
+                    let id = Msg::SnapshotPointerRetainGeneration;
+                    sub(c, Msg::SnapshotPointerRetain, id)
+                })
+                .mut_subcommand("drop", |c| sub(c, Msg::SnapshotPointerDrop, id()))
+        })
+        .mut_subcommand("fence", |c| {
+            (c.about(Msg::SnapshotFence.text())).mut_subcommand("recover", |c| {
+                (c.about(Msg::SnapshotFenceRecover.text()))
+                    .mut_arg("at_least", |a| a.help(Msg::SnapshotFenceAtLeast.text()))
+                    .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
+            })
+        })
     });
     #[cfg(feature = "github-app")]
     let matches = matches.mut_subcommand("github-app", |c| {
@@ -267,6 +469,43 @@ fn main() -> ExitCode {
                     .mut_arg("repository", |a| a.help(Msg::GithubAppRepository.text()))
                     .mut_arg("retry_after", |a| a.help(Msg::GithubAppRetryAfter.text()))
             })
+    });
+    #[cfg(feature = "ui")]
+    let matches = matches.mut_subcommand("ui", |c| {
+        (c.about(Msg::Ui.text()))
+            .mut_arg("listen", |a| a.help(Msg::UiListenHelp.text()))
+            .mut_arg("workspace", |a| a.help(Msg::UiWorkspaceHelp.text()))
+    });
+    #[cfg(feature = "generation-pointer")]
+    let matches = matches.mut_subcommand("workspace", |c| {
+        let bootstrap = |a: clap::Arg| a.help(Msg::WorkspaceBootstrapHelp.text());
+        (c.about(Msg::Workspace.text()))
+            .mut_subcommand("import", |c| {
+                (c.about(Msg::WorkspaceImport.text()))
+                    .mut_arg("file", |a| a.help(Msg::WorkspaceImportFile.text()))
+                    .mut_arg("message", |a| a.help(Msg::WorkspaceImportMessage.text()))
+                    .mut_arg("author", |a| a.help(Msg::WorkspaceImportAuthor.text()))
+                    .mut_arg("workspace", bootstrap)
+            })
+            .mut_subcommand("list", |c| {
+                (c.about(Msg::WorkspaceList.text())).mut_arg("workspace", bootstrap)
+            })
+            .mut_subcommand("show", |c| {
+                (c.about(Msg::WorkspaceShow.text()))
+                    .mut_arg("version", |a| a.help(Msg::WorkspaceShowVersion.text()))
+                    .mut_arg("workspace", bootstrap)
+            })
+            .mut_subcommand("pull", |c| {
+                (c.about(Msg::WorkspacePull.text())).mut_arg("workspace", bootstrap)
+            })
+    });
+    #[cfg(feature = "refresh-lock")]
+    let matches = matches.mut_subcommand("workspace", |c| {
+        c.mut_subcommand("apply", |c| {
+            (c.about(Msg::WorkspaceApply.text()))
+                .mut_arg("version", |a| a.help(Msg::WorkspaceApplyVersion.text()))
+                .mut_arg("workspace", |a| a.help(Msg::WorkspaceBootstrapHelp.text()))
+        })
     });
     #[cfg(feature = "snapshot")]
     let matches = ["status", "export", "mcp"]
@@ -319,7 +558,9 @@ fn main() -> ExitCode {
             // The MCP surface is English whatever `LANG` says (ADR 0008).
             msg::init(None);
             match (listen, workspace) {
-                (Some(listen), Some(manifest)) => listen_at(&listen, &manifest),
+                (Some(listen), Some(manifest)) => {
+                    drained(|| meada::mcp::listen(&listen, &manifest))
+                }
                 _ => meada::mcp::serve(),
             }
         }
@@ -327,9 +568,9 @@ fn main() -> ExitCode {
             workspace: Some(manifest),
             ..
         } => meada::with_busy_timeout(engine::PROBE_BUSY, || {
-            engine::status_workspace(&manifest).map(|status| {
+            engine::probe_workspace(&manifest).map(|(status, ready)| {
                 print!("{status}");
-                unready = !engine::ready(&manifest);
+                unready = !ready;
             })
         }),
         Command::Status {
@@ -369,6 +610,21 @@ fn main() -> ExitCode {
         } => pull(&workspace, every),
         #[cfg(feature = "github-app")]
         Command::GithubApp { command } => github_app(command),
+        #[cfg(feature = "generation-pointer")]
+        Command::Workspace { command } => workspace(command),
+        // Every problem that refuses the start on its own line. The API is English whatever
+        // `LANG` says, as the MCP surface is (ADR 0008).
+        #[cfg(feature = "ui")]
+        Command::Ui { listen, workspace } => {
+            msg::init(None);
+            if let Err(e) = drained(|| meada::ui::listen(&listen, &workspace)) {
+                for line in e.to_string().lines() {
+                    eprintln!("meada: {line}");
+                }
+                std::process::exit(1);
+            }
+            Ok(())
+        }
         // The child's exit code, or 1 with the reason: the lock held elsewhere or lost.
         #[cfg(feature = "refresh-lock")]
         Command::Snapshot {
@@ -382,6 +638,75 @@ fn main() -> ExitCode {
                 std::process::exit(1);
             }
         },
+        // The new state is the only line on stdout.
+        #[cfg(feature = "refresh-lock")]
+        Command::Snapshot {
+            command:
+                SnapshotCommand::Pointer {
+                    command:
+                        PointerCommand::Set {
+                            generation,
+                            workspace,
+                        },
+                },
+        } => {
+            let author = meada::snapshot::lock::cli_author();
+            meada::snapshot::operation::pointer_set(&workspace, &generation, &author)
+                .map(|state| println!("{state}"))
+        }
+        #[cfg(feature = "refresh-lock")]
+        Command::Snapshot {
+            command:
+                SnapshotCommand::Pointer {
+                    command:
+                        PointerCommand::Retain {
+                            generation,
+                            workspace,
+                        },
+                },
+        } => {
+            let author = meada::snapshot::lock::cli_author();
+            meada::snapshot::operation::pointer_retain(&workspace, &generation, &author)
+                .map(|id| println!("{id}"))
+        }
+        #[cfg(feature = "refresh-lock")]
+        Command::Snapshot {
+            command:
+                SnapshotCommand::Pointer {
+                    command:
+                        PointerCommand::Drop {
+                            generation,
+                            workspace,
+                        },
+                },
+        } => {
+            let author = meada::snapshot::lock::cli_author();
+            meada::snapshot::operation::pointer_drop(&workspace, &generation, &author)
+                .map(|id| println!("{id}"))
+        }
+        // What could not be counted on stderr, the new fence on stdout.
+        #[cfg(feature = "refresh-lock")]
+        Command::Snapshot {
+            command:
+                SnapshotCommand::Fence {
+                    command:
+                        FenceCommand::Recover {
+                            at_least,
+                            workspace,
+                        },
+                },
+        } => {
+            let author = meada::snapshot::lock::cli_author();
+            let at_least = at_least.as_deref();
+            meada::snapshot::operation::fence_recover(&workspace, at_least, &author).map(
+                |(fence, skipped)| {
+                    for line in skipped.iter().flat_map(|s| s.lines()) {
+                        eprintln!("meada: {line}");
+                    }
+                    println!("{fence}");
+                },
+            )
+        }
         Command::Export {
             workspace: Some(manifest),
             repo: Some(repo),

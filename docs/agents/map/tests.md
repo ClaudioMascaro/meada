@@ -8,6 +8,20 @@ Reviewing a change to an `*.export.json` golden: `cargo run --example golden_dif
 diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_diff.rs` for the
 `--range` forms) prints added, removed and moved entries per section instead of the raw JSON.
 
+- `ui/tests/operations.test.ts` projects operational API fixtures into fleet diagnostics,
+  retention/bundle metadata, repository provenance, cached credential lifetime and token-check
+  outcomes. `operations.test.tsx` exercises the five pages through their DOM and HTTP client,
+  including bilingual accessible controls and the pasted token's lifetime.
+- `ui/tests/actions.test.ts` checks the operator/operations gates, eligible generation actions,
+  shell-quoted commands and exact u64 recovery floors. `action-pages.test.tsx` exercises those
+  actions through the DOM and HTTP client: no write before confirmation or after Escape,
+  named holder refusals, successful writes followed by fleet reload, missing bootstrap reads,
+  and bilingual keyboard controls. `ConfirmDialog.test.tsx` checks focus restoration,
+  cancellation and the busy state through the native dialog's DOM boundary.
+- `scripts/compose-check` checks the local, generations and explicit console profiles without
+  starting them, including parsed bootstraps, independent console storage and proxy admission.
+  `scripts/helm-check` covers default and enabled console resources, optional Ingress, private
+  CA and OIDC values, negative module/operation combinations and managed refresh ordering.
 - Test modules of `tests/it/` by subject: `docs` (the repository map against the code:
   `ponytail:` limits in Known ceilings, entry point kinds and process marks in their lists),
   `conformance` (pack; for Python also its HTTP providers and consumers
@@ -33,7 +47,7 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `freshness` moves a `mod`, declares the orphan, adds a module, drops the `[[bin]]`, edits a
   `pub use`, moves an item between files and renames a package, and
   exports it with the walk reversed), `xlang` (a TypeScript and a Python repository linked both ways, over HTTP
-  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files), `index` (export, schema rebuild, writes only in `.meada/`), `self_index` (a copy of this repository's tracked files, indexed in about 6 s in debug: no call from `src/` reaches `tests/fixtures/`, and `Resolver.call` has an `exact` caller), `hostile` (per pack, repositories of pathological files sized past the limits of Known ceilings: deep nesting, long chains, wide files and manifests, values traced through chains and lattices of constants, wrappers, parameters and return values; each indexed on a thread with a small stack within a time budget, so a recursion with no limit aborts the run and a loop with none fails it; `--nocapture` names each case as it starts), `query` (search/context), `workspace` (peers, status, config errors), `manifest` (server mode's workspace manifest: `index`, `status` and `export --repo` with `--workspace`, the refused entries, manifest errors, entry blocks configuring mirrors with no `meada.toml` and ignored under one, decisions replayed, reads that write nothing and see the index until `meada index` refreshes it, nothing written into a mirror, refreshed equals cold), `gateway`
+  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files), `index` (export, schema rebuild, writes only in `.meada/`), `self_index` (a copy of this repository's tracked files, indexed in about 6 s in debug: no call from `src/` reaches `tests/fixtures/`, and `Resolver.call` has an `exact` caller), `hostile` (per pack, repositories of pathological files sized past the limits of Known ceilings: deep nesting, long chains, wide files and manifests, values traced through chains and lattices of constants, wrappers, parameters and return values; each indexed on a thread with a small stack within a time budget, so a recursion with no limit aborts the run and a loop with none fails it; `--nocapture` names each case as it starts), `query` (search/context), `workspace` (peers, status, config errors), `manifest` (server mode's workspace manifest: `index`, `status` and `export --repo` with `--workspace`, the refused entries, manifest errors, entry blocks configuring mirrors with no `meada.toml` and ignored under one, decisions replayed, reads that write nothing and see the index until `meada index` refreshes it, nothing written into a mirror, refreshed equals cold, `[workspace]`'s unknown key and source, `source = "file"` as before, `source = "store"` naming `generation-pointer` without it and its sections or `[[repository]]` with it; with `snapshot`, a bad `[snapshot] node_name` naming the file, the line and the key), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export
   carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a channel handler's process, a cycle, an
@@ -46,7 +60,19 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `freshness` (cold vs refreshed, also an edited zod schema dropping a field, edited calls moving
   every repository's communities and processes, and the chain's export byte-identical under
   `meada::with_reversed_walk`), `items` (open items and their `search` goldens, fixtures
-  `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`), `mcp`
+  `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`; with
+  `refresh-lock`, the operations' refusals: a malformed id, no `[refresh_lock]`, a generation
+  not retained, the current generation dropped, a full kept set, a lock held by a named or an
+  unknown holder; without it, no `snapshot pointer`
+  or `snapshot fence`; `[workspace]`'s errors and, with `generation-pointer`, `source = "store"`
+  without its sections or beside `[[repository]]`, `index` without a pulled version naming
+  `meada workspace pull`, `mcp --listen` naming `--generations`, and `meada workspace`'s
+  refusals of a malformed id and of a manifest without `[generations]` (`pull` included); with
+  `refresh-lock`, `workspace apply`'s malformed id and missing `[refresh_lock]`, and against the
+  services `apply` of a version not stored, `pull` with no current version, below the current
+  file's fence and already current; with `snapshot`, the `[snapshot] node_name` error in both
+  languages),
+  `mcp`
   (the binary over stdio), `server` (`meada mcp --listen` as a child process over the chain's
   mirrors, through rmcp's streamable HTTP client and plain HTTP requests: the stdio tools and
   `trace` byte for byte, the 404 listing, the `uncommitted` refusal, the behind line before and
@@ -59,16 +85,55 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   secret in an authentication failure, no redirect followed, `[snapshot]` errors, a pull that
   keeps the previous generation, corrupted and hostile generations (bundles, tar entries, ids,
   identities, index schemas, a pointer and a document past their bounds) changing nothing, a
-  pulled mirror that runs nothing its bundle configured, a nested repository refused),
+  pulled mirror that runs nothing its bundle configured, a nested repository refused;
+  `snapshot/tls.rs` runs binary publish/pull through a TLS front of the local store with a
+  private CA, refusing absent, wrong, empty, invalid and oversized CA files without exposing
+  fixture secrets),
   `serving` (`mcp --listen --generations`, `status --generations` and `export --generations`:
   the chain goldens from a pulled generation, a swap between two calls, the probe and the start
-  depending only on the node, the fixed 503, an index naming files outside its mirror),
-  `generations` (the generation pointer and pins: a pin answered on every node until it is no
+  depending only on the node, the fixed 503, an index naming files outside its mirror, the same goldens, header and `_meta` from a node whose companion writes heartbeats),
+  `generations` (the heartbeat of each `pull --every` round: its fields equal the node pointer file, the held directories, the readiness and the version, its TTL of three periods and the node set scored by the expiry, a swap writing the new generation and fence, a failed round and an unreachable Valkey (one warning, no password, nothing else changed), expiry and the next heartbeat removing the stale name, no heartbeat from a single `pull` or without `[generations]`, the host name by default; the generation pointer and pins: a pin answered on every node until it is no
   longer retained, the 404 of a pin not held, `Origin` refused before a pin, every id and fence
-  from Valkey checked, a retained generation that fails to pull, the probe reading Valkey,
-  `[generations]` errors), `refresh_lock` (`snapshot lock`: the child terminated past the TTL,
-  killed past the grace, stopped when the lock changes hands, a SIGTERM reaching it, a stale
-  fence refused, a lost fence stopping a node, `[refresh_lock]` errors), `oidc` (`[oidc]`
+  from Valkey checked, a retained list longer than `keep` plus `KEPT_MAX`, a retained
+  generation that fails to pull, the probe reading Valkey,
+  `[generations]` errors, `snapshot pointer set` rolling two nodes back to G1's goldens until
+  the next publish, a generation not retained and malformed ids refused, a generation kept by
+  `pointer retain` held and pinned on two nodes past `keep` until `pointer drop`; the workspace
+  versions: `workspace import` of the chain's manifest storing `workspaces/<id>.json` with every
+  field and its metadata, the same entries again uploading nothing and answering the first
+  author and message, two entries swapped giving another id, an invalid file refused with its
+  file, line and key before any connection, its other sections named as not imported; `workspace
+  list` newest first, the current one marked once `{<key_prefix>}:workspace` names it, a
+  malformed pointer refused, a corrupted and a forged document listed as malformed; `workspace
+  show` of entries with blocks read back by `import` to the same id, and with no current
+  version naming `meada workspace apply`; `workspace pull` refused with no current version,
+  writing the document and the current file, current on a second run, swapping after the
+  pointer moves and keeping only the current version and the one it replaced, refusing a
+  pointer whose fence is not above the current file's; a malformed pointer id or fence, a
+  document of another id, one whose id does not derive from its entries, an oversized one and
+  one with invalid entries each refused, the directory unchanged; `index` over a pulled version
+  opening no connection to its `[snapshot]` and `[valkey]` ports, the export goldens after it;
+  with the chain stored, applied and pulled, `index` and `export` giving the export goldens,
+  `status` the file's report, `publish` recording the version in the document's `workspace`
+  field with the ids of a file's publish, the stored document unchanged by a file's publish and
+  after another version, no field from a file's new generation, a node pulling and serving it
+  and refusing a field that is no version id; and without a pulled version `index`, `status`,
+  `export` and `snapshot publish` naming `meada workspace pull` and `mcp --listen` naming
+  `--generations`, while the `--generations` commands serve),
+  `refresh_lock`
+  (`snapshot lock`: the child terminated past the TTL, killed past the grace, stopped when the
+  lock changes hands, a SIGTERM reaching it, a stale fence refused, a lost fence stopping a node
+  with the recovery named in both languages, `[refresh_lock]` errors; the operations: each
+  refused while a lock holds, naming the holder, the holder's fields, TTL, renewal and release,
+  no lock or holder left by an operation, `retain` and `drop` changing only the retained list
+  and the kept set (already retained, appended with its fence and counted by `fence recover`,
+  not stored, past `KEPT_MAX`, current, not retained), a stuck fleet moving again after `fence
+  recover`, the
+  highest recorded fence and the `--at-least` floor, never lowered, live, expired and malformed
+  heartbeats written by hand; `workspace apply` moving `{<key_prefix>}:workspace` with a fence
+  above the previous one and rolling back with a new one, refused for a version not stored,
+  while a job holds the lock and with the fence lowered, `fence recover` counting the workspace
+  pointer, and a malformed id refused before any connection), `oidc` (`[oidc]`
   against an issuer and a JWKS served on loopback: a token admits what its claim lists and leaks
   nowhere, a rotated key, an oversized JWKS refusing the start, a pinned path admitted as its
   identity), `github_app` (`github-app credential` and `throttled` against a GitHub API served
@@ -77,7 +142,63 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   throttled installation skipped until its retry time, a mint answered 429 passing to the next
   installation, a token minted again after its cache runs out or `erase`, an uncovered host or
   owner, a new block and new installations after the refresh, `[[github_app]]` errors, no
-  request from `mcp --listen`, and no key, JWT or token on stderr), `resources` (resource `search`, `context`, `trace` start and `status`
+  request from `mcp --listen`, and no key, JWT or token on stderr), `ui` (`meada ui` as a child
+  process over a `[ui] dir` it writes, with a `meada-ui.json` naming this build's version, in
+  plain HTTP over raw sockets so no path is normalised: the `config`, `session` and `manifest`
+  documents, the JSON 404, the `manifest` errors of a file broken after the start; the
+  `--listen` forms and both flags required; the `Host` 403 before the `Origin` 403, a write
+  without `Origin` refused; static files with their content type, cache rule and security
+  headers, `..`, `%2e%2e`, an empty segment, a symbolic link out of the directory and an unknown
+  extension refused, no listing, an unknown path answering `index.html`; no cookie or
+  `Access-Control-*` header on any answer; every start refusal listed at once; a
+  `password_file`'s content in no answer, with `valkey`; and an answer in flight, blocked on a
+  FIFO, received after SIGTERM, then exit 0; in `ui/playground.rs`, the playground and the
+  exports over the chain: started before `meada index --workspace`, both a 503 naming it while
+  `config` and `manifest` answer, then with no restart `search`, `context` and `trace` equal to
+  the chain goldens with `generation` null and every export equal to its golden, `index_dir`
+  byte-identical after them; with `snapshot` (skipped without the store), the same before and
+  after an init `meada snapshot pull` into the console's `local_dir` (naming `meada snapshot
+  pull`, then the goldens with the current id, by default and named), a second pull's
+  generation answering the next query, the retained one when named, an unheld generation a 404
+  naming both held ids, `local_dir` byte-identical; in both, `trace` with `changes:
+  uncommitted` refused with the node's text, an unknown repository and an unheld generation a
+  404, a body over `QUERY_MAX` a 413, malformed JSON, an unknown tool, arguments not the tool's
+  or an unknown key a fixed 400, a query without the console's `Origin` or with a foreign one
+  a 403; in `ui/reads.rs`, local repository freshness and commit provenance, unknown commits
+  for absent, oversized or stale sidecars; explicit missing modules; four blocked readers
+  timing out without releasing worker permits early, bounded overload and independent basic
+  routes; non-regular credentials refused before open; with `generation-pointer`,
+  two pull companions and the console's own companion, the live fleet, generation/workspace
+  documents, retention and kept marks, modification time, schemas from held copies, malformed
+  names/ids/fences excluded from diagnostics and both stuck recoveries; with `github-app`,
+  the cached installation/token-expiry/throttle view against the module's loopback API without
+  any additional API request or private key read; with `oidc`, in `ui/oidc.rs`, against the `oidc`
+  module's loopback issuer, which logs every request: no token, an expired one, the nodes'
+  audience, another issuer and `HS256` get 401 with `WWW-Authenticate`, a missing scope 403, a
+  valid token the viewer's `session`; static files and `config` (the issuer, `client_id`, the
+  scopes) without a token, the issuer's origin in every answer's `connect-src`; the start
+  refused without `[ui] client_id`, metadata or JWKS; `admission` with the metadata, the key
+  ids, the last read, the groups table bounded by the grant and, after the JWKS fails, the
+  failed refresh; `admission/check` per check for a valid, an expired, a wrong-audience, a
+  forged and an unknown-`kid` token, the identities bounded by both grants, no request to the
+  issuer and no pasted token in its log, a 413 past the cap and a fixed 400; a viewer's grant
+  bounding the manifest's entries and its error text, whole for `*`; the playground and the
+  exports under a grant, the goldens for `*`, a `WEB`-only trace and export with no peer
+  outside the grant, the repositories outside it the 404 of one not served, a 401 without a
+  token; the admission routes
+  absent without `[oidc]`; manifest peers and error text bounded even for an unlisted peer;
+  operator groups and strict boolean claims, all five configuration errors, whole operator
+  views despite restricted grants, and header-only refused writes proving bodies stay unread;
+  in `ui/oidc/writes.rs` (with `ui,oidc,refresh-lock`), real pointer retain/set/drop, exact
+  decimal fence recovery, save/CLI validation agreement, admitted author, workspace apply and
+  catalog refusals, per-route caps, held-lock refusals and one escaped audit line per attempt,
+  including unauthenticated refusals and tokens pasted into ids/floors; save422 exactly matches
+  CLI diagnostics while its fixed audit outcome excludes JWT fixtures pasted into entries;
+  malformed heartbeat
+  MAX fences ignored by CLI and HTTP recovery, and workspace-pointer fences in fleet diagnostics;
+  serialized workspace versions refused before storage even when their uploads fit the cap;
+  managed workspace views and nested peers bounded by grants, the
+  token check using current workspace identities; no token, claim value or identity on stderr), `resources` (resource `search`, `context`, `trace` start and `status`
   over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
   fixture: kafkajs forms, fan-out, same-repository links, an unrelated `send`; amqplib queues,
   publishes through a binding of another repository, the empty exchange, queues named like the
@@ -255,3 +376,27 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   the MCP server leave the stub with zero requests. Answer cases (malformed, threshold,
   `--min-p`, `--dry-run`) script the stub per test; a malformed first answer must leave the
   second item written.
+
+### Immutable workspace import and managed status
+
+`generations/imports.rs` uses the binary and real local RustFS: two concurrent imports see
+missing through a reply barrier, but only one conditionally creates the immutable document;
+the other reports the first author, time and message. A local workspace-pointer swap during
+status's informational Valkey probe proves the report and readiness exit code share one
+managed workspace read. CLI import is also checked with `generation-pointer` alone.
+
+## Workspace editor and shared validation (#310)
+
+`meada-core/tests/workspace.rs` exercises the public diff seam: entry/key order, unchanged
+versions, nested keys, reordered entries and absent fields moving between array-table rows.
+`tests/fixtures/workspace-validation.json` is the single pt-BR/English validation table used
+by the real WASM in `ui/tests/core.test.ts` and the binary `workspace import` in
+`tests/it/generations/imports.rs` with generation-pointer and real configured store services.
+`ui/tests/workspace.test.ts` checks local editor validation/diff and captured commands;
+`ui/tests/WorkspacePage.test.tsx` covers the labelled versions/editor/diff DOM and HTTP boundary.
+
+Review regressions for #293 cover manifest-wide grant filtering (including groups-only
+identities in validation errors), issuer query preservation at `Auth.login`, exact recovery
+ceilings through CLI and HTTP, and live-heartbeat selection with a controlled RESP `TIME`
+response while all other commands reach the real Valkey fixture. The ceiling tests preserve
+one final locked publish and compare English and Brazilian Portuguese refusals.
