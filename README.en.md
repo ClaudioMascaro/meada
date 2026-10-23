@@ -207,6 +207,8 @@ refused.
 The [Docker Compose example](deploy/compose/README.en.md) provides both layouts below, with two
 nodes, TLS and token admission at the proxy.
 
+The [Helm chart](deploy/helm/meada/README.en.md) configures init, readiness, drain and the generations profile on Kubernetes.
+
 Several servers over the same indexes work with no cloud module, provided the operator keeps
 to one writer per index.
 

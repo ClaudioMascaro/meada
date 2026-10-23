@@ -207,6 +207,8 @@ os blocos do manifesto são ignorados (o `meada status` os nomeia). Um espelho �
 O [exemplo Docker Compose](deploy/compose/README.md) oferece os dois layouts abaixo, com dois
 nós, TLS e admissão por token no proxy.
 
+O [chart Helm](deploy/helm/meada/README.md) configura init, readiness, drain e o perfil de gerações no Kubernetes.
+
 Vários servidores sobre os mesmos índices servem sem módulo de nuvem, desde que o operador
 respeite um único escritor por índice.
 

@@ -1,0 +1,16 @@
+{{- if .Values.modules.oidc.enabled }}
+OIDC admission is enabled. Your Ingress must forward Authorization unchanged.
+{{- else }}
+Configure admission in your Ingress or auth proxy before exposing this service.
+Without OIDC, a misconfigured Ingress exposes the source graph.
+{{- end }}
+Preserve MCP-Protocol-Version, MCP-Session-Id, Mcp-Method, Mcp-Name and Mcp-Param-*.
+Return Meada-Generation unchanged. Never add Origin.
+
+For local inspection:
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/{{ include "meada.name" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+
+{{- if .Values.modules.snapshot.enabled }}
+The store and Valkey are external dependencies. Configure TLS endpoints and credential Secrets.
+The first generation must be published before the initial pull can finish.
+{{- end }}

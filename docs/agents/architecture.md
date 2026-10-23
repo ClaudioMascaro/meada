@@ -1285,6 +1285,18 @@ one for the area a change touches.
   repository is never inferred. A file its pack leaves out
   (`Layout::members`) resolves nothing and has no symbol, call or `files` row in the export.
 
+## Deployment (`deploy/`)
+
+- `deploy/helm/meada/` renders a module-free, two-node Deployment by default. Its init
+  container fetches mirrors outside Meada and indexes its own `emptyDir` before MCP starts.
+  `values-generations.yaml` enables the cloud image, an initial pull and pull companion per
+  pod, plus a `Forbid` refresh CronJob with separate mirrors and indexes under the refresh lock.
+- The chart's ConfigMap owns the workspace manifest. Disabled modules emit no TOML section;
+  external store and Valkey endpoints require TLS, credentials come from Secrets or platform
+  identity, and the optional Ingress leaves admission and header forwarding to the controller.
+- `scripts/helm-check` checks public renders with Helm and parses the resulting TOML. The
+  Helm workflow runs it without a cluster; a local kind smoke checks MCP search after install.
+
 ## Tests (`tests/`)
 
 - `meada-core/tests/` tests that crate at its public seam, and `cargo test` runs them with the

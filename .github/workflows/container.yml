@@ -114,3 +114,20 @@ jobs:
           build-args: |
             FEATURES=${{ matrix.features }}
             VERSION=${{ steps.image.outputs.version }}
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+        if: matrix.features == ''
+        with:
+          version: v3.19.0
+      - name: Publish the OCI chart
+        if: matrix.features == ''
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.image.outputs.version }}
+        shell: bash
+        run: |
+          helm lint deploy/helm/meada
+          printf '%s' "$REGISTRY_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          mkdir -p "$RUNNER_TEMP/chart/verify"
+          helm package deploy/helm/meada --destination "$RUNNER_TEMP/chart" --version "$VERSION" --app-version "$VERSION"
+          helm push "$RUNNER_TEMP/chart/meada-$VERSION.tgz" oci://ghcr.io/claudiomascaro/charts
+          helm pull oci://ghcr.io/claudiomascaro/charts/meada --version "$VERSION" --destination "$RUNNER_TEMP/chart/verify"
