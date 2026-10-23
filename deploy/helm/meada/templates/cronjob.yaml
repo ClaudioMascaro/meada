@@ -39,11 +39,11 @@ spec:
                 - --
                 - sh
                 - -ec
-                - /bin/sh /etc/meada/fetch.sh && meada index --workspace /etc/meada/meada.workspace.toml && meada snapshot publish --workspace /etc/meada/meada.workspace.toml
+                - {{ if eq .Values.workspace.source "store" }}meada workspace pull --workspace /etc/meada/meada.workspace.toml && {{ end }}/bin/sh /etc/meada/fetch.sh && meada index --workspace /etc/meada/meada.workspace.toml && meada snapshot publish --workspace /etc/meada/meada.workspace.toml
               {{- else }}
               command: ["/bin/sh", "-ec"]
               args:
-                - /bin/sh /etc/meada/fetch.sh && meada index --workspace /etc/meada/meada.workspace.toml && meada snapshot publish --workspace /etc/meada/meada.workspace.toml
+                - {{ if eq .Values.workspace.source "store" }}meada workspace pull --workspace /etc/meada/meada.workspace.toml && {{ end }}/bin/sh /etc/meada/fetch.sh && meada index --workspace /etc/meada/meada.workspace.toml && meada snapshot publish --workspace /etc/meada/meada.workspace.toml
               {{- end }}
               env: {{ include "meada.env" . | nindent 16 }}
               {{- if .Values.workspace.gitCredentialsSecret }}

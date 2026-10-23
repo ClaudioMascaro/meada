@@ -1,0 +1,28 @@
+index_dir = "/var/lib/meada/indexes"
+
+[workspace]
+source = "store"
+
+[snapshot]
+endpoint = "https://store:9000"
+region = "us-east-1"
+bucket = "meada-compose"
+prefix = "prod"
+path_style = true
+credentials = "static"
+access_key_id_env = "AWS_ACCESS_KEY_ID"
+secret_access_key_env = "AWS_SECRET_ACCESS_KEY"
+ca_file = "/etc/meada/ca/ca.pem"
+local_dir = "/var/lib/meada/generations"
+
+[valkey]
+url = "rediss://meada@valkey:6379"
+password_env = "VALKEY_PASSWORD"
+key_prefix = "meada:compose"
+ca_file = "/etc/meada/ca/ca.pem"
+
+[generations]
+keep = 3
+
+[refresh_lock]
+ttl_seconds = 300

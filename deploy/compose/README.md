@@ -4,7 +4,7 @@
 
 Exemplo local com dois nós, um Caddy com TLS e admissão por bearer token. Requer Docker
 Compose v2 e imagens da mesma versão publicada. Somente `127.0.0.1:8443` fica publicado.
-Os serviços não usam OIDC e a console fica desligada. Para acesso remoto, configure DNS,
+Os serviços não usam OIDC e a console fica desligada por padrão. Para acesso remoto, configure DNS,
 certificado e regras de admissão próprios no Caddy.
 
 ```sh
@@ -80,3 +80,66 @@ Chame o mesmo caminho com `@G1` no fim (`/.../meada@G1`): deve continuar respond
 nessa URL deve manter o mesmo grafo mesmo depois da atualização. Geração fora da retenção
 responde 404 com a geração atual e as guardadas. O exemplo não publica artefatos: as imagens
 continuam vinculadas ao workflow de release.
+
+## Console de gerenciamento, opcional
+
+O overlay da console usa a imagem cloud e depende do perfil `generations`. Sem o overlay,
+nenhum serviço, porta ou volume da console é iniciado. O exemplo admite um viewer local por
+loopback, com operações desligadas. Antes de acesso remoto, configure OIDC ou admissão própria
+no proxy; uma console exposta além dessa admissão revela o grafo.
+
+Execute no diretório deste exemplo, com `.env` configurado. Edite `console.repositories.toml`
+para o seed inicial, `REPOSITORIES` para o fetch e os bootstraps `job.workspace.toml` e
+`console.workspace.toml` para o mesmo store, Valkey, prefixos e CA dos nós. O seed é uma ação
+explícita do operador, feita uma vez; o deploy nunca reaplica uma versão automaticamente:
+
+```sh
+compose_console() {
+  docker compose -f compose.yaml -f compose.console.yaml --profile generations --profile console "$@"
+}
+compose_console config -q
+compose_console up -d bucket valkey
+VERSION=$(compose_console run --rm --entrypoint meada generation-indexer workspace import \
+  /etc/meada/repositories.toml --message "Initial managed workspace" --workspace /etc/meada/meada.workspace.toml)
+compose_console run --rm --entrypoint meada generation-indexer workspace apply "$VERSION" \
+  --workspace /etc/meada/meada.workspace.toml
+compose_console up -d
+compose_console logs -f generation-indexer console-first-pull console-pull console
+```
+
+O writer usa `[workspace] source = "store"`. O loop segura **uma** `snapshot lock` durante
+`workspace pull`, fetch externo, `index` e `snapshot publish`. O fetch continua usando
+`REPOSITORIES`, sem ler URLs ou caminhos arbitrários do editor. Ao adicionar um repositório ou
+mudar seu caminho, ajuste essa lista, as credenciais e o mirror correspondente antes do refresh;
+um mirror ausente impede publish, sem avançar o pointer. Aplicar uma versão apenas prepara o
+próximo refresh; ela aparece na geração depois de publish e pull. Pare o writer para manter um
+rollback de geração além do próximo refresh.
+
+A console tem bootstrap, `index_dir`, `local_dir`, volume e `node_name = "console"` próprios.
+Seu pull inicial termina antes da subida; um companion `snapshot pull --every 30` atualiza só
+esse volume e escreve seu heartbeat. Os dois nós mantêm seus volumes e identidades separados.
+`snapshot.ca_file` acrescenta raízes às do sistema; `valkey.ca_file` usa somente as do arquivo.
+
+A rota TLS `https://localhost:8444` é própria, sem o bearer estático da porta MCP 8443.
+O Caddy preserva `Host`, `Origin` e `Authorization`. Assets, `/api/v1/config` e `/auth/callback`
+precisam chegar ao backend antes do login PKCE:
+
+```sh
+compose_console cp console-proxy:/data/caddy/pki/authorities/local/root.crt ./console-ca.crt
+curl --cacert console-ca.crt https://localhost:8444/api/v1/config
+curl --cacert console-ca.crt https://localhost:8444/auth/callback
+```
+
+Para OIDC, descomente e ajuste a política em `console.workspace.toml`: issuer, claims, grupos
+e escopos iguais aos dos nós; `[oidc] public_url`/audience descrevem o MCP. `[ui] public_url`,
+`client_id` e `audience` são próprios da console. Registre um cliente público sem segredo,
+Authorization Code com PKCE S256 e redirect URI exato `https://localhost:8444/auth/callback`.
+O browser precisa acessar discovery e token endpoint do issuer, com CORS para essa origem;
+a troca de código ocorre diretamente entre eles. A API protegida exige o bearer do issuer.
+Para operações, habilite `operations = true` e escolha `operator_groups` ou `operator_claim`,
+apenas uma opção; grupos exigem `oidc.groups_claim`. O claim de operador deve ser booleano true.
+
+O smoke local usa viewer por loopback, sem simular um IdP. OIDC e suas recusas são cobertos pelos
+testes HTTP/Rust; o perfil OIDC do chart passa por lint/template. Valide com
+`python3 ../../scripts/compose-check` a partir deste diretório. Encerre com
+`compose_console down`; `down -v` também remove os dados e exige novo seed.

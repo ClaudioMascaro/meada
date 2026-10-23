@@ -6,7 +6,7 @@ Configure a admissão no Ingress ou no proxy de autenticação antes de expor o 
 Sem `[oidc]`, esse componente admite os clientes; uma configuração incorreta expõe o grafo
 de código. Com OIDC, preserve `Authorization`. Preserve também os headers SEP-2243
 `MCP-Protocol-Version`, `MCP-Session-Id`, `Mcp-Method`, `Mcp-Name` e `Mcp-Param-*`,
-devolva `Meada-Generation` e nunca acrescente `Origin`.
+devolva `Meada-Generation` e nunca acrescente `Origin` nas rotas MCP.
 O chart não fixa annotations de um controller: configure a autenticação do seu Ingress.
 
 ## Instalação
@@ -68,3 +68,64 @@ python3 scripts/helm-check
 `helm-check` usa Python 3.11+ e PyYAML. O CI valida os templates, sem criar cluster.
 O smoke local usa um cluster kind descartável, a imagem default carregada e um repositório
 de teste criado no init container, depois consulta `search` por port-forward.
+
+## Console opcional e workspace gerenciado
+
+A console fica desligada por padrão e não produz recursos até `console.enabled=true`.
+O perfil abaixo habilita cloud, módulos de gerações, refresh lock, workspace gerenciado e OIDC.
+Edite `meus-valores.yaml` com endpoints, Secrets, política OIDC dos nós e os valores próprios
+`console.publicUrl`, `clientId`, `audience`, `operations`, `operatorGroups` ou `operatorClaim`.
+Escolha apenas um seletor de operador; operações ficam desligadas até habilitadas explicitamente.
+A origem/audience da console não substituem `modules.oidc.publicUrl`/audience do MCP.
+
+```sh
+helm upgrade --install meada deploy/helm/meada -f deploy/helm/meada/values-console.yaml -f meus-valores.yaml
+```
+
+A console tem Deployment, ConfigMap de bootstrap, Service e Ingress próprios, com
+`console.ingress` separado do Ingress MCP. Preserve `Host`, `Origin` e `Authorization` e não
+herde um bearer estático que bloqueie assets, `/api/v1/config` ou `/auth/callback` antes do
+login. Registre o redirect URI `<console.publicUrl>/auth/callback` no cliente público do issuer,
+sem segredo, com PKCE S256; discovery e token endpoint devem aceitar o browser com CORS para
+a origem configurada. A API exige OIDC; o browser troca o código diretamente com o issuer.
+O init faz snapshot pull, e um companion pull periódico usa o mesmo `local_dir` exclusivo do
+pod da console. A readiness verifica o listener TCP. O hostname único do pod nomeia o heartbeat.
+
+O writer usa `[workspace] source = "store"` e executa `workspace pull`, `workspace.fetch`,
+`index` e `snapshot publish` dentro de uma única `snapshot lock`. O fetch continua sendo o
+script do operador: ao adicionar repos ou alterar paths no editor, atualize esse script,
+credenciais e mirrors também. Não há clone dinâmico pela console; um mirror ausente impede o
+publish. Cada job/pod tem seus próprios diretórios. Uma CA montada acrescenta raízes ao trust do
+snapshot; Valkey usa somente as raízes desse arquivo.
+
+Inicialize o workspace uma vez antes do primeiro publish. Salve as entradas abaixo em
+`repositories.toml` (ajuste junto com `workspace.fetch`). O exemplo usa release `meada` e
+namespace atual. O pod temporário reaproveita volumes e Secrets do CronJob, mas substitui
+seu comando por sleep para o operador executar import/apply. Nenhum deploy reaplica o seed:
+
+```toml
+[[repository]]
+repo = "github.com/claudiomascaro/meada"
+path = "/data/mirrors/meada"
+```
+
+```sh
+kubectl create job meada-seed --from=cronjob/meada-meada-refresh --dry-run=client -o json | \
+  python3 -c 'import json,sys; j=json.load(sys.stdin); c=j["spec"]["template"]["spec"]["containers"][0]; c["command"]=["sleep","3600"]; c.pop("args",None); print(json.dumps(j))' | \
+  kubectl apply -f -
+kubectl wait --for=condition=Ready pod -l job-name=meada-seed --timeout=120s
+POD=$(kubectl get pod -l job-name=meada-seed -o jsonpath='{.items[0].metadata.name}')
+kubectl cp repositories.toml "$POD:/tmp/repositories.toml"
+VERSION=$(kubectl exec "$POD" -- meada workspace import /tmp/repositories.toml \
+  --message "Initial managed workspace" --workspace /etc/meada/meada.workspace.toml)
+kubectl exec "$POD" -- meada workspace apply "$VERSION" --workspace /etc/meada/meada.workspace.toml
+kubectl delete job meada-seed
+kubectl create job meada-first-refresh --from=cronjob/meada-meada-refresh
+```
+
+Espere o primeiro refresh e os pulls iniciais terminarem; então os dois nós e a console devem
+ficar prontos. Aplicar outra versão prepara o próximo refresh, não publica imediatamente.
+Para inspeção local, faça port-forward do Service `meada-meada-console` e envie o Host público
+configurado. `scripts/helm-check` valida o perfil OIDC, seus seletores e a rota independente.
+O smoke implantado usa viewer admitido por loopback; login OIDC completo é coberto pelos testes
+HTTP/Rust e não é simulado com um IdP no cluster.

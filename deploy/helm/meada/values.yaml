@@ -41,6 +41,7 @@ ingress:
   host: meada.example.internal
   tls: []
 workspace:
+  source: file
   repositories: |
     [[repository]]
     repo = "github.com/claudiomascaro/meada"
@@ -56,7 +57,7 @@ workspace:
       git -C /data/mirrors/meada checkout --detach FETCH_HEAD
     fi
   gitCredentialsSecret: ""
-# Additional CA trust for the external store and Valkey, mounted as ca.crt.
+# Mounted as ca.crt: snapshot adds these roots to platform trust; Valkey uses only these roots.
 tls:
   caSecret: ""
   caConfigMap: ""
@@ -95,3 +96,26 @@ modules:
 cronJob:
   schedule: "*/10 * * * *"
   resources: {}
+
+# Separate management console, disabled unless explicitly enabled.
+# Preserve browser Host, Origin and Authorization. With OIDC, assets, config and
+# /auth/callback remain public so the browser can complete PKCE login.
+console:
+  enabled: false
+  replicaCount: 1
+  listen: 7334
+  publicUrl: https://console.example.internal
+  clientId: meada-console
+  audience: https://console.example.internal
+  operations: false
+  operatorGroups: []
+  operatorClaim: ""
+  resources: {}
+  service:
+    port: 7334
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: console.example.internal
+    tls: []

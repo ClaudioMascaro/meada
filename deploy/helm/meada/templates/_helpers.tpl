@@ -63,6 +63,29 @@ app.kubernetes.io/component: server
 {{- if and .Values.modules.refreshLock.enabled (not .Values.modules.generations.enabled) -}}
 {{- fail "modules.refreshLock requires generations" -}}
 {{- end -}}
+{{- if not (has .Values.workspace.source (list "file" "store")) -}}
+{{- fail "workspace.source must be file or store" -}}
+{{- end -}}
+{{- if and (eq .Values.workspace.source "store") (not .Values.modules.refreshLock.enabled) -}}
+{{- fail "workspace.source=store requires modules.refreshLock for the managed refresh" -}}
+{{- end -}}
+{{- if .Values.console.enabled -}}
+{{- if not (and .Values.image.cloud .Values.modules.snapshot.enabled .Values.modules.generations.enabled .Values.modules.valkey.enabled) -}}
+{{- fail "console requires image.cloud and snapshot, valkey and generations" -}}
+{{- end -}}
+{{- if and (or .Values.console.operations .Values.console.operatorGroups .Values.console.operatorClaim) (not .Values.modules.oidc.enabled) -}}
+{{- fail "console operations and operator selectors require modules.oidc" -}}
+{{- end -}}
+{{- if and .Values.console.operatorGroups .Values.console.operatorClaim -}}
+{{- fail "choose console.operatorGroups or console.operatorClaim" -}}
+{{- end -}}
+{{- if and .Values.console.operations (not (or .Values.console.operatorGroups .Values.console.operatorClaim)) -}}
+{{- fail "console.operations requires an operator selector" -}}
+{{- end -}}
+{{- if and .Values.console.operatorGroups (not .Values.modules.oidc.groupsClaim) -}}
+{{- fail "console.operatorGroups requires modules.oidc.groupsClaim" -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}
 {{- define "meada.mounts" -}}
 - name: config
@@ -117,5 +140,28 @@ app.kubernetes.io/component: server
       name: {{ .Values.modules.snapshot.credentialsSecret }}
       key: session-token
       optional: true
+{{- end }}
+{{- end -}}
+{{- define "meada.consoleName" -}}
+{{- printf "%s-console" (include "meada.name" . | trunc 55 | trimSuffix "-") -}}
+{{- end -}}
+{{- define "meada.consoleLabels" -}}
+{{ include "meada.labels" . }}
+app.kubernetes.io/component: console
+{{- end -}}
+{{- define "meada.consoleVolumes" -}}
+- name: config
+  configMap:
+    name: {{ include "meada.consoleName" . }}
+- name: data
+  emptyDir: {}
+{{- if .Values.tls.caSecret }}
+- name: ca
+  secret:
+    secretName: {{ .Values.tls.caSecret }}
+{{- else if .Values.tls.caConfigMap }}
+- name: ca
+  configMap:
+    name: {{ .Values.tls.caConfigMap }}
 {{- end }}
 {{- end -}}
