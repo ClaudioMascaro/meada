@@ -647,6 +647,8 @@ Constantes fixas:
 
 ## Estado
 
+A console oferece operações autenticadas por OIDC para operadores: pointer, recuperação de fence e versões do workspace, com o mesmo lock e as mesmas verificações do CLI. As operações ficam desligadas por padrão e cada tentativa gera uma linha de auditoria.
+
 Versão 0.1, a primeira. Indexa repositórios TypeScript e JavaScript (`.ts`, `.tsx`, `.js`,
 `.jsx`, `.mjs`, `.cjs`) e Python (`.py`), lê o código Rust (`.rs`) dos crates do repositório
 (cada `Cargo.toml` com `[package]`, em qualquer pasta, cada crate pela árvore de módulos que os

@@ -8,6 +8,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Console operator writes (spec #293): verified groups or a boolean claim grant the operator
+  role and the whole fleet view. Fenced pointer changes, fence recovery, workspace save and
+  apply share the CLI operations, with authorization before uploads and one escaped audit
+  line per accepted or refused write. Entry validation is shared with CLI import, concurrent
+  imports preserve the first version's metadata, and serialized versions respect the reader's
+  existing size cap. Recovery ignores malformed heartbeats and includes workspace fences.
+  Managed status uses one workspace version for its report and readiness exit code.
+
 - Console frontend distribution (issue #313): the cloud image includes the static UI at
   `/usr/share/meada/ui`, built with pinned Node and wasm-pack from the npm lockfile. The
   container release workflow also attaches `meada-ui-<version>.tar.gz` with the same files

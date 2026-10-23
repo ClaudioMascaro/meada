@@ -263,6 +263,8 @@ pub struct Admitted {
     /// The token's `sub`, when it has one.
     pub subject: Option<String>,
     pub grant: Grant,
+    /// The console role derived only from verified groups or a strict boolean claim.
+    pub operator: bool,
 }
 
 /// Each check of a pasted token (ADR 0014): `None` where it could not be made, since the
@@ -668,14 +670,31 @@ impl Oidc {
         &self,
         headers: &HeaderMap,
         audience: &str,
+        operator_groups: Option<&[String]>,
+        operator_claim: Option<&str>,
     ) -> Result<Admitted, (StatusCode, String)> {
         let refused = match bearer(headers) {
             Ok(Some(token)) => match self.verified(token, &[audience.to_string()]) {
                 Ok(claims) => {
                     let subject = claims.get("sub").and_then(Value::as_str);
+                    let operator = operator_claim
+                        .is_some_and(|name| claims.get(name) == Some(&Value::Bool(true)))
+                        || operator_groups.is_some_and(|operators| {
+                            self.config.groups.as_ref().is_some_and(|(claim, _)| {
+                                claims
+                                    .get(claim)
+                                    .and_then(Value::as_array)
+                                    .is_some_and(|groups| {
+                                        groups.iter().filter_map(Value::as_str).any(|group| {
+                                            operators.iter().any(|operator| operator == group)
+                                        })
+                                    })
+                            })
+                        });
                     return Ok(Admitted {
                         subject: subject.map(str::to_string),
                         grant: Grant::of(&claims, &self.config),
+                        operator,
                     });
                 }
                 Err(refusal) => refusal,

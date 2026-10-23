@@ -14,7 +14,10 @@ connection as `peer<n>`. Locally the index is the checkout's own `.meada/index.d
 **workspace manifest** instead (`workspace::Manifest`: every listed repository, `repo` first,
 then manifest order, nothing discovered; under an OIDC grant only the granted ones) and each
 index lives at `<index_dir>/<identity>/index.db`; `engine::index_workspace` and
-`engine::status_workspace` are `meada index --workspace` and `meada status --workspace`. An
+`engine::probe_workspace` are `meada index --workspace` and `meada status --workspace`.
+The status report and readiness share one `Manifest::read_listed`, including a managed version
+swap during the informational Valkey probe; `ready` also reuses one listed manifest across
+its normal and locked-index checks. An
 engine opened from a
 manifest opens every index read-only on one connection (`index::open_read`: nothing created,
 `trusted_schema` off and `SQLITE_DBCONFIG_DEFENSIVE` on, since a generation's index comes from
@@ -91,7 +94,9 @@ with wasm-pack and checks both trees.
   `Resource`, `Role`, `declared`, `gateway_path`); `parse` and `error_at`, the errors naming
   the file, the line and the dotted key (`line_of`); `identity_problem` and `entry_problems`
   (an identity listed twice); `validate`, a workspace text's entries or its problems as the CLI
-  prints them (a text holding only `[[repository]]` entries).
+  prints them (a text holding only `[[repository]]` entries). `validate_import(file, src)`
+  validates entries while ignoring other top-level keys, with CLI import's file prefix on
+  identity errors; CLI and HTTP import preparation share it, independently of the WASM binding.
 - `meada-core/src/ids.rs`: `bundle_id`, `generation_id` (ADR 0012), `workspace_version_id`
   (ADR 0014: the canonical JSON of the entries, `{"blocks","path","repo"}` in manifest order),
   `is_id`, `fence`, `entry_blocks`.
@@ -270,13 +275,14 @@ one for the area a change touches.
   read at start, the cached key ids, the last read and a refresh that failed since, with its
   reason and never the answer's body, and the groups table bounded by the caller's grant).
 - `ui.rs` (feature `ui`, no crate of its own; `cloud` enables it): the management console's
-  process (ADR 0014), `meada ui --listen <addr> --workspace <bootstrap manifest>`, read only,
+  process (ADR 0014), `meada ui --listen <addr> --workspace <bootstrap manifest>`,
   on the node's listener (`mcp::serve_http`, `mcp::address`, the same drain); never a node's
   route, never an MCP server. `File` is `[ui]` and `validated` lists every problem of it at
   once (`dir` and `public_url` required, `public_url` `https` or loopback `http` with nothing
   past the host through `modules::reachable`; `audience` defaults to `public_url`; `client_id`,
-  `operations`, `operator_groups` and `operator_claim` are read, and the last three checked by
-  #307). `Console::start` refuses, listing every problem: a manifest error, no `[ui]`, `[oidc]`
+  `operations` defaults to false and requires `[oidc]` plus one operator key when true;
+  `operator_groups` and `operator_claim` are mutually exclusive and require `[oidc]`, and the
+  groups key also requires `oidc.groups_claim`). `Console::start` refuses, listing every problem: a manifest error, no `[ui]`, `[oidc]`
   without `[ui] client_id`, `[oidc]` whose issuer's metadata or JWKS cannot be read
   (`Oidc::start`, as a node), a `[ui] dir` that is not a directory, and the version check:
   `meada-ui.json` at the root of `[ui] dir` must be `{"version": "<this Meada version>"}`, and
@@ -289,8 +295,10 @@ one for the area a change touches.
   (feature `oidc`) a bearer token for `[ui] audience` through the nodes' module
   (`Oidc::admit_console`), a 401 with `WWW-Authenticate: Bearer` (and `error="invalid_token"`
   when a token was sent) or a 403 for a missing scope, both as JSON errors. The static files
-  and `config` need no token, since the browser needs them to log in. Every admitted subject is
-  a viewer (operators come with #307). The request's `Session` carries the token's grant, and
+  and `config` need no token, since the browser needs them to log in. A verified subject in
+  `operator_groups`, or with the top-level `operator_claim` equal to JSON boolean true, is an
+  operator; string `"true"` is a viewer. `Session::reads` and `whole` let operators see the
+  entire fleet regardless of grant. The request's `Session` carries the token's grant, and
   `Session::reads` is the one check every view of a repository goes through, as #290 bounds a
   node's answers: a repository outside the grant is absent, state that belongs to no repository
   is shown whole, a `*` grant reads everything; the read routes (#304) and the playground
@@ -298,22 +306,39 @@ one for the area a change touches.
   and with `[oidc]` `admission` and `POST admission/check`; errors `{"error": {"code",
   "message"}}`, an unknown path a 404 in that shape, as the admission routes are without
   `[oidc]`); `config` adds, with `[oidc]`, the issuer, `client_id`, the scopes and the audience
-  the browser's authorization code flow with PKCE needs; `session` is the subject and `viewer`;
+  the browser's authorization code flow with PKCE needs; `session` is the subject and role;
   `manifest` answers the file as loaded at start (a TOML table as JSON: secrets' variable and
   file names only), the module table with what this build has, and the errors of the file as it
   now stands on disk, read again per request, for a session that does not read everything
   without the `[[repository]]` entries outside its grant and with only the file and line of an
-  error whose text could name one; `admission/check` reads `{"token": ...}` (the one body the
-  console reads, `CHECK_MAX`) and answers each check's outcome and the identities, of the
+  error whose text could name one; `admission/check` reads `{"token": ...}` (`CHECK_MAX`) and answers each check's outcome and the identities, of the
   file's entries or the checked current workspace version's entries for `source = "store"`,
   that both the token's grant and the session's admit; the token lives
   only for that request, and a body that does not parse is a fixed 400, never serde's text.
+  `ui/write.rs` owns four POST routes, all disabled unless `operations` is true and the
+  admitted operator has a nonempty subject. Host, Origin, admission and role are checked before
+  reading any body, carrying that same session into routing. `pointer` takes `{action,
+  generation}` (`set`, `retain`, `drop`) and calls `snapshot::operation::pointer_set`,
+  `pointer_retain` or `pointer_drop`; `fence/recover` takes `{at_least?}` (u64 or checked decimal
+  string) and calls `fence_recover`; `workspace/versions` takes `{entries, message}` and calls
+  `versions::save`; `workspace/apply` takes `{version}` and calls `versions::apply`. These
+  owner functions keep the CLI checks, refresh lock and holder (operation plus escaped subject),
+  with the admitted subject as author. Success is 200 `{result: "<CLI line>"}`; operational
+  refusals are 409 with the CLI message; entry validation is 422 with CLI line/key diagnostics;
+  malformed JSON, extra keys or malformed ids/fences are safe fixed 400s; caps are 413s. Every
+  accepted or refused write logs one stderr line `ui: <subject> <action> <arguments>: <outcome>`,
+  with controls escaped throughout. Pre-authentication refusals use absent subject `-` and safe
+  fixed arguments, never body or token text. Save validation keeps its full CLI diagnostics in
+  the 422 response but logs only the fixed outcome `workspace entries failed validation`, so
+  invalid identities cannot copy editor contents into stderr. No route releases locks or
+  triggers refresh.
   Operational reads live in `ui/read.rs`: `GET fleet` reads the checked pointer/retained/kept
   state (`generations::inspect`), live heartbeats (`heartbeat::read`), holder and remaining
   lock TTL, and fence counter from Valkey; workspace ids come from generation documents and
   last publish from the current document's modification time in the store. Malformed
   heartbeats are shown with fixed reasons, never used for a key or diagnostic. The two stuck
-  cases name `meada snapshot fence recover`, and a stuck node also names deleting its own
+  cases name `meada snapshot fence recover`; the fleet maximum includes the current workspace
+  pointer's fence, and a stuck node also names deleting its own
   `<local_dir>/current`. `GET store` lists every generation document name and fully reads
   current/retained documents only; `store/generations/<id>` reads one. Both use the pull's
   checked document reader, with validated ids, bundle keys, identities, hashes and blocks.
@@ -531,8 +556,8 @@ one for the area a change touches.
   Valkey does not answer within `WRITE_TIMEOUT` (two seconds, the bound the probe waits for
   Valkey), is one stderr warning for the round (`Msg::HeartbeatNotWritten`, the key and the
   scrubbed reason): the round's outcome, the pointer file, the exit code and the readiness do
-  not change. `fence recover` reads these keys (`operation.rs`: `heartbeat_fence`,
-  `is_node_name`).
+  not change. `fence recover` reads these keys through the same complete
+  `heartbeat::checked` validator as the console: malformed documents never contribute fences.
   `snapshot/versions.rs` (feature `generation-pointer`, ADR 0014) holds the workspace
   versions: the `[[repository]]` entries of a workspace as immutable documents in the store, at
   `workspaces/<version id>.json` under `[snapshot] prefix` (`Version`: `id`, `author`, `time`
@@ -543,11 +568,15 @@ one for the area a change touches.
   `{<key_prefix>}:workspace`, a hash `{id, fence}` under the pointer's hash tag (`pointer_key`,
   read by `current`, moved by `meada workspace apply`, #302). `import` (`meada workspace import
   <file> --message <text> [--author <name>] --workspace <bootstrap manifest>`) reads the file's
-  `[[repository]]` entries through `meada_core::manifest::validate_entries`, names each other
+  `[[repository]]` entries through `meada_core::manifest::validate_import`, names each other
   top-level key on stderr as not imported (`Msg::WorkspaceNotImported`), and validates before
   `Store::connect`; entries whose document is stored upload nothing and answer it with its first
-  author and message (`Msg::WorkspaceStored`). `list` reads and checks the pointer first (a
-  malformed one, `Msg::WorkspaceBadPointer`, refuses the listing), then every object under
+  author and message (`Msg::WorkspaceStored`). Shared `store_version` checks the serialized
+  document against `VERSION_MAX`, then `Store::create` uses conditional create with size/hash
+  metadata: concurrent imports preserve the first author, time and message, and a losing
+  writer reads the checked original. HTTP `save` shares the preparation and storage under the
+  refresh lock; CLI `import` requires only `generation-pointer` and takes no refresh lock.
+  `list` reads and checks the pointer first (a malformed one, `Msg::WorkspaceBadPointer`, refuses the listing), then every object under
   `workspaces/` (`Store::list`), sorted newest first by time, then id; a name that is not an id,
   or a document that fails `checked`, is a `!` line. `show [<version>]` checks the argument
   first (`Msg::BadVersionArg`), takes the current version without one
@@ -1445,7 +1474,11 @@ one for the area a change touches.
   timed-out workers retain their slots until I/O completes, so overload starts no additional
   work. `index.rs` reads optional `index.commit.json` up to
   `PROVENANCE_MAX` (4 KiB); anything larger has no trusted indexed commit.
-- `snapshot/versions.rs`: a workspace version document holds at most `VERSION_MAX` (4 MiB);
+- `ui/write.rs`: `POINTER_MAX`, `FENCE_MAX` and `APPLY_MAX` bound their respective POST bodies
+  to 1 KiB; `SAVE_MAX` bounds a version save's JSON body to 4 MiB. Over-cap authorized uploads
+  get 413 before any operation; unauthorized uploads are never consumed.
+- `snapshot/versions.rs`: a workspace version document holds at most `VERSION_MAX` (4 MiB),
+  checked both before immutable creation and while reading;
   past it the document is refused (on import, apply and pull, and read from
   `<index_dir>/workspace/`) or listed as malformed, naming its key or file.
 - `render.rs`: a source file an answer reads (`render::source`, for `path:line` and a symbol's

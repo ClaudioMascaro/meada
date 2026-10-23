@@ -263,6 +263,23 @@ pub fn validate_entries(file: &str, src: &str) -> Result<Vec<EntryFile>, Vec<Str
     checked(parsed.repositories)
 }
 
+/// The entry-only validation of `meada workspace import`, including the file prefix on
+/// identity errors. Other top-level keys are ignored; the CLI separately reports its notes.
+pub fn validate_import(file: &str, src: &str) -> Result<Vec<EntryFile>, Vec<String>> {
+    validate_entries(file, src).map_err(|problems| {
+        problems
+            .into_iter()
+            .map(|problem| {
+                if problem.starts_with(file) {
+                    problem
+                } else {
+                    format!("{file}: {problem}")
+                }
+            })
+            .collect()
+    })
+}
+
 /// `entries`, or each one's `<repo>: <problem>` that its identity decides.
 fn checked(entries: Vec<EntryFile>) -> Result<Vec<EntryFile>, Vec<String>> {
     let problems = entry_problems(entries.iter().map(|e| e.repo.as_str()));

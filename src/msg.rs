@@ -625,6 +625,27 @@ pub enum Msg<'a> {
     /// A complete operational read, including permit wait and blocking I/O, timed out.
     #[cfg(feature = "ui")]
     UiReadTimeout(u64),
+    /// Console operator configuration requires OIDC.
+    #[cfg(feature = "ui")]
+    UiNeedsOidc,
+    /// Enabled writes require one operator admission key.
+    #[cfg(feature = "ui")]
+    UiOperatorNeeded,
+    /// Mutually exclusive console operator keys.
+    #[cfg(feature = "ui")]
+    UiOperatorBoth,
+    /// A refused operation before admission or body consumption.
+    #[cfg(feature = "ui")]
+    UiWritesDisabled,
+    /// A write needs an admitted operator with an authenticated subject.
+    #[cfg(feature = "ui")]
+    UiOperatorRequired,
+    /// A fixed audit refusal that never records invalid editor identities or text.
+    #[cfg(feature = "ui")]
+    UiEntriesInvalid,
+    /// A fixed body error that never echoes untrusted JSON.
+    #[cfg(feature = "ui")]
+    UiWriteBody,
     About,
     Index,
     Status,
@@ -766,6 +787,12 @@ pub enum Msg<'a> {
     WorkspaceNotVersion(&'a str),
     #[cfg(feature = "generation-pointer")]
     WorkspaceNoVersion(&'a str),
+    /// A serialized import that its bounded reader could not read back.
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceVersionTooLarge {
+        key: &'a str,
+        max: u64,
+    },
     /// A key or section of an imported file that is not a `[[repository]]` entry.
     #[cfg(feature = "generation-pointer")]
     WorkspaceNotImported,
@@ -2108,6 +2135,38 @@ impl Msg<'_> {
                 format!("no answer within {ms} ms"),
                 format!("sem resposta em {ms} ms"),
             ),
+            #[cfg(feature = "ui")]
+            Msg::UiNeedsOidc => pick("requires [oidc]".into(), "exige [oidc]".into()),
+            #[cfg(feature = "ui")]
+            Msg::UiOperatorNeeded => pick(
+                "set `ui.operator_groups` or `ui.operator_claim`".into(),
+                "defina `ui.operator_groups` ou `ui.operator_claim`".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiOperatorBoth => pick(
+                "set either `ui.operator_groups` or `ui.operator_claim`, not both".into(),
+                "defina `ui.operator_groups` ou `ui.operator_claim`, apenas um".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiWritesDisabled => pick(
+                "console writes are disabled by `ui.operations`".into(),
+                "as escritas da console estão desativadas por `ui.operations`".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiOperatorRequired => pick(
+                "console writes require an authenticated operator with a subject".into(),
+                "as escritas da console exigem um operador autenticado com subject".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiEntriesInvalid => pick(
+                "workspace entries failed validation".into(),
+                "as entradas do workspace falharam na validação".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiWriteBody => pick(
+                "not a valid console operation body".into(),
+                "body inválido para uma operação da console".into(),
+            ),
             Msg::About => pick(
                 "LLM-free code graph for agents and people".into(),
                 "Grafo de código sem LLM para agentes e pessoas".into(),
@@ -2542,6 +2601,11 @@ impl Msg<'_> {
             Msg::WorkspaceNoVersion(key) => pick(
                 format!("{key}: no such workspace version in the store"),
                 format!("{key}: essa versão do workspace não está no store"),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceVersionTooLarge { key, max } => pick(
+                format!("{key}: workspace version exceeds {max} bytes: nothing stored"),
+                format!("{key}: versão do workspace excede {max} bytes: nada guardado"),
             ),
             #[cfg(feature = "generation-pointer")]
             Msg::WorkspaceNotImported => pick(

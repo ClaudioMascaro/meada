@@ -850,21 +850,26 @@ fn fence_recover_counts_live_heartbeats_and_names_malformed_ones() {
         .unwrap()
         .as_secs();
     let (live, past) = ((now + 60).to_string(), (now - 10).to_string());
-    let beat = |fence: &str| {
+    let beat = |name: &str, fence: &str| {
+        let generation = if fence == "null" {
+            "null".to_string()
+        } else {
+            format!("\"{g1}\"")
+        };
         format!(
-            "{{\"name\":\"n\",\"generation\":\"{g1}\",\"fence\":{fence},\"held\":[\"{g1}\"],\
+            "{{\"name\":\"{name}\",\"generation\":{generation},\"fence\":{fence},\"held\":[\"{g1}\"],\
              \"ready\":true,\"version\":\"0.1.0\",\"time\":\"2026-10-22T00:00:00Z\"}}"
         )
     };
     let nodes = key(&fleet, "nodes");
     // The name, its score in the node set, and its heartbeat (none: its key expired).
     let cases = [
-        ("n1", &live, Some(beat("9"))),
-        ("n2", &past, Some(beat("50"))),
+        ("n1", &live, Some(beat("n1", "9"))),
+        ("n2", &past, Some(beat("n2", "50"))),
         ("n3", &live, None),
-        ("n4", &live, Some(beat("\"40\""))),
-        ("n5", &live, Some(beat("null"))),
-        ("Bad_Name", &live, Some(beat("60"))),
+        ("n4", &live, Some(beat("n4", "\"40\""))),
+        ("n5", &live, Some(beat("n5", "null"))),
+        ("Bad_Name", &live, Some(beat("Bad_Name", "60"))),
     ];
     for (name, score, heartbeat) in &cases {
         send(&mut valkey, &["ZADD", &nodes, score, name]);

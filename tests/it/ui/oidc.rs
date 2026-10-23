@@ -709,3 +709,236 @@ fn managed_workspace_reads_and_admission_check_obey_viewer_grants() {
         404
     );
 }
+
+/// An operator is decided from the configured group or a boolean claim, and sees the whole
+/// workspace even when the token grants a single repository. A string is never a boolean.
+#[test]
+fn operator_groups_and_boolean_claims_decide_the_role_and_whole_workspace_view() {
+    let (encoding, jwk) = key("operator");
+    let issuer = Issuer::new(set(&[&jwk]));
+    for (case, setting, changes) in [
+        (
+            "ui_operator_group",
+            "operator_groups = [\"operators\"]\n",
+            json!({"groups": ["operators"]}),
+        ),
+        (
+            "ui_operator_claim",
+            "operator_claim = \"meada_operator\"\n",
+            json!({"meada_operator": true}),
+        ),
+        (
+            "ui_viewer_string",
+            "operator_claim = \"meada_operator\"\n",
+            json!({"meada_operator": "true"}),
+        ),
+    ] {
+        let ui = ui_oidc() + "operations = true\n" + setting;
+        let dir = console_dir(case, Some(VERSION), &head(&issuer.base), &ui);
+        let console = start(&dir, "127.0.0.1:0");
+        let mut token_claims = claims(&issuer.base, &[WEB]);
+        token_claims
+            .as_object_mut()
+            .unwrap()
+            .extend(changes.as_object().unwrap().clone());
+        let token = sign(&encoding, "operator", Algorithm::ES256, &token_claims);
+        let operator = case != "ui_viewer_string";
+        let session = ask(&console, "/api/v1/session", &token).json();
+        assert_eq!(
+            session["role"],
+            if operator { "operator" } else { "viewer" }
+        );
+        let manifest = ask(&console, "/api/v1/manifest", &token).json();
+        assert_eq!(
+            manifest["manifest"]["repository"].as_array().unwrap().len(),
+            if operator { 2 } else { 1 }
+        );
+    }
+}
+
+/// Operator configuration errors name their file, line and the keys that must be corrected.
+#[test]
+fn operator_configuration_requires_oidc_one_role_key_and_the_group_claim() {
+    let issuer = "http://127.0.0.1:9";
+    let cases = [
+        (
+            "ui_operations_no_oidc",
+            String::new(),
+            "operations = true\noperator_claim = \"operator\"\n",
+            "ui.operations",
+            "[oidc]",
+        ),
+        (
+            "ui_operator_no_key",
+            oidc(issuer),
+            "operations = true\n",
+            "ui.operator_groups",
+            "ui.operator_claim",
+        ),
+        (
+            "ui_operator_both_keys",
+            oidc(issuer),
+            "operator_groups = [\"operators\"]\noperator_claim = \"operator\"\n",
+            "ui.operator_groups",
+            "ui.operator_claim",
+        ),
+        (
+            "ui_operator_no_group_claim",
+            format!(
+                "[oidc]\nissuer = \"{issuer}\"\npublic_url = \"{NODES}\"\nidentities_claim = \"meada_repositories\"\n"
+            ),
+            "operator_groups = [\"operators\"]\n",
+            "ui.operator_groups",
+            "oidc.groups_claim",
+        ),
+        (
+            "ui_operator_key_no_oidc",
+            String::new(),
+            "operator_claim = \"operator\"\n",
+            "ui.operator_claim",
+            "[oidc]",
+        ),
+    ];
+    for (case, head, setting, first, second) in cases {
+        let dir = console_dir(case, Some(VERSION), &head, &(ui_oidc() + setting));
+        let (_, stderr, ok) = run_args(&dir, &["status", "--workspace", MANIFEST]);
+        assert_eq!(ok, Some(1), "{case}: {stderr}");
+        assert!(
+            stderr.contains(first) && stderr.contains(second),
+            "{case}: {stderr}"
+        );
+        assert!(
+            stderr
+                .lines()
+                .any(|line| line.starts_with(&format!("meada: {MANIFEST}:"))
+                    && line
+                        .split(':')
+                        .nth(2)
+                        .is_some_and(|part| part.parse::<usize>().is_ok())),
+            "{case}: {stderr}"
+        );
+    }
+}
+
+/// No refused operation waits for an upload: Host, Origin, authentication, disabled writes
+/// and the role are decided first. Every refusal leaves one safe audit line.
+#[test]
+fn refused_writes_are_authorized_and_audited_before_any_body_is_consumed() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpStream;
+    use std::time::Duration;
+    let (encoding, jwk) = key("write-preflight");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let token = |change: fn(&mut Value)| {
+        sign(
+            &encoding,
+            "write-preflight",
+            Algorithm::ES256,
+            &edited(&issuer.base, change),
+        )
+    };
+    let viewer = token(|_| {});
+    let operator = token(|c| c["operator"] = json!(true));
+    let nameless = token(|c| {
+        c["operator"] = json!(true);
+        c.as_object_mut().unwrap().remove("sub");
+    });
+    for enabled in [true, false] {
+        let case = if enabled {
+            "ui_write_preflight"
+        } else {
+            "ui_write_disabled"
+        };
+        let ui = format!(
+            "{}operations = {enabled}\noperator_claim = \"operator\"\n",
+            ui_oidc()
+        );
+        let dir = console_dir(case, Some(VERSION), &head(&issuer.base), &ui);
+        let console = start(&dir, "127.0.0.1:0");
+        let address = console.url.trim_start_matches("http://");
+        let cases = if enabled {
+            vec![
+                (Some(&viewer), Some(PUBLIC), address, 403),
+                (None, Some(PUBLIC), address, 401),
+                (
+                    Some(&operator),
+                    Some("https://foreign.example"),
+                    address,
+                    403,
+                ),
+                (Some(&operator), None, address, 403),
+                (Some(&operator), Some(PUBLIC), "foreign.example", 403),
+                (Some(&nameless), Some(PUBLIC), address, 403),
+            ]
+        } else {
+            vec![(Some(&operator), Some(PUBLIC), address, 403)]
+        };
+        for route in [
+            "pointer",
+            "fence/recover",
+            "workspace/versions",
+            "workspace/apply",
+        ] {
+            for (bearer_token, origin, host, expected) in &cases {
+                for length in ["Content-Length: 99999999", "Transfer-Encoding: chunked"] {
+                    let mut stream = TcpStream::connect(address).unwrap();
+                    stream
+                        .set_read_timeout(Some(Duration::from_millis(700)))
+                        .unwrap();
+                    let mut request = format!(
+                        "POST /api/v1/{route} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n{length}\r\n"
+                    );
+                    if let Some(origin) = origin {
+                        request += &format!("Origin: {origin}\r\n");
+                    }
+                    if let Some(token) = bearer_token {
+                        request += &format!("Authorization: Bearer {token}\r\n");
+                    }
+                    request += "\r\n";
+                    stream.write_all(request.as_bytes()).unwrap();
+                    let mut status = String::new();
+                    BufReader::new(stream)
+                        .read_line(&mut status)
+                        .expect("a refusal without reading the body");
+                    assert_eq!(
+                        status
+                            .split_whitespace()
+                            .nth(1)
+                            .unwrap()
+                            .parse::<u16>()
+                            .unwrap(),
+                        *expected,
+                        "{route}: {status}"
+                    );
+                }
+            }
+        }
+        let expected_audits = 4 * cases.len() * 2;
+        let stderr = console.stderr();
+        let lines: Vec<_> = stderr
+            .lines()
+            .filter(|line| line.starts_with("ui: "))
+            .collect();
+        assert_eq!(lines.len(), expected_audits, "{stderr}");
+        assert!(
+            lines.iter().any(|line| line.starts_with("ui: - ")),
+            "{stderr}"
+        );
+        if enabled {
+            assert!(
+                lines
+                    .iter()
+                    .any(|line| line.starts_with(&format!("ui: {SUBJECT} "))),
+                "{stderr}"
+            );
+        }
+        for token in [&viewer, &operator, &nameless] {
+            for part in token.split('.') {
+                assert!(!stderr.contains(part), "token in audit: {stderr}");
+            }
+        }
+    }
+}
+
+#[cfg(feature = "refresh-lock")]
+mod writes;

@@ -1,5 +1,5 @@
 //! The management console's process (ADR 0014, feature `ui`): `meada ui --listen <addr>
-//! --workspace <bootstrap manifest>` serves the front end's files from `[ui] dir` and a read-only
+//! --workspace <bootstrap manifest>` serves the front end's files from `[ui] dir` and the
 //! JSON API under `/api/v1/`, on the listener `meada mcp --listen` uses (`mcp::serve_http`). It is
 //! never a node's route and never an MCP server. Every request goes through, in order, the `Host`
 //! check, the `Origin` check, admission and routing. No answer sets a cookie or carries an
@@ -9,8 +9,10 @@
 //! With `[oidc]` (feature `oidc`) the console is a resource server as a node is: a bearer token
 //! for `[ui] audience`, checked by the nodes' own module (`Oidc::admit_console`), except for the
 //! static files and `config`, which the browser needs to log in. Every admitted subject is a
-//! viewer, and the token's grant bounds every view (`Session::reads`, #290): a repository outside
-//! it is absent, while state that belongs to no repository is shown whole.
+//! viewer unless its verified groups or boolean claim admit it as an operator. A viewer's
+//! token grant bounds every view (`Session::reads`, #290); operators see the whole fleet and
+//! may write when operations are enabled. Each write is authorized before its body is consumed
+//! and leaves one escaped audit line (`write`).
 //!
 //! The playground (`POST query`) and the exports (`GET repositories/<identity>/export`) answer
 //! in process from what the console holds (`Holds`), through the engine and the tools' own code,
@@ -36,11 +38,12 @@ use crate::msg::Msg;
 use crate::workspace::Manifest;
 
 mod read;
+mod write;
 
 type Answer = Response<BoxBody<Bytes, Infallible>>;
 
-/// A request's body as the console read it: empty except for the token check's and the
-/// playground's, or the status refusing it (413 past its route's cap, 400 when it could not be
+/// A request's bounded body: empty except for token checks, playground queries and admitted
+/// operations, or the status refusing it (413 past its route's cap, 400 when it could not be
 /// read).
 type Body = std::result::Result<Bytes, StatusCode>;
 
@@ -87,8 +90,7 @@ pub struct File {
     operator_claim: Option<String>,
 }
 
-/// The validated section. `client_id` is checked at start beside `[oidc]`, `operations` and the
-/// operator keys with the operations (#307).
+/// The validated section; `client_id` is also checked at start beside the OIDC module.
 #[derive(Clone, Debug)]
 pub struct Config {
     /// The front end's files.
@@ -105,8 +107,40 @@ pub struct Config {
 
 impl File {
     /// The section checked, every problem at once; `dir` is relative to `base`.
-    fn validate(self, base: &Path) -> std::result::Result<Config, Vec<Problem>> {
+    fn validate(
+        self,
+        base: &Path,
+        oidc: Option<&toml::Table>,
+    ) -> std::result::Result<Config, Vec<Problem>> {
         let mut problems = Vec::new();
+        if self.operations && oidc.is_none() {
+            problems.push(("ui.operations", Msg::UiNeedsOidc.text()));
+        }
+        match (&self.operator_groups, &self.operator_claim) {
+            (None, None) if self.operations => {
+                problems.push(("ui.operations", Msg::UiOperatorNeeded.text()));
+            }
+            (Some(_), Some(_)) => {
+                problems.push(("ui.operator_groups", Msg::UiOperatorBoth.text()));
+            }
+            _ => {}
+        }
+        for (key, present) in [
+            ("ui.operator_groups", self.operator_groups.is_some()),
+            ("ui.operator_claim", self.operator_claim.is_some()),
+        ] {
+            if present && oidc.is_none() {
+                problems.push((key, Msg::UiNeedsOidc.text()));
+            }
+        }
+        if self.operator_groups.is_some()
+            && oidc.is_some_and(|oidc| !oidc.contains_key("groups_claim"))
+        {
+            problems.push((
+                "ui.operator_groups",
+                Msg::KeyMissing("oidc.groups_claim").text(),
+            ));
+        }
         if self.dir.is_none() {
             problems.push(("ui", Msg::KeyMissing("ui.dir").text()));
         }
@@ -147,7 +181,9 @@ pub(crate) fn validated(
     let Some(section) = section else {
         return Ok(None);
     };
-    section.validate(base).map(Some).map_err(|problems| {
+    let table: toml::Table = toml::from_str(src)?;
+    let oidc = table.get("oidc").and_then(toml::Value::as_table);
+    section.validate(base, oidc).map(Some).map_err(|problems| {
         let lines: Vec<String> = (problems.iter())
             .map(|(key, problem)| crate::config::error_at(file, src, key, problem).to_string())
             .collect();
@@ -193,11 +229,11 @@ enum Holds {
     Generations(std::result::Result<crate::snapshot::serve::Current, String>),
 }
 
-/// Who asks: the admitted subject (none behind the proxy), always a viewer for now (operators
-/// come with #307), and what the request may read.
+/// Who asks: the admitted subject (none behind the proxy), its role and what it may read.
 #[derive(Clone)]
 struct Session {
     subject: Option<String>,
+    operator: bool,
     /// The token's grant; none behind the proxy, where every identity is read.
     #[cfg(feature = "oidc")]
     grant: Option<crate::oidc::Grant>,
@@ -208,6 +244,9 @@ impl Session {
     /// repository asks it (the manifest's entries here; the read routes and the playground of
     /// #304 and #305 through the same call), as a node bounds its answers (#290).
     fn reads(&self, identity: &str) -> bool {
+        if self.operator {
+            return true;
+        }
         #[cfg(feature = "oidc")]
         if let Some(grant) = &self.grant {
             return grant.reads(identity);
@@ -216,8 +255,11 @@ impl Session {
         true
     }
 
-    /// Whether the session reads every identity: behind the proxy, or a `*` grant.
+    /// Whether the session reads every identity: operator, proxy admission or a `*` grant.
     fn whole(&self) -> bool {
+        if self.operator {
+            return true;
+        }
         #[cfg(feature = "oidc")]
         if let Some(grant) = &self.grant {
             return matches!(grant, crate::oidc::Grant::All);
@@ -239,21 +281,31 @@ pub fn listen(listen: &str, manifest: &Path) -> Result<()> {
             let console = console.clone();
             async move {
                 let (parts, body) = request.into_parts();
-                let body = read(&parts, body).await;
-                let request = Request::from_parts(parts, body);
-                tokio::task::block_in_place(|| console.answer(bound, &request))
+                let admitted = tokio::task::block_in_place(|| console.checked(bound, &parts));
+                let answer = match admitted {
+                    Err(refused) => *refused,
+                    Ok(session) => {
+                        let body = read(&parts, body).await;
+                        let request = Request::from_parts(parts, body);
+                        tokio::task::block_in_place(|| console.answer(&request, &session))
+                    }
+                };
+                console.secure(answer)
             }
         }
     })
 }
 
-/// The body of a POST to the token check (at most `CHECK_MAX` bytes) or to the playground (at
-/// most `QUERY_MAX`); any other request's is left unread. It lives only for its request:
-/// nothing stores, prints or forwards it.
+/// Bounded POST bodies for token checks, playground queries and already-authorized operations.
+/// Other bodies stay unread. Tokens and raw uploads are never printed or forwarded.
 async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
     let max = match parts.uri.path() {
         CHECK => CHECK_MAX,
         QUERY => QUERY_MAX,
+        "/api/v1/pointer" => write::POINTER_MAX,
+        "/api/v1/fence/recover" => write::FENCE_MAX,
+        "/api/v1/workspace/versions" => write::SAVE_MAX,
+        "/api/v1/workspace/apply" => write::APPLY_MAX,
         _ => return Ok(Bytes::new()),
     };
     if parts.method != Method::POST {
@@ -344,9 +396,8 @@ impl Console {
         })
     }
 
-    /// The answer to `request`, the listener bound at `bound`.
-    fn answer(self: &Arc<Self>, bound: SocketAddr, request: &Request<Body>) -> Answer {
-        let mut answer = self.checked(bound, request);
+    /// The security headers of every answer, including a refusal before admission.
+    fn secure(&self, mut answer: Answer) -> Answer {
         let headers = answer.headers_mut();
         headers.insert("x-content-type-options", "nosniff".parse().unwrap());
         headers.insert("referrer-policy", "no-referrer".parse().unwrap());
@@ -354,31 +405,85 @@ impl Console {
         answer
     }
 
-    fn checked(self: &Arc<Self>, bound: SocketAddr, request: &Request<Body>) -> Answer {
-        let headers = request.headers();
+    /// All request authorization runs before the listener consumes any body. An operation's
+    /// pre-authentication refusal has no subject and never logs its query or body arguments.
+    fn checked(
+        &self,
+        bound: SocketAddr,
+        request: &hyper::http::request::Parts,
+    ) -> std::result::Result<Session, Box<Answer>> {
+        let headers = &request.headers;
+        let write = !matches!(request.method, Method::GET | Method::HEAD);
+        let route = request.uri.path().strip_prefix("/api/v1/");
+        let operation = route.and_then(write::operation).filter(|_| write);
+        let audit = |subject: Option<&str>, outcome: &str| {
+            if let Some(operation) = operation {
+                write::audit(subject, operation, "-", outcome);
+            }
+        };
         let host = headers.get(header::HOST).and_then(|h| h.to_str().ok());
         if !host.is_some_and(|host| self.hosts(host, bound)) {
-            return plain(StatusCode::FORBIDDEN, HOST_REFUSED);
+            audit(None, HOST_REFUSED);
+            return Err(Box::new(plain(StatusCode::FORBIDDEN, HOST_REFUSED)));
         }
-        let write = !matches!(*request.method(), Method::GET | Method::HEAD);
         match headers
             .get(header::ORIGIN)
             .map(|o| o.to_str().unwrap_or(""))
         {
             Some(origin) if !origin.eq_ignore_ascii_case(&self.ui.public_url) => {
-                return plain(StatusCode::FORBIDDEN, ORIGIN_REFUSED);
+                audit(None, ORIGIN_REFUSED);
+                return Err(Box::new(plain(StatusCode::FORBIDDEN, ORIGIN_REFUSED)));
             }
-            None if write => return plain(StatusCode::FORBIDDEN, WRITE_REFUSED),
+            None if write => {
+                audit(None, WRITE_REFUSED);
+                return Err(Box::new(plain(StatusCode::FORBIDDEN, WRITE_REFUSED)));
+            }
             _ => {}
         }
-        let path = request.uri().path();
-        let route = path.strip_prefix("/api/v1/");
+        if operation.is_some() && !self.ui.operations {
+            let message = Msg::UiWritesDisabled.text();
+            audit(None, &message);
+            return Err(Box::new(error(
+                StatusCode::FORBIDDEN,
+                "forbidden",
+                &message,
+            )));
+        }
         let session = match self.admit(headers, route) {
             Ok(session) => session,
-            Err(refused) => return *refused,
+            Err(refused) => {
+                #[cfg(feature = "oidc")]
+                {
+                    let message = match refused.status() {
+                        StatusCode::UNAUTHORIZED => Msg::UiUnauthorized.text(),
+                        _ => Msg::UiScope.text(),
+                    };
+                    audit(None, &message);
+                }
+                return Err(refused);
+            }
         };
+        if operation.is_some()
+            && (!session.operator || session.subject.as_deref().is_none_or(str::is_empty))
+        {
+            let message = Msg::UiOperatorRequired.text();
+            audit(session.subject.as_deref(), &message);
+            return Err(Box::new(error(
+                StatusCode::FORBIDDEN,
+                "forbidden",
+                &message,
+            )));
+        }
+        Ok(session)
+    }
+
+    /// Routes only an already-admitted request; its exact session survives body consumption.
+    fn answer(self: &Arc<Self>, request: &Request<Body>, session: &Session) -> Answer {
+        let path = request.uri().path();
+        let route = path.strip_prefix("/api/v1/");
+        let write = !matches!(*request.method(), Method::GET | Method::HEAD);
         match route {
-            Some(route) => self.api(request, route, &session),
+            Some(route) => self.api(request, route, session),
             None if write => plain(StatusCode::METHOD_NOT_ALLOWED, "Method Not Allowed\n"),
             None => self.file(path),
         }
@@ -397,10 +502,16 @@ impl Console {
         if let Some(oidc) = &self.oidc
             && !open
         {
-            return match oidc.admit_console(headers, &self.ui.audience) {
+            return match oidc.admit_console(
+                headers,
+                &self.ui.audience,
+                self.ui.operator_groups.as_deref(),
+                self.ui.operator_claim.as_deref(),
+            ) {
                 Ok(admitted) => Ok(Session {
                     subject: admitted.subject,
                     grant: Some(admitted.grant),
+                    operator: admitted.operator,
                 }),
                 Err((status, challenge)) => {
                     let (code, message) = match status {
@@ -420,6 +531,7 @@ impl Console {
         let _ = (headers, open);
         Ok(Session {
             subject: None,
+            operator: false,
             #[cfg(feature = "oidc")]
             grant: None,
         })
@@ -436,6 +548,9 @@ impl Console {
     fn api(self: &Arc<Self>, request: &Request<Body>, route: &str, session: &Session) -> Answer {
         let method = request.method();
         let read = matches!(*method, Method::GET | Method::HEAD);
+        if !read && write::operation(route).is_some() {
+            return self.write(route, method, request.body(), session);
+        }
         // An identity holds slashes: everything between `repositories/` and the last `/export`.
         if read
             && let Some(identity) =
@@ -451,7 +566,9 @@ impl Console {
         }
         let document = match route {
             "config" if read => Some(self.config()),
-            "session" if read => Some(json!({"subject": session.subject, "role": "viewer"})),
+            "session" if read => Some(
+                json!({"subject": session.subject, "role": if session.operator { "operator" } else { "viewer" }}),
+            ),
             "manifest" if read => Some(self.manifest(session)),
             #[cfg(feature = "oidc")]
             "admission" if read => (self.oidc.as_ref()).map(|o| o.admission(&|i| session.reads(i))),

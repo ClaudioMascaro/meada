@@ -452,6 +452,27 @@ fn every_id_and_fence_read_from_valkey_is_checked_before_the_node_changes() {
         assert!(contents(&local) == before, "{case}: the node changed");
     }
 
+    // The retained-list ceiling has the same refusal in the Brazilian Portuguese catalog.
+    reset(&mut valkey);
+    let many: Vec<String> = (0..10).map(|n| format!("{n:016x}:0")).collect();
+    let mut append = vec!["RPUSH", r];
+    append.extend(many.iter().map(String::as_str));
+    send(&mut valkey, &append);
+    let before = contents(&local);
+    let (stdout, stderr, code) = meada_in(
+        &fleet.dir,
+        "pt_BR.UTF-8",
+        &["snapshot", "pull", "--workspace", &node],
+    );
+    assert_eq!((stdout.as_str(), code), ("", Some(1)));
+    assert_eq!(
+        stderr,
+        format!(
+            "meada: {r}: tem mais de 10 entradas, `keep` mais as 8 gerações mantidas permitidas\n"
+        )
+    );
+    assert!(contents(&local) == before);
+
     // The fence read with the id reaches the pointer file.
     reset(&mut valkey);
     send(&mut valkey, &["HSET", c, "fence", "7"]);
@@ -1863,3 +1884,5 @@ fn the_job_s_commands_read_the_pulled_version_and_publish_records_it() {
     assert_ne!(g2, g1);
     assert_eq!(field(&document(&g2)), None);
 }
+
+mod imports;

@@ -174,6 +174,16 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   outside the grant, the repositories outside it the 404 of one not served, a 401 without a
   token; the admission routes
   absent without `[oidc]`; manifest peers and error text bounded even for an unlisted peer;
+  operator groups and strict boolean claims, all five configuration errors, whole operator
+  views despite restricted grants, and header-only refused writes proving bodies stay unread;
+  in `ui/oidc/writes.rs` (with `ui,oidc,refresh-lock`), real pointer retain/set/drop, exact
+  decimal fence recovery, save/CLI validation agreement, admitted author, workspace apply and
+  catalog refusals, per-route caps, held-lock refusals and one escaped audit line per attempt,
+  including unauthenticated refusals and tokens pasted into ids/floors; save422 exactly matches
+  CLI diagnostics while its fixed audit outcome excludes JWT fixtures pasted into entries;
+  malformed heartbeat
+  MAX fences ignored by CLI and HTTP recovery, and workspace-pointer fences in fleet diagnostics;
+  serialized workspace versions refused before storage even when their uploads fit the cap;
   managed workspace views and nested peers bounded by grants, the
   token check using current workspace identities; no token, claim value or identity on stderr), `resources` (resource `search`, `context`, `trace` start and `status`
   over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
@@ -353,3 +363,11 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   the MCP server leave the stub with zero requests. Answer cases (malformed, threshold,
   `--min-p`, `--dry-run`) script the stub per test; a malformed first answer must leave the
   second item written.
+
+### Immutable workspace import and managed status
+
+`generations/imports.rs` uses the binary and real local RustFS: two concurrent imports see
+missing through a reply barrier, but only one conditionally creates the immutable document;
+the other reports the first author, time and message. A local workspace-pointer swap during
+status's informational Valkey probe proves the report and readiness exit code share one
+managed workspace read. CLI import is also checked with `generation-pointer` alone.
