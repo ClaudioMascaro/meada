@@ -29,6 +29,14 @@ Escolha uma das cinco formas.
   `mcp --listen 0.0.0.0:7333 --workspace /etc/meada/meada.workspace.toml`, seguindo
   [Modo servidor](#modo-servidor) e sua configuração de admissão.
 
+Para a console, execute `cargo install meada --features ui`, baixe o
+`meada-ui-<versão>.tar.gz` da mesma release e descompacte-o. Aponte `[ui] dir` no manifesto
+para o diretório `meada-ui-<versão>/` extraído. A console recusa iniciar com uma UI de outra
+versão e informa as duas versões. A imagem `-cloud` já contém esses arquivos em
+`/usr/share/meada/ui`; a imagem padrão e os binários prontos continuam sem a UI. Node só é
+necessário para compilar o frontend a partir dos fontes, nunca para instalar pelo Cargo ou
+executar a console.
+
 ## Configuração
 
 Cada repositório pode ter um `meada.toml` na raiz, versionado no git, dizendo com quem ele

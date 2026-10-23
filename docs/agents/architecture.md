@@ -126,6 +126,13 @@ Node pinned by `.nvmrc` and wasm-pack by `scripts/wasm.mjs`. Cargo never invokes
 WASM bundle builds from `meada-core` into ignored `ui/wasm/`; Vite puts content-hashed scripts,
 styles and WASM under `dist/assets/`, with `meada-ui.json` carrying the workspace version.
 
+`Dockerfile` builds the frontend in a pinned build-platform stage. Only its `cloud` target
+copies `dist/` to `/usr/share/meada/ui`; the default `runtime` target skips Node entirely.
+`scripts/ui-tarball` packages that directory from the cloud image under one versioned root.
+The container workflow checks both images, compares the archive's files and bytes with the
+image, and attaches it to the published release. cargo-dist's default binary artifacts stay
+in their separate release workflow.
+
 `src/api.ts` owns the same-origin `/api/v1/` client; `auth.ts` owns OIDC discovery, PKCE and the
 memory-only bearer. Only the pending redirect's verifier and state enter sessionStorage, and
 both are removed on callback. `main.tsx` handles `/auth/callback` before rendering the shell;

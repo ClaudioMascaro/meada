@@ -8,6 +8,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Console frontend distribution (issue #313): the cloud image includes the static UI at
+  `/usr/share/meada/ui`, built with pinned Node and wasm-pack from the npm lockfile. The
+  container release workflow also attaches `meada-ui-<version>.tar.gz` with the same files
+  under one versioned directory, for Cargo installations with `ui`. Default images, Cargo
+  builds and cargo-dist's binary artifacts remain independent of the frontend.
+
 - Multi-arch OCI images (issue #279): `ghcr.io/claudiomascaro/meada:<version>` and `latest`
   for the default build, `<version>-cloud` and `latest-cloud` for every cloud module, on
   Linux amd64 and arm64. Prereleases get version tags only. The Debian bookworm-slim runtime

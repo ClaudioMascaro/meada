@@ -13,6 +13,11 @@ on:
       - .dockerignore
       - .github/workflows/container.yml
       - scripts/container-smoke
+      - scripts/ui-tarball
+      - ui/**
+      - meada-core/**
+      - Cargo.toml
+      - Cargo.lock
 
 permissions:
   contents: read
@@ -23,6 +28,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Workspace version
+        id: version
+        run: python3 -c 'import tomllib; print("version=" + tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])' >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -33,7 +41,23 @@ jobs:
           provenance: false
           sbom: false
           tags: meada:check
+          build-args: VERSION=${{ steps.version.outputs.version }}
       - run: python3 scripts/container-smoke meada:check
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: cloud
+          platforms: linux/amd64
+          load: true
+          push: false
+          provenance: false
+          sbom: false
+          tags: meada:check-cloud
+          build-args: |
+            FEATURES=cloud
+            VERSION=${{ steps.version.outputs.version }}
+      - run: python3 scripts/ui-tarball meada:check-cloud ui-artifacts
+      - run: python3 scripts/container-smoke meada:check-cloud --cloud --ui-tarball ui-artifacts/meada-ui-${{ steps.version.outputs.version }}.tar.gz
 
   publish:
     if: >-
@@ -43,7 +67,7 @@ jobs:
        github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-24.04
     permissions:
-      contents: read
+      contents: write
       packages: write
     strategy:
       fail-fast: false
@@ -51,8 +75,10 @@ jobs:
         include:
           - features: ""
             suffix: ""
+            target: runtime
           - features: cloud
             suffix: -cloud
+            target: cloud
     steps:
       - name: Published release
         id: release
@@ -103,9 +129,12 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+      - name: Publish image
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
+          target: ${{ matrix.target }}
           platforms: linux/amd64,linux/arm64
           push: true
           provenance: false
@@ -131,3 +160,19 @@ jobs:
           helm package deploy/helm/meada --destination "$RUNNER_TEMP/chart" --version "$VERSION" --app-version "$VERSION"
           helm push "$RUNNER_TEMP/chart/meada-$VERSION.tgz" oci://ghcr.io/claudiomascaro/charts
           helm pull oci://ghcr.io/claudiomascaro/charts/meada --version "$VERSION" --destination "$RUNNER_TEMP/chart/verify"
+      - name: Verify UI release archive
+        if: matrix.features == 'cloud'
+        env:
+          IMAGE: ghcr.io/claudiomascaro/meada@${{ steps.build.outputs.digest }}
+          VERSION: ${{ steps.image.outputs.version }}
+        run: |
+          docker pull "$IMAGE"
+          python3 scripts/ui-tarball "$IMAGE" ui-artifacts
+          python3 scripts/container-smoke "$IMAGE" --cloud --ui-tarball "ui-artifacts/meada-ui-$VERSION.tar.gz"
+      - name: Attach UI archive to release
+        if: matrix.features == 'cloud'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.image.outputs.version }}
+        run: gh release upload "$RELEASE_TAG" "ui-artifacts/meada-ui-$VERSION.tar.gz" --clobber

@@ -13,3 +13,16 @@
 !tests/
 !tests/golden/
 !tests/golden/schema.txt
+!ui/
+!ui/package.json
+!ui/package-lock.json
+!ui/.nvmrc
+!ui/index.html
+!ui/tsconfig.json
+!ui/vite.config.ts
+!ui/scripts/
+!ui/scripts/**
+!ui/src/
+!ui/src/**
+!ui/tests/
+!ui/tests/**
