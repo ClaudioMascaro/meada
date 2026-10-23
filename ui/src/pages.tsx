@@ -10,6 +10,11 @@ export const routes = [
   { path: '/manifest', label: 'manifest' },
   { path: '/playground', label: 'playground' },
   { path: '/graph', label: 'graph' },
+  { path: '/fleet', label: 'fleet' },
+  { path: '/store', label: 'store' },
+  { path: '/repositories', label: 'repositories' },
+  { path: '/credentials', label: 'credentials' },
+  { path: '/admission', label: 'admission' },
 ] as const;
 
 export function Shell({ path, locale, onLanguage, session, t, children, onNavigate }: {

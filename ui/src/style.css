@@ -36,7 +36,7 @@ nav a[aria-current="page"] { color: #124f41; background: #e5eee7; font-weight: 6
 .session-summary { border-top: 1px solid var(--line); padding: 1rem; display: grid; gap: .5rem; font-size: .85rem; overflow-wrap: anywhere; }
 .role { font-weight: 600; }
 .subject { color: var(--muted); }
-main { padding: 3rem clamp(1.5rem, 5vw, 5rem) 5rem; width: 100%; max-width: 1200px; }
+main { padding: 3rem clamp(1.5rem, 5vw, 5rem) 5rem; width: 100%; min-width: 0; max-width: 1200px; }
 main:focus { outline: none; }
 h1 { font-size: clamp(1.65rem, 3vw, 2rem); line-height: 1.2; letter-spacing: -.025em; font-weight: 600; margin: 0 0 .8rem; text-wrap: balance; }
 h2 { font-size: 1.1rem; font-weight: 600; margin: 2.5rem 0 1rem; }

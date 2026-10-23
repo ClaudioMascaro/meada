@@ -8,6 +8,10 @@ Reviewing a change to an `*.export.json` golden: `cargo run --example golden_dif
 diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_diff.rs` for the
 `--range` forms) prints added, removed and moved entries per section instead of the raw JSON.
 
+- `ui/tests/operations.test.ts` projects operational API fixtures into fleet diagnostics,
+  retention/bundle metadata, repository provenance, cached credential lifetime and token-check
+  outcomes. `operations.test.tsx` exercises the five pages through their DOM and HTTP client,
+  including bilingual accessible controls and the pasted token's lifetime.
 - Test modules of `tests/it/` by subject: `docs` (the repository map against the code:
   `ponytail:` limits in Known ceilings, entry point kinds and process marks in their lists),
   `conformance` (pack; for Python also its HTTP providers and consumers

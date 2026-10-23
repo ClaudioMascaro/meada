@@ -1,0 +1,8 @@
+.operation-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+.operation-heading button { flex: none; }
+.recovery-commands { margin: 0; padding-left: 1.1rem; }
+.recovery-commands code { white-space: normal; }
+.token-check { display: grid; justify-items: start; gap: .75rem; margin: 2.5rem 0; }
+.token-check label { font-weight: 600; }
+.token-check p { margin: 0; color: var(--muted); }
+.token-check textarea { width: 100%; min-height: 7rem; resize: vertical; font: inherit; border: 1px solid #aab7b2; border-radius: 4px; padding: .75rem; background: #fff; color: inherit; caret-color: var(--accent); }

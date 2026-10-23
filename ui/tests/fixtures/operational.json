@@ -1,0 +1,6 @@
+{
+  "store": { "generations": [{ "id": "bbbbbbbbbbbbbbbb", "current": true, "retained": true, "kept": true, "document": { "generation": "bbbbbbbbbbbbbbbb", "repositories": [{ "identity": "example.com/team/api", "head": "a1b2c3", "bundle": "bundles/aaaaaaaaaaaaaaaa.tar", "size": 4096, "blake3": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "blocks": {} }] } }], "malformed": [], "pointer": null, "retained": [] },
+  "repositories": { "repositories": [{ "identity": "example.com/team/api", "head": "new", "indexed_commit": "old", "schema": 7, "behind": true }] },
+  "credentials": { "apps": [{ "host": "github.com", "app_id": 42, "malformed": false, "throttled_until": null, "installations": [{ "owner": "team", "id": 7, "cached": true, "expires": 1700000600, "remaining_seconds": 600, "throttled_until": 1700000300 }] }] },
+  "admission": { "issuer": "https://issuer.example", "metadata": { "issuer": "https://issuer.example", "authorization_endpoint": "https://issuer.example/authorize" }, "jwks_uri": "https://issuer.example/keys", "keys": ["key-1"], "refreshed": "2026-10-22T20:00:00Z", "failed": null, "identities_claim": "repositories", "groups_claim": "teams", "groups": { "reviewers": ["example.com/team/api"] }, "scopes": ["read"] }
+}

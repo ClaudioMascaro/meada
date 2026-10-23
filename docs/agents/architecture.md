@@ -136,8 +136,13 @@ sends the MCP-shaped query that `playground.ts` builds, displaying the answer un
 `GraphPage.tsx` fetches an export through `Api.export`, and `graph.ts` checks it with WASM
 `parseExport` before deriving communities, contracts, cross-repository links, drift and
 applied/stale decisions. View changes are local; explicit generation exports are cached in the
-page and a current-generation load reads again. `graph-i18n.ts` holds this area's pt-BR/en
-copy. Later operational pages join that shell. Vitest exercises the built WASM and the public client, view-model and DOM
+page and a current-generation load reads again. `graph-i18n.ts` holds this area's pt-BR/en copy.
+`OperationalPage.tsx` reads the fleet, store, repositories, credentials and admission routes;
+`operations.ts` projects their checked DTOs, with bilingual copy in `operations-i18n.ts`.
+Missing modules name their sections, errors remain local to the page, and the pasted token
+exists only in the uncontrolled field and its request body, cleared on completion.
+The API reader preserves large JSON integers as decimal strings instead of rounding fences.
+Vitest exercises the built WASM and the public client, view-model and DOM
 seams, without a browser end-to-end suite.
 
 ## Modules (`src/`)

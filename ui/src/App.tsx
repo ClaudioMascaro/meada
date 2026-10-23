@@ -7,6 +7,7 @@ import { loadCore } from './core';
 import { ConfigPage, ManifestPage, SessionPage, Shell, routes } from './pages';
 import { PlaygroundPage } from './PlaygroundPage';
 import { GraphPage } from './GraphPage';
+import { OperationalPage } from './OperationalPage';
 
 export function App({ api, config, initialLanguage }: { api: Api; config: Config; initialLanguage: Language }) {
   const [locale, setLocale] = useState(initialLanguage);
@@ -17,6 +18,7 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
   const [attempt, setAttempt] = useState(0);
   const [signedOut, setSignedOut] = useState(false);
   const t = copy[locale];
+  const operational = (['fleet', 'store', 'repositories', 'credentials', 'admission'] as const).find(kind => path === `/${kind}`);
 
   function navigate(next: string) {
     setError(undefined);
@@ -55,7 +57,8 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
 
   useEffect(() => {
     const route = routes.find(route => route.path === path);
-    document.title = `${route ? t[route.label] : t.notFound} · Meada`;
+    const name = route ? t[route.label] : t.notFound;
+    document.title = `${name} · Meada`;
   }, [path, t]);
 
   async function login() {
@@ -78,6 +81,7 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
       : path === '/manifest' ? manifest ? <ManifestPage manifest={manifest} t={t} /> : <p role="status">{t.loading}</p>
       : path === '/playground' ? <PlaygroundPage api={api} locale={locale} />
       : path === '/graph' ? <GraphPage api={api} locale={locale} />
+      : operational ? session ? <OperationalPage kind={operational} api={api} locale={locale} /> : <p role="status">{t.loading}</p>
       : <h1>{t.notFound}</h1>}
   </Shell>;
 }
