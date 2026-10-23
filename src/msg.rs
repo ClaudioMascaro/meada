@@ -405,6 +405,12 @@ pub enum Msg<'a> {
     /// `--at-least` that is not a decimal fence.
     #[cfg(feature = "refresh-lock")]
     BadFenceArg(&'a str),
+    /// An operation would leave no usable fence under Valkey's signed INCR ceiling.
+    #[cfg(feature = "refresh-lock")]
+    FenceLimit {
+        key: &'a str,
+        max: u64,
+    },
     /// What `fence recover` read and could not count: the problem, named.
     #[cfg(feature = "refresh-lock")]
     FenceNotCounted(&'a str),
@@ -1657,6 +1663,11 @@ impl Msg<'_> {
             Msg::BadFenceArg(text) => pick(
                 format!("--at-least {text}: not a decimal fence"),
                 format!("--at-least {text}: não é um fence decimal"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::FenceLimit { key, max } => pick(
+                format!("{key}: operation would exhaust the fence counter; the maximum usable fence is {max} (Valkey INCR limit)"),
+                format!("{key}: a operação esgotaria o contador de fences; o maior fence utilizável é {max} (limite de INCR do Valkey)"),
             ),
             #[cfg(feature = "refresh-lock")]
             Msg::FenceNotCounted(problem) => pick(

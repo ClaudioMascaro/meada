@@ -432,7 +432,11 @@ nomeando `{<key_prefix>}:fence`, o pull de um nó com fence maior sai com 1 sem 
 `meada status --generations` nesse nó imprime uma linha `fence: travado: ...` (`fence: stuck: ...` fora do português) com os dois fences
 (o código de saída não muda). Execute `meada snapshot fence recover --workspace <manifesto>`:
 o comando recupera o contador sob a trava até o maior fence do pointer, das gerações retidas,
-do workspace e dos heartbeats válidos. O próximo publish usa um fence maior e destrava os nós.
+do workspace e dos heartbeats válidos, usando o relógio do Valkey para escolher os nós vivos.
+O próximo publish usa um fence maior e destrava os nós. O `INCR` do Valkey tem teto de
+9223372036854775807; a recuperação recusa pisos ou fences registrados acima de
+9223372036854775806, e não consome a última aquisição disponível. Leitura e transporte
+continuam aceitando fences `u64` exatos.
 Se um nó isolado guarda um fence que não aparece num heartbeat válido, informe esse valor em
 `--at-least <fence>`, ou apague seu `<local_dir>/current` para ele tomar a geração atual. Desligar `[refresh_lock]` depois
 que os nós gravaram fences acima de 0 também trava a frota, já que sem a trava todo fence é 0:
@@ -831,7 +835,9 @@ incluem perfis de implantação. A admissão e as operações são descritas aci
 
 A console oferece operações autenticadas por OIDC para operadores: pointer, recuperação de
 fence e versões do workspace, com o mesmo lock e as mesmas verificações do CLI. As
-operações ficam desligadas por padrão e cada tentativa gera uma linha de auditoria.
+operações ficam desligadas por padrão e cada tentativa gera uma linha de auditoria. O grant
+limita também os grupos e erros do manifesto; o login preserva os parâmetros do issuer e a
+recuperação respeita o relógio e o limite do contador do Valkey.
 
 Versão 0.1, a primeira. Indexa repositórios TypeScript e JavaScript (`.ts`, `.tsx`, `.js`,
 `.jsx`, `.mjs`, `.cjs`) e Python (`.py`), lê o código Rust (`.rs`) dos crates do repositório

@@ -1128,3 +1128,198 @@ fn apply_refuses_a_malformed_id_before_any_connection() {
     let accepted = listener.accept().map(drop).map_err(|e| e.kind());
     assert_eq!(accepted, Err(std::io::ErrorKind::WouldBlock));
 }
+
+/// Recovery refuses counters that leave no signed INCR for the next publish. Both explicit
+/// floors and recorded workspace fences are checked before consuming an acquisition.
+#[test]
+fn fence_recovery_refuses_unusable_counters_without_poisoning_the_next_publish() {
+    let Some(fleet) = fleet("ops_ceiling") else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let g1 = locked_publish(dir);
+    let mut valkey = admin(&fleet.valkey);
+    let fence_key = key(&fleet, "fence");
+    let workspace = key(&fleet, "workspace");
+    for value in [
+        "9223372036854775807",
+        "9223372036854775808",
+        "18446744073709551615",
+    ] {
+        for lang in ["en_US.UTF-8", "pt_BR.UTF-8"] {
+            for recorded in [false, true] {
+                let before = get(&fleet, "fence");
+                let mut args = vec!["snapshot", "fence", "recover", "--workspace", MANIFEST];
+                if recorded {
+                    send(
+                        &mut valkey,
+                        &["HSET", &workspace, "id", "0123456789abcdef", "fence", value],
+                    );
+                } else {
+                    args.extend(["--at-least", value]);
+                }
+                let (stdout, stderr, code) = run_in(dir, lang, &args);
+                assert_eq!((code, stdout.as_str()), (Some(1), ""), "{value}: {stderr}");
+                let reason = if lang.starts_with("pt") {
+                    "a operação esgotaria o contador de fences; o maior fence utilizável é 9223372036854775806 (limite de INCR do Valkey)"
+                } else {
+                    "operation would exhaust the fence counter; the maximum usable fence is 9223372036854775806 (Valkey INCR limit)"
+                };
+                assert_eq!(stderr, format!("meada: {fence_key}: {reason}\n"));
+                assert_eq!(get(&fleet, "fence"), before);
+                assert!(released(&fleet));
+                send(&mut valkey, &["DEL", &workspace]);
+            }
+        }
+    }
+    assert_eq!(locked_publish(dir), g1);
+    let recover = [
+        "snapshot",
+        "fence",
+        "recover",
+        "--workspace",
+        MANIFEST,
+        "--at-least",
+        "9223372036854775806",
+    ];
+    assert_eq!(
+        run_in(dir, "en_US.UTF-8", &recover),
+        ("9223372036854775806\n".into(), String::new(), Some(0))
+    );
+    // A recovery acquisition itself must leave the last native INCR available to a publish.
+    let again = run_in(dir, "en_US.UTF-8", &recover);
+    assert_eq!(again.2, Some(1), "{again:?}");
+    assert_eq!(get(&fleet, "fence").as_deref(), Some("9223372036854775806"));
+    assert!(released(&fleet));
+    assert_eq!(locked_publish(dir), g1);
+    assert_eq!(current(&fleet).1, "9223372036854775807");
+}
+
+/// A RESP boundary with a controlled server TIME; every other command reaches the real
+/// Valkey fixture. This changes neither the host clock nor production time configuration.
+struct ServerTime {
+    address: std::net::SocketAddr,
+    stop: Arc<AtomicBool>,
+    worker: Option<std::thread::JoinHandle<()>>,
+}
+
+impl ServerTime {
+    fn new(upstream: String, seconds: u64) -> Self {
+        fn reply(to: &mut TcpStream, value: redis::Value) {
+            use redis::Value;
+            match value {
+                Value::Nil => to.write_all(b"$-1\r\n").unwrap(),
+                Value::Int(n) => write!(to, ":{n}\r\n").unwrap(),
+                Value::Okay => to.write_all(b"+OK\r\n").unwrap(),
+                Value::SimpleString(s) => write!(to, "+{s}\r\n").unwrap(),
+                Value::BulkString(bytes) => {
+                    write!(to, "${}\r\n", bytes.len()).unwrap();
+                    to.write_all(&bytes).unwrap();
+                    to.write_all(b"\r\n").unwrap();
+                }
+                Value::Array(values) => {
+                    write!(to, "*{}\r\n", values.len()).unwrap();
+                    for value in values {
+                        reply(to, value);
+                    }
+                }
+                other => panic!("unexpected RESP2 value: {other:?}"),
+            }
+        }
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let stop = Arc::new(AtomicBool::new(false));
+        let flag = stop.clone();
+        let worker = std::thread::spawn(move || {
+            for client in listener.incoming() {
+                if flag.load(Ordering::SeqCst) {
+                    break;
+                }
+                let mut client = client.unwrap();
+                client
+                    .set_read_timeout(Some(Duration::from_secs(10)))
+                    .unwrap();
+                let mut parser = redis::Parser::new();
+                let mut server = admin(&upstream);
+                while let Ok(value) = parser.parse_value(&mut client) {
+                    let args: Vec<Vec<u8>> = redis::from_redis_value(value).unwrap();
+                    let command = std::str::from_utf8(&args[0]).unwrap();
+                    if command.eq_ignore_ascii_case("TIME") {
+                        reply(
+                            &mut client,
+                            redis::Value::Array(vec![
+                                redis::Value::BulkString(seconds.to_string().into_bytes()),
+                                redis::Value::BulkString(b"0".to_vec()),
+                            ]),
+                        );
+                    } else {
+                        match redis::cmd(command)
+                            .arg(&args[1..])
+                            .query::<redis::Value>(&mut server)
+                        {
+                            Ok(value) => reply(&mut client, value),
+                            Err(_) => client
+                                .write_all(b"-ERR upstream command failed\r\n")
+                                .unwrap(),
+                        }
+                    }
+                }
+            }
+        });
+        Self {
+            address,
+            stop,
+            worker: Some(worker),
+        }
+    }
+}
+
+impl Drop for ServerTime {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::SeqCst);
+        let _ = TcpStream::connect(self.address);
+        self.worker.take().unwrap().join().unwrap();
+    }
+}
+
+/// The recovery host is ahead of Valkey. A live node's highest fence still wins over the
+/// workspace pointer, while a higher fence whose score expired on the server is excluded.
+#[test]
+fn fence_recovery_uses_the_heartbeat_servers_clock() {
+    let Some(fleet) = fleet("ops_server_clock") else {
+        return;
+    };
+    let mut valkey = admin(&fleet.valkey);
+    let id = "0123456789abcdef";
+    send(
+        &mut valkey,
+        &["HSET", &key(&fleet, "workspace"), "id", id, "fence", "500"],
+    );
+    for (name, score, fence) in [("live", "1001", 700), ("expired", "999", 900)] {
+        let beat = serde_json::json!({"name":name,"generation":id,"fence":fence,"held":[id],"ready":true,"version":"0.1.0","time":"2026-10-22T00:00:00Z"});
+        send(&mut valkey, &["ZADD", &key(&fleet, "nodes"), score, name]);
+        send(
+            &mut valkey,
+            &[
+                "SET",
+                &key(&fleet, &format!("node:{name}")),
+                &beat.to_string(),
+                "EX",
+                "60",
+            ],
+        );
+    }
+    let time = ServerTime::new(fleet.valkey.clone(), 1000);
+    let file = fleet.dir.join(MANIFEST);
+    let source = fs::read_to_string(&file)
+        .unwrap()
+        .replace(&fleet.valkey, &format!("redis://{}", time.address));
+    fs::write(&file, source).unwrap();
+    let recovered = run_in(
+        &fleet.dir,
+        "en_US.UTF-8",
+        &["snapshot", "fence", "recover", "--workspace", MANIFEST],
+    );
+    drop(time);
+    assert_eq!(recovered, ("700\n".into(), String::new(), Some(0)));
+}

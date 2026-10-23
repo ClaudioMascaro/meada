@@ -428,8 +428,11 @@ fleet stops: the refused publish exits 1 naming `{<key_prefix>}:fence`, the pull
 a higher fence exits 1 without swapping, and `meada status --generations` on that node prints a
 `fence: stuck: ...` line with both fences (its exit code does not change). Run
 `meada snapshot fence recover --workspace <manifest>`: under the lock, it raises the counter
-to the highest fence in the pointer, retained generations, workspace and valid heartbeats.
-The next publish uses a higher fence and unsticks the nodes. For an isolated node whose fence
+to the highest fence in the pointer, retained generations, workspace and valid heartbeats,
+using Valkey time to select live nodes. The next publish uses a higher fence and unsticks the
+nodes. Valkey `INCR` has a ceiling of 9223372036854775807; recovery refuses floors or recorded
+fences above 9223372036854775806 and does not consume the last available acquisition. Reads
+and transport continue to accept exact `u64` fences. For an isolated node whose fence
 appears in no valid heartbeat, pass it as `--at-least <fence>`, or delete that node's
 `<local_dir>/current` so it takes the current generation. Turning `[refresh_lock]` off after nodes recorded fences above 0 stops the fleet too,
 since without the lock every fence is 0: delete each node's `<local_dir>/current`.
@@ -828,7 +831,8 @@ include deployment profiles. Admission and operations are described above.
 
 The console offers OIDC-authenticated operator actions for the pointer, fence recovery and
 workspace versions, sharing the CLI lock and checks. Operations are off by default and
-every attempt leaves one audit line.
+every attempt leaves one audit line. Grants also bound manifest groups and errors; login
+preserves issuer parameters, and recovery respects Valkey's clock and counter ceiling.
 
 Version 0.1, the first. It indexes TypeScript and JavaScript repositories (`.ts`, `.tsx`, `.js`,
 `.jsx`, `.mjs`, `.cjs`) and Python ones (`.py`), reads the Rust code (`.rs`) of the

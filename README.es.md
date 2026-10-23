@@ -442,8 +442,11 @@ flota se detiene: el publish rechazado sale con 1 nombrando `{<key_prefix>}:fenc
 nodo con fence mayor sale con 1 sin cambiar, y `meada status --generations` en ese nodo imprime
 una línea `fence: stuck: ...` con los dos fences (su código de salida no cambia). Ejecute
 `meada snapshot fence recover --workspace <manifiesto>`: bajo el lock, eleva el contador hasta
-el mayor fence del pointer, las generaciones retenidas, el workspace y los heartbeats válidos.
-El siguiente publish usa un fence mayor y desbloquea los nodos. Para un nodo aislado cuyo fence
+el mayor fence del pointer, las generaciones retenidas, el workspace y los heartbeats válidos,
+usando el reloj de Valkey para seleccionar los nodos vivos. El siguiente publish usa un fence
+mayor y desbloquea los nodos. `INCR` de Valkey tiene un límite de 9223372036854775807; la
+recuperación rechaza pisos o fences registrados superiores a 9223372036854775806 y no consume
+la última adquisición disponible. La lectura y el transporte siguen aceptando fences `u64` exactos. Para un nodo aislado cuyo fence
 no aparece en un heartbeat válido, páselo como `--at-least <fence>`, o borre su
 `<local_dir>/current` para que tome la generación actual. Apagar `[refresh_lock]` después de que los nodos registraron fences
 por encima de 0 también detiene la flota, ya que sin el candado todo fence es 0: borre el
@@ -854,7 +857,8 @@ se describen arriba.
 La consola ofrece operaciones autenticadas por OIDC para operadores: pointer, recuperación
 de fence y versiones del workspace, con el mismo lock y las mismas comprobaciones del CLI.
 Las operaciones están desactivadas por defecto y cada intento genera una línea de
-auditoría.
+auditoría. El grant también limita los grupos y errores del manifiesto; el login conserva los
+parámetros del issuer y la recuperación respeta el reloj y el límite del contador de Valkey.
 
 Versión 0.1, la primera. Indexa repositorios TypeScript y JavaScript (`.ts`, `.tsx`, `.js`,
 `.jsx`, `.mjs`, `.cjs`) y Python (`.py`), lee el código Rust (`.rs`) de los crates del

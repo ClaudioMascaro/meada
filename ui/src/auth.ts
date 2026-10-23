@@ -67,13 +67,14 @@ export class Auth {
     const state = random();
     const verifier = random();
     const url = new URL(metadata.authorization);
-    url.search = new URLSearchParams({
+    const parameters = {
       response_type: 'code', client_id: this.config.client_id!,
       redirect_uri: `${this.config.public_url}/auth/callback`,
       scope: [...new Set(['openid', ...this.config.scopes ?? []])].join(' '),
       state, code_challenge: await challenge(verifier), code_challenge_method: 'S256',
       ...this.config.audience ? { audience: this.config.audience } : {},
-    }).toString();
+    };
+    for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
     sessionStorage.setItem(STATE, state);
     sessionStorage.setItem(VERIFIER, verifier);
     this.redirect(url.href);

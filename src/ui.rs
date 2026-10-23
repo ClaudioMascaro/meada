@@ -621,6 +621,18 @@ impl Console {
             if let Some(Value::Array(entries)) = loaded.get_mut("repository") {
                 read::filter_entries(entries, "repo", session);
             }
+            if let Some(groups) = loaded
+                .pointer_mut("/oidc/groups")
+                .and_then(Value::as_object_mut)
+            {
+                for identities in groups.values_mut().filter_map(Value::as_array_mut) {
+                    identities.retain(|identity| {
+                        identity
+                            .as_str()
+                            .is_some_and(|i| i == "*" || session.reads(i))
+                    });
+                }
+            }
             let on_disk = fs::read_to_string(&self.file).ok();
             let on_disk = on_disk.and_then(|src| toml::from_str::<toml::Table>(&src).ok());
             let hidden: Option<Vec<String>> = on_disk.map(|table| {
@@ -883,10 +895,10 @@ fn origin(url: &str) -> &str {
     &url[..end]
 }
 
-/// Repository and peer identities of `manifest`, including peers it does not list as entries.
+/// Repository, peer and group identities, including identities not listed as entries.
 fn identities(manifest: &Value) -> impl Iterator<Item = &str> {
     let entries = manifest.get("repository").and_then(Value::as_array);
-    (entries.into_iter().flatten()).flat_map(|entry| {
+    let repositories = (entries.into_iter().flatten()).flat_map(|entry| {
         let own = entry.get("repo").and_then(Value::as_str);
         let peers = entry
             .get("peer")
@@ -895,7 +907,22 @@ fn identities(manifest: &Value) -> impl Iterator<Item = &str> {
             .flatten()
             .filter_map(|peer| peer.get("repo").and_then(Value::as_str));
         own.into_iter().chain(peers)
-    })
+    });
+    let groups = manifest
+        .pointer("/oidc/groups")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flat_map(|groups| groups.values())
+        .flat_map(|value| {
+            value.as_str().into_iter().chain(
+                value
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str),
+            )
+        });
+    repositories.chain(groups)
 }
 
 /// The position of the manifest error `line` about `file`: `<file>:<line>`, its text left out.

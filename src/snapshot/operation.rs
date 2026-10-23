@@ -12,7 +12,7 @@ use redis::cmd;
 use super::generations::{self, KEPT_MAX, pointer};
 use super::lock::{self, Held};
 use super::store::Store;
-use super::{fence, is_id, is_node_name, pull};
+use super::{fence, is_id, pull};
 use crate::msg::Msg;
 use crate::valkey::{self, Valkey};
 use crate::workspace::Manifest;
@@ -58,7 +58,8 @@ pub(super) fn locked<T>(
     let config = &sections.valkey;
     let run = async {
         let valkey = Valkey::connect(config).await?;
-        let held = lock::acquire(&valkey, config, sections.lock.ttl, holds).await?;
+        let held =
+            lock::acquire(&valkey, config, sections.lock.ttl, holds, lock::LAST_FENCE).await?;
         let done = op(&valkey, config, sections.keep, &held).await;
         lock::release(&valkey, config, &held.token).await;
         done
@@ -232,7 +233,8 @@ pub fn pointer_drop(manifest: &Path, id: &str, author: &str) -> crate::Result<St
 }
 
 /// Raises the fence to `ARGV[2]` while the lock (`KEYS[1]`) holds the token `ARGV[1]`, never
-/// lowering it: the fence (`KEYS[2]`) it leaves, compared as decimal text; nil without the lock.
+/// lowering it: the fence (`KEYS[2]`) it leaves, compared as decimal text; nil without the lock,
+/// an empty string if the stored counter exceeds the recovery ceiling `ARGV[3]`.
 const RAISE: &str = r"
 if redis.call('GET', KEYS[1]) ~= ARGV[1] then
   return false
@@ -240,6 +242,10 @@ end
 local held = redis.call('GET', KEYS[2])
 if held and string.match(held, '^%d+$') then
   held = (string.gsub(held, '^0+(%d)', '%1'))
+  local ceiling = ARGV[3]
+  if #held > #ceiling or (#held == #ceiling and held > ceiling) then
+    return ''
+  end
   local fence = ARGV[2]
   if #fence < #held or (#fence == #held and fence <= held) then
     return held
@@ -264,23 +270,51 @@ pub fn fence_recover(
             fence(text).ok_or_else(|| Msg::BadFenceArg(&text.escape_debug().to_string()).text())?
         }
     };
-    locked(
-        &sections(manifest)?,
-        &format!("fence recover {}", author.escape_debug()),
-        async |valkey, config, _, held| {
+    let sections = sections(manifest)?;
+    let config = &sections.valkey;
+    let (lock, fence_key, _) = lock::keys(config);
+    // Recovery must leave one native INCR for the next locked publish.
+    let max = lock::LAST_FENCE - 1;
+    let usable = |value: u64| match value <= max {
+        true => Ok(()),
+        false => Err(Msg::FenceLimit {
+            key: &fence_key,
+            max,
+        }
+        .text()),
+    };
+    usable(floor)?;
+    let run = async {
+        let valkey = Valkey::connect(config).await?;
+        usable(recorded(&valkey, config, &mut Vec::new()).await?)?;
+        let holds = format!("fence recover {}", author.escape_debug());
+        let held = lock::acquire(&valkey, config, sections.lock.ttl, &holds, max).await?;
+        let done = async {
             let mut skipped = Vec::new();
-            let highest = recorded(valkey, config, &mut skipped).await?.max(floor);
-            let (lock, fence_key, _) = lock::keys(config);
+            // Recheck under the lock: another publisher may have run since the preflight.
+            let highest = recorded(&valkey, config, &mut skipped).await?.max(floor);
+            usable(highest)?;
             let mut raise = cmd("EVAL");
             raise.arg(RAISE).arg(2).arg(&lock).arg(&fence_key);
-            raise.arg(&held.token).arg(highest);
+            raise.arg(&held.token).arg(highest).arg(max);
             let left: Option<String> =
                 (valkey.query(&raise).await).map_err(|e| format!("{fence_key}: {e}"))?;
             let left = left.ok_or_else(|| Msg::LockNotHeld(&lock).text())?;
+            if left.is_empty() {
+                return Err(Msg::FenceLimit {
+                    key: &fence_key,
+                    max,
+                }
+                .text());
+            }
             let left = fence(&left).ok_or_else(|| Msg::LockBadFence(&fence_key).text())?;
             Ok((left, skipped))
-        },
-    )
+        }
+        .await;
+        lock::release(&valkey, config, &held.token).await;
+        done
+    };
+    Ok(crate::modules::block_on(run)??)
 }
 
 /// The highest fence recorded in the pointer, the workspace pointer, the retained list and the
@@ -326,35 +360,10 @@ async fn recorded(
         }
     }
 
-    let nodes = config.key("nodes", true);
-    let live = cmd("ZRANGEBYSCORE")
-        .arg(&nodes)
-        .arg(format!("({}", lock::now()))
-        .arg("+inf")
-        .clone();
-    let names: Vec<Vec<u8>> = (valkey.query(&live).await).map_err(|e| format!("{nodes}: {e}"))?;
-    for name in &names {
-        let Some(name) = std::str::from_utf8(name).ok().filter(|n| is_node_name(n)) else {
-            let name = String::from_utf8_lossy(name).escape_debug().to_string();
-            skip(
-                Msg::NodeNameBad {
-                    key: &nodes,
-                    name: &name,
-                }
-                .text(),
-            );
-            continue;
-        };
-        let key = config.key(&format!("node:{name}"), true);
-        let get = cmd("GET").arg(&key).clone();
-        let beat: Option<Vec<u8>> =
-            (valkey.query(&get).await).map_err(|e| format!("{key}: {e}"))?;
-        // A name whose key expired has no heartbeat: nothing to count.
-        let Some(beat) = beat else { continue };
-        match super::heartbeat::checked(name, &beat) {
-            Some(beat) => fences.extend(beat.fence),
-            None => skip(Msg::HeartbeatBad(&key).text()),
-        }
+    let (heartbeats, malformed) = super::heartbeat::read(valkey, config).await?;
+    fences.extend(heartbeats.into_iter().filter_map(|beat| beat.fence));
+    for problem in malformed {
+        skip(problem.warning(config));
     }
     Ok(fences.into_iter().max().unwrap_or(0))
 }

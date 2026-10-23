@@ -160,14 +160,37 @@ end
 return 0
 ";
 
+/// The last fence Valkey's native signed INCR can issue. Wire/read fences remain u64.
+pub(super) const LAST_FENCE: u64 = i64::MAX as u64;
+
+/// Increment only under our token and below the caller's ceiling. Compare decimal text and
+/// read back after INCR: Lua numbers cannot return large fences exactly. Nil means lock lost;
+/// an empty string means the acquisition would exceed the ceiling.
+const INCREMENT: &str = r"
+if redis.call('GET', KEYS[1]) ~= ARGV[1] then
+  return false
+end
+local held = redis.call('GET', KEYS[2])
+if held and string.match(held, '^%d+$') then
+  held = (string.gsub(held, '^0+(%d)', '%1'))
+  local ceiling = ARGV[2]
+  if #held > #ceiling or (#held == #ceiling and held >= ceiling) then
+    return ''
+  end
+end
+redis.call('INCR', KEYS[2])
+return redis.call('GET', KEYS[2])
+";
+
 /// Takes the refresh lock for `ttl` as `meada snapshot lock` does, its holder saying what
-/// `holds` it, then `INCR`s the fence: the token and the fence, or an error naming the key (a
-/// lock already held names its holder). Whoever gets `Ok` calls `release`.
+/// `holds` it, then `INCR`s the fence up to `max_fence`: the token and the fence, or an error
+/// naming the key (a lock already held names its holder). Whoever gets `Ok` calls `release`.
 pub async fn acquire(
     valkey: &Valkey,
     config: &valkey::Config,
     ttl: Duration,
     holds: &str,
+    max_fence: u64,
 ) -> Result<Held, String> {
     let (lock, fence_key, holder) = keys(config);
     let token = token()?;
@@ -191,19 +214,26 @@ pub async fn acquire(
         };
         return Err(Msg::LockHeld { key: &lock, holder }.text());
     }
-    let incr = cmd("INCR").arg(&fence_key).clone();
-    let fence = match valkey.query::<i64>(&incr).await {
-        Ok(fence) => u64::try_from(fence).ok().filter(|f| *f > 0),
-        Err(e) => {
-            release(valkey, config, &token).await;
-            return Err(format!("{fence_key}: {e}"));
+    let mut incr = cmd("EVAL");
+    incr.arg(INCREMENT).arg(2).arg(&lock).arg(&fence_key);
+    incr.arg(&token).arg(max_fence);
+    let acquired = match valkey.query::<Option<String>>(&incr).await {
+        Ok(None) => Err(Msg::LockNotHeld(&lock).text()),
+        Ok(Some(text)) if text.is_empty() => Err(Msg::FenceLimit {
+            key: &fence_key,
+            max: max_fence,
         }
+        .text()),
+        Ok(Some(text)) => super::fence(&text)
+            .filter(|f| *f > 0)
+            .ok_or_else(|| Msg::LockBadFence(&fence_key).text()),
+        Err(e) => Err(format!("{fence_key}: {e}")),
     };
-    match fence {
-        Some(fence) => Ok(Held { token, fence }),
-        None => {
+    match acquired {
+        Ok(fence) => Ok(Held { token, fence }),
+        Err(error) => {
             release(valkey, config, &token).await;
-            Err(Msg::LockBadFence(&fence_key).text())
+            Err(error)
         }
     }
 }
@@ -260,7 +290,8 @@ async fn supervise(
     // A renewal counts from before it was sent: the lock lives at least a TTL from then.
     let mut renewed = Instant::now();
     let program = command[0].to_string_lossy();
-    let Held { token, fence } = acquire(&valkey, config, ttl, &format!("lock {program}")).await?;
+    let Held { token, fence } =
+        acquire(&valkey, config, ttl, &format!("lock {program}"), LAST_FENCE).await?;
     let child = match spawn(command, &token, fence) {
         Ok(child) => child,
         Err(e) => {

@@ -178,13 +178,46 @@ pub(super) fn checked(name: &str, bytes: &[u8]) -> Option<Heartbeat> {
         })
 }
 
+/// A live entry that cannot contribute a fence or a generation lookup.
+#[cfg(any(feature = "ui", feature = "refresh-lock"))]
+pub(crate) enum Malformed {
+    Name(String),
+    Document(String),
+}
+
+#[cfg(any(feature = "ui", feature = "refresh-lock"))]
+impl Malformed {
+    #[cfg(feature = "refresh-lock")]
+    pub(super) fn warning(&self, config: &valkey::Config) -> String {
+        match self {
+            Self::Name(name) => Msg::NodeNameBad {
+                key: &config.key("nodes", true),
+                name: &name.escape_debug().to_string(),
+            }
+            .text(),
+            Self::Document(name) => {
+                Msg::HeartbeatBad(&config.key(&format!("node:{name}"), true)).text()
+            }
+        }
+    }
+
+    #[cfg(feature = "ui")]
+    pub(crate) fn row(&self, config: &valkey::Config) -> serde_json::Value {
+        match self {
+            Self::Name(name) => serde_json::json!({"name":name, "reason":"not a node name"}),
+            Self::Document(name) => {
+                serde_json::json!({"name":name, "reason":Msg::HeartbeatBad(&config.key(&format!("node:{name}"), true)).text()})
+            }
+        }
+    }
+}
+
 /// Live, well-formed heartbeats and malformed names/documents. Invalid names never form keys.
-#[cfg(feature = "ui")]
+#[cfg(any(feature = "ui", feature = "refresh-lock"))]
 pub(crate) async fn read(
     valkey: &Valkey,
     config: &valkey::Config,
-) -> std::result::Result<(Vec<Heartbeat>, Vec<serde_json::Value>), String> {
-    use serde_json::json;
+) -> std::result::Result<(Vec<Heartbeat>, Vec<Malformed>), String> {
     let nodes = config.key("nodes", true);
     // Scores are written against Valkey's own clock, including when a node's clock is skewed.
     let time: (u64, u64) = valkey.query(&cmd("TIME")).await?;
@@ -195,21 +228,25 @@ pub(crate) async fn read(
                 .arg(format!("({}", time.0))
                 .arg("+inf"),
         )
-        .await?;
+        .await
+        .map_err(|e| format!("{nodes}: {e}"))?;
     let (mut valid, mut malformed) = (Vec::new(), Vec::new());
     for bytes in names {
         let name = String::from_utf8_lossy(&bytes).to_string();
         if !is_node_name(&name) {
-            malformed.push(json!({"name": name, "reason": "not a node name"}));
+            malformed.push(Malformed::Name(name));
             continue;
         }
         let key = config.key(&format!("node:{name}"), true);
-        let bytes: Option<Vec<u8>> = valkey.query(cmd("GET").arg(&key)).await?;
+        let bytes: Option<Vec<u8>> = valkey
+            .query(cmd("GET").arg(&key))
+            .await
+            .map_err(|e| format!("{key}: {e}"))?;
         let Some(bytes) = bytes else { continue };
         let beat = checked(&name, &bytes);
         match beat {
             Some(beat) => valid.push(beat),
-            None => malformed.push(json!({"name": name, "reason": Msg::HeartbeatBad(&key).text()})),
+            None => malformed.push(Malformed::Document(name)),
         }
     }
     Ok((valid, malformed))

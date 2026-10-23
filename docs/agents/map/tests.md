@@ -394,3 +394,9 @@ by the real WASM in `ui/tests/core.test.ts` and the binary `workspace import` in
 `tests/it/generations/imports.rs` with generation-pointer and real configured store services.
 `ui/tests/workspace.test.ts` checks local editor validation/diff and captured commands;
 `ui/tests/WorkspacePage.test.tsx` covers the labelled versions/editor/diff DOM and HTTP boundary.
+
+Review regressions for #293 cover manifest-wide grant filtering (including groups-only
+identities in validation errors), issuer query preservation at `Auth.login`, exact recovery
+ceilings through CLI and HTTP, and live-heartbeat selection with a controlled RESP `TIME`
+response while all other commands reach the real Valkey fixture. The ceiling tests preserve
+one final locked publish and compare English and Brazilian Portuguese refusals.
