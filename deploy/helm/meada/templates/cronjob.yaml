@@ -1,0 +1,66 @@
+{{- if .Values.modules.snapshot.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "meada.name" . | trunc 44 | trimSuffix "-" }}-refresh
+  labels:
+    {{- include "meada.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.cronJob.schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "meada.labels" . | nindent 12 }}
+            app.kubernetes.io/component: refresh
+        spec:
+          serviceAccountName: {{ include "meada.account" . }}
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: refresh
+              image: {{ include "meada.image" . }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              {{- if .Values.modules.refreshLock.enabled }}
+              args:
+                - snapshot
+                - lock
+                - --workspace
+                - /etc/meada/meada.workspace.toml
+                - --
+                - sh
+                - -ec
+                - /bin/sh /etc/meada/fetch.sh && meada index --workspace /etc/meada/meada.workspace.toml && meada snapshot publish --workspace /etc/meada/meada.workspace.toml
+              {{- else }}
+              command: ["/bin/sh", "-ec"]
+              args:
+                - /bin/sh /etc/meada/fetch.sh && meada index --workspace /etc/meada/meada.workspace.toml && meada snapshot publish --workspace /etc/meada/meada.workspace.toml
+              {{- end }}
+              env: {{ include "meada.env" . | nindent 16 }}
+              {{- if .Values.workspace.gitCredentialsSecret }}
+              envFrom:
+                - secretRef:
+                    name: {{ .Values.workspace.gitCredentialsSecret }}
+              {{- end }}
+              volumeMounts: {{ include "meada.mounts" . | nindent 16 }}
+              resources: {{ toYaml .Values.cronJob.resources | nindent 16 }}
+          volumes: {{ include "meada.volumes" . | nindent 12 }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity: {{ toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

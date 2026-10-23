@@ -1,0 +1,9 @@
+apiVersion: v2
+name: meada
+description: Local-first code graph, served over read-only MCP HTTP
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/ClaudioMascaro/meada
+sources:
+  - https://github.com/ClaudioMascaro/meada

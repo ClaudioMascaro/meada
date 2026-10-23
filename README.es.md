@@ -214,6 +214,8 @@ Un espejo es un checkout con árbol de trabajo; un clon bare no tiene qué index
 El [ejemplo Docker Compose](deploy/compose/README.es.md) ofrece los dos layouts siguientes, con
 dos nodos, TLS y admisión por token en el proxy.
 
+El [chart Helm](deploy/helm/meada/README.es.md) configura init, readiness, drain y el perfil de generaciones en Kubernetes.
+
 Varios servidores sobre los mismos índices funcionan sin módulo de nube, siempre que el
 operador respete un único escritor por índice.
 

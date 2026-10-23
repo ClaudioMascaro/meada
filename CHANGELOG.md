@@ -50,6 +50,9 @@ All notable changes to Meada are recorded here. The format follows
   managed workspace. Server-mode indexing records optional commit provenance beside the index,
   validated against its contents without changing the SQLite schema.
 
+- Helm chart for module-free nodes and generations, with local readiness, fenced refresh jobs,
+  external TLS services, OIDC values and OCI release publishing (#281).
+
 - Node heartbeat (spec #293, ADR 0014, feature `generation-pointer`): with `[generations]`,
   every round of `meada snapshot pull --every <seconds>` ends by writing the node's state into
   Valkey, whether the round swapped, changed nothing or failed: `{<key_prefix>}:node:<name>`, a

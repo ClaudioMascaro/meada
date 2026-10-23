@@ -1,0 +1,26 @@
+name: Helm
+
+on:
+  pull_request:
+    paths:
+      - deploy/helm/**
+      - scripts/helm-check
+      - .github/workflows/helm.yml
+      - Cargo.toml
+
+permissions:
+  contents: read
+
+jobs:
+  templates:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+        with:
+          version: v3.19.0
+      - name: Render both deployment profiles
+        run: |
+          python3 -m venv "$RUNNER_TEMP/helm-check-env"
+          "$RUNNER_TEMP/helm-check-env/bin/pip" install PyYAML==6.0.2
+          "$RUNNER_TEMP/helm-check-env/bin/python" scripts/helm-check

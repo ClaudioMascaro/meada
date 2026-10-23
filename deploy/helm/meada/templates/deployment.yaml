@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "meada.name" . }}
+  labels:
+    {{- include "meada.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "meada.serverLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "meada.serverLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "meada.account" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        {{- if .Values.modules.snapshot.enabled }}
+        - name: pull
+          image: {{ include "meada.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["snapshot", "pull", "--workspace", "/etc/meada/meada.workspace.toml"]
+          env: {{ include "meada.env" . | nindent 12 }}
+          volumeMounts: {{ include "meada.mounts" . | nindent 12 }}
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+        {{- else }}
+        - name: index
+          image: {{ include "meada.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - /bin/sh /etc/meada/fetch.sh; exec meada index --workspace /etc/meada/meada.workspace.toml
+          volumeMounts: {{ include "meada.mounts" . | nindent 12 }}
+          {{- if .Values.workspace.gitCredentialsSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.workspace.gitCredentialsSecret }}
+          {{- end }}
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+        {{- end }}
+      containers:
+        - name: meada
+          image: {{ include "meada.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: {{ include "meada.args" . | nindent 12 }}
+          ports:
+            - name: mcp
+              containerPort: {{ .Values.listen }}
+          readinessProbe:
+            {{- if eq .Values.readiness.type "tcp" }}
+            tcpSocket:
+              port: mcp
+            {{- else }}
+            exec:
+              command:
+                - meada
+                - status
+                - --workspace
+                - /etc/meada/meada.workspace.toml
+                {{- if .Values.modules.snapshot.enabled }}
+                - --generations
+                {{- end }}
+            {{- end }}
+            periodSeconds: {{ .Values.readiness.periodSeconds }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", {{ .Values.preStop.sleepSeconds | quote }}]
+          volumeMounts: {{ include "meada.mounts" . | nindent 12 }}
+          env: {{ include "meada.env" . | nindent 12 }}
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+        {{- if .Values.modules.snapshot.enabled }}
+        - name: pull
+          image: {{ include "meada.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["snapshot", "pull", "--every", {{ .Values.modules.generations.pullEverySeconds | quote }}, "--workspace", "/etc/meada/meada.workspace.toml"]
+          env: {{ include "meada.env" . | nindent 12 }}
+          volumeMounts: {{ include "meada.mounts" . | nindent 12 }}
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+        {{- end }}
+      volumes: {{ include "meada.volumes" . | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{ toYaml . | nindent 8 }}
+      {{- end }}
