@@ -16,6 +16,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Expanded pt-BR capabilities reference (issue #147): supported forms and known gaps for
+  each delivered language pack, contracts and provider documents, shape drift, communities
+  and process limits, with Release 2 language plans clearly separated from delivered packs.
+
 - Complete pt-BR setup reference (issue #146): installation channels, MCP parameters,
   local configuration and decision schemas, every delivered CLI command/option, and a
   canonical JSON export reference in Portuguese, English and Spanish.
