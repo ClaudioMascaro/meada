@@ -70,8 +70,9 @@ implemented, or reported as blocked.
 ## Docs move with the capability
 
 A change users can see (a language, a framework, a contract kind, a command or MCP behavior)
-updates, in the same PR, the README "Estado" section (`README.md`, with `README.en.md` and
-`README.es.md` as `AGENTS.md` requires) and `CHANGELOG.md` under its unreleased version.
+updates, in the same PR, the documentation capabilities page (`docs/site/pt/capabilities.md`,
+with its `en` and `es` equivalents as `AGENTS.md` requires), the relevant guide or reference,
+and `CHANGELOG.md` under its unreleased version.
 
 A change to what the code relies on updates the repository map (`docs/agents/architecture.md`)
 in the same change:

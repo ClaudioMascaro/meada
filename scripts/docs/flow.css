@@ -1,0 +1,89 @@
+/* Read-only engineering maps: a local canvas, not another application shell. */
+.graph-explorer { margin: 1.8rem 0 2.3rem; --flow-surface: #fafbf8; --flow-node: #fff; --flow-ink: #263d34; --flow-muted: #53695b; --flow-rule: #c9d8cd; --flow-control: #f0f4ee; }
+[data-md-color-scheme="slate"] .graph-explorer { --flow-surface: #192b22; --flow-node: #253e30; --flow-ink: #e4ece3; --flow-muted: #becdbf; --flow-rule: #4b6955; --flow-control: #304b39; }
+.graph-explorer .meada-flow:empty { display: none; }
+.graph-ready .graph-static { display: none; }
+.flow-shell { color: var(--flow-ink); background: var(--flow-surface); border: 1px solid var(--flow-rule); border-radius: 12px; overflow: hidden; }
+.flow-shell:fullscreen { border-radius: 0; display: flex; flex-direction: column; background: var(--flow-surface); }
+.flow-shell:fullscreen .flow-canvas { flex: 1; height: auto; }
+.flow-heading { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem 1.1rem .65rem; }
+.flow-heading strong { font-size: .83rem; line-height: 1.3; font-weight: 600; }
+.flow-heading > span { color: var(--flow-muted); white-space: nowrap; font-size: .58rem; }
+.flow-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; padding: 0 .8rem .75rem; border-bottom: 1px solid var(--flow-rule); }
+.flow-toolbar button, .flow-focus select { color: var(--flow-ink); background: var(--flow-control); border: 1px solid var(--flow-rule); border-radius: 6px; height: 36px; font: 500 12px/1 "IBM Plex Sans", sans-serif; }
+.flow-toolbar button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 9px; cursor: pointer; }
+.flow-toolbar button:hover, .flow-focus select:hover { background: var(--flow-node); }
+.flow-toolbar button:disabled { opacity: .45; cursor: default; }
+.flow-toolbar svg { width: 17px; height: 17px; }
+.flow-zoom { display: flex; gap: 2px; align-items: center; }
+.flow-zoom button { width: 32px; padding: 0; }
+.flow-zoom > span { width: 37px; font-size: 11px; text-align: center; font-variant-numeric: tabular-nums; }
+.flow-focus { min-width: 0; flex: 1; max-width: 220px; }
+.flow-focus select { width: 100%; min-width: 110px; padding: 0 22px 0 8px; text-overflow: ellipsis; cursor: pointer; }
+.flow-toolbar .flow-expand { margin-left: auto; }
+.flow-canvas { height: 460px; width: 100%; }
+.flow-canvas .react-flow { --xy-background-color: var(--flow-surface); --xy-node-color: var(--flow-ink); --xy-minimap-background-color: var(--flow-node); --xy-edge-stroke: #587b68; --xy-edge-stroke-width: 1.5; --xy-attribution-background-color: var(--flow-surface); }
+.flow-canvas .react-flow__node { width: 244px; height: 168px; border-radius: 12px; }
+.flow-canvas .react-flow__node:focus-visible { outline: 3px solid var(--md-accent-fg-color); outline-offset: 5px; }
+.flow-step { width: 244px; height: 168px; padding: 15px 16px 12px; background: var(--flow-node); color: var(--flow-ink); border: 1px solid var(--flow-rule); border-radius: 12px; box-sizing: border-box; display: flex; flex-direction: column; }
+.flow-step--planned { border-style: dashed; border-color: #927138; }
+.flow-step--guardrail { border-color: #a35a43; }
+.flow-step-heading { display: flex; align-items: flex-start; gap: 9px; }
+.flow-step-heading strong { font-size: 18px; line-height: 1.25; letter-spacing: -.015em; font-weight: 600; }
+.flow-step-icon { display: block; flex: 0 0 22px; color: #37755a; }
+.flow-step-icon svg { width: 22px; height: 22px; }
+.flow-step--planned .flow-step-icon { color: #8c6a27; }
+.flow-step--guardrail .flow-step-icon { color: #a35a43; }
+[data-md-color-scheme="slate"] .flow-step-icon { color: #a5d4b8; }
+[data-md-color-scheme="slate"] .flow-step--planned .flow-step-icon { color: #dfc492; }
+[data-md-color-scheme="slate"] .flow-step--guardrail .flow-step-icon { color: #ecc1b0; }
+.flow-step p { color: var(--flow-muted); font-size: 15px; line-height: 1.45; margin: 9px 0 0; }
+.flow-step-meta { display: flex; gap: 7px; align-items: center; margin-top: auto; padding-top: 7px; font-size: 11px; line-height: 1; }
+.flow-stage { font: 500 11px/1 "IBM Plex Mono", monospace; background: var(--flow-control); border-radius: 4px; padding: 4px 5px; }
+.flow-step-meta a { color: var(--meada-link); margin-left: auto; text-decoration: underline; }
+.flow-canvas .react-flow__handle { width: 5px; height: 5px; border: 0; background: var(--flow-rule); pointer-events: none; }
+.flow-canvas .react-flow__edge-text { fill: var(--flow-ink); font: 13px "IBM Plex Sans", sans-serif; }
+.flow-canvas .react-flow__edge-textbg { fill: var(--flow-surface); }
+/* Material constrains article SVG widths; Flow's absolute edge layer has no intrinsic width. */
+.flow-canvas .react-flow__edges svg { max-width: none; }
+.flow-edge--planned .react-flow__edge-path { stroke: #927138; stroke-dasharray: 6 5; }
+.flow-edge--failure .react-flow__edge-path { stroke: #a35a43; }
+.flow-canvas .react-flow__minimap { width: 114px; height: 76px; margin: 12px; border: 1px solid var(--flow-rule); border-radius: 6px; overflow: hidden; bottom: 20px; }
+.flow-canvas .react-flow__attribution { font-size: 10px; line-height: 1.4; padding: 4px 8px; color: var(--flow-muted); }
+.flow-canvas .react-flow__attribution a { color: var(--flow-muted); }
+.md-typeset .flow-instruction { margin: 0; padding: .55rem .85rem; border-top: 1px solid var(--flow-rule); font-size: .62rem; line-height: 1.5; color: var(--flow-muted); max-width: none; }
+.md-typeset .graph-description { margin: .8rem 0 0; border: 1px solid var(--meada-rule); border-radius: 7px; box-shadow: none; font-size: .72rem; background: transparent; }
+.md-typeset .graph-description > summary { background: transparent; padding: .65rem 1rem .65rem 1.8rem; color: var(--md-default-fg-color); }
+.md-typeset .graph-description > summary:before { display: none; }
+.md-typeset .graph-description > summary { padding-left: 1rem; }
+.md-typeset .graph-description ul { margin: 0; padding: 1rem 1.2rem 1rem 2.1rem; }
+.md-typeset .graph-description li { margin-bottom: .8rem; }
+.md-typeset .graph-description li span { display: block; }
+.md-typeset .graph-description .graph-next { color: var(--md-default-fg-color--light); font-size: .66rem; }
+.md-typeset .graph-links { margin: .6rem 0 0; display: flex; justify-content: space-between; gap: 1rem; font-size: .62rem; }
+.flow-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@media (max-width: 40em) {
+  .flow-heading { align-items: flex-start; padding: .85rem .75rem .6rem; gap: .5rem; }
+  .flow-heading strong { font-size: .77rem; }
+  .flow-heading > span { font-size: .55rem; }
+  .flow-toolbar { padding: 0 .65rem .65rem; gap: .35rem; }
+  .flow-toolbar button, .flow-focus select { height: 38px; }
+  .flow-focus { flex: 1 1 100%; order: 3; max-width: none; }
+  .flow-canvas { height: 430px; }
+  .flow-canvas .react-flow__minimap { width: 90px; height: 60px; }
+  .flow-step-heading strong { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .flow-shell *, .flow-shell *:before, .flow-shell *:after { animation: none !important; transition: none !important; } }
+.graph-static .diagram img { width: auto; max-width: none; min-width: 0; max-height: none; height: auto; }
+.flow-step-heading { border: 0; padding: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.flow-step-heading:hover strong { text-decoration: underline; text-underline-offset: 3px; }
+.flow-step.is-active { border-color: var(--md-accent-fg-color); background: var(--flow-control); }
+.flow-inspector { border-top: 1px solid var(--flow-rule); background: var(--flow-node); padding: 1rem 1.1rem .8rem; }
+.flow-detail > strong { display: block; font-size: .86rem; font-weight: 600; }
+.md-typeset .flow-detail > p { font-size: .74rem; line-height: 1.65; margin: .45rem 0 .6rem; color: var(--flow-muted); }
+.flow-detail > a { font-size: .7rem; text-decoration: underline; }
+.flow-step-navigation { display: flex; align-items: center; justify-content: space-between; gap: .7rem; padding-top: .9rem; }
+.flow-step-navigation button { color: var(--meada-link); border: 0; background: none; padding: 3px 0; font: 500 .65rem/1.5 "IBM Plex Sans",sans-serif; cursor: pointer; }
+.flow-step-navigation button:disabled { color: var(--flow-muted); opacity: .5; cursor: default; }
+.flow-step-navigation > span { color: var(--flow-muted); font-size: .6rem; font-variant-numeric: tabular-nums; }
+.flow-shell:fullscreen .flow-inspector { max-height: 30vh; overflow-y: auto; }
