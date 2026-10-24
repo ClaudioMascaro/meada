@@ -16,6 +16,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Stability policy for 1.x in pt-BR, English and Spanish (issue #148), with the frozen
+  surface, versioning rules and review gates; it takes effect only when 1.0 is published.
+
 - Expanded pt-BR capabilities reference (issue #147): supported forms and known gaps for
   each delivered language pack, contracts and provider documents, shape drift, communities
   and process limits, with Release 2 language plans clearly separated from delivered packs.
