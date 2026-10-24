@@ -30,6 +30,13 @@ All notable changes to Meada are recorded here. The format follows
   literal `group:artifact` providers, Maven modules and parent groups, Gradle project names,
   dependencies with unchecked ranges, and ambiguous candidates for computed coordinates.
   Indexing invokes no JVM toolchain and looks up no registry.
+- Spring MVC HTTP providers (spec #26, #86): methods of `@RestController` and `@Controller`
+  classes with `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping`
+  or `@RequestMapping(method = ..)`, under the class `@RequestMapping` prefix, with `static
+  final` constants and `+` folded across classes and one provider per path of an array. A
+  `@RequestMapping` without `method` is an `http::ANY::<path>` provider. Annotations and
+  `RequestMethod` count only through a single-type or static Spring import; a wildcard import,
+  a shadowing repository type and `server.servlet.context-path` give no route.
 
 - A multilingual documentation site (issue #320), with the README reference migrated to
   Portuguese, English and Spanish guides, React Flow maps and roadmap, accessible static and

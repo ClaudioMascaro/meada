@@ -772,7 +772,7 @@ one for the area a change touches.
   requests, httpx and aiohttp consumers, whose rows also list reqwest and ureq; `http/rust.rs`
   and `http/rust/axum.rs`, actix-web, Rocket and axum providers; `http/go.rs` and
   `http/go/clients.rs`, net/http, gin, echo, chi and gorilla/mux providers and their consumers
-  with resty), resource and channel kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
+  with resty; `http/java.rs`, Spring MVC providers), resource and channel kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
   contracts (specs #22, #24, #30, #25 and #26), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
   [map/contracts.md](map/contracts.md).
@@ -1677,6 +1677,17 @@ one for the area a change touches.
   is found when its third argument is a literal or a name that holds one; any other leaves the
   consumer on the function that calls `Consume`. A queue name is the last segment of the SQS
   queue URL.
+- `http/java.rs` (spec #26, #86): a Spring MVC route is read from `Call::decorates` on a method
+  of a `@RestController` or `@Controller` class, under the class's `@RequestMapping` prefix
+  (nested classes do not inherit the outer prefix). An annotation or `RequestMethod.X` counts
+  only when `Code::outside` says a single-type or static import from Spring binds its name, so
+  a wildcard import (`...bind.annotation.*`, unresolved for any pack) and a type of the
+  repository with the same name (a nested or same-package `RequestMethod`) yield no route; the
+  kind reads the enum member off the written `Value::Ref`, with no table in the pack. A path
+  folds constants and `+` through `Code::value`; one that does not fold, a `value` with a
+  `path`, a class-level `method`, an unreadable `method` element, or a pattern with a `/`
+  inside braces (`{id:a/b}`) serves nothing. Interface-declared mappings, composed annotations
+  and `server.servlet.context-path` are not read.
 - `http/go.rs` (spec #25): a route is read only with a literal path and a literal prefix; a
   group prefix or a pattern Meada cannot read serves nothing. `net/http` reads `{name}`,
   `{name...}` and `{$}` alone: a `:name` segment is a literal no contract can spell, so its route

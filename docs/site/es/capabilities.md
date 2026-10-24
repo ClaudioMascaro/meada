@@ -54,6 +54,9 @@ Meada conecta consumidores y proveedores entre lenguajes, incluso detrás de gat
 | Python | `requests`, `httpx`, `aiohttp` | FastAPI, Flask, Django |
 | Rust | `reqwest`, `ureq` | axum, actix-web, Rocket |
 | Go | `net/http`, resty | `net/http`, gin, echo, chi, gorilla/mux |
+| Java | n/a | Spring MVC |
+
+En Java, un método de una clase `@RestController` o `@Controller` con `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping` o `@RequestMapping(method = RequestMethod.X)` pasa a ser proveedor, bajo el prefijo del `@RequestMapping` de la clase. La ruta pliega constantes `static final` (también de otras clases) y `+`; cada ruta de un array es un proveedor. Un `@RequestMapping` sin `method` atiende todos los métodos (`http::ANY::<ruta>`) y se vincula a consumidores de cualquier método, con "any method" en la razón. `server.servlet.context-path` no se aplica. Las anotaciones y `RequestMethod` solo valen por un import simple o estático de Spring: `import ...bind.annotation.*` no basta y una clase del repositorio con el mismo nombre las oculta.
 
 En Rust, `base_url_env` puede vincular una URL base leída con `std::env::var`, `env!` o `dotenvy::var`. En Go, cubre `os.Getenv` y `os.LookupEnv`, incluidos valores por defecto con `if v == ""`, `len(v) == 0`, `!ok` o `!ok || v == ""` cuando `ok` viene del mismo `os.LookupEnv`. También sigue `strings.TrimSuffix`, `TrimRight` y `TrimSpace`.
 
