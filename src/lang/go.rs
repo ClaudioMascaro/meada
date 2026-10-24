@@ -945,6 +945,7 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
         decorates: None,
         by_path: false,
         root: None,
+        on: None,
         receiver: None,
         arg_types: Vec::new(),
         uses: Vec::new(),

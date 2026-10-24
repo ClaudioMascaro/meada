@@ -206,6 +206,7 @@ impl LanguagePack for Python {
                             decorates: decorators.remove(&node.id()),
                             by_path: false,
                             root: None,
+                            on: None,
                             receiver: None,
                             arg_types: Vec::new(),
                             uses: Vec::new(),

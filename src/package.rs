@@ -1760,6 +1760,7 @@ mod tests {
                 target: None,
                 level: None,
                 candidates: Vec::new(),
+                narrowed: false,
                 span: Span {
                     path: "web/app.ts".into(),
                     start: 0,

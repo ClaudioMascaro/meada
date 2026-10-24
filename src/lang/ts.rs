@@ -130,6 +130,7 @@ impl LanguagePack for TsJs {
                             decorates: None,
                             by_path: false,
                             root: None,
+                            on: None,
                             receiver: None,
                             arg_types: arguments
                                 .map(|a| named(a).map(|arg| cast(arg, src, &parents)).collect())

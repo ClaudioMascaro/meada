@@ -543,6 +543,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                                 decorates: Some(qualified.clone()),
                                 by_path,
                                 root: None,
+                                on: None,
                                 receiver: None,
                                 arg_types: Vec::new(),
                                 uses: Vec::new(),
@@ -758,6 +759,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     decorates: None,
                     by_path,
                     root: chain_root(function, src),
+                    on: None,
                     receiver: None,
                     arg_types: Vec::new(),
                     uses: Vec::new(),
@@ -2510,6 +2512,7 @@ mod tests {
                     Class::Enclosing => "Self".to_string(),
                     Class::Named(n) | Class::Type(n) => n,
                     Class::Returned(n) | Class::Called(n) => format!("{n}()"),
+                    Class::Result(n) => format!("#{n}()"),
                     Class::Imported => "imported".into(),
                     Class::Unknown => "?".into(),
                 };

@@ -1,0 +1,9 @@
+example.com/acme/conformance maven/api/src/main/java/example/calls/Store.java:7-7 example.calls.Store.ping()
+community: maven/api/src/main/java/example/calls
+processes: 2 (2 export; 1 repository): example.calls.Client.typed(Repo) (example.com/acme/conformance), example.calls.Repo.run() (example.com/acme/conformance)
+public void ping() {}
+callers:
+example.com/acme/conformance maven/api/src/main/java/example/calls/Client.java:13 example.calls.Client.typed(Repo)
+example.com/acme/conformance maven/api/src/main/java/example/calls/Client.java:40 example.calls.Client.unknown() [ambiguous: 2 methods named ping]
+example.com/acme/conformance maven/api/src/main/java/example/calls/Repo.java:15 example.calls.Repo.run() [inferred: one of several methods named ping]
+callees: none
