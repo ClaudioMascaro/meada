@@ -16,6 +16,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Complete pt-BR setup reference (issue #146): installation channels, MCP parameters,
+  local configuration and decision schemas, every delivered CLI command/option, and a
+  canonical JSON export reference in Portuguese, English and Spanish.
+
 - Public fixture benchmark (issue #149): release-profile index/reindex timings, root and
   workspace index sizes, and default-answer/tool-list token estimates in every PR/main CI
   summary and retained JSON/Markdown artifact. Timings are informational.

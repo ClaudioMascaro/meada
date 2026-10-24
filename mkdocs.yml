@@ -69,6 +69,7 @@ plugins:
             Configuração: Configuration
             Usar: Use Meada
             Comandos: Commands
+            Export JSON: JSON export
             Agentes e MCP: Agents and MCP
             Decisões: Decisions
             Capacidades e limites: Capabilities and limits
@@ -100,6 +101,7 @@ plugins:
             Configuração: Configuración
             Usar: Usar Meada
             Comandos: Comandos
+            Export JSON: Exportación JSON
             Agentes e MCP: Agentes y MCP
             Decisões: Decisiones
             Capacidades e limites: Capacidades y límites
@@ -145,6 +147,7 @@ nav:
       - Configuração: configuration.md
   - Usar:
       - Comandos: cli.md
+      - Export JSON: export.md
       - Agentes e MCP: mcp.md
       - Decisões: decisions.md
       - Capacidades e limites: capabilities.md
