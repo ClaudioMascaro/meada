@@ -44,4 +44,4 @@ Uma chave desconhecida ou mal escrita dá um erro com o arquivo, a linha e a cha
 
 ## Artefatos JVM
 
-Os contratos de pacotes JVM são descobertos nos manifests: `pom.xml`, `settings.gradle`, `settings.gradle.kts`, `build.gradle` e `build.gradle.kts`. Não exigem chave adicional em `meada.toml`. Declare os outros repositórios em `[[peer]]` como nos exemplos acima. Use coordenadas literais para ligações `exact`; propriedades Maven e expressões Gradle permanecem sem avaliação e produzem candidatos `ambiguous`.
+Os contratos de pacotes JVM são descobertos nos manifests: `pom.xml`, `settings.gradle`, `settings.gradle.kts`, `build.gradle` e `build.gradle.kts`. Não exigem chave adicional em `meada.toml`. Declare os outros repositórios em `[[peer]]` como nos exemplos acima. Use coordenadas literais para ligações `exact`; propriedades Maven e expressões Gradle permanecem sem avaliação, e as que formam o grupo ou o artefato produzem candidatos `ambiguous`.

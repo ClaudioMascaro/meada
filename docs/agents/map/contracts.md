@@ -404,6 +404,12 @@ modules updates it.
   only literal group/project/include metadata, which `inherit` joins with build files.
   Each named manifest provides `package::maven::<group>:<artifact>`. Dependencies use the
   existing package reason with `range unchecked`; properties and variables stay unevaluated.
-  The generic `fits` question matches candidate names, and `uncertainty` keeps computed
-  coordinates ambiguous even with one provider. Literal coordinate fragments filter those
-  candidates; dependencies outside the workspace add nothing.
+  The generic `fits` question matches candidate names, and `uncertainty` keeps a computed
+  group or artifact ambiguous even with one provider; a computed version alone stays exact,
+  its range as written. Literal coordinate fragments filter those candidates, a coordinate
+  with none (`*:*`) is no consumer, and a manifest is never a candidate of its own
+  dependency (`consume` and `link` drop it). Gradle map notation (`group:`/`name:`/`version:`)
+  is read as a coordinate; a call (`project(...)`, `platform(...)`), a catalog accessor and
+  a configuration block's contents are not. A settings assignment to a project's `name` or
+  `projectDir`, and a `group` set in `allprojects`, drop the affected provider.
+  Dependencies outside the workspace add nothing.

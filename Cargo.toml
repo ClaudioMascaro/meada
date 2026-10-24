@@ -82,7 +82,9 @@ rustls = { version = "0.23.46", optional = true, default-features = false, featu
     "tls12",
 ] }
 rustls-platform-verifier = { version = "0.7.1", optional = true }
-# Maven POMs: read-only XML, DTD disabled and bounded in the shared JVM reader.
+# Maven POMs: read-only XML, DTD disabled and bounded in the shared JVM reader. Not quick-xml:
+# it is in the lockfile only through the optional `snapshot` feature (`object_store`), and the
+# default dependency tree forbids it.
 roxmltree = "0.21.1"
 rusqlite = { version = "0.40.2", features = ["bundled"] }
 schemars = "1.2.3"

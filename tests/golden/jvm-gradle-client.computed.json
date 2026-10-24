@@ -13,7 +13,7 @@
     {
       "contract": "package::maven::example:models",
       "site": "example.com/jvm/gradle-client::build.gradle::api::example:models",
-      "via": "computed"
+      "via": null
     },
     {
       "contract": "package::maven::*:tools",
@@ -71,14 +71,14 @@
       "provider": "example.com/jvm/gradle-client::build.gradle",
       "contract": "package::maven::example:*",
       "level": "ambiguous",
-      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
     },
     {
       "consumer": "example.com/jvm/gradle-client::build.gradle::api::example:models",
       "provider": "example.com/jvm/maven::models/pom.xml",
       "contract": "package::maven::example:models",
-      "level": "ambiguous",
-      "reason": "computed coordinate; package::maven::example:models $version (local 1.2.0), range unchecked"
+      "level": "exact",
+      "reason": "package::maven::example:models $version (local 1.2.0), range unchecked"
     },
     {
       "consumer": "example.com/jvm/gradle-client::build.gradle::compileOnly::*:tools",
@@ -99,56 +99,49 @@
       "provider": "example.com/jvm/client::pom.xml",
       "contract": "package::maven::example:*",
       "level": "ambiguous",
-      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
-    },
-    {
-      "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
-      "provider": "example.com/jvm/gradle-client::build.gradle",
-      "contract": "package::maven::example:*",
-      "level": "ambiguous",
-      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
     },
     {
       "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
       "provider": "example.com/jvm/gradle::build.gradle.kts",
       "contract": "package::maven::example:*",
       "level": "ambiguous",
-      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 2.0), range unchecked"
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 2.0), range unchecked"
     },
     {
       "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
       "provider": "example.com/jvm/gradle::extras/nested/build.gradle.kts",
       "contract": "package::maven::example:*",
       "level": "ambiguous",
-      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
     },
     {
       "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
       "provider": "example.com/jvm/gradle::tools/build.gradle",
       "contract": "package::maven::example:*",
       "level": "ambiguous",
-      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 2.0), range unchecked"
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 2.0), range unchecked"
     },
     {
       "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
       "provider": "example.com/jvm/maven::billing/pom.xml",
       "contract": "package::maven::example:*",
       "level": "ambiguous",
-      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked"
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked"
     },
     {
       "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
       "provider": "example.com/jvm/maven::models/pom.xml",
       "contract": "package::maven::example:*",
       "level": "ambiguous",
-      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked"
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked"
     },
     {
       "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
       "provider": "example.com/jvm/maven::pom.xml",
       "contract": "package::maven::example:*",
       "level": "ambiguous",
-      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked"
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked"
     }
   ]
 }

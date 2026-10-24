@@ -101,3 +101,35 @@ pub fn fits(pattern: &str, value: &str) -> bool {
     }
     false
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_pattern_keeps_literal_fragments_around_one_hole_each() {
+        assert_eq!(pattern("model${suffix}").as_deref(), Some("model*"));
+        assert_eq!(pattern("${a}${b}-core").as_deref(), Some("*-core"));
+        assert_eq!(pattern("$name").as_deref(), Some("*"));
+        assert_eq!(pattern("${a{b}}x").as_deref(), Some("*x"));
+        assert_eq!(pattern("${open"), None);
+        assert_eq!(pattern("$"), None);
+        assert_eq!(pattern("a/b"), None);
+        assert_eq!(pattern(""), None);
+        assert_eq!(pattern(&"a".repeat(crate::package::MAX_NAME + 1)), None);
+    }
+
+    #[test]
+    fn fits_matches_only_the_literal_fragments() {
+        assert!(fits("example:model*", "example:models"));
+        assert!(fits("example:model*", "example:model"));
+        assert!(fits("*:tools", "example:tools"));
+        assert!(fits("a*b*c", "aXbYc"));
+        assert!(fits("example:models", "example:models"));
+        assert!(!fits("example:models", "example:models2"));
+        assert!(!fits("*:tools", "example:toolsx"));
+        assert!(!fits("ab*b", "ab"));
+        assert!(!fits("a*b*c", "acb"));
+        assert!(!fits("x*ab*b", "xab"));
+    }
+}

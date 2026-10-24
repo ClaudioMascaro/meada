@@ -2193,8 +2193,13 @@ one for the area a change touches.
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).
 
-- `jvm/maven.rs` (spec #26): `XML_DEPTH` (64 ancestors, including the document node) and
-  `XML_NODES` (65,536) bound the read-only POM tree, in addition to `lang::MAX_BYTES`.
-  `roxmltree` rejects DTDs and never loads external entities. An over-limit or malformed
-  manifest reads as an empty summary; indexing continues. JVM coordinate names share
+- `jvm/maven.rs` (spec #26): `XML_DEPTH` (64 nested elements), `XML_NAMESPACES` (16 `xmlns`
+  occurrences in the file) and `XML_ATTRIBUTES` (64 per tag) are checked by one linear pass
+  before parsing, since roxmltree copies the enclosing namespaces into each element that
+  declares one and checks a tag's attributes pairwise; `XML_NODES` (65,536) bounds the parsed
+  tree, in addition to `lang::MAX_BYTES`. `roxmltree` rejects DTDs and never loads external
+  entities. An over-limit, unterminated or malformed manifest reads as an empty summary;
+  indexing continues. `jvm/gradle.rs`: `GRADLE_DEPTH` (64) bounds nested blocks; a deeper build
+  or settings file reads as an empty summary. The Gradle scanner does not read Groovy slashy
+  strings, and reads a triple-quoted string as quoted pairs. JVM coordinate names share
   `package::MAX_NAME` (214 bytes). These readers never run Maven, Gradle or a JDK.

@@ -1,9 +1,14 @@
 //! A line-oriented scanner for Gradle's literal assignments and dependency coordinates.
 //! Tokens only separate strings, comments and block boundaries; no build grammar is loaded.
 
+use std::collections::BTreeSet;
+
 use crate::package::{Entry, Summary};
 
-#[derive(Debug)]
+// ponytail: build scripts nest a few blocks; a deeper file reads as nothing.
+const GRADLE_DEPTH: usize = 64;
+
+#[derive(Debug, PartialEq)]
 enum Token {
     Word(String),
     String(String, bool),
@@ -132,37 +137,35 @@ fn configuration(name: &str) -> bool {
             .any(|s| name.ends_with(s))
 }
 
-fn dependency(field: &str, args: &[Token]) -> Option<Entry> {
-    // A call (`project(...)`, `files(...)`, `platform(...)`) or no string at all
-    // (`libs.models`) declares no `group:artifact` coordinate.
-    let call = args
-        .windows(2)
-        .any(|w| matches!(w, [Token::Word(_), Token::Mark('(')]));
-    if call
-        || !args.iter().any(|t| matches!(t, Token::String(..)))
-        || args.iter().any(|t| matches!(t, Token::Unread))
-    {
-        return None;
-    }
+/// A value's text, with `*` for each part that is no string: `"g:a:" + v` is `g:a:*`. A string
+/// holding `*`, or a `$` that is no interpolation, is no coordinate.
+fn text(tokens: &[Token]) -> Option<String> {
     let mut text = String::new();
-    let mut computed = false;
-    let mut quoted = 0;
-    for token in args {
+    for token in tokens {
         match token {
             Token::String(s, dynamic) => {
+                if s.contains('*') || !dynamic && s.contains('$') {
+                    return None;
+                }
                 text.push_str(s);
-                computed |= dynamic;
-                quoted += 1;
             }
-            Token::Mark('(' | ')') => {}
-            Token::Mark('+') => computed = true,
-            _ => {
-                text.push('*');
-                computed = true;
-            }
+            Token::Mark('(' | ')' | '+') => {}
+            _ => text.push('*'),
         }
     }
-    computed |= quoted != 1;
+    Some(text)
+}
+
+/// A group or artifact as a literal, or as the pattern of its literal fragments (`true`).
+fn piece(part: &str) -> Option<(String, bool)> {
+    match super::literal(part) {
+        true => Some((part.to_string(), false)),
+        false => super::pattern(part).map(|p| (p, true)),
+    }
+}
+
+/// The parts of `"group:artifact[:version]"`, split at the colons outside `${...}`.
+fn positional(text: &str) -> Option<(&str, &str, Option<&str>)> {
     let mut parts = Vec::new();
     let mut depth = 0usize;
     let mut start = 0;
@@ -180,31 +183,80 @@ fn dependency(field: &str, args: &[Token]) -> Option<Entry> {
         previous = Some(c);
     }
     parts.push(&text[start..]);
-    let (group, artifact, range) = match parts.as_slice() {
-        [g, a] => (*g, *a, None),
-        [g, a, v] => (*g, *a, Some((*v).to_string())),
-        _ if computed => ("*", "*", None),
-        _ => return None,
+    match parts.as_slice() {
+        [g, a] => Some((g, a, None)),
+        [g, a, v] => Some((g, a, Some(v))),
+        _ => None,
+    }
+}
+
+/// The `group`, `name` and `version` of map notation (`group: 'g', name: 'a'` or Kotlin's
+/// `group = "g", name = "a"`); `None` when the arguments are not named.
+fn named(args: &[Token]) -> Option<Option<(String, String, Option<String>)>> {
+    let args = arguments(args);
+    let key = |arg: &[Token]| match arg {
+        [Token::Word(k), Token::Mark(':' | '='), ..] => Some(k.clone()),
+        _ => None,
     };
-    let group = if computed {
-        super::pattern(group)?
-    } else {
-        super::literal(group).then(|| group.to_string())?
+    key(args.first()?)?;
+    let mut found: [Option<String>; 3] = Default::default();
+    for arg in args {
+        let Some(k) = key(arg) else {
+            return Some(None);
+        };
+        let at = match k.as_str() {
+            "group" => 0,
+            "name" => 1,
+            "version" => 2,
+            _ => continue,
+        };
+        let Some(value) = text(&arg[2..]) else {
+            return Some(None);
+        };
+        found[at] = Some(value);
+    }
+    let [group, artifact, version] = found;
+    Some(group.zip(artifact).map(|(g, a)| (g, a, version)))
+}
+
+fn dependency(field: &str, args: &[Token]) -> Option<Entry> {
+    // A call (`project(...)`, `files(...)`, `platform(...)`) or no string at all
+    // (`libs.models`) declares no `group:artifact` coordinate.
+    let call = args
+        .windows(2)
+        .any(|w| matches!(w, [Token::Word(_), Token::Mark('(')]));
+    if call
+        || !args.iter().any(|t| matches!(t, Token::String(..)))
+        || args.iter().any(|t| matches!(t, Token::Unread))
+    {
+        return None;
+    }
+    let (group, artifact, range) = match named(args) {
+        Some(coordinate) => coordinate?,
+        None => {
+            let text = text(args)?;
+            let (g, a, v) = positional(&text)?;
+            (g.to_string(), a.to_string(), v.map(str::to_string))
+        }
     };
-    let artifact = if computed {
-        super::pattern(artifact)?
-    } else {
-        super::literal(artifact).then(|| artifact.to_string())?
-    };
+    let (group, group_computed) = piece(&group)?;
+    let (artifact, artifact_computed) = piece(&artifact)?;
+    // A coordinate without one literal fragment fits every provider: it names none.
+    if group == "*" && artifact == "*" {
+        return None;
+    }
     let name = format!("{group}:{artifact}");
     if name.len() > crate::package::MAX_NAME {
         return None;
     }
+    // A computed version keeps the coordinate literal: the range is kept as written, a part
+    // that is no string leaves none.
+    let range = range.filter(|v| !v.contains('*'));
     Some(Entry {
         field: field.into(),
         name,
         range,
-        via: computed.then(|| "computed".into()),
+        via: (group_computed || artifact_computed).then(|| "computed".into()),
         ..Entry::default()
     })
 }
@@ -235,32 +287,49 @@ fn assigns(tokens: &[Token], name: &str) -> bool {
     })
 }
 
-/// The arguments of `include` that are a lone literal string, in `include(":a", ":b")` or
-/// `include ':a', ':b'`; an argument that computes its value (a call, a concatenation) names
-/// no project.
-fn included(args: &[Token]) -> Vec<&str> {
+/// The arguments of a call, `f(a, b)` or `f a, b`, split at the commas outside brackets.
+fn arguments(args: &[Token]) -> Vec<&[Token]> {
     let args = match args {
         [Token::Mark('('), inner @ .., Token::Mark(')')] => inner,
         _ => args,
     };
     let mut depth = 0usize;
-    let mut out = Vec::new();
-    for arg in args.split(|t| {
+    args.split(|t| {
         match t {
             Token::Mark('(' | '[') => depth += 1,
             Token::Mark(')' | ']') => depth = depth.saturating_sub(1),
             _ => {}
         }
         depth == 0 && matches!(t, Token::Mark(','))
-    }) {
-        if let [Token::String(s, false)] = arg {
-            out.push(s.as_str());
-        }
-    }
-    out
+    })
+    .collect()
 }
 
-fn statement(tokens: &[Token], blocks: &[String], build: &mut super::Build, summary: &mut Summary) {
+/// The arguments of `include` that are a lone literal string, in `include(":a", ":b")` or
+/// `include ':a', ':b'`; an argument that computes its value (a call, a concatenation) names
+/// no project.
+fn included(args: &[Token]) -> Vec<&str> {
+    (arguments(args).into_iter())
+        .filter_map(|arg| match arg {
+            [Token::String(s, false)] => Some(s.as_str()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// What a scan has read so far.
+#[derive(Default)]
+struct Scan {
+    build: super::Build,
+    summary: Summary,
+    /// The included project paths a `project(':p').name` or `.projectDir` assignment changes.
+    moved: BTreeSet<String>,
+    /// Some assignment changes a project's name or directory without saying which.
+    unplaced: bool,
+}
+
+fn statement(tokens: &[Token], blocks: &[String], controlled: bool, scan: &mut Scan) {
+    let Scan { build, summary, .. } = scan;
     if blocks.is_empty() {
         if let Some(group) = assigned(tokens, "group") {
             build.group = group.filter(|s| super::literal(s)).map(str::to_string);
@@ -286,7 +355,9 @@ fn statement(tokens: &[Token], blocks: &[String], build: &mut super::Build, summ
             }
         }
     }
-    let conditional = blocks.iter().any(|s| control(s))
+    // `allprojects` configures this project too, so its assignments are never literal here.
+    let conditional = controlled
+        || blocks.iter().any(|b| b == "allprojects")
         || tokens.first().and_then(Token::word).is_some_and(control);
     for (name, value) in [
         ("group", &mut build.group),
@@ -299,6 +370,26 @@ fn statement(tokens: &[Token], blocks: &[String], build: &mut super::Build, summ
             *value = None;
         }
     }
+    let member = |t: &Token| {
+        t.word().is_some_and(|w| {
+            w != "rootProject.name" && (w.ends_with(".name") || w.ends_with(".projectDir"))
+        })
+    };
+    if let Some(at) =
+        (tokens.windows(2)).position(|w| member(&w[0]) && matches!(w[1], Token::Mark('=')))
+    {
+        match &tokens[..at] {
+            [
+                Token::Word(call),
+                Token::Mark('('),
+                Token::String(path, false),
+                Token::Mark(')'),
+            ] if call == "project" => {
+                (scan.moved).insert(path.strip_prefix(':').unwrap_or(path).replace(':', "/"));
+            }
+            _ => scan.unplaced = true,
+        }
+    }
     if blocks.len() == 1
         && blocks[0] == "dependencies"
         && let Some(kind) = tokens
@@ -307,10 +398,13 @@ fn statement(tokens: &[Token], blocks: &[String], build: &mut super::Build, summ
             .filter(|s| configuration(s))
         && let Some(entry) = dependency(kind, &tokens[1..])
     {
-        summary.dependencies.push(entry);
+        scan.summary.dependencies.push(entry);
     }
 }
 
+// ponytail: Groovy slashy strings (`/a/`, `$/a/$`) are not read as strings, and a triple-quoted
+// string reads as quoted pairs; text inside them may be scanned as code when its quotes do not
+// pair up.
 pub fn read(path: &str, src: &[u8]) -> Summary {
     if src.len() > crate::lang::MAX_BYTES {
         return Summary::default();
@@ -318,31 +412,34 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
     let Ok(text) = std::str::from_utf8(src) else {
         return Summary::default();
     };
-    let mut build = super::Build::default();
-    let mut summary = Summary::default();
-    let mut blocks = Vec::new();
+    let mut scan = Scan::default();
+    let mut blocks: Vec<String> = Vec::new();
+    let mut controls = 0usize;
     let mut line = Vec::new();
     let mut enclosed = 0usize;
     for token in tokens(text) {
         match token {
             Token::Mark('{') => {
-                blocks.push(
-                    line.iter()
-                        .filter_map(Token::word)
-                        .next()
-                        .unwrap_or("")
-                        .to_string(),
-                );
+                // The block's head is a statement too: `implementation("g:a:1") { ... }`.
+                statement(&line, &blocks, controls > 0, &mut scan);
+                if blocks.len() == GRADLE_DEPTH {
+                    return Summary::default();
+                }
+                let head = line.iter().find_map(Token::word).unwrap_or("").to_string();
+                controls += usize::from(control(&head));
+                blocks.push(head);
                 line.clear();
             }
             Token::Mark('}') => {
-                statement(&line, &blocks, &mut build, &mut summary);
+                statement(&line, &blocks, controls > 0, &mut scan);
                 line.clear();
-                blocks.pop();
+                if blocks.pop().is_some_and(|b| control(&b)) {
+                    controls -= 1;
+                }
             }
             Token::Mark('\n') if enclosed > 0 => {}
             Token::Mark('\n' | ';') if enclosed == 0 => {
-                statement(&line, &blocks, &mut build, &mut summary);
+                statement(&line, &blocks, controls > 0, &mut scan);
                 line.clear();
             }
             Token::Mark('(' | '[') => {
@@ -356,7 +453,13 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
             _ => line.push(token),
         }
     }
-    statement(&line, &blocks, &mut build, &mut summary);
+    statement(&line, &blocks, controls > 0, &mut scan);
+    let Scan {
+        mut build,
+        mut summary,
+        moved,
+        unplaced,
+    } = scan;
     let settings = path
         .rsplit('/')
         .next()
@@ -364,6 +467,10 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
     if !settings {
         summary.roots = vec!["src/main/java".into(), "src/test/java".into()];
     }
+    // A renamed or moved project is not where, or not what, `include` says.
+    build
+        .includes
+        .retain(|(_, path)| !unplaced && !moved.contains(path));
     build.includes.sort();
     build.includes.dedup();
     summary.build = Some(build);
@@ -372,4 +479,76 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
         .sort_by(|a, b| (&a.field, &a.name, &a.range).cmp(&(&b.field, &b.name, &b.range)));
     summary.dependencies.dedup();
     summary
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn build(path: &str, src: &str) -> super::super::Build {
+        read(path, src.as_bytes()).build.unwrap_or_default()
+    }
+
+    #[test]
+    fn tokens_keep_strings_and_drop_comments() {
+        let found = tokens("a.b = 'x' // 'y'\n\"g:$v\" /* z */ 'q\\u0041' 'bad\\s' (");
+        assert_eq!(
+            found,
+            [
+                Token::Word("a.b".into()),
+                Token::Mark('='),
+                Token::String("x".into(), false),
+                Token::Mark('\n'),
+                Token::String("g:$v".into(), true),
+                Token::String("qA".into(), false),
+                Token::Unread,
+                Token::Mark('('),
+            ]
+        );
+        // An unclosed string ends the scan.
+        assert_eq!(tokens("a 'open"), [Token::Word("a".into())]);
+    }
+
+    #[test]
+    fn blocks_nested_past_the_limit_read_as_nothing() {
+        let nested = |n: usize| format!("group = 'example'\n{}{}", "a {".repeat(n), "}".repeat(n));
+        assert_eq!(
+            build("build.gradle", &nested(GRADLE_DEPTH))
+                .group
+                .as_deref(),
+            Some("example")
+        );
+        assert_eq!(
+            read("build.gradle", nested(GRADLE_DEPTH + 1).as_bytes()),
+            Summary::default()
+        );
+    }
+
+    #[test]
+    fn allprojects_leaves_the_group_unknown_until_assigned_again() {
+        let src = "group = 'example'\nallprojects {\n    group = 'other'\n}\n";
+        assert_eq!(build("build.gradle", src).group, None);
+        let src = format!("{src}group = 'example'\n");
+        assert_eq!(
+            build("build.gradle", &src).group.as_deref(),
+            Some("example")
+        );
+    }
+
+    #[test]
+    fn a_renamed_or_moved_project_names_no_artifact() {
+        let settings = "rootProject.name = 'kit'\ninclude ':tools', ':app'\n";
+        let names = |extra: &str| -> Vec<String> {
+            (build("settings.gradle", &format!("{settings}{extra}"))
+                .includes
+                .into_iter())
+            .map(|(name, _)| name)
+            .collect()
+        };
+        assert_eq!(names(""), ["app", "tools"]);
+        assert_eq!(names("project(':app').name = 'svc'\n"), ["tools"]);
+        assert_eq!(names("project(':app').projectDir = file('x')\n"), ["tools"]);
+        assert!(names("rootProject.children.each { it.name = 'x' }\n").is_empty());
+        assert!(names("findProject(':app')?.name = 'svc'\n").is_empty());
+    }
 }

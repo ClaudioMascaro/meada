@@ -75,16 +75,36 @@ fn computed_coordinates_keep_literal_parts_and_stay_ambiguous_with_one_provider(
         gradle_client.join("build.gradle"),
     )
     .unwrap();
-    for (path, golden) in [
-        (&client, "jvm-client.computed.json"),
-        (&gradle_client, "jvm-gradle-client.computed.json"),
+    for (path, golden, version) in [
+        (&client, "jvm-client.computed.json", "${version}"),
+        (
+            &gradle_client,
+            "jvm-gradle-client.computed.json",
+            "$version",
+        ),
     ] {
         let export = Engine::open(path).unwrap().export().unwrap();
         let json: Value = serde_json::from_str(&export).unwrap();
         let links = json["links"].as_array().unwrap();
         assert!(!links.is_empty(), "{export}");
-        assert!(links.iter().all(|l| l["level"] == "ambiguous"), "{export}");
-        for pattern in ["example:model*", "example:models", "*:tools"] {
+        // A computed version alone leaves a literal coordinate: exact, its range as written.
+        let literal: Vec<_> = (links.iter())
+            .filter(|l| l["contract"] == "package::maven::example:models")
+            .collect();
+        assert_eq!(literal.len(), 1, "{export}");
+        assert_eq!(literal[0]["level"], "exact", "{export}");
+        assert_eq!(
+            literal[0]["reason"],
+            format!("package::maven::example:models {version} (local 1.2.0), range unchecked")
+        );
+        let computed: Vec<_> = (links.iter())
+            .filter(|l| l["contract"] != "package::maven::example:models")
+            .collect();
+        assert!(
+            computed.iter().all(|l| l["level"] == "ambiguous"),
+            "{export}"
+        );
+        for pattern in ["example:model*", "*:tools"] {
             let wanted = format!("package::maven::{pattern}");
             let matching: Vec<_> = links.iter().filter(|l| l["contract"] == wanted).collect();
             assert_eq!(matching.len(), 1, "{wanted}: {export}");
@@ -97,6 +117,15 @@ fn computed_coordinates_keep_literal_parts_and_stay_ambiguous_with_one_provider(
                 > 1,
             "{export}"
         );
+        // A consumer's own manifest is never one of its candidates.
+        for l in links {
+            let consumer = l["consumer"].as_str().unwrap();
+            let provider = l["provider"].as_str().unwrap();
+            assert!(
+                !consumer.starts_with(&format!("{provider}::")),
+                "{consumer} -> {provider}"
+            );
+        }
         assert_golden(golden, &export);
     }
 }
@@ -366,6 +395,59 @@ fn a_gradle_declaration_without_a_coordinate_string_is_no_consumer() {
         let json: Value = serde_json::from_str(&export).unwrap();
         assert!(
             json["links"].as_array().unwrap().is_empty(),
+            "{declaration}: {export}"
+        );
+    }
+}
+
+#[test]
+fn map_notation_and_configured_declarations_read_their_coordinate() {
+    let [_, _, _, client] = workspace("jvm_packages_declarations");
+    let exact = Some(("package::maven::example:models", "exact"));
+    for (declaration, wanted) in [
+        (
+            "implementation group: 'example', name: 'models', version: '1.2.0'",
+            exact,
+        ),
+        (
+            "implementation(group = \"example\", name = \"models\", version = \"1.2.0\")",
+            exact,
+        ),
+        (
+            "implementation group: 'outside', name: 'absent', version: '1'",
+            None,
+        ),
+        ("implementation group: 'example', version: '1'", None),
+        (
+            "implementation(\"example:models:1.2.0\") { exclude(group = \"x\") }",
+            exact,
+        ),
+        (
+            "implementation('example:models:1.2.0') {\n        transitive = false\n    }",
+            exact,
+        ),
+        // No literal fragment at all is no coordinate, as `libs.models` is none.
+        ("implementation \"$coordinates\"", None),
+        ("implementation(\"${group}:${artifact}:1\")", None),
+    ] {
+        fs::write(
+            client.join("build.gradle"),
+            format!("group = 'example'\ndependencies {{\n    {declaration}\n}}\n"),
+        )
+        .unwrap();
+        let export = Engine::open(&client).unwrap().export().unwrap();
+        let json: Value = serde_json::from_str(&export).unwrap();
+        let links: Vec<_> = (json["links"].as_array().unwrap().iter())
+            .map(|l| {
+                (
+                    l["contract"].as_str().unwrap(),
+                    l["level"].as_str().unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            links,
+            wanted.into_iter().collect::<Vec<_>>(),
             "{declaration}: {export}"
         );
     }

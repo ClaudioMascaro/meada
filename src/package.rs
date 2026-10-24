@@ -1,6 +1,7 @@
 //! Packages (spec #22): every manifest of a workspace repository with a valid name provides
 //! `package::<ecosystem>::<name>` (`package.json`: `npm`; `pyproject.toml`: `pypi`, spec #24;
-//! `Cargo.toml`: `cargo`, spec #30; `go.mod`: `go`, spec #25),
+//! `Cargo.toml`: `cargo`, spec #30; `go.mod`: `go`, spec #25; `pom.xml` and the Gradle build and
+//! settings files: `maven`, spec #26),
 //! and every dependency entry that names a package of the workspace, in the same ecosystem,
 //! consumes it. `refresh` reads each manifest into a `Summary`, derived from its bytes
 //! alone and stored in the index; `Packages::declare` turns the named ones into providers and
@@ -11,7 +12,7 @@
 //! This file holds what the ecosystems share: the `Ecosystem` trait with its defaults (Node's
 //! rule for the ways in, the candidates and the provider view), the list `ECOSYSTEMS`, the
 //! summary types and the workspace steps. Each ecosystem's own rules live in its module under
-//! `package/` (`npm`, `pypi`, `cargo`, `go`).
+//! `package/` (`npm`, `pypi`, `cargo`, `go`, `maven`).
 //!
 //! Imports cross too: `extract` stores every call through a binding imported from a bare
 //! specifier, and `import`, a workspace step after `consume`, resolves those whose package the
@@ -1285,17 +1286,19 @@ fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
 /// `dependencies` row. An entry whose package is outside the workspace, or a `workspace:` one
 /// whose package is outside its own repository, adds nothing.
 fn consume(exports: &mut [Export], providers: &Providers) {
-    let found: Vec<_> = (exports.iter())
-        .map(|export| {
+    let found: Vec<_> = (exports.iter().enumerate())
+        .map(|(n, export)| {
             let mut consumers = Vec::new();
             let mut dependencies = Vec::new();
-            for manifest in &export.manifests {
+            for (i, manifest) in export.manifests.iter().enumerate() {
                 let Some(ecosystem) = of(&manifest.path) else {
                     continue;
                 };
                 for e in &manifest.summary.dependencies {
                     let source = (e.via.as_deref(), e.range.as_deref());
-                    let of = providers.matching(ecosystem, e);
+                    // A manifest is never a candidate of its own dependency.
+                    let mut of = providers.matching(ecosystem, e);
+                    of.retain(|&p| p != (n, i));
                     let reaches = |&&(m, i): &&(usize, usize)| {
                         let at = &exports[m].manifests[i];
                         ecosystem.reaches(source, export.place(), (exports[m].place(), &at.path))
@@ -1658,6 +1661,8 @@ impl ContractKind for Packages {
         };
         let source = (consumer.via.as_deref(), range);
         let fits: Vec<_> = (providers.iter())
+            // A manifest is never a candidate of its own dependency.
+            .filter(|(_, p)| !consumer.site.starts_with(&format!("{}::", p.site)))
             .filter(|(repo, p)| {
                 let at = (p.site.strip_prefix(&repo.identity)).and_then(|s| s.strip_prefix("::"));
                 let (from, to) = (

@@ -42,4 +42,4 @@ Without a `meada.toml`, the repository declares no peers.
 
 ## JVM artifacts
 
-JVM package contracts are discovered from manifests: `pom.xml`, `settings.gradle`, `settings.gradle.kts`, `build.gradle` and `build.gradle.kts`. They need no additional `meada.toml` key. Declare other repositories in `[[peer]]` as in the examples above. Use literal coordinates for `exact` links; Maven properties and Gradle expressions remain unevaluated and produce `ambiguous` candidates.
+JVM package contracts are discovered from manifests: `pom.xml`, `settings.gradle`, `settings.gradle.kts`, `build.gradle` and `build.gradle.kts`. They need no additional `meada.toml` key. Declare other repositories in `[[peer]]` as in the examples above. Use literal coordinates for `exact` links; Maven properties and Gradle expressions remain unevaluated, and those that make up the group or artifact produce `ambiguous` candidates.
