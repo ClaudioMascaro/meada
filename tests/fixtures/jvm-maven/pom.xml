@@ -1,0 +1,1 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion><groupId>example</groupId><artifactId>bundle</artifactId><version>1.2.0</version><modules><module>models</module><module>billing</module></modules></project>

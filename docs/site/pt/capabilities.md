@@ -105,6 +105,12 @@ A ligação é `exact`, com a versão do `require` como faixa, `(local none)` co
 
 O Meada não lê `go.sum` nem lockfiles, incluindo `Cargo.lock`. Não consulta o proxy de módulos, o registro npm, PyPI ou crates.io.
 
+## Pacotes Maven e Gradle
+
+Cada `pom.xml` com coordenadas literais e cada projeto Gradle com `group` e nome literais gera `package::maven::<grupo>:<artefato>`. O Maven herda o grupo literal de `<parent>` quando necessário; cada módulo é um artefato. No Gradle, `rootProject.name` e `include` de `settings.gradle` ou `settings.gradle.kts` nomeiam os projetos dos arquivos `build.gradle` ou `build.gradle.kts`. Um projeto renomeado ou movido em `settings.gradle` (`project(":app").name`, `.projectDir`) e um `group` definido em `allprojects` não geram artefato.
+
+Dependências Maven e Gradle, inclusive na notação de mapa (`group: 'g', name: 'a'`), se ligam aos artefatos do workspace com nível `exact` e `range unchecked`. Uma versão calculada (`${project.version}`, `$v`) mantém a ligação `exact`, com a versão como foi escrita. Um grupo ou artefato que usa propriedade ou variável fica `ambiguous`, mesmo com um único candidato; as partes literais filtram os candidatos, e uma coordenada sem nenhuma parte literal não gera dependência. Uma declaração Gradle sem coordenada, como `project(":tools")`, `files(...)`, `platform(...)` ou `libs.models`, não gera dependência. Dependências externas ficam de fora. Os leitores são compartilhados com Kotlin, sem executar JDK, Maven ou Gradle e sem consultar registros.
+
 ## Drift de formato
 
 Drift é um campo que um consumidor `fetch` lê da resposta, mas que a rota não devolve. O Meada compara a leitura com OpenAPI, schema zod ou objetos literais do handler.

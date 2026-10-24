@@ -395,3 +395,21 @@ modules updates it.
   (`; import crate name`) and no `ambiguous` fallback. A crate of the repository itself is
   reached through the module tree instead, so a path or version dependency inside the repository
   links at the manifest only.
+
+- JVM artifacts (spec #26, ticket #93): `package/maven.rs` implements `Ecosystem` for
+  `pom.xml`, `settings.gradle{,.kts}` and `build.gradle{,.kts}`. Grammar-independent readers
+  in `jvm/{maven,gradle}.rs` are shared with Kotlin: the Maven reader takes direct project
+  dependencies and literal parent group/version values; the Gradle scanner separates quoted
+  strings, comments and block boundaries, without loading a grammar. `Summary::build` holds
+  only literal group/project/include metadata, which `inherit` joins with build files.
+  Each named manifest provides `package::maven::<group>:<artifact>`. Dependencies use the
+  existing package reason with `range unchecked`; properties and variables stay unevaluated.
+  The generic `fits` question matches candidate names, and `uncertainty` keeps a computed
+  group or artifact ambiguous even with one provider; a computed version alone stays exact,
+  its range as written. Literal coordinate fragments filter those candidates, a coordinate
+  with none (`*:*`) is no consumer, and a manifest is never a candidate of its own
+  dependency (`consume` and `link` drop it). Gradle map notation (`group:`/`name:`/`version:`)
+  is read as a coordinate; a call (`project(...)`, `platform(...)`), a catalog accessor and
+  a configuration block's contents are not. A settings assignment to a project's `name` or
+  `projectDir`, and a `group` set in `allprojects`, drop the affected provider.
+  Dependencies outside the workspace add nothing.

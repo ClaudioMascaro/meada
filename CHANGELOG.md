@@ -24,6 +24,10 @@ All notable changes to Meada are recorded here. The format follows
   supertypes written in `extends` and `implements`. Overload families are read per signature
   across a class family, an interface receiver stops at the interface, and a call on an unknown
   receiver is a name match that prefers the one candidate in the calling class's family.
+- Maven and Gradle artifact contracts (spec #26, #93), using shared JVM manifest readers:
+  literal `group:artifact` providers, Maven modules and parent groups, Gradle project names,
+  dependencies with unchecked ranges, and ambiguous candidates for computed coordinates.
+  Indexing invokes no JVM toolchain and looks up no registry.
 
 - A multilingual documentation site (issue #320), with the README reference migrated to
   Portuguese, English and Spanish guides, React Flow maps and roadmap, accessible static and

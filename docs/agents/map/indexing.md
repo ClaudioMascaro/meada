@@ -470,6 +470,12 @@ modules updates it.
   spelled chain when the chain's head is itself an import from outside the repository (what `Packages::extract` stores). `Resolver::exported()` is
   what each file exports, as `export` reads it, for the `exports` table.
 
+- JVM build files (spec #26, ticket #93) join the existing `manifests` pass through the package
+  ecosystem seam: Maven POMs and Gradle settings/build files, including nested modules. Their
+  stored summaries contain coordinate fragments and the literal metadata needed to join a
+  Gradle build to its settings, never source text. `package::inherit` runs that join after all
+  summaries are loaded; changing any build/settings file refreshes the same workspace links.
+
 ## Java receivers and supertypes (#85)
 
 Each class writes `Def::bases` from `extends` and `implements` (type arguments dropped; an

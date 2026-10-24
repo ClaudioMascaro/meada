@@ -1,0 +1,147 @@
+{
+  "repository": "example.com/jvm/client",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "package::maven::example:web",
+      "site": "example.com/jvm/client::pom.xml"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "package::maven::*:tools",
+      "site": "example.com/jvm/client::pom.xml::dependencies::*:tools",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::pom.xml::dependencies::example:model*",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::pom.xml::dependencies::example:models",
+      "via": null
+    }
+  ],
+  "packages": [
+    {
+      "name": "example:web",
+      "repository": "example.com/jvm/client",
+      "directory": ".",
+      "ecosystem": "maven"
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "pom.xml",
+      "field": "dependencies",
+      "name": "*:tools",
+      "range": "2"
+    },
+    {
+      "manifest": "pom.xml",
+      "field": "dependencies",
+      "name": "example:*",
+      "range": "3"
+    },
+    {
+      "manifest": "pom.xml",
+      "field": "dependencies",
+      "name": "example:model*",
+      "range": "1"
+    },
+    {
+      "manifest": "pom.xml",
+      "field": "dependencies",
+      "name": "example:models",
+      "range": "${version}"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::*:tools",
+      "provider": "example.com/jvm/gradle::tools/build.gradle",
+      "contract": "package::maven::*:tools",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::*:tools 2 (local 2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "provider": "example.com/jvm/gradle-client::build.gradle",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "provider": "example.com/jvm/gradle::build.gradle.kts",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "provider": "example.com/jvm/gradle::extras/nested/build.gradle.kts",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "provider": "example.com/jvm/gradle::tools/build.gradle",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "provider": "example.com/jvm/maven::billing/pom.xml",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "provider": "example.com/jvm/maven::models/pom.xml",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "provider": "example.com/jvm/maven::pom.xml",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:model*",
+      "provider": "example.com/jvm/maven::models/pom.xml",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:models",
+      "provider": "example.com/jvm/maven::models/pom.xml",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
+      "provider": "example.com/jvm/client::pom.xml",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
+    }
+  ]
+}

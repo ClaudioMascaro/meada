@@ -1131,8 +1131,41 @@
       }
     }
   ],
-  "providers": [],
+  "providers": [
+    {
+      "contract": "package::maven::example:api",
+      "site": "example.com/acme/conformance::maven/api/pom.xml"
+    },
+    {
+      "contract": "package::maven::example:conformance",
+      "site": "example.com/acme/conformance::gradle/build.gradle"
+    },
+    {
+      "contract": "package::maven::example:conformance",
+      "site": "example.com/acme/conformance::maven/pom.xml"
+    }
+  ],
   "consumers": [],
+  "packages": [
+    {
+      "name": "example:api",
+      "repository": "example.com/acme/conformance",
+      "directory": "maven/api",
+      "ecosystem": "maven"
+    },
+    {
+      "name": "example:conformance",
+      "repository": "example.com/acme/conformance",
+      "directory": "gradle",
+      "ecosystem": "maven"
+    },
+    {
+      "name": "example:conformance",
+      "repository": "example.com/acme/conformance",
+      "directory": "maven",
+      "ecosystem": "maven"
+    }
+  ],
   "communities": [
     {
       "name": "maven/api/src/main/java/example",

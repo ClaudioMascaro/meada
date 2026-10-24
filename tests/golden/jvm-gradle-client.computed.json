@@ -1,0 +1,147 @@
+{
+  "repository": "example.com/jvm/gradle-client",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "package::maven::example:worker",
+      "site": "example.com/jvm/gradle-client::build.gradle"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/gradle-client::build.gradle::api::example:models",
+      "via": null
+    },
+    {
+      "contract": "package::maven::*:tools",
+      "site": "example.com/jvm/gradle-client::build.gradle::compileOnly::*:tools",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/gradle-client::build.gradle::implementation::example:model*",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
+      "via": "computed"
+    }
+  ],
+  "packages": [
+    {
+      "name": "example:worker",
+      "repository": "example.com/jvm/gradle-client",
+      "directory": ".",
+      "ecosystem": "maven"
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "build.gradle",
+      "field": "api",
+      "name": "example:models",
+      "range": "$version"
+    },
+    {
+      "manifest": "build.gradle",
+      "field": "compileOnly",
+      "name": "*:tools",
+      "range": "2"
+    },
+    {
+      "manifest": "build.gradle",
+      "field": "implementation",
+      "name": "example:model*",
+      "range": "1"
+    },
+    {
+      "manifest": "build.gradle",
+      "field": "runtimeOnly",
+      "name": "example:*",
+      "range": "3"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "provider": "example.com/jvm/gradle-client::build.gradle",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::build.gradle::api::example:models",
+      "provider": "example.com/jvm/maven::models/pom.xml",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models $version (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::build.gradle::compileOnly::*:tools",
+      "provider": "example.com/jvm/gradle::tools/build.gradle",
+      "contract": "package::maven::*:tools",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::*:tools 2 (local 2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::build.gradle::implementation::example:model*",
+      "provider": "example.com/jvm/maven::models/pom.xml",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
+      "provider": "example.com/jvm/client::pom.xml",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
+      "provider": "example.com/jvm/gradle::build.gradle.kts",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
+      "provider": "example.com/jvm/gradle::extras/nested/build.gradle.kts",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
+      "provider": "example.com/jvm/gradle::tools/build.gradle",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
+      "provider": "example.com/jvm/maven::billing/pom.xml",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
+      "provider": "example.com/jvm/maven::models/pom.xml",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
+      "provider": "example.com/jvm/maven::pom.xml",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked"
+    }
+  ]
+}

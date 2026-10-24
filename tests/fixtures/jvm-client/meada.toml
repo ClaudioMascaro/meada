@@ -1,0 +1,9 @@
+[[peer]]
+repo = "example.com/jvm/maven"
+path = "../jvm-maven"
+[[peer]]
+repo = "example.com/jvm/gradle"
+path = "../jvm-gradle"
+[[peer]]
+repo = "example.com/jvm/gradle-client"
+path = "../jvm-gradle-client"
