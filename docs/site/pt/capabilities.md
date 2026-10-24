@@ -54,6 +54,9 @@ O Meada liga consumidores e provedores, inclusive entre linguagens e atrás de g
 | Python | `requests`, `httpx`, `aiohttp` | FastAPI, Flask, Django |
 | Rust | `reqwest`, `ureq` | axum, actix-web, Rocket |
 | Go | `net/http`, resty | `net/http`, gin, echo, chi, gorilla/mux |
+| Java | n/a | Spring MVC |
+
+Em Java, um método de uma classe `@RestController` ou `@Controller` com `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping` ou `@RequestMapping(method = RequestMethod.X)` vira provedor, sob o prefixo do `@RequestMapping` da classe. O caminho dobra constantes `static final` (também de outras classes) e `+`; cada caminho de um array é um provedor. Um `@RequestMapping` sem `method` atende todos os métodos (`http::ANY::<caminho>`) e liga a consumidores de qualquer método, com "any method" na razão. `server.servlet.context-path` não é aplicado. Anotações e `RequestMethod` valem por import do Spring, simples, estático ou `import ...bind.annotation.*`; uma classe do repositório com o mesmo nome, ou um import que também poderia trazer o nome, as esconde. Em `method` ou num array de caminhos, um elemento ilegível é ignorado e os demais valem.
 
 Em Rust, `base_url_env` pode ligar uma URL base lida por `std::env::var`, `env!` ou `dotenvy::var`. Em Go, cobre `os.Getenv` e `os.LookupEnv`, inclusive valores padrão com `if v == ""`, `len(v) == 0`, `!ok` ou `!ok || v == ""` quando `ok` vem do mesmo `os.LookupEnv`. Também acompanha `strings.TrimSuffix`, `TrimRight` e `TrimSpace`.
 

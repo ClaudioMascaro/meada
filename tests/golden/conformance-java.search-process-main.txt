@@ -1,4 +1,7 @@
+example.com/acme/conformance example.Mains.Decorated.main(String[]) process::example.com/acme/conformance::maven/api/src/main/java/example/Mains.java::example.Mains.Decorated.main(String[]) (program)
+example.com/acme/conformance example.Mains.Iface.main(String[]) process::example.com/acme/conformance::maven/api/src/main/java/example/Mains.java::example.Mains.Iface.main(String[]) (program)
 example.com/acme/conformance example.Mains.Instance.main(String[]) process::example.com/acme/conformance::maven/api/src/main/java/example/Mains.java::example.Mains.Instance.main(String[]) (export)
+example.com/acme/conformance example.Mains.Qualified.main(java.lang.String[]) process::example.com/acme/conformance::maven/api/src/main/java/example/Mains.java::example.Mains.Qualified.main(java.lang.String[]) (program)
 example.com/acme/conformance example.Mains.Spread.main(String...) process::example.com/acme/conformance::maven/api/src/main/java/example/Mains.java::example.Mains.Spread.main(String...) (program)
 example.com/acme/conformance example.Mains.Wrong.main() process::example.com/acme/conformance::maven/api/src/main/java/example/Mains.java::example.Mains.Wrong.main() (export)
 example.com/acme/conformance example.Mains.Wrong.main(String) process::example.com/acme/conformance::maven/api/src/main/java/example/Mains.java::example.Mains.Wrong.main(String) (export)

@@ -306,7 +306,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
             if kind == Kind::Method
                 && !constructor
                 && name == "main"
-                && modifiers.contains(&"public")
+                && (modifiers.contains(&"public") || (interface && !modifiers.contains(&"private")))
                 && modifiers.contains(&"static")
                 && node
                     .child_by_field_name("type")
