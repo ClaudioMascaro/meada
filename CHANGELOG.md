@@ -8,6 +8,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Public fixture benchmark (issue #149): release-profile index/reindex timings, root and
+  workspace index sizes, and default-answer/tool-list token estimates in every PR/main CI
+  summary and retained JSON/Markdown artifact. Timings are informational.
+
 - The English user guide and README (#150, spec #32): `docs/user-guide.en.md` translates both
   halves of the pt-BR guide section by section (sections 1 to 11) with the same neutral examples
   and links the English stability page; `README.en.md` now links it instead of the pt-BR guide.
