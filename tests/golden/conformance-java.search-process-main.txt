@@ -1,0 +1,6 @@
+example.com/acme/conformance example.Mains.Instance.main(String[]) process::example.com/acme/conformance::maven/api/src/main/java/example/Mains.java::example.Mains.Instance.main(String[]) (export)
+example.com/acme/conformance example.Mains.Spread.main(String...) process::example.com/acme/conformance::maven/api/src/main/java/example/Mains.java::example.Mains.Spread.main(String...) (program)
+example.com/acme/conformance example.Mains.Wrong.main() process::example.com/acme/conformance::maven/api/src/main/java/example/Mains.java::example.Mains.Wrong.main() (export)
+example.com/acme/conformance example.Mains.Wrong.main(String) process::example.com/acme/conformance::maven/api/src/main/java/example/Mains.java::example.Mains.Wrong.main(String) (export)
+example.com/acme/conformance example.Mains.Wrong.main(int[]) process::example.com/acme/conformance::maven/api/src/main/java/example/Mains.java::example.Mains.Wrong.main(int[]) (export)
+example.com/acme/conformance example.Orders.main(String[]) process::example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.main(String[]) (program)

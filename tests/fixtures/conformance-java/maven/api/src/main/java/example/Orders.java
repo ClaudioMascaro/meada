@@ -7,6 +7,7 @@ import static example.util.Tools.*;
 
 public class Orders {
     public Orders() {}
+    public static void main(String[] args) { new Orders().start(); }
     public Orders(String id) { check(); }
     public static void place(String id, int count) {}
     public static void place(String id) {}

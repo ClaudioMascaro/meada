@@ -1,12 +1,12 @@
-example.com/acme/conformance maven/api/src/main/java/example/Orders.java:44-44 example.Orders.check()
+example.com/acme/conformance maven/api/src/main/java/example/Orders.java:45-45 example.Orders.check()
 community: maven/api/src/main/java/example#2
-processes: 4 (4 export; 1 repository): example.Orders.enclosed() (example.com/acme/conformance), example.Orders.imported() (example.com/acme/conformance), example.Orders.qualified(java.lang.String) (example.com/acme/conformance), example.Orders.start() (example.com/acme/conformance)
+processes: 4 (3 export, 1 program; 1 repository): example.Orders.enclosed() (example.com/acme/conformance), example.Orders.imported() (example.com/acme/conformance), example.Orders.main(String[]) (example.com/acme/conformance), example.Orders.qualified(java.lang.String) (example.com/acme/conformance)
 protected void check() {}
 callers:
-example.com/acme/conformance maven/api/src/main/java/example/Orders.java:10 example.Orders.Orders(String)
-example.com/acme/conformance maven/api/src/main/java/example/Orders.java:15 example.Orders.start()
+example.com/acme/conformance maven/api/src/main/java/example/Orders.java:11 example.Orders.Orders(String)
 example.com/acme/conformance maven/api/src/main/java/example/Orders.java:16 example.Orders.start()
-example.com/acme/conformance maven/api/src/main/java/example/Orders.java:33 example.Orders.enclosed()
-example.com/acme/conformance maven/api/src/main/java/example/Orders.java:35 example.Orders.enclosed() [inferred: one method named check]
-example.com/acme/conformance maven/api/src/main/java/example/Orders.java:38 example.Orders.qualified(java.lang.String)
+example.com/acme/conformance maven/api/src/main/java/example/Orders.java:17 example.Orders.start()
+example.com/acme/conformance maven/api/src/main/java/example/Orders.java:34 example.Orders.enclosed()
+example.com/acme/conformance maven/api/src/main/java/example/Orders.java:36 example.Orders.enclosed() [inferred: one method named check]
+example.com/acme/conformance maven/api/src/main/java/example/Orders.java:39 example.Orders.qualified(java.lang.String)
 callees: none

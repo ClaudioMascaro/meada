@@ -28,6 +28,7 @@ fn java() {
         &[
             "maven/api/src/main/java/example/Orders.java::example.Orders",
             "maven/api/src/main/java/example/Orders.java::example.Orders.Orders()",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.main(String[])",
             "maven/api/src/main/java/example/Orders.java::example.Orders.Orders(String)",
             "maven/api/src/main/java/example/Orders.java::example.Orders.place(String,int)",
             "maven/api/src/main/java/example/Orders.java::example.Orders.place(String)",
@@ -90,8 +91,22 @@ fn java() {
             "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)",
             "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.shadowed(Port)",
             "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.unknown()",
+            "maven/api/src/main/java/example/Mains.java::example.Mains",
+            "maven/api/src/main/java/example/Mains.java::example.Mains.Spread",
+            "maven/api/src/main/java/example/Mains.java::example.Mains.Spread.main(String...)",
+            "maven/api/src/main/java/example/Mains.java::example.Mains.Instance",
+            "maven/api/src/main/java/example/Mains.java::example.Mains.Instance.main(String[])",
+            "maven/api/src/main/java/example/Mains.java::example.Mains.Hidden",
+            "maven/api/src/main/java/example/Mains.java::example.Mains.Hidden.main(String[])",
+            "maven/api/src/main/java/example/Mains.java::example.Mains.Wrong",
+            "maven/api/src/main/java/example/Mains.java::example.Mains.Wrong.main(String)",
+            "maven/api/src/main/java/example/Mains.java::example.Mains.Wrong.main()",
+            "maven/api/src/main/java/example/Mains.java::example.Mains.Wrong.main(int[])",
         ],
-        &[],
+        &[
+            "maven/api/src/main/java/example/Mains.java::example.Mains.Spread.main(String...)",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.main(String[])",
+        ],
         JAVA_CALLS,
     );
 }

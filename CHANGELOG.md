@@ -16,6 +16,8 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Java program entry points (issue #91): a `public static void main(String[])` or
+  `String...` method is a program with its own process.
 - Java source indexing (issue #84): package-qualified types and method signatures, overloads
   narrowed by argument count, package and static imports, and conformance, determinism and
   incremental-refresh coverage, without a JDK or build tool.
