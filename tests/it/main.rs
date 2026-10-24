@@ -4,6 +4,7 @@
 mod common;
 
 mod asyncapi;
+mod benchmark;
 mod cargo;
 mod channel_queries;
 mod channels;
