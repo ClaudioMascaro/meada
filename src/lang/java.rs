@@ -254,6 +254,14 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     });
                 }
             }
+            let string_array = matches!(
+                parameters.as_slice(),
+                [(_, ty, _)]
+                    if matches!(
+                        ty.as_str(),
+                        "String[]" | "java.lang.String[]" | "String..." | "java.lang.String..."
+                    )
+            );
             let params = parameters
                 .into_iter()
                 .map(|(name, _, _)| Param {
@@ -294,6 +302,19 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     _ => None,
                 },
             });
+            // `public static void main(String[])` (or `String...`) starts a program.
+            if kind == Kind::Method
+                && !constructor
+                && name == "main"
+                && (modifiers.contains(&"public") || (interface && !modifiers.contains(&"private")))
+                && modifiers.contains(&"static")
+                && node
+                    .child_by_field_name("type")
+                    .is_some_and(|t| t.kind() == "void_type")
+                && string_array
+            {
+                facts.programs.push(inner.as_ref().clone());
+            }
             if kind == Kind::Method {
                 let callable = if constructor {
                     scope.as_ref().clone()
