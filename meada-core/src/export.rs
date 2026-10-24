@@ -125,6 +125,9 @@ pub struct CallSite {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub candidates: Vec<String>,
     pub span: Span,
+    /// An `inferred` name match narrowed to one of several definitions of its name.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub narrowed: bool,
 }
 
 /// The provider side of a contract: a symbol that serves it, a file, a repository, the call

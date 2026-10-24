@@ -7,7 +7,7 @@ CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NU
 CREATE INDEX symbols_path ON symbols (path);
 CREATE TABLE calls (
     id TEXT NOT NULL, caller TEXT NOT NULL, target TEXT, level TEXT,
-    path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL
+    path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, narrowed INTEGER NOT NULL
 );
 CREATE INDEX calls_path ON calls (path);
 CREATE TABLE candidates (call TEXT NOT NULL, target TEXT NOT NULL);

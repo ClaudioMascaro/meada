@@ -24,6 +24,10 @@ public class Client {
         port.send("body", 2);
     }
 
+    public void chained() {
+        make().save(1);
+    }
+
     public void shadowed(Port repo) {
         repo.send("body");
         Store Repo = new Store();

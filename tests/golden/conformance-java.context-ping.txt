@@ -4,6 +4,6 @@ processes: 2 (2 export; 1 repository): example.calls.Client.typed(Repo) (example
 public void ping() {}
 callers:
 example.com/acme/conformance maven/api/src/main/java/example/calls/Client.java:13 example.calls.Client.typed(Repo)
-example.com/acme/conformance maven/api/src/main/java/example/calls/Client.java:36 example.calls.Client.unknown() [ambiguous: 2 methods named ping]
-example.com/acme/conformance maven/api/src/main/java/example/calls/Repo.java:15 example.calls.Repo.run() [inferred: one method named ping]
+example.com/acme/conformance maven/api/src/main/java/example/calls/Client.java:40 example.calls.Client.unknown() [ambiguous: 2 methods named ping]
+example.com/acme/conformance maven/api/src/main/java/example/calls/Repo.java:15 example.calls.Repo.run() [inferred: one of several methods named ping]
 callees: none

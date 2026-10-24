@@ -44,7 +44,8 @@ pub(crate) fn schema_version() -> i32 {
 /// is NULL when it was too recent to trust. `files.facts` is what the pack parsed, as JSON
 /// (names, specifiers and byte ranges, no source text); `files.resolved` is the BLAKE3 of the
 /// file's resolved symbol and call rows, empty for a file its pack leaves out (`Layout::members`: a
-/// Rust file no `mod` reaches), which has no rows and is no file of the export. `calls.target` holds the one definition an `exact` or
+/// Rust file no `mod` reaches), which has no rows and is no file of the export. `calls.narrowed` is 1 for an
+/// `inferred` call a family or scope narrowed from several definitions of its name. `calls.target` holds the one definition an `exact` or
 /// `inferred` call reaches; an `ambiguous` call has no target and lists every definition that
 /// fits in `candidates`. An unresolved consumer's `contracts` row keeps the `method` it calls
 /// with, when readable, and the literal `fragments` of its URL path as a JSON array (NULL when
@@ -86,7 +87,7 @@ CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NU
 CREATE INDEX symbols_path ON symbols (path);
 CREATE TABLE calls (
     id TEXT NOT NULL, caller TEXT NOT NULL, target TEXT, level TEXT,
-    path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL
+    path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, narrowed INTEGER NOT NULL
 );
 CREATE INDEX calls_path ON calls (path);
 CREATE TABLE candidates (call TEXT NOT NULL, target TEXT NOT NULL);
@@ -539,6 +540,9 @@ struct Resolved {
     start: i64,
     end: i64,
     candidates: Vec<String>,
+    /// An `inferred` match narrowed to one of several definitions of its name.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    narrowed: bool,
 }
 
 /// The symbol and call rows of one file, before they are written.
@@ -829,7 +833,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         }
         for row in &rows.calls {
             tx.execute(
-                "INSERT INTO calls VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                "INSERT INTO calls VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                 params![
                     row.id,
                     row.caller,
@@ -837,7 +841,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
                     row.level.map(Level::name),
                     path,
                     row.start,
-                    row.end
+                    row.end,
+                    row.narrowed
                 ],
             )?;
             for candidate in &row.candidates {
@@ -1456,9 +1461,13 @@ fn resolve_file<'a>(
         .iter()
         .zip(call_ids(identity, path, facts, names))
         .map(|(call, (caller, call_id))| {
-            let (target, level, candidates) = match resolver.call(path, call) {
+            let resolution = resolver.call(path, call);
+            let narrowed = matches!(resolution, Resolution::Narrowed(_));
+            let (target, level, candidates) = match resolution {
                 Resolution::Exact(t) => (Some(id(&t)), Some(Level::Exact), Vec::new()),
-                Resolution::Inferred(t) => (Some(id(&t)), Some(Level::Inferred), Vec::new()),
+                Resolution::Inferred(t) | Resolution::Narrowed(t) => {
+                    (Some(id(&t)), Some(Level::Inferred), Vec::new())
+                }
                 Resolution::Ambiguous(ts) => {
                     (None, Some(Level::Ambiguous), ts.iter().map(id).collect())
                 }
@@ -1472,6 +1481,7 @@ fn resolve_file<'a>(
                 start: call.range.start as i64,
                 end: call.range.end as i64,
                 candidates,
+                narrowed,
             }
         })
         .collect();
@@ -1720,7 +1730,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
     }
     let calls = db
         .prepare(&format!(
-            "SELECT id, caller, target, level, path, start, end FROM {schema}.calls \
+            "SELECT id, caller, target, level, path, start, end, narrowed FROM {schema}.calls \
              ORDER BY id, path, start, end"
         ))?
         .query_map([], |r| {
@@ -1735,6 +1745,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
                     .as_deref()
                     .and_then(Level::parse),
                 span: span(r, 4)?,
+                narrowed: r.get(7)?,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;

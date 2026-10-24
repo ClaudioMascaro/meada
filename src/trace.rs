@@ -1060,6 +1060,7 @@ mod tests {
                     target: Some(id(n + 1)),
                     level: Some(Level::Exact),
                     candidates: Vec::new(),
+                    narrowed: false,
                     span: span(),
                 })
                 .collect(),

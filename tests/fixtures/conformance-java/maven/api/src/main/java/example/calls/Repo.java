@@ -2,7 +2,7 @@ package example.calls;
 
 public class Repo extends Store implements Port {
     public void save() {}
-    public void touch(int id) {}
+    public void touch(int id) { super.touch(id); }
     public void mark(String key) {}
     public void send(String body) {}
     public void send(String body, int retries) {}

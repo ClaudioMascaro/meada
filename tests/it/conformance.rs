@@ -86,6 +86,7 @@ fn java() {
             "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.Task.run()",
             "maven/api/src/main/java/example/calls/Client.java::example.calls.Client",
             "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.make()",
+            "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.chained()",
             "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)",
             "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.shadowed(Port)",
             "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.unknown()",
@@ -97,6 +98,16 @@ fn java() {
 
 /// Calls through typed receivers, written supertypes and name matches (#85).
 const JAVA_CALLS: &[ExpectedCall] = &[
+    (
+        "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.touch(int)::super.touch#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Store.java::example.calls.Store.touch(int)"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.chained()::(method_invocation).save#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Store.java::example.calls.Store.save(int)"],
+    ),
     (
         "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.run()::save#0",
         EXACT,
@@ -132,12 +143,12 @@ const JAVA_CALLS: &[ExpectedCall] = &[
     ),
     (
         "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.use()::own#0",
-        EXACT,
+        INFERRED,
         &["maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.own()"],
     ),
     (
         "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.use()::this.own#0",
-        EXACT,
+        INFERRED,
         &["maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.own()"],
     ),
     (
@@ -147,8 +158,8 @@ const JAVA_CALLS: &[ExpectedCall] = &[
     ),
     (
         "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.Task.run()::own#0",
-        None,
-        &[],
+        INFERRED,
+        &["maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.own()"],
     ),
     (
         "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)::repo.save#0",
@@ -243,6 +254,37 @@ fn java_context_lists_callers_through_receivers_and_name_matches() {
             .context("example.calls.Store.ping()", None)
             .unwrap(),
     );
+}
+
+#[test]
+fn java_static_imports_an_outside_base_may_shadow_are_name_matches() {
+    let repo = fixture_repo("java_shadowed_static", "conformance-java", Some(ORIGIN));
+    std::fs::write(
+        repo.join("Job.java"),
+        "package other; import static example.util.Tools.single; \
+         public class Job extends Remote { void run() { single(); } } \
+         class Plain { void run() { single(); } }",
+    )
+    .unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let call = |caller: &str| {
+        json["calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["caller"].as_str().unwrap().ends_with(caller))
+            .unwrap()
+            .clone()
+    };
+    let target = "example.util.Tools.single()";
+    let plain = call("other.Plain.run()");
+    assert_eq!(plain["level"], "exact", "{plain}");
+    assert!(plain["target"].as_str().unwrap().ends_with(target));
+    // `Remote` may declare `single()`, which would shadow the import.
+    let shadowed = call("other.Job.run()");
+    assert_eq!(shadowed["level"], "inferred", "{shadowed}");
+    assert!(shadowed["target"].as_str().unwrap().ends_with(target));
 }
 
 #[test]

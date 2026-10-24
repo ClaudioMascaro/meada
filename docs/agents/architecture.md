@@ -1253,8 +1253,20 @@ one for the area a change touches.
   leaves it unknown. A pack with `members_in_scope` reads a bare called name with
   `Reading::Method`, which at each class body takes that family's overloads
   (`Resolver::inherited`) and stops, unknown, at a class whose family is absent or has an
-  opaque base and declares none. A name match narrowed by `Call::arity` that leaves several
-  candidates takes the one declared in the family of the class around the call, at `inferred`. A language whose imports name a path rather than a file (Rust's
+  opaque base and declares none, or that does not declare a name every class has
+  (`LanguagePack::implicit_members`); a bare field name reads the family's fields first
+  (`Resolver::inherited_field`). Overloads merge across the family, so an opaque base anywhere
+  in it keeps them from `exact` (Opaque outside, strict; #353 tracks a relaxation).
+  `LanguagePack::unordered_bases` drops the written base list from the C3 merge (Java's
+  `implements I, J` with `J extends I`), and a `base_receiver` call reads the overloads of the
+  family past the class (`Resolver::base_member`). A call made on a call's result names it
+  (`Call::on`), as a local may (`Class::Result`): the receiver is the class the declared result
+  of that call's exact target names (`Resolver::result_of`, bounded by `RECEIVER_DEPTH`). A name
+  match of a call narrowed by `Call::arity` (`Resolver::matched`) reads the family that owns it:
+  a typed receiver, `this` or a bare call match within that family alone, a bare call past an
+  opaque base falls back to what its scope binds, and any other receiver takes, from several,
+  the one declared in the family of the class around the call other than the caller; a match
+  narrowed from several is `Resolution::Narrowed`, stored as `inferred` with `calls.narrowed`. A language whose imports name a path rather than a file (Rust's
   `use a::b as c`) writes `Imported::Path` (what the dotted callee-like name gives, resolved
   from the scope of the import's own `local`, which a pack qualifies by the scope that holds
   it: `inner.c`, `f.c`) and `Imported::Glob` (every name the module the path gives takes:
@@ -1340,7 +1352,9 @@ one for the area a change touches.
   parse is rebuilt by the first refresh that reads them (when a file changed), which `status`
   cannot tell.
 - The index holds no source text and no values, apart from the argument count and constructor
-  form of an overloaded call (`Call::arity`, `Call::constructs`), callable-to-signature and
+  form of an overloaded call (`Call::arity`, `Call::constructs`), the place of the call a
+  chained call is made on (`Call::on`), whether an `inferred` call was narrowed from several
+  definitions of its name (`calls.narrowed`), callable-to-signature and
   static-member names (`Facts::overloads`, `Facts::constructors` and
   `Facts::statics`), the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths

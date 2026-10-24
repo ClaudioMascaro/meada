@@ -20,10 +20,12 @@ All notable changes to Meada are recorded here. The format follows
   narrowed by argument count, package and static imports, and conformance, determinism and
   incremental-refresh coverage, without a JDK or build tool.
 - Java method calls (issue #85) through the types the source writes: fields, parameters,
-  locals, `var` with `new T(...)` or a call whose declared return type is written, and the
-  supertypes written in `extends` and `implements`. Overload families are read per signature
-  across a class family, an interface receiver stops at the interface, and a call on an unknown
-  receiver is a name match that prefers the one candidate in the calling class's family.
+  locals, `var` with `new T(...)` or a call, chains `f().g()` through the declared return type,
+  `super.f()`, and the supertypes written in `extends` and `implements`. Overload families are
+  read per signature across a class family, an interface receiver stops at the interface, an
+  outside base anywhere in a family keeps its methods from `exact`, and a call on an unknown
+  receiver is a name match that prefers the one candidate in the owning family; a narrowed match
+  says "one of several" in its reason.
 - Maven and Gradle artifact contracts (spec #26, #93), using shared JVM manifest readers:
   literal `group:artifact` providers, Maven modules and parent groups, Gradle project names,
   dependencies with unchecked ranges, and ambiguous candidates for computed coordinates.

@@ -87,9 +87,25 @@ pub trait LanguagePack {
     }
 
     /// A keyword naming the base of the enclosing class, such as `super`: what its members
-    /// are is not resolved.
+    /// are is not resolved, except an overload family (`Facts::overloads`), read through the
+    /// class's family past the class itself.
     fn base_receiver(&self) -> Option<&'static str> {
         None
+    }
+
+    /// Whether the order of a class's written bases says nothing about precedence (Java's
+    /// `implements I, J`): C3 then merges the bases' families without the written list, so a
+    /// redundant interface (`J extends I`) is no conflict. A subtype still comes before its
+    /// supertypes, and the first base written before the next.
+    fn unordered_bases(&self) -> bool {
+        false
+    }
+
+    /// Methods every class has without declaring them (Java's `java.lang.Object` members): a
+    /// bare call of one that the class's family does not declare is unknown, and the climb to
+    /// outer classes and imports stops there.
+    fn implicit_members(&self) -> &'static [&'static str] {
+        &[]
     }
 
     /// Whether a method call that no function of the repository answers may hand back the
@@ -336,6 +352,10 @@ pub enum Class {
     /// name is read as an expression, so its head may be a local or a parameter whose class
     /// the source writes, and a method of that class is the function called.
     Called(String),
+    /// What the call at this place of the file's `Facts::calls` gives (Java's `var x =
+    /// make(1)`): as `Call::on` reads it, so the overload the call's argument count picks
+    /// decides.
+    Result(usize),
     /// Bound by an import in the scope: what the file's imports bind the name to.
     Imported,
     /// Bound otherwise, so an outer binding of the name is hidden.
@@ -604,6 +624,12 @@ pub struct Call {
     /// that does not resolve falls back to takes functions as well as methods.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub by_path: bool,
+    /// The call of the same file whose result this call is made on (`make()` in
+    /// `make().save()`, whose callee is `(method_invocation).save`), by its place in
+    /// `Facts::calls`, when the pack gives it: the receiver is an instance of the class the
+    /// declared result of that call's exact target names.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on: Option<usize>,
     /// The name a method call on a call chain starts at (`client` in `client.get(u).send()`,
     /// whose callee is `(call_expression).send`), when it is a plain name or a member chain of
     /// them. An outside type owns the whole chain, so the resolver reads the call as one on

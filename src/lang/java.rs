@@ -52,6 +52,30 @@ impl LanguagePack for Java {
         true
     }
 
+    fn base_receiver(&self) -> Option<&'static str> {
+        Some("super")
+    }
+
+    fn unordered_bases(&self) -> bool {
+        true
+    }
+
+    // ponytail: an enum's implicit `values`, `valueOf`, `ordinal`, `name` and a record's
+    // accessors are not listed; a bare call of one may still climb to an outer method.
+    fn implicit_members(&self) -> &'static [&'static str] {
+        &[
+            "clone",
+            "equals",
+            "finalize",
+            "getClass",
+            "hashCode",
+            "notify",
+            "notifyAll",
+            "toString",
+            "wait",
+        ]
+    }
+
     fn config_files(&self) -> &'static [&'static str] {
         &[]
     }
@@ -141,6 +165,12 @@ fn parse(src: &[u8]) -> Result<Facts> {
     }];
     let mut fields = BTreeSet::new();
     let mut locals = Vec::new();
+    // The types declared so far: a local whose scope is one sits in an initializer.
+    let mut classes = BTreeSet::new();
+    // Initializer calls of `var` locals (by `Class::Result` place) and chained calls (by place
+    // in `facts.calls`), linked to the calls they name once every call is read.
+    let mut results: Vec<Range<usize>> = Vec::new();
+    let mut chains: Vec<(usize, Range<usize>)> = Vec::new();
     let mut outside = BTreeSet::new();
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
@@ -239,6 +269,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 .any(|m| matches!(*m, "public" | "protected"))
                 || (interface && !modifiers.contains(&"private"));
             public = visible && own_public;
+            if kind == Kind::Class {
+                classes.insert(inner.as_ref().clone());
+            }
             facts.defs.push(Def {
                 name: inner.as_ref().clone(),
                 kind,
@@ -336,6 +369,17 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 at.args = arguments(node, src, 0);
                 at.arity = Some(at.args.len());
                 at.receiver = node.child_by_field_name("object").map(|n| value(n, src, 0));
+                // `make().save()` and `make().x.save()`: the call the chain is made on.
+                let mut object = node.child_by_field_name("object");
+                while let Some(n) = object.filter(|n| n.kind() == "field_access") {
+                    object = n.child_by_field_name("object");
+                }
+                if let Some(inner) = object.filter(|n| n.kind() == "method_invocation")
+                    && definitions
+                    && at.callee.starts_with("(method_invocation).")
+                {
+                    chains.push((facts.calls.len(), inner.byte_range()));
+                }
                 facts.calls.push(at);
             }
             "object_creation_expression" => {
@@ -357,8 +401,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
             "local_variable_declaration" | "enhanced_for_statement" | "resource" if definitions => {
                 // A declared type, or the class a `var` takes from `new T(..)` or a call.
                 let declared = node.child_by_field_name("type");
-                let typed = |value: Option<Node>, dimensions: bool| match declared {
-                    _ if dimensions => Class::Unknown,
+                // An initializer block's or a field lambda's local is no field of the class.
+                let initializer = classes.contains(scope.as_str());
+                let mut typed = |value: Option<Node>, dimensions: bool| match declared {
+                    _ if dimensions || initializer => Class::Unknown,
                     Some(ty) if text(ty, src) == "var" => match value {
                         Some(v)
                             if v.kind() == "object_creation_expression"
@@ -368,11 +414,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
                             class_of(v.child_by_field_name("type").unwrap(), src, &generics)
                         }
                         Some(v) if v.kind() == "method_invocation" => {
-                            let called = callee(v, src);
-                            match called.contains('(') {
-                                true => Class::Unknown,
-                                false => Class::Called(called),
-                            }
+                            results.push(v.byte_range());
+                            Class::Result(results.len() - 1)
                         }
                         _ => Class::Unknown,
                     },
@@ -514,7 +557,18 @@ fn parse(src: &[u8]) -> Result<Facts> {
     }
     // A local is typed only where it is the one binding of its name in its scope; one named
     // like a field may be read as the field before its declaration, so its class is unknown.
+    let called: BTreeMap<(usize, usize), usize> = (facts.calls.iter().enumerate())
+        .filter(|(_, c)| c.decorates.is_none())
+        .map(|(n, c)| ((c.range.start, c.range.end), n))
+        .collect();
+    let call_at = |r: &Range<usize>| called.get(&(r.start, r.end)).copied();
+    for (outer, inner) in chains {
+        facts.calls[outer].on = call_at(&inner);
+    }
     for mut local in locals {
+        if let Class::Result(n) = local.class {
+            local.class = call_at(&results[n]).map_or(Class::Unknown, Class::Result);
+        }
         if fields.contains(&local.name) {
             local.class = Class::Unknown;
         }
@@ -717,6 +771,7 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
         decorates: None,
         by_path: false,
         root: None,
+        on: None,
         receiver: None,
         arg_types: Vec::new(),
         uses: Vec::new(),
