@@ -21,6 +21,869 @@ const EXACT: Option<&str> = Some("exact");
 const INFERRED: Option<&str> = Some("inferred");
 const AMBIGUOUS: Option<&str> = Some("ambiguous");
 
+#[test]
+fn java() {
+    conform(
+        "conformance-java",
+        &[
+            "maven/api/src/main/java/example/Orders.java::example.Orders",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.Orders()",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.Orders(String)",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.place(String,int)",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.place(String)",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.place(int)",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.start()",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.imported()",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.enclosed()",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.qualified(java.lang.String)",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.shadow(Object)",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.localShadow()",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.check()",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.hidden()",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.Nested",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.Nested.run()",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.Protected",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.Protected.run()",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.Private",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.Private.run()",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.Package",
+            "maven/api/src/main/java/example/Orders.java::example.Orders.Package.run()",
+            "maven/api/src/main/java/example/Local.java::example.Local",
+            "maven/api/src/main/java/example/Local.java::example.Local.same()",
+            "maven/api/src/main/java/example/util/Tools.java::example.util.Tools",
+            "maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()",
+            "maven/api/src/main/java/example/util/Tools.java::example.util.Tools.doubled()",
+            "maven/api/src/main/java/example/util/Tools.java::example.util.Tools.valueOf(int)",
+            "maven/api/src/main/java/example/stars/Wave.java::example.stars.Wave",
+            "maven/api/src/main/java/example/stars/Wave.java::example.stars.Wave.wave()",
+            "gradle/src/main/java/example/Receipt.java::example.Receipt",
+            "gradle/src/main/java/example/Receipt.java::example.Receipt.Receipt(String)",
+            "gradle/src/main/java/example/Receipt.java::example.Pending",
+            "gradle/src/main/java/example/Receipt.java::example.Pending.finish()",
+            "gradle/src/main/java/example/Receipt.java::example.State",
+        ],
+        &[],
+        &[],
+    );
+}
+
+#[test]
+fn java_static_calls_resolve_overloads_by_argument_count() {
+    let repo = fixture_repo("java_static_calls", "conformance-java", Some(ORIGIN));
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let calls: Vec<_> = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| {
+            c["caller"]
+                .as_str()
+                .is_some_and(|c| c.ends_with("example.Orders.start()"))
+        })
+        .collect();
+    assert_eq!(calls.len(), 4);
+    let call = |suffix: &str| {
+        calls
+            .iter()
+            .find(|c| c["id"].as_str().unwrap().ends_with(suffix))
+            .unwrap()
+    };
+    for suffix in ["::check#0", "::this.check#0"] {
+        assert_eq!(call(suffix)["level"], "exact");
+        assert!(
+            call(suffix)["target"]
+                .as_str()
+                .unwrap()
+                .ends_with("example.Orders.check()")
+        );
+    }
+    assert_eq!(call("::Orders.place#0")["level"], "exact");
+    assert!(
+        call("::Orders.place#0")["target"]
+            .as_str()
+            .unwrap()
+            .ends_with("place(String,int)")
+    );
+    assert_eq!(call("::Orders.place#1")["level"], "ambiguous");
+    assert_eq!(
+        call("::Orders.place#1")["candidates"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+}
+
+#[test]
+fn java_imports_constructors_and_enclosed_calls_reach_the_written_symbols() {
+    let repo = fixture_repo("java_imports", "conformance-java", Some(ORIGIN));
+    let engine = Engine::open(&repo).unwrap();
+    let json: Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let calls = json["calls"].as_array().unwrap();
+    let call = |scope: &str, suffix: &str| {
+        calls
+            .iter()
+            .find(|c| {
+                c["caller"].as_str().unwrap().ends_with(scope)
+                    && c["id"].as_str().unwrap().ends_with(suffix)
+            })
+            .unwrap()
+    };
+    for (suffix, target) in [
+        ("::Tools.single#0", "example.util.Tools.single()"),
+        ("::single#0", "example.util.Tools.single()"),
+        ("::doubled#0", "example.util.Tools.doubled()"),
+        ("::Wave.wave#0", "example.stars.Wave.wave()"),
+        ("::Local.same#0", "example.Local.same()"),
+        ("::Orders#0", "example.Orders.Orders()"),
+        ("::Orders#1", "example.Orders.Orders(String)"),
+        ("::Receipt#0", "example.Receipt.Receipt(String)"),
+    ] {
+        let found = call("example.Orders.imported()", suffix);
+        assert_eq!(found["level"], "exact", "{suffix}: {found}");
+        assert!(
+            found["target"].as_str().unwrap().ends_with(target),
+            "{suffix}: {found}"
+        );
+    }
+    for suffix in ["::String.valueOf#0", "::System.currentTimeMillis#0"] {
+        assert!(call("example.Orders.imported()", suffix)["target"].is_null());
+    }
+    assert_eq!(
+        call("example.Orders.enclosed()", "::check#0")["level"],
+        "exact"
+    );
+    assert_eq!(
+        call("example.Orders.enclosed()", "::(anonymous).check#0")["level"],
+        "inferred"
+    );
+    assert_eq!(
+        call(
+            "example.Orders.qualified(java.lang.String)",
+            "::this.check#0"
+        )["level"],
+        "exact"
+    );
+    for scope in [
+        "example.Orders.shadow(Object)",
+        "example.Orders.localShadow()",
+    ] {
+        assert_ne!(call(scope, "::Tools.single#0")["level"], "exact");
+    }
+    let doors: Vec<_> = json["processes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["entry_point"].as_str().unwrap())
+        .collect();
+    assert!(
+        doors
+            .iter()
+            .any(|d| d.ends_with("example.Orders.Protected.run()"))
+    );
+    assert!(
+        doors
+            .iter()
+            .any(|d| d.ends_with("example.Orders.qualified(java.lang.String)"))
+    );
+    for hidden in [
+        "example.Orders.Private.run()",
+        "example.Orders.Package.run()",
+        "example.Orders.hidden()",
+        "example.Pending.finish()",
+    ] {
+        assert!(!doors.iter().any(|d| d.ends_with(hidden)), "{hidden}");
+    }
+    assert_golden(
+        "conformance-java.search-orders.txt",
+        &engine.search("Orders", Some("symbol"), None).unwrap(),
+    );
+    assert_golden(
+        "conformance-java.context-check.txt",
+        &engine.context("example.Orders.check()", None).unwrap(),
+    );
+}
+
+#[test]
+fn java_hostile_definition_value_and_member_depths_remain_bounded() {
+    let repo = fixture_repo("java_depths", "conformance-java", Some(ORIGIN));
+    let mut deep = String::from("package hostile; public class Deep { void ping() {}");
+    for n in 0..132 {
+        deep.push_str(&format!("public class Inner{n} {{"));
+    }
+    deep.push_str("void ping() {} void leaf() { ping(); this.ping(); missing(); }");
+    deep.push_str(&"}".repeat(133));
+    std::fs::write(repo.join("Deep.java"), deep).unwrap();
+    let expression = format!("{}\"value\"{}", "(".repeat(1024), ")".repeat(1024));
+    let member = format!("root{}.send()", ".part".repeat(300));
+    std::fs::write(repo.join("Values.java"), format!("package hostile; public class Values {{ static final String V = {expression}; public void run() {{ {member}; }} }}")).unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let definitions = json["symbols"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|s| s["span"]["path"] == "Deep.java")
+        .count();
+    assert_eq!(definitions, 129);
+    assert!(
+        json["calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|c| c["span"]["path"] == "Deep.java")
+            .all(|c| c["level"] != "exact")
+    );
+    assert!(
+        json["calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["span"]["path"] == "Values.java" && c["target"].is_null())
+    );
+}
+
+#[test]
+fn java_inner_bindings_hide_imports_in_each_source_binding_form() {
+    let repo = fixture_repo("java_hidden_names", "conformance-java", Some(ORIGIN));
+    std::fs::write(
+        repo.join("Shadow.java"),
+        r#"
+package other;
+import example /* path comment */ . util.Tools;
+class Shadow {
+    Object Tools;
+    void field() { Tools.single(); }
+    void parameter(Object Tools) { Tools.single(); }
+    void local() { Object Tools = null; Tools.single(); }
+    void lambda() { java.util.function.Consumer<Object> action = (Object Tools) -> Tools.single(); }
+    void caught() { try { missing(); } catch (Exception Tools) { Tools.single(); } }
+    void resource() { try (AutoCloseable Tools = missing()) { Tools.single(); } }
+    void loop(Object[] items) { for (Object Tools : items) { Tools.single(); } }
+    void pattern(Object item) { if (item instanceof Object Tools) { Tools.single(); } }
+}
+"#,
+    )
+    .unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let calls: Vec<_> = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| {
+            c["span"]["path"] == "Shadow.java"
+                && c["id"].as_str().unwrap().contains("::Tools.single#")
+        })
+        .collect();
+    assert_eq!(calls.len(), 8);
+    assert!(calls.iter().all(|c| c["level"] != "exact"));
+    assert!(
+        json["processes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|p| !p["entry_point"].as_str().unwrap().contains("Shadow.java"))
+    );
+}
+
+#[test]
+fn java_method_names_are_separate_from_values_and_anonymous_receivers_are_opaque() {
+    let repo = fixture_repo("java_method_namespace", "conformance-java", Some(ORIGIN));
+    std::fs::write(
+        repo.join("App.java"),
+        r#"
+package example;
+import external.Remote;
+public class App {
+    public void ping() {}
+    public void run() { int ping = 1; ping(); }
+    public void anonymous() {
+        Remote remote = new Remote() {
+            public void start() { ping(); this.ping(); }
+        };
+    }
+}
+"#,
+    )
+    .unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let calls = json["calls"].as_array().unwrap();
+    let run = calls
+        .iter()
+        .find(|c| {
+            c["id"]
+                .as_str()
+                .unwrap()
+                .ends_with("example.App.run()::ping#0")
+        })
+        .unwrap();
+    assert_eq!(run["level"], "exact");
+    assert!(
+        run["target"]
+            .as_str()
+            .unwrap()
+            .ends_with("example.App.ping()")
+    );
+    let anonymous: Vec<_> = calls
+        .iter()
+        .filter(|c| {
+            c["caller"]
+                .as_str()
+                .unwrap()
+                .ends_with("example.App.anonymous()")
+                && c["id"].as_str().unwrap().contains("::(anonymous).ping#")
+        })
+        .collect();
+    assert_eq!(anonymous.len(), 2);
+    assert!(anonymous.iter().all(|c| c["level"] != "exact"));
+}
+
+#[test]
+fn java_on_demand_imports_keep_ambiguity_and_explicit_imports_take_priority() {
+    let repo = fixture_repo("java_import_priority", "conformance-java", Some(ORIGIN));
+    for (path, source) in [
+        (
+            "one/Wild.java",
+            "package one; public class Wild { public static void ping() {} }",
+        ),
+        (
+            "two/Wild.java",
+            "package two; public class Wild { public static void ping() {} }",
+        ),
+        (
+            "other/Noise.java",
+            "package other; public class Noise { public static void ping() {} }",
+        ),
+        (
+            "client/Ambiguous.java",
+            "package client; import one.*; import two.*; public class Ambiguous { public static void run() { Wild.ping(); } }",
+        ),
+        (
+            "client/Explicit.java",
+            "package client; import one.Wild; import two.*; import one.*; public class Explicit { public static void run() { Wild.ping(); } }",
+        ),
+        (
+            "client/Choice.java",
+            "package client; class Choice { public static void pick() {} }",
+        ),
+        (
+            "java/lang/Choice.java",
+            "package java.lang; public class Choice { public static void pick() {} }",
+        ),
+        (
+            "java/lang/Implicit.java",
+            "package java.lang; public class Implicit { public static void touch() {} }",
+        ),
+        (
+            "client/Current.java",
+            "package client; public class Current { public static void run() { Choice.pick(); } }",
+        ),
+        (
+            "client/Language.java",
+            "package client; public class Language { public static void run() { Implicit.touch(); } }",
+        ),
+        (
+            "client/StaticAmbiguous.java",
+            "package client; import static one.Wild.*; import static two.Wild.*; public class StaticAmbiguous { public static void run() { ping(); } }",
+        ),
+        (
+            "client/StaticExplicit.java",
+            "package client; import static one.Wild.ping; import static two.Wild.*; import static one.Wild.*; public class StaticExplicit { public static void run() { ping(); } }",
+        ),
+        (
+            "client/NestedImported.java",
+            "package client; import static example.Orders.*; public class NestedImported { public static void run() { new Nested(); } }",
+        ),
+        (
+            "module-one/src/p/Tools.java",
+            "package p; public class Tools { public static void go() {} }",
+        ),
+        (
+            "module-two/src/p/Tools.java",
+            "package p; public class Tools { public static void go() {} }",
+        ),
+        (
+            "client/Duplicate.java",
+            "package client; import p.Tools; public class Duplicate { public static void run() { Tools.go(); } }",
+        ),
+    ] {
+        let path = repo.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, source).unwrap();
+    }
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let call = |caller: &str| {
+        json["calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["caller"].as_str().unwrap().ends_with(caller))
+            .unwrap()
+    };
+    let duplicate = call("client.Duplicate.run()");
+    assert_eq!(duplicate["level"], "ambiguous");
+    let candidates = duplicate["candidates"].as_array().unwrap();
+    assert_eq!(candidates.len(), 2);
+    assert!(
+        candidates[0]
+            .as_str()
+            .unwrap()
+            .contains("module-one/src/p/Tools.java::p.Tools.go()")
+    );
+    assert!(
+        candidates[1]
+            .as_str()
+            .unwrap()
+            .contains("module-two/src/p/Tools.java::p.Tools.go()")
+    );
+    for caller in ["client.Ambiguous.run()", "client.StaticAmbiguous.run()"] {
+        let found = call(caller);
+        assert_eq!(found["level"], "ambiguous", "{caller}: {found}");
+        let candidates: Vec<_> = found["candidates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c.as_str().unwrap().rsplit("::").next().unwrap())
+            .collect();
+        assert_eq!(
+            candidates,
+            ["one.Wild.ping()", "two.Wild.ping()"],
+            "{caller}"
+        );
+    }
+    for (caller, target) in [
+        ("client.Explicit.run()", "one.Wild.ping()"),
+        ("client.StaticExplicit.run()", "one.Wild.ping()"),
+        ("client.Current.run()", "client.Choice.pick()"),
+        ("client.Language.run()", "java.lang.Implicit.touch()"),
+        ("client.NestedImported.run()", "example.Orders.Nested"),
+    ] {
+        let found = call(caller);
+        assert_eq!(found["level"], "exact", "{caller}: {found}");
+        assert!(
+            found["target"].as_str().unwrap().ends_with(target),
+            "{caller}: {found}"
+        );
+    }
+}
+
+#[test]
+fn java_type_use_annotation_values_stay_out_of_exported_signatures() {
+    let repo = fixture_repo("java_type_use", "conformance-java", Some(ORIGIN));
+    std::fs::write(
+        repo.join("Annotated.java"),
+        r#"
+package example;
+import java.lang.annotation.Target;
+import java.lang.annotation.ElementType;
+@Target(ElementType.TYPE_USE)
+@interface Tag { String value(); }
+public class Annotated {
+    public void generic(java.util.List<@Tag("generic-value") String> values) {}
+    public void commented(java.util./* comment-value */List<String> values) {}
+    public void array(String @Tag("array-value") [] values) {}
+    public void after(String values @Tag("after-value") []) {}
+    public void spread(String @Tag("spread-value") ... values) {}
+    public void create() { new java.util.@Tag("new-value") ArrayList<String>(); }
+}
+
+record Tagged(java.util.List<@Tag("record-value") String> values) { Tagged {} }
+"#,
+    )
+    .unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    let export = engine.export().unwrap();
+    for value in [
+        "generic-value",
+        "array-value",
+        "after-value",
+        "spread-value",
+        "new-value",
+        "record-value",
+        "comment-value",
+    ] {
+        assert!(
+            !export.contains(value),
+            "annotation value escaped into an indexed name: {value}"
+        );
+    }
+    let json: Value = serde_json::from_str(&export).unwrap();
+    for name in [
+        "example.Annotated.generic(java.util.List<String>)",
+        "example.Annotated.commented(java.util.List<String>)",
+        "example.Annotated.array(String[])",
+        "example.Annotated.after(String[])",
+        "example.Annotated.spread(String...)",
+        "example.Tagged.Tagged(java.util.List<String>)",
+    ] {
+        assert!(
+            json["symbols"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|s| s["id"].as_str().unwrap().ends_with(name)),
+            "{name}"
+        );
+    }
+    assert_eq!(export, engine.export().unwrap());
+}
+
+#[test]
+fn java_comments_do_not_change_overload_argument_counts() {
+    let repo = fixture_repo("java_argument_comments", "conformance-java", Some(ORIGIN));
+    std::fs::write(
+        repo.join("Comments.java"),
+        r#"
+package example;
+class Comments {
+    static void pick() {}
+    static void pick(String value) {}
+    static void pair(String first, String second) {}
+    static void pair(String first, String second, String third) {}
+    static void run() { pick(/* none */); pair("first", /* middle */ "second"); }
+}
+"#,
+    )
+    .unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let calls: Vec<_> = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| {
+            c["caller"]
+                .as_str()
+                .unwrap()
+                .ends_with("example.Comments.run()")
+        })
+        .collect();
+    assert_eq!(calls.len(), 2);
+    for (suffix, target) in [
+        ("::pick#0", "example.Comments.pick()"),
+        ("::pair#0", "example.Comments.pair(String,String)"),
+    ] {
+        let call = calls
+            .iter()
+            .find(|c| c["id"].as_str().unwrap().ends_with(suffix))
+            .unwrap();
+        assert_eq!(call["level"], "exact");
+        assert!(call["target"].as_str().unwrap().ends_with(target), "{call}");
+    }
+}
+
+#[test]
+fn java_enum_and_interface_values_hide_imported_types() {
+    let repo = fixture_repo("java_constant_bindings", "conformance-java", Some(ORIGIN));
+    for (path, source) in [
+        (
+            "EnumValue.java",
+            "package other; import example.util.Tools; enum EnumValue { Tools; void single() {} void run() { Tools.single(); } }",
+        ),
+        (
+            "InterfaceValue.java",
+            "package other; import example.util.Tools; interface InterfaceValue { InterfaceValue Tools = null; default void single() {} default void run() { Tools.single(); } }",
+        ),
+    ] {
+        std::fs::write(repo.join(path), source).unwrap();
+    }
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    for caller in ["other.EnumValue.run()", "other.InterfaceValue.run()"] {
+        let call = json["calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["caller"].as_str().unwrap().ends_with(caller))
+            .unwrap();
+        assert_ne!(call["level"], "exact", "{call}");
+    }
+}
+
+#[test]
+fn java_fully_qualified_static_calls_respect_value_shadowing() {
+    let repo = fixture_repo("java_qualified_static", "conformance-java", Some(ORIGIN));
+    std::fs::write(repo.join("Qualified.java"), "package other; class Qualified { void run() { example.util.Tools.single(); } void hidden(Object example) { example.util.Tools.single(); } }").unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let call = |caller: &str| {
+        json["calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["caller"].as_str().unwrap().ends_with(caller))
+            .unwrap()
+    };
+    assert_eq!(call("other.Qualified.run()")["level"], "exact");
+    assert!(
+        call("other.Qualified.run()")["target"]
+            .as_str()
+            .unwrap()
+            .ends_with("example.util.Tools.single()")
+    );
+    assert_ne!(call("other.Qualified.hidden(Object)")["level"], "exact");
+}
+
+#[test]
+fn java_same_named_factories_and_nested_constructors_stay_separate() {
+    let repo = fixture_repo("java_factory_namespace", "conformance-java", Some(ORIGIN));
+    std::fs::write(repo.join("Factory.java"), "package example; class Factory { static class Task { Task() {} } static Task Task() { return new Task(); } static void run() { Task(); new Task(); } }").unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let calls: Vec<_> = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["span"]["path"] == "Factory.java")
+        .collect();
+    assert_eq!(calls.len(), 3);
+    for call in calls {
+        let suffix = if call["id"].as_str().unwrap().ends_with("::Task#0")
+            && call["caller"].as_str().unwrap().ends_with("Factory.run()")
+        {
+            "example.Factory.Task()"
+        } else {
+            "example.Factory.Task.Task()"
+        };
+        assert_eq!(call["level"], "exact", "{call}");
+        assert!(call["target"].as_str().unwrap().ends_with(suffix), "{call}");
+    }
+}
+
+#[test]
+fn java_constructor_names_ignore_methods_and_value_bindings() {
+    let repo = fixture_repo("java_constructor_names", "conformance-java", Some(ORIGIN));
+    for (path, source) in [
+        (
+            "Task.java",
+            "package other; public class Task { public Task() {} }",
+        ),
+        (
+            "Creator.java",
+            "package example; import other.Task; class Creator { static void Task() {} void run(Object Task) { new Task(); } }",
+        ),
+    ] {
+        std::fs::write(repo.join(path), source).unwrap();
+    }
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let call = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| {
+            c["caller"]
+                .as_str()
+                .unwrap()
+                .ends_with("example.Creator.run(Object)")
+        })
+        .unwrap();
+    assert_eq!(call["level"], "exact", "{call}");
+    assert!(
+        call["target"]
+            .as_str()
+            .unwrap()
+            .ends_with("other.Task.Task()"),
+        "{call}"
+    );
+}
+
+#[test]
+fn java_package_paths_cannot_bypass_a_shadowing_value() {
+    let repo = fixture_repo("java_package_value", "conformance-java", Some(ORIGIN));
+    for (path, source) in [
+        (
+            "Tools.java",
+            "package provider; public class Tools { public static void single() {} }",
+        ),
+        (
+            "Holder.java",
+            "package provider; class Holder { Holder Tools; void single() {} }",
+        ),
+        (
+            "Caller.java",
+            "package provider; class Caller { void run(Holder provider) { provider.Tools.single(); } }",
+        ),
+    ] {
+        std::fs::write(repo.join(path), source).unwrap();
+    }
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let call = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| {
+            c["caller"]
+                .as_str()
+                .unwrap()
+                .ends_with("provider.Caller.run(Holder)")
+        })
+        .unwrap();
+    assert_ne!(call["level"], "exact", "{call}");
+}
+
+#[test]
+fn java_omitted_nested_types_cannot_construct_an_outer_type() {
+    let repo = fixture_repo("java_omitted_constructor", "conformance-java", Some(ORIGIN));
+    let mut source = String::from("package hostile; class Root { static class Task { Task() {} }");
+    for _ in 0..128 {
+        source.push_str("class N {");
+    }
+    source.push_str("class Task { Task() {} } void run() { new Task(); }");
+    source.push_str(&"}".repeat(129));
+    std::fs::write(repo.join("Root.java"), source).unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let call = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["span"]["path"] == "Root.java")
+        .unwrap();
+    assert_ne!(call["level"], "exact", "{call}");
+}
+
+#[test]
+fn java_constructors_and_class_named_methods_have_distinct_identities() {
+    let repo = fixture_repo(
+        "java_constructor_identity",
+        "conformance-java",
+        Some(ORIGIN),
+    );
+    std::fs::write(repo.join("Task.java"), "package example; class Task { Task() {} void Task() {} void run() { new Task(); Task(); } }").unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let calls: Vec<_> = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| {
+            c["caller"]
+                .as_str()
+                .unwrap()
+                .ends_with("example.Task.run()")
+        })
+        .collect();
+    assert_eq!(calls.len(), 2);
+    assert!(calls.iter().all(|c| c["level"] == "exact"));
+    assert_ne!(calls[0]["target"], calls[1]["target"]);
+    for call in calls {
+        assert_eq!(
+            json["symbols"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|s| s["id"] == call["target"])
+                .count(),
+            1
+        );
+    }
+}
+
+#[test]
+fn java_malformed_type_literals_stay_out_of_exported_names() {
+    let repo = fixture_repo("java_type_literals", "conformance-java", Some(ORIGIN));
+    std::fs::write(
+        repo.join("Malformed.java"),
+        r#"
+package example;
+class Malformed {
+    void string(java.util.List<"literal-type-value"> value) {}
+    void character(java.util.List<'§'> value) {}
+    void number(java.util.List<917263540> value) {}
+}
+"#,
+    )
+    .unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    for literal in ["literal-type-value", "§", "917263540"] {
+        assert!(
+            !export.contains(literal),
+            "type error persisted a literal: {literal}"
+        );
+    }
+    assert!(export.contains("example.Orders.start()"));
+}
+
+#[test]
+fn java_external_constructor_cannot_bind_static_method_overloads() {
+    let repo = fixture_repo(
+        "java_external_constructor",
+        "conformance-java",
+        Some(ORIGIN),
+    );
+    std::fs::write(repo.join("Helpers.java"), "package helpers; public class Helpers { public static void Task() {} public static void Task(int value) {} }").unwrap();
+    std::fs::write(repo.join("Caller.java"), "package client; import external.*; import static helpers.Helpers.*; class Caller { void run() { new Task(); } }").unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let call = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| {
+            c["caller"]
+                .as_str()
+                .unwrap()
+                .ends_with("client.Caller.run()")
+        })
+        .unwrap();
+    assert_ne!(call["level"], "exact", "{call}");
+    assert!(call["target"].is_null(), "{call}");
+}
+
+#[test]
+fn java_qualification_expansion_discards_the_whole_file_and_keeps_other_files() {
+    let repo = fixture_repo(
+        "java_qualification_budget",
+        "conformance-java",
+        Some(ORIGIN),
+    );
+    let package = format!("p{}", "a".repeat(4096));
+    let mut source = format!(
+        "package {package}; public class Expanded {{ public static void overloaded(String value) {{}} "
+    );
+    for n in 0..600 {
+        source.push_str(&format!("public static void method{n}() {{}} "));
+    }
+    source.push_str("public static void overloaded(int value) {} }");
+    std::fs::write(repo.join("Expanded.java"), source).unwrap();
+    std::fs::write(repo.join("BudgetCaller.java"), format!("package example; import {package}.Expanded; public class BudgetCaller {{ public static void run() {{ Expanded.overloaded(\"value\"); }} }}")).unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let symbols = json["symbols"].as_array().unwrap();
+    assert!(symbols.iter().all(|s| s["span"]["path"] != "Expanded.java"));
+    assert!(symbols.iter().any(|s| {
+        s["id"]
+            .as_str()
+            .unwrap()
+            .ends_with("example.Orders.start()")
+    }));
+    assert!(symbols.iter().any(|s| {
+        s["id"]
+            .as_str()
+            .unwrap()
+            .ends_with("example.BudgetCaller.run()")
+    }));
+    let called = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| {
+            c["caller"]
+                .as_str()
+                .unwrap()
+                .ends_with("example.BudgetCaller.run()")
+        })
+        .unwrap();
+    assert!(called["target"].is_null());
+    assert!(called["level"].is_null());
+}
+
 /// `programs` are the program entry points the pack declares (spec #31), as identities relative
 /// to the repository, sorted; a pack with none passes an empty list.
 fn conform(fixture: &str, symbols: &[&str], programs: &[&str], calls: &[ExpectedCall]) {

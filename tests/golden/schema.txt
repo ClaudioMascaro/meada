@@ -1265,6 +1265,204 @@ sample.go
   "package": "store"
 }
 
+sample.java
+{
+  "defs": [
+    {
+      "name": "example.Store",
+      "kind": "Class",
+      "range": {
+        "start": 89,
+        "end": 344
+      },
+      "params": []
+    },
+    {
+      "name": "example.Store.Store()",
+      "kind": "Method",
+      "range": {
+        "start": 164,
+        "end": 181
+      },
+      "params": []
+    },
+    {
+      "name": "example.Store.get(String)",
+      "kind": "Method",
+      "range": {
+        "start": 186,
+        "end": 244
+      },
+      "params": [
+        {
+          "name": "key",
+          "binds": "Any"
+        }
+      ]
+    },
+    {
+      "name": "example.Store.get(String,int)",
+      "kind": "Method",
+      "range": {
+        "start": 249,
+        "end": 313
+      },
+      "params": [
+        {
+          "name": "key",
+          "binds": "Any"
+        },
+        {
+          "name": "count",
+          "binds": "Any"
+        }
+      ]
+    },
+    {
+      "name": "example.Store.hidden()",
+      "kind": "Method",
+      "range": {
+        "start": 318,
+        "end": 342
+      },
+      "params": []
+    }
+  ],
+  "overloads": {
+    "example.Store.get": [
+      "example.Store.get(String)",
+      "example.Store.get(String,int)"
+    ],
+    "example.Store.hidden": [
+      "example.Store.hidden()"
+    ]
+  },
+  "constructors": {
+    "example.Store": [
+      "example.Store.Store()"
+    ]
+  },
+  "statics": [
+    "example.Store.PREFIX"
+  ],
+  "imports": [
+    {
+      "local": "@glob0",
+      "source": "java.lang",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob0",
+          "inside": false,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "@glob2",
+      "source": "example",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob2",
+          "inside": true,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "Client",
+      "source": "example.shared.Client",
+      "name": "Qualified"
+    },
+    {
+      "local": "@static5",
+      "source": "example.shared.Helpers",
+      "name": "Qualified"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@static5",
+          "inside": false,
+          "public": false
+        }
+      }
+    }
+  ],
+  "exports": [
+    {
+      "Local": {
+        "exported": "Store",
+        "local": "example.Store"
+      }
+    },
+    {
+      "Local": {
+        "exported": "example.Store",
+        "local": "example.Store"
+      }
+    }
+  ],
+  "star": {
+    "Only": [
+      "Store",
+      "example.Store"
+    ]
+  },
+  "calls": [
+    {
+      "scope": "example.Store.get(String)",
+      "callee": "Client.read",
+      "arity": 1,
+      "range": {
+        "start": 225,
+        "end": 241
+      }
+    },
+    {
+      "scope": "example.Store.get(String,int)",
+      "callee": "get",
+      "arity": 1,
+      "range": {
+        "start": 302,
+        "end": 310
+      },
+      "by_path": true
+    }
+  ],
+  "consts": [
+    {
+      "name": "example.Store.PREFIX"
+    }
+  ],
+  "receivers": [
+    {
+      "scope": "example.Store",
+      "name": "PREFIX",
+      "class": "Unknown"
+    }
+  ],
+  "externs": [
+    "Client",
+    "String"
+  ],
+  "hidden": [
+    "example.Store.hidden()"
+  ],
+  "package": "example"
+}
+
 sample.openapi.yaml
 {
   "format": "openapi",

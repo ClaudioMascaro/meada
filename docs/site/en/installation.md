@@ -27,3 +27,5 @@ a UI of another version and names both versions. The `-cloud` image already carr
 files at `/usr/share/meada/ui`; the default image and prebuilt binaries still carry no UI.
 Node is needed only to build the frontend from source, never to install through Cargo or
 run the console.
+
+To index Java, only the Meada binary and git are needed. No JDK, Maven or Gradle is required; analysis reads `.java` files without compiling or running the project.

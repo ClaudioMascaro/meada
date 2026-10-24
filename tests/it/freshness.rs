@@ -15,6 +15,51 @@ use meada::engine::Engine;
 const ORIGIN: Option<&str> = Some("https://example.com/acme/conformance.git");
 const WEB: Option<&str> = Some("https://example.com/acme/web.git");
 
+#[test]
+fn java_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
+    let edit = |repo: &Path| {
+        let path = repo.join("maven/api/src/main/java/example/util/Tools.java");
+        let before = fs::read_to_string(&path).unwrap();
+        fs::write(&path, before.replace("single()", "single(int count)")).unwrap();
+        fs::write(
+            repo.join("Extra.java"),
+            "package example; public class Extra { public static void wave() {} }\n",
+        )
+        .unwrap();
+        fs::remove_file(repo.join("maven/api/src/main/java/example/stars/Wave.java")).unwrap();
+    };
+    let repo = fixture_repo("fresh_java", "conformance-java", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_java_cold", "conformance-java", ORIGIN, edit)
+    );
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    let called = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| {
+            c["id"]
+                .as_str()
+                .unwrap()
+                .ends_with("example.Orders.start()::Orders.place#0")
+        })
+        .unwrap();
+    assert_eq!(called["level"], "exact");
+    assert!(
+        called["target"]
+            .as_str()
+            .unwrap()
+            .ends_with("place(String,int)")
+    );
+}
+
 /// Edits a file whose exports others import, adds a file whose definition turns an inferred
 /// call in an unrelated file into an ambiguous one, deletes a file, and drops the tsconfig
 /// path alias.

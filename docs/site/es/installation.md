@@ -27,3 +27,5 @@ de otra versión e indica ambas versiones. La imagen `-cloud` ya incluye estos a
 `/usr/share/meada/ui`; la imagen predeterminada y los binarios listos siguen sin la UI.
 Node solo es necesario para compilar el frontend desde los fuentes, nunca para instalar
 mediante Cargo o ejecutar la consola.
+
+Para indexar Java, solo se necesitan el binario de Meada y git. No hacen falta JDK, Maven ni Gradle; el análisis lee los archivos `.java` sin compilar ni ejecutar el proyecto.

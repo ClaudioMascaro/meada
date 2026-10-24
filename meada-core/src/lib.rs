@@ -32,5 +32,14 @@ pub fn qualify(scope: &str, name: &str) -> String {
 
 /// The scope enclosing the dotted `scope`, empty at the top: `outer` for `outer.inner`.
 pub fn parent(scope: &str) -> &str {
-    scope.rsplit_once('.').map_or("", |(parent, _)| parent)
+    let mut parentheses = 0usize;
+    for (at, ch) in scope.char_indices().rev() {
+        match ch {
+            ')' => parentheses += 1,
+            '(' => parentheses = parentheses.saturating_sub(1),
+            '.' if parentheses == 0 => return &scope[..at],
+            _ => {}
+        }
+    }
+    ""
 }
