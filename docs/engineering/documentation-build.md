@@ -1,9 +1,8 @@
 # Documentation build and publication
 
 The reader site lives in `docs/site/{pt,en,es}`. `docs/adr` and `docs/agents` remain source
-references at their existing paths. Engineering notes in this directory are intentionally
-outside the published site's `docs_dir` and navigation. The README migration coverage and
-technical research are recorded beside this guide.
+references at their existing paths. This build guide is outside the published site's
+`docs_dir` and navigation.
 
 ## Install and build
 

@@ -19,15 +19,6 @@ LANGUAGES = ('pt', 'en', 'es')
 MARKER = re.compile(r'<!-- meada-graph:([a-z][a-z0-9-]*) -->')
 GRAPHS = {}
 WIDTH, HEIGHT = 244, 168
-CONTRACT = """<!--
-THESIS: A technical handbook where commands, boundaries and explorable maps lead comprehension.
-OWN-WORLD: Forest-green masthead, warm paper, local IBM Plex type, precise rules and custom React Flow nodes.
-STORY: Understand Meada, choose a task, run a real command, then follow its operational guarantees.
-FIRST VIEWPORT: Compact masthead above navigation, a measured reading column and local contents.
-The index opens with real install/query commands. Maps reveal their relationships through pan, zoom and step focus.
-FORM: Technical handbook, position 1; explicit user direction; concept seed a0811cc0.
-FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
--->"""
 LABELS = {
     'pt': dict(details='Etapas e relações em texto', open='Abrir imagem completa', licenses='Licenças dos componentes', next='Conecta a', delivered='Entregue', planned='Planejado', guardrail='Em caso de falha', spec='Especificação'),
     'en': dict(details='Steps and relationships in text', open='Open full image', licenses='Component licenses', next='Connects to', delivered='Delivered', planned='Planned', guardrail='On failure', spec='Specification'),
@@ -242,7 +233,6 @@ def on_page_markdown(markdown, page, config, files):
 
 
 def on_post_page(output, page, config):
-    output = re.sub(r'(<body[^>]*>)', lambda match: match[0] + '\n' + CONTRACT, output, count=1)
     if config.theme['language'] == 'pt-BR':
         output = output.replace('<html lang="pt"', '<html lang="pt-BR"')
     output = output.replace('hreflang="pt"', 'hreflang="pt-BR"')

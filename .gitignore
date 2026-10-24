@@ -6,5 +6,7 @@
 /docs/site/assets/diagrams/
 /docs/site/assets/interactive/
 /.cache/docs/
-/.impeccable/review/
+/.impeccable/
+/DESIGN.md
+/PRODUCT.md
 /scripts/docs/__pycache__/
