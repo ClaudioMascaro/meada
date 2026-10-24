@@ -1680,13 +1680,16 @@ one for the area a change touches.
 - `http/java.rs` (spec #26, #86): a Spring MVC route is read from `Call::decorates` on a method
   of a `@RestController` or `@Controller` class, under the class's `@RequestMapping` prefix
   (nested classes do not inherit the outer prefix). An annotation or `RequestMethod.X` counts
-  only when `Code::outside` says a single-type or static import from Spring binds its name, so
-  a wildcard import (`...bind.annotation.*`, unresolved for any pack) and a type of the
-  repository with the same name (a nested or same-package `RequestMethod`) yield no route; the
-  kind reads the enum member off the written `Value::Ref`, with no table in the pack. A path
-  folds constants and `+` through `Code::value`; one that does not fold, a `value` with a
-  `path`, a class-level `method`, an unreadable `method` element, or a pattern with a `/`
-  inside braces (`{id:a/b}`) serves nothing. Interface-declared mappings, composed annotations
+  only when `Code::outside` says an import from Spring binds its name: single-type, static, or
+  the one on-demand candidate in the kind's table (`Outside::candidates`: `...bind.annotation.*`
+  alone or beside `java.util.*`). A type of the repository with the same name (a nested,
+  same-package or repository-wildcard `GetMapping` or `RequestMethod`), a single-type import of
+  another package and two candidates in the table yield no route; the kind reads the enum
+  member off the written `Value::Ref`, with no table in the pack. A path folds constants and
+  `+` through `Code::value`; one that does not fold, a `value` with a `path`, a class-level
+  `method`, a `method` with no readable element, or a pattern with a `/` inside braces
+  (`{id:a/b}`) serves nothing. An unreadable element beside readable ones of a `method` or a
+  path array is dropped: the others still serve. Interface-declared mappings, composed annotations
   and `server.servlet.context-path` are not read.
 - `http/go.rs` (spec #25): a route is read only with a literal path and a literal prefix; a
   group prefix or a pattern Meada cannot read serves nothing. `net/http` reads `{name}`,

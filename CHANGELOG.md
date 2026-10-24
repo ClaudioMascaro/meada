@@ -35,8 +35,9 @@ All notable changes to Meada are recorded here. The format follows
   or `@RequestMapping(method = ..)`, under the class `@RequestMapping` prefix, with `static
   final` constants and `+` folded across classes and one provider per path of an array. A
   `@RequestMapping` without `method` is an `http::ANY::<path>` provider. Annotations and
-  `RequestMethod` count only through a single-type or static Spring import; a wildcard import,
-  a shadowing repository type and `server.servlet.context-path` give no route.
+  `RequestMethod` count only through a Spring import (single-type, static or on-demand, the
+  latter through the new `Outside::candidates`, which every Java kind can use); a shadowing
+  repository type, a competing import and `server.servlet.context-path` give no route.
 
 - A multilingual documentation site (issue #320), with the README reference migrated to
   Portuguese, English and Spanish guides, React Flow maps and roadmap, accessible static and

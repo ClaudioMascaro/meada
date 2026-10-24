@@ -41,10 +41,7 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
         }
         // What Spring annotation a call is, by its name outside the repository.
         let spring = |call: &'a Call| -> Option<String> {
-            Some(
-                code.outside(path, &call.scope, &call.callee, false)?
-                    .spelled,
-            )
+            known(code, path, &call.scope, &call.callee, annotation)
         };
         let annotations: Vec<(usize, &'a Call, String)> = (facts.calls.iter().enumerate())
             .filter(|(_, c)| c.decorates.is_some())
@@ -118,6 +115,39 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
     found
 }
 
+/// The name `name`, written in `scope` of `file`, as a Spring name `is_known` accepts: bound by
+/// an import (single-type or static) from outside, or the one candidate of the on-demand imports
+/// in the table. Two candidates in the table, or none, is no name of Spring's.
+fn known<'a>(
+    code: &Code<'a>,
+    file: &'a str,
+    scope: &'a str,
+    name: &'a str,
+    is_known: impl Fn(&str) -> bool,
+) -> Option<String> {
+    let outside = code.outside(file, scope, name, false)?;
+    let spellings = match outside.candidates.is_empty() {
+        true => vec![outside.spelled],
+        false => outside.candidates,
+    };
+    let mut hits = spellings.into_iter().filter(|s| is_known(s));
+    let found = hits.next()?;
+    hits.next().is_none().then_some(found)
+}
+
+/// Whether `spelled` is a Spring annotation this module reads.
+fn annotation(spelled: &str) -> bool {
+    CONTROLLERS.contains(&spelled)
+        || spelled == MAPPING
+        || (SHORTCUTS.iter()).any(|(s, _)| spelled == format!("{WEB}{s}"))
+}
+
+/// The member of Spring's `RequestMethod` that `spelled` names.
+fn member_of(spelled: &str) -> Option<&str> {
+    let member = spelled.strip_prefix(&format!("{WEB}RequestMethod."))?;
+    REQUEST_METHODS.contains(&member).then_some(member)
+}
+
 /// The paths of a mapping annotation: `value` or `path` (or the one unnamed argument), a string
 /// or an array of them, constants folded; the root when it gives none. `None` when it gives
 /// both, or a value that is no list of strings; a path that cannot be read yields none.
@@ -146,11 +176,8 @@ fn request_methods<'a>(code: &Code<'a>, file: &'a str, call: &'a Call) -> Option
         let Value::Ref(name) = value else {
             return None;
         };
-        let spelled = code.outside(file, &call.scope, name, false)?.spelled;
-        let member = spelled.strip_prefix(&format!("{WEB}RequestMethod."))?;
-        REQUEST_METHODS
-            .contains(&member)
-            .then(|| member.to_string())
+        let spelled = known(code, file, &call.scope, name, |s| member_of(s).is_some())?;
+        member_of(&spelled).map(str::to_string)
     };
     let methods: Vec<String> = match call.keyword("method") {
         None => return Some(vec![ANY.into()]),
@@ -199,10 +226,19 @@ mod tests {
 
     /// The contracts of the providers one controller file gives.
     fn served(imports: &str, body: &str) -> Vec<String> {
+        served_with(imports, body, &[])
+    }
+
+    /// The same, with other files of the repository (`(path, source)`).
+    fn served_with(imports: &str, body: &str, others: &[(&str, &str)]) -> Vec<String> {
         let src = format!("package a;\n{imports}\n{body}\n");
-        let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
-        let files = BTreeMap::from([("a/C.java", &facts)]);
-        let resolver = Resolver::new(&files, Java.modules(&[], &files).unwrap(), &Java);
+        let mut parsed = vec![("a/C.java", Java.parse("a/C.java", src.as_bytes()).unwrap())];
+        for (path, source) in others {
+            parsed.push((path, Java.parse(path, source.as_bytes()).unwrap()));
+        }
+        let files: BTreeMap<&str, &_> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let layout = Java.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
         let code = Code::new(&resolver, &files, &Java);
         let mut found: Vec<String> = (providers(&code).into_iter())
             .filter_map(|f| f.contract)
@@ -301,5 +337,71 @@ mod tests {
                 "http::GET::/v2/b"
             ]
         );
+    }
+
+    const WILD: &str = "import org.springframework.web.bind.annotation.*;\n";
+    const ROUTE: &str = "@RestController @RequestMapping(\"/p\") class C { \
+        @GetMapping(\"/x\") void f() {} \
+        @RequestMapping(value = \"/y\", method = RequestMethod.POST) void g() {} }";
+
+    #[test]
+    fn a_wildcard_import_from_spring_binds_its_annotations_and_enum() {
+        assert_eq!(served(WILD, ROUTE), ["http::GET::/p/x", "http::POST::/p/y"]);
+        // Another on-demand import, `java.lang` and the package's own do not bind them.
+        let more = format!("import java.util.*;\nimport org.acme.*;\n{WILD}");
+        assert_eq!(
+            served(&more, ROUTE),
+            ["http::GET::/p/x", "http::POST::/p/y"]
+        );
+    }
+
+    #[test]
+    fn a_wildcard_import_binds_nothing_another_binding_or_candidate_may_take() {
+        // Only the `GetMapping` is hidden: `RequestMethod.POST` still binds.
+        const POST: [&str; 1] = ["http::POST::/p/y"];
+        // A class of the package, a single-type import, a class a repository wildcard brings,
+        // and a static on-demand import of an outside class: any of them may be the name.
+        let same = [("a/GetMapping.java", "package a; class GetMapping {}")];
+        assert_eq!(served_with(WILD, ROUTE, &same), POST);
+        let single = format!("{WILD}import org.acme.GetMapping;\n");
+        assert_eq!(served(&single, ROUTE), POST);
+        let other = [("b/GetMapping.java", "package b; public class GetMapping {}")];
+        let repository = format!("{WILD}import b.*;\n");
+        assert_eq!(served_with(&repository, ROUTE, &other), POST);
+        // A repository wildcard that does not define the name leaves it to Spring's.
+        let unrelated = [("b/Other.java", "package b; public class Other {}")];
+        assert_eq!(served_with(&repository, ROUTE, &unrelated).len(), 2);
+        let ambiguous = format!("{WILD}import static org.acme.Util.*;\nimport b.*;\n");
+        assert_eq!(served_with(&ambiguous, ROUTE, &other), POST);
+    }
+
+    #[test]
+    fn a_static_wildcard_import_of_the_enum_binds_its_members() {
+        let imports = format!(
+            "{IMPORTS}import static org.springframework.web.bind.annotation.RequestMethod.*;\n"
+        );
+        let found = controller(
+            "",
+            "@RequestMapping(value = \"/x\", method = GET) void f() {}",
+        );
+        assert!(found.is_empty(), "without the import nothing binds GET");
+        let found = served(
+            &imports,
+            "@RestController class C { @RequestMapping(value = \"/x\", method = {GET, POST}) void f() {} }",
+        );
+        assert_eq!(found, ["http::GET::/x", "http::POST::/x"]);
+        let other = format!("{IMPORTS}import static org.acme.Methods.*;\n");
+        let body =
+            "@RestController class C { @RequestMapping(value = \"/x\", method = GET) void f() {} }";
+        assert!(served(&other, body).is_empty());
+    }
+
+    #[test]
+    fn a_list_with_an_unreadable_element_serves_the_readable_ones() {
+        let found = controller(
+            "",
+            "@RequestMapping(value = {\"/a\", Api.NOT_A_CONSTANT}, method = {RequestMethod.GET, Missing.X}) void f() {}",
+        );
+        assert_eq!(found, ["http::GET::/a"]);
     }
 }
