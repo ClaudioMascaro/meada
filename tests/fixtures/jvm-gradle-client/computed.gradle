@@ -1,0 +1,7 @@
+group = 'example'
+dependencies {
+    implementation("example:model${suffix}:1")
+    api("example:models:$version")
+    compileOnly(group + ':tools:2')
+    runtimeOnly("example:$artifact:3")
+}

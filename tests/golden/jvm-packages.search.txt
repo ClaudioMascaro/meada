@@ -1,0 +1,8 @@
+example.com/jvm/client . example:web (maven) (consumers: 0)
+example.com/jvm/gradle . example:kit@2.0 (maven) (consumers: 1)
+example.com/jvm/gradle extras/nested example:nested (maven) (consumers: 0)
+example.com/jvm/gradle tools example:tools@2.0 (maven) (consumers: 1)
+example.com/jvm/gradle-client . example:worker (maven) (consumers: 0)
+example.com/jvm/maven . example:bundle@1.2.0 (maven) (consumers: 0)
+example.com/jvm/maven billing example:billing@1.2.0 (maven) (consumers: 0)
+example.com/jvm/maven models example:models@1.2.0 (maven) (consumers: 2)
