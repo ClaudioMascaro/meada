@@ -8,7 +8,7 @@
 ## Why this code exists
 
 Meada starts from principles that apply to the people who build it as well
-([README](README.en.md#principles)):
+([Principles](docs/site/en/principles.md)):
 
 - **Your code stays with you.** The same respect covers the personal information of everyone
   who takes part: nobody exposes what is private to someone else.

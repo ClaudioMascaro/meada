@@ -16,6 +16,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- A multilingual documentation site (issue #320), with the README reference migrated to
+  Portuguese, English and Spanish guides, React Flow maps and roadmap, accessible static and
+  textual fallbacks, and a strict GitHub Pages build. S3, S4 and S5 proposals are clearly separated from delivered S1/S2.
+
 - Workspace editor and version history (issue #310): viewers compare any two immutable
   versions; operators validate entries and review a local WASM diff before confirming save
   or apply. Rollbacks name the next refresh, existing saves show their first author/message,

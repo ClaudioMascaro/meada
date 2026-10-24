@@ -78,6 +78,14 @@ them say so and skip).
 
 If the change touches behavior, include the test that covers it.
 
+## Site documentation
+
+Pages live in `docs/site/pt`, `docs/site/en` and `docs/site/es`, with the same filename in all
+three languages. The [build guide](docs/engineering/documentation-build.md) explains dependency
+installation, local preview and publication. Before submitting a change, run
+`mkdocs build --strict` and `python scripts/docs/check.py` in the documentation environment.
+These commands check links, anchors, translations and diagrams, in addition to the Rust gates above.
+
 ## Commits and PRs
 
 - **Conventional Commits**: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, `ci:`,

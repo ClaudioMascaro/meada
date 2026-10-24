@@ -8,7 +8,7 @@
 ## Por que este código existe
 
 Meada nasce com princípios que valem também para as pessoas que a constroem
-([README](README.md#princípios)):
+([Princípios](docs/site/pt/principles.md)):
 
 - **O seu código fica com você.** O mesmo respeito vale para as informações pessoais de quem
   participa: ninguém expõe o que é privado de outra pessoa.

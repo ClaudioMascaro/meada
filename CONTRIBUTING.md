@@ -78,6 +78,14 @@ avisam e pulam).
 
 Se a mudança mexe em comportamento, inclua o teste que a cobre.
 
+## Documentação do site
+
+As páginas ficam em `docs/site/pt`, `docs/site/en` e `docs/site/es`, com o mesmo nome nos três
+idiomas. O [guia de build](docs/engineering/documentation-build.md) explica a instalação das
+dependências, a prévia local e a publicação. Antes de enviar uma alteração, rode
+`mkdocs build --strict` e `python scripts/docs/check.py` no ambiente de documentação. Esses
+comandos conferem links, âncoras, traduções e diagramas, além dos gates Rust acima.
+
 ## Commits e PRs
 
 - **Conventional Commits**: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, `ci:`, com

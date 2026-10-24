@@ -1,0 +1,168 @@
+site_name: Meada
+site_description: O mapa entre seus repositórios. Documentação para pessoas e agentes.
+site_url: https://claudiomascaro.github.io/meada/
+repo_url: https://github.com/ClaudioMascaro/meada
+repo_name: ClaudioMascaro/meada
+docs_dir: docs/site
+site_dir: site
+strict: true
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: warn
+    anchors: warn
+    unrecognized_links: warn
+    absolute_links: warn
+theme:
+  name: material
+  language: pt-BR
+  font: false
+  icon:
+    logo: material/graph-outline
+    repo: fontawesome/brands/github
+  palette:
+    - media: '(prefers-color-scheme: light)'
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Mudar tema
+    - media: '(prefers-color-scheme: dark)'
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Mudar tema
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+plugins:
+  - search
+  - i18n:
+      docs_structure: folder
+      fallback_to_default: false
+      languages:
+        - locale: pt
+          default: true
+          name: Português (Brasil)
+          theme:
+            language: pt-BR
+        - locale: en
+          name: English
+          site_description: The map between your repositories. Documentation for people and agents.
+          theme:
+            language: en
+          nav_translations:
+            Visão geral: Overview
+            Começar: Get started
+            Instalação: Installation
+            Configuração: Configuration
+            Usar: Use Meada
+            Comandos: Commands
+            Agentes e MCP: Agents and MCP
+            Decisões: Decisions
+            Capacidades e limites: Capabilities and limits
+            Operar: Operate
+            Modo servidor: Server mode
+            Vários nós: Multiple nodes
+            Módulos de nuvem: Cloud modules
+            Gerações e retenção: Generations and retention
+            Refresh e publicação: Refresh and publication
+            Autenticação e grants: Authentication and grants
+            Credenciais de GitHub App: GitHub App credentials
+            Console: Console
+            Versões e owners: Versions and owners
+            Identidade empresarial: Enterprise identity
+            Workspaces nomeados: Named workspaces
+            Projeto: Project
+            Sobre o Meada: About Meada
+            Princípios: Principles
+            Participar: Contribute
+        - locale: es
+          name: Español
+          site_description: El mapa entre tus repositorios. Documentación para personas y agentes.
+          theme:
+            language: es
+          nav_translations:
+            Visão geral: Visión general
+            Começar: Comenzar
+            Instalação: Instalación
+            Configuração: Configuración
+            Usar: Usar Meada
+            Comandos: Comandos
+            Agentes e MCP: Agentes y MCP
+            Decisões: Decisiones
+            Capacidades e limites: Capacidades y límites
+            Operar: Operar
+            Modo servidor: Modo servidor
+            Vários nós: Varios nodos
+            Módulos de nuvem: Módulos de nube
+            Gerações e retenção: Generaciones y retención
+            Refresh e publicação: Refresh y publicación
+            Autenticação e grants: Autenticación y grants
+            Credenciais de GitHub App: Credenciales de GitHub App
+            Console: Consola
+            Versões e owners: Versiones y owners
+            Identidade empresarial: Identidad empresarial
+            Workspaces nomeados: Workspaces con nombre
+            Projeto: Proyecto
+            Sobre o Meada: Sobre Meada
+            Princípios: Principios
+            Participar: Participar
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+hooks:
+  - scripts/docs/hooks.py
+extra_css:
+  - assets/stylesheets/meada.css
+extra:
+  generator: false
+nav:
+  - Visão geral: index.md
+  - Começar:
+      - Instalação: installation.md
+      - Configuração: configuration.md
+  - Usar:
+      - Comandos: cli.md
+      - Agentes e MCP: mcp.md
+      - Decisões: decisions.md
+      - Capacidades e limites: capabilities.md
+  - Operar:
+      - Modo servidor: server.md
+      - Vários nós: scaling.md
+      - Módulos de nuvem: cloud.md
+      - Snapshots: snapshots.md
+      - Gerações e retenção: generations.md
+      - Refresh e publicação: refresh.md
+      - Autenticação e grants: admission.md
+      - Credenciais de GitHub App: github-app.md
+      - Console: console.md
+      - Versões e owners: workspaces.md
+      - Identidade empresarial: enterprise.md
+      - Workspaces nomeados: named-workspaces.md
+  - Roadmap: roadmap.md
+  - Projeto:
+      - Sobre o Meada: about.md
+      - Princípios: principles.md
+      - Participar: contributing.md

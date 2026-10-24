@@ -1,2 +1,12 @@
 /target
 /.claude/worktrees/
+/.venv-docs/
+/site/
+/scripts/docs/node_modules/
+/docs/site/assets/diagrams/
+/docs/site/assets/interactive/
+/.cache/docs/
+/.impeccable/
+/DESIGN.md
+/PRODUCT.md
+/scripts/docs/__pycache__/

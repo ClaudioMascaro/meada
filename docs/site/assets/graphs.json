@@ -1,0 +1,3081 @@
+{
+  "schemaVersion": 1,
+  "graphs": {
+    "refresh": {
+      "title": {
+        "pt": "Um refresh, uma publicação",
+        "en": "One refresh, one publication",
+        "es": "Un refresh, una publicación"
+      },
+      "summary": {
+        "pt": "Lock e fence estão entregues. O abort de todo o conjunto em falha de fetch/indexação é a política planejada em #316.",
+        "en": "Lock and fencing are delivered. Whole-set abort on fetch/indexing failure is the policy planned in #316.",
+        "es": "Lock y fence están entregados. El abort del conjunto ante fallos de fetch/indexación es la política planeada en #316."
+      },
+      "start": "lock",
+      "nodes": [
+        {
+          "id": "lock",
+          "title": {
+            "pt": "Lock e fence",
+            "en": "Lock and fence",
+            "es": "Lock y fence"
+          },
+          "body": {
+            "pt": "Um único job controla a publicação.",
+            "en": "One job controls publication.",
+            "es": "Un único job controla la publicación."
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Trava de refresh (feature refresh-lock, que inclui generation-pointer, só Unix; cargo install meada --features refresh-lock). Com a seção [refresh_lock], que exige [generations], o refresh inteiro roda sob uma trava no Valkey, e cada aquisição ganha um fence, de modo que um job sobreposto ou travado nunca troca uma geração nova por uma mais antiga.",
+            "en": "Refresh lock (feature refresh-lock, which includes generation-pointer, Unix only; cargo install meada --features refresh-lock). With the [refresh_lock] section, which needs [generations], the whole refresh runs under a lock in Valkey, and each acquisition gets a fence, so an overlapping or stalled job never replaces a newer generation with an older one.",
+            "es": "Candado de refresh (feature refresh-lock, que incluye generation-pointer, solo Unix; cargo install meada --features refresh-lock). Con la sección [refresh_lock], que exige [generations], todo el refresh corre bajo un candado en Valkey, y cada adquisición recibe un fence, de modo que un job superpuesto o trabado nunca reemplaza una generación nueva por una más antigua."
+          },
+          "reference": {
+            "pt": "#refresh-e-publicacao",
+            "en": "#refresh-and-publication",
+            "es": "#refresh-y-publicacion"
+          }
+        },
+        {
+          "id": "version",
+          "title": {
+            "pt": "Versão do workspace",
+            "en": "Workspace version",
+            "es": "Versión del workspace"
+          },
+          "body": {
+            "pt": "A configuração aplicada orienta o refresh.",
+            "en": "The applied configuration directs the refresh.",
+            "es": "La configuración aplicada dirige el refresh."
+          },
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "A versão aplicada escolhe as entradas que o job usará. Aplicar configuração não publica uma geração: o job precisa recebê-la antes de executar fetch, indexação e publicação.",
+            "en": "The applied version selects the entries the job will use. Applying configuration does not publish a generation: the job must receive it before fetch, indexing and publication.",
+            "es": "La versión aplicada elige las entradas que usará el job. Aplicar configuración no publica una generación: el job debe recibirla antes de fetch, indexación y publicación."
+          },
+          "reference": {
+            "pt": "#refresh-e-publicacao",
+            "en": "#refresh-and-publication",
+            "es": "#refresh-y-publicacion"
+          }
+        },
+        {
+          "id": "fetch",
+          "title": {
+            "pt": "Atualizar mirrors",
+            "en": "Fetch mirrors",
+            "es": "Actualizar mirrors"
+          },
+          "body": {
+            "pt": "Fetch acontece fora do indexador.",
+            "en": "Fetch happens outside the indexer.",
+            "es": "El fetch ocurre fuera del indexador."
+          },
+          "position": {
+            "x": 600,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Git atualiza os mirrors fora do indexador. Meada não faz fetch nem clone; o job coordena essas etapas e usa encadeamento que pare ao primeiro comando com erro.",
+            "en": "Git updates mirrors outside the indexer. Meada neither fetches nor clones; the job coordinates these steps and uses chaining that stops on the first failed command.",
+            "es": "Git actualiza los mirrors fuera del indexador. Meada no hace fetch ni clone; el job coordina esas etapas y usa encadenamiento que se detenga ante el primer comando fallido."
+          },
+          "reference": {
+            "pt": "#refresh-e-publicacao",
+            "en": "#refresh-and-publication",
+            "es": "#refresh-y-publicacion"
+          }
+        },
+        {
+          "id": "index",
+          "title": {
+            "pt": "Indexar localmente",
+            "en": "Index locally",
+            "es": "Indexar localmente"
+          },
+          "body": {
+            "pt": "Sem LLM e sem conexões de rede.",
+            "en": "No LLM and no network connections.",
+            "es": "Sin LLM ni conexiones de red."
+          },
+          "position": {
+            "x": 600,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "meada index lê os checkouts locais e produz índices sem LLM ou conexão de rede. A política de impedir toda publicação após falha em qualquer repositório está planejada em #316.",
+            "en": "meada index reads local checkouts and produces indexes without an LLM or network connection. Preventing all publication after a failure in any repository is planned in #316.",
+            "es": "meada index lee checkouts locales y produce índices sin LLM ni conexión de red. Impedir toda publicación tras un fallo en cualquier repositorio está planeado en #316."
+          },
+          "reference": {
+            "pt": "#refresh-e-publicacao",
+            "en": "#refresh-and-publication",
+            "es": "#refresh-y-publicacion"
+          }
+        },
+        {
+          "id": "publish",
+          "title": {
+            "pt": "Publicar o conjunto",
+            "en": "Publish the whole set",
+            "es": "Publicar el conjunto"
+          },
+          "body": {
+            "pt": "Uma geração completa move o ponteiro.",
+            "en": "One complete generation moves the pointer.",
+            "es": "Una generación completa mueve el puntero."
+          },
+          "position": {
+            "x": 300,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Com refresh_lock, publish confere o token e usa o fence na atualização do ponteiro. Essa proteção entregue evita que um job antigo substitua uma geração mais nova; não substitui a garantia de abort de #316.",
+            "en": "With refresh_lock, publish checks the token and uses the fence when updating the pointer. This delivered protection prevents an old job replacing a newer generation; it does not replace #316’s abort guarantee.",
+            "es": "Con refresh_lock, publish comprueba el token y usa el fence al actualizar el puntero. Esta protección entregada impide que un job antiguo sustituya una generación más nueva; no sustituye la garantía de abort de #316."
+          },
+          "reference": {
+            "pt": "#publicacao-e-recuperacao-do-fence",
+            "en": "#refresh-and-publication",
+            "es": "#publicacion-y-recuperacion-del-fence"
+          }
+        },
+        {
+          "id": "pull",
+          "title": {
+            "pt": "Nós recebem",
+            "en": "Nodes receive",
+            "es": "Los nodos reciben"
+          },
+          "body": {
+            "pt": "Pull instala a geração para consultas.",
+            "en": "Pull installs the generation for queries.",
+            "es": "Pull instala la generación para consultas."
+          },
+          "position": {
+            "x": 0,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Os nós recebem a geração publicada e instalam o ponteiro local. Não indexam nem fazem fetch; uma consulta aberta continua usando a geração em que começou, sujeita aos limites de retenção documentados.",
+            "en": "Nodes receive the published generation and install the local pointer. They neither index nor fetch; an open query keeps its starting generation, subject to the documented retention limits.",
+            "es": "Los nodos reciben la generación publicada e instalan el puntero local. No indexan ni hacen fetch; una consulta abierta conserva su generación inicial, sujeta a los límites de retención documentados."
+          },
+          "reference": {
+            "pt": "#publicacao-e-recuperacao-do-fence",
+            "en": "#publication-and-fence-recovery",
+            "es": "#publicacion-y-recuperacion-del-fence"
+          }
+        },
+        {
+          "id": "retain",
+          "title": {
+            "pt": "Preservar a atual",
+            "en": "Keep the current one",
+            "es": "Conservar la actual"
+          },
+          "body": {
+            "pt": "Falha em fetch ou indexação aborta toda a publicação.",
+            "en": "A fetch or indexing failure aborts the entire publication.",
+            "es": "Un fallo de fetch o indexación aborta toda la publicación."
+          },
+          "position": {
+            "x": 900,
+            "y": 230
+          },
+          "kind": "planned",
+          "detail": {
+            "pt": "A política escolhida é abortar toda a publicação se qualquer fetch ou indexação falhar, mantendo a geração atual. A entrega e verificação dessa garantia pertencem ao ticket aberto #316; hoje, o operador encadeia comandos com sh -ec para parar em uma falha.",
+            "en": "The selected policy is to abort the whole publication if any fetch or indexing step fails, preserving the current generation. Delivery and verification of this guarantee belong to open #316; today the operator chains commands with sh -ec to stop on failure.",
+            "es": "La política elegida es abortar toda la publicación si falla cualquier fetch o indexación y conservar la generación actual. La entrega y verificación de esa garantía pertenecen al ticket abierto #316; hoy el operador encadena comandos con sh -ec para detenerse ante un fallo."
+          },
+          "reference": {
+            "pt": "#publicacao-e-recuperacao-do-fence",
+            "en": "#refresh-and-publication",
+            "es": "#publicacion-y-recuperacion-del-fence"
+          },
+          "issue": 316
+        }
+      ],
+      "edges": [
+        {
+          "id": "lock-version",
+          "source": "lock",
+          "target": "version",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "version-fetch",
+          "source": "version",
+          "target": "fetch",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "fetch-index",
+          "source": "fetch",
+          "target": "index",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        },
+        {
+          "id": "index-publish",
+          "source": "index",
+          "target": "publish",
+          "sourceHandle": "left",
+          "targetHandle": "right",
+          "kind": "normal"
+        },
+        {
+          "id": "publish-pull",
+          "source": "publish",
+          "target": "pull",
+          "sourceHandle": "left",
+          "targetHandle": "right",
+          "kind": "normal"
+        },
+        {
+          "id": "fetch-retain",
+          "source": "fetch",
+          "target": "retain",
+          "sourceHandle": "right",
+          "targetHandle": "top",
+          "kind": "planned",
+          "label": {
+            "pt": "falha",
+            "en": "failure",
+            "es": "fallo"
+          }
+        },
+        {
+          "id": "index-retain",
+          "source": "index",
+          "target": "retain",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "planned",
+          "label": {
+            "pt": "falha",
+            "en": "failure",
+            "es": "fallo"
+          }
+        }
+      ]
+    },
+    "admission": {
+      "title": {
+        "pt": "Da identidade à resposta",
+        "en": "From identity to response",
+        "es": "De la identidad a la respuesta"
+      },
+      "summary": {
+        "pt": "Admissão valida a identidade. O grant limita repositórios e os dois lados de cada link.",
+        "en": "Admission validates identity. The grant bounds repositories and both ends of every link.",
+        "es": "La admisión valida la identidad. El grant limita repositorios y ambos extremos de cada enlace."
+      },
+      "start": "client",
+      "nodes": [
+        {
+          "id": "client",
+          "title": {
+            "pt": "Cliente MCP",
+            "en": "MCP client",
+            "es": "Cliente MCP"
+          },
+          "body": {
+            "pt": "A requisição chega com o token do provedor de identidade.",
+            "en": "The request carries the identity provider’s token.",
+            "es": "La petición lleva el token del proveedor de identidad."
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "O agente obtém o token no provedor de identidade e o envia ao endpoint MCP. O proxy preserva Authorization e os headers SEP-2243.",
+            "en": "The agent obtains its token from the identity provider and sends it to the MCP endpoint. The proxy preserves Authorization and the SEP-2243 headers.",
+            "es": "El agente obtiene el token del proveedor de identidad y lo envía al endpoint MCP. El proxy conserva Authorization y los headers SEP-2243."
+          },
+          "reference": {
+            "pt": "#preparar-o-provedor-de-identidade",
+            "en": "#prepare-the-identity-provider",
+            "es": "#preparar-el-proveedor-de-identidad"
+          }
+        },
+        {
+          "id": "admit",
+          "title": {
+            "pt": "Admitir a requisição",
+            "en": "Admit the request",
+            "es": "Admitir la petición"
+          },
+          "body": {
+            "pt": "Proxy ou OIDC valida identidade e escopos.",
+            "en": "Proxy or OIDC validates identity and scopes.",
+            "es": "El proxy u OIDC valida identidad y scopes."
+          },
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Com OIDC, o Meada valida assinatura, issuer, audience, tempo e scopes antes de atender. Sem OIDC, a admissão pertence ao proxy; ela não torna a rede pública confiável.",
+            "en": "With OIDC, Meada validates signature, issuer, audience, time and scopes before serving. Without OIDC, admission belongs to the proxy; it does not make a public network trusted.",
+            "es": "Con OIDC, Meada valida firma, issuer, audience, tiempo y scopes antes de responder. Sin OIDC, la admisión corresponde al proxy; no convierte una red pública en confiable."
+          },
+          "reference": {
+            "pt": "#metadados-e-validacao",
+            "en": "#metadata-and-validation",
+            "es": "#metadatos-y-validacion"
+          }
+        },
+        {
+          "id": "grant",
+          "title": {
+            "pt": "Calcular o grant",
+            "en": "Compute the grant",
+            "es": "Calcular el grant"
+          },
+          "body": {
+            "pt": "Claims e grupos definem o acesso entregue hoje.",
+            "en": "Claims and groups define the access delivered today.",
+            "es": "Claims y grupos definen el acceso disponible hoy."
+          },
+          "position": {
+            "x": 600,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Os grupos do token são mapeados em identidades por oidc.groups. As identidades da lista direta em identities_claim se unem às identidades concedidas pelos grupos. Claims ausentes ou malformados não concedem acesso.",
+            "en": "Token groups map to identities through oidc.groups. Identities listed directly in identities_claim are combined with those granted by groups. Missing or malformed claims grant no access.",
+            "es": "Los grupos del token se mapean a identidades mediante oidc.groups. Las identidades de la lista directa en identities_claim se unen a las concedidas por los grupos. Los claims ausentes o malformados no conceden acceso."
+          },
+          "reference": {
+            "pt": "#calcular-o-grant",
+            "en": "#compute-the-grant",
+            "es": "#calcular-el-grant"
+          }
+        },
+        {
+          "id": "repos",
+          "title": {
+            "pt": "Filtrar repositórios",
+            "en": "Filter repositories",
+            "es": "Filtrar repositorios"
+          },
+          "body": {
+            "pt": "Um link exige grant em ambas as pontas.",
+            "en": "A link requires a grant on both ends.",
+            "es": "Un enlace requiere grant en ambos extremos."
+          },
+          "position": {
+            "x": 600,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "O grant filtra o conjunto consultável. Um vínculo entre repositórios só aparece quando o sujeito pode ler as duas pontas; conhecer uma identidade não concede acesso a ela.",
+            "en": "The grant filters the queryable set. A cross-repository link appears only when the subject can read both ends; knowing an identity does not grant access to it.",
+            "es": "El grant filtra el conjunto consultable. Un vínculo entre repositorios aparece solo cuando el sujeto puede leer ambos extremos; conocer una identidad no concede acceso."
+          },
+          "reference": {
+            "pt": "#calcular-o-grant",
+            "en": "#compute-the-grant",
+            "es": "#calcular-el-grant"
+          }
+        },
+        {
+          "id": "answer",
+          "title": {
+            "pt": "Responder no escopo",
+            "en": "Answer within scope",
+            "es": "Responder en el ámbito"
+          },
+          "body": {
+            "pt": "Conteúdo sem grant não aparece na resposta.",
+            "en": "Content outside the grant is absent from the answer.",
+            "es": "El contenido sin grant no aparece en la respuesta."
+          },
+          "position": {
+            "x": 300,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "A resposta permanece dentro do grant. Token ausente ou inválido recebe 401; falta de scope recebe 403; uma identidade fora do grant é recusada sem revelar conteúdo. Consulte a referência para os headers de cada resposta.",
+            "en": "The answer stays within the grant. A missing or invalid token receives 401; missing scope receives 403; an identity outside the grant is refused without revealing content. See the reference for each response’s headers.",
+            "es": "La respuesta permanece dentro del grant. Un token ausente o inválido recibe 401; la falta de scope recibe 403; una identidad fuera del grant se rechaza sin revelar contenido. Consulta los headers en la referencia."
+          },
+          "reference": {
+            "pt": "#respostas-de-autorizacao",
+            "en": "#authorization-responses",
+            "es": "#respuestas-de-autorizacion"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "client-admit",
+          "source": "client",
+          "target": "admit",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "admit-grant",
+          "source": "admit",
+          "target": "grant",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "grant-repos",
+          "source": "grant",
+          "target": "repos",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        },
+        {
+          "id": "repos-answer",
+          "source": "repos",
+          "target": "answer",
+          "sourceHandle": "left",
+          "targetHandle": "right",
+          "kind": "normal"
+        }
+      ]
+    },
+    "workspaces": {
+      "title": {
+        "pt": "Versão, autorização, geração",
+        "en": "Version, authorization, generation",
+        "es": "Versión, autorización, generación"
+      },
+      "summary": {
+        "pt": "Salvar, aplicar e publicar são ações distintas. Owners e autorização por equipe pertencem ao S3 planejado.",
+        "en": "Save, apply and publish are separate actions. Owners and team authorization belong to planned S3.",
+        "es": "Guardar, aplicar y publicar son acciones distintas. Owners y autorización por equipo pertenecen al S3 planeado."
+      },
+      "start": "editor",
+      "nodes": [
+        {
+          "id": "editor",
+          "title": {
+            "pt": "Editor ou CLI",
+            "en": "Editor or CLI",
+            "es": "Editor o CLI"
+          },
+          "body": {
+            "pt": "Preparar e validar a configuração.",
+            "en": "Prepare and validate configuration.",
+            "es": "Preparar y validar la configuración."
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Prepare as entradas de repositório com os caminhos dos mirrors do job. O editor e o import validam a mesma configuração antes de criar uma versão.",
+            "en": "Prepare repository entries using the job’s mirror paths. The editor and import validate the same configuration before creating a version.",
+            "es": "Prepara las entradas de repositorio con las rutas de los mirrors del job. El editor y el import validan la misma configuración antes de crear una versión."
+          },
+          "reference": {
+            "pt": "#importar-e-aplicar-uma-versao",
+            "en": "#import-and-apply-a-version",
+            "es": "#importar-y-aplicar-una-version"
+          }
+        },
+        {
+          "id": "version",
+          "title": {
+            "pt": "Versão imutável",
+            "en": "Immutable version",
+            "es": "Versión inmutable"
+          },
+          "body": {
+            "pt": "Salvar registra uma configuração reproduzível.",
+            "en": "Save records a reproducible configuration.",
+            "es": "Guardar registra una configuración reproducible."
+          },
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Salvar ou importar cria uma versão imutável. Importar o mesmo conteúdo novamente preserva o identificador e os metadados da primeira gravação.",
+            "en": "Saving or importing creates an immutable version. Importing the same content again preserves its identifier and the first write’s metadata.",
+            "es": "Guardar o importar crea una versión inmutable. Importar otra vez el mismo contenido conserva el identificador y los metadatos de la primera escritura."
+          },
+          "reference": {
+            "pt": "#importar-e-aplicar-uma-versao",
+            "en": "#import-and-apply-a-version",
+            "es": "#importar-y-aplicar-una-version"
+          }
+        },
+        {
+          "id": "apply",
+          "title": {
+            "pt": "Aplicar versão",
+            "en": "Apply version",
+            "es": "Aplicar versión"
+          },
+          "body": {
+            "pt": "Move o ponteiro; não publica uma geração.",
+            "en": "Moves the pointer; does not publish a generation.",
+            "es": "Mueve el puntero; no publica una generación."
+          },
+          "position": {
+            "x": 600,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Apply move o ponteiro do workspace sob a trava. Ainda não publica índices. O pull instala essa versão localmente para que os próximos comandos a leiam sem rede durante a indexação.",
+            "en": "Apply moves the workspace pointer under the lock. It does not publish indexes. Pull installs that version locally so subsequent commands can read it without network access during indexing.",
+            "es": "Apply mueve el puntero del workspace bajo bloqueo. Todavía no publica índices. Pull instala esa versión localmente para que los siguientes comandos la lean sin red durante la indexación."
+          },
+          "reference": {
+            "pt": "#importar-e-aplicar-uma-versao",
+            "en": "#import-and-apply-a-version",
+            "es": "#importar-y-aplicar-una-version"
+          }
+        },
+        {
+          "id": "job",
+          "title": {
+            "pt": "Job de refresh",
+            "en": "Refresh job",
+            "es": "Job de refresh"
+          },
+          "body": {
+            "pt": "Usa a versão aplicada para preparar o conjunto.",
+            "en": "Uses the applied version to prepare the set.",
+            "es": "Usa la versión aplicada para preparar el conjunto."
+          },
+          "position": {
+            "x": 600,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "O job faz workspace pull, fetch externo, indexação e publicação sob a mesma trava. Ele usa mirrors e diretórios próprios; compartilha com a frota apenas os serviços de store e Valkey.",
+            "en": "The job runs workspace pull, external fetch, indexing and publication under one lock. It uses its own mirrors and directories; it shares only store and Valkey services with the fleet.",
+            "es": "El job ejecuta workspace pull, fetch externo, indexación y publicación bajo el mismo bloqueo. Usa mirrors y directorios propios; solo comparte los servicios de store y Valkey con la flota."
+          },
+          "reference": {
+            "pt": "#importar-e-aplicar-uma-versao",
+            "en": "#import-and-apply-a-version",
+            "es": "#importar-y-aplicar-una-version"
+          }
+        },
+        {
+          "id": "generation",
+          "title": {
+            "pt": "Geração publicada",
+            "en": "Published generation",
+            "es": "Generación publicada"
+          },
+          "body": {
+            "pt": "Nós recebem conteúdo pronto para consultar.",
+            "en": "Nodes receive content ready to query.",
+            "es": "Los nodos reciben contenido listo para consultar."
+          },
+          "position": {
+            "x": 300,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Uma entrada poderá ter um owner, o nome exato de um grupo OIDC. O operador global delegará a primeira entrada; o operador de equipe poderá alterar apenas entradas dos seus grupos que seu grant permita ler. O viewer consultará o que seu grant admitir.",
+            "en": "Import validates the same entries as the console editor; importing the same content again preserves the id and the first write's metadata. apply moves the workspace pointer under the lock without publishing a generation. pull installs that version locally; subsequent commands read it without opening a connection during indexing. The job owns its bootstrap, index_dir, mirrors and local_dir; it shares only the module sections pointing to the same store and Valkey with the nodes and console. Run its entire refresh under one lock, with fetch outside Meada:",
+            "es": "Una entrada podrá tener un owner, el nombre exacto de un grupo OIDC. El operador global delegará la primera entrada; el operador de equipo podrá modificar solo entradas de sus grupos que su grant permita leer. El viewer consultará lo que su grant admita."
+          },
+          "reference": {
+            "pt": "#ownership-por-equipe",
+            "en": "#import-and-apply-a-version",
+            "es": "#ownership-por-equipo"
+          }
+        },
+        {
+          "id": "owners",
+          "title": {
+            "pt": "Owners e autorização",
+            "en": "Owners and authorization",
+            "es": "Owners y autorización"
+          },
+          "body": {
+            "pt": "Definir, trocar ou limpar owner é owner_change.",
+            "en": "Setting, replacing or clearing an owner is owner_change.",
+            "es": "Asignar, cambiar o borrar un owner es owner_change."
+          },
+          "position": {
+            "x": 900,
+            "y": 0
+          },
+          "kind": "planned",
+          "stage": "S3",
+          "issue": 294,
+          "detail": {
+            "pt": "Definir, substituir ou limpar um owner será owner_change, reservado ao operador global. Salvar uma proposta gerará uma versão imutável; aplicar a versão e publicar a geração continuarão sendo ações distintas. Uma aplicação somente de owners não exigirá reindexar o código.",
+            "en": "Setting, replacing or clearing an owner will be owner_change, reserved for the global operator. Saving a proposal will create an immutable version; applying the version and publishing a generation will remain separate actions. Applying only owner changes will not require indexing code again.",
+            "es": "Asignar, sustituir o borrar un owner será owner_change, reservado al operador global. Guardar una propuesta creará una versión inmutable; aplicar la versión y publicar la generación seguirán siendo acciones distintas. Aplicar solo cambios de owners no requerirá indexar el código otra vez."
+          },
+          "reference": {
+            "pt": "#ownership-por-equipe",
+            "en": "#team-ownership",
+            "es": "#ownership-por-equipo"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "editor-version",
+          "source": "editor",
+          "target": "version",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "version-apply",
+          "source": "version",
+          "target": "apply",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "apply-job",
+          "source": "apply",
+          "target": "job",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        },
+        {
+          "id": "job-generation",
+          "source": "job",
+          "target": "generation",
+          "sourceHandle": "left",
+          "targetHandle": "right",
+          "kind": "normal"
+        },
+        {
+          "id": "owners-editor",
+          "source": "owners",
+          "target": "editor",
+          "sourceHandle": "top",
+          "targetHandle": "top",
+          "kind": "planned"
+        },
+        {
+          "id": "owners-apply",
+          "source": "owners",
+          "target": "apply",
+          "sourceHandle": "left",
+          "targetHandle": "right",
+          "kind": "planned"
+        }
+      ]
+    },
+    "enterprise": {
+      "title": {
+        "pt": "Identidade e dados, em camadas",
+        "en": "Identity and data, in layers",
+        "es": "Identidad y datos, por capas"
+      },
+      "summary": {
+        "pt": "Arquitetura planejada no S4: o provedor de identidade emite tokens, o job mantém permissões e cada camada guarda um tipo de estado.",
+        "en": "Planned S4 architecture: the identity provider issues tokens, the job maintains permissions and each layer stores a distinct kind of state.",
+        "es": "Arquitectura planeada en S4: el proveedor de identidad emite tokens, el job mantiene permisos y cada capa guarda un tipo de estado."
+      },
+      "start": "idp",
+      "nodes": [
+        {
+          "id": "idp",
+          "title": {
+            "pt": "Provedor de identidade",
+            "en": "Identity provider",
+            "es": "Proveedor de identidad"
+          },
+          "body": {
+            "pt": "Emite JWT e provisiona o diretório por SCIM.",
+            "en": "Issues JWTs and provisions the directory through SCIM.",
+            "es": "Emite JWT y aprovisiona el directorio por SCIM."
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "kind": "planned",
+          "stage": "S4",
+          "issue": 319,
+          "detail": {
+            "pt": "O provedor de identidade continuará emitindo o token. O grant efetivo reunirá as identidades permitidas pelas claims e, quando configurado, pelas permissões do GitHub. A consulta de papéis no GitHub caberá ao job de refresh, nunca ao console ou à indexação.",
+            "en": "The identity provider will keep issuing the token. The effective grant will combine identities allowed by claims and, when configured, by GitHub permissions. The refresh job will check GitHub roles, never the console or indexing.",
+            "es": "El proveedor de identidad seguirá emitiendo el token. El grant efectivo reunirá las identidades permitidas por claims y, cuando se configure, por permisos de GitHub. El job de refresh consultará los roles de GitHub, nunca la consola ni la indexación."
+          },
+          "reference": {
+            "pt": "#autenticar-conceder-acesso-e-registrar",
+            "en": "#authenticate-grant-access-and-record",
+            "es": "#autenticar-conceder-acceso-y-registrar"
+          }
+        },
+        {
+          "id": "postgres",
+          "title": {
+            "pt": "Postgres",
+            "en": "Postgres",
+            "es": "Postgres"
+          },
+          "body": {
+            "pt": "Diretório, permissões e auditoria duráveis.",
+            "en": "Durable directory, permissions and audit.",
+            "es": "Directorio, permisos y auditoría duraderos."
+          },
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "kind": "planned",
+          "stage": "S4",
+          "detail": {
+            "pt": "Postgres será um módulo opt-in para estado mutável durável: auditoria, diretório e permissões. O snapshot store continuará guardando documentos e bundles imutáveis; Valkey continuará guardando ponteiros, locks, fences e caches. meada index continuará sem rede.",
+            "en": "Postgres will be an opt-in module for durable mutable state: audit, directory and permissions. The snapshot store will keep immutable documents and bundles; Valkey will keep pointers, locks, fences and caches. meada index will remain network-free.",
+            "es": "Postgres será un módulo opt-in para estado mutable duradero: auditoría, directorio y permisos. El snapshot store conservará documentos y bundles inmutables; Valkey mantendrá punteros, locks, fences y cachés. meada index seguirá sin red."
+          },
+          "reference": {
+            "pt": "#autenticar-conceder-acesso-e-registrar",
+            "en": "#authenticate-grant-access-and-record",
+            "es": "#autenticar-conceder-acceso-y-registrar"
+          }
+        },
+        {
+          "id": "admission",
+          "title": {
+            "pt": "Console e nós",
+            "en": "Console and nodes",
+            "es": "Consola y nodos"
+          },
+          "body": {
+            "pt": "Leem o grant para admitir e limitar respostas.",
+            "en": "Read the grant to admit and bound answers.",
+            "es": "Leen el grant para admitir y limitar respuestas."
+          },
+          "position": {
+            "x": 600,
+            "y": 0
+          },
+          "kind": "planned",
+          "stage": "S4",
+          "detail": {
+            "pt": "O provedor de identidade continuará emitindo o token. O grant efetivo reunirá as identidades permitidas pelas claims e, quando configurado, pelas permissões do GitHub. A consulta de papéis no GitHub caberá ao job de refresh, nunca ao console ou à indexação.",
+            "en": "The identity provider will keep issuing the token. The effective grant will combine identities allowed by claims and, when configured, by GitHub permissions. The refresh job will check GitHub roles, never the console or indexing.",
+            "es": "El proveedor de identidad seguirá emitiendo el token. El grant efectivo reunirá las identidades permitidas por claims y, cuando se configure, por permisos de GitHub. El job de refresh consultará los roles de GitHub, nunca la consola ni la indexación."
+          },
+          "reference": {
+            "pt": "#autenticar-conceder-acesso-e-registrar",
+            "en": "#authenticate-grant-access-and-record",
+            "es": "#autenticar-conceder-acceso-y-registrar"
+          }
+        },
+        {
+          "id": "job",
+          "title": {
+            "pt": "Job e roles do GitHub",
+            "en": "Job and GitHub roles",
+            "es": "Job y roles de GitHub"
+          },
+          "body": {
+            "pt": "Atualiza permissões e publica o conjunto.",
+            "en": "Refreshes permissions and publishes the set.",
+            "es": "Actualiza permisos y publica el conjunto."
+          },
+          "position": {
+            "x": 300,
+            "y": 230
+          },
+          "kind": "planned",
+          "stage": "S4",
+          "detail": {
+            "pt": "O provedor de identidade continuará emitindo o token. O grant efetivo reunirá as identidades permitidas pelas claims e, quando configurado, pelas permissões do GitHub. A consulta de papéis no GitHub caberá ao job de refresh, nunca ao console ou à indexação.",
+            "en": "The identity provider will keep issuing the token. The effective grant will combine identities allowed by claims and, when configured, by GitHub permissions. The refresh job will check GitHub roles, never the console or indexing.",
+            "es": "El proveedor de identidad seguirá emitiendo el token. El grant efectivo reunirá las identidades permitidas por claims y, cuando se configure, por permisos de GitHub. El job de refresh consultará los roles de GitHub, nunca la consola ni la indexación."
+          },
+          "reference": {
+            "pt": "#autenticar-conceder-acesso-e-registrar",
+            "en": "#authenticate-grant-access-and-record",
+            "es": "#autenticar-conceder-acceso-y-registrar"
+          }
+        },
+        {
+          "id": "store",
+          "title": {
+            "pt": "Snapshot store",
+            "en": "Snapshot store",
+            "es": "Snapshot store"
+          },
+          "body": {
+            "pt": "Documentos, bundles e gerações imutáveis.",
+            "en": "Immutable documents, bundles and generations.",
+            "es": "Documentos, bundles y generaciones inmutables."
+          },
+          "position": {
+            "x": 600,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Postgres será um módulo opt-in para estado mutável durável: auditoria, diretório e permissões. O snapshot store continuará guardando documentos e bundles imutáveis; Valkey continuará guardando ponteiros, locks, fences e caches. meada index continuará sem rede.",
+            "en": "Postgres will be an opt-in module for durable mutable state: audit, directory and permissions. The snapshot store will keep immutable documents and bundles; Valkey will keep pointers, locks, fences and caches. meada index will remain network-free.",
+            "es": "Postgres será un módulo opt-in para estado mutable duradero: auditoría, directorio y permisos. El snapshot store conservará documentos y bundles inmutables; Valkey mantendrá punteros, locks, fences y cachés. meada index seguirá sin red."
+          },
+          "reference": {
+            "pt": "#autenticar-conceder-acesso-e-registrar",
+            "en": "#authenticate-grant-access-and-record",
+            "es": "#autenticar-conceder-acceso-y-registrar"
+          }
+        },
+        {
+          "id": "valkey",
+          "title": {
+            "pt": "Valkey",
+            "en": "Valkey",
+            "es": "Valkey"
+          },
+          "body": {
+            "pt": "Ponteiros, locks, fences e caches.",
+            "en": "Pointers, locks, fences and caches.",
+            "es": "Punteros, locks, fences y cachés."
+          },
+          "position": {
+            "x": 300,
+            "y": 460
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Postgres será um módulo opt-in para estado mutável durável: auditoria, diretório e permissões. O snapshot store continuará guardando documentos e bundles imutáveis; Valkey continuará guardando ponteiros, locks, fences e caches. meada index continuará sem rede.",
+            "en": "Postgres will be an opt-in module for durable mutable state: audit, directory and permissions. The snapshot store will keep immutable documents and bundles; Valkey will keep pointers, locks, fences and caches. meada index will remain network-free.",
+            "es": "Postgres será un módulo opt-in para estado mutable duradero: auditoría, directorio y permisos. El snapshot store conservará documentos y bundles inmutables; Valkey mantendrá punteros, locks, fences y cachés. meada index seguirá sin red."
+          },
+          "reference": {
+            "pt": "#autenticar-conceder-acesso-e-registrar",
+            "en": "#authenticate-grant-access-and-record",
+            "es": "#autenticar-conceder-acceso-y-registrar"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "idp-postgres",
+          "source": "idp",
+          "target": "postgres",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "planned",
+          "label": {
+            "pt": "SCIM",
+            "en": "SCIM",
+            "es": "SCIM"
+          }
+        },
+        {
+          "id": "postgres-admission",
+          "source": "postgres",
+          "target": "admission",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "planned"
+        },
+        {
+          "id": "idp-admission",
+          "source": "idp",
+          "target": "admission",
+          "sourceHandle": "top",
+          "targetHandle": "top",
+          "kind": "planned",
+          "label": {
+            "pt": "JWT",
+            "en": "JWT",
+            "es": "JWT"
+          }
+        },
+        {
+          "id": "job-postgres",
+          "source": "job",
+          "target": "postgres",
+          "sourceHandle": "top",
+          "targetHandle": "bottom",
+          "kind": "planned",
+          "label": {
+            "pt": "roles",
+            "en": "roles",
+            "es": "roles"
+          }
+        },
+        {
+          "id": "job-store",
+          "source": "job",
+          "target": "store",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "job-valkey",
+          "source": "job",
+          "target": "valkey",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        }
+      ]
+    },
+    "roadmap": {
+      "title": {
+        "pt": "Das bases aos contextos nomeados",
+        "en": "From foundations to named contexts",
+        "es": "De las bases a los contextos con nombre"
+      },
+      "summary": {
+        "pt": "S1 e S2 estão entregues. S3, S4 e S5 estão planejados; as setas mostram dependência, não datas.",
+        "en": "S1 and S2 are delivered. S3, S4 and S5 are planned; arrows show dependency, not dates.",
+        "es": "S1 y S2 están entregados. S3, S4 y S5 están planeados; las flechas muestran dependencia, no fechas."
+      },
+      "start": "s1",
+      "nodes": [
+        {
+          "id": "s1",
+          "title": {
+            "pt": "Servidor compartilhado",
+            "en": "Shared server",
+            "es": "Servidor compartido"
+          },
+          "body": {
+            "pt": "Nuvem, snapshots e consultas com grant.",
+            "en": "Cloud modules, snapshots and grant-scoped queries.",
+            "es": "Nube, snapshots y consultas limitadas por grant."
+          },
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "kind": "delivered",
+          "stage": "S1",
+          "issue": 259,
+          "detail": {
+            "pt": "S1, #259 entregou as bases do servidor compartilhado: módulos de nuvem, snapshots e consultas limitadas pelo grant.",
+            "en": "S1, #259 delivered the shared-server foundation: cloud modules, snapshots and grant-bounded queries.",
+            "es": "S1, #259 entregó las bases del servidor compartido: módulos de nube, snapshots y consultas limitadas por grant."
+          },
+          "reference": {
+            "pt": "#o-que-ja-esta-disponivel",
+            "en": "#what-is-available",
+            "es": "#que-esta-disponible"
+          }
+        },
+        {
+          "id": "s2",
+          "title": {
+            "pt": "Console e versões",
+            "en": "Console and versions",
+            "es": "Consola y versiones"
+          },
+          "body": {
+            "pt": "Editor, versões imutáveis e operação da frota.",
+            "en": "Editor, immutable versions and fleet operations.",
+            "es": "Editor, versiones inmutables y operación de la flota."
+          },
+          "position": {
+            "x": 300,
+            "y": 230
+          },
+          "kind": "delivered",
+          "stage": "S2",
+          "issue": 293,
+          "detail": {
+            "pt": "S2, #293 entregou console, editor, versões imutáveis e operações da frota. Salvar, aplicar e publicar permanecem ações separadas.",
+            "en": "S2, #293 delivered the console, editor, immutable versions and fleet operations. Saving, applying and publishing remain separate actions.",
+            "es": "S2, #293 entregó consola, editor, versiones inmutables y operaciones de la flota. Guardar, aplicar y publicar siguen siendo acciones separadas."
+          },
+          "reference": {
+            "pt": "#o-que-ja-esta-disponivel",
+            "en": "#what-is-available",
+            "es": "#que-esta-disponible"
+          }
+        },
+        {
+          "id": "s3",
+          "title": {
+            "pt": "Ownership por equipe",
+            "en": "Team ownership",
+            "es": "Ownership por equipo"
+          },
+          "body": {
+            "pt": "Owners e autorização sobre entradas do workspace.",
+            "en": "Owners and authorization over workspace entries.",
+            "es": "Owners y autorización sobre entradas del workspace."
+          },
+          "position": {
+            "x": 0,
+            "y": 460
+          },
+          "kind": "planned",
+          "stage": "S3",
+          "issue": 294,
+          "detail": {
+            "pt": "S3, #294 trata de owners e autorização das entradas. S4, #319 trata de identidade, grants, diretório e auditoria. Partes dessas bases podem avançar em paralelo; o grafo dos tickets determina os bloqueios reais.",
+            "en": "S3, #294 covers owners and entry authorization. S4, #319 covers identity, grants, directory and audit. Parts of these foundations can advance in parallel; the ticket graph determines the actual blockers.",
+            "es": "S3, #294 trata owners y autorización de entradas. S4, #319 trata identidad, grants, directorio y auditoría. Partes de estas bases pueden avanzar en paralelo; el grafo de tickets determina los bloqueos reales."
+          },
+          "reference": {
+            "pt": "#bases-em-construcao",
+            "en": "#foundations-in-progress",
+            "es": "#bases-en-construccion"
+          }
+        },
+        {
+          "id": "s4",
+          "title": {
+            "pt": "Identidade empresarial",
+            "en": "Enterprise identity",
+            "es": "Identidad empresarial"
+          },
+          "body": {
+            "pt": "Grants de repositório, diretório e auditoria.",
+            "en": "Repository grants, directory and audit.",
+            "es": "Grants de repositorio, directorio y auditoría."
+          },
+          "position": {
+            "x": 600,
+            "y": 460
+          },
+          "kind": "planned",
+          "stage": "S4",
+          "issue": 319,
+          "detail": {
+            "pt": "S3, #294 trata de owners e autorização das entradas. S4, #319 trata de identidade, grants, diretório e auditoria. Partes dessas bases podem avançar em paralelo; o grafo dos tickets determina os bloqueios reais.",
+            "en": "S3, #294 covers owners and entry authorization. S4, #319 covers identity, grants, directory and audit. Parts of these foundations can advance in parallel; the ticket graph determines the actual blockers.",
+            "es": "S3, #294 trata owners y autorización de entradas. S4, #319 trata identidad, grants, directorio y auditoría. Partes de estas bases pueden avanzar en paralelo; el grafo de tickets determina los bloqueos reales."
+          },
+          "reference": {
+            "pt": "#bases-em-construcao",
+            "en": "#foundations-in-progress",
+            "es": "#bases-en-construccion"
+          }
+        },
+        {
+          "id": "s5",
+          "title": {
+            "pt": "Workspaces nomeados",
+            "en": "Named workspaces",
+            "es": "Workspaces con nombre"
+          },
+          "body": {
+            "pt": "Contextos sobrepostos e propostas via MCP.",
+            "en": "S3, S4 and their prerequisites before contracts and runtime.",
+            "es": "S3, S4 y sus requisitos antes de los contratos y el runtime."
+          },
+          "position": {
+            "x": 300,
+            "y": 950
+          },
+          "kind": "planned",
+          "stage": "S5",
+          "issue": 339,
+          "detail": {
+            "pt": "S5, #339 introduzirá workspaces nomeados sobre indexação compartilhada. A consolidação de contratos, #340, vem antes do runtime. A sequência aceita é contratos → catálogo elegível → primeiro workspace → versões e sobreposição → configuração entre repositórios.",
+            "en": "S5, #339 will introduce named workspaces over shared indexing. Contract consolidation, #340, precedes runtime work. The accepted sequence is contracts → eligible catalog → first workspace → versions and overlap → cross-repository configuration.",
+            "es": "S5, #339 introducirá workspaces con nombre sobre indexación compartida. La consolidación de contratos, #340, precede al runtime. La secuencia aceptada es contratos → catálogo elegible → primer workspace → versiones y superposición → configuración entre repositorios."
+          },
+          "reference": {
+            "pt": "#depois-das-bases",
+            "en": "#after-the-foundations",
+            "es": "#despues-de-las-bases"
+          }
+        },
+        {
+          "id": "atomic",
+          "title": {
+            "pt": "Publicação atômica",
+            "en": "Atomic publication",
+            "es": "Publicación atómica"
+          },
+          "body": {
+            "pt": "Falhas abortam o conjunto e preservam a geração atual.",
+            "en": "Failures abort the whole set and preserve the current generation.",
+            "es": "Los fallos abortan el conjunto y conservan la generación actual."
+          },
+          "position": {
+            "x": 0,
+            "y": 710
+          },
+          "kind": "planned",
+          "issue": 316,
+          "detail": {
+            "pt": "S5 depende das duas bases, da publicação atômica, #316, e da medição e validação, #338.",
+            "en": "S5 depends on both foundations, atomic publication, #316, and measurement and validation, #338.",
+            "es": "S5 depende de ambas bases, de la publicación atómica, #316, y de la medición y validación, #338."
+          },
+          "reference": {
+            "pt": "#bases-em-construcao",
+            "en": "#foundations-in-progress",
+            "es": "#bases-en-construccion"
+          }
+        },
+        {
+          "id": "measurement",
+          "title": {
+            "pt": "Medição e validação",
+            "en": "Measurement and validation",
+            "es": "Medición y validación"
+          },
+          "body": {
+            "pt": "Evidência de custo e limites antes do S5.",
+            "en": "Cost and limit evidence before S5.",
+            "es": "Evidencia de coste y límites antes de S5."
+          },
+          "position": {
+            "x": 600,
+            "y": 710
+          },
+          "kind": "planned",
+          "issue": 338,
+          "detail": {
+            "pt": "S5 depende das duas bases, da publicação atômica, #316, e da medição e validação, #338.",
+            "en": "S5 depends on both foundations, atomic publication, #316, and measurement and validation, #338.",
+            "es": "S5 depende de ambas bases, de la publicación atómica, #316, y de la medición y validación, #338."
+          },
+          "reference": {
+            "pt": "#bases-em-construcao",
+            "en": "#foundations-in-progress",
+            "es": "#bases-en-construccion"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "s1-s2",
+          "source": "s1",
+          "target": "s2",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        },
+        {
+          "id": "s2-s3",
+          "source": "s2",
+          "target": "s3",
+          "sourceHandle": "left",
+          "targetHandle": "top",
+          "kind": "planned"
+        },
+        {
+          "id": "s2-s4",
+          "source": "s2",
+          "target": "s4",
+          "sourceHandle": "right",
+          "targetHandle": "top",
+          "kind": "planned"
+        },
+        {
+          "id": "s3-s5",
+          "source": "s3",
+          "target": "s5",
+          "sourceHandle": "right",
+          "targetHandle": "top",
+          "kind": "planned"
+        },
+        {
+          "id": "s4-s5",
+          "source": "s4",
+          "target": "s5",
+          "sourceHandle": "left",
+          "targetHandle": "top",
+          "kind": "planned"
+        },
+        {
+          "id": "atomic-s5",
+          "source": "atomic",
+          "target": "s5",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "planned"
+        },
+        {
+          "id": "measurement-s5",
+          "source": "measurement",
+          "target": "s5",
+          "sourceHandle": "left",
+          "targetHandle": "right",
+          "kind": "planned"
+        }
+      ]
+    },
+    "server-request": {
+      "title": {
+        "pt": "Uma chamada, um repositório de entrada",
+        "en": "One call, one entry repository",
+        "es": "Una llamada, un repositorio de entrada"
+      },
+      "summary": {
+        "pt": "Siga a requisição do cliente até a resposta, com admissão explícita e leitura local.",
+        "en": "Follow a client request through explicit admission to a locally read answer.",
+        "es": "Sigue una petición desde la admisión explícita hasta una respuesta leída localmente."
+      },
+      "nodes": [
+        {
+          "id": "client",
+          "title": {
+            "pt": "Cliente MCP",
+            "en": "MCP client",
+            "es": "Cliente MCP"
+          },
+          "body": {
+            "pt": "Usa uma URL por repositório.",
+            "en": "Uses one URL per repository.",
+            "es": "Usa una URL por repositorio."
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Cada repositório tem seu endpoint HTTP, identificado pelo nome canônico. Configure no cliente uma URL para cada repositório com que ele trabalha.",
+            "en": "Each repository has an HTTP endpoint named by its canonical identity. Configure one URL in the client for each repository it works on.",
+            "es": "Cada repositorio tiene un endpoint HTTP identificado por su nombre canónico. Configura una URL en el cliente por cada repositorio con el que trabaja."
+          },
+          "reference": {
+            "pt": "#indexar-e-servir",
+            "en": "#index-and-serve",
+            "es": "#indexar-y-servir"
+          }
+        },
+        {
+          "id": "proxy",
+          "title": {
+            "pt": "Admissão",
+            "en": "Admission",
+            "es": "Admisión"
+          },
+          "body": {
+            "pt": "O proxy admite clientes; OIDC é opt-in.",
+            "en": "The proxy admits clients; OIDC is opt-in.",
+            "es": "El proxy admite clientes; OIDC es opt-in."
+          },
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Atenção. Em modo servidor o Meada devolve trechos de código-fonte a quem consegue conectar, e por padrão não autentica ninguém: o proxy reverso do operador admite os clientes (TLS, tokens, SSO, política de rede); o módulo OIDC é a alternativa opt-in. Sem host, o servidor escuta só no loopback; escutar além dele é uma escolha explícita do operador, e um proxy mal configurado expõe o código.",
+            "en": "Warning. In server mode Meada returns source code to whoever can connect, and by default it authenticates nobody: the operator's reverse proxy admits the clients (TLS, tokens, SSO, network policy); the OIDC module is the opt-in alternative. With no host the server listens on the loopback interface only; listening beyond it is the operator's explicit choice, and a misconfigured proxy exposes source.",
+            "es": "Atención. En modo servidor Meada devuelve fragmentos de código fuente a quien logre conectarse, y por defecto no autentica a nadie: el proxy inverso del operador admite a los clientes (TLS, tokens, SSO, política de red); el módulo OIDC es la alternativa opt-in. Sin host, el servidor escucha solo en el loopback; escuchar más allá es una elección explícita del operador, y un proxy mal configurado expone el código."
+          },
+          "reference": {
+            "pt": "#modo-servidor",
+            "en": "#server-mode",
+            "es": "#modo-servidor"
+          }
+        },
+        {
+          "id": "endpoint",
+          "title": {
+            "pt": "Endpoint da identidade",
+            "en": "Identity endpoint",
+            "es": "Endpoint de la identidad"
+          },
+          "body": {
+            "pt": "HTTP stateless encaminha a consulta.",
+            "en": "Stateless HTTP routes the query.",
+            "es": "HTTP stateless dirige la consulta."
+          },
+          "position": {
+            "x": 600,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "O transporte HTTP é stateless: qualquer nó com os mesmos índices pode atender a chamada. O caminho escolhe a identidade; um caminho desconhecido retorna 404, sujeito à admissão configurada.",
+            "en": "HTTP transport is stateless: any node with the same indexes can answer the call. The path selects the identity; an unknown path returns 404, subject to configured admission.",
+            "es": "El transporte HTTP es stateless: cualquier nodo con los mismos índices puede responder. La ruta elige la identidad; una ruta desconocida devuelve 404, sujeta a la admisión configurada."
+          },
+          "reference": {
+            "pt": "#indexar-e-servir",
+            "en": "#index-and-serve",
+            "es": "#indexar-y-servir"
+          }
+        },
+        {
+          "id": "engine",
+          "title": {
+            "pt": "Leitura local",
+            "en": "Local read",
+            "es": "Lectura local"
+          },
+          "body": {
+            "pt": "O servidor lê índices; não faz fetch.",
+            "en": "The server reads indexes; it does not fetch.",
+            "es": "El servidor lee índices; no hace fetch."
+          },
+          "position": {
+            "x": 600,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "O job prepara os índices; o servidor só lê. Alterar código exige reindexação, enquanto alterar manifesto ou configuração lida no startup exige reiniciar o servidor.",
+            "en": "The job prepares indexes; the server only reads. Code changes require reindexing, while changes to the manifest or configuration read at startup require a server restart.",
+            "es": "El job prepara los índices; el servidor solo lee. Los cambios de código requieren reindexar; los cambios de manifiesto o configuración leída al inicio requieren reiniciar el servidor."
+          },
+          "reference": {
+            "pt": "#indexar-e-servir",
+            "en": "#index-and-serve",
+            "es": "#indexar-y-servir"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "client-proxy",
+          "source": "client",
+          "target": "proxy",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "proxy-endpoint",
+          "source": "proxy",
+          "target": "endpoint",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "endpoint-engine",
+          "source": "endpoint",
+          "target": "engine",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        }
+      ],
+      "start": "client"
+    },
+    "node-layout": {
+      "title": {
+        "pt": "Quem prepara, quem atende",
+        "en": "Who prepares, who serves",
+        "es": "Quién prepara, quién sirve"
+      },
+      "summary": {
+        "pt": "No layout com job único, escrita e consulta têm responsabilidades separadas.",
+        "en": "In the single-job layout, writing and querying have separate responsibilities.",
+        "es": "En el layout de job único, escritura y consulta tienen responsabilidades separadas."
+      },
+      "nodes": [
+        {
+          "id": "job",
+          "title": {
+            "pt": "Job único",
+            "en": "One job",
+            "es": "Un job"
+          },
+          "body": {
+            "pt": "Faz fetch e indexa sem sobreposição.",
+            "en": "Fetches and indexes without overlap.",
+            "es": "Hace fetch e indexa sin solaparse."
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "No layout B, um único job faz fetch e indexa o conjunto. Evite sobreposição entre escritores, por exemplo com concurrencyPolicy: Forbid no CronJob.",
+            "en": "In layout B, one job fetches and indexes the set. Prevent overlapping writers, for example with concurrencyPolicy: Forbid on the CronJob.",
+            "es": "En el layout B, un único job hace fetch e indexa el conjunto. Evita escritores simultáneos, por ejemplo con concurrencyPolicy: Forbid en el CronJob."
+          },
+          "reference": {
+            "pt": "#escolher-como-distribuir-os-indices",
+            "en": "#choose-how-to-distribute-indexes",
+            "es": "#elegir-como-distribuir-los-indices"
+          }
+        },
+        {
+          "id": "handoff",
+          "title": {
+            "pt": "Conjunto pronto",
+            "en": "Complete set",
+            "es": "Conjunto listo"
+          },
+          "body": {
+            "pt": "Entrega mirrors e índices completos.",
+            "en": "Delivers complete mirrors and indexes.",
+            "es": "Entrega mirrors e índices completos."
+          },
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Os nós recebem mirrors e índices prontos, sem repetir a indexação. A troca por rename oferece ao leitor o índice antigo ou o novo completo.",
+            "en": "Nodes receive finished mirrors and indexes without repeating indexing. A rename swap gives the reader either the old index or the complete new one.",
+            "es": "Los nodos reciben mirrors e índices preparados, sin repetir la indexación. Un cambio por rename ofrece al lector el índice antiguo o el nuevo completo."
+          },
+          "reference": {
+            "pt": "#escolher-como-distribuir-os-indices",
+            "en": "#choose-how-to-distribute-indexes",
+            "es": "#elegir-como-distribuir-los-indices"
+          }
+        },
+        {
+          "id": "node",
+          "title": {
+            "pt": "Disco local do nó",
+            "en": "Node-local disk",
+            "es": "Disco local del nodo"
+          },
+          "body": {
+            "pt": "Instala por rename, fora de uma escrita ativa.",
+            "en": "Installs by rename, outside an active write.",
+            "es": "Instala por rename, fuera de una escritura activa."
+          },
+          "position": {
+            "x": 600,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Cada nó mantém index_dir local, ou em um volume que só ele escreve. Não compartilhe SQLite por NFS/EFS entre escritor e leitores; não troque um índice enquanto houver indexação ativa nele.",
+            "en": "Each node keeps index_dir locally, or on a volume only it writes. Do not share SQLite over NFS/EFS between a writer and readers; do not swap an index while it is being indexed.",
+            "es": "Cada nodo mantiene index_dir local, o en un volumen que solo él escribe. No compartas SQLite por NFS/EFS entre escritor y lectores ni cambies un índice mientras se está indexando."
+          },
+          "reference": {
+            "pt": "#escolher-como-distribuir-os-indices",
+            "en": "#choose-how-to-distribute-indexes",
+            "es": "#elegir-como-distribuir-los-indices"
+          }
+        },
+        {
+          "id": "ready",
+          "title": {
+            "pt": "Prontidão",
+            "en": "Readiness",
+            "es": "Disponibilidad"
+          },
+          "body": {
+            "pt": "Um índice servível admite consultas stateless.",
+            "en": "A servable index admits stateless queries.",
+            "es": "Un índice disponible admite consultas stateless."
+          },
+          "position": {
+            "x": 600,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Inicialize os índices antes de aceitar tráfego. Uma probe TCP ou meada status verifica a prontidão; o 404 em / lista identidades e não é health check.",
+            "en": "Initialize indexes before accepting traffic. A TCP probe or meada status checks readiness; the 404 at / lists identities and is not a health check.",
+            "es": "Inicializa los índices antes de aceptar tráfico. Una probe TCP o meada status comprueba disponibilidad; el 404 en / lista identidades y no es un health check."
+          },
+          "reference": {
+            "pt": "#escolher-como-distribuir-os-indices",
+            "en": "#choose-how-to-distribute-indexes",
+            "es": "#elegir-como-distribuir-los-indices"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "job-handoff",
+          "source": "job",
+          "target": "handoff",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "handoff-node",
+          "source": "handoff",
+          "target": "node",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "node-ready",
+          "source": "node",
+          "target": "ready",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        }
+      ],
+      "start": "job"
+    },
+    "snapshot-lifecycle": {
+      "title": {
+        "pt": "Publicar e receber um snapshot",
+        "en": "Publish and receive a snapshot",
+        "es": "Publicar y recibir un snapshot"
+      },
+      "summary": {
+        "pt": "O store transporta conteúdo imutável. A instalação local só muda após a validação.",
+        "en": "The store transports immutable content. Local installation changes only after validation.",
+        "es": "El store transporta contenido inmutable. La instalación local solo cambia tras validarlo."
+      },
+      "nodes": [
+        {
+          "id": "validate",
+          "title": {
+            "pt": "Validar a origem",
+            "en": "Validate the source",
+            "es": "Validar el origen"
+          },
+          "body": {
+            "pt": "Índices atuais e mirrors limpos.",
+            "en": "Current indexes and clean mirrors.",
+            "es": "Índices actuales y mirrors limpios."
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Publish verifica, somente lendo, se cada índice corresponde ao mirror e se o checkout está limpo, inclusive sem arquivos ignorados. Uma origem inválida é recusada antes da publicação.",
+            "en": "Publish checks, without writing, that every index matches its mirror and every checkout is clean, including ignored files. An invalid source is refused before publication.",
+            "es": "Publish verifica, solo leyendo, que cada índice corresponda a su mirror y que el checkout esté limpio, incluso sin archivos ignorados. Un origen inválido se rechaza antes de publicar."
+          },
+          "reference": {
+            "pt": "#snapshots",
+            "en": "#snapshots",
+            "es": "#snapshots"
+          }
+        },
+        {
+          "id": "upload",
+          "title": {
+            "pt": "Enviar bundles",
+            "en": "Upload bundles",
+            "es": "Enviar bundles"
+          },
+          "body": {
+            "pt": "Documento com tamanho e hash BLAKE3.",
+            "en": "A document records size and BLAKE3 hash.",
+            "es": "Un documento registra tamaño y hash BLAKE3."
+          },
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Cada repositório vira um bundle com mirror, .git e index.db. O documento registra tamanhos e hashes BLAKE3; conteúdo já armazenado não é reenviado e o ponteiro é publicado por último.",
+            "en": "Each repository becomes a bundle containing its mirror, .git and index.db. The document records sizes and BLAKE3 hashes; stored content is not uploaded again and the pointer is published last.",
+            "es": "Cada repositorio se convierte en un bundle con mirror, .git e index.db. El documento registra tamaños y hashes BLAKE3; no se reenvía contenido almacenado y el puntero se publica al final."
+          },
+          "reference": {
+            "pt": "#snapshots",
+            "en": "#snapshots",
+            "es": "#snapshots"
+          }
+        },
+        {
+          "id": "pull",
+          "title": {
+            "pt": "Baixar no nó",
+            "en": "Pull on the node",
+            "es": "Descargar en el nodo"
+          },
+          "body": {
+            "pt": "Recebe a geração que o ponteiro nomeia.",
+            "en": "Receives the generation named by the pointer.",
+            "es": "Recibe la generación que nombra el puntero."
+          },
+          "position": {
+            "x": 600,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "O nó lê current e baixa os bundles que faltam em seu local_dir. Um único pull atua nesse diretório; --every repete a operação e informa apenas mudanças do ponteiro.",
+            "en": "The node reads current and downloads missing bundles into its local_dir. Only one pull operates on that directory; --every repeats the operation and reports pointer changes.",
+            "es": "El nodo lee current y descarga los bundles que faltan en su local_dir. Solo un pull actúa sobre ese directorio; --every repite la operación e informa cambios del puntero."
+          },
+          "reference": {
+            "pt": "#receber-uma-geracao",
+            "en": "#receive-a-generation",
+            "es": "#recibir-una-generacion"
+          }
+        },
+        {
+          "id": "check",
+          "title": {
+            "pt": "Verificar e extrair",
+            "en": "Check and extract",
+            "es": "Verificar y extraer"
+          },
+          "body": {
+            "pt": "Conteúdo do store é entrada hostil.",
+            "en": "Store content is hostile input.",
+            "es": "El contenido del store es entrada hostil."
+          },
+          "position": {
+            "x": 600,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "O pull confere tamanho, hash e limites do arquivo antes da instalação. Recusa caminhos inseguros e links que escapem do repositório; uma falha mantém o ponteiro e as gerações locais anteriores.",
+            "en": "Pull checks size, hash and archive limits before installation. It refuses unsafe paths and links escaping the repository; a failure preserves the previous local pointer and generations.",
+            "es": "Pull comprueba tamaño, hash y límites del archivo antes de instalarlo. Rechaza rutas inseguras y enlaces que salgan del repositorio; un fallo conserva el puntero y las generaciones locales anteriores."
+          },
+          "reference": {
+            "pt": "#validar-os-bundles",
+            "en": "#validate-bundles",
+            "es": "#validar-los-bundles"
+          }
+        },
+        {
+          "id": "serve",
+          "title": {
+            "pt": "Trocar e servir",
+            "en": "Swap and serve",
+            "es": "Cambiar y servir"
+          },
+          "body": {
+            "pt": "Rename move o ponteiro local.",
+            "en": "Rename moves the local pointer.",
+            "es": "Rename mueve el puntero local."
+          },
+          "position": {
+            "x": 300,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "O nó troca seu ponteiro por rename e serve índices read-only, sem conexão ao store por chamada. Uma consulta já aberta termina na geração em que começou; a seguinte vê a nova.",
+            "en": "The node swaps its pointer by rename and serves read-only indexes, with no per-call store connection. An open query finishes on its starting generation; the next query sees the new one.",
+            "es": "El nodo cambia su puntero por rename y sirve índices read-only, sin conexión al store por llamada. Una consulta abierta termina en su generación inicial; la siguiente ve la nueva."
+          },
+          "reference": {
+            "pt": "#servir-sem-reindexar",
+            "en": "#serve-without-indexing",
+            "es": "#servir-sin-indexar"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "validate-upload",
+          "source": "validate",
+          "target": "upload",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "upload-pull",
+          "source": "upload",
+          "target": "pull",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "pull-check",
+          "source": "pull",
+          "target": "check",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        },
+        {
+          "id": "check-serve",
+          "source": "check",
+          "target": "serve",
+          "sourceHandle": "left",
+          "targetHandle": "right",
+          "kind": "normal"
+        }
+      ],
+      "start": "validate"
+    },
+    "generation-lifecycle": {
+      "title": {
+        "pt": "Atual, retida ou fixada",
+        "en": "Current, retained or pinned",
+        "es": "Actual, retenida o fijada"
+      },
+      "summary": {
+        "pt": "O ponteiro escolhe a atual; retenção define disponibilidade; um pin escolhe a geração da chamada.",
+        "en": "The pointer selects current; retention defines availability; a pin selects a call’s generation.",
+        "es": "El puntero elige la actual; la retención define disponibilidad; un pin elige la generación de la llamada."
+      },
+      "nodes": [
+        {
+          "id": "publish",
+          "title": {
+            "pt": "Publicar no Valkey",
+            "en": "Publish to Valkey",
+            "es": "Publicar en Valkey"
+          },
+          "body": {
+            "pt": "Atualiza current e retained juntos.",
+            "en": "Updates current and retained together.",
+            "es": "Actualiza current y retained juntos."
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Com generation-pointer, current e retained ficam no Valkey e são atualizados no mesmo script. Use o mesmo keep no job e nos nós para que a frota compartilhe a política de retenção.",
+            "en": "With generation-pointer, current and retained live in Valkey and are updated in one script. Use the same keep on the job and nodes so the fleet shares its retention policy.",
+            "es": "Con generation-pointer, current y retained están en Valkey y se actualizan en un mismo script. Usa el mismo keep en el job y los nodos para compartir la política de retención."
+          },
+          "reference": {
+            "pt": "#ponteiro-e-retencao",
+            "en": "#pointer-and-retention",
+            "es": "#puntero-y-retencion"
+          }
+        },
+        {
+          "id": "pull",
+          "title": {
+            "pt": "Receber as retidas",
+            "en": "Receive retained versions",
+            "es": "Recibir las retenidas"
+          },
+          "body": {
+            "pt": "A geração atual chega primeiro.",
+            "en": "The current generation arrives first.",
+            "es": "La generación actual llega primero."
+          },
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "O pull valida IDs e fences antes de mudar o nó e instala a atual primeiro. Falhar ao receber outra geração retida depois disso gera um aviso e uma nova tentativa no próximo pull.",
+            "en": "Pull validates IDs and fences before changing the node and installs current first. A later failure receiving another retained generation produces a warning and a retry on the next pull.",
+            "es": "Pull valida IDs y fences antes de modificar el nodo e instala primero la actual. Un fallo posterior al recibir otra generación retenida produce un aviso y un nuevo intento en el siguiente pull."
+          },
+          "reference": {
+            "pt": "#ponteiro-e-retencao",
+            "en": "#pointer-and-retention",
+            "es": "#puntero-y-retencion"
+          }
+        },
+        {
+          "id": "query",
+          "title": {
+            "pt": "Consultar a atual",
+            "en": "Query current",
+            "es": "Consultar la actual"
+          },
+          "body": {
+            "pt": "A resposta informa Meada-Generation.",
+            "en": "The response reports Meada-Generation.",
+            "es": "La respuesta informa Meada-Generation."
+          },
+          "position": {
+            "x": 600,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Uma URL sem pin consulta a geração atual. A resposta informa a geração no header Meada-Generation e nos metadados do resultado, permitindo que o cliente fixe as chamadas seguintes.",
+            "en": "An unpinned URL queries the current generation. The response reports its generation in the Meada-Generation header and result metadata, allowing the client to pin subsequent calls.",
+            "es": "Una URL sin pin consulta la generación actual. La respuesta informa la generación en el header Meada-Generation y los metadatos del resultado, permitiendo fijar las llamadas siguientes."
+          },
+          "reference": {
+            "pt": "#fixar-uma-geracao",
+            "en": "#pin-a-generation",
+            "es": "#fijar-una-generacion"
+          }
+        },
+        {
+          "id": "pin",
+          "title": {
+            "pt": "Fixar a próxima chamada",
+            "en": "Pin the next call",
+            "es": "Fijar la siguiente llamada"
+          },
+          "body": {
+            "pt": "O caminho usa @<generation>.",
+            "en": "The path uses @<generation>.",
+            "es": "La ruta usa @<generation>."
+          },
+          "position": {
+            "x": 600,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "O caminho /<identity>@<generation> seleciona uma geração ainda retida. Um pin não impede a retenção de removê-la; uma chamada aberta nessa geração pode falhar se a remoção ocorrer durante a leitura.",
+            "en": "The /<identity>@<generation> path selects a generation still retained. A pin does not prevent retention from removing it; an open call may fail if removal occurs during the read.",
+            "es": "La ruta /<identity>@<generation> selecciona una generación aún retenida. Un pin no impide que la retención la elimine; una llamada abierta puede fallar si se elimina durante la lectura."
+          },
+          "reference": {
+            "pt": "#fixar-uma-geracao",
+            "en": "#pin-a-generation",
+            "es": "#fijar-una-generacion"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "publish-pull",
+          "source": "publish",
+          "target": "pull",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "pull-query",
+          "source": "pull",
+          "target": "query",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "query-pin",
+          "source": "query",
+          "target": "pin",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        }
+      ],
+      "start": "publish"
+    },
+    "fence-recovery": {
+      "title": {
+        "pt": "Recuperar um fence sem retroceder",
+        "en": "Recover a fence without going back",
+        "es": "Recuperar un fence sin retroceder"
+      },
+      "summary": {
+        "pt": "Após perda do contador, a recuperação eleva o fence sob lock. Não edite o contador manualmente.",
+        "en": "After counter loss, recovery raises the fence under the lock. Do not edit the counter manually.",
+        "es": "Tras perder el contador, la recuperación eleva el fence bajo lock. No edites el contador manualmente."
+      },
+      "nodes": [
+        {
+          "id": "detect",
+          "title": {
+            "pt": "Detectar o bloqueio",
+            "en": "Detect the stall",
+            "es": "Detectar el bloqueo"
+          },
+          "body": {
+            "pt": "Um fence menor não substitui o atual.",
+            "en": "A lower fence cannot replace the current one.",
+            "es": "Un fence menor no sustituye al actual."
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Uma perda ou restauração antiga do Valkey pode deixar o contador abaixo dos fences que os nós já registraram. A frota recusa retroceder; status --generations mostra fence: stuck com os valores.",
+            "en": "A Valkey loss or stale restore can leave the counter below fences already recorded by nodes. The fleet refuses to go backward; status --generations shows fence: stuck with the values.",
+            "es": "Una pérdida o restauración antigua de Valkey puede dejar el contador por debajo de los fences registrados por los nodos. La flota se niega a retroceder; status --generations muestra fence: stuck con los valores."
+          },
+          "reference": {
+            "pt": "#publicacao-e-recuperacao-do-fence",
+            "en": "#publication-and-fence-recovery",
+            "es": "#publicacion-y-recuperacion-del-fence"
+          }
+        },
+        {
+          "id": "lock",
+          "title": {
+            "pt": "Obter o lock",
+            "en": "Acquire the lock",
+            "es": "Obtener el lock"
+          },
+          "body": {
+            "pt": "A recuperação usa o mesmo domínio de publicação.",
+            "en": "Recovery uses the same publication domain.",
+            "es": "La recuperación usa el mismo dominio de publicación."
+          },
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Execute meada snapshot fence recover no domínio de publicação correto. A recuperação adquire o lock antes de elevar o contador, preservando a coordenação com o job.",
+            "en": "Run meada snapshot fence recover in the correct publication domain. Recovery acquires the lock before raising the counter, preserving coordination with the job.",
+            "es": "Ejecuta meada snapshot fence recover en el dominio de publicación correcto. La recuperación obtiene el lock antes de elevar el contador y mantiene la coordinación con el job."
+          },
+          "reference": {
+            "pt": "#publicacao-e-recuperacao-do-fence",
+            "en": "#publication-and-fence-recovery",
+            "es": "#publicacion-y-recuperacion-del-fence"
+          }
+        },
+        {
+          "id": "raise",
+          "title": {
+            "pt": "Elevar o contador",
+            "en": "Raise the counter",
+            "es": "Elevar el contador"
+          },
+          "body": {
+            "pt": "Considera fences registrados e um piso opcional.",
+            "en": "Considers recorded fences and an optional floor.",
+            "es": "Considera fences registrados y un mínimo opcional."
+          },
+          "position": {
+            "x": 600,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "A recuperação considera ponteiro, gerações retidas, workspace e heartbeats válidos. Para um nó isolado cujo fence não aparece neles, informe --at-least com esse valor.",
+            "en": "Recovery considers the pointer, retained generations, workspace and valid heartbeats. For an isolated node whose fence is absent from those records, supply its value with --at-least.",
+            "es": "La recuperación considera puntero, generaciones retenidas, workspace y heartbeats válidos. Para un nodo aislado cuyo fence no aparezca en esos registros, indica su valor con --at-least."
+          },
+          "reference": {
+            "pt": "#publicacao-e-recuperacao-do-fence",
+            "en": "#publication-and-fence-recovery",
+            "es": "#publicacion-y-recuperacion-del-fence"
+          }
+        },
+        {
+          "id": "resume",
+          "title": {
+            "pt": "Publicar novamente",
+            "en": "Publish again",
+            "es": "Publicar de nuevo"
+          },
+          "body": {
+            "pt": "O próximo publish usa um fence maior.",
+            "en": "The next publish uses a higher fence.",
+            "es": "El siguiente publish usa un fence mayor."
+          },
+          "position": {
+            "x": 600,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "A próxima publicação usa um fence maior e destrava os nós. Não edite nem reduza o contador manualmente: use o comando de recuperação para preservar a coordenação.",
+            "en": "The next publish uses a higher fence and unsticks the nodes. Do not edit or lower the counter manually: use the recovery command to preserve coordination.",
+            "es": "La próxima publicación usa un fence mayor y desbloquea los nodos. No edites ni reduzcas el contador manualmente: usa el comando de recuperación para preservar la coordinación."
+          },
+          "reference": {
+            "pt": "#publicacao-e-recuperacao-do-fence",
+            "en": "#publication-and-fence-recovery",
+            "es": "#publicacion-y-recuperacion-del-fence"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "detect-lock",
+          "source": "detect",
+          "target": "lock",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "lock-raise",
+          "source": "lock",
+          "target": "raise",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "raise-resume",
+          "source": "raise",
+          "target": "resume",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        }
+      ],
+      "start": "detect"
+    },
+    "app-credentials": {
+      "title": {
+        "pt": "Credenciais ficam com o job",
+        "en": "Credentials stay with the job",
+        "es": "Las credenciales quedan en el job"
+      },
+      "summary": {
+        "pt": "Git faz o fetch. O helper seleciona e renova tokens; os nós não chamam GitHub.",
+        "en": "Git performs the fetch. The helper selects and renews tokens; nodes do not call GitHub.",
+        "es": "Git hace el fetch. El helper selecciona y renueva tokens; los nodos no llaman a GitHub."
+      },
+      "nodes": [
+        {
+          "id": "git",
+          "title": {
+            "pt": "Git pede credencial",
+            "en": "Git requests a credential",
+            "es": "Git pide una credencial"
+          },
+          "body": {
+            "pt": "O pedido inclui host e caminho do repositório.",
+            "en": "The request includes host and repository path.",
+            "es": "La petición incluye host y ruta del repositorio."
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Configure o helper no job com credential.useHttpPath=true e o caminho absoluto do manifesto. Git continua responsável pelo fetch; Meada só responde à solicitação de credencial.",
+            "en": "Configure the helper on the job with credential.useHttpPath=true and an absolute manifest path. Git remains responsible for fetch; Meada only answers the credential request.",
+            "es": "Configura el helper en el job con credential.useHttpPath=true y la ruta absoluta del manifiesto. Git sigue siendo responsable del fetch; Meada solo responde a la petición de credencial."
+          },
+          "reference": {
+            "pt": "#configurar-o-helper",
+            "en": "#configure-the-helper",
+            "es": "#configurar-el-helper"
+          }
+        },
+        {
+          "id": "installation",
+          "title": {
+            "pt": "Selecionar instalação",
+            "en": "Select an installation",
+            "es": "Seleccionar instalación"
+          },
+          "body": {
+            "pt": "Escolhe uma instalação que cobre o owner.",
+            "en": "Chooses an installation covering the owner.",
+            "es": "Elige una instalación que cubra al owner."
+          },
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "O helper descobre instalações e seleciona entre as que cobrem o owner, ignorando as marcadas por throttling. Sem cobertura, responde vazio com exit 0 para Git tentar o próximo helper.",
+            "en": "The helper discovers installations and selects among those covering the owner, skipping throttled ones. Without coverage it returns no credential with exit 0 so Git can try its next helper.",
+            "es": "El helper descubre instalaciones y elige entre las que cubren al owner, omitiendo las limitadas por throttling. Sin cobertura, responde vacío con exit 0 para que Git pruebe el siguiente helper."
+          },
+          "reference": {
+            "pt": "#configurar-o-helper",
+            "en": "#configure-the-helper",
+            "es": "#configurar-el-helper"
+          }
+        },
+        {
+          "id": "token",
+          "title": {
+            "pt": "Reusar ou emitir token",
+            "en": "Reuse or mint a token",
+            "es": "Reusar o emitir token"
+          },
+          "body": {
+            "pt": "Valkey coordena cache e lock por instalação.",
+            "en": "Valkey coordinates cache and per-installation lock.",
+            "es": "Valkey coordina caché y lock por instalación."
+          },
+          "position": {
+            "x": 600,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Um token em cache é reutilizado enquanto tiver pelo menos dez minutos de validade. Um lock por instalação evita emissões concorrentes; quem lê esse Valkey pode ler o source durante a validade do token.",
+            "en": "A cached token is reused while it has at least ten minutes of validity. A per-installation lock prevents concurrent minting; anyone able to read that Valkey can read source while the token remains valid.",
+            "es": "Un token en caché se reutiliza mientras tenga al menos diez minutos de validez. Un lock por instalación evita emisiones simultáneas; quien lea ese Valkey podrá leer source mientras el token sea válido."
+          },
+          "reference": {
+            "pt": "#configurar-o-helper",
+            "en": "#configure-the-helper",
+            "es": "#configurar-el-helper"
+          }
+        },
+        {
+          "id": "fetch",
+          "title": {
+            "pt": "Fetch no job",
+            "en": "Fetch on the job",
+            "es": "Fetch en el job"
+          },
+          "body": {
+            "pt": "Rate limits voltam ao helper pelo job.",
+            "en": "The job reports rate limits to the helper.",
+            "es": "El job informa rate limits al helper."
+          },
+          "position": {
+            "x": 600,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Se o fetch recebe um rate limit secundário, o job informa o helper com github-app throttled. O helper não observa sozinho as respostas de Git; suas próprias chamadas REST tratam limites separadamente.",
+            "en": "When fetch receives a secondary rate limit, the job reports it with github-app throttled. The helper cannot observe Git’s responses itself; its own REST calls handle limits separately.",
+            "es": "Si el fetch recibe un rate limit secundario, el job lo informa con github-app throttled. El helper no observa por sí mismo las respuestas de Git; sus propias llamadas REST tratan los límites aparte."
+          },
+          "reference": {
+            "pt": "#configurar-o-helper",
+            "en": "#github-app-credentials",
+            "es": "#configurar-el-helper"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "git-installation",
+          "source": "git",
+          "target": "installation",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "installation-token",
+          "source": "installation",
+          "target": "token",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "token-fetch",
+          "source": "token",
+          "target": "fetch",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        }
+      ],
+      "start": "git"
+    },
+    "console-authoring": {
+      "title": {
+        "pt": "Da edição à próxima geração",
+        "en": "From editing to the next generation",
+        "es": "De la edición a la próxima generación"
+      },
+      "summary": {
+        "pt": "Validar, salvar, aplicar e publicar são passos distintos, com autoridade conferida em cada ação.",
+        "en": "Validate, save, apply and publish are separate steps, with authority checked for each action.",
+        "es": "Validar, guardar, aplicar y publicar son pasos distintos, con autoridad comprobada en cada acción."
+      },
+      "nodes": [
+        {
+          "id": "validate",
+          "title": {
+            "pt": "Validar e comparar",
+            "en": "Validate and compare",
+            "es": "Validar y comparar"
+          },
+          "body": {
+            "pt": "O editor verifica a proposta e mostra o diff.",
+            "en": "The editor checks the proposal and shows the diff.",
+            "es": "El editor verifica la propuesta y muestra el diff."
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "O editor prepara uma proposta, valida as entradas e apresenta a comparação antes de salvar. O grant limita a leitura; as operações exigem a autoridade configurada e confirmação explícita.",
+            "en": "The editor prepares a proposal, validates entries and presents the comparison before saving. The grant limits reading; operations require configured authority and explicit confirmation.",
+            "es": "El editor prepara una propuesta, valida las entradas y muestra la comparación antes de guardar. El grant limita la lectura; las operaciones requieren autoridad configurada y confirmación explícita."
+          },
+          "reference": {
+            "pt": "#papeis-e-operacoes",
+            "en": "#roles-and-operations",
+            "es": "#roles-y-operaciones"
+          }
+        },
+        {
+          "id": "save",
+          "title": {
+            "pt": "Salvar uma versão",
+            "en": "Save a version",
+            "es": "Guardar una versión"
+          },
+          "body": {
+            "pt": "Cria um documento imutável.",
+            "en": "Creates an immutable document.",
+            "es": "Crea un documento inmutable."
+          },
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Salvar registra uma versão imutável do workspace, sem publicar conteúdo indexado. A mesma configuração importada novamente preserva o identificador e os metadados da primeira escrita.",
+            "en": "Saving records an immutable workspace version without publishing indexed content. Importing the same configuration again preserves its identifier and first-write metadata.",
+            "es": "Guardar registra una versión inmutable del workspace sin publicar contenido indexado. Importar de nuevo la misma configuración conserva el identificador y los metadatos de la primera escritura."
+          },
+          "reference": {
+            "pt": "#papeis-e-operacoes",
+            "en": "#roles-and-operations",
+            "es": "#roles-y-operaciones"
+          }
+        },
+        {
+          "id": "apply",
+          "title": {
+            "pt": "Aplicar explicitamente",
+            "en": "Apply explicitly",
+            "es": "Aplicar explícitamente"
+          },
+          "body": {
+            "pt": "Move o ponteiro da configuração sob lock.",
+            "en": "Moves the configuration pointer under the lock.",
+            "es": "Mueve el puntero de configuración bajo lock."
+          },
+          "position": {
+            "x": 600,
+            "y": 0
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "Aplicar escolhe a versão da configuração que o job usará. Essa ação move o ponteiro sob lock, mas não é o mesmo que publicar uma geração ou mudar imediatamente o conteúdo servido pelos nós.",
+            "en": "Applying selects the configuration version the job will use. It moves the pointer under the lock, but does not itself publish a generation or immediately change content served by nodes.",
+            "es": "Aplicar elige la versión de configuración que usará el job. Mueve el puntero bajo lock, pero no publica por sí mismo una generación ni cambia inmediatamente el contenido servido por los nodos."
+          },
+          "reference": {
+            "pt": "#papeis-e-operacoes",
+            "en": "#roles-and-operations",
+            "es": "#roles-y-operaciones"
+          }
+        },
+        {
+          "id": "publish",
+          "title": {
+            "pt": "Refresh do job",
+            "en": "Job refresh",
+            "es": "Refresh del job"
+          },
+          "body": {
+            "pt": "Publicação e pull tornam o conteúdo consultável.",
+            "en": "Publication and pull make the content queryable.",
+            "es": "Publicación y pull permiten consultar el contenido."
+          },
+          "position": {
+            "x": 600,
+            "y": 230
+          },
+          "kind": "process",
+          "detail": {
+            "pt": "O job lê a versão aplicada e executa o refresh. Console e nós recebem depois a geração publicada em seus próprios local_dir; o playground lê os índices locais da console.",
+            "en": "The job reads the applied version and runs refresh. Console and nodes later receive the published generation in their own local_dir; the playground reads the console’s local indexes.",
+            "es": "El job lee la versión aplicada y ejecuta el refresh. Consola y nodos reciben después la generación publicada en sus propios local_dir; el playground lee los índices locales de la consola."
+          },
+          "reference": {
+            "pt": "#iniciar-a-console",
+            "en": "#start-the-console",
+            "es": "#iniciar-la-consola"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "validate-save",
+          "source": "validate",
+          "target": "save",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "save-apply",
+          "source": "save",
+          "target": "apply",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "apply-publish",
+          "source": "apply",
+          "target": "publish",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        }
+      ],
+      "start": "validate"
+    },
+    "scim-revocation": {
+      "title": {
+        "pt": "Ausência não é exclusão",
+        "en": "Absence is not deletion",
+        "es": "Ausencia no es eliminación"
+      },
+      "summary": {
+        "pt": "No S4 planejado, exclusão SCIM deixa um bloqueio durável na console para sujeitos provisionados.",
+        "en": "In planned S4, SCIM deletion leaves a durable console block for provisioned subjects.",
+        "es": "En el S4 planeado, la eliminación SCIM deja un bloqueo duradero en la consola para sujetos aprovisionados."
+      },
+      "nodes": [
+        {
+          "id": "provisioned",
+          "title": {
+            "pt": "Sujeito provisionado",
+            "en": "Provisioned subject",
+            "es": "Sujeto aprovisionado"
+          },
+          "body": {
+            "pt": "O diretório já conhece sua identidade.",
+            "en": "The directory already knows the identity.",
+            "es": "El directorio ya conoce su identidad."
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "kind": "planned",
+          "issue": 319,
+          "detail": {
+            "pt": "SCIM manterá um diretório de usuários e grupos para a identidade empresarial. O fato de um sujeito ter sido provisionado é distinto de sua presença atual e da política de admissão normal.",
+            "en": "SCIM will maintain a user and group directory for enterprise identity. Having been provisioned is distinct from current presence and normal admission policy.",
+            "es": "SCIM mantendrá un directorio de usuarios y grupos para identidad empresarial. Haber sido aprovisionado es distinto de la presencia actual y de la política normal de admisión."
+          },
+          "reference": {
+            "pt": "#diretorio-e-revogacao",
+            "en": "#directory-and-revocation",
+            "es": "#directorio-y-revocacion"
+          }
+        },
+        {
+          "id": "deleted",
+          "title": {
+            "pt": "Exclusão SCIM",
+            "en": "SCIM deletion",
+            "es": "Eliminación SCIM"
+          },
+          "body": {
+            "pt": "Revogação não apaga a evidência do bloqueio.",
+            "en": "Revocation retains evidence of the block.",
+            "es": "La revocación conserva la evidencia del bloqueo."
+          },
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "kind": "planned",
+          "detail": {
+            "pt": "Excluir um sujeito provisionado pelo SCIM deixará um bloqueio durável na console. Remover a linha do diretório não poderá apagar a evidência de que a identidade foi revogada.",
+            "en": "Deleting a provisioned subject through SCIM will leave a durable console block. Removing a directory row must not erase evidence that the identity was revoked.",
+            "es": "Eliminar un sujeto aprovisionado mediante SCIM dejará un bloqueo duradero en la consola. Borrar una fila del directorio no podrá borrar la evidencia de que la identidad fue revocada."
+          },
+          "reference": {
+            "pt": "#diretorio-e-revogacao",
+            "en": "#directory-and-revocation",
+            "es": "#directorio-y-revocacion"
+          }
+        },
+        {
+          "id": "blocked",
+          "title": {
+            "pt": "Bloqueio na console",
+            "en": "Console block",
+            "es": "Bloqueo en la consola"
+          },
+          "body": {
+            "pt": "Persiste até reprovisionamento ativo explícito.",
+            "en": "Persists until explicit active reprovisioning.",
+            "es": "Persiste hasta un reaprovisionamiento activo explícito."
+          },
+          "position": {
+            "x": 600,
+            "y": 0
+          },
+          "kind": "planned",
+          "detail": {
+            "pt": "O bloqueio continuará até um reprovisionamento ativo explícito. Esse é o contrato planejado da console; a política específica dos nós permanece na especificação S4.",
+            "en": "The block will remain until explicit active reprovisioning. This is the planned console contract; the nodes’ specific policy remains in the S4 specification.",
+            "es": "El bloqueo continuará hasta un reaprovisionamiento activo explícito. Es el contrato planeado de la consola; la política específica de los nodos permanece en la especificación S4."
+          },
+          "reference": {
+            "pt": "#diretorio-e-revogacao",
+            "en": "#directory-and-revocation",
+            "es": "#directorio-y-revocacion"
+          }
+        },
+        {
+          "id": "never",
+          "title": {
+            "pt": "Nunca provisionado",
+            "en": "Never provisioned",
+            "es": "Nunca aprovisionado"
+          },
+          "body": {
+            "pt": "Mantém a admissão normal; ausência não é exclusão.",
+            "en": "Keeps normal admission; absence is not deletion.",
+            "es": "Conserva la admisión normal; ausencia no es eliminación."
+          },
+          "position": {
+            "x": 600,
+            "y": 230
+          },
+          "kind": "planned",
+          "detail": {
+            "pt": "Um sujeito nunca provisionado continuará no caminho normal de admissão. Ausência de registro, por si só, não equivale a uma exclusão SCIM anterior.",
+            "en": "A never-provisioned subject will retain the normal admission path. An absent record alone does not mean there was a prior SCIM deletion.",
+            "es": "Un sujeto nunca aprovisionado conservará la admisión normal. La ausencia de registro por sí sola no significa que hubo una eliminación SCIM anterior."
+          },
+          "reference": {
+            "pt": "#diretorio-e-revogacao",
+            "en": "#directory-and-revocation",
+            "es": "#directorio-y-revocacion"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "provisioned-deleted",
+          "source": "provisioned",
+          "target": "deleted",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "planned"
+        },
+        {
+          "id": "deleted-blocked",
+          "source": "deleted",
+          "target": "blocked",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "planned"
+        }
+      ],
+      "start": "provisioned"
+    },
+    "workspace-overlap": {
+      "title": {
+        "pt": "Compartilhar Y não compartilha A ou B",
+        "en": "Sharing Y does not share A or B",
+        "es": "Compartir Y no comparte A ni B"
+      },
+      "summary": {
+        "pt": "S5 planeja contextos sobrepostos; o grant efetivo de cada pessoa continua sendo a autoridade.",
+        "en": "S5 plans overlapping contexts; each person’s effective grant remains authoritative.",
+        "es": "S5 planea contextos superpuestos; el grant efectivo de cada persona sigue siendo la autoridad."
+      },
+      "nodes": [
+        {
+          "id": "a",
+          "title": {
+            "pt": "Operador de A",
+            "en": "Operator for A",
+            "es": "Operador de A"
+          },
+          "body": {
+            "pt": "Seu grant permite Y e A.",
+            "en": "Their grant permits Y and A.",
+            "es": "Su grant permite Y y A."
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "kind": "planned",
+          "issue": 339,
+          "detail": {
+            "pt": "No S5, roles aceitas de repositório, diretas ou herdadas de grupo, permitirão criar um contexto. O operador seleciona Y e A apenas quando seus grants atuais cobrem ambos.",
+            "en": "In S5, accepted repository roles, direct or group-derived, will allow context creation. The operator selects Y and A only when current grants cover both.",
+            "es": "En S5, roles aceptados de repositorio, directos o heredados del grupo, permitirán crear un contexto. El operador selecciona Y y A solo cuando sus grants actuales cubran ambos."
+          },
+          "reference": {
+            "pt": "#compor-sem-duplicar-a-indexacao",
+            "en": "#compose-without-duplicating-indexing",
+            "es": "#componer-sin-duplicar-la-indexacion"
+          }
+        },
+        {
+          "id": "ya",
+          "title": {
+            "pt": "Workspace Y+A",
+            "en": "Workspace Y+A",
+            "es": "Workspace Y+A"
+          },
+          "body": {
+            "pt": "Um contexto, sem duplicar o índice de Y.",
+            "en": "One context, without duplicating Y’s index.",
+            "es": "Un contexto, sin duplicar el índice de Y."
+          },
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "kind": "planned",
+          "detail": {
+            "pt": "O workspace descreve um contexto entre repositórios sobre a indexação compartilhada. Incluir Y em Y+A e em outro workspace não cria outra cópia do índice de Y.",
+            "en": "A workspace describes a cross-repository context over shared indexing. Including Y in Y+A and another workspace does not create another copy of Y’s index.",
+            "es": "Un workspace describe un contexto entre repositorios sobre indexación compartida. Incluir Y en Y+A y en otro workspace no crea otra copia del índice de Y."
+          },
+          "reference": {
+            "pt": "#compor-sem-duplicar-a-indexacao",
+            "en": "#compose-without-duplicating-indexing",
+            "es": "#componer-sin-duplicar-la-indexacion"
+          }
+        },
+        {
+          "id": "peer",
+          "title": {
+            "pt": "Colega do grupo",
+            "en": "Group member",
+            "es": "Miembro del grupo"
+          },
+          "body": {
+            "pt": "Herda viewer, sempre limitado pelo próprio grant.",
+            "en": "Inherits viewer, always bounded by their own grant.",
+            "es": "Hereda viewer, siempre limitado por su propio grant."
+          },
+          "position": {
+            "x": 600,
+            "y": 0
+          },
+          "kind": "planned",
+          "detail": {
+            "pt": "Colegas herdarão viewer a partir de seus próprios grants efetivos, incluindo roles do grupo. Não será necessário um segundo convite Meada, ingresso em grupo do provedor de identidade ou acesso por pacote para consultar o que esses grants permitem.",
+            "en": "Colleagues will inherit viewer from their own effective grants, including group roles. No second Meada invitation, identity provider group enrollment or access package will be required to query what those grants permit.",
+            "es": "Los compañeros heredarán viewer desde sus propios grants efectivos, incluidos roles del grupo. No se requerirá otra invitación Meada, inscripción en grupo del proveedor de identidad o paquete de acceso para consultar lo que esos grants permitan."
+          },
+          "reference": {
+            "pt": "#compor-sem-duplicar-a-indexacao",
+            "en": "#compose-without-duplicating-indexing",
+            "es": "#componer-sin-duplicar-la-indexacion"
+          }
+        },
+        {
+          "id": "b",
+          "title": {
+            "pt": "Operador de B",
+            "en": "Operator for B",
+            "es": "Operador de B"
+          },
+          "body": {
+            "pt": "Seu grant permite Y e B.",
+            "en": "Their grant permits Y and B.",
+            "es": "Su grant permite Y y B."
+          },
+          "position": {
+            "x": 600,
+            "y": 230
+          },
+          "kind": "planned",
+          "detail": {
+            "pt": "Outro operador poderá selecionar Y e B independentemente quando seus grants cobrirem ambos. A autoridade de operar um workspace continua distinta da permissão de ler seus repositórios.",
+            "en": "Another operator can independently select Y and B when grants cover both. Authority to operate a workspace remains distinct from permission to read its repositories.",
+            "es": "Otro operador podrá seleccionar Y y B de forma independiente cuando sus grants cubran ambos. La autoridad para operar un workspace sigue siendo distinta del permiso para leer sus repositorios."
+          },
+          "reference": {
+            "pt": "#compor-sem-duplicar-a-indexacao",
+            "en": "#compose-without-duplicating-indexing",
+            "es": "#componer-sin-duplicar-la-indexacion"
+          }
+        },
+        {
+          "id": "yb",
+          "title": {
+            "pt": "Workspace Y+B",
+            "en": "Workspace Y+B",
+            "es": "Workspace Y+B"
+          },
+          "body": {
+            "pt": "Compartilhar Y não revela A ao grupo de B.",
+            "en": "Sharing Y does not reveal A to B’s group.",
+            "es": "Compartir Y no revela A al grupo de B."
+          },
+          "position": {
+            "x": 300,
+            "y": 230
+          },
+          "kind": "planned",
+          "detail": {
+            "pt": "Compartilhar Y não concede A ao operador de B nem B ao operador de A. Um link entre repositórios só será visível quando o grant permitir seus dois lados.",
+            "en": "Sharing Y grants neither A to B’s operator nor B to A’s operator. A cross-repository link will be visible only when the grant permits both ends.",
+            "es": "Compartir Y no concede A al operador de B ni B al operador de A. Un enlace entre repositorios solo será visible cuando el grant permita ambos extremos."
+          },
+          "reference": {
+            "pt": "#compor-sem-duplicar-a-indexacao",
+            "en": "#compose-without-duplicating-indexing",
+            "es": "#componer-sin-duplicar-la-indexacion"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "a-ya",
+          "source": "a",
+          "target": "ya",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "planned"
+        },
+        {
+          "id": "ya-peer",
+          "source": "ya",
+          "target": "peer",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "planned"
+        },
+        {
+          "id": "b-yb",
+          "source": "b",
+          "target": "yb",
+          "sourceHandle": "left",
+          "targetHandle": "right",
+          "kind": "planned"
+        }
+      ],
+      "start": "a"
+    },
+    "mcp-proposal": {
+      "title": {
+        "pt": "Propor sem salvar ou aplicar",
+        "en": "Propose without saving or applying",
+        "es": "Proponer sin guardar ni aplicar"
+      },
+      "summary": {
+        "pt": "MCP autenticado produzirá propostas stateless. A persistência depende da revisão e ação autorizada de uma pessoa.",
+        "en": "Authenticated MCP will produce stateless proposals. Persistence requires a person’s review and authorized action.",
+        "es": "MCP autenticado producirá propuestas stateless. La persistencia requiere revisión y acción autorizada de una persona."
+      },
+      "nodes": [
+        {
+          "id": "agent",
+          "title": {
+            "pt": "Agente autenticado",
+            "en": "Authenticated agent",
+            "es": "Agente autenticado"
+          },
+          "body": {
+            "pt": "Propõe sob a identidade do operador.",
+            "en": "Proposes under the operator’s identity.",
+            "es": "Propone bajo la identidad del operador."
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "kind": "planned",
+          "issue": 339,
+          "detail": {
+            "pt": "A interface de proposta será autenticada e vinculada à identidade do operador. O agente poderá usar suas próprias ferramentas GitHub de leitura para propor o contexto; isso não autoriza persistência.",
+            "en": "The proposal interface will be authenticated and tied to the operator’s identity. An agent may use its own GitHub read tools to propose context; that does not authorize persistence.",
+            "es": "La interfaz de propuesta será autenticada y vinculada a la identidad del operador. El agente podrá usar sus propias herramientas GitHub de lectura para proponer el contexto; eso no autoriza persistencia."
+          },
+          "reference": {
+            "pt": "#autoria-assistida-por-mcp",
+            "en": "#mcp-assisted-authoring",
+            "es": "#autoria-asistida-por-mcp"
+          }
+        },
+        {
+          "id": "check",
+          "title": {
+            "pt": "Validar o escopo",
+            "en": "Validate the scope",
+            "es": "Validar el ámbito"
+          },
+          "body": {
+            "pt": "Meada confere a proposta com os grants atuais.",
+            "en": "Meada checks the proposal against current grants.",
+            "es": "Meada comprueba la propuesta con grants actuales."
+          },
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "kind": "planned",
+          "detail": {
+            "pt": "Meada validará a proposta contra a identidade e os grants atuais do operador. O conjunto proposto não poderá ampliar o acesso efetivo aos repositórios.",
+            "en": "Meada will validate the proposal against the operator’s identity and current grants. The proposed set cannot widen effective repository access.",
+            "es": "Meada validará la propuesta con la identidad y los grants actuales del operador. El conjunto propuesto no podrá ampliar el acceso efectivo a los repositorios."
+          },
+          "reference": {
+            "pt": "#autoria-assistida-por-mcp",
+            "en": "#mcp-assisted-authoring",
+            "es": "#autoria-asistida-por-mcp"
+          }
+        },
+        {
+          "id": "proposal",
+          "title": {
+            "pt": "Retornar proposta",
+            "en": "Return a proposal",
+            "es": "Devolver propuesta"
+          },
+          "body": {
+            "pt": "Não persiste nem aplica configuração.",
+            "en": "Does not persist or apply configuration.",
+            "es": "No persiste ni aplica configuración."
+          },
+          "position": {
+            "x": 600,
+            "y": 0
+          },
+          "kind": "planned",
+          "detail": {
+            "pt": "As ferramentas iniciais retornarão propostas stateless. Não salvarão versões, não aplicarão configurações e não modificarão o ambiente em execução.",
+            "en": "Initial tools will return stateless proposals. They will not save versions, apply configuration or modify the running environment.",
+            "es": "Las herramientas iniciales devolverán propuestas stateless. No guardarán versiones, aplicarán configuraciones ni modificarán el entorno en ejecución."
+          },
+          "reference": {
+            "pt": "#autoria-assistida-por-mcp",
+            "en": "#mcp-assisted-authoring",
+            "es": "#autoria-asistida-por-mcp"
+          }
+        },
+        {
+          "id": "human",
+          "title": {
+            "pt": "Revisão humana",
+            "en": "Human review",
+            "es": "Revisión humana"
+          },
+          "body": {
+            "pt": "A pessoa usa o fluxo autorizado de save/apply.",
+            "en": "The person uses the authorized save/apply flow.",
+            "es": "La persona usa el flujo autorizado de save/apply."
+          },
+          "position": {
+            "x": 600,
+            "y": 230
+          },
+          "kind": "planned",
+          "detail": {
+            "pt": "Uma pessoa revisará o resultado e usará o fluxo autorizado para salvar e aplicar. A autoridade e a versão-base deverão ser conferidas novamente nesse momento, conforme os contratos finais do S5.",
+            "en": "A person will review the result and use the authorized save/apply flow. Authority and the base version must be checked again at that point, under S5’s final contracts.",
+            "es": "Una persona revisará el resultado y usará el flujo autorizado para guardar y aplicar. La autoridad y la versión base deberán comprobarse otra vez en ese momento, según los contratos finales de S5."
+          },
+          "reference": {
+            "pt": "#autoria-assistida-por-mcp",
+            "en": "#mcp-assisted-authoring",
+            "es": "#autoria-asistida-por-mcp"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "agent-check",
+          "source": "agent",
+          "target": "check",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "planned"
+        },
+        {
+          "id": "check-proposal",
+          "source": "check",
+          "target": "proposal",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "planned"
+        },
+        {
+          "id": "proposal-human",
+          "source": "proposal",
+          "target": "human",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "planned"
+        }
+      ],
+      "start": "agent"
+    },
+    "statefulset-s3": {
+      "title": {
+        "pt": "StatefulSet: S3 comum, índices por réplica",
+        "en": "StatefulSet: shared S3, per-replica indexes",
+        "es": "StatefulSet: S3 común, índices por réplica"
+      },
+      "summary": {
+        "pt": "Perfil de referência: um job publica no S3, Valkey coordena e cada réplica consulta seus índices locais. O chart atual usa Deployment.",
+        "en": "Reference profile: one job publishes to S3, Valkey coordinates, and each replica queries local indexes. The current chart uses Deployment.",
+        "es": "Perfil de referencia: un job publica en S3, Valkey coordina y cada réplica consulta índices locales. El chart actual usa Deployment."
+      },
+      "start": "job",
+      "nodes": [
+        {
+          "id": "job",
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "title": {
+            "pt": "Um job de refresh",
+            "en": "One refresh job",
+            "es": "Un job de refresh"
+          },
+          "body": {
+            "pt": "Fetch, indexação local e publicação.",
+            "en": "Fetch, local indexing and publication.",
+            "es": "Fetch, indexación local y publicación."
+          },
+          "detail": {
+            "pt": "Um único job busca os mirrors, indexa sem rede e publica sob lock e fence. Seus mirrors e índices pertencem ao job, separados dos diretórios das réplicas.",
+            "en": "One job fetches mirrors, indexes offline and publishes under lock and fence. Its mirrors and indexes belong to the job, separate from replica directories.",
+            "es": "Un único job obtiene mirrors, indexa sin red y publica bajo lock y fence. Sus mirrors e índices pertenecen al job, separados de los directorios de las réplicas."
+          },
+          "reference": {
+            "pt": "#statefulset-com-s3-compartilhado",
+            "en": "#statefulset-with-shared-s3",
+            "es": "#statefulset-con-s3-compartido"
+          },
+          "kind": "process"
+        },
+        {
+          "id": "s3",
+          "position": {
+            "x": 0,
+            "y": 250
+          },
+          "title": {
+            "pt": "S3 compartilhado",
+            "en": "Shared S3",
+            "es": "S3 compartido"
+          },
+          "body": {
+            "pt": "Mesmo bucket e prefixo para a frota.",
+            "en": "One bucket and prefix for the fleet.",
+            "es": "Mismo bucket y prefijo para la flota."
+          },
+          "detail": {
+            "pt": "O store guarda documentos e bundles imutáveis. Cada pod baixa o conjunto pela API de objetos; S3 não é um filesystem montado nem um SQLite compartilhado.",
+            "en": "The store holds immutable documents and bundles. Each pod downloads the set through the object API; S3 is neither a mounted filesystem nor shared SQLite.",
+            "es": "El store guarda documentos y bundles inmutables. Cada pod descarga el conjunto mediante la API de objetos; S3 no es un filesystem montado ni SQLite compartido."
+          },
+          "reference": {
+            "pt": "#statefulset-com-s3-compartilhado",
+            "en": "#statefulset-with-shared-s3",
+            "es": "#statefulset-con-s3-compartido"
+          },
+          "kind": "process"
+        },
+        {
+          "id": "valkey",
+          "position": {
+            "x": 600,
+            "y": 250
+          },
+          "title": {
+            "pt": "Valkey",
+            "en": "Valkey",
+            "es": "Valkey"
+          },
+          "body": {
+            "pt": "Ponteiro, lock, fence e heartbeats.",
+            "en": "Pointer, lock, fence and heartbeats.",
+            "es": "Puntero, lock, fence y heartbeats."
+          },
+          "detail": {
+            "pt": "Job e réplicas usam o mesmo domínio Valkey para coordenar o ponteiro da geração, retenção e publicação. Os heartbeats identificam cada nó com um node_name único.",
+            "en": "Job and replicas use the same Valkey domain to coordinate the generation pointer, retention and publication. Heartbeats identify each node with a unique node_name.",
+            "es": "Job y réplicas usan el mismo dominio Valkey para coordinar el puntero de generación, retención y publicación. Los heartbeats identifican cada nodo con un node_name único."
+          },
+          "reference": {
+            "pt": "#statefulset-com-s3-compartilhado",
+            "en": "#statefulset-with-shared-s3",
+            "es": "#statefulset-con-s3-compartido"
+          },
+          "kind": "process"
+        },
+        {
+          "id": "pod-zero",
+          "position": {
+            "x": 0,
+            "y": 510
+          },
+          "title": {
+            "pt": "Réplica meada-0",
+            "en": "Replica meada-0",
+            "es": "Réplica meada-0"
+          },
+          "body": {
+            "pt": "Init + pull periódico + MCP local.",
+            "en": "Init + periodic pull + local MCP.",
+            "es": "Init + pull periódico + MCP local."
+          },
+          "detail": {
+            "pt": "O init faz o primeiro pull. O companion atualiza o local_dir exclusivo deste pod; o servidor lê essa cópia com --generations. Um PVC próprio pode preservar o cache, sem compartilhar arquivos SQLite ativos.",
+            "en": "Init performs the first pull. The companion updates this pod’s exclusive local_dir; the server reads that copy with --generations. Its own PVC can preserve the cache without sharing active SQLite files.",
+            "es": "El init hace el primer pull. El companion actualiza el local_dir exclusivo del pod; el servidor lee esa copia con --generations. Un PVC propio puede conservar la caché sin compartir archivos SQLite activos."
+          },
+          "reference": {
+            "pt": "#statefulset-com-s3-compartilhado",
+            "en": "#statefulset-with-shared-s3",
+            "es": "#statefulset-con-s3-compartido"
+          },
+          "kind": "process"
+        },
+        {
+          "id": "pod-one",
+          "position": {
+            "x": 600,
+            "y": 510
+          },
+          "title": {
+            "pt": "Réplica meada-1",
+            "en": "Replica meada-1",
+            "es": "Réplica meada-1"
+          },
+          "body": {
+            "pt": "Outro local_dir, outro node_name.",
+            "en": "Separate local_dir and node_name.",
+            "es": "Otro local_dir y otro node_name."
+          },
+          "detail": {
+            "pt": "A segunda réplica recebe a mesma geração em armazenamento próprio. Ela pode ficar temporariamente atrás enquanto o pull termina; o header Meada-Generation informa qual geração respondeu.",
+            "en": "The second replica receives the same generation in its own storage. It may briefly lag while pull finishes; the Meada-Generation header identifies the responding generation.",
+            "es": "La segunda réplica recibe la misma generación en almacenamiento propio. Puede quedar temporalmente atrás mientras termina el pull; el header Meada-Generation identifica la generación que respondió."
+          },
+          "reference": {
+            "pt": "#statefulset-com-s3-compartilhado",
+            "en": "#statefulset-with-shared-s3",
+            "es": "#statefulset-con-s3-compartido"
+          },
+          "kind": "process"
+        },
+        {
+          "id": "service",
+          "position": {
+            "x": 300,
+            "y": 770
+          },
+          "title": {
+            "pt": "Proxy e Service",
+            "en": "Proxy and Service",
+            "es": "Proxy y Service"
+          },
+          "body": {
+            "pt": "Tráfego só para réplicas prontas.",
+            "en": "Traffic goes to ready replicas.",
+            "es": "Tráfico solo a réplicas listas."
+          },
+          "detail": {
+            "pt": "O proxy faz admissão conforme a política escolhida e o Service distribui as consultas. Não é necessária afinidade de sessão. Preserve os headers MCP e aguarde prontidão antes de encaminhar tráfego.",
+            "en": "The proxy admits requests according to the selected policy and the Service distributes queries. Session affinity is unnecessary. Preserve MCP headers and wait for readiness before routing traffic.",
+            "es": "El proxy admite peticiones según la política elegida y el Service distribuye consultas. No hace falta afinidad de sesión. Conserva los headers MCP y espera disponibilidad antes de enviar tráfico."
+          },
+          "reference": {
+            "pt": "#statefulset-com-s3-compartilhado",
+            "en": "#statefulset-with-shared-s3",
+            "es": "#statefulset-con-s3-compartido"
+          },
+          "kind": "process"
+        }
+      ],
+      "edges": [
+        {
+          "id": "job-s3",
+          "source": "job",
+          "target": "s3",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        },
+        {
+          "id": "job-valkey",
+          "source": "job",
+          "target": "valkey",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        },
+        {
+          "id": "s3-pod-zero",
+          "source": "s3",
+          "target": "pod-zero",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        },
+        {
+          "id": "s3-pod-one",
+          "source": "s3",
+          "target": "pod-one",
+          "sourceHandle": "right",
+          "targetHandle": "left",
+          "kind": "normal"
+        },
+        {
+          "id": "valkey-pod-zero",
+          "source": "valkey",
+          "target": "pod-zero",
+          "sourceHandle": "left",
+          "targetHandle": "right",
+          "kind": "normal"
+        },
+        {
+          "id": "valkey-pod-one",
+          "source": "valkey",
+          "target": "pod-one",
+          "sourceHandle": "bottom",
+          "targetHandle": "top",
+          "kind": "normal"
+        },
+        {
+          "id": "service-pod-zero",
+          "source": "service",
+          "target": "pod-zero",
+          "sourceHandle": "top",
+          "targetHandle": "bottom",
+          "kind": "normal"
+        },
+        {
+          "id": "service-pod-one",
+          "source": "service",
+          "target": "pod-one",
+          "sourceHandle": "top",
+          "targetHandle": "bottom",
+          "kind": "normal"
+        }
+      ]
+    }
+  }
+}
