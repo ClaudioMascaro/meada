@@ -105,6 +105,8 @@ struct Visit<'t> {
     visible: bool,
     definitions: bool,
     depth: usize,
+    /// The type parameters declared around the node: a type they name is no class.
+    generics: Rc<Vec<String>>,
 }
 
 fn parse(src: &[u8]) -> Result<Facts> {
@@ -135,7 +137,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
         visible: true,
         definitions: true,
         depth: 0,
+        generics: Rc::new(Vec::new()),
     }];
+    let mut fields = BTreeSet::new();
+    let mut locals = Vec::new();
     let mut outside = BTreeSet::new();
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
@@ -145,6 +150,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         visible,
         definitions,
         depth,
+        mut generics,
     }) = stack.pop()
     {
         let Some(remaining) = qualification_bytes.checked_sub(scope.len()) else {
@@ -181,13 +187,22 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 node.kind(),
                 "constructor_declaration" | "compact_constructor_declaration"
             );
-            let parameters = parameters(node, src);
+            if let Some(declared) = node.child_by_field_name("type_parameters") {
+                let mut names = generics.as_ref().clone();
+                names.extend(
+                    named(declared)
+                        .filter_map(|p| named(p).find(|n| n.kind() == "type_identifier"))
+                        .map(|n| text(n, src).to_string()),
+                );
+                generics = Rc::new(names);
+            }
+            let parameters = parameters(node, src, &generics);
             let written = if kind == Kind::Method {
                 let signature = format!(
                     "{name}({})",
                     parameters
                         .iter()
-                        .map(|(_, ty)| ty.as_str())
+                        .map(|(_, ty, _)| ty.as_str())
                         .collect::<Vec<_>>()
                         .join(",")
                 );
@@ -200,9 +215,18 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 name.to_string()
             };
             inner = Rc::new(qualify(&scope, &written));
+            if kind == Kind::Method {
+                for (name, _, class) in &parameters {
+                    facts.receivers.push(Receiver {
+                        scope: inner.as_ref().clone(),
+                        name: name.clone(),
+                        class: class.clone(),
+                    });
+                }
+            }
             let params = parameters
                 .into_iter()
-                .map(|(name, _)| Param {
+                .map(|(name, _, _)| Param {
                     name,
                     binds: Binds::Any,
                     default: None,
@@ -220,12 +244,22 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 kind,
                 range: node.byte_range(),
                 params,
-                bases: Vec::new(),
+                bases: if kind == Kind::Class {
+                    bases(node, src, &generics)
+                } else {
+                    Vec::new()
+                },
                 decorators: Vec::new(),
                 return_values: Vec::new(),
                 returns: None,
                 type_params: Vec::new(),
-                result: None,
+                result: match node
+                    .child_by_field_name("type")
+                    .map(|t| class_of(t, src, &generics))
+                {
+                    Some(Class::Type(ty)) if !constructor => Some(Class::Type(ty)),
+                    _ => None,
+                },
             });
             if kind == Kind::Method {
                 let callable = if constructor {
@@ -285,7 +319,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
             if let Some(name) = node.child_by_field_name("name") {
                 facts.locals.push(qualify(&scope, text(name, src)));
             }
-            for (name, _) in parameters(node, src) {
+            for (name, _, _) in parameters(node, src, &generics) {
                 facts.locals.push(qualify(&scope, &name));
             }
         }
@@ -318,6 +352,55 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     at.args = arguments(node, src, 0);
                     at.arity = Some(at.args.len());
                     facts.calls.push(at);
+                }
+            }
+            "local_variable_declaration" | "enhanced_for_statement" | "resource" if definitions => {
+                // A declared type, or the class a `var` takes from `new T(..)` or a call.
+                let declared = node.child_by_field_name("type");
+                let typed = |value: Option<Node>, dimensions: bool| match declared {
+                    _ if dimensions => Class::Unknown,
+                    Some(ty) if text(ty, src) == "var" => match value {
+                        Some(v)
+                            if v.kind() == "object_creation_expression"
+                                && v.child_by_field_name("type").is_some()
+                                && named(v).all(|n| n.kind() != "class_body") =>
+                        {
+                            class_of(v.child_by_field_name("type").unwrap(), src, &generics)
+                        }
+                        Some(v) if v.kind() == "method_invocation" => {
+                            let called = callee(v, src);
+                            match called.contains('(') {
+                                true => Class::Unknown,
+                                false => Class::Called(called),
+                            }
+                        }
+                        _ => Class::Unknown,
+                    },
+                    Some(ty) => class_of(ty, src, &generics),
+                    None => Class::Unknown,
+                };
+                let mut bind = |name: Node, class: Class| {
+                    locals.push(Receiver {
+                        scope: scope.as_ref().clone(),
+                        name: text(name, src).to_string(),
+                        class,
+                    });
+                };
+                if let Some(name) = node.child_by_field_name("name") {
+                    let value = node.child_by_field_name("value");
+                    let dimensions = node.child_by_field_name("dimensions").is_some();
+                    // The element of a loop is no `var` initializer.
+                    let value = value.filter(|_| node.kind() == "resource");
+                    bind(name, typed(value, dimensions));
+                }
+                for declaration in named(node).filter(|n| n.kind() == "variable_declarator") {
+                    if let Some(name) = declaration.child_by_field_name("name") {
+                        let dimensions = declaration.child_by_field_name("dimensions").is_some();
+                        bind(
+                            name,
+                            typed(declaration.child_by_field_name("value"), dimensions),
+                        );
+                    }
                 }
             }
             "local_variable_declaration"
@@ -378,12 +461,24 @@ fn parse(src: &[u8]) -> Result<Facts> {
             _ => {}
         }
         if matches!(node.kind(), "field_declaration" | "constant_declaration") {
+            let declared = node.child_by_field_name("type");
             for declaration in named(node).filter(|n| n.kind() == "variable_declarator") {
                 if let Some(name) = declaration.child_by_field_name("name") {
+                    // A field of an anonymous class sits in the enclosing scope: untyped there.
+                    let class = match declared {
+                        Some(ty)
+                            if definitions
+                                && declaration.child_by_field_name("dimensions").is_none() =>
+                        {
+                            class_of(ty, src, &generics)
+                        }
+                        _ => Class::Unknown,
+                    };
+                    fields.insert(text(name, src).to_string());
                     facts.receivers.push(Receiver {
                         scope: scope.as_ref().clone(),
                         name: text(name, src).to_string(),
-                        class: Class::Unknown,
+                        class,
                     });
                 }
             }
@@ -413,9 +508,36 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 visible: public,
                 definitions: definitions && !anonymous && (kind.is_none() || defining),
                 depth: nested,
+                generics: generics.clone(),
             });
         }
     }
+    // A local is typed only where it is the one binding of its name in its scope; one named
+    // like a field may be read as the field before its declaration, so its class is unknown.
+    for mut local in locals {
+        if fields.contains(&local.name) {
+            local.class = Class::Unknown;
+        }
+        facts.receivers.push(local);
+    }
+    let mut at = BTreeMap::new();
+    let mut receivers: Vec<Receiver> = Vec::new();
+    for receiver in std::mem::take(&mut facts.receivers) {
+        let key = (receiver.scope.clone(), receiver.name.clone());
+        match at.get(&key) {
+            Some(&n) => {
+                let kept: &mut Receiver = &mut receivers[n];
+                if kept.class != receiver.class {
+                    kept.class = Class::Unknown;
+                }
+            }
+            None => {
+                at.insert(key, receivers.len());
+                receivers.push(receiver);
+            }
+        }
+    }
+    facts.receivers = receivers;
     facts.externs = outside.into_iter().collect();
     let private: BTreeSet<_> = facts.private.iter().map(String::as_str).collect();
     facts.star = super::Star::Only(
@@ -510,7 +632,8 @@ fn modifiers(node: Node<'_>) -> Vec<&str> {
         .map_or_else(Vec::new, |n| children(n).map(|c| c.kind()).collect())
 }
 
-fn parameters(node: Node, src: &[u8]) -> Vec<(String, String)> {
+/// Each parameter's name, its type as written and the class that type names.
+fn parameters(node: Node, src: &[u8], generics: &[String]) -> Vec<(String, String, Class)> {
     let list = node.child_by_field_name("parameters").or_else(|| {
         (node.kind() == "compact_constructor_declaration")
             .then(|| node.parent()?.parent()?.child_by_field_name("parameters"))
@@ -528,6 +651,7 @@ fn parameters(node: Node, src: &[u8]) -> Vec<(String, String)> {
             let ty = p.child_by_field_name("type").or_else(|| {
                 named(p).find(|n| n.kind() != "modifiers" && n.kind() != "variable_declarator")
             });
+            let mut ty_class = ty.map_or(Class::Unknown, |t| class_of(t, src, generics));
             let mut ty = ty.map_or_else(String::new, |t| type_spelling(t, src));
             // The grammar recovers an annotation before a varargs ellipsis as an ERROR
             // child of a formal parameter. Only the ellipsis tokens survive this check.
@@ -540,11 +664,13 @@ fn parameters(node: Node, src: &[u8]) -> Vec<(String, String)> {
                 });
             if spread {
                 ty.push_str("...");
+                ty_class = Class::Unknown;
             }
             if let Some(dimensions) = p.child_by_field_name("dimensions") {
                 ty.push_str(&type_spelling(dimensions, src));
+                ty_class = Class::Unknown;
             }
-            (name.map_or("", |n| text(n, src)).to_string(), ty)
+            (name.map_or("", |n| text(n, src)).to_string(), ty, ty_class)
         })
         .collect()
 }
@@ -595,6 +721,47 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
         arg_types: Vec::new(),
         uses: Vec::new(),
     }
+}
+
+/// The class a written type names, as a callee-like name: unknown for a primitive, an array,
+/// `var`, a type parameter or a type with arguments inside its path (`Outer<T>.Inner`).
+fn class_of(ty: Node, src: &[u8], generics: &[String]) -> Class {
+    let ty = match ty.kind() {
+        "generic_type" => named(ty).find(|n| n.kind() != "type_arguments"),
+        _ => Some(ty),
+    };
+    let Some(ty) = ty.filter(|t| matches!(t.kind(), "type_identifier" | "scoped_type_identifier"))
+    else {
+        return Class::Unknown;
+    };
+    let name = callee(ty, src);
+    let head = name.split('.').next().unwrap_or(&name);
+    if name == "var" || name.contains('(') || generics.iter().any(|g| g == head) {
+        return Class::Unknown;
+    }
+    Class::Type(name)
+}
+
+/// The supertypes a type declaration writes in `extends` and `implements`, in order; one whose
+/// class cannot be read stays as an unread base (`(type)`), whose members are not known.
+fn bases(node: Node, src: &[u8], generics: &[String]) -> Vec<String> {
+    let superclass = node
+        .child_by_field_name("superclass")
+        .into_iter()
+        .flat_map(named);
+    let lists = (node.child_by_field_name("interfaces").into_iter())
+        .chain(named(node).filter(|n| n.kind() == "extends_interfaces"))
+        .flat_map(named)
+        .filter(|n| n.kind() == "type_list")
+        .flat_map(named);
+    superclass
+        .chain(lists)
+        .filter(|n| !matches!(n.kind(), "line_comment" | "block_comment"))
+        .map(|ty| match class_of(ty, src, generics) {
+            Class::Type(name) => name,
+            _ => "(type)".to_string(),
+        })
+        .collect()
 }
 
 fn type_name(node: Node, src: &[u8]) -> String {

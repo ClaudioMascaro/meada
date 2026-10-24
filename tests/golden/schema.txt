@@ -1273,16 +1273,20 @@ sample.java
       "kind": "Class",
       "range": {
         "start": 89,
-        "end": 344
+        "end": 453
       },
-      "params": []
+      "params": [],
+      "bases": [
+        "Base",
+        "Comparable"
+      ]
     },
     {
       "name": "example.Store.Store()",
       "kind": "Method",
       "range": {
-        "start": 164,
-        "end": 181
+        "start": 233,
+        "end": 250
       },
       "params": []
     },
@@ -1290,22 +1294,25 @@ sample.java
       "name": "example.Store.get(String)",
       "kind": "Method",
       "range": {
-        "start": 186,
-        "end": 244
+        "start": 255,
+        "end": 313
       },
       "params": [
         {
           "name": "key",
           "binds": "Any"
         }
-      ]
+      ],
+      "result": {
+        "Type": "String"
+      }
     },
     {
       "name": "example.Store.get(String,int)",
       "kind": "Method",
       "range": {
-        "start": 249,
-        "end": 313
+        "start": 318,
+        "end": 382
       },
       "params": [
         {
@@ -1316,14 +1323,17 @@ sample.java
           "name": "count",
           "binds": "Any"
         }
-      ]
+      ],
+      "result": {
+        "Type": "String"
+      }
     },
     {
       "name": "example.Store.hidden()",
       "kind": "Method",
       "range": {
-        "start": 318,
-        "end": 342
+        "start": 387,
+        "end": 451
       },
       "params": []
     }
@@ -1426,8 +1436,8 @@ sample.java
       "callee": "Client.read",
       "arity": 1,
       "range": {
-        "start": 225,
-        "end": 241
+        "start": 294,
+        "end": 310
       }
     },
     {
@@ -1435,10 +1445,30 @@ sample.java
       "callee": "get",
       "arity": 1,
       "range": {
-        "start": 302,
-        "end": 310
+        "start": 371,
+        "end": 379
       },
       "by_path": true
+    },
+    {
+      "scope": "example.Store.hidden()",
+      "callee": "Store",
+      "arity": 0,
+      "constructs": true,
+      "range": {
+        "start": 422,
+        "end": 433
+      },
+      "by_path": true
+    },
+    {
+      "scope": "example.Store.hidden()",
+      "callee": "copy.hidden",
+      "arity": 0,
+      "range": {
+        "start": 435,
+        "end": 448
+      }
     }
   ],
   "consts": [
@@ -1449,13 +1479,52 @@ sample.java
   "receivers": [
     {
       "scope": "example.Store",
+      "name": "client",
+      "class": {
+        "Type": "Client"
+      }
+    },
+    {
+      "scope": "example.Store",
       "name": "PREFIX",
+      "class": {
+        "Type": "String"
+      }
+    },
+    {
+      "scope": "example.Store.get(String)",
+      "name": "key",
+      "class": {
+        "Type": "String"
+      }
+    },
+    {
+      "scope": "example.Store.get(String,int)",
+      "name": "key",
+      "class": {
+        "Type": "String"
+      }
+    },
+    {
+      "scope": "example.Store.get(String,int)",
+      "name": "count",
       "class": "Unknown"
+    },
+    {
+      "scope": "example.Store.hidden()",
+      "name": "copy",
+      "class": {
+        "Type": "Store"
+      }
     }
   ],
   "externs": [
+    "Base",
     "Client",
-    "String"
+    "Comparable",
+    "Store",
+    "String",
+    "var"
   ],
   "hidden": [
     "example.Store.hidden()"

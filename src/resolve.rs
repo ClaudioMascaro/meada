@@ -197,15 +197,22 @@ enum Reading {
     Type,
     /// A `use` path: its head among types and modules, its last member of any kind.
     Alias,
+    /// A bare name called where class members are in scope (Java's `f()`): a path's head,
+    /// that at each class body around it names the methods of the class's family
+    /// (`Resolver::inherited`).
+    Method,
 }
 
 impl Reading {
     fn types(self) -> bool {
-        matches!(self, Reading::Path | Reading::Type | Reading::Alias)
+        matches!(
+            self,
+            Reading::Path | Reading::Type | Reading::Alias | Reading::Method
+        )
     }
 
     fn value(self) -> bool {
-        matches!(self, Reading::Value | Reading::Path)
+        matches!(self, Reading::Value | Reading::Path | Reading::Method)
     }
 }
 
@@ -704,6 +711,10 @@ impl<'a> Resolver<'a> {
                 let (seen, work) = (&mut self.seen(path, &call.scope), &mut Work::default());
                 self.resolve_as(path, &call.scope, &call.callee, seen, work, Reading::Type)
             }
+            (false, true) if self.members_in_scope && !call.callee.contains('.') => {
+                let (seen, work) = (&mut self.seen(path, &call.scope), &mut Work::default());
+                self.resolve_as(path, &call.scope, &call.callee, seen, work, Reading::Method)
+            }
             (false, true) => self.path_binding(path, &call.scope, &call.callee),
             (false, false) => self.binding(path, &call.scope, &call.callee),
         };
@@ -752,7 +763,9 @@ impl<'a> Resolver<'a> {
             | Binding::Param(..)
             | Binding::Local(..)
             | Binding::Hidden
-            | Binding::Unknown => self.infer(path, &call.callee, call.by_path, call.arity),
+            | Binding::Unknown => {
+                self.infer(path, &call.scope, &call.callee, call.by_path, call.arity)
+            }
         }
     }
 
@@ -906,8 +919,10 @@ impl<'a> Resolver<'a> {
             self.dotted(path, callee, seen)
                 .unwrap_or_else(|| lexical(seen))
         };
+        // A head bound only as a package (a type's first segment, in `Facts::externs`) may
+        // start a fully qualified type.
         if self.qualified_types
-            && matches!(binding, Binding::Unknown)
+            && matches!(binding, Binding::Unknown | Binding::Module(_))
             && !seen.cut
             && let Some(found) = self.qualified_type(path, callee, seen)
         {
@@ -1088,6 +1103,8 @@ impl<'a> Resolver<'a> {
         let by_path = callee.rsplit_once('.').filter(|_| !value);
         let reading = if by_path.is_some() {
             path_reading
+        } else if value && self.members_in_scope && !callee.contains('.') {
+            Reading::Method
         } else {
             Reading::Value
         };
@@ -1119,12 +1136,16 @@ impl<'a> Resolver<'a> {
     }
 
     /// `member` of `class`: the first class of its family that defines it, or binds it as an
-    /// attribute. A base whose members are not known, met first, leaves it unknown, and so
-    /// does a family C3 rejects.
+    /// attribute; for an overload family, each signature from the first class that declares
+    /// it (`overloaded`). A base whose members are not known, met first, leaves it unknown,
+    /// and so does a family C3 rejects.
     fn member(&self, class: Target<'a>, member: &'a str, work: &mut Work<'a>) -> Binding<'a> {
         let Some(family) = self.family(class, work) else {
             return Binding::Unknown;
         };
+        if let Some(found) = self.overloaded(&family, member) {
+            return found;
+        }
         for ancestor in family {
             let Ancestor::Class(c) = ancestor else {
                 return Binding::Unknown;
@@ -1148,6 +1169,64 @@ impl<'a> Resolver<'a> {
             }
         }
         Binding::Unknown
+    }
+
+    /// The overloads of `member` a family declares (`Facts::overloads`), as `member` reads a
+    /// name: in family order, each written signature from the first class that declares it,
+    /// so a class's `f(int)` overrides its base's and keeps the base's `f()`. `None` when no
+    /// class declares one; unknown when a class past a base whose members are not known does,
+    /// since that base may declare or override any of them. Other bindings of the name (a
+    /// field) are not methods and do not join the family.
+    fn overloaded(&self, family: &[Ancestor<'a>], member: &str) -> Option<Binding<'a>> {
+        let (mut found, mut signatures, mut opaque) = (Vec::new(), HashSet::new(), false);
+        for ancestor in family {
+            let Ancestor::Class(c) = *ancestor else {
+                opaque = true;
+                continue;
+            };
+            if self.overloads[c.path].is_empty() {
+                continue;
+            }
+            let qualified = format!("{}.{member}", c.name);
+            if self.defs[c.path].contains_key(qualified.as_str()) {
+                continue;
+            }
+            let Some(all) = self.overloads[c.path].get(qualified.as_str()) else {
+                continue;
+            };
+            if opaque {
+                return Some(Binding::Unknown);
+            }
+            for t in all {
+                if signatures.insert(t.name.strip_prefix(c.name).unwrap_or(t.name)) {
+                    found.push(*t);
+                }
+            }
+        }
+        found.sort();
+        match found[..] {
+            [] => None,
+            [one] => Some(Binding::Def(one)),
+            _ => Some(Binding::Several(found)),
+        }
+    }
+
+    /// What a bare method name written in the body of class `class` of `path` names
+    /// (`Reading::Method`): the overloads its family declares (`overloaded`). Unknown when the
+    /// family is absent, or when none declares it and a base whose members are not known may;
+    /// `None` when the name is no member, so outer scopes are read, or while families are being
+    /// linearized, when the class's own overloads stand.
+    fn inherited(&self, path: &'a str, class: &'a str, name: &str) -> Option<Binding<'a>> {
+        let family = self.families.get(&Target { path, name: class })?;
+        let Some(family) = family else {
+            return Some(Binding::Unknown);
+        };
+        match self.overloaded(family, name) {
+            None if family.iter().any(|a| matches!(a, Ancestor::Opaque(_))) => {
+                Some(Binding::Unknown)
+            }
+            found => found,
+        }
     }
 
     /// The method `qualified` (`Type.method`) of `class` that another file of its package
@@ -1318,10 +1397,13 @@ impl<'a> Resolver<'a> {
 
     /// The definitions whose name matches the callee's last name anywhere `path` reaches
     /// (`reaches`): methods for a member call (`x.area()`), top-level functions and classes for
-    /// a plain call (`area()`), both for a path (`a::area()`, `by_path`).
+    /// a plain call (`area()`), both for a path (`a::area()`, `by_path`). A call narrowed by its
+    /// argument count (`Call::arity`) whose candidates are several, one of them declared in
+    /// the family of the class around `scope`, takes that one.
     fn infer(
         &self,
-        path: &str,
+        path: &'a str,
+        scope: &str,
         callee: &str,
         by_path: bool,
         arity: Option<usize>,
@@ -1341,6 +1423,20 @@ impl<'a> Resolver<'a> {
         }
         if let Some(arity) = arity {
             found.retain(|t| self.arities.get(t).is_none_or(|n| *n == arity));
+            if let (true, Binding::Def(class)) = (found.len() > 1, self.class(path, scope))
+                && let Some(Some(family)) = self.families.get(&class)
+            {
+                let declared = |t: &Target<'a>| {
+                    let owner = Target {
+                        path: t.path,
+                        name: crate::parent(t.name),
+                    };
+                    family.contains(&Ancestor::Class(owner))
+                };
+                if let [one] = found.iter().filter(|t| declared(t)).collect::<Vec<_>>()[..] {
+                    return Resolution::Inferred(*one);
+                }
+            }
         }
         match found[..] {
             [] => Resolution::Unresolved,
@@ -1457,6 +1553,12 @@ impl<'a> Resolver<'a> {
                         return Binding::Def(Target { path, name });
                     }
                     _ => {
+                        if reading == Reading::Method
+                            && defs.get(s).is_some_and(|d| d.kind == Kind::Class)
+                            && let Some(found) = self.inherited(path, s, name)
+                        {
+                            return found;
+                        }
                         if reading != Reading::Type
                             && let Some(overloads) = self.overloads[path].get(candidate.as_str())
                         {
@@ -6805,5 +6907,95 @@ mod tests {
             constructed_sites(&format!("{head}{wrapper}"), "send.q", "q.add"),
             ["send -> jobs", "send -> mail"]
         );
+    }
+
+    /// What each call of one Java file resolves to, by `scope callee`: the level and target.
+    fn java_calls(src: &str) -> BTreeMap<String, String> {
+        use crate::lang::java::Java;
+        let facts = Java.parse("A.java", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("A.java", &facts)]);
+        let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Java);
+        let mut out = BTreeMap::new();
+        for call in &facts.calls {
+            let found = match resolver.call("A.java", call) {
+                Resolution::Exact(t) => format!("exact {}", t.name),
+                Resolution::Inferred(t) => format!("inferred {}", t.name),
+                Resolution::Ambiguous(all) => {
+                    let names: Vec<_> = all.iter().map(|t| t.name).collect();
+                    format!("ambiguous {}", names.join(" "))
+                }
+                Resolution::Unresolved => "none".to_string(),
+            };
+            out.insert(format!("{} {}", call.scope, call.callee), found);
+        }
+        out
+    }
+
+    #[test]
+    fn an_overload_declared_past_an_outside_base_leaves_the_member_unknown() {
+        let calls = java_calls(
+            "package p;
+             interface Port { void f(String s); }
+             abstract class Own extends Remote { void g(int n) {} void run() { this.g(1); g(1); } }
+             abstract class Past extends Remote implements Port {
+                 void f(int n) {}
+                 void run() { this.f(1); f(1); }
+             }",
+        );
+        assert_eq!(calls["p.Own.run() this.g"], "exact p.Own.g(int)");
+        assert_eq!(calls["p.Own.run() g"], "exact p.Own.g(int)");
+        // `Remote` may declare or override `f`; the name match lists both of the family.
+        let both = "ambiguous p.Past.f(int) p.Port.f(String)";
+        assert_eq!(calls["p.Past.run() this.f"], both);
+        assert_eq!(calls["p.Past.run() f"], "none");
+    }
+
+    #[test]
+    fn a_family_without_overloads_keeps_the_first_class_that_defines_the_name() {
+        // Python declares no overload families: the first class of the C3 order still wins.
+        let src = "class A:\n    def f(self): pass\nclass B(A):\n    def f(self): pass\n\
+                   class C(B, A):\n    def go(self): self.f()\n";
+        let facts = Python.parse("a.py", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("a.py", &facts)]);
+        let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+        let call = facts.calls.iter().find(|c| c.scope == "C.go").unwrap();
+        assert!(matches!(resolver.call("a.py", call), Resolution::Exact(t) if t.name == "B.f"));
+    }
+
+    #[test]
+    fn a_receiver_whose_class_the_source_does_not_settle_is_no_exact_owner() {
+        let calls = java_calls(
+            "package p;
+             class T { void f() {} }
+             class Repo { void f() {} void h() {} }
+             class Other { void f() {} void h() {} }
+             class Box<T> { T item; void run() { item.f(); } }
+             class Field {
+                 Repo x;
+                 void run() { x.f(); Other x = null; x.h(); }
+             }
+             class Blocks {
+                 void run(boolean b) {
+                     if (b) { Repo y = null; y.h(); } else { Other y = null; y.h(); }
+                 }
+             }
+             class Anonymous {
+                 void run() { var z = new Repo() { void f() {} }; z.f(); }
+                 void field() { Object o = new Object() { Repo w; }; w.f(); }
+             }
+             class Cycle extends Loop { void run() { this.f(); } }
+             class Loop extends Cycle { void f() {} }",
+        );
+        for call in [
+            "p.Box.run() item.f",
+            "p.Field.run() x.f",
+            "p.Field.run() x.h",
+            "p.Blocks.run(boolean) y.h",
+            "p.Anonymous.run() z.f",
+            "p.Anonymous.field() w.f",
+            "p.Cycle.run() this.f",
+        ] {
+            assert!(!calls[call].starts_with("exact"), "{call}: {}", calls[call]);
+        }
     }
 }

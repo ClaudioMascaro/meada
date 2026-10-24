@@ -61,9 +61,187 @@ fn java() {
             "gradle/src/main/java/example/Receipt.java::example.Pending",
             "gradle/src/main/java/example/Receipt.java::example.Pending.finish()",
             "gradle/src/main/java/example/Receipt.java::example.State",
+            "maven/api/src/main/java/example/calls/Store.java::example.calls.Store",
+            "maven/api/src/main/java/example/calls/Store.java::example.calls.Store.save(int)",
+            "maven/api/src/main/java/example/calls/Store.java::example.calls.Store.touch(int)",
+            "maven/api/src/main/java/example/calls/Store.java::example.calls.Store.mark(int)",
+            "maven/api/src/main/java/example/calls/Store.java::example.calls.Store.ping()",
+            "maven/api/src/main/java/example/calls/Port.java::example.calls.Port",
+            "maven/api/src/main/java/example/calls/Port.java::example.calls.Port.send(String)",
+            "maven/api/src/main/java/example/calls/Port.java::example.calls.Port.send(String,int)",
+            "maven/api/src/main/java/example/calls/Noise.java::example.calls.Noise",
+            "maven/api/src/main/java/example/calls/Noise.java::example.calls.Noise.ping()",
+            "maven/api/src/main/java/example/calls/Noise.java::example.calls.Noise.flush()",
+            "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo",
+            "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.save()",
+            "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.touch(int)",
+            "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.mark(String)",
+            "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.send(String)",
+            "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.send(String,int)",
+            "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.run()",
+            "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing",
+            "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.own()",
+            "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.use()",
+            "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.Task",
+            "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.Task.run()",
+            "maven/api/src/main/java/example/calls/Client.java::example.calls.Client",
+            "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.make()",
+            "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)",
+            "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.shadowed(Port)",
+            "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.unknown()",
         ],
         &[],
+        JAVA_CALLS,
+    );
+}
+
+/// Calls through typed receivers, written supertypes and name matches (#85).
+const JAVA_CALLS: &[ExpectedCall] = &[
+    (
+        "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.run()::save#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Store.java::example.calls.Store.save(int)"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.run()::this.save#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Store.java::example.calls.Store.save(int)"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.run()::this.save#1",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.save()"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.run()::touch#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.touch(int)"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.run()::mark#0",
+        AMBIGUOUS,
+        &[
+            "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.mark(String)",
+            "maven/api/src/main/java/example/calls/Store.java::example.calls.Store.mark(int)",
+        ],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.run()::item.ping#0",
+        INFERRED,
+        &["maven/api/src/main/java/example/calls/Store.java::example.calls.Store.ping()"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.use()::own#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.own()"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.use()::this.own#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.own()"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.use()::this.send#0",
+        INFERRED,
+        &["maven/api/src/main/java/example/calls/Port.java::example.calls.Port.send(String)"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.Task.run()::own#0",
+        None,
         &[],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)::repo.save#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.save()"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)::repo.save#1",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Store.java::example.calls.Store.save(int)"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)::repo.ping#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Store.java::example.calls.Store.ping()"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)::this.repo.touch#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.touch(int)"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)::given.touch#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.touch(int)"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)::local.mark#0",
+        AMBIGUOUS,
+        &[
+            "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.mark(String)",
+            "maven/api/src/main/java/example/calls/Store.java::example.calls.Store.mark(int)",
+        ],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)::fresh.save#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.save()"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)::made.save#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Store.java::example.calls.Store.save(int)"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)::qualified.save#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.save()"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)::port.send#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Port.java::example.calls.Port.send(String)"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)::port.send#1",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Port.java::example.calls.Port.send(String,int)"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.shadowed(Port)::repo.send#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Port.java::example.calls.Port.send(String)"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.shadowed(Port)::Repo.mark#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Store.java::example.calls.Store.mark(int)"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.unknown()::item.flush#0",
+        INFERRED,
+        &["maven/api/src/main/java/example/calls/Noise.java::example.calls.Noise.flush()"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.unknown()::item.ping#0",
+        AMBIGUOUS,
+        &[
+            "maven/api/src/main/java/example/calls/Noise.java::example.calls.Noise.ping()",
+            "maven/api/src/main/java/example/calls/Store.java::example.calls.Store.ping()",
+        ],
+    ),
+];
+
+#[test]
+fn java_context_lists_callers_through_receivers_and_name_matches() {
+    let repo = fixture_repo("java_receiver_context", "conformance-java", Some(ORIGIN));
+    assert_golden(
+        "conformance-java.context-ping.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .context("example.calls.Store.ping()", None)
+            .unwrap(),
     );
 }
 
@@ -593,15 +771,27 @@ fn java_enum_and_interface_values_hide_imported_types() {
     }
     let json: Value =
         serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
-    for caller in ["other.EnumValue.run()", "other.InterfaceValue.run()"] {
-        let call = json["calls"]
+    let call = |caller: &str| {
+        json["calls"]
             .as_array()
             .unwrap()
             .iter()
             .find(|c| c["caller"].as_str().unwrap().ends_with(caller))
-            .unwrap();
-        assert_ne!(call["level"], "exact", "{call}");
-    }
+            .unwrap()
+            .clone()
+    };
+    let enumerated = call("other.EnumValue.run()");
+    assert_ne!(enumerated["level"], "exact", "{enumerated}");
+    // The constant's written type, not the import, owns the method.
+    let typed = call("other.InterfaceValue.run()");
+    assert_eq!(typed["level"], "exact", "{typed}");
+    assert!(
+        typed["target"]
+            .as_str()
+            .unwrap()
+            .ends_with("other.InterfaceValue.single()"),
+        "{typed}"
+    );
 }
 
 #[test]
@@ -724,7 +914,15 @@ fn java_package_paths_cannot_bypass_a_shadowing_value() {
                 .ends_with("provider.Caller.run(Holder)")
         })
         .unwrap();
-    assert_ne!(call["level"], "exact", "{call}");
+    // The field's written type, not the package path, owns the method.
+    assert_eq!(call["level"], "exact", "{call}");
+    assert!(
+        call["target"]
+            .as_str()
+            .unwrap()
+            .ends_with("provider.Holder.single()"),
+        "{call}"
+    );
 }
 
 #[test]

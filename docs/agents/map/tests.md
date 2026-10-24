@@ -415,3 +415,13 @@ The hostile-depth tests exceed Java's definition, value and member-path limits a
 exact links that escape an omitted scope. A long package prefix exceeds the qualification
 budget and leaves the whole file out; annotation values, comments and malformed type literals
 never enter exported names. `schema` has a Java sample for the adapter facts the index persists.
+
+The `example.calls` package (#85) adds `JAVA_CALLS`, each receiver form at each level: field,
+`this.field`, parameter, local, `var` with `new T(...)` and with a call's declared return type, a
+fully qualified field type, an interface receiver, a parameter and a type-named local that
+shadow, inherited overloads of another arity, a written-signature override, a same-count tie
+across the family, an outside base, and unknown receivers matched in the calling family or
+across the repository; `conformance-java.context-ping.txt` lists exact, inferred and ambiguous
+callers. Resolver unit tests (`java_calls`) cover an overload past an outside base, Python's
+first-defining-class rule, and receivers left unknown: a type parameter, a local named like a
+field, same-named locals of different types, an anonymous class and a cyclic family.

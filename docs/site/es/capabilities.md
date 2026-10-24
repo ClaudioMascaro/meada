@@ -36,7 +36,11 @@ Una llamada `recv.M()` es `exact` cuando el código indica el tipo en un paráme
 
 Meada lee clases, interfaces, enums, records, métodos y constructores, incluidos los tipos anidados. Los nombres incluyen el paquete y, en los métodos, los tipos escritos de los parámetros: `example.Orders.place(String,int)`. Las llamadas en lambdas y clases anónimas pertenecen al símbolo que las contiene.
 
-Los imports simples, de paquete y estáticos, incluidos los de `*`, se resuelven por las declaraciones de paquete. Las llamadas sin receptor, con `this` o estáticas son `exact` cuando la cantidad de argumentos deja un solo método; las sobrecargas con la misma cantidad quedan `ambiguous`. Los tipos externos siguen siendo externos. Los tipos públicos y sus miembros públicos o protegidos forman la superficie exportada.
+Los imports simples, de paquete y estáticos, incluidos los de `*`, se resuelven por las declaraciones de paquete. Las llamadas sin receptor, con `this` o estáticas son `exact` cuando la cantidad de argumentos deja un solo método; las sobrecargas con la misma cantidad quedan `ambiguous`. Los tipos externos siguen siendo externos.
+
+Una llamada sobre un campo, parámetro o variable local de tipo escrito se resuelve en ese tipo y en los supertipos escritos en `extends` e `implements`, igual que `var x = new T(...)`, `var x = f()` por el tipo de retorno declarado de `f` y las llamadas sin receptor o con `this`. Cada firma viene de la primera clase que la declara, así que `f(int)` de la clase sobrescribe el de la base y un `f()` heredado sigue visible. Una llamada a través de un receptor de tipo interfaz se detiene en el método de la interfaz. Un supertipo de fuera del repositorio tiene miembros desconocidos: un método declarado después de él en la jerarquía no es `exact`. Con el receptor desconocido, la llamada se resuelve por nombre: `inferred` cuando un solo método tiene ese nombre en el repositorio o en la jerarquía de la clase que llama, `ambiguous` con todos los candidatos cuando hay varios.
+
+Los tipos públicos y sus miembros públicos o protegidos forman la superficie exportada.
 
 La indexación no necesita JDK, Maven ni Gradle y no ejecuta código del repositorio.
 

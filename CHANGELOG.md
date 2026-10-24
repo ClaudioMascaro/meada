@@ -19,6 +19,11 @@ All notable changes to Meada are recorded here. The format follows
 - Java source indexing (issue #84): package-qualified types and method signatures, overloads
   narrowed by argument count, package and static imports, and conformance, determinism and
   incremental-refresh coverage, without a JDK or build tool.
+- Java method calls (issue #85) through the types the source writes: fields, parameters,
+  locals, `var` with `new T(...)` or a call whose declared return type is written, and the
+  supertypes written in `extends` and `implements`. Overload families are read per signature
+  across a class family, an interface receiver stops at the interface, and a call on an unknown
+  receiver is a name match that prefers the one candidate in the calling class's family.
 
 - A multilingual documentation site (issue #320), with the README reference migrated to
   Portuguese, English and Spanish guides, React Flow maps and roadmap, accessible static and

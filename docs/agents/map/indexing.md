@@ -470,6 +470,19 @@ modules updates it.
   spelled chain when the chain's head is itself an import from outside the repository (what `Packages::extract` stores). `Resolver::exported()` is
   what each file exports, as `export` reads it, for the `exports` table.
 
+## Java receivers and supertypes (#85)
+
+Each class writes `Def::bases` from `extends` and `implements` (type arguments dropped; an
+unreadable base is `(type)`, opaque), and each method its declared return class as
+`Def::result`. Fields, parameters and locals become `Facts::receivers` with `Class::Type` of
+their written type; `var` takes the class of `new T(...)` without a body, or `Class::Called` for
+a call. Primitives, arrays, varargs and type parameters are `Class::Unknown`. A local is typed
+only when it is the one binding of its name in its method scope, and not when a field of the file
+has its name (a use before the declaration reads the field). The shared resolver reads overload
+families per signature across the C3 family (`Resolver::overloaded`), bare calls through
+`Reading::Method` (`Resolver::inherited`), and narrows an arity-narrowed name match to the one
+candidate in the calling class's family (`Resolver::infer`).
+
 ## Java source facts (#84)
 
 `lang/java.rs` reads `.java` with tree-sitter-java, with no JDK or build tool. Types carry their
