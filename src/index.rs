@@ -2540,6 +2540,9 @@ mod tests {
             ("sample.Cargo.toml", "Cargo.toml"),
             ("sample.pyproject.toml", "pyproject.toml"),
             ("sample.requirements.txt", "requirements.txt"),
+            ("sample.pom.xml", "pom.xml"),
+            ("sample.build.gradle.kts", "build.gradle.kts"),
+            ("sample.settings.gradle.kts", "settings.gradle.kts"),
         ] {
             let src = fs::read(tests.join("fixtures/schema").join(name)).unwrap();
             let summary = package::read_manifest(path, &src);

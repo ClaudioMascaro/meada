@@ -1,0 +1,5 @@
+group = 'example'
+dependencies {
+    implementation 'example:tools:2.0'
+    testImplementation('example:models:1.2.0')
+}

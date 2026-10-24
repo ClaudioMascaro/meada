@@ -1,0 +1,60 @@
+{
+  "repository": "example.com/jvm/maven",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "package::maven::example:billing",
+      "site": "example.com/jvm/maven::billing/pom.xml"
+    },
+    {
+      "contract": "package::maven::example:bundle",
+      "site": "example.com/jvm/maven::pom.xml"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/maven::models/pom.xml"
+    }
+  ],
+  "consumers": [],
+  "packages": [
+    {
+      "name": "example:billing",
+      "version": "1.2.0",
+      "repository": "example.com/jvm/maven",
+      "directory": "billing",
+      "ecosystem": "maven"
+    },
+    {
+      "name": "example:bundle",
+      "version": "1.2.0",
+      "repository": "example.com/jvm/maven",
+      "directory": ".",
+      "ecosystem": "maven"
+    },
+    {
+      "name": "example:models",
+      "version": "1.2.0",
+      "repository": "example.com/jvm/maven",
+      "directory": "models",
+      "ecosystem": "maven"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:models",
+      "provider": "example.com/jvm/maven::models/pom.xml",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::build.gradle::testImplementation::example:models",
+      "provider": "example.com/jvm/maven::models/pom.xml",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked"
+    }
+  ]
+}

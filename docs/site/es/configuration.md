@@ -42,3 +42,7 @@ entero.
 Meada encuentra los pares por su remoto git, aunque el clon esté en otra ruta en cada máquina.
 Una clave desconocida o mal escrita da un error con el archivo, la línea y la clave. Sin
 `meada.toml`, el repositorio no declara ningún par.
+
+## Artefactos JVM
+
+Los contratos de paquetes JVM se descubren en los manifests: `pom.xml`, `settings.gradle`, `settings.gradle.kts`, `build.gradle` y `build.gradle.kts`. No necesitan una clave adicional en `meada.toml`. Declare otros repositorios en `[[peer]]` como en los ejemplos anteriores. Use coordenadas literales para vínculos `exact`; las propiedades Maven y expresiones Gradle quedan sin evaluar y producen candidatos `ambiguous`.

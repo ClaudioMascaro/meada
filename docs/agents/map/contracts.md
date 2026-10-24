@@ -395,3 +395,15 @@ modules updates it.
   (`; import crate name`) and no `ambiguous` fallback. A crate of the repository itself is
   reached through the module tree instead, so a path or version dependency inside the repository
   links at the manifest only.
+
+- JVM artifacts (spec #26, ticket #93): `package/maven.rs` implements `Ecosystem` for
+  `pom.xml`, `settings.gradle{,.kts}` and `build.gradle{,.kts}`. Grammar-independent readers
+  in `jvm/{maven,gradle}.rs` are shared with Kotlin: the Maven reader takes direct project
+  dependencies and literal parent group/version values; the Gradle scanner separates quoted
+  strings, comments and block boundaries, without loading a grammar. `Summary::build` holds
+  only literal group/project/include metadata, which `inherit` joins with build files.
+  Each named manifest provides `package::maven::<group>:<artifact>`. Dependencies use the
+  existing package reason with `range unchecked`; properties and variables stay unevaluated.
+  The generic `fits` question matches candidate names, and `uncertainty` keeps computed
+  coordinates ambiguous even with one provider. Literal coordinate fragments filter those
+  candidates; dependencies outside the workspace add nothing.
