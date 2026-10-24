@@ -458,7 +458,13 @@ modules updates it.
   call it was declared from through the methods called on the way. `Code::outside(path, scope,
   name, by_path)` names what an import from outside the repository binds a name to
   (`fastapi.APIRouter`, `express.default`): the package and name there, the name as the file's
-  imports spell it and whether its head is the import itself. Contract kinds recognize framework
+  imports spell it and whether its head is the import itself. A pack with `unordered_globs()`
+  (Java) adds `Outside::candidates` for a name nothing else binds: one spelling per top-level
+  on-demand import from outside (`import a.b.*;`, `import static a.B.*;`, the implicit
+  `java.lang`), sorted (`Resolver::on_demand`, which asks `through_glob`, the per-glob step of
+  `globs`, whether any repository glob may give the name). Compiling code has at most one real
+  candidate, so a kind accepts the name when exactly one candidate is in its table; a repository
+  type, an ambiguity among globs or a cut link leaves none. Contract kinds recognize framework
   constructors with it; with `by_path` the name is a path (Rust's `a::b::f()`) whose head is read
   among types and modules. `Code::expand(Expand::Constructed { held, at }, read)` is the
   expansion over the arguments of the `new` a `held` constant holds, on behalf of the call `at`

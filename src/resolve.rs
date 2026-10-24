@@ -1972,6 +1972,95 @@ impl<'a> Resolver<'a> {
         }
     }
 
+    /// The outside sources of the top-level on-demand imports of `path` that may bind `name`,
+    /// sorted: a package (`import a.b.*;`) or a class (`import static a.B.*;`). Called for a
+    /// name nothing else binds (`Binding::Unknown` without a cut). Empty when any glob may give
+    /// the name from the repository, or several globs give it ambiguously, or a link was cut:
+    /// then the name is not an on-demand import's with certainty.
+    fn on_demand(&self, path: &'a str, name: &'a str) -> Vec<&'a str> {
+        let (imports, seen) = (&self.files[path].imports, &mut self.seen(path, ""));
+        let mut sources = Vec::new();
+        for &at in self.by_local[path].of(&crate::qualify("", "*")) {
+            let Imported::Glob {
+                path: target,
+                inside: false,
+                ..
+            } = &imports[at].name
+            else {
+                continue;
+            };
+            if seen.depth >= LINK_DEPTH {
+                return Vec::new();
+            }
+            seen.depth += 1;
+            let work = &mut Work::default();
+            let bound = self.resolve_as(path, "", target, seen, work, Reading::Alias);
+            let source = match bound {
+                Binding::External(source, Imported::Namespace | Imported::Qualified) => {
+                    Some(source)
+                }
+                other => match self.through_glob(other, false, name, work, seen) {
+                    Binding::Unknown => None,
+                    _ => return Vec::new(),
+                },
+            };
+            seen.depth -= 1;
+            if seen.cut {
+                return Vec::new();
+            }
+            sources.extend(source);
+        }
+        sources.sort_unstable();
+        sources.dedup();
+        sources
+    }
+
+    /// What a glob import whose target is `bound` gives `name` (`globs`).
+    fn through_glob(
+        &self,
+        bound: Binding<'a>,
+        inside: bool,
+        name: &'a str,
+        work: &mut Work<'a>,
+        seen: &mut Seen<'a>,
+    ) -> Binding<'a> {
+        match bound {
+            Binding::Module(m) if inside => self.export(m, name, seen),
+            Binding::Module(m) => self.star(m, name, seen).unwrap_or(Binding::Unknown),
+            // A module written in place states no visibility of its items: only a glob
+            // from inside it, which sees them all, is read.
+            Binding::Def(t) if inside && self.defs[t.path][t.name].kind == Kind::Module => {
+                let member = format!("{}.{name}", t.name);
+                match self.def(t.path, &member) {
+                    Binding::Unknown => self
+                        .imported_at(t.path, t.name, name, seen)
+                        .unwrap_or(Binding::Unknown),
+                    found => found,
+                }
+            }
+            Binding::Def(t) if self.is_class(t) => {
+                let found = self.member(t, name, work);
+                match found {
+                    Binding::Def(t) if self.statics.contains(&t) => Binding::Def(t),
+                    Binding::Several(all) => one(all
+                        .into_iter()
+                        .filter(|t| self.statics.contains(t))
+                        .map(Binding::Def)
+                        .collect())
+                    .unwrap_or(Binding::Unknown),
+                    Binding::Const(path, name) if self.statics.contains(&Target { path, name }) => {
+                        Binding::Const(path, name)
+                    }
+                    _ => Binding::Unknown,
+                }
+            }
+            Binding::External(source, name) if matches!(name, Imported::Qualified) => {
+                Binding::External(source, name)
+            }
+            _ => Binding::Unknown,
+        }
+    }
+
     /// What the glob imports written in `scope` give `name`, the latest first; `public` limits
     /// them to the re-exporting ones (`pub use`). A glob is asked for a name once: it may reach
     /// itself. A glob cut at `LINK_DEPTH` may give the name: it is unknown, and no other glob
@@ -2012,43 +2101,8 @@ impl<'a> Resolver<'a> {
             }
             seen.depth += 1;
             let work = &mut Work::default();
-            let found = match self.resolve_as(path, scope, target, seen, work, Reading::Alias) {
-                Binding::Module(m) if *inside => self.export(m, name, seen),
-                Binding::Module(m) => self.star(m, name, seen).unwrap_or(Binding::Unknown),
-                // A module written in place states no visibility of its items: only a glob
-                // from inside it, which sees them all, is read.
-                Binding::Def(t) if *inside && self.defs[t.path][t.name].kind == Kind::Module => {
-                    let member = format!("{}.{name}", t.name);
-                    match self.def(t.path, &member) {
-                        Binding::Unknown => self
-                            .imported_at(t.path, t.name, name, seen)
-                            .unwrap_or(Binding::Unknown),
-                        found => found,
-                    }
-                }
-                Binding::Def(t) if self.is_class(t) => {
-                    let found = self.member(t, name, work);
-                    match found {
-                        Binding::Def(t) if self.statics.contains(&t) => Binding::Def(t),
-                        Binding::Several(all) => one(all
-                            .into_iter()
-                            .filter(|t| self.statics.contains(t))
-                            .map(Binding::Def)
-                            .collect())
-                        .unwrap_or(Binding::Unknown),
-                        Binding::Const(path, name)
-                            if self.statics.contains(&Target { path, name }) =>
-                        {
-                            Binding::Const(path, name)
-                        }
-                        _ => Binding::Unknown,
-                    }
-                }
-                Binding::External(source, name) if matches!(name, Imported::Qualified) => {
-                    Binding::External(source, name)
-                }
-                _ => Binding::Unknown,
-            };
+            let bound = self.resolve_as(path, scope, target, seen, work, Reading::Alias);
+            let found = self.through_glob(bound, *inside, name, work, seen);
             seen.depth -= 1;
             if seen.cut {
                 return Some(Binding::Unknown);
@@ -2880,6 +2934,15 @@ pub struct Outside<'a> {
     pub spelled: String,
     /// Whether the head of the name is the import itself, not a value made from it.
     pub direct: bool,
+    /// For a pack with `unordered_globs` (Java), when nothing of higher precedence binds the head
+    /// and on-demand imports (`import a.b.*;`, `import static a.B.*;`, the pack's implicit ones)
+    /// may: the name as each of them would spell it (`a.b.Name`), sorted. An on-demand import is
+    /// a candidate, not a fact: compiling code has at most one real candidate for a name, so a
+    /// kind accepts the name when exactly one candidate is in its own table, and only a name it
+    /// knows is no type of `java.lang` or of any package it cannot see. Empty when an import
+    /// binds the name by itself, and when a repository type, an ambiguity or a cut link may
+    /// take it.
+    pub candidates: Vec<String>,
 }
 
 /// What the constants walk found: the form of the call that made the value, what it names
@@ -3035,6 +3098,7 @@ impl<'a> Code<'a> {
                             imported: Some((package, name)),
                             spelled,
                             direct: true,
+                            candidates: Vec::new(),
                         },
                         steps: Vec::new(),
                         held: None,
@@ -3293,19 +3357,48 @@ impl<'a> Code<'a> {
             true => (Reading::Path, Reading::Path),
             false => (Reading::Value, Reading::Any),
         };
-        let external = |name| {
+        let resolve = |name| {
             let (seen, work) = (&mut r.seen(path, scope), &mut Work::default());
             let found = r.resolve_as(path, scope, name, seen, work, reading);
-            matches!(found, Binding::External(..))
+            (found, seen.cut)
         };
-        if !external(name) {
-            return None;
-        }
+        let external = |name| matches!(resolve(name).0, Binding::External(..));
         let head = name.split_once('.').map_or(name, |(head, _)| head);
+        // The on-demand imports that may bind the head, spelled with the whole name.
+        let on_demand = || -> Vec<String> {
+            let spelled = |source: &str| format!("{source}.{name}");
+            let sources = match r.unordered_globs && !by_path {
+                true => r.on_demand(path, head),
+                false => Vec::new(),
+            };
+            sources.into_iter().map(spelled).collect()
+        };
+        let candidates = match resolve(name) {
+            // A static on-demand import brings the member, with no import naming the head.
+            (Binding::External(_, Imported::Qualified), _)
+                if r.by_local[path].of(head).is_empty() =>
+            {
+                on_demand()
+            }
+            (Binding::External(..), _) => Vec::new(),
+            (Binding::Unknown, false) => match on_demand() {
+                found if found.is_empty() => return None,
+                found => {
+                    return Some(Outside {
+                        imported: None,
+                        spelled: name.to_string(),
+                        direct: false,
+                        candidates: found,
+                    });
+                }
+            },
+            _ => return None,
+        };
         Some(Outside {
             imported: self.imported_as(path, scope, name, head_reading),
             spelled: r.imported_name(path, scope, name),
             direct: external(head),
+            candidates,
         })
     }
 
@@ -3328,6 +3421,7 @@ impl<'a> Code<'a> {
             imported: Some((package, name.to_string())),
             spelled: format!("{package}.{name}"),
             direct: true,
+            candidates: Vec::new(),
         })
     }
 

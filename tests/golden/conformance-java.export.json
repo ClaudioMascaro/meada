@@ -44,6 +44,42 @@
     {
       "path": "maven/api/src/main/java/example/util/Tools.java",
       "hash": "7e4e1cefff4cae2aea8135d9a0edb79ddd645be4852e23c5f189fd1d11c7f34b"
+    },
+    {
+      "path": "maven/api/src/main/java/example/web/Api.java",
+      "hash": "b4df114965b1429e1bc772525c8b5cc121f87a353df14749a295e804177bdf29"
+    },
+    {
+      "path": "maven/api/src/main/java/example/web/OrderController.java",
+      "hash": "cafcb47bf254e0c33e9f6ab9ec40211c6e3c6bebfe4b14faf7a6945233053bd5"
+    },
+    {
+      "path": "maven/api/src/main/java/example/web/PageController.java",
+      "hash": "87cc365aafc0f29c7b5a6c5dc0047f683b52e1687f9a15fd15e5d94b9746310e"
+    },
+    {
+      "path": "maven/api/src/main/java/example/web/Plain.java",
+      "hash": "d97efd35977b7b082ee9f1a6114c2dbcd72e4b3262ec7412848c6b11b1afa726"
+    },
+    {
+      "path": "maven/api/src/main/java/example/web/Wildcard.java",
+      "hash": "e3938cfcdf22a8dc91328a1c185d1a840afba77042a1817f734258d272899436"
+    },
+    {
+      "path": "maven/api/src/main/java/example/web/shadow/GetMapping.java",
+      "hash": "12b0612477f32b71462cc3886e637484760ba3b6a41a060f220cbd61b23cf5ba"
+    },
+    {
+      "path": "maven/api/src/main/java/example/web/shadow/RequestMethod.java",
+      "hash": "44abb724c69c13288aa54db3450c35cbff0ebb9d2ab1040a67240b5ea96bce08"
+    },
+    {
+      "path": "maven/api/src/main/java/example/web/shadow/Shadowed.java",
+      "hash": "34284d29c85094294f2b7e3b2c349eee849818020471f9d141f9f4d022eb8c83"
+    },
+    {
+      "path": "maven/api/src/main/java/example/web/shadow/Wild.java",
+      "hash": "19f517d2678822ac5301ef94107610b8a4108885ba73ba3c330139943827472c"
     }
   ],
   "symbols": [
@@ -557,6 +593,302 @@
         "path": "maven/api/src/main/java/example/util/Tools.java",
         "start": 131,
         "end": 190
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Api.java::example.web.Api",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Api.java",
+        "start": 22,
+        "end": 244
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 573,
+        "end": 1466
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.any()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 1402,
+        "end": 1464
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.create()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 847,
+        "end": 916
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.flag()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 1025,
+        "end": 1097
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.get(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 752,
+        "end": 841
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.list()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 695,
+        "end": 746
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.remove()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 1103,
+        "end": 1154
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.replace()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 922,
+        "end": 1019
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.several()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 1160,
+        "end": 1286
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.single()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 1292,
+        "end": 1396
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/PageController.java",
+        "start": 330,
+        "end": 837
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.Inner",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/PageController.java",
+        "start": 683,
+        "end": 835
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.Inner.echo()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/PageController.java",
+        "start": 765,
+        "end": 829
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.nested()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/PageController.java",
+        "start": 570,
+        "end": 677
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.page()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/PageController.java",
+        "start": 417,
+        "end": 488
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.store()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/PageController.java",
+        "start": 494,
+        "end": 564
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Plain",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Plain.java",
+        "start": 257,
+        "end": 374
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Plain.mapped()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Plain.java",
+        "start": 308,
+        "end": 372
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Unreadable",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Plain.java",
+        "start": 376,
+        "end": 633
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Unreadable.known()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Plain.java",
+        "start": 415,
+        "end": 477
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Unreadable.moving()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Plain.java",
+        "start": 483,
+        "end": 548
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Unreadable.partial()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Plain.java",
+        "start": 554,
+        "end": 631
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web.Wildcard",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Wildcard.java",
+        "start": 329,
+        "end": 560
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web.Wildcard.card()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Wildcard.java",
+        "start": 398,
+        "end": 458
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web.Wildcard.removed()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Wildcard.java",
+        "start": 464,
+        "end": 558
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/GetMapping.java::example.web.shadow.GetMapping",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/GetMapping.java",
+        "start": 29,
+        "end": 106
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/RequestMethod.java::example.web.shadow.RequestMethod",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/RequestMethod.java",
+        "start": 29,
+        "end": 68
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Shadowed.java",
+        "start": 156,
+        "end": 715
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.anno()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Shadowed.java",
+        "start": 653,
+        "end": 713
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.local()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Shadowed.java",
+        "start": 373,
+        "end": 474
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.ok()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Shadowed.java",
+        "start": 227,
+        "end": 287
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.outside()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Shadowed.java",
+        "start": 480,
+        "end": 580
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Wild.java",
+        "start": 171,
+        "end": 477
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild.anno()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Wild.java",
+        "start": 242,
+        "end": 302
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild.local()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Wild.java",
+        "start": 308,
+        "end": 409
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild.ok()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Wild.java",
+        "start": 415,
+        "end": 475
       }
     }
   ],
@@ -1172,9 +1504,529 @@
         "start": 78,
         "end": 87
       }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController::DeleteMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 1103,
+        "end": 1126
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController::GetMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 695,
+        "end": 706
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController::GetMapping#1",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 752,
+        "end": 773
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController::PatchMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 1025,
+        "end": 1057
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController::PostMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 847,
+        "end": 874
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController::PutMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 922,
+        "end": 976
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController::RequestMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 1160,
+        "end": 1243
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController::RequestMapping#1",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 1292,
+        "end": 1354
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController::RequestMapping#2",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 1402,
+        "end": 1425
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web::RequestMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 589,
+        "end": 616
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web::RestController#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/OrderController.java",
+        "start": 573,
+        "end": 588
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.Inner::GetMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.Inner",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/PageController.java",
+        "start": 765,
+        "end": 785
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController::Controller#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/PageController.java",
+        "start": 683,
+        "end": 694
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController::GetMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/PageController.java",
+        "start": 417,
+        "end": 448
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController::RequestMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/PageController.java",
+        "start": 494,
+        "end": 523
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController::RequestMapping#1",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/PageController.java",
+        "start": 570,
+        "end": 635
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController::RequestMapping#2",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/PageController.java",
+        "start": 699,
+        "end": 724
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web::Controller#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/PageController.java",
+        "start": 330,
+        "end": 341
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web::RequestMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/PageController.java",
+        "start": 342,
+        "end": 382
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Plain::GetMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Plain",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Plain.java",
+        "start": 308,
+        "end": 330
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Unreadable::GetMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Unreadable",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Plain.java",
+        "start": 415,
+        "end": 436
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Unreadable::GetMapping#1",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Unreadable",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Plain.java",
+        "start": 483,
+        "end": 506
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Unreadable::GetMapping#2",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Unreadable",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Plain.java",
+        "start": 554,
+        "end": 588
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web::RequestMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Plain.java",
+        "start": 257,
+        "end": 282
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web::RestController#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Plain.java",
+        "start": 376,
+        "end": 391
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web.Wildcard::GetMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web.Wildcard",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Wildcard.java",
+        "start": 398,
+        "end": 418
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web.Wildcard::RequestMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web.Wildcard",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Wildcard.java",
+        "start": 464,
+        "end": 515
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web::RequestMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Wildcard.java",
+        "start": 345,
+        "end": 369
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web::RestController#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/Wildcard.java",
+        "start": 329,
+        "end": 344
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed::GetMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/GetMapping.java::example.web.shadow.GetMapping",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Shadowed.java",
+        "start": 653,
+        "end": 673
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed::RequestMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Shadowed.java",
+        "start": 227,
+        "end": 249
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed::RequestMapping#1",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Shadowed.java",
+        "start": 373,
+        "end": 433
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed::RequestMapping#2",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Shadowed.java",
+        "start": 480,
+        "end": 537
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow::RequestMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Shadowed.java",
+        "start": 172,
+        "end": 198
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow::RestController#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Shadowed.java",
+        "start": 156,
+        "end": 171
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild::GetMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/GetMapping.java::example.web.shadow.GetMapping",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Wild.java",
+        "start": 242,
+        "end": 262
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild::RequestMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Wild.java",
+        "start": 308,
+        "end": 368
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild::RequestMapping#1",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Wild.java",
+        "start": 415,
+        "end": 437
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow::RequestMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Wild.java",
+        "start": 187,
+        "end": 217
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow::RestController#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/shadow/Wild.java",
+        "start": 171,
+        "end": 186
+      }
     }
   ],
   "providers": [
+    {
+      "contract": "http::ANY::/api/orders/any",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.any()"
+    },
+    {
+      "contract": "http::ANY::/shadow/ok",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.ok()"
+    },
+    {
+      "contract": "http::ANY::/wildshadow/ok",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild.ok()"
+    },
+    {
+      "contract": "http::DELETE::/api/orders/{}",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.remove()"
+    },
+    {
+      "contract": "http::DELETE::/v1/pages/nested",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.nested()"
+    },
+    {
+      "contract": "http::DELETE::/wild/static",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web.Wildcard.removed()"
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.list()"
+    },
+    {
+      "contract": "http::GET::/api/orders/multi",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.several()"
+    },
+    {
+      "contract": "http::GET::/api/orders/{}",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.get(String)"
+    },
+    {
+      "contract": "http::GET::/inner/echo",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.Inner.echo()"
+    },
+    {
+      "contract": "http::GET::/known",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Unreadable.known()"
+    },
+    {
+      "contract": "http::GET::/v1/pages/{}",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.page()"
+    },
+    {
+      "contract": "http::GET::/wild/card",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web.Wildcard.card()"
+    },
+    {
+      "contract": "http::HEAD::/api/orders/multi",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.several()"
+    },
+    {
+      "contract": "http::PATCH::/api/orders/{}/flag",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.flag()"
+    },
+    {
+      "contract": "http::POST::/api/orders/new",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.create()"
+    },
+    {
+      "contract": "http::POST::/api/orders/single",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.single()"
+    },
+    {
+      "contract": "http::PUT::/api/orders/by-ref/{}",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.replace()"
+    },
+    {
+      "contract": "http::PUT::/api/orders/{}",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.replace()"
+    },
+    {
+      "contract": "http::PUT::/v1/pages",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.store()"
+    },
     {
       "contract": "package::maven::example:api",
       "site": "example.com/acme/conformance::maven/api/pom.xml"
@@ -1266,6 +2118,14 @@
       "members": [
         "example.com/acme/conformance::maven/api/src/main/java/example/calls/Client.java::example.calls.Client.unknown()",
         "example.com/acme/conformance::maven/api/src/main/java/example/calls/Noise.java::example.calls.Noise.flush()"
+      ]
+    },
+    {
+      "name": "maven/api/src/main/java/example/web/shadow",
+      "members": [
+        "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/GetMapping.java::example.web.shadow.GetMapping",
+        "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed",
+        "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild"
       ]
     }
   ],
@@ -1815,6 +2675,370 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.valueOf(int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.any()::http::ANY::/api/orders/any",
+      "kind": "route",
+      "label": "ANY /api/orders/any",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.any()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.create()::http::POST::/api/orders/new",
+      "kind": "route",
+      "label": "POST /api/orders/new",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.create()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.flag()::http::PATCH::/api/orders/{}/flag",
+      "kind": "route",
+      "label": "PATCH /api/orders/{}/flag",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.flag()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.get(String)::http::GET::/api/orders/{}",
+      "kind": "route",
+      "label": "GET /api/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.get(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.list()::http::GET::/api/orders",
+      "kind": "route",
+      "label": "GET /api/orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.list()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.remove()::http::DELETE::/api/orders/{}",
+      "kind": "route",
+      "label": "DELETE /api/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.remove()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.replace()::http::PUT::/api/orders/by-ref/{}",
+      "kind": "route",
+      "label": "PUT /api/orders/by-ref/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.replace()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.replace()::http::PUT::/api/orders/{}",
+      "kind": "route",
+      "label": "PUT /api/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.replace()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.several()::http::GET::/api/orders/multi",
+      "kind": "route",
+      "label": "GET /api/orders/multi",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.several()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.several()::http::HEAD::/api/orders/multi",
+      "kind": "route",
+      "label": "HEAD /api/orders/multi",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.several()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.single()::http::POST::/api/orders/single",
+      "kind": "route",
+      "label": "POST /api/orders/single",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.single()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.Inner.echo()::http::GET::/inner/echo",
+      "kind": "route",
+      "label": "GET /inner/echo",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.Inner.echo()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.nested()::http::DELETE::/v1/pages/nested",
+      "kind": "route",
+      "label": "DELETE /v1/pages/nested",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.nested()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.page()::http::GET::/v1/pages/{}",
+      "kind": "route",
+      "label": "GET /v1/pages/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.page()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.store()::http::PUT::/v1/pages",
+      "kind": "route",
+      "label": "PUT /v1/pages",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.store()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Plain.mapped()",
+      "kind": "export",
+      "label": "example.web.Plain.mapped()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Plain.mapped()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Unreadable.known()::http::GET::/known",
+      "kind": "route",
+      "label": "GET /known",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Unreadable.known()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web.Wildcard.card()::http::GET::/wild/card",
+      "kind": "route",
+      "label": "GET /wild/card",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web.Wildcard.card()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web.Wildcard.removed()::http::DELETE::/wild/static",
+      "kind": "route",
+      "label": "DELETE /wild/static",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/Wildcard.java::example.web.Wildcard.removed()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.anno()",
+      "kind": "export",
+      "label": "example.web.shadow.Shadowed.anno()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.anno()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.local()",
+      "kind": "export",
+      "label": "example.web.shadow.Shadowed.local()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.local()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.ok()::http::ANY::/shadow/ok",
+      "kind": "route",
+      "label": "ANY /shadow/ok",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.ok()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.outside()",
+      "kind": "export",
+      "label": "example.web.shadow.Shadowed.outside()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.outside()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild.anno()",
+      "kind": "export",
+      "label": "example.web.shadow.Wild.anno()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild.anno()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild.local()",
+      "kind": "export",
+      "label": "example.web.shadow.Wild.local()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild.local()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild.ok()::http::ANY::/wildshadow/ok",
+      "kind": "route",
+      "label": "ANY /wildshadow/ok",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/shadow/Wild.java::example.web.shadow.Wild.ok()"
         }
       ]
     }
