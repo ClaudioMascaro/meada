@@ -1460,6 +1460,10 @@ one for the area a change touches.
   1,000-token check; large answers through each tool check the effective default of 2,000.
   `surface.cli.{default,cloud}.en.txt` records English help recursively for
   every command of the default and complete cloud builds; both CI feature gates check it.
+  `docs/reference/output-grammar.md` owns the successful query text's normative line kinds,
+  states and executable patterns. `tests/it/grammar.rs` checks the prose/pattern inventories
+  and every query-answer golden, allowing opaque source only for a header's counted span
+  (full, cut prefix or omitted). A new text-golden family needs explicit classification.
   An export golden of a test about something else goes through
   `without_processes(export)`, which drops `processes`: only the chain's own exports
   (`chain-{web,gateway,catalog,worker}.export.json`), the conformance export and the

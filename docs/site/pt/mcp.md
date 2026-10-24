@@ -38,3 +38,7 @@ As respostas são linhas compactas dentro de um orçamento de tokens (2.000 por 
 a cada chamada). Cada ligação entre repositórios traz o nível e o motivo (`→[level: reason]`),
 e o `trace` termina com um rodapé: o nível mais fraco da cadeia, o número de saltos, os
 repositórios envolvidos e os tokens usados.
+
+A [referência normativa da gramática de saída](https://github.com/ClaudioMascaro/meada/blob/main/docs/reference/output-grammar.md)
+especifica cada tipo de linha, identificadores, anotações, cortes e o cálculo de tokens.
+Ela é escrita em inglês, como a superfície MCP.

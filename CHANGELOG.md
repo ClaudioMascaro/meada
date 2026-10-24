@@ -16,6 +16,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Normative English MCP output grammar (issue #145), checked against every rendered-answer
+  golden with counted context source spans and file/line diagnostics for undocumented lines.
+
 - A multilingual documentation site (issue #320), with the README reference migrated to
   Portuguese, English and Spanish guides, React Flow maps and roadmap, accessible static and
   textual fallbacks, and a strict GitHub Pages build. S3, S4 and S5 proposals are clearly separated from delivered S1/S2.
