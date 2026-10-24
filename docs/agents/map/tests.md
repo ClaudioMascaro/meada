@@ -24,6 +24,9 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   CA and OIDC values, negative module/operation combinations and managed refresh ordering.
 - Test modules of `tests/it/` by subject: `docs` (the repository map against the code:
   `ponytail:` limits in Known ceilings, entry point kinds and process marks in their lists),
+  `grammar` (the normative output reference's prose/executable line-kind and state inventories,
+  every rendered-answer golden, counted source spans, and negative line/level/footer/drift
+  checks with file/line diagnostics),
   `conformance` (pack; for Python also its HTTP providers and consumers
   and its message channels, over `conformance-python` (`messages/`), `python-mounts` and
   `python-django`; for Rust, `conformance-rust`: a Cargo workspace whose members are `api`
