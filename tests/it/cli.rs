@@ -88,6 +88,55 @@ fn help_follows_lang() {
     }
 }
 
+/// The two distribution shapes expose every command and subcommand through English help.
+/// Walking the command listings also makes a newly added subcommand part of the golden.
+#[cfg(any(
+    feature = "cloud",
+    not(any(
+        feature = "snapshot",
+        feature = "github-app",
+        feature = "ui",
+        feature = "generation-pointer"
+    ))
+))]
+#[test]
+fn every_command_has_an_english_help_golden() {
+    fn help(path: &[&str], all: &mut String) {
+        let out = Command::new(env!("CARGO_BIN_EXE_meada"))
+            .arg("help")
+            .args(path)
+            .env("LANG", "en_US.UTF-8")
+            .env("NO_COLOR", "1")
+            .output()
+            .expect("meada runs");
+        assert!(out.status.success(), "help {path:?}: {out:?}");
+        assert!(out.stderr.is_empty(), "help {path:?}: {out:?}");
+        let text = String::from_utf8(out.stdout).unwrap();
+        let command = format!("meada help {}", path.join(" "));
+        all.push_str(&format!("$ {}\n{text}\n", command.trim_end()));
+        if let Some((_, commands)) = text.split_once("\nCommands:\n") {
+            for line in commands.lines().take_while(|line| line.starts_with("  ")) {
+                let name = line.split_whitespace().next().unwrap();
+                let mut child = path.to_vec();
+                child.push(name);
+                help(&child, all);
+            }
+        }
+    }
+
+    let mut all = String::new();
+    help(&[], &mut all);
+    let build = if cfg!(feature = "cloud") {
+        "cloud"
+    } else {
+        "default"
+    };
+    assert_golden(
+        &format!("surface.cli.{build}.en.txt"),
+        all.strip_suffix('\n').unwrap(),
+    );
+}
+
 /// `meada ui` exists only in a build with the `ui` feature (ADR 0014).
 #[cfg(not(feature = "ui"))]
 #[test]

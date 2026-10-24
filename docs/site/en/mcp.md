@@ -38,3 +38,7 @@ Answers are compact lines under a token budget (2,000 by default, adjustable per
 link between repositories carries its level and reason (`→[level: reason]`), and `trace` ends
 with a footer: the weakest level of the chain, the number of hops, the repositories involved
 and the tokens used.
+
+The normative [output grammar reference](https://github.com/ClaudioMascaro/meada/blob/main/docs/reference/output-grammar.md)
+specifies every line kind, identifier, annotation, cut and token calculation. It is written
+in English, like the MCP surface.

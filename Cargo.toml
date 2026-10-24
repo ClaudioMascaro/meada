@@ -141,6 +141,8 @@ name = "golden_diff"
 test = true
 
 [dev-dependencies]
+# The normative output grammar's executable patterns (spec #32), already in the lockfile.
+regex = "1.13.1"
 # The OIDC tests' signing keys, generated in the test: ring is every build's rustls provider.
 ring = "0.17.14"
 rmcp = { version = "3.5.1", features = [

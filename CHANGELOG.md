@@ -16,6 +16,24 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Stability policy for 1.x in pt-BR, English and Spanish (issue #148), with the frozen
+  surface, versioning rules and review gates; it takes effect only when 1.0 is published.
+
+- Expanded pt-BR capabilities reference (issue #147): supported forms and known gaps for
+  each delivered language pack, contracts and provider documents, shape drift, communities
+  and process limits, with Release 2 language plans clearly separated from delivered packs.
+
+- Complete pt-BR setup reference (issue #146): installation channels, MCP parameters,
+  local configuration and decision schemas, every delivered CLI command/option, and a
+  canonical JSON export reference in Portuguese, English and Spanish.
+
+- Public fixture benchmark (issue #149): release-profile index/reindex timings, root and
+  workspace index sizes, and default-answer/tool-list token estimates in every PR/main CI
+  summary and retained JSON/Markdown artifact. Timings are informational.
+
+- Normative English MCP output grammar (issue #145), checked against every rendered-answer
+  golden with counted context source spans and file/line diagnostics for undocumented lines.
+
 - A multilingual documentation site (issue #320), with the README reference migrated to
   Portuguese, English and Spanish guides, React Flow maps and roadmap, accessible static and
   textual fallbacks, and a strict GitHub Pages build. S3, S4 and S5 proposals are clearly separated from delivered S1/S2.

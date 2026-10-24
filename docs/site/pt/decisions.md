@@ -19,13 +19,42 @@ modo humano, ou um modelo, se você pedir.
   `--decider`, de 0 a 1) é a probabilidade mínima para o modelo gravar.
 
 `meada.decisions.toml` é um arquivo versionado no git, como um lockfile: o diff dele é o que se
-revisa. Cada `[[decision]]` traz a chamada (`call`), o provedor escolhido (`target`), quem
+revisa. Cada `[[decision]]` traz o tipo (`kind`), a chamada (`call`), o provedor escolhido (`target`), quem
 decidiu (`by`: `human` ou o id do modelo) e, para um modelo, a probabilidade (`p`). A
 indexação só relê o arquivo: a ligação decidida ganha o nível `decided` e o motivo mostra quem
 decidiu. Quando o código muda e uma decisão deixa de caber (a chamada sumiu, o item não está
 mais aberto, o provedor sumiu ou não é mais candidato), `meada status` a mostra como obsoleta,
 sob o repositório, e `meada decide --prune` a remove. Uma decisão que espera um par ainda não
 encontrado aparece à parte e é mantida.
+
+## Referência de `meada.decisions.toml`
+
+O arquivo só aceita uma lista `[[decision]]`; ausente ou vazia significa nenhuma decisão.
+Não há campos de versão, horário ou configuração de modelo. Cada entrada contém:
+
+| Chave | Tipo | Regra |
+| --- | --- | --- |
+| `kind` | string obrigatória | `ambiguous-link` para vários provedores candidatos, ou `dynamic-url` para URL não avaliada. |
+| `call` | string obrigatória | Identidade canônica da chamada mostrada no export; só uma entrada por `call` em todo o arquivo, independentemente do tipo. |
+| `target` | string obrigatória | `<identidade-do-provedor>::<contrato>`, o alvo escolhido. |
+| `by` | string obrigatória | Exatamente `human` para pessoa; outro valor identifica o modelo. |
+| `p` | número de ponto flutuante, condicional | Proibido com `by = "human"`; obrigatório para modelo, finito e entre 0 e 1, inclusive. |
+
+Por exemplo, uma escolha humana:
+
+```toml
+[[decision]]
+kind = "ambiguous-link"
+call = "example.com/acme/web::src/orders.ts::load::fetch#0"
+target = "example.com/acme/api::http::GET::/orders/{}"
+by = "human"
+```
+
+Uma decisão de modelo usa `by = "<id-do-modelo>"` e acrescenta, por exemplo, `p = 0.9`.
+Chaves desconhecidas, tipos errados e chamadas repetidas dão erro com arquivo/linha. A
+validade semântica de um alvo é verificada ao reaplicar as decisões: um alvo que sumiu pode
+tornar a decisão obsoleta, em vez de ser um erro de sintaxe TOML. O escritor ordena por
+`call` e não preserva comentários nem acrescenta timestamps.
 
 ### Decisor por modelo
 
@@ -51,6 +80,8 @@ Quatro variáveis de ambiente o configuram (nada vem de arquivo):
 
 Qualquer gateway que fale um dos dois protocolos serve: basta trocar a URL. HTTPS em qualquer
 lugar; HTTP só para `localhost` ou um endereço de loopback.
+Valores vazios dessas variáveis contam como ausentes; uma chave precisa conter apenas
+caracteres ASCII visíveis. Não coloque a chave no `meada.toml` nem no arquivo de decisões.
 
 O que sai da máquina, por item: a chamada, a função que a contém (lida do disco) e a lista de
 candidatos (repositório, método e caminho), mais o id do repositório que a chama. Nenhum

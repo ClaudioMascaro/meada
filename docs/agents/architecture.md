@@ -118,7 +118,9 @@ with wasm-pack and checks both trees.
   re-exports the shared pieces where they lived (`index`, `contract`, `package`, `decisions`,
   `community`, `entry`, `document`) and keeps its own `Export`, `Provider`, `Consumer`,
   `Document` and `Package` with what only the build needs, turned into these by
-  `index::Export::written`.
+  `index::Export::written`. The emitted field/null/omission and enum inventory is documented
+  in `docs/site/pt/export.md`, with matching English and Spanish references; storage-only
+  shape imports are distinguished from the canonical export's public imports.
 - `meada-core/src/shape.rs`: shapes and shape drift (ADR 0009: `Drift`, `{missing, unchecked}`,
   `shape::drift`), which the binary reaches as `crate::shape`. `drift.rs`: how `context`,
   `search` and `status` show a link's drift (`consumers`, `matches`, `counts`, over the `Entry`s
@@ -1399,6 +1401,16 @@ one for the area a change touches.
   module per subject (`tests/it/<subject>.rs`) and the harness in `tests/it/common/`. A new
   subject is a file there and its `mod` line in `main.rs` (`every_file_here_is_a_module` checks
   it); `cargo test --test it <subject>::` runs one.
+- `tests/it/benchmark.rs` is an ignored development harness over the public chain (with
+  document/drift overlays), every conformance fixture and peer, and every cross-language
+  chain. It reuses the disk fixture helpers and `Engine`, times cold workspace indexing and
+  refresh after one root source edit, verifies the changed file hash through the export,
+  and reports each index's logical file size plus root/workspace totals. Fixed default
+  search/context/trace queries reject empty or missing subjects. Token costs use
+  `meada-core::render::tokens`; the MCP stdio list records both the full compact result and
+  descriptions plus schemas, which the existing tests budget. A fixture inventory guard
+  catches new conformance/cross-language directories. CI runs the release harness on every
+  PR and main push, retaining JSON/Markdown and a job-summary table. Timings are informational.
 - `tests/it/common/mod.rs`: `fixture_repo(case, fixture, origin)` copies `tests/fixtures/<fixture>`
   to `$CARGO_TARGET_TMPDIR/<case>/<fixture>` and makes it a git repository (`init`, `origin`,
   one commit). `case` must be unique per test across every subject, since they run in parallel in
@@ -1456,7 +1468,15 @@ one for the area a change touches.
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
-  ranges are in them. An export golden of a test about something else goes through
+  ranges are in them. `surface.mcp-tools.json` records the full stdio tool list beside its
+  1,000-token check; large answers through each tool check the effective default of 2,000.
+  `surface.cli.{default,cloud}.en.txt` records English help recursively for
+  every command of the default and complete cloud builds; both CI feature gates check it.
+  `docs/reference/output-grammar.md` owns the successful query text's normative line kinds,
+  states and executable patterns. `tests/it/grammar.rs` checks the prose/pattern inventories
+  and every query-answer golden, allowing opaque source only for a header's counted span
+  (full, cut prefix or omitted). A new text-golden family needs explicit classification.
+  An export golden of a test about something else goes through
   `without_processes(export)`, which drops `processes`: only the chain's own exports
   (`chain-{web,gateway,catalog,worker}.export.json`), the conformance export and the
   `*.processes.json` goldens carry them (spec #31), so a change to the process walk re-blesses

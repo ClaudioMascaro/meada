@@ -24,6 +24,7 @@ Elija Cargo, un binario, el instalador, npm o un contenedor en la guía completa
 - [Modo servidor](https://claudiomascaro.github.io/meada/es/server/)
 - [Consola](https://claudiomascaro.github.io/meada/es/console/)
 - [Capacidades y límites](https://claudiomascaro.github.io/meada/es/capabilities/)
+- [Estabilidad en 1.x](https://claudiomascaro.github.io/meada/es/stability/)
 - [Participar](https://claudiomascaro.github.io/meada/es/contributing/)
 
 [Apache-2.0](LICENSE).

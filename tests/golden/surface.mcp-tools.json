@@ -1,0 +1,101 @@
+[
+  {
+    "name": "context",
+    "description": "Show one symbol: its community, the processes it belongs to, its source, callers and callees.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "budget": {
+          "description": "Token budget for the answer (default 2000).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "symbol": {
+          "description": "Symbol name, `<path>::<name>` or full identity; a resource, `resource::<kind>::<id>`; or a channel, `channel::<broker>::<name>`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "search",
+    "description": "Find symbols by name and contracts by identifier (`http::GET::/users/{}`). One line each: repository, path:line, name.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "budget": {
+          "description": "Token budget for the answer (default 2000).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Only this kind: `symbol`, `contract`, `route` (an HTTP contract), `resource` (a\ndeclared one, matched by kind and id), `channel` (a queue or topic, by broker kind and\nname), `document` (an OpenAPI or AsyncAPI file, by path or title), `package` (by name,\nwith its consumers), `drift` (fields consumers read that a route lacks, by route or field\npath), `community` (by name), `process` (by its entry point's label, with the\n`process::` identity `trace` starts from), or `ambiguous` or `unresolved` (open items,\nwith the `meada decide` command for each).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "query": {
+          "description": "Name to look for, case-insensitive.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "trace",
+    "description": "Follow a chain through calls and cross-repository links, down or up, until it ends. Links show →[level: reason]; a footer sums it up.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "budget": {
+          "description": "Token budget for the answer (default 2000).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "changes": {
+          "description": "`uncommitted`: start from the symbols the working-tree diff touches instead.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "direction": {
+          "description": "`down` (default: what it reaches) or `up` (what reaches it).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "from": {
+          "description": "Start: a symbol, a route (`GET /users/{}` or its contract), a call site, or a process\n(`process::<entry point identity>`, down only).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  }
+]

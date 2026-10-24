@@ -8,6 +8,16 @@ Reviewing a change to an `*.export.json` golden: `cargo run --example golden_dif
 diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_diff.rs` for the
 `--range` forms) prints added, removed and moved entries per section instead of the raw JSON.
 
+Run the public benchmark with `cargo test --locked --release --test it
+benchmark::records_public_fixture_benchmark -- --ignored --exact --nocapture` (one shell
+command). `MEADA_BENCH_OUT` selects the report directory; otherwise it is
+`$CARGO_TARGET_TMPDIR/public-fixture-benchmark`. Under local `bounded`, prefix Cargo with
+`env -u LD_PRELOAD` to measure real fsync, as CI does. Cold means indexes absent, not an
+emptied OS page cache; setup and report I/O are outside the timers. The reindex timer covers
+the whole workspace after one root source edit. Sizes are logical `index.db` bytes, with
+root and workspace totals distinguished. JSON names the fixed subjects, edited sources and
+all repository fixtures; it contains no private corpus data. Existing tests own token limits.
+
 - `ui/tests/operations.test.ts` projects operational API fixtures into fleet diagnostics,
   retention/bundle metadata, repository provenance, cached credential lifetime and token-check
   outcomes. `operations.test.tsx` exercises the five pages through their DOM and HTTP client,
@@ -24,6 +34,12 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   CA and OIDC values, negative module/operation combinations and managed refresh ordering.
 - Test modules of `tests/it/` by subject: `docs` (the repository map against the code:
   `ponytail:` limits in Known ceilings, entry point kinds and process marks in their lists),
+  `grammar` (the normative output reference's prose/executable line-kind and state inventories,
+  every rendered-answer golden, counted source spans, and negative line/level/footer/drift
+  checks with file/line diagnostics),
+  `benchmark` (public fixture index/reindex times and sizes, fixed default-answer and MCP
+  tool-list token costs, JSON/Markdown reports, future conformance/cross-language coverage
+  guard; ignored development harness, timings never gate),
   `conformance` (pack; for Python also its HTTP providers and consumers
   and its message channels, over `conformance-python` (`messages/`), `python-mounts` and
   `python-django`; for Rust, `conformance-rust`: a Cargo workspace whose members are `api`
@@ -73,7 +89,10 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   file's fence and already current; with `snapshot`, the `[snapshot] node_name` error in both
   languages),
   `mcp`
-  (the binary over stdio), `server` (`meada mcp --listen` as a child process over the chain's
+  (the binary over stdio, its complete tool-list golden and 1,000-token description/schema
+  budget, and each tool's effective 2,000-token default over a large answer); `cli` also walks
+  every command's English help into default and cloud surface goldens, regenerated only with
+  `MEADA_BLESS=1`. `server` (`meada mcp --listen` as a child process over the chain's
   mirrors, through rmcp's streamable HTTP client and plain HTTP requests: the stdio tools and
   `trace` byte for byte, the 404 listing, the `uncommitted` refusal, the behind line before and
   after `meada index`, two stateless servers answering alternate calls, the refused start, and
