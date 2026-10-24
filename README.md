@@ -61,6 +61,7 @@ Veja as [capacidades atuais](https://claudiomascaro.github.io/meada/capabilities
 - [Modo servidor](https://claudiomascaro.github.io/meada/server/)
 - [Console](https://claudiomascaro.github.io/meada/console/)
 - [Capacidades e limites](https://claudiomascaro.github.io/meada/capabilities/)
+- [Estabilidade em 1.x](https://claudiomascaro.github.io/meada/stability/)
 - [Participar](https://claudiomascaro.github.io/meada/contributing/)
 
 [Apache-2.0](LICENSE).

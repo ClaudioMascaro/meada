@@ -61,3 +61,6 @@ Sigue la cadena entre repositorios.
 El modo servidor ([S1, #259](https://github.com/ClaudioMascaro/meada/issues/259)) y la consola ([S2, #293](https://github.com/ClaudioMascaro/meada/issues/293)) están entregados. Ownership por equipo (S3), automatización de identidad (S4) y workspaces con nombre (S5) están planificados. Cada página distingue el comportamiento disponible de la propuesta.
 
 [Consulta las capacidades y los límites](capabilities.md) · [S3](workspaces.md) · [S4](enterprise.md) · [S5](named-workspaces.md)
+
+[Estabilidad en 1.x](stability.md) define la promesa que comienza cuando se publique la 1.0.
+La serie 0.x no tiene promesa de estabilidad.

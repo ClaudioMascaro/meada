@@ -23,6 +23,7 @@ Choose Cargo, a binary, the installer, npm or a container in the complete instal
 - [Server mode](https://claudiomascaro.github.io/meada/en/server/)
 - [Console](https://claudiomascaro.github.io/meada/en/console/)
 - [Capabilities and limits](https://claudiomascaro.github.io/meada/en/capabilities/)
+- [Stability in 1.x](https://claudiomascaro.github.io/meada/en/stability/)
 - [Contribute](https://claudiomascaro.github.io/meada/en/contributing/)
 
 [Apache-2.0](LICENSE).
