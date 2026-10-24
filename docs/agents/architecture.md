@@ -756,7 +756,7 @@ one for the area a change touches.
   one, never a missing or empty file; `refresh` stays one transaction in place. An operator
   renames an index in (built elsewhere) only while no `meada index` writes that index, one
   writer per index: a refresh's live `index.db-journal` would be taken for the new file's. `lang/`: the
-  language adapter and the TS/JS, Python, Rust and Go packs. `resolve.rs`: calls to definitions (`Resolver`), values
+  language adapter and the TS/JS, Python, Rust, Go and Java packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`: `Code::origins`, the one origin question, with three evidence policies
   (`Values`, `Constants` for the TypeScript forms, `Declarations` for Go's typed clients and
   forms), `Code::outside` for what an import from outside binds a name to, and `Code::expand`
@@ -1205,7 +1205,16 @@ one for the area a change touches.
   (Rust's default features) also gives `settings` (a string per file path, stored as
   `files.setting` and `Facts::setting`) and takes it in `parse_with`; a file whose setting
   changed is parsed again, whatever its content. Besides `parse` and `modules`, it says what the
-  shared resolution cannot guess: `receiver` and `base_receiver` (keywords for the enclosing
+  shared resolution cannot guess: `members_in_scope` (bare names may name class members),
+  `unordered_globs` (combine wildcard candidates, with an inside glob taking priority),
+  `qualified_types` (an unbound path head may name a repository type through its layout),
+  `Facts::overloads` and `Facts::constructors` (separate method and constructor families with
+  written signatures), `Call::arity` and `Call::constructs`
+  (the argument count and constructor call form, kept in cached facts), `Facts::statics` (members a class wildcard
+  import takes), `Imported::Qualified` (a fully qualified definition import),
+  with Java parameter types spelled from syntax tokens, excluding annotations and comments,
+  and `#method` after a class-named method's signature to distinguish it from a constructor,
+  `receiver` and `base_receiver` (keywords for the enclosing
   class and its base), `globals` (names bound everywhere), `Def::bases` (a class's bases, for
   its family), `Facts::receivers` (the class each binding gives a name), `Facts::star` (what a
   star import takes), `stars_bind` (whether a star import rebinds names in statement order, as
@@ -1224,8 +1233,7 @@ one for the area a change touches.
   and `Layout::programs` (both below), and `Layout::reaches` (default: none, every file), the
   files a name match may reach from a caller (`Resolver::reaching`, called by `refresh`):
   Rust's are its crate's and those of the repository's libraries it depends on. A language whose
-  files share one scope (a Go package: the files of one directory that declare one package; Java,
-  Kotlin and C# packages next) says which through `Layout::shared`, groups of files that
+  files share one scope (a Go package: the files of one directory that declare one package; Java packages; Kotlin and C# packages next) says which through `Layout::shared`, groups of files that
   `Resolver::with_shared` takes: a name a file and its imports leave unbound is looked up
   among the top-level definitions and constants of the others in its group, private ones
   included (`Resolver::sibling`, at the end of `lexical_as`), and an import that names any
@@ -1320,7 +1328,10 @@ one for the area a change touches.
   unreadable one, is rebuilt beside it and renamed over it, and `status` says so. One whose stored facts do not
   parse is rebuilt by the first refresh that reads them (when a file changed), which `status`
   cannot tell.
-- The index holds no source text and no values, apart from the literal URL path fragments and the
+- The index holds no source text and no values, apart from the argument count and constructor
+  form of an overloaded call (`Call::arity`, `Call::constructs`), callable-to-signature and
+  static-member names (`Facts::overloads`, `Facts::constructors` and
+  `Facts::statics`), the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
   consumer reads from the parsed response, and those of the zod schema or object literals a
@@ -1469,6 +1480,15 @@ one for the area a change touches.
   first and lists each call's level and target, its providers, consumers and links (needs `jq`).
 
 ## Known ceilings
+
+- `lang/java.rs`: `DEFINITION_DEPTH` (128) bounds nested named types; deeper definitions and
+  their bindings stay with the enclosing symbol. `VALUE_DEPTH` (64) bounds nested values and
+  `PATH_DEPTH` (256) bounds callee segments; deeper values or callees are unknown.
+  `QUALIFICATION_BYTES` (4 MiB) bounds enclosing-name bytes across syntax visits, before each
+  visit's bounded metadata fanout. Pending visits share their scope strings. A file that
+  exceeds this budget contributes no facts or package layout, so an incomplete overload
+  family cannot produce an exact link; other files still index. The Java hostile-depth and
+  long-prefix engine fixtures exceed these limits.
 
 - `snapshot/pull.rs`: a generation's bundles hold at most `GENERATION_BYTES_MAX` (256 GiB)
   together, as the document records their sizes (checked before any download) and as the

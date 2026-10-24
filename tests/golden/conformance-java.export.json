@@ -1,0 +1,850 @@
+{
+  "repository": "example.com/acme/conformance",
+  "files": [
+    {
+      "path": "gradle/src/main/java/example/Receipt.java",
+      "hash": "a5be663724dcd220f12d474a7ef63662e365143453315c555a9292a7d7bff0ad"
+    },
+    {
+      "path": "maven/api/src/main/java/example/Local.java",
+      "hash": "934f9044844b3acad6c0084238837a051446f68d0d5471da2faff06b4ce54417"
+    },
+    {
+      "path": "maven/api/src/main/java/example/Orders.java",
+      "hash": "b61f28f7b607369724c71cd861ead5c77a6316b26b658ae2fe79580e02924d9c"
+    },
+    {
+      "path": "maven/api/src/main/java/example/stars/Wave.java",
+      "hash": "dfa9b17bf44a8c0344cc3beea02314f809e37e6502bcc3f826d1a24099dd302c"
+    },
+    {
+      "path": "maven/api/src/main/java/example/util/Tools.java",
+      "hash": "7e4e1cefff4cae2aea8135d9a0edb79ddd645be4852e23c5f189fd1d11c7f34b"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/conformance::gradle/src/main/java/example/Receipt.java::example.Pending",
+      "span": {
+        "path": "gradle/src/main/java/example/Receipt.java",
+        "start": 77,
+        "end": 117
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::gradle/src/main/java/example/Receipt.java::example.Pending.finish()",
+      "span": {
+        "path": "gradle/src/main/java/example/Receipt.java",
+        "start": 101,
+        "end": 115
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::gradle/src/main/java/example/Receipt.java::example.Receipt",
+      "span": {
+        "path": "gradle/src/main/java/example/Receipt.java",
+        "start": 18,
+        "end": 76
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::gradle/src/main/java/example/Receipt.java::example.Receipt.Receipt(String)",
+      "span": {
+        "path": "gradle/src/main/java/example/Receipt.java",
+        "start": 57,
+        "end": 74
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::gradle/src/main/java/example/Receipt.java::example.State",
+      "span": {
+        "path": "gradle/src/main/java/example/Receipt.java",
+        "start": 118,
+        "end": 150
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Local.java::example.Local",
+      "span": {
+        "path": "maven/api/src/main/java/example/Local.java",
+        "start": 18,
+        "end": 59
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Local.java::example.Local.same()",
+      "span": {
+        "path": "maven/api/src/main/java/example/Local.java",
+        "start": 36,
+        "end": 57
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 147,
+        "end": 1512
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Nested",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 1241,
+        "end": 1304
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Nested.run()",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 1278,
+        "end": 1298
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Orders()",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 173,
+        "end": 191
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Orders(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 196,
+        "end": 233
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Package",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 1453,
+        "end": 1510
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Package.run()",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 1484,
+        "end": 1504
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Private",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 1383,
+        "end": 1448
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Private.run()",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 1422,
+        "end": 1442
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Protected",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 1309,
+        "end": 1378
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Protected.run()",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 1352,
+        "end": 1372
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.check()",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 1182,
+        "end": 1207
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.enclosed()",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 797,
+        "end": 964
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.hidden()",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 1212,
+        "end": 1236
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 514,
+        "end": 792
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.localShadow()",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 1091,
+        "end": 1177
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.place(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 292,
+        "end": 330
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.place(String,int)",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 238,
+        "end": 287
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.place(int)",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 335,
+        "end": 373
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.qualified(java.lang.String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 969,
+        "end": 1029
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.shadow(Object)",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 1034,
+        "end": 1086
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.start()",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 378,
+        "end": 509
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/stars/Wave.java::example.stars.Wave",
+      "span": {
+        "path": "maven/api/src/main/java/example/stars/Wave.java",
+        "start": 24,
+        "end": 78
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/stars/Wave.java::example.stars.Wave.wave()",
+      "span": {
+        "path": "maven/api/src/main/java/example/stars/Wave.java",
+        "start": 48,
+        "end": 76
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools",
+      "span": {
+        "path": "maven/api/src/main/java/example/util/Tools.java",
+        "start": 23,
+        "end": 192
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.doubled()",
+      "span": {
+        "path": "maven/api/src/main/java/example/util/Tools.java",
+        "start": 95,
+        "end": 126
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()",
+      "span": {
+        "path": "maven/api/src/main/java/example/util/Tools.java",
+        "start": 48,
+        "end": 90
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.valueOf(int)",
+      "span": {
+        "path": "maven/api/src/main/java/example/util/Tools.java",
+        "start": 131,
+        "end": 190
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Orders(String)::check#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Orders(String)",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.check()",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 223,
+        "end": 230
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.enclosed()::(anonymous).check#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.enclosed()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.check()",
+      "level": "inferred",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 937,
+        "end": 944
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.enclosed()::Runnable#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.enclosed()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 888,
+        "end": 957
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.enclosed()::check#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.enclosed()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.check()",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 854,
+        "end": 861
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()::Local.same#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/Local.java::example.Local.same()",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 629,
+        "end": 641
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()::Orders#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Orders()",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 651,
+        "end": 663
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()::Orders#1",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Orders(String)",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 673,
+        "end": 692
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()::Receipt#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()",
+      "target": "example.com/acme/conformance::gradle/src/main/java/example/Receipt.java::example.Receipt.Receipt(String)",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 702,
+        "end": 722
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()::String.valueOf#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 732,
+        "end": 749
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()::System.currentTimeMillis#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 759,
+        "end": 785
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()::Tools.single#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 547,
+        "end": 561
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()::Wave.wave#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/stars/Wave.java::example.stars.Wave.wave()",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 608,
+        "end": 619
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()::doubled#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.doubled()",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 589,
+        "end": 598
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()::single#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 571,
+        "end": 579
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.localShadow()::Tools.single#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.localShadow()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()",
+      "level": "inferred",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 1156,
+        "end": 1170
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.qualified(java.lang.String)::this.check#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.qualified(java.lang.String)",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.check()",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 1014,
+        "end": 1026
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.shadow(Object)::Tools.single#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.shadow(Object)",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()",
+      "level": "inferred",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 1069,
+        "end": 1083
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.start()::Orders.place#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.start()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.place(String,int)",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 447,
+        "end": 471
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.start()::Orders.place#1",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.start()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.place(String)",
+        "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.place(int)"
+      ],
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 481,
+        "end": 502
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.start()::check#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.start()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.check()",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 408,
+        "end": 415
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.start()::this.check#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.start()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.check()",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/Orders.java",
+        "start": 425,
+        "end": 437
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()::doubled#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.doubled()",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/util/Tools.java",
+        "start": 78,
+        "end": 87
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [],
+  "communities": [
+    {
+      "name": "maven/api/src/main/java/example",
+      "members": [
+        "example.com/acme/conformance::gradle/src/main/java/example/Receipt.java::example.Receipt.Receipt(String)",
+        "example.com/acme/conformance::maven/api/src/main/java/example/Local.java::example.Local.same()",
+        "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Orders()",
+        "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Orders(String)",
+        "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()",
+        "example.com/acme/conformance::maven/api/src/main/java/example/stars/Wave.java::example.stars.Wave.wave()"
+      ]
+    },
+    {
+      "name": "maven/api/src/main/java/example#2",
+      "members": [
+        "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.check()",
+        "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.enclosed()",
+        "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.place(String,int)",
+        "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.qualified(java.lang.String)",
+        "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.start()"
+      ]
+    },
+    {
+      "name": "maven/api/src/main/java/example#3",
+      "members": [
+        "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.localShadow()",
+        "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.shadow(Object)",
+        "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.doubled()",
+        "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()"
+      ]
+    }
+  ],
+  "links": [],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Nested.run()",
+      "kind": "export",
+      "label": "example.Orders.Nested.run()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Nested.run()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Protected.run()",
+      "kind": "export",
+      "label": "example.Orders.Protected.run()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Protected.run()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.enclosed()",
+      "kind": "export",
+      "label": "example.Orders.enclosed()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.enclosed()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.check()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()",
+      "kind": "export",
+      "label": "example.Orders.imported()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.imported()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.doubled()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.doubled()",
+          "mark": "seen"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/stars/Wave.java::example.stars.Wave.wave()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Local.java::example.Local.same()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Orders()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.Orders(String)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.check()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::gradle/src/main/java/example/Receipt.java::example.Receipt.Receipt(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.localShadow()",
+      "kind": "export",
+      "label": "example.Orders.localShadow()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.localShadow()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.doubled()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.qualified(java.lang.String)",
+      "kind": "export",
+      "label": "example.Orders.qualified(java.lang.String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.qualified(java.lang.String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.check()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.shadow(Object)",
+      "kind": "export",
+      "label": "example.Orders.shadow(Object)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.shadow(Object)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.doubled()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.start()",
+      "kind": "export",
+      "label": "example.Orders.start()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.start()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.check()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.place(String,int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.start()::Orders.place#1",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.place(String)",
+            "example.com/acme/conformance::maven/api/src/main/java/example/Orders.java::example.Orders.place(int)"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.valueOf(int)",
+      "kind": "export",
+      "label": "example.util.Tools.valueOf(int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.valueOf(int)"
+        }
+      ]
+    }
+  ]
+}

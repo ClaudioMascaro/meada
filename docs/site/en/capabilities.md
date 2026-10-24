@@ -1,6 +1,6 @@
 # Capabilities and limits
 
-Meada 0.1 indexes TypeScript, JavaScript, Python, Rust and Go. It finds calls in code and connects repositories through HTTP, packages and messaging channels. Each link reports its confidence level.
+Meada 0.1 indexes TypeScript, JavaScript, Python, Rust, Go and Java. It finds calls in code and connects repositories through HTTP, packages and messaging channels. Each link reports its confidence level.
 
 Server mode includes the [console](console.md), [snapshots](snapshots.md), [retention](generations.md) and [managed workspace](workspaces.md) through optional modules. The console has an editor, diff, playground and graph. [Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/) and [Helm](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/) provide deployment examples.
 
@@ -12,6 +12,7 @@ Server mode includes the [console](console.md), [snapshots](snapshots.md), [rete
 | Python | `.py` |
 | Rust | `.rs` reachable through each crate's module tree |
 | Go | `.go` included by the package's build rules |
+| Java | `.java`, resolved by their `package` declarations |
 
 ### Rust
 
@@ -30,6 +31,14 @@ The `module` path in each `go.mod` resolves imports to package directories, incl
 Analysis targets linux/amd64. Files named `_windows.go`, with a false `//go:build`, or using cgo (`import "C"`) stay out. Meada reads functions, types, interfaces and methods (`Type.Method`). It resolves calls within the package and through imports (`pkg.F()`, alias or dot); standard-library and external modules remain external.
 
 A `recv.M()` call is `exact` when the code supplies its type in a parameter, field, `var`, composite literal or function result. Otherwise, name resolution is `inferred` or `ambiguous`. A call through an interface stops at its interface method.
+
+### Java
+
+Meada reads classes, interfaces, enums, records, methods and constructors, including nested types. Names include the package and, for methods, the written parameter types: `example.Orders.place(String,int)`. Calls in lambdas and anonymous classes belong to the enclosing symbol.
+
+Single-type, package and static imports, including `*`, resolve through package declarations. Bare, `this` and static calls are `exact` when argument count leaves one method; overloads with the same argument count stay `ambiguous`. External types stay external. Public types and their public or protected members form the exported surface.
+
+Indexing needs no JDK, Maven or Gradle and executes no repository code.
 
 ## HTTP and contract documents
 

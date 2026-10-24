@@ -11,6 +11,7 @@ use tree_sitter::Node;
 use crate::Result;
 
 pub mod go;
+pub mod java;
 pub mod python;
 pub mod rust;
 pub mod ts;
@@ -66,6 +67,23 @@ pub trait LanguagePack {
     /// language that names it as a parameter (`self`) writes it in `Facts::receivers` instead.
     fn receiver(&self) -> Option<&'static str> {
         None
+    }
+
+    /// Whether bare names in a method can name the enclosing class's members (Java).
+    fn members_in_scope(&self) -> bool {
+        false
+    }
+
+    /// Whether wildcard imports combine their candidates rather than the latest one winning.
+    /// An inside glob has priority over public globs (the class's own package in Java).
+    fn unordered_globs(&self) -> bool {
+        false
+    }
+
+    /// Whether a dotted type name may bind through the layout without an import, when no
+    /// lexical value hides its head (Java's fully qualified types).
+    fn qualified_types(&self) -> bool {
+        false
     }
 
     /// A keyword naming the base of the enclosing class, such as `super`: what its members
@@ -148,7 +166,13 @@ pub struct Layout {
 }
 
 /// Every pack Meada ships, in a fixed order.
-const PACKS: &[&dyn LanguagePack] = &[&ts::TsJs, &python::Python, &rust::Rust, &go::Go];
+const PACKS: &[&dyn LanguagePack] = &[
+    &ts::TsJs,
+    &python::Python,
+    &rust::Rust,
+    &go::Go,
+    &java::Java,
+];
 
 /// The index of the pack that parses `path`, if any.
 pub fn pack_for(path: &str) -> Option<usize> {
@@ -173,6 +197,16 @@ pub fn packs() -> impl Iterator<Item = &'static dyn LanguagePack> {
 #[derive(Default, Serialize, Deserialize)]
 pub struct Facts {
     pub defs: Vec<Def>,
+    /// Callable names whose definitions carry distinct written signatures. A call resolves
+    /// to their definitions after narrowing by its argument count.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub overloads: BTreeMap<String, Vec<String>>,
+    /// Constructor families, separate from methods of the same name in the enclosing type.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub constructors: BTreeMap<String, Vec<String>>,
+    /// The members a class makes available through a static wildcard import.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub statics: Vec<String>,
     pub imports: Vec<Import>,
     /// Everything an explicit import can name: `exports` lists every binding the file makes
     /// available, and `star` narrows what a star import takes from them.
@@ -321,6 +355,9 @@ pub struct Import {
 
 #[derive(Serialize, Deserialize)]
 pub enum Imported {
+    /// The fully qualified definition named by `source`, rather than an export of a module
+    /// (`import example.Tools`). Outside the repository its spelling is `source` itself.
+    Qualified,
     /// One exported name; a default import is the name `default`.
     Name(String),
     /// A name the module exports or, when it exports none (or the module is not a file of
@@ -542,6 +579,14 @@ fn unknown() -> Value {
 pub struct Call {
     pub scope: String,
     pub callee: String,
+    /// Argument count for languages that narrow overloads by arity. Unlike values it survives
+    /// a cached file's facts, so a refreshed resolution agrees with a cold one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arity: Option<usize>,
+    /// Whether this call uses constructor syntax, in languages with a distinct constructor
+    /// namespace. Kept with its argument count in cached facts.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub constructs: bool,
     pub range: Range<usize>,
     /// The arguments, as far as the call's own syntax tells: what contract kinds read URLs
     /// and options from. Not kept in the index: they hold string literals, so the index

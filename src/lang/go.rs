@@ -935,6 +935,8 @@ fn result_list(node: Node) -> Option<Node> {
 
 fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
     Call {
+        arity: None,
+        constructs: false,
         scope: scope.to_string(),
         callee,
         range,

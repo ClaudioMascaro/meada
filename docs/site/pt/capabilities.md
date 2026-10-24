@@ -1,6 +1,6 @@
 # Capacidades e limites
 
-O Meada 0.1 indexa TypeScript, JavaScript, Python, Rust e Go. Ele encontra chamadas no código e liga repositórios por HTTP, pacotes e canais de mensagens. Os resultados indicam o nível de certeza de cada ligação.
+O Meada 0.1 indexa TypeScript, JavaScript, Python, Rust, Go e Java. Ele encontra chamadas no código e liga repositórios por HTTP, pacotes e canais de mensagens. Os resultados indicam o nível de certeza de cada ligação.
 
 O modo servidor inclui [console](console.md), [snapshots](snapshots.md), [retenção](generations.md) e [workspace gerenciado](workspaces.md), em módulos opcionais. A console tem editor, diff, playground e grafo. [Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/) e [Helm](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/) trazem exemplos de implantação.
 
@@ -12,6 +12,7 @@ O modo servidor inclui [console](console.md), [snapshots](snapshots.md), [reten�
 | Python | `.py` |
 | Rust | `.rs` alcançados pela árvore de módulos de cada crate |
 | Go | `.go` incluídos pelas regras de build do pacote |
+| Java | `.java`, resolvidos pelas declarações de `package` |
 
 ### Rust
 
@@ -30,6 +31,14 @@ O caminho `module` de cada `go.mod` resolve imports para pastas de pacotes, incl
 A análise usa linux/amd64. Arquivos `_windows.go`, com `//go:build` falso ou com cgo (`import "C"`) ficam de fora. O Meada lê funções, tipos, interfaces e métodos (`Tipo.Metodo`). Resolve chamadas no pacote e por imports (`pkg.F()`, alias ou ponto); biblioteca padrão e módulos externos continuam externos.
 
 Uma chamada `recv.M()` é `exact` quando o código informa o tipo em parâmetro, campo, `var`, literal composto ou resultado de função. Sem isso, a resolução pelo nome é `inferred` ou `ambiguous`. Uma chamada por interface para no método da interface.
+
+### Java
+
+O Meada lê classes, interfaces, enums, records, métodos e construtores, inclusive tipos aninhados. Os nomes incluem o pacote e, nos métodos, os tipos escritos dos parâmetros: `example.Orders.place(String,int)`. Lambdas e classes anônimas mantêm as chamadas no símbolo que as contém.
+
+Imports simples, de pacote e estáticos, inclusive com `*`, resolvem pelas declarações de pacote. Chamadas sem receptor, com `this` ou estáticas são `exact` quando resta um método pela quantidade de argumentos; sobrecargas com a mesma quantidade ficam `ambiguous`. Tipos externos continuam externos. Tipos públicos e seus membros públicos ou protegidos compõem a superfície exportada.
+
+A indexação não precisa de JDK, Maven ou Gradle e não executa código do repositório.
 
 ## HTTP e documentos de contrato
 
