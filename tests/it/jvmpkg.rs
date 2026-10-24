@@ -346,3 +346,27 @@ fn only_standalone_literal_include_arguments_name_gradle_artifacts() {
         assert_eq!(actual, wanted, "{include}: {export}");
     }
 }
+
+#[test]
+fn a_gradle_declaration_without_a_coordinate_string_is_no_consumer() {
+    let [_, _, _, client] = workspace("jvm_packages_not_coordinates");
+    for declaration in [
+        "implementation(project(':tools'))",
+        "implementation project(':tools')",
+        "implementation(libs.models)",
+        "testImplementation files('libs/models.jar')",
+        "api(platform('example:kit:1'))",
+    ] {
+        fs::write(
+            client.join("build.gradle"),
+            format!("group = 'example'\ndependencies {{\n    {declaration}\n}}\n"),
+        )
+        .unwrap();
+        let export = Engine::open(&client).unwrap().export().unwrap();
+        let json: Value = serde_json::from_str(&export).unwrap();
+        assert!(
+            json["links"].as_array().unwrap().is_empty(),
+            "{declaration}: {export}"
+        );
+    }
+}

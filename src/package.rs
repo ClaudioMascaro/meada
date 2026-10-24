@@ -2233,7 +2233,7 @@ mod tests {
     #[test]
     fn the_list_names_each_ecosystem_once_in_its_order() {
         let names: Vec<_> = ECOSYSTEMS.iter().map(|e| e.name()).collect();
-        assert_eq!(names, ["npm", "pypi", "cargo", "go"]);
+        assert_eq!(names, ["npm", "pypi", "cargo", "go", "maven"]);
         let prefixes: Vec<_> = ECOSYSTEMS.iter().map(|e| e.prefix()).collect();
         assert_eq!(
             prefixes,
@@ -2241,7 +2241,8 @@ mod tests {
                 "package::npm::",
                 "package::pypi::",
                 "package::cargo::",
-                "package::go::"
+                "package::go::",
+                "package::maven::"
             ]
         );
     }

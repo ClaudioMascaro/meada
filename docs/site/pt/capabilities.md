@@ -105,7 +105,7 @@ O Meada não lê `go.sum` nem lockfiles, incluindo `Cargo.lock`. Não consulta o
 
 Cada `pom.xml` com coordenadas literais e cada projeto Gradle com `group` e nome literais gera `package::maven::<grupo>:<artefato>`. O Maven herda o grupo literal de `<parent>` quando necessário; cada módulo é um artefato. No Gradle, `rootProject.name` e `include` de `settings.gradle` ou `settings.gradle.kts` nomeiam os projetos dos arquivos `build.gradle` ou `build.gradle.kts`.
 
-Dependências Maven e Gradle se ligam aos artefatos do workspace com nível `exact` e `range unchecked`. Uma coordenada que usa propriedade ou variável fica `ambiguous`, mesmo com um único candidato; as partes literais filtram os candidatos. Dependências externas ficam de fora. Os leitores são compartilhados com Kotlin, sem executar JDK, Maven ou Gradle e sem consultar registros.
+Dependências Maven e Gradle se ligam aos artefatos do workspace com nível `exact` e `range unchecked`. Uma coordenada que usa propriedade ou variável fica `ambiguous`, mesmo com um único candidato; as partes literais filtram os candidatos. Uma declaração Gradle sem string `grupo:artefato`, como `project(":tools")`, `files(...)`, `platform(...)` ou `libs.models`, não gera dependência. Dependências externas ficam de fora. Os leitores são compartilhados com Kotlin, sem executar JDK, Maven ou Gradle e sem consultar registros.
 
 ## Drift de formato
 

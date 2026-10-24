@@ -133,7 +133,15 @@ fn configuration(name: &str) -> bool {
 }
 
 fn dependency(field: &str, args: &[Token]) -> Option<Entry> {
-    if args.iter().any(|t| matches!(t, Token::Unread)) {
+    // A call (`project(...)`, `files(...)`, `platform(...)`) or no string at all
+    // (`libs.models`) declares no `group:artifact` coordinate.
+    let call = args
+        .windows(2)
+        .any(|w| matches!(w, [Token::Word(_), Token::Mark('(')]));
+    if call
+        || !args.iter().any(|t| matches!(t, Token::String(..)))
+        || args.iter().any(|t| matches!(t, Token::Unread))
+    {
         return None;
     }
     let mut text = String::new();
@@ -227,6 +235,31 @@ fn assigns(tokens: &[Token], name: &str) -> bool {
     })
 }
 
+/// The arguments of `include` that are a lone literal string, in `include(":a", ":b")` or
+/// `include ':a', ':b'`; an argument that computes its value (a call, a concatenation) names
+/// no project.
+fn included(args: &[Token]) -> Vec<&str> {
+    let args = match args {
+        [Token::Mark('('), inner @ .., Token::Mark(')')] => inner,
+        _ => args,
+    };
+    let mut depth = 0usize;
+    let mut out = Vec::new();
+    for arg in args.split(|t| {
+        match t {
+            Token::Mark('(' | '[') => depth += 1,
+            Token::Mark(')' | ']') => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+        depth == 0 && matches!(t, Token::Mark(','))
+    }) {
+        if let [Token::String(s, false)] = arg {
+            out.push(s.as_str());
+        }
+    }
+    out
+}
+
 fn statement(tokens: &[Token], blocks: &[String], build: &mut super::Build, summary: &mut Summary) {
     if blocks.is_empty() {
         if let Some(group) = assigned(tokens, "group") {
@@ -239,11 +272,8 @@ fn statement(tokens: &[Token], blocks: &[String], build: &mut super::Build, summ
             build.project = project.filter(|s| super::literal(s)).map(str::to_string);
         }
         if tokens.first().and_then(Token::word) == Some("include") {
-            for project in tokens.iter().skip(1).filter_map(|t| match t {
-                Token::String(s, false) => Some(s),
-                _ => None,
-            }) {
-                let project = project.trim_start_matches(':');
+            for project in included(&tokens[1..]) {
+                let project = project.strip_prefix(':').unwrap_or(project);
                 if project
                     .split(':')
                     .all(|s| super::literal(s) && !matches!(s, "." | ".."))

@@ -105,7 +105,7 @@ Meada reads neither `go.sum` nor lockfiles, including `Cargo.lock`. It queries n
 
 Each `pom.xml` with literal coordinates and each Gradle project with a literal `group` and name provides `package::maven::<group>:<artifact>`. Maven inherits the literal `<parent>` group when needed; every module is an artifact. For Gradle, `rootProject.name` and `include` in `settings.gradle` or `settings.gradle.kts` name the projects of `build.gradle` or `build.gradle.kts` files.
 
-Maven and Gradle dependencies link to workspace artifacts at `exact` with `range unchecked`. A coordinate using a property or variable stays `ambiguous`, even with one candidate; its literal fragments filter candidates. External dependencies stay out. The readers are shared with Kotlin and invoke no JDK, Maven or Gradle and query no registry.
+Maven and Gradle dependencies link to workspace artifacts at `exact` with `range unchecked`. A coordinate using a property or variable stays `ambiguous`, even with one candidate; its literal fragments filter candidates. A Gradle declaration without a `group:artifact` string, such as `project(":tools")`, `files(...)`, `platform(...)` or `libs.models`, is no dependency. External dependencies stay out. The readers are shared with Kotlin and invoke no JDK, Maven or Gradle and query no registry.
 
 ## Shape drift
 

@@ -1710,6 +1710,66 @@ sample.requirements.txt
   ]
 }
 
+sample.pom.xml
+{
+  "name": "example:models",
+  "version": "1.0",
+  "dependencies": [
+    {
+      "field": "dependencies",
+      "name": "example:shared*",
+      "range": "${release}",
+      "via": "computed"
+    }
+  ],
+  "roots": [
+    "src/main/java",
+    "src/test/java"
+  ]
+}
+
+sample.build.gradle.kts
+{
+  "build": {
+    "group": "example"
+  },
+  "version": "1.0",
+  "dependencies": [
+    {
+      "field": "implementation",
+      "name": "example:models",
+      "range": "1.0"
+    },
+    {
+      "field": "runtimeOnly",
+      "name": "example:*",
+      "range": "$version",
+      "via": "computed"
+    }
+  ],
+  "roots": [
+    "src/main/java",
+    "src/test/java"
+  ]
+}
+
+sample.settings.gradle.kts
+{
+  "build": {
+    "project": "kit",
+    "includes": [
+      [
+        "nested",
+        "extras/nested"
+      ],
+      [
+        "tools",
+        "tools"
+      ]
+    ]
+  }
+}
+
 sample.tsconfig.json
 {
   "out_dir": "./dist",
