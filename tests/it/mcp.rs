@@ -55,6 +55,10 @@ async fn serves_three_tools_over_stdio_within_the_description_budget() {
         "tool list costs {} tokens",
         bytes.div_ceil(4)
     );
+    common::assert_golden(
+        "surface.mcp-tools.json",
+        &format!("{}\n", serde_json::to_string_pretty(&tools).unwrap()),
+    );
 
     let answer = client
         .call_tool(
@@ -73,6 +77,64 @@ async fn serves_three_tools_over_stdio_within_the_description_budget() {
         "example.com/acme/web src/math.ts:5 sum\n  example.com/acme/web src/math.ts:1 add\n\
          chain: exact · 0 hops · 1 repos · 32 tokens\n"
     );
+    client.cancel().await.unwrap();
+}
+
+/// The effective default stays 2,000 for every tool, even if its schema text stays unchanged.
+#[tokio::test]
+async fn the_three_tools_default_to_a_2000_token_budget() {
+    let repo = fixture_repo(
+        "mcp_default_budget",
+        "ts-basic",
+        Some("https://example.com/acme/web.git"),
+    );
+    let mut source = String::from("export function entrypoint() {\n");
+    for i in 0..256 {
+        source.push_str(&format!("  step{i:03}();\n"));
+    }
+    source.push_str("}\n");
+    for i in 0..256 {
+        source.push_str(&format!("export function step{i:03}() {{ return {i}; }}\n"));
+    }
+    std::fs::write(repo.join("src/surface.ts"), source).unwrap();
+    let transport = TokioChildProcess::new(
+        tokio::process::Command::new(env!("CARGO_BIN_EXE_meada")).configure(|c| {
+            c.arg("mcp").current_dir(&repo);
+        }),
+    )
+    .unwrap();
+    let client = ().serve(transport).await.unwrap();
+    for (tool, args) in [
+        ("search", serde_json::json!({"query": ""})),
+        ("context", serde_json::json!({"symbol": "entrypoint"})),
+        ("trace", serde_json::json!({"from": "entrypoint"})),
+    ] {
+        let mut answers = Vec::new();
+        for budget in [None, Some(2000)] {
+            let mut args = args.as_object().unwrap().clone();
+            if let Some(budget) = budget {
+                args.insert("budget".into(), serde_json::json!(budget));
+            }
+            let answer = client
+                .call_tool(CallToolRequestParams::new(tool).with_arguments(args))
+                .await
+                .unwrap();
+            assert_ne!(answer.is_error, Some(true), "{tool}: {answer:?}");
+            let text = &answer
+                .content
+                .first()
+                .and_then(|c| c.as_text())
+                .unwrap()
+                .text;
+            answers.push(text.clone());
+        }
+        assert_eq!(answers[0], answers[1], "{tool}: default budget changed");
+        assert!(
+            answers[0].contains("(budget 2000 tokens)"),
+            "{tool}: the fixture must exceed the default budget"
+        );
+        assert!(answers[0].len().div_ceil(4) <= 2000, "{tool}");
+    }
     client.cancel().await.unwrap();
 }
 
