@@ -118,7 +118,9 @@ with wasm-pack and checks both trees.
   re-exports the shared pieces where they lived (`index`, `contract`, `package`, `decisions`,
   `community`, `entry`, `document`) and keeps its own `Export`, `Provider`, `Consumer`,
   `Document` and `Package` with what only the build needs, turned into these by
-  `index::Export::written`.
+  `index::Export::written`. The emitted field/null/omission and enum inventory is documented
+  in `docs/site/pt/export.md`, with matching English and Spanish references; storage-only
+  shape imports are distinguished from the canonical export's public imports.
 - `meada-core/src/shape.rs`: shapes and shape drift (ADR 0009: `Drift`, `{missing, unchecked}`,
   `shape::drift`), which the binary reaches as `crate::shape`. `drift.rs`: how `context`,
   `search` and `status` show a link's drift (`consumers`, `matches`, `counts`, over the `Entry`s
