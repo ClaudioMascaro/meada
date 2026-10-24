@@ -1,0 +1,363 @@
+$ meada help
+LLM-free code graph for agents and people
+
+Usage: meada <COMMAND>
+
+Commands:
+  index       Build the indexes of the workspace of the repository in the current directory.
+  status      Show the workspace: each repository, its index state and any peer not found.
+  export      Print the index as sorted JSON, with the links that touch it.
+  mcp         Serve the repository in the current directory to agents over MCP (stdio).
+  decide      Resolve the open items of this repository, ambiguous links and dynamic URLs, and record the picks in meada.decisions.toml.
+  snapshot    Server mode: the snapshot store of generations (ADR 0012).
+  github-app  git credentials from GitHub App installation tokens, for the indexing job.
+  ui          Serve the management console, read only, at host:port, :port or port (loopback without a host).
+  workspace   Manage the workspace versions in the snapshot store
+  help        Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+
+$ meada help index
+Build the indexes of the workspace of the repository in the current directory.
+
+Usage: meada index [OPTIONS]
+
+Options:
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+  -h, --help                   Print help
+
+$ meada help status
+Show the workspace: each repository, its index state and any peer not found.
+
+Usage: meada status [OPTIONS]
+
+Options:
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+      --generations            Use the generation `meada snapshot pull` made current on this node, with the --workspace manifest's [snapshot] section
+  -h, --help                   Print help
+
+$ meada help export
+Print the index as sorted JSON, with the links that touch it.
+
+Usage: meada export [OPTIONS]
+
+Options:
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+      --repo <REPO>            Server mode: the identity of the repository to export
+      --generations            Use the generation `meada snapshot pull` made current on this node, with the --workspace manifest's [snapshot] section
+  -h, --help                   Print help
+
+$ meada help mcp
+Serve the repository in the current directory to agents over MCP (stdio).
+
+Usage: meada mcp [OPTIONS]
+
+Options:
+      --listen <LISTEN>        Server mode: serve over MCP streamable HTTP at host:port, :port or port (loopback without a host), with --workspace
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+      --generations            Use the generation `meada snapshot pull` made current on this node, with the --workspace manifest's [snapshot] section
+  -h, --help                   Print help
+
+$ meada help decide
+Resolve the open items of this repository, ambiguous links and dynamic URLs, and record the picks in meada.decisions.toml.
+
+Usage: meada decide [OPTIONS]
+
+Options:
+      --item <ITEM>    Work on this item only, even one already decided, to redo it (a call-site id, as `meada decide --list` or the MCP `search` tool prints it).
+      --dry-run        Print the decisions the run would write and leave the file unchanged.
+      --list           Print the open items; neither ask nor write.
+      --prune          Remove the stale decisions from meada.decisions.toml; keep those waiting on a missing peer.
+      --decider        Ask the model the MEADA_DECIDER_* variables configure instead of a person.
+      --show-request   With --decider: print every request the run would send, and send none.
+      --min-p <MIN_P>  With --decider: write a model decision only from this probability up (default 0.5).
+  -h, --help           Print help
+
+$ meada help snapshot
+Server mode: the snapshot store of generations (ADR 0012).
+
+Usage: meada snapshot <COMMAND>
+
+Commands:
+  publish  Upload the workspace as a generation, once every index equals its mirror.
+  pull     Fetch the store's current generation into local_dir, verify it and make it the node's current one.
+  lock     Take the workspace's refresh lock, run the command as its child and release the lock.
+  pointer  Move the workspace's generation pointer under the refresh lock.
+  fence    Recover the refresh lock's fence under the lock.
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+
+$ meada help snapshot publish
+Upload the workspace as a generation, once every index equals its mirror.
+
+Usage: meada snapshot publish --workspace <WORKSPACE>
+
+Options:
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+  -h, --help                   Print help
+
+$ meada help snapshot pull
+Fetch the store's current generation into local_dir, verify it and make it the node's current one.
+
+Usage: meada snapshot pull [OPTIONS] --workspace <WORKSPACE>
+
+Options:
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+      --every <SECONDS>        Pull again every this many seconds.
+  -h, --help                   Print help
+
+$ meada help snapshot lock
+Take the workspace's refresh lock, run the command as its child and release the lock.
+
+Usage: meada snapshot lock --workspace <WORKSPACE> -- <COMMAND>...
+
+Arguments:
+  <COMMAND>...  The refresh to run: fetch, meada index --workspace, meada snapshot publish.
+
+Options:
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+  -h, --help                   Print help
+
+$ meada help snapshot pointer
+Move the workspace's generation pointer under the refresh lock.
+
+Usage: meada snapshot pointer <COMMAND>
+
+Commands:
+  set     Point the fleet at a retained generation: a rollback, or forward again.
+  retain  Keep a generation on every node, outside the keep trim, until it is dropped.
+  drop    Stop retaining a generation that is not current; the next pull deletes it.
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+
+$ meada help snapshot pointer set
+Point the fleet at a retained generation: a rollback, or forward again.
+
+Usage: meada snapshot pointer set --workspace <WORKSPACE> <GENERATION>
+
+Arguments:
+  <GENERATION>  The generation id, one of the retained set.
+
+Options:
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+  -h, --help                   Print help
+
+$ meada help snapshot pointer retain
+Keep a generation on every node, outside the keep trim, until it is dropped.
+
+Usage: meada snapshot pointer retain --workspace <WORKSPACE> <GENERATION>
+
+Arguments:
+  <GENERATION>  The generation id, one whose document the store holds.
+
+Options:
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+  -h, --help                   Print help
+
+$ meada help snapshot pointer drop
+Stop retaining a generation that is not current; the next pull deletes it.
+
+Usage: meada snapshot pointer drop --workspace <WORKSPACE> <GENERATION>
+
+Arguments:
+  <GENERATION>  The generation id, one of the retained set.
+
+Options:
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+  -h, --help                   Print help
+
+$ meada help snapshot pointer help
+Print this message or the help of the given subcommand(s)
+
+Usage: meada snapshot pointer help [COMMAND]...
+
+Arguments:
+  [COMMAND]...  Print help for the subcommand(s)
+
+$ meada help snapshot fence
+Recover the refresh lock's fence under the lock.
+
+Usage: meada snapshot fence <COMMAND>
+
+Commands:
+  recover  Raise the fence to the highest one recorded in Valkey, never lowering it.
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+
+$ meada help snapshot fence recover
+Raise the fence to the highest one recorded in Valkey, never lowering it.
+
+Usage: meada snapshot fence recover [OPTIONS] --workspace <WORKSPACE>
+
+Options:
+      --at-least <FENCE>       A floor for the fence, such as one read in a node's <local_dir>/current.
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+  -h, --help                   Print help
+
+$ meada help snapshot fence help
+Print this message or the help of the given subcommand(s)
+
+Usage: meada snapshot fence help [COMMAND]...
+
+Arguments:
+  [COMMAND]...  Print help for the subcommand(s)
+
+$ meada help snapshot help
+Print this message or the help of the given subcommand(s)
+
+Usage: meada snapshot help [COMMAND]...
+
+Arguments:
+  [COMMAND]...  Print help for the subcommand(s)
+
+$ meada help github-app
+git credentials from GitHub App installation tokens, for the indexing job.
+
+Usage: meada github-app <COMMAND>
+
+Commands:
+  credential  git's credential helper: answer get with an installation token, ignore store, drop the cached token on erase.
+  throttled   Mark the installation that last answered for a repository as throttled, after a fetch that failed with 403 or 429.
+  help        Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+
+$ meada help github-app credential
+git's credential helper: answer get with an installation token, ignore store, drop the cached token on erase.
+
+Usage: meada github-app credential --workspace <WORKSPACE> <ACTION>
+
+Arguments:
+  <ACTION>  The operation git asks for: get, store or erase. [possible values: get, store, erase]
+
+Options:
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+  -h, --help                   Print help
+
+$ meada help github-app throttled
+Mark the installation that last answered for a repository as throttled, after a fetch that failed with 403 or 429.
+
+Usage: meada github-app throttled [OPTIONS] --workspace <WORKSPACE> <REPOSITORY>
+
+Arguments:
+  <REPOSITORY>  The https URL of the repository whose fetch failed.
+
+Options:
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+      --retry-after <SECONDS>  The Retry-After of the failed fetch, in seconds; without it, 1 minute, doubled on each repeat.
+  -h, --help                   Print help
+
+$ meada help github-app help
+Print this message or the help of the given subcommand(s)
+
+Usage: meada github-app help [COMMAND]...
+
+Arguments:
+  [COMMAND]...  Print help for the subcommand(s)
+
+$ meada help ui
+Serve the management console, read only, at host:port, :port or port (loopback without a host).
+
+Usage: meada ui --listen <LISTEN> --workspace <WORKSPACE>
+
+Options:
+      --listen <LISTEN>        Where the console listens: host:port, :port or port (loopback without a host)
+      --workspace <WORKSPACE>  The bootstrap manifest, with its [ui] section
+  -h, --help                   Print help
+
+$ meada help workspace
+Manage the workspace versions in the snapshot store
+
+Usage: meada workspace <COMMAND>
+
+Commands:
+  import  Store the [[repository]] entries of a manifest file as a workspace version and print its id
+  list    List the workspace versions, newest first, the current one marked
+  show    Print a workspace version as [[repository]] entries
+  apply   Make a stored workspace version the current one, under the refresh lock
+  pull    Bring the current workspace version onto this machine, under index_dir
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+
+$ meada help workspace import
+Store the [[repository]] entries of a manifest file as a workspace version and print its id
+
+Usage: meada workspace import [OPTIONS] --message <MESSAGE> --workspace <WORKSPACE> <FILE>
+
+Arguments:
+  <FILE>  The manifest file whose [[repository]] entries are imported
+
+Options:
+      --message <MESSAGE>      Why the workspace changes
+      --author <AUTHOR>        The version's author (cli:<login>@<host> by default)
+      --workspace <WORKSPACE>  The bootstrap manifest, with its [snapshot] and [generations] sections
+  -h, --help                   Print help
+
+$ meada help workspace list
+List the workspace versions, newest first, the current one marked
+
+Usage: meada workspace list --workspace <WORKSPACE>
+
+Options:
+      --workspace <WORKSPACE>  The bootstrap manifest, with its [snapshot] and [generations] sections
+  -h, --help                   Print help
+
+$ meada help workspace show
+Print a workspace version as [[repository]] entries
+
+Usage: meada workspace show --workspace <WORKSPACE> [VERSION]
+
+Arguments:
+  [VERSION]  The workspace version id (the current one by default)
+
+Options:
+      --workspace <WORKSPACE>  The bootstrap manifest, with its [snapshot] and [generations] sections
+  -h, --help                   Print help
+
+$ meada help workspace apply
+Make a stored workspace version the current one, under the refresh lock
+
+Usage: meada workspace apply --workspace <WORKSPACE> <VERSION>
+
+Arguments:
+  <VERSION>  The workspace version id to apply
+
+Options:
+      --workspace <WORKSPACE>  The bootstrap manifest, with its [snapshot] and [generations] sections
+  -h, --help                   Print help
+
+$ meada help workspace pull
+Bring the current workspace version onto this machine, under index_dir
+
+Usage: meada workspace pull --workspace <WORKSPACE>
+
+Options:
+      --workspace <WORKSPACE>  The bootstrap manifest, with its [snapshot] and [generations] sections
+  -h, --help                   Print help
+
+$ meada help workspace help
+Print this message or the help of the given subcommand(s)
+
+Usage: meada workspace help [COMMAND]...
+
+Arguments:
+  [COMMAND]...  Print help for the subcommand(s)
+
+$ meada help help
+Print this message or the help of the given subcommand(s)
+
+Usage: meada help [COMMAND]...
+
+Arguments:
+  [COMMAND]...  Print help for the subcommand(s)

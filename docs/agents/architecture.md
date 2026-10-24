@@ -1456,7 +1456,11 @@ one for the area a change touches.
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
-  ranges are in them. An export golden of a test about something else goes through
+  ranges are in them. `surface.mcp-tools.json` records the full stdio tool list beside its
+  1,000-token check; large answers through each tool check the effective default of 2,000.
+  `surface.cli.{default,cloud}.en.txt` records English help recursively for
+  every command of the default and complete cloud builds; both CI feature gates check it.
+  An export golden of a test about something else goes through
   `without_processes(export)`, which drops `processes`: only the chain's own exports
   (`chain-{web,gateway,catalog,worker}.export.json`), the conformance export and the
   `*.processes.json` goldens carry them (spec #31), so a change to the process walk re-blesses

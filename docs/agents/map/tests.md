@@ -73,7 +73,10 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   file's fence and already current; with `snapshot`, the `[snapshot] node_name` error in both
   languages),
   `mcp`
-  (the binary over stdio), `server` (`meada mcp --listen` as a child process over the chain's
+  (the binary over stdio, its complete tool-list golden and 1,000-token description/schema
+  budget, and each tool's effective 2,000-token default over a large answer); `cli` also walks
+  every command's English help into default and cloud surface goldens, regenerated only with
+  `MEADA_BLESS=1`. `server` (`meada mcp --listen` as a child process over the chain's
   mirrors, through rmcp's streamable HTTP client and plain HTTP requests: the stdio tools and
   `trace` byte for byte, the 404 listing, the `uncommitted` refusal, the behind line before and
   after `meada index`, two stateless servers answering alternate calls, the refused start, and
