@@ -16,6 +16,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Public fixture benchmark (issue #149): release-profile index/reindex timings, root and
+  workspace index sizes, and default-answer/tool-list token estimates in every PR/main CI
+  summary and retained JSON/Markdown artifact. Timings are informational.
+
 - Normative English MCP output grammar (issue #145), checked against every rendered-answer
   golden with counted context source spans and file/line diagnostics for undocumented lines.
 

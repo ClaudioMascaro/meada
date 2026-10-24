@@ -8,6 +8,16 @@ Reviewing a change to an `*.export.json` golden: `cargo run --example golden_dif
 diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_diff.rs` for the
 `--range` forms) prints added, removed and moved entries per section instead of the raw JSON.
 
+Run the public benchmark with `cargo test --locked --release --test it
+benchmark::records_public_fixture_benchmark -- --ignored --exact --nocapture` (one shell
+command). `MEADA_BENCH_OUT` selects the report directory; otherwise it is
+`$CARGO_TARGET_TMPDIR/public-fixture-benchmark`. Under local `bounded`, prefix Cargo with
+`env -u LD_PRELOAD` to measure real fsync, as CI does. Cold means indexes absent, not an
+emptied OS page cache; setup and report I/O are outside the timers. The reindex timer covers
+the whole workspace after one root source edit. Sizes are logical `index.db` bytes, with
+root and workspace totals distinguished. JSON names the fixed subjects, edited sources and
+all repository fixtures; it contains no private corpus data. Existing tests own token limits.
+
 - `ui/tests/operations.test.ts` projects operational API fixtures into fleet diagnostics,
   retention/bundle metadata, repository provenance, cached credential lifetime and token-check
   outcomes. `operations.test.tsx` exercises the five pages through their DOM and HTTP client,
@@ -27,6 +37,9 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `grammar` (the normative output reference's prose/executable line-kind and state inventories,
   every rendered-answer golden, counted source spans, and negative line/level/footer/drift
   checks with file/line diagnostics),
+  `benchmark` (public fixture index/reindex times and sizes, fixed default-answer and MCP
+  tool-list token costs, JSON/Markdown reports, future conformance/cross-language coverage
+  guard; ignored development harness, timings never gate),
   `conformance` (pack; for Python also its HTTP providers and consumers
   and its message channels, over `conformance-python` (`messages/`), `python-mounts` and
   `python-django`; for Rust, `conformance-rust`: a Cargo workspace whose members are `api`
