@@ -1,6 +1,6 @@
 # Capabilities and limits
 
-Meada 0.1 indexes TypeScript, JavaScript, Python, Rust and Go. It finds calls in code and connects repositories through HTTP, packages and messaging channels. Each link reports its confidence level.
+Meada 0.1 indexes TypeScript, JavaScript, Python, Rust, Go and Java. It finds calls in code and connects repositories through HTTP, packages and messaging channels. Each link reports its confidence level.
 
 Server mode includes the [console](console.md), [snapshots](snapshots.md), [retention](generations.md) and [managed workspace](workspaces.md) through optional modules. The console has an editor, diff, playground and graph. [Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/) and [Helm](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/) provide deployment examples.
 
@@ -12,6 +12,7 @@ Server mode includes the [console](console.md), [snapshots](snapshots.md), [rete
 | Python | `.py` |
 | Rust | `.rs` reachable through each crate's module tree |
 | Go | `.go` included by the package's build rules |
+| Java | `.java`, resolved by their `package` declarations |
 
 ### Rust
 
@@ -30,6 +31,14 @@ The `module` path in each `go.mod` resolves imports to package directories, incl
 Analysis targets linux/amd64. Files named `_windows.go`, with a false `//go:build`, or using cgo (`import "C"`) stay out. Meada reads functions, types, interfaces and methods (`Type.Method`). It resolves calls within the package and through imports (`pkg.F()`, alias or dot); standard-library and external modules remain external.
 
 A `recv.M()` call is `exact` when the code supplies its type in a parameter, field, `var`, composite literal or function result. Otherwise, name resolution is `inferred` or `ambiguous`. A call through an interface stops at its interface method.
+
+### Java
+
+Meada reads classes, interfaces, enums, records, methods and constructors, including nested types. Names include the package and, for methods, the written parameter types: `example.Orders.place(String,int)`. Calls in lambdas and anonymous classes belong to the enclosing symbol.
+
+Single-type, package and static imports, including `*`, resolve through package declarations. Bare, `this` and static calls are `exact` when argument count leaves one method; overloads with the same argument count stay `ambiguous`. External types stay external. Public types and their public or protected members form the exported surface.
+
+Indexing needs no JDK, Maven or Gradle and executes no repository code.
 
 ## HTTP and contract documents
 
@@ -91,6 +100,12 @@ Each `go.mod` with `module` produces `package::go::<module path>`. `require` and
 The link is `exact`, with the `require` version as its range, `(local none)` as the local version and `range unchecked`. An import of `<module>/<directory>` reaches the directory's exported functions, types and methods. When the directory exists, the link is `exact`, with `; import module path` in its reason.
 
 Meada reads neither `go.sum` nor lockfiles, including `Cargo.lock`. It queries no module proxy, npm registry, PyPI or crates.io.
+
+## Maven and Gradle packages
+
+Each `pom.xml` with literal coordinates and each Gradle project with a literal `group` and name provides `package::maven::<group>:<artifact>`. Maven inherits the literal `<parent>` group when needed; every module is an artifact. For Gradle, `rootProject.name` and `include` in `settings.gradle` or `settings.gradle.kts` name the projects of `build.gradle` or `build.gradle.kts` files. A project renamed or moved in `settings.gradle` (`project(":app").name`, `.projectDir`) and a `group` set in `allprojects` provide no artifact.
+
+Maven and Gradle dependencies, map notation (`group: 'g', name: 'a'`) included, link to workspace artifacts at `exact` with `range unchecked`. A computed version (`${project.version}`, `$v`) keeps the link `exact`, with the version as written. A group or artifact using a property or variable stays `ambiguous`, even with one candidate; its literal fragments filter candidates, and a coordinate with no literal fragment is no dependency. A Gradle declaration without a coordinate, such as `project(":tools")`, `files(...)`, `platform(...)` or `libs.models`, is no dependency. External dependencies stay out. The readers are shared with Kotlin and invoke no JDK, Maven or Gradle and query no registry.
 
 ## Shape drift
 

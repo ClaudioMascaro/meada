@@ -756,7 +756,7 @@ one for the area a change touches.
   one, never a missing or empty file; `refresh` stays one transaction in place. An operator
   renames an index in (built elsewhere) only while no `meada index` writes that index, one
   writer per index: a refresh's live `index.db-journal` would be taken for the new file's. `lang/`: the
-  language adapter and the TS/JS, Python, Rust and Go packs. `resolve.rs`: calls to definitions (`Resolver`), values
+  language adapter and the TS/JS, Python, Rust, Go and Java packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`: `Code::origins`, the one origin question, with three evidence policies
   (`Values`, `Constants` for the TypeScript forms, `Declarations` for Go's typed clients and
   forms), `Code::outside` for what an import from outside binds a name to, and `Code::expand`
@@ -772,8 +772,8 @@ one for the area a change touches.
   requests, httpx and aiohttp consumers, whose rows also list reqwest and ureq; `http/rust.rs`
   and `http/rust/axum.rs`, actix-web, Rocket and axum providers; `http/go.rs` and
   `http/go/clients.rs`, net/http, gin, echo, chi and gorilla/mux providers and their consumers
-  with resty), resource and channel kinds. `package.rs` and `package/`: npm, PyPI, Cargo and Go packages as
-  contracts (specs #22, #24, #30 and #25), the shared steps and one module per ecosystem behind
+  with resty), resource and channel kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
+  contracts (specs #22, #24, #30, #25 and #26), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `literals.rs`, `zod.rs` (and `meada-core`'s `shape.rs`): OpenAPI and AsyncAPI
@@ -821,7 +821,8 @@ one for the area a change touches.
   from its own repository (a monorepo), at any level.
 - Package: `package::npm::<name>`, `package::pypi::<name>` (the PEP 503 normalized name) or
   `package::cargo::<name>` (the `[package] name`; a dependent's site names the key it writes, so
-  a renamed crate has its own site) or `package::go::<module path>` (the `module` of a `go.mod`),
+  a renamed crate has its own site) or `package::go::<module path>` (the `module` of a `go.mod`), or
+  `package::maven::<group>:<artifact>` (a Maven or Gradle artifact),
   provided at `<repository>::<manifest path>` (such as `example.com/pkg/shared::package.json` or
   `example.com/pkg/pylib::pyproject.toml`) and consumed at `<repository>::<manifest
   path>::<field>::<name>` (PyPI fields: `project.dependencies`, `tool.poetry.dependencies`, and
@@ -1034,8 +1035,8 @@ one for the area a change touches.
   `xlang-go-*` fixtures carry a TypeScript producer to the Go consumer group.
 - New **package ecosystem** (spec #22 user story 26, spec #225; track B packs): implement the
   `Ecosystem` trait of `package.rs` in a module of its own under `package/` (`npm`, `pypi`,
-  `cargo`, `go` today) and add it to `ECOSYSTEMS`; the package kind, the index writer and the
-  packs learn no name. An arm for one ecosystem added to the shared code is a finding. It plugs
+  `cargo`, `go`, `maven` today) and add it to `ECOSYSTEMS`; the package kind, the index writer
+  and the packs learn no name. An arm for one ecosystem added to the shared code is a finding. It plugs
   in another manifest format (`Cargo.toml`, `go.mod`) without a new kind of contract: the
   contract `package::<name>::<package>` (`Ecosystem::prefix`, derived from `name`) still routes
   to the same `Packages` steps (`declare`, `consume`, `import`, `shapes`, `link`, `place`,
@@ -1049,6 +1050,8 @@ one for the area a change touches.
     hostile bytes read as empty); `sources()` (the extensions of the source files whose imports
     name its packages); `names_package(specifier)`; `entries(..)` (the dependency entries an
     import of a file may name, each with the subpath inside the package).
+  - `fits`: literal package-name equality; Maven matches the literal fragments of a computed
+    coordinate. `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
   - `flag`: the range is unchecked (`range unchecked`); npm checks semver.
   - `reaches`: every provider; npm's `workspace:` keeps the dependent's own repository, Cargo
     and Go share `sourced`, in the seam (a `path` by the folded location, a `git` by the
@@ -1205,7 +1208,16 @@ one for the area a change touches.
   (Rust's default features) also gives `settings` (a string per file path, stored as
   `files.setting` and `Facts::setting`) and takes it in `parse_with`; a file whose setting
   changed is parsed again, whatever its content. Besides `parse` and `modules`, it says what the
-  shared resolution cannot guess: `receiver` and `base_receiver` (keywords for the enclosing
+  shared resolution cannot guess: `members_in_scope` (bare names may name class members),
+  `unordered_globs` (combine wildcard candidates, with an inside glob taking priority),
+  `qualified_types` (an unbound path head may name a repository type through its layout),
+  `Facts::overloads` and `Facts::constructors` (separate method and constructor families with
+  written signatures), `Call::arity` and `Call::constructs`
+  (the argument count and constructor call form, kept in cached facts), `Facts::statics` (members a class wildcard
+  import takes), `Imported::Qualified` (a fully qualified definition import),
+  with Java parameter types spelled from syntax tokens, excluding annotations and comments,
+  and `#method` after a class-named method's signature to distinguish it from a constructor,
+  `receiver` and `base_receiver` (keywords for the enclosing
   class and its base), `globals` (names bound everywhere), `Def::bases` (a class's bases, for
   its family), `Facts::receivers` (the class each binding gives a name), `Facts::star` (what a
   star import takes), `stars_bind` (whether a star import rebinds names in statement order, as
@@ -1224,8 +1236,7 @@ one for the area a change touches.
   and `Layout::programs` (both below), and `Layout::reaches` (default: none, every file), the
   files a name match may reach from a caller (`Resolver::reaching`, called by `refresh`):
   Rust's are its crate's and those of the repository's libraries it depends on. A language whose
-  files share one scope (a Go package: the files of one directory that declare one package; Java,
-  Kotlin and C# packages next) says which through `Layout::shared`, groups of files that
+  files share one scope (a Go package: the files of one directory that declare one package; Java packages; Kotlin and C# packages next) says which through `Layout::shared`, groups of files that
   `Resolver::with_shared` takes: a name a file and its imports leave unbound is looked up
   among the top-level definitions and constants of the others in its group, private ones
   included (`Resolver::sibling`, at the end of `lexical_as`), and an import that names any
@@ -1320,7 +1331,10 @@ one for the area a change touches.
   unreadable one, is rebuilt beside it and renamed over it, and `status` says so. One whose stored facts do not
   parse is rebuilt by the first refresh that reads them (when a file changed), which `status`
   cannot tell.
-- The index holds no source text and no values, apart from the literal URL path fragments and the
+- The index holds no source text and no values, apart from the argument count and constructor
+  form of an overloaded call (`Call::arity`, `Call::constructs`), callable-to-signature and
+  static-member names (`Facts::overloads`, `Facts::constructors` and
+  `Facts::statics`), the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
   consumer reads from the parsed response, and those of the zod schema or object literals a
@@ -1346,7 +1360,11 @@ one for the area a change touches.
   entries with the version requirement as written, the `alias` when the key renames the crate
   and the `via`: a `path` folded from the manifest's directory, which keeps its leading `../`
   when it leaves the repository, or the normalized `git` URL; `workspace = true` as a flag; the
-  `[workspace.dependencies]` entries; the `[workspace.package]` version), the `tsconfig.json` rows
+  `[workspace.dependencies]` entries; the `[workspace.package]` version), and of JVM build files
+  (spec #26: literal Maven coordinates and versions, dependency coordinate fragments with `*`
+  for computed parts, declared ranges and a `computed` source flag, source roots, and Gradle's
+  literal group, root project name and included project names/directories in `Summary::build`),
+  the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition, constant, type or file they name), the `entry_points` table (spec #31:
   each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
@@ -1469,6 +1487,15 @@ one for the area a change touches.
   first and lists each call's level and target, its providers, consumers and links (needs `jq`).
 
 ## Known ceilings
+
+- `lang/java.rs`: `DEFINITION_DEPTH` (128) bounds nested named types; deeper definitions and
+  their bindings stay with the enclosing symbol. `VALUE_DEPTH` (64) bounds nested values and
+  `PATH_DEPTH` (256) bounds callee segments; deeper values or callees are unknown.
+  `QUALIFICATION_BYTES` (4 MiB) bounds enclosing-name bytes across syntax visits, before each
+  visit's bounded metadata fanout. Pending visits share their scope strings. A file that
+  exceeds this budget contributes no facts or package layout, so an incomplete overload
+  family cannot produce an exact link; other files still index. The Java hostile-depth and
+  long-prefix engine fixtures exceed these limits.
 
 - `snapshot/pull.rs`: a generation's bundles hold at most `GENERATION_BYTES_MAX` (256 GiB)
   together, as the document records their sizes (checked before any download) and as the
@@ -2165,3 +2192,14 @@ one for the area a change touches.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).
+
+- `jvm/maven.rs` (spec #26): `XML_DEPTH` (64 nested elements), `XML_NAMESPACES` (16 `xmlns`
+  occurrences in the file) and `XML_ATTRIBUTES` (64 per tag) are checked by one linear pass
+  before parsing, since roxmltree copies the enclosing namespaces into each element that
+  declares one and checks a tag's attributes pairwise; `XML_NODES` (65,536) bounds the parsed
+  tree, in addition to `lang::MAX_BYTES`. `roxmltree` rejects DTDs and never loads external
+  entities. An over-limit, unterminated or malformed manifest reads as an empty summary;
+  indexing continues. `jvm/gradle.rs`: `GRADLE_DEPTH` (64) bounds nested blocks; a deeper build
+  or settings file reads as an empty summary. The Gradle scanner does not read Groovy slashy
+  strings, and reads a triple-quoted string as quoted pairs. JVM coordinate names share
+  `package::MAX_NAME` (214 bytes). These readers never run Maven, Gradle or a JDK.

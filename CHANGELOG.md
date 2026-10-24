@@ -16,6 +16,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Java source indexing (issue #84): package-qualified types and method signatures, overloads
+  narrowed by argument count, package and static imports, and conformance, determinism and
+  incremental-refresh coverage, without a JDK or build tool.
+- Maven and Gradle artifact contracts (spec #26, #93), using shared JVM manifest readers:
+  literal `group:artifact` providers, Maven modules and parent groups, Gradle project names,
+  dependencies with unchecked ranges, and ambiguous candidates for computed coordinates.
+  Indexing invokes no JVM toolchain and looks up no registry.
+
 - A multilingual documentation site (issue #320), with the README reference migrated to
   Portuguese, English and Spanish guides, React Flow maps and roadmap, accessible static and
   textual fallbacks, and a strict GitHub Pages build. S3, S4 and S5 proposals are clearly separated from delivered S1/S2.

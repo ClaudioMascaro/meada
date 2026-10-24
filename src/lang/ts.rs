@@ -114,6 +114,8 @@ impl LanguagePack for TsJs {
                             node.start_byte()
                         };
                         facts.calls.push(Call {
+                            arity: None,
+                            constructs: false,
                             scope: scope.clone(),
                             callee: callee(function, src),
                             range: start..node.end_byte(),

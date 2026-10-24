@@ -82,6 +82,10 @@ rustls = { version = "0.23.46", optional = true, default-features = false, featu
     "tls12",
 ] }
 rustls-platform-verifier = { version = "0.7.1", optional = true }
+# Maven POMs: read-only XML, DTD disabled and bounded in the shared JVM reader. Not quick-xml:
+# it is in the lockfile only through the optional `snapshot` feature (`object_store`), and the
+# default dependency tree forbids it.
+roxmltree = "0.21.1"
 rusqlite = { version = "0.40.2", features = ["bundled"] }
 schemars = "1.2.3"
 serde = { version = "1.0.229", features = ["derive"] }
@@ -92,6 +96,7 @@ toml = "1.1.8"
 tokio = { version = "1.53.3", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 tree-sitter = "0.27.1"
 tree-sitter-go = "0.25.0"
+tree-sitter-java = "0.23.5"
 tree-sitter-javascript = "0.25.0"
 tree-sitter-python = "0.25.0"
 tree-sitter-rust = "0.24.2"

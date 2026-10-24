@@ -1,6 +1,6 @@
 # Capacidades y límites
 
-Meada 0.1 indexa TypeScript, JavaScript, Python, Rust y Go. Encuentra llamadas en el código y conecta repositorios mediante HTTP, paquetes y canales de mensajes. Cada vínculo indica su nivel de certeza.
+Meada 0.1 indexa TypeScript, JavaScript, Python, Rust, Go y Java. Encuentra llamadas en el código y conecta repositorios mediante HTTP, paquetes y canales de mensajes. Cada vínculo indica su nivel de certeza.
 
 El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [retención](generations.md) y [workspace gestionado](workspaces.md) mediante módulos opcionales. La consola tiene editor, diff, playground y grafo. [Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/) y [Helm](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/) ofrecen ejemplos de despliegue.
 
@@ -12,6 +12,7 @@ El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [rete
 | Python | `.py` |
 | Rust | `.rs` alcanzados por el árbol de módulos de cada crate |
 | Go | `.go` incluidos por las reglas de build del paquete |
+| Java | `.java`, resueltos por sus declaraciones de `package` |
 
 ### Rust
 
@@ -30,6 +31,14 @@ La ruta `module` de cada `go.mod` resuelve imports a carpetas de paquetes, inclu
 El análisis usa linux/amd64. Archivos `_windows.go`, con `//go:build` falso o con cgo (`import "C"`) quedan fuera. Meada lee funciones, tipos, interfaces y métodos (`Tipo.Metodo`). Resuelve llamadas dentro del paquete y mediante imports (`pkg.F()`, alias o punto); la biblioteca estándar y los módulos externos permanecen externos.
 
 Una llamada `recv.M()` es `exact` cuando el código indica el tipo en un parámetro, campo, `var`, literal compuesto o resultado de función. Sin ello, la resolución por nombre es `inferred` o `ambiguous`. Una llamada por interfaz termina en el método de la interfaz.
+
+### Java
+
+Meada lee clases, interfaces, enums, records, métodos y constructores, incluidos los tipos anidados. Los nombres incluyen el paquete y, en los métodos, los tipos escritos de los parámetros: `example.Orders.place(String,int)`. Las llamadas en lambdas y clases anónimas pertenecen al símbolo que las contiene.
+
+Los imports simples, de paquete y estáticos, incluidos los de `*`, se resuelven por las declaraciones de paquete. Las llamadas sin receptor, con `this` o estáticas son `exact` cuando la cantidad de argumentos deja un solo método; las sobrecargas con la misma cantidad quedan `ambiguous`. Los tipos externos siguen siendo externos. Los tipos públicos y sus miembros públicos o protegidos forman la superficie exportada.
+
+La indexación no necesita JDK, Maven ni Gradle y no ejecuta código del repositorio.
 
 ## HTTP y documentos de contrato
 
@@ -91,6 +100,12 @@ Cada `go.mod` con `module` genera `package::go::<ruta del módulo>`. `require` y
 El vínculo es `exact`, con la versión del `require` como rango, `(local none)` como versión local y `range unchecked`. Un import de `<módulo>/<carpeta>` llega a sus funciones, tipos y métodos exportados. Si existe la carpeta, el vínculo es `exact`, con `; import module path` en la razón.
 
 Meada no lee `go.sum` ni lockfiles, incluido `Cargo.lock`. No consulta el proxy de módulos, el registro npm, PyPI ni crates.io.
+
+## Paquetes Maven y Gradle
+
+Cada `pom.xml` con coordenadas literales y cada proyecto Gradle con `group` y nombre literales genera `package::maven::<grupo>:<artefacto>`. Maven hereda el grupo literal de `<parent>` cuando hace falta; cada módulo es un artefacto. En Gradle, `rootProject.name` e `include` de `settings.gradle` o `settings.gradle.kts` nombran los proyectos de los archivos `build.gradle` o `build.gradle.kts`. Un proyecto renombrado o movido en `settings.gradle` (`project(":app").name`, `.projectDir`) y un `group` definido en `allprojects` no generan artefacto.
+
+Las dependencias Maven y Gradle, también en notación de mapa (`group: 'g', name: 'a'`), se vinculan con artefactos del workspace con nivel `exact` y `range unchecked`. Una versión calculada (`${project.version}`, `$v`) mantiene el vínculo `exact`, con la versión tal como está escrita. Un grupo o artefacto que usa una propiedad o variable queda `ambiguous`, incluso con un solo candidato; sus partes literales filtran candidatos, y una coordenada sin ninguna parte literal no genera dependencia. Una declaración Gradle sin coordenada, como `project(":tools")`, `files(...)`, `platform(...)` o `libs.models`, no genera dependencia. Las dependencias externas quedan fuera. Los lectores se comparten con Kotlin, sin ejecutar JDK, Maven o Gradle ni consultar registros.
 
 ## Drift de formato
 

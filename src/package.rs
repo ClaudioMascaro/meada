@@ -1,6 +1,7 @@
 //! Packages (spec #22): every manifest of a workspace repository with a valid name provides
 //! `package::<ecosystem>::<name>` (`package.json`: `npm`; `pyproject.toml`: `pypi`, spec #24;
-//! `Cargo.toml`: `cargo`, spec #30; `go.mod`: `go`, spec #25),
+//! `Cargo.toml`: `cargo`, spec #30; `go.mod`: `go`, spec #25; `pom.xml` and the Gradle build and
+//! settings files: `maven`, spec #26),
 //! and every dependency entry that names a package of the workspace, in the same ecosystem,
 //! consumes it. `refresh` reads each manifest into a `Summary`, derived from its bytes
 //! alone and stored in the index; `Packages::declare` turns the named ones into providers and
@@ -11,7 +12,7 @@
 //! This file holds what the ecosystems share: the `Ecosystem` trait with its defaults (Node's
 //! rule for the ways in, the candidates and the provider view), the list `ECOSYSTEMS`, the
 //! summary types and the workspace steps. Each ecosystem's own rules live in its module under
-//! `package/` (`npm`, `pypi`, `cargo`, `go`).
+//! `package/` (`npm`, `pypi`, `cargo`, `go`, `maven`).
 //!
 //! Imports cross too: `extract` stores every call through a binding imported from a bare
 //! specifier, and `import`, a workspace step after `consume`, resolves those whose package the
@@ -42,11 +43,13 @@ use crate::workspace::Repository;
 
 mod cargo;
 mod go;
+mod maven;
 mod npm;
 mod pypi;
 
 use cargo::Cargo;
 use go::Go;
+use maven::Maven;
 use npm::{Npm, exported};
 use pypi::Pypi;
 
@@ -91,6 +94,17 @@ trait Ecosystem {
     /// The start of its contract identifiers.
     fn prefix(&self) -> String {
         format!("{PREFIX}{}::", self.name())
+    }
+
+    /// Whether an uncertain dependency name may name a provider: literal equality.
+    /// Certain names use the provider index directly.
+    fn fits(&self, wanted: &str, provided: &str) -> bool {
+        wanted == provided
+    }
+
+    /// Why the dependency's source cannot establish an exact coordinate, if any.
+    fn uncertainty(&self, _via: Option<&str>) -> Option<&'static str> {
+        None
     }
 
     /// What the dependency `range` says of the provider's `version`: never evaluated.
@@ -173,7 +187,7 @@ trait Ecosystem {
         let mut out = Vec::new();
         for (entry, subpath) in self.entries(exports, providers, (n, from), specifier) {
             let mut resolved = Vec::new();
-            for &(m, i) in providers.of(self.name(), &entry.name) {
+            for (m, i) in providers.matching(self, entry) {
                 let manifest = &exports[m].manifests[i];
                 let source = (entry.via.as_deref(), entry.range.as_deref());
                 let to = (exports[m].place(), manifest.path.as_str());
@@ -210,7 +224,7 @@ trait Ecosystem {
 }
 
 /// Every ecosystem, in the order `of` and `of_contract` search and `inherit` runs.
-const ECOSYSTEMS: &[&dyn Ecosystem] = &[&Npm, &Pypi, &Cargo, &Go];
+const ECOSYSTEMS: &[&dyn Ecosystem] = &[&Npm, &Pypi, &Cargo, &Go, &Maven];
 
 /// The ecosystem of the manifest at `path`, by its file name (`Ecosystem::is_manifest`); `None`
 /// for any other file.
@@ -283,7 +297,7 @@ pub fn read_manifest(path: &str, src: &[u8]) -> Summary {
 
 /// The longest package name read, in bytes; a longer one makes no provider.
 // ponytail: npm's own limit, for PyPI names too; a name past it is not a package.
-const MAX_NAME: usize = 214;
+pub(crate) const MAX_NAME: usize = 214;
 
 /// The longest chain of `export *` a lookup in a provider follows; a name further down is not
 /// found.
@@ -295,6 +309,9 @@ const MAX_REEXPORTS: usize = 64;
 /// the ecosystem has no use for stays empty.
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
 pub struct Summary {
+    /// JVM build metadata needed to join Gradle settings and project manifests.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<crate::jvm::Build>,
     /// The package's name as its ecosystem spells it; `None` when absent, not a string or not
     /// valid there, which makes no provider.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -316,7 +333,7 @@ pub struct Summary {
     pub module: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub main: Option<String>,
-    /// The source roots a `pyproject.toml` declares, relative to its directory (PyPI only).
+    /// Source roots relative to the manifest's directory (PyPI and JVM).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub roots: Vec<String>,
     /// The console scripts a `pyproject.toml` declares, as `(module, function)` (PyPI only).
@@ -348,8 +365,8 @@ pub struct Entry {
     /// Cargo only: the key the entry is written under when it renames the package.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
-    /// Cargo only: where the package comes from, `path <manifest>` or `git <identity>`; none
-    /// for a version.
+    /// Where the package comes from: Cargo's `path <manifest>` or `git <identity>`,
+    /// or `computed` for a coordinate whose literal fragments only constrain candidates.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub via: Option<String>,
     /// Cargo only: `workspace = true`, until the seam's `inherit` fills the entry.
@@ -952,6 +969,24 @@ impl Providers {
         Self(providers)
     }
 
+    /// Providers of a literal name, or candidates of an uncertain coordinate, sorted.
+    fn matching<E: Ecosystem + ?Sized>(&self, ecosystem: &E, entry: &Entry) -> Vec<(usize, usize)> {
+        if ecosystem.uncertainty(entry.via.as_deref()).is_none() {
+            return self.of(ecosystem.name(), &entry.name).to_vec();
+        }
+        let name = &entry.name;
+        let mut found: Vec<_> = self
+            .0
+            .iter()
+            .filter(|((kind, provided), _)| {
+                *kind == ecosystem.name() && ecosystem.fits(name, provided)
+            })
+            .flat_map(|(_, locations)| locations.iter().copied())
+            .collect();
+        found.sort();
+        found
+    }
+
     /// The providers of the package `name` of the ecosystem named `ecosystem`.
     fn of(&self, ecosystem: &'static str, name: &str) -> &[(usize, usize)] {
         (self.0.get(&(ecosystem, name.to_string()))).map_or(&[], Vec::as_slice)
@@ -1251,17 +1286,19 @@ fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
 /// `dependencies` row. An entry whose package is outside the workspace, or a `workspace:` one
 /// whose package is outside its own repository, adds nothing.
 fn consume(exports: &mut [Export], providers: &Providers) {
-    let found: Vec<_> = (exports.iter())
-        .map(|export| {
+    let found: Vec<_> = (exports.iter().enumerate())
+        .map(|(n, export)| {
             let mut consumers = Vec::new();
             let mut dependencies = Vec::new();
-            for manifest in &export.manifests {
+            for (i, manifest) in export.manifests.iter().enumerate() {
                 let Some(ecosystem) = of(&manifest.path) else {
                     continue;
                 };
                 for e in &manifest.summary.dependencies {
                     let source = (e.via.as_deref(), e.range.as_deref());
-                    let of = providers.of(ecosystem.name(), &e.name);
+                    // A manifest is never a candidate of its own dependency.
+                    let mut of = providers.matching(ecosystem, e);
+                    of.retain(|&p| p != (n, i));
                     let reaches = |&&(m, i): &&(usize, usize)| {
                         let at = &exports[m].manifests[i];
                         ecosystem.reaches(source, export.place(), (exports[m].place(), &at.path))
@@ -1624,24 +1661,37 @@ impl ContractKind for Packages {
         };
         let source = (consumer.via.as_deref(), range);
         let fits: Vec<_> = (providers.iter())
+            // A manifest is never a candidate of its own dependency.
+            .filter(|(_, p)| !consumer.site.starts_with(&format!("{}::", p.site)))
             .filter(|(repo, p)| {
                 let at = (p.site.strip_prefix(&repo.identity)).and_then(|s| s.strip_prefix("::"));
                 let (from, to) = (
                     (&*from.identity, &*from.root),
                     (&*repo.identity, &*repo.root),
                 );
-                p.contract == *contract
+                p.contract
+                    .strip_prefix(&ecosystem.prefix())
+                    .is_some_and(|provided| {
+                        let wanted = contract.strip_prefix(&ecosystem.prefix()).unwrap();
+                        ecosystem.fits(wanted, provided)
+                    })
                     && at.is_some_and(|manifest| ecosystem.reaches(source, from, (to, manifest)))
             })
             .collect();
+        let uncertain = ecosystem.uncertainty(consumer.via.as_deref());
         let (level, n) = match fits.len() {
             0 => return Vec::new(),
-            1 => (Level::Exact, None),
+            1 if uncertain.is_none() => (Level::Exact, None),
+            1 => (Level::Ambiguous, None),
             n => (Level::Ambiguous, Some(n)),
         };
         fits.into_iter()
             .flat_map(|(_, p)| {
                 let said = reason(contract, range, p.version.as_deref());
+                let said = match uncertain {
+                    Some(why) => format!("{why}; {said}"),
+                    None => said,
+                };
                 let link = Link {
                     consumer: consumer.site.clone(),
                     provider: p.site.clone(),
@@ -2188,7 +2238,7 @@ mod tests {
     #[test]
     fn the_list_names_each_ecosystem_once_in_its_order() {
         let names: Vec<_> = ECOSYSTEMS.iter().map(|e| e.name()).collect();
-        assert_eq!(names, ["npm", "pypi", "cargo", "go"]);
+        assert_eq!(names, ["npm", "pypi", "cargo", "go", "maven"]);
         let prefixes: Vec<_> = ECOSYSTEMS.iter().map(|e| e.prefix()).collect();
         assert_eq!(
             prefixes,
@@ -2196,7 +2246,8 @@ mod tests {
                 "package::npm::",
                 "package::pypi::",
                 "package::cargo::",
-                "package::go::"
+                "package::go::",
+                "package::maven::"
             ]
         );
     }
@@ -2259,26 +2310,26 @@ mod tests {
     #[test]
     fn a_file_no_ecosystem_claims_is_none() {
         for path in [
-            "A.java",
+            "A.unknown",
             "notes.txt",
             "Makefile",
             "tsconfig.json",
-            "pom.xml",
+            "unknown.xml",
         ] {
             assert!(of_source(path).is_none(), "{path}");
             assert!(of(path).is_none(), "{path}");
         }
-        assert!(of_contract("package::maven::x").is_none());
+        assert!(of_contract("package::unknown::x").is_none());
     }
 
     #[test]
     fn a_contract_of_no_ecosystem_has_no_flag_no_suffix_and_no_link() {
-        let contract = "package::maven::x";
+        let contract = "package::unknown::x";
         assert!(of_contract(contract).is_none());
         assert_eq!(flag_of(contract, Some("1"), Some("2")), None);
         assert_eq!(
             reason(contract, Some("1"), Some("2")),
-            "package::maven::x 1 (local 2)"
+            "package::unknown::x 1 (local 2)"
         );
         let consumer = Consumer {
             contract: Some(contract.into()),

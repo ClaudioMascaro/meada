@@ -1,0 +1,62 @@
+{
+  "repository": "example.com/jvm/gradle-client",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "package::maven::example:worker",
+      "site": "example.com/jvm/gradle-client::build.gradle"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "package::maven::example:tools",
+      "site": "example.com/jvm/gradle-client::build.gradle::implementation::example:tools",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/gradle-client::build.gradle::testImplementation::example:models",
+      "via": null
+    }
+  ],
+  "packages": [
+    {
+      "name": "example:worker",
+      "repository": "example.com/jvm/gradle-client",
+      "directory": ".",
+      "ecosystem": "maven"
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "build.gradle",
+      "field": "implementation",
+      "name": "example:tools",
+      "range": "2.0"
+    },
+    {
+      "manifest": "build.gradle",
+      "field": "testImplementation",
+      "name": "example:models",
+      "range": "1.2.0"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/jvm/gradle-client::build.gradle::implementation::example:tools",
+      "provider": "example.com/jvm/gradle::tools/build.gradle",
+      "contract": "package::maven::example:tools",
+      "level": "exact",
+      "reason": "package::maven::example:tools 2.0 (local 2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::build.gradle::testImplementation::example:models",
+      "provider": "example.com/jvm/maven::models/pom.xml",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked"
+    }
+  ]
+}

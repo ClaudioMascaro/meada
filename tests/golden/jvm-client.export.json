@@ -1,0 +1,62 @@
+{
+  "repository": "example.com/jvm/client",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "package::maven::example:web",
+      "site": "example.com/jvm/client::pom.xml"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "package::maven::example:kit",
+      "site": "example.com/jvm/client::pom.xml::dependencies::example:kit",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::pom.xml::dependencies::example:models",
+      "via": null
+    }
+  ],
+  "packages": [
+    {
+      "name": "example:web",
+      "repository": "example.com/jvm/client",
+      "directory": ".",
+      "ecosystem": "maven"
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "pom.xml",
+      "field": "dependencies",
+      "name": "example:kit",
+      "range": "2.0"
+    },
+    {
+      "manifest": "pom.xml",
+      "field": "dependencies",
+      "name": "example:models",
+      "range": "1.2.0"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:kit",
+      "provider": "example.com/jvm/gradle::build.gradle.kts",
+      "contract": "package::maven::example:kit",
+      "level": "exact",
+      "reason": "package::maven::example:kit 2.0 (local 2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:models",
+      "provider": "example.com/jvm/maven::models/pom.xml",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked"
+    }
+  ]
+}
