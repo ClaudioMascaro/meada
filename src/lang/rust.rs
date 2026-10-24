@@ -533,6 +533,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                                 paths.push((Slot::Call(at), path));
                             }
                             facts.calls.push(Call {
+                                arity: None,
+                                constructs: false,
                                 scope: scope.clone(),
                                 callee: callee.unwrap_or_default(),
                                 range: item.byte_range(),
@@ -746,6 +748,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 let put = Put::Call(facts.calls.len());
                 held.push(Held { at, node, put });
                 facts.calls.push(Call {
+                    arity: None,
+                    constructs: false,
                     scope: scope.clone(),
                     callee,
                     range: node.byte_range(),

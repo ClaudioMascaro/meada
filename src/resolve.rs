@@ -36,7 +36,7 @@ pub enum Resolution<'a> {
 /// The scope a qualified name is written in: `outer` for `outer.inner`, the empty top-level
 /// scope for a top-level name.
 pub fn scope_of(name: &str) -> &str {
-    name.rsplit_once('.').map_or("", |(scope, _)| scope)
+    crate::parent(name)
 }
 
 /// What a crate outside the repository is imported as.
@@ -193,13 +193,15 @@ enum Reading {
     /// A path called (`a::b::f()`): its head among types and modules, no local or parameter
     /// hiding it, and its last member a value.
     Path,
+    /// A constructor's type name: no method, parameter or local of the same name hides it.
+    Type,
     /// A `use` path: its head among types and modules, its last member of any kind.
     Alias,
 }
 
 impl Reading {
     fn types(self) -> bool {
-        matches!(self, Reading::Path | Reading::Alias)
+        matches!(self, Reading::Path | Reading::Type | Reading::Alias)
     }
 
     fn value(self) -> bool {
@@ -270,6 +272,13 @@ type Params<'a> = HashMap<(&'a str, &'a str), (usize, Option<usize>)>;
 pub struct Resolver<'a> {
     files: &'a BTreeMap<&'a str, &'a Facts>,
     defs: HashMap<&'a str, HashMap<&'a str, &'a Def>>,
+    overloads: HashMap<&'a str, HashMap<&'a str, Vec<Target<'a>>>>,
+    constructors: HashMap<&'a str, HashMap<&'a str, Vec<Target<'a>>>>,
+    arities: HashMap<Target<'a>, usize>,
+    statics: HashSet<Target<'a>>,
+    members_in_scope: bool,
+    unordered_globs: bool,
+    qualified_types: bool,
     consts: HashMap<&'a str, HashSet<&'a str>>,
     /// The names some file of the repository writes through a selector (`cfg.Base = ..`): a
     /// constant marked `.Name` (Go). A variable of such a name holds no one value.
@@ -381,6 +390,41 @@ impl<'a> Resolver<'a> {
             .collect();
         let named: HashMap<&str, Named> = (files.iter())
             .map(|(path, facts)| (*path, Named::exports(&facts.exports)))
+            .collect();
+        let mut arities = HashMap::new();
+        let mut families = |select: fn(&Facts) -> &BTreeMap<String, Vec<String>>| {
+            files
+                .iter()
+                .map(|(&path, facts)| {
+                    let aliases = select(facts)
+                        .iter()
+                        .map(|(alias, names)| {
+                            let targets = names
+                                .iter()
+                                .filter_map(|name| {
+                                    let (&name, def) = defs[path].get_key_value(name.as_str())?;
+                                    let target = Target { path, name };
+                                    arities.insert(target, def.params.len());
+                                    Some(target)
+                                })
+                                .collect();
+                            (alias.as_str(), targets)
+                        })
+                        .collect();
+                    (path, aliases)
+                })
+                .collect()
+        };
+        let overloads = families(|f| &f.overloads);
+        let constructors = families(|f| &f.constructors);
+        let statics = files
+            .iter()
+            .flat_map(|(&path, facts)| {
+                facts.statics.iter().map(move |name| Target {
+                    path,
+                    name: name.as_str(),
+                })
+            })
             .collect();
         let mut groups = Vec::new();
         let mut sharing = HashMap::new();
@@ -497,6 +541,9 @@ impl<'a> Resolver<'a> {
             };
             for def in &facts.defs {
                 let name = def.name.as_str();
+                if arities.contains_key(&Target { path, name }) {
+                    continue;
+                }
                 let key = match (def.kind, name.rsplit_once('.')) {
                     (Kind::Method, Some((_, last))) => (true, last),
                     (Kind::Function | Kind::Class, None) => (false, name),
@@ -508,6 +555,15 @@ impl<'a> Resolver<'a> {
                     _ => continue,
                 };
                 by_name.entry(key).or_default().push(Target { path, name });
+            }
+            for (alias, names) in &facts.overloads {
+                let last = alias.rsplit('.').next().unwrap_or(alias);
+                for name in names {
+                    by_name
+                        .entry((true, last))
+                        .or_default()
+                        .push(Target { path, name });
+                }
             }
         }
         by_name.values_mut().for_each(|targets| targets.sort());
@@ -534,6 +590,13 @@ impl<'a> Resolver<'a> {
         let mut resolver = Self {
             files,
             defs,
+            overloads,
+            constructors,
+            arities,
+            statics,
+            members_in_scope: language.members_in_scope(),
+            unordered_globs: language.unordered_globs(),
+            qualified_types: language.qualified_types(),
             written,
             consts,
             locals,
@@ -636,10 +699,46 @@ impl<'a> Resolver<'a> {
         if self.strict && call.decorates.is_some() {
             return Resolution::Unresolved;
         }
-        let binding = match call.by_path {
-            true => self.path_binding(path, &call.scope, &call.callee),
-            false => self.binding(path, &call.scope, &call.callee),
+        let binding = match (call.constructs, call.by_path) {
+            (true, _) => {
+                let (seen, work) = (&mut self.seen(path, &call.scope), &mut Work::default());
+                self.resolve_as(path, &call.scope, &call.callee, seen, work, Reading::Type)
+            }
+            (false, true) => self.path_binding(path, &call.scope, &call.callee),
+            (false, false) => self.binding(path, &call.scope, &call.callee),
         };
+        let binding = match binding {
+            Binding::Several(all) if call.constructs => {
+                let classes: Vec<_> = all.into_iter().filter(|t| self.is_class(*t)).collect();
+                match classes[..] {
+                    [] => return Resolution::Unresolved,
+                    [one] => Binding::Def(one),
+                    _ => Binding::Several(classes),
+                }
+            }
+            found => found,
+        };
+        if call.constructs && matches!(binding, Binding::Def(t) if !self.is_class(t)) {
+            return Resolution::Unresolved;
+        }
+        let binding = match binding {
+            Binding::Def(t) if call.arity.is_some() && self.is_class(t) => {
+                let (families, absent) = if call.constructs {
+                    (&self.constructors, Binding::Def(t))
+                } else {
+                    (&self.overloads, Binding::Unknown)
+                };
+                families[t.path]
+                    .get(t.name)
+                    .map_or(absent, |all| Binding::Several(all.clone()))
+            }
+            found => found,
+        };
+        let known = matches!(binding, Binding::Def(_) | Binding::Several(_));
+        let binding = self.narrow(binding, call.arity);
+        if known && matches!(binding, Binding::Unknown) {
+            return Resolution::Unresolved;
+        }
         match binding {
             Binding::Def(t) => Resolution::Exact(t),
             Binding::Several(all) => Resolution::Ambiguous(all),
@@ -653,7 +752,21 @@ impl<'a> Resolver<'a> {
             | Binding::Param(..)
             | Binding::Local(..)
             | Binding::Hidden
-            | Binding::Unknown => self.infer(path, &call.callee, call.by_path),
+            | Binding::Unknown => self.infer(path, &call.callee, call.by_path, call.arity),
+        }
+    }
+
+    fn narrow(&self, binding: Binding<'a>, arity: Option<usize>) -> Binding<'a> {
+        let Some(arity) = arity else { return binding };
+        let fits = |t: &Target<'a>| self.arities.get(t).is_none_or(|n| *n == arity);
+        match binding {
+            Binding::Def(t) if !fits(&t) => Binding::Unknown,
+            Binding::Several(all) => match all.into_iter().filter(fits).collect::<Vec<_>>()[..] {
+                [] => Binding::Unknown,
+                [one] => Binding::Def(one),
+                ref several => Binding::Several(several.to_vec()),
+            },
+            found => found,
         }
     }
 
@@ -772,7 +885,7 @@ impl<'a> Resolver<'a> {
         work: &mut Work<'a>,
         reading: Reading,
     ) -> Binding<'a> {
-        let (mut binding, members) = self.dotted(path, callee, seen).unwrap_or_else(|| {
+        let lexical = |seen: &mut Seen<'a>| {
             let (head, members) = callee.split_once('.').unwrap_or((callee, ""));
             let binding = match head {
                 _ if Some(head) == self.receiver => self.class(path, scope),
@@ -781,7 +894,25 @@ impl<'a> Resolver<'a> {
                 _ => self.lexical_as(path, scope, head, seen, reading),
             };
             (binding, members)
-        });
+        };
+        let (mut binding, mut members) = if self.qualified_types {
+            let found = lexical(seen);
+            if matches!(found.0, Binding::Unknown) {
+                self.dotted(path, callee, seen).unwrap_or(found)
+            } else {
+                found
+            }
+        } else {
+            self.dotted(path, callee, seen)
+                .unwrap_or_else(|| lexical(seen))
+        };
+        if self.qualified_types
+            && matches!(binding, Binding::Unknown)
+            && !seen.cut
+            && let Some(found) = self.qualified_type(path, callee, seen)
+        {
+            (binding, members) = found;
+        }
         let members: Vec<&str> = members.split('.').filter(|m| !m.is_empty()).collect();
         for (n, member) in members.iter().enumerate() {
             let value = reading.value() && n + 1 == members.len();
@@ -796,11 +927,48 @@ impl<'a> Resolver<'a> {
                     found => found,
                 },
                 Binding::Module(m) => self.export_as(m, member, seen, value),
+                Binding::Several(all)
+                    if self.unordered_globs && all.iter().all(|t| self.is_class(*t)) =>
+                {
+                    alternatives(
+                        all.into_iter()
+                            .map(|t| self.member(t, member, work))
+                            .collect(),
+                    )
+                    .unwrap_or(Binding::Unknown)
+                }
                 Binding::Several(_) => Binding::Unknown,
                 other => other,
             };
         }
         binding
+    }
+
+    /// A written type path without an import, after lexical lookup left its head unbound.
+    /// Only a repository class proves a binding; an unknown expression stays unknown.
+    fn qualified_type(
+        &self,
+        path: &'a str,
+        callee: &'a str,
+        seen: &mut Seen<'a>,
+    ) -> Option<(Binding<'a>, &'a str)> {
+        for at in std::iter::once(callee.len()).chain(callee.rmatch_indices('.').map(|(at, _)| at))
+        {
+            let source = &callee[..at];
+            let Some(module) = self.module(path, source) else {
+                continue;
+            };
+            let found = self.export(module, source, seen);
+            if matches!(found, Binding::Def(t) if self.is_class(t))
+                || matches!(&found, Binding::Several(all) if all.iter().all(|t| self.is_class(*t)))
+            {
+                return Some((found, callee.get(at + 1..).unwrap_or("")));
+            }
+            if seen.cut {
+                return None;
+            }
+        }
+        None
     }
 
     /// A member of a module written in place that no item of it is: a name its `pub use` brings
@@ -965,11 +1133,15 @@ impl<'a> Resolver<'a> {
                 return found;
             }
             let qualified = format!("{}.{member}", c.name);
-            if let Some((name, _)) = self.defs[c.path].get_key_value(qualified.as_str()) {
-                return Binding::Def(Target { path: c.path, name });
+            let found = self.def(c.path, &qualified);
+            if !matches!(found, Binding::Unknown) {
+                return found;
             }
             if let Some(found) = self.sibling_method(c, &qualified) {
                 return found;
+            }
+            if let Some(constant) = self.consts[c.path].get(qualified.as_str()) {
+                return Binding::Const(c.path, constant);
             }
             if self.receivers[c.path].contains_key(&(c.name, member)) {
                 return Binding::Local(c.path, c.name, member);
@@ -1136,7 +1308,7 @@ impl<'a> Resolver<'a> {
         let (head, rest) = name.split_at(name.find('.').unwrap_or(name.len()));
         let latest = self.by_local[path].of(head).last();
         match latest.map(|&at| (&imports[at], &imports[at].name)) {
-            Some((i, Imported::Namespace)) => format!("{}{rest}", i.source),
+            Some((i, Imported::Namespace | Imported::Qualified)) => format!("{}{rest}", i.source),
             Some((i, Imported::Name(n) | Imported::Member { name: n, .. })) => {
                 format!("{}.{n}{rest}", i.source)
             }
@@ -1147,7 +1319,13 @@ impl<'a> Resolver<'a> {
     /// The definitions whose name matches the callee's last name anywhere `path` reaches
     /// (`reaches`): methods for a member call (`x.area()`), top-level functions and classes for
     /// a plain call (`area()`), both for a path (`a::area()`, `by_path`).
-    fn infer(&self, path: &str, callee: &str, by_path: bool) -> Resolution<'a> {
+    fn infer(
+        &self,
+        path: &str,
+        callee: &str,
+        by_path: bool,
+        arity: Option<usize>,
+    ) -> Resolution<'a> {
         let (member, last) = match callee.rsplit_once('.') {
             Some((_, last)) => (true, last),
             None => (false, callee),
@@ -1161,6 +1339,9 @@ impl<'a> Resolver<'a> {
         if let Some(reaches) = &self.reaches {
             found.retain(|t| reaches(path, t.path));
         }
+        if let Some(arity) = arity {
+            found.retain(|t| self.arities.get(t).is_none_or(|n| *n == arity));
+        }
         match found[..] {
             [] => Resolution::Unresolved,
             [one] => Resolution::Inferred(one),
@@ -1171,7 +1352,11 @@ impl<'a> Resolver<'a> {
     fn def(&self, path: &'a str, name: &str) -> Binding<'a> {
         match self.defs[path].get_key_value(name) {
             Some((name, _)) => Binding::Def(Target { path, name }),
-            None => Binding::Unknown,
+            None => match self.overloads[path].get(name).map(Vec::as_slice) {
+                Some([one]) => Binding::Def(*one),
+                Some(several) if !several.is_empty() => Binding::Several(several.to_vec()),
+                _ => Binding::Unknown,
+            },
         }
     }
 
@@ -1253,7 +1438,7 @@ impl<'a> Resolver<'a> {
             scope = (!s.is_empty() && !module).then(|| crate::parent(s));
             let class_body = !first && defs.get(s).is_some_and(|d| d.kind == Kind::Class);
             first = false;
-            if class_body {
+            if class_body && !self.members_in_scope {
                 continue;
             }
             let candidate = if s.is_empty() {
@@ -1272,8 +1457,20 @@ impl<'a> Resolver<'a> {
                         return Binding::Def(Target { path, name });
                     }
                     _ => {
+                        if reading != Reading::Type
+                            && let Some(overloads) = self.overloads[path].get(candidate.as_str())
+                        {
+                            return match overloads[..] {
+                                [one] => Binding::Def(one),
+                                _ => Binding::Several(overloads.clone()),
+                            };
+                        }
                         if let Some(found) = self.imported_at(path, s, name, seen) {
-                            return found;
+                            let method = matches!(found, Binding::Def(t) if self.defs[t.path][t.name].kind == Kind::Method)
+                                || matches!(&found, Binding::Several(all) if all.iter().any(|t| self.defs[t.path][t.name].kind == Kind::Method));
+                            if reading != Reading::Type || !method {
+                                return found;
+                            }
                         }
                         continue;
                     }
@@ -1295,6 +1492,12 @@ impl<'a> Resolver<'a> {
                 && !(def.kind == Kind::Module && reading == Reading::Value)
             {
                 return Binding::Def(Target { path, name });
+            }
+            if let Some(overloads) = self.overloads[path].get(candidate.as_str()) {
+                return match overloads[..] {
+                    [one] => Binding::Def(one),
+                    _ => Binding::Several(overloads.clone()),
+                };
             }
             if let Some(constant) = self.consts[path].get(candidate.as_str()) {
                 return Binding::Const(path, constant);
@@ -1459,6 +1662,7 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
     ) -> Option<Binding<'a>> {
         let imports = &self.files[path].imports;
+        let mut candidates = Vec::new();
         for &at in self.by_local[path]
             .of(&crate::qualify(scope, "*"))
             .iter()
@@ -1499,17 +1703,48 @@ impl<'a> Resolver<'a> {
                         found => found,
                     }
                 }
+                Binding::Def(t) if self.is_class(t) => {
+                    let found = self.member(t, name, work);
+                    match found {
+                        Binding::Def(t) if self.statics.contains(&t) => Binding::Def(t),
+                        Binding::Several(all) => one(all
+                            .into_iter()
+                            .filter(|t| self.statics.contains(t))
+                            .map(Binding::Def)
+                            .collect())
+                        .unwrap_or(Binding::Unknown),
+                        Binding::Const(path, name)
+                            if self.statics.contains(&Target { path, name }) =>
+                        {
+                            Binding::Const(path, name)
+                        }
+                        _ => Binding::Unknown,
+                    }
+                }
+                Binding::External(source, name) if matches!(name, Imported::Qualified) => {
+                    Binding::External(source, name)
+                }
                 _ => Binding::Unknown,
             };
             seen.depth -= 1;
             if seen.cut {
                 return Some(Binding::Unknown);
             }
-            if matches!(found, Binding::Def(_) | Binding::Module(_)) {
-                return Some(found);
+            if matches!(
+                found,
+                Binding::Def(_)
+                    | Binding::Several(_)
+                    | Binding::Const(..)
+                    | Binding::External(..)
+                    | Binding::Module(_)
+            ) {
+                if !self.unordered_globs || *inside {
+                    return Some(found);
+                }
+                candidates.push(found);
             }
         }
-        None
+        alternatives(candidates)
     }
 
     /// What the callee-like name `target` written in `scope` gives (a `use` path): its head
@@ -1568,6 +1803,7 @@ impl<'a> Resolver<'a> {
             (Imported::Glob { .. }, _) => return Binding::Unknown,
             (_, None) => Binding::External(source, name),
             (Imported::Namespace, Some(module)) => Binding::Module(module),
+            (Imported::Qualified, Some(module)) => self.export(module, source, seen),
             (Imported::Name(name) | Imported::Member { name, .. }, Some(module)) => {
                 self.export(module, name, seen)
             }
@@ -1588,7 +1824,15 @@ impl<'a> Resolver<'a> {
     /// (`Seen::looped`) is absent, so that an earlier binding gives the name; one cut at
     /// `LINK_DEPTH` stays unknown.
     fn star(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
-        if !self.takers[path].takes(name) {
+        let shared = self.shared.get(path).is_some_and(|&group| {
+            let group = &self.groups[group];
+            group.exporting.names.get(name).is_some_and(|places| {
+                places
+                    .iter()
+                    .any(|&at| self.takers[group.files[at]].takes(name))
+            })
+        });
+        if !self.takers[path].takes(name) && !shared {
             return self.globs(path, "", name, true, seen);
         }
         let outer = std::mem::take(&mut seen.looped);
@@ -1944,6 +2188,16 @@ fn latest<'a>(
 
 /// The one binding several files that share a scope give a name, when they give the same one:
 /// `None` when none gives it, `Several` when they define it apart, unknown otherwise.
+fn alternatives(found: Vec<Binding>) -> Option<Binding> {
+    one(found
+        .into_iter()
+        .flat_map(|binding| match binding {
+            Binding::Several(all) => all.into_iter().map(Binding::Def).collect(),
+            other => vec![other],
+        })
+        .collect())
+}
+
 fn one(found: Vec<Binding>) -> Option<Binding> {
     let mut distinct: Vec<Binding> = Vec::new();
     for binding in found {
@@ -1980,6 +2234,7 @@ fn same(a: &Binding, b: &Binding) -> bool {
             p == q
                 && match (x, y) {
                     (Imported::Namespace, Imported::Namespace) => true,
+                    (Imported::Qualified, Imported::Qualified) => true,
                     (Imported::Name(x), Imported::Name(y)) => x == y,
                     _ => false,
                 }
@@ -2434,7 +2689,7 @@ impl<'a> Code<'a> {
             {
                 Binding::External(package, name) => {
                     let name = match name {
-                        Imported::Namespace => String::new(),
+                        Imported::Namespace | Imported::Qualified => String::new(),
                         Imported::Name(name) | Imported::Member { name, .. } => name.clone(),
                         // A star import spells no name of its own.
                         Imported::All | Imported::Path(_) | Imported::Glob { .. } => {
@@ -2564,7 +2819,7 @@ impl<'a> Code<'a> {
             return Some((specifier, rest.to_string()));
         }
         let mut spelled = match name {
-            Imported::Namespace => String::new(),
+            Imported::Namespace | Imported::Qualified => String::new(),
             Imported::Name(name) | Imported::Member { name, .. } => name.clone(),
             Imported::All | Imported::Path(_) | Imported::Glob { .. } => return None,
         };
@@ -4294,6 +4549,8 @@ mod tests {
         };
         facts.calls = (names.iter().enumerate())
             .map(|(i, name)| Call {
+                arity: None,
+                constructs: false,
                 scope: String::new(),
                 callee: name.clone(),
                 range: i..i + 1,

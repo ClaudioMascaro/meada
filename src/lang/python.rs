@@ -196,6 +196,8 @@ impl LanguagePack for Python {
                         }
                         let (args, kwargs) = arguments(node, src);
                         facts.calls.push(Call {
+                            arity: None,
+                            constructs: false,
                             scope: scope.clone(),
                             callee,
                             range: node.byte_range(),

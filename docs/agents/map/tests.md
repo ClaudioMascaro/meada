@@ -400,3 +400,18 @@ identities in validation errors), issuer query preservation at `Auth.login`, exa
 ceilings through CLI and HTTP, and live-heartbeat selection with a controlled RESP `TIME`
 response while all other commands reach the real Valkey fixture. The ceiling tests preserve
 one final locked publish and compare English and Brazilian Portuguese refusals.
+
+## Java conformance (#84)
+
+`conformance-java` holds Maven modules and a Gradle source tree. `conformance::java` checks
+all Java definitions and its golden export; the companion engine tests check package and
+static imports and their priority/ambiguity (including duplicate fully qualified types),
+overloads and constructors in separate namespaces, fully qualified calls with shadowing,
+class-named method identities, qualified parameter types, visibility, anonymous
+class and lambda ownership, and search/context goldens. `index` checks byte-identical exports
+from independent copies; `freshness` edits, adds and deletes sources and compares the refreshed
+export with a cold one, including overload arity from an unchanged file's cached facts.
+The hostile-depth tests exceed Java's definition, value and member-path limits and reject
+exact links that escape an omitted scope. A long package prefix exceeds the qualification
+budget and leaves the whole file out; annotation values, comments and malformed type literals
+never enter exported names. `schema` has a Java sample for the adapter facts the index persists.
