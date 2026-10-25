@@ -1,4 +1,4 @@
-example.com/xlang-kotlin/api src/main/kotlin/com/example/api/Server.kt:12 com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient)
-example.com/xlang-kotlin/api src/main/kotlin/com/example/api/Server.kt:22 com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}
+example.com/xlang-kotlin/api src/main/kotlin/com/example/api/Server.kt:12 com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi)
+example.com/xlang-kotlin/api src/main/kotlin/com/example/api/Server.kt:23 com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}
   →[inferred: base URL from API_URL, a base_url_env of peer example.com/xlang-kotlin/api] example.com/xlang-kotlin/web src/sync.ts:4 syncOrders
-chain: inferred · 1 hops · 2 repos · 149 tokens
+chain: inferred · 1 hops · 2 repos · 154 tokens

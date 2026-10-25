@@ -3,7 +3,8 @@
 //! candidate, not a fact, so a kind accepts a name when exactly one of its spellings is in the
 //! kind's own table (`one`).
 
-use crate::lang::{Facts, Kind};
+use crate::lang::{Bound, Class, Facts, Kind};
+use crate::qualify;
 use crate::resolve::{Code, Follow, Form, Of, Outside};
 
 /// The Java files of `code`, with their facts: what the Java readers of the kinds read.
@@ -79,4 +80,36 @@ pub fn declared<'a>(
         }
         _ => None,
     }
+}
+
+/// The value the nearest binding of `name` around `scope` of `path` holds (`Facts::bound`, which
+/// only the Kotlin pack fills), when no other binding of the name is in the same scope (a name
+/// declared twice, a loop variable, a parameter, a constant, a property).
+pub fn local<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &str) -> Option<&'a Bound> {
+    let facts = code.files()[path];
+    let mut at = Some(scope);
+    while let Some(s) = at {
+        let mut bound = (code.bound(path).iter()).filter(|b| b.scope == s && b.name == name);
+        let held = bound.next();
+        let qualified = qualify(s, name);
+        let others = bound.next().is_some()
+            || facts.locals.binary_search(&qualified).is_ok()
+            || (facts.consts.iter()).any(|c| c.name == qualified)
+            || (facts.defs.iter()).any(|d| d.name == s && d.params.iter().any(|p| p.name == name))
+            || (facts.receivers.iter())
+                .any(|r| r.scope == s && r.name == name && r.class == Class::Unknown);
+        match (held, others) {
+            (Some(found), false) => return Some(found),
+            (None, false)
+                if !facts
+                    .receivers
+                    .iter()
+                    .any(|r| r.scope == s && r.name == name) =>
+            {
+                at = (!s.is_empty()).then(|| crate::parent(s));
+            }
+            _ => return None,
+        }
+    }
+    None
 }

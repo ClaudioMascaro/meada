@@ -16,8 +16,8 @@ mod declarative;
 use super::{ANY, METHODS, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
-use crate::jvm::names::{is_method, java_files, jvm_files, known, one, typed};
-use crate::lang::{Call, Value};
+use crate::jvm::names::{is_method, java_files, jvm_files, known, local, one, typed};
+use crate::lang::{Bound, Call, Value};
 use crate::resolve::{Code, Follow, Of, passes_nothing};
 
 const WEB: &str = "org.springframework.web.bind.annotation.";
@@ -233,6 +233,20 @@ fn made<'a>(
     ty: &str,
     makes: impl Fn(&Code<'a>, &'a str, usize) -> bool,
 ) -> bool {
+    reach(code, (path, scope), client, ty, &makes, 0)
+}
+
+/// How many locals `made` is followed through (`val a = b`, `val b = Client()`).
+const LOCAL_DEPTH: usize = 8;
+
+fn reach<'a>(
+    code: &Code<'a>,
+    (path, scope): (&'a str, &'a str),
+    client: &'a Value,
+    ty: &str,
+    makes: &impl Fn(&Code<'a>, &'a str, usize) -> bool,
+    depth: usize,
+) -> bool {
     match client {
         Value::Ref(name) => {
             if one(&typed(code, path, scope, name), |t| t == ty).is_some() {
@@ -242,7 +256,16 @@ fn made<'a>(
                 passes: passes_nothing,
             };
             let origins = code.origins(path, scope, Of::Name(name), follow);
-            (origins.iter().filter_map(|o| o.call)).any(|(at, i)| makes(code, at, i))
+            if (origins.iter().filter_map(|o| o.call)).any(|(at, i)| makes(code, at, i)) {
+                return true;
+            }
+            // A local the source writes no type of holds what the pack recorded for it (Kotlin).
+            match local(code, path, scope, name) {
+                Some(Bound { within, value, .. }) if depth < LOCAL_DEPTH => {
+                    reach(code, (path, within), value, ty, makes, depth + 1)
+                }
+                _ => false,
+            }
         }
         Value::Call(inner) => code
             .call_index(path, &inner.range)

@@ -1839,6 +1839,23 @@ fn callee(node: Node, src: &[u8]) -> String {
     parts.join(".")
 }
 
+/// The class `X` of the class literal `X::class.java` (a path, `a.X`, too).
+fn java_class(node: Node, src: &[u8]) -> Option<String> {
+    let mut outer = named(node);
+    let (literal, java) = (outer.next()?, outer.next()?);
+    if outer.next().is_some()
+        || text(java, src) != "java"
+        || literal.kind() != "navigation_expression"
+    {
+        return None;
+    }
+    let mut inner = named(literal);
+    let (on, class) = (inner.next()?, inner.next()?);
+    let literal_of_class =
+        children(literal).any(|c| c.kind() == "::") && text(class, src) == "class";
+    (inner.next().is_none() && literal_of_class).then(|| callee(on, src))
+}
+
 /// The string methods an environment read passes through, still the variable's value as far as
 /// the host goes.
 const STRING_METHODS: &[&str] = &[
@@ -1986,7 +2003,12 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             }
             Value::Str(parts)
         }
-        "identifier" | "navigation_expression" => Value::Ref(callee(node, src)),
+        // `Api::class.java`, the `Api.class` of Java.
+        "navigation_expression" => match java_class(node, src) {
+            Some(class) => Value::Member(class, "class".into()),
+            None => Value::Ref(callee(node, src)),
+        },
+        "identifier" => Value::Ref(callee(node, src)),
         "this_expression" => Value::Ref("this".into()),
         "call_expression" => {
             let (function, args) = parts(node);
@@ -2162,6 +2184,25 @@ mod tests {
             Value::Str(parts) => Some(parts),
             _ => None,
         }
+    }
+
+    /// A class literal is the member `class` of the class named, as Java's `Api.class` is: the
+    /// `Api::class.java` that Retrofit's `create` takes.
+    #[test]
+    fn a_class_literal_is_the_member_class_of_the_type() {
+        let of = |literal: &str| {
+            let facts = parse(format!("package a\nval x = {literal}\n").as_bytes(), false);
+            facts.unwrap().consts.remove(0).value
+        };
+        for literal in ["Api::class.java", "a.Api::class.java"] {
+            let name = literal.split("::").next().unwrap();
+            let Value::Member(ty, class) = of(literal) else {
+                panic!("{literal} is a class literal");
+            };
+            assert_eq!((ty.as_str(), class.as_str()), (name, "class"), "{literal}");
+        }
+        // A callable reference is no class literal.
+        assert!(!matches!(of("Api::create"), Value::Member(..)));
     }
 
     /// `\$` is a `$` that starts no template: Spring's `@Value("\${key}")` is the text `${key}`.
