@@ -46,3 +46,5 @@ Una clave desconocida o mal escrita da un error con el archivo, la línea y la c
 ## Artefactos JVM
 
 Los contratos de paquetes JVM se descubren en los manifests: `pom.xml`, `settings.gradle`, `settings.gradle.kts`, `build.gradle` y `build.gradle.kts`. No necesitan una clave adicional en `meada.toml`. Declare otros repositorios en `[[peer]]` como en los ejemplos anteriores. Use coordenadas literales para vínculos `exact`; las propiedades Maven y expresiones Gradle quedan sin evaluar, y las que forman el grupo o el artefacto producen candidatos `ambiguous`.
+
+En Java con Spring, la URL base puede venir de `@Value("${clave}")`, leída del `application.properties` o del `application.yml` en `src/main/resources` de cada módulo, sin clave nueva en `meada.toml`. Una URL literal vincula por host en `[serve] hosts`; un placeholder `${VAR}` (con o sin `:valor`) usa las mismas claves `base_url_env` de `[[peer]]`. Un valor por defecto cuyo host sirve algún par vincula por ese host.

@@ -1,0 +1,8 @@
+# The web app (TypeScript, Next.js) reaches the api service (Java, Spring) through a base URL
+# variable and through the api's declared host. The Java repository uses these same keys.
+[serve]
+hosts = ["web.example.com"]
+
+[[peer]]
+repo = "example.com/xlang-java/api"
+base_url_env = ["API_URL"]

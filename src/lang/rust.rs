@@ -991,6 +991,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     name,
                     value,
                     ty: None,
+                    scope: None,
                 });
             }
             Put::Let(name) => {
@@ -1009,6 +1010,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     name,
                     value,
                     ty: None,
+                    scope: None,
                 });
             }
             Put::Returns(def) => facts.defs[def].return_values = reader.returns(&at, node),
@@ -1904,7 +1906,7 @@ mod tests {
                     Part::Text(t) => t.clone(),
                     Part::Ref(r) => format!("<{r}>"),
                     Part::Env(e) => format!("env:{e}"),
-                    Part::Hole => "{}".into(),
+                    Part::EnvOr(..) | Part::Hole => "{}".into(),
                 })
                 .collect::<String>(),
             Value::Ref(name) => format!("@{name}"),

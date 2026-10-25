@@ -1002,6 +1002,101 @@ fn a_refreshed_go_cross_language_pair_exports_what_a_cold_pair_does() {
     assert!(!refreshed[1].contains("env:WEB_URL"));
 }
 
+/// Edits, adds and deletes `.java` and Spring configuration files of the api: a placeholder's
+/// default goes, the YAML file that gave a constructor parameter its literal URL goes (its key
+/// now names a variable), a module appears with a client and a configuration of its own, a
+/// `@Value` key changes, and the file with the environment read goes.
+fn edit_xlang_java((_, api): &(PathBuf, PathBuf)) {
+    let java = "src/main/java/com/example/api";
+    edit_file(
+        api,
+        "src/main/resources/application.properties",
+        "${AUDIT_URL:https://web.example.com/api}",
+        "${AUDIT_URL}",
+    );
+    fs::remove_file(api.join("src/main/resources/application.yml")).unwrap();
+    edit_file(
+        api,
+        &format!("{java}/PromotionClient.java"),
+        "${PROMO_URL:http://promotions.internal/v2}",
+        "${web.url}",
+    );
+    fs::remove_file(api.join(format!("{java}/ReportClient.java"))).unwrap();
+    let tools = api.join("tools/src/main");
+    fs::create_dir_all(tools.join("resources")).unwrap();
+    fs::create_dir_all(tools.join("java/com/example/tools")).unwrap();
+    fs::write(
+        tools.join("resources/application.properties"),
+        "tool.url=https://web.example.com/api\n",
+    )
+    .unwrap();
+    fs::write(
+        tools.join("java/com/example/tools/ToolClient.java"),
+        "package com.example.tools;\n\n\
+         import org.springframework.beans.factory.annotation.Value;\n\
+         import org.springframework.web.client.RestTemplate;\n\n\
+         public class ToolClient {\n\
+         \x20   @Value(\"${tool.url}\")\n\
+         \x20   private String toolUrl;\n\
+         \x20   private final RestTemplate rest = new RestTemplate();\n\n\
+         \x20   public void level() {\n\
+         \x20       rest.getForObject(toolUrl + \"/stock\", String.class);\n\
+         \x20   }\n\
+         }\n",
+    )
+    .unwrap();
+}
+
+#[test]
+fn a_refreshed_java_cross_language_pair_exports_what_a_cold_pair_does() {
+    let exports = |(web, api): &(PathBuf, PathBuf)| -> Vec<String> {
+        [web, api]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = common::xlang_java("fresh_xlang_java");
+    [&repos.0, &repos.1].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_xlang_java(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = common::xlang_java("fresh_xlang_java_cold");
+    edit_xlang_java(&cold);
+    assert_eq!(refreshed, exports(&cold));
+    assert_ne!(refreshed[1], before[1]);
+    // The default left the configuration, the literal with its file, and the new module's
+    // configuration gives its client a host.
+    assert!(before[1].contains("env:AUDIT_URL|host:web.example.com"));
+    assert!(!refreshed[1].contains("env:AUDIT_URL|host:"));
+    assert!(refreshed[1].contains("\"env:stock.url\""));
+    assert!(refreshed[1].contains("tools/src/main/java/com/example/tools/ToolClient.java"));
+    assert!(!refreshed[1].contains("ReportClient.java"));
+    let tool = "\"contract\": \"http::GET::/api/stock\",\n      \"site\": \"example.com/xlang-java/api::tools/";
+    assert!(refreshed[1].contains(tool), "{}", refreshed[1]);
+}
+
+/// A Spring configuration edited alone, with no `.java` file changed, refreshes the contracts.
+#[test]
+fn an_edited_spring_configuration_alone_refreshes_the_java_consumers() {
+    let (_, api) = common::xlang_java("fresh_xlang_java_config");
+    age(&api);
+    let before = Engine::open(&api).unwrap().export().unwrap();
+    let properties = "src/main/resources/application.properties";
+    edit_file(
+        &api,
+        properties,
+        "web.url=${WEB_URL}",
+        "web.url=${SITE_URL}",
+    );
+
+    let refreshed = Engine::open(&api).unwrap().export().unwrap();
+
+    assert!(before.contains("\"via\": \"env:WEB_URL\""));
+    assert!(refreshed.contains("\"via\": \"env:SITE_URL\""));
+}
+
 #[test]
 fn an_edited_meada_toml_relinks_resources_like_a_cold_chain() {
     let exports = |gateway: &Path| -> Vec<String> {

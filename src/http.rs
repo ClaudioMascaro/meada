@@ -64,6 +64,44 @@ fn fetch(args: &[Value]) -> Option<Read> {
     })
 }
 
+/// `fetch`, with a URL whose base is an environment read with a default (`Part::EnvOr`, Spring's
+/// `${X:http://api.example.com}`) read both ways: through the variable, as `Part::Env`, and,
+/// when the default names a host, through the default by that host. The variable's `via` then
+/// names the host too (`env:X|host:api.example.com`): it links only when no provider of the
+/// workspace serves that host (`Http::link`), so the default's host wins where a peer serves it.
+fn fetches(args: &[Value]) -> Option<Vec<Read>> {
+    let Some(Value::Str(parts)) = args.first() else {
+        return Some(vec![fetch(args)?]);
+    };
+    let Some((Part::EnvOr(var, default), tail)) = parts.split_first() else {
+        return Some(vec![fetch(args)?]);
+    };
+    let with = |mut head: Vec<Part>| {
+        head.extend(tail.iter().cloned());
+        let mut args = args.to_vec();
+        args[0] = Value::Str(head);
+        args
+    };
+    let mut through = fetch(&with(vec![Part::Env(var.clone())]))?;
+    // `${X:http://h/}` + `/path` joins with one `/`.
+    let mut default = default.clone();
+    if let (Some(Part::Text(end)), Some(Part::Text(next))) = (default.last_mut(), tail.first())
+        && next.starts_with('/')
+    {
+        *end = end.trim_end_matches('/').to_string();
+    }
+    let by_default =
+        fetch(&with(default)).filter(|d| d.via.as_deref().is_some_and(|v| v.starts_with("host:")));
+    Some(match by_default {
+        Some(host) => {
+            let via = (through.via.as_deref()).zip(host.via.as_deref());
+            through.via = via.map(|(env, host)| format!("{env}|{host}"));
+            vec![through, host]
+        }
+        None => vec![through],
+    })
+}
+
 /// The literal parts of the path of a URL, in order: what is left of `parts` once its scheme
 /// and host and its query are dropped, split at every part that is not literal.
 fn fragments(parts: &[Part]) -> Vec<String> {
@@ -184,7 +222,9 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>)> {
         _ => return Some((None, None)),
     };
     let (via, path) = match parts.split_first() {
-        Some((Part::Env(var), rest)) => (Some(format!("env:{var}")), Some(render(rest))),
+        Some((Part::Env(var) | Part::EnvOr(var, _), rest)) => {
+            (Some(format!("env:{var}")), Some(render(rest)))
+        }
         _ => {
             let url = render(parts);
             match url.split_once("://") {
@@ -316,7 +356,7 @@ fn render(parts: &[Part]) -> String {
         .iter()
         .map(|p| match p {
             Part::Text(t) => t.as_str(),
-            Part::Env(_) | Part::Ref(_) | Part::Hole => PARAM,
+            Part::Env(_) | Part::EnvOr(..) | Part::Ref(_) | Part::Hole => PARAM,
         })
         .collect()
 }
@@ -467,7 +507,7 @@ impl ContractKind for Http {
         })
     }
 
-    fn extract(&self, code: &Code, _: &Indexed) -> Vec<Found> {
+    fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
         let mut found = Vec::new();
         // One reader of each shape source for the whole extraction: each budget per file once.
         let mut literals = Literals::default();
@@ -479,7 +519,7 @@ impl ContractKind for Http {
         found.extend(go::consumers(code));
         found.extend(python::providers(code));
         found.extend(java::providers(code));
-        found.extend(java::consumers(code));
+        found.extend(java::consumers(code, indexed));
         found
     }
 
@@ -579,7 +619,18 @@ impl ContractKind for Http {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
         };
-        let via = consumer.via.as_deref();
+        // A variable with a default whose host a provider of the workspace serves
+        // (`fetches`): the default's host is what the consumer reaches, through its own read.
+        let (via, default) = match consumer.via.as_deref().and_then(|v| v.split_once('|')) {
+            Some((via, default)) => (Some(via), default.strip_prefix("host:")),
+            None => (consumer.via.as_deref(), None),
+        };
+        let served = |host: &str| {
+            (providers.iter()).any(|(_, p)| p.hosts.iter().any(|h| h.eq_ignore_ascii_case(host)))
+        };
+        if default.is_some_and(served) {
+            return Vec::new();
+        }
         // A route serves a consumer by its code path, or by its gateway path with the reason
         // for the rewrite. Within one repository a code path match wins over gateway path
         // matches; across repositories both are candidates.

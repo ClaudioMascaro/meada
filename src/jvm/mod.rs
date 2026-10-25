@@ -1,10 +1,12 @@
-//! Literal JVM build readers shared by language packs and the Maven package ecosystem.
+//! Literal JVM build readers shared by language packs and the Maven package ecosystem, and the
+//! Spring configuration reader the JVM packs' contract kinds share (`spring`).
 //! They read only the supplied bytes, never a build tool or another file.
 
 use serde::{Deserialize, Serialize};
 
 pub mod gradle;
 pub mod maven;
+pub mod spring;
 
 /// Cross-file Gradle metadata retained in a manifest summary, never the build source text.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]

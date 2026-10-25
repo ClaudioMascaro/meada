@@ -7,8 +7,8 @@ use std::rc::Rc;
 use tree_sitter::{Node, Parser};
 
 use super::{
-    Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
-    LanguagePack, Layout, Modules, Param, Part, Receiver, children, named, text,
+    Annotated, Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
+    LanguagePack, Layout, Marked, Modules, Param, Part, Receiver, children, named, text,
 };
 use crate::{Result, qualify};
 
@@ -76,8 +76,9 @@ impl LanguagePack for Java {
         ]
     }
 
+    /// Spring's base configuration, which the kinds read (`jvm::spring`) and imports do not.
     fn config_files(&self) -> &'static [&'static str] {
-        &[]
+        &["**/application.properties", "**/application.yml"]
     }
 
     fn modules(
@@ -147,6 +148,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         package,
         ..Facts::default()
     };
+    SYSTEM_BOUND.set(binds_system(tree.root_node(), src));
     // The current package and java.lang are implicitly visible before explicit imports.
     wildcard("java.lang", false, &mut facts);
     let package = facts.package.clone();
@@ -175,7 +177,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // The instance `final` fields (class, name, initializer) and what constructors assign to
     // fields, by class and field.
     let mut finals: Vec<(String, String, Option<Value>)> = Vec::new();
-    let mut assigned: BTreeMap<(String, String), Vec<Value>> = BTreeMap::new();
+    let mut assigned: BTreeMap<(String, String), Vec<(Value, String)>> = BTreeMap::new();
+    // The names assigned anywhere in the file (`f = v`, `x.f = v`), marked as constants `.f`.
+    let mut written = BTreeSet::new();
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
         node,
@@ -231,11 +235,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 generics = Rc::new(names);
             }
             let parameters = parameters(node, src, &generics);
-            if node.kind() == "constructor_declaration" {
-                let names: Vec<&str> = parameters.iter().map(|(n, _, _)| n.as_str()).collect();
-                assignments(node, src, &scope, &names, &mut assigned);
-            }
-            let written = if kind == Kind::Method {
+            let signature_name = if kind == Kind::Method {
                 let signature = format!(
                     "{name}({})",
                     parameters
@@ -252,8 +252,19 @@ fn parse(src: &[u8]) -> Result<Facts> {
             } else {
                 name.to_string()
             };
-            inner = Rc::new(qualify(&scope, &written));
+            inner = Rc::new(qualify(&scope, &signature_name));
+            if node.kind() == "constructor_declaration" {
+                let names: Vec<&str> = parameters.iter().map(|(n, _, _)| n.as_str()).collect();
+                assignments(node, src, &scope, &inner, &names, &mut assigned);
+            }
             if kind == Kind::Method {
+                // The annotations of each parameter (`@Value("${key}") String base`).
+                for (n, parameter) in formal_parameters(node).enumerate() {
+                    for annotation in annotations(parameter, src, &scope) {
+                        let on = Marked::Param(inner.as_ref().clone(), n);
+                        facts.annotated.push(Annotated { on, annotation });
+                    }
+                }
                 for (name, _, class) in &parameters {
                     facts.receivers.push(Receiver {
                         scope: inner.as_ref().clone(),
@@ -374,7 +385,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
             if !public {
                 facts.hidden.push(inner.as_ref().clone());
             }
-            annotations(node, src, &scope, &inner, &mut facts);
+            for mut at in annotations(node, src, &scope) {
+                at.decorates = Some(inner.as_ref().clone());
+                facts.calls.push(at);
+            }
             in_interface = node.kind() == "interface_declaration";
             if in_interface {
                 facts.interfaces.push(inner.as_ref().clone());
@@ -526,6 +540,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                                 .child_by_field_name("value")
                                 .map_or(Value::Unknown, |n| value(n, src, 0)),
                             ty: None,
+                            scope: None,
                         });
                     }
                 }
@@ -546,6 +561,15 @@ fn parse(src: &[u8]) -> Result<Facts> {
             "type_identifier" => {
                 outside.insert(text(node, src).to_string());
             }
+            "assignment_expression" => {
+                let left = node.child_by_field_name("left");
+                let name = match left {
+                    Some(n) if n.kind() == "identifier" => Some(n),
+                    Some(n) if n.kind() == "field_access" => n.child_by_field_name("field"),
+                    _ => None,
+                };
+                written.extend(name.map(|n| text(n, src).to_string()));
+            }
             _ => {}
         }
         if matches!(node.kind(), "field_declaration" | "constant_declaration") {
@@ -563,6 +587,12 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         _ => Class::Unknown,
                     };
                     fields.insert(text(name, src).to_string());
+                    if definitions {
+                        for annotation in annotations(node, src, &scope) {
+                            let on = Marked::Field(scope.as_ref().clone(), text(name, src).into());
+                            facts.annotated.push(Annotated { on, annotation });
+                        }
+                    }
                     facts.receivers.push(Receiver {
                         scope: scope.as_ref().clone(),
                         name: text(name, src).to_string(),
@@ -602,17 +632,30 @@ fn parse(src: &[u8]) -> Result<Facts> {
     }
     // A `final` field holds the one value its initializer or a constructor gives it: a constant
     // of the class, which no static context reads (it is no `statics`). Two values give none.
+    // A value a constructor assigns is written in that constructor, its parameters in scope.
     for (class, name, initial) in finals {
         let given = assigned.remove(&(class.clone(), name.clone()));
-        let mut values = initial.into_iter().chain(given.into_iter().flatten());
-        if let (Some(value), None) = (values.next(), values.next()) {
+        let initial = initial.map(|v| (v, None));
+        let given = given.into_iter().flatten().map(|(v, at)| (v, Some(at)));
+        let mut values = initial.into_iter().chain(given);
+        if let (Some((value, scope)), None) = (values.next(), values.next()) {
             let name = qualify(&class, &name);
             facts.consts.push(Const {
                 name,
                 value,
                 ty: None,
+                scope,
             });
         }
+    }
+    // What `Code::field_written` reads: a field so assigned holds no one value.
+    for name in written {
+        facts.consts.push(Const {
+            name: format!(".{name}"),
+            value: Value::Unknown,
+            ty: None,
+            scope: None,
+        });
     }
     // A local is typed only where it is the one binding of its name in its scope; one named
     // like a field may be read as the field before its declaration, so its class is unknown.
@@ -747,8 +790,9 @@ fn assignments(
     node: Node,
     src: &[u8],
     class: &str,
+    constructor: &str,
     params: &[&str],
-    out: &mut BTreeMap<(String, String), Vec<Value>>,
+    out: &mut BTreeMap<(String, String), Vec<(Value, String)>>,
 ) {
     let mut pending: Vec<Node> = node.child_by_field_name("body").into_iter().collect();
     while let Some(n) = pending.pop() {
@@ -773,7 +817,8 @@ fn assignments(
                     });
                 if let (Some(field), Some(right)) = (field, n.child_by_field_name("right")) {
                     let at = (class.to_string(), field.to_string());
-                    out.entry(at).or_default().push(value(right, src, 0));
+                    let assigned = (value(right, src, 0), constructor.to_string());
+                    out.entry(at).or_default().push(assigned);
                 }
             }
             _ => {}
@@ -788,16 +833,20 @@ fn modifiers(node: Node<'_>) -> Vec<&str> {
         .map_or_else(Vec::new, |n| children(n).map(|c| c.kind()).collect())
 }
 
-/// Each parameter's name, its type as written and the class that type names.
-fn parameters(node: Node, src: &[u8], generics: &[String]) -> Vec<(String, String, Class)> {
+/// The parameter nodes of the method or constructor `node`, in order.
+fn formal_parameters(node: Node) -> impl Iterator<Item = Node> {
     let list = node.child_by_field_name("parameters").or_else(|| {
         (node.kind() == "compact_constructor_declaration")
             .then(|| node.parent()?.parent()?.child_by_field_name("parameters"))
             .flatten()
     });
-    list.into_iter()
-        .flat_map(named)
+    (list.into_iter().flat_map(named))
         .filter(|p| matches!(p.kind(), "formal_parameter" | "spread_parameter"))
+}
+
+/// Each parameter's name, its type as written and the class that type names.
+fn parameters(node: Node, src: &[u8], generics: &[String]) -> Vec<(String, String, Class)> {
+    formal_parameters(node)
         .map(|p| {
             let name = p.child_by_field_name("name").or_else(|| {
                 named(p)
@@ -831,7 +880,10 @@ fn parameters(node: Node, src: &[u8], generics: &[String]) -> Vec<(String, Strin
         .collect()
 }
 
-fn annotations(node: Node, src: &[u8], scope: &str, target: &str, facts: &mut Facts) {
+/// The annotations of the declaration `node` (its `modifiers`), each as a call written in
+/// `scope`: its name the callee, its arguments positional or named.
+fn annotations(node: Node, src: &[u8], scope: &str) -> Vec<Call> {
+    let mut out = Vec::new();
     for annotation in named(node)
         .filter(|n| n.kind() == "modifiers")
         .flat_map(named)
@@ -841,7 +893,6 @@ fn annotations(node: Node, src: &[u8], scope: &str, target: &str, facts: &mut Fa
             continue;
         };
         let mut at = call(scope, callee(name, src), annotation.byte_range());
-        at.decorates = Some(target.to_string());
         if let Some(args) = annotation.child_by_field_name("arguments") {
             for argument in named(args) {
                 if argument.kind() == "element_value_pair" {
@@ -857,8 +908,9 @@ fn annotations(node: Node, src: &[u8], scope: &str, target: &str, facts: &mut Fa
                 }
             }
         }
-        facts.calls.push(at);
+        out.push(at);
     }
+    out
 }
 
 fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
@@ -985,6 +1037,58 @@ fn callee(node: Node, src: &[u8]) -> String {
     parts.join(".")
 }
 
+/// The variable `System.getenv("X")` (or `java.lang.System.getenv("X")`) reads, unless the file
+/// binds `System` to another type: by a single-type import, or by declaring one.
+// ponytail: a `System` type another file of the package declares is not seen; it hides
+// `java.lang.System` there, and its `getenv` still reads as an environment read.
+fn getenv(node: Node, src: &[u8]) -> Option<String> {
+    let callee = callee(node, src);
+    if callee != "System.getenv" && callee != "java.lang.System.getenv" {
+        return None;
+    }
+    if callee == "System.getenv" && SYSTEM_BOUND.get() {
+        return None;
+    }
+    let [Value::Str(parts)] = &arguments(node, src, 0)[..] else {
+        return None;
+    };
+    match &parts[..] {
+        [Part::Text(name)] => Some(name.clone()),
+        _ => None,
+    }
+}
+
+thread_local! {
+    /// Whether the file `parse` reads binds `System` to a type other than `java.lang.System`
+    /// (`binds_system`), for `getenv`.
+    static SYSTEM_BOUND: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether the file binds `System` to another type: a single-type import of one, or a type it
+/// may declare by that name.
+fn binds_system(root: Node, src: &[u8]) -> bool {
+    let imported = named(root)
+        .filter(|n| n.kind() == "import_declaration")
+        .any(|n| {
+            let import = text(n, src).trim_end_matches(';').trim_end();
+            import.ends_with(".System")
+        });
+    imported || declares_system(src)
+}
+
+/// Whether the source may declare a type named `System`: the word after `class`, `interface`,
+/// `enum` or `record`, wherever it stands (a comment that reads so counts too).
+fn declares_system(src: &[u8]) -> bool {
+    let mut words = (src.split(|b| !(b.is_ascii_alphanumeric() || matches!(b, b'_' | b'$'))))
+        .filter(|w| !w.is_empty());
+    let mut before: &[u8] = b"";
+    words.any(|word| {
+        let declared = matches!(before, b"class" | b"interface" | b"enum" | b"record");
+        before = word;
+        declared && word == b"System"
+    })
+}
+
 fn arguments(node: Node, src: &[u8], depth: usize) -> Vec<Value> {
     node.child_by_field_name("arguments")
         .into_iter()
@@ -1005,6 +1109,9 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             .map_or(Value::Unknown, |s| Value::Str(vec![Part::Text(s)])),
         "identifier" | "field_access" | "scoped_identifier" => Value::Ref(callee(node, src)),
         "this" => Value::Ref("this".into()),
+        "method_invocation" if let Some(name) = getenv(node, src) => {
+            Value::Str(vec![Part::Env(name)])
+        }
         "method_invocation" => Value::Call(Invocation {
             callee: callee(node, src),
             receiver: node

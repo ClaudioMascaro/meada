@@ -1,0 +1,602 @@
+{
+  "repository": "example.com/xlang-java/api",
+  "files": [
+    {
+      "path": "src/main/java/com/example/api/AuditClient.java",
+      "hash": "ef6a9c85e39e40172b54cd978640929f4f7ee5c4f0075c71e24b2fc871bc7b2a"
+    },
+    {
+      "path": "src/main/java/com/example/api/OrderController.java",
+      "hash": "e1322eaf612944cb86bd3457e44af617aae0988bc2ce88a627a099e22f0d3a94"
+    },
+    {
+      "path": "src/main/java/com/example/api/PriceClient.java",
+      "hash": "132ef78631432de5e529f70ed51298e4b9bbd1e1c8802e76f159b5fd617acee6"
+    },
+    {
+      "path": "src/main/java/com/example/api/PromotionClient.java",
+      "hash": "5bb02d435aa688b66395c7047cc6e6d156ee9f5cd1885166706ee412889dfec6"
+    },
+    {
+      "path": "src/main/java/com/example/api/ReportClient.java",
+      "hash": "76e84ae1fe9774cf405e3b4d0b71a33ba1e22d8d1668a971a3a0a98707e1dc81"
+    },
+    {
+      "path": "src/main/java/com/example/api/StockClient.java",
+      "hash": "a8c750ec5c85fa8fc3a36a2ee4a9d40b83cdcc4be45e5a14959046ed4a6273cd"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api.AuditClient",
+      "span": {
+        "path": "src/main/java/com/example/api/AuditClient.java",
+        "start": 271,
+        "end": 527
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api.AuditClient.record()",
+      "span": {
+        "path": "src/main/java/com/example/api/AuditClient.java",
+        "start": 428,
+        "end": 525
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController",
+      "span": {
+        "path": "src/main/java/com/example/api/OrderController.java",
+        "start": 333,
+        "end": 1207
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.OrderController(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient)",
+      "span": {
+        "path": "src/main/java/com/example/api/OrderController.java",
+        "start": 610,
+        "end": 909
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.reserve()",
+      "span": {
+        "path": "src/main/java/com/example/api/OrderController.java",
+        "start": 1069,
+        "end": 1205
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)",
+      "span": {
+        "path": "src/main/java/com/example/api/OrderController.java",
+        "start": 915,
+        "end": 1063
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/PriceClient.java::com.example.api.PriceClient",
+      "span": {
+        "path": "src/main/java/com/example/api/PriceClient.java",
+        "start": 271,
+        "end": 546
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/PriceClient.java::com.example.api.PriceClient.priceOf(String)",
+      "span": {
+        "path": "src/main/java/com/example/api/PriceClient.java",
+        "start": 424,
+        "end": 544
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient",
+      "span": {
+        "path": "src/main/java/com/example/api/PromotionClient.java",
+        "start": 274,
+        "end": 577
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient.current()",
+      "span": {
+        "path": "src/main/java/com/example/api/PromotionClient.java",
+        "start": 470,
+        "end": 575
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient",
+      "span": {
+        "path": "src/main/java/com/example/api/ReportClient.java",
+        "start": 192,
+        "end": 364
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()",
+      "span": {
+        "path": "src/main/java/com/example/api/ReportClient.java",
+        "start": 235,
+        "end": 362
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient",
+      "span": {
+        "path": "src/main/java/com/example/api/StockClient.java",
+        "start": 286,
+        "end": 550
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.StockClient(String)",
+      "span": {
+        "path": "src/main/java/com/example/api/StockClient.java",
+        "start": 362,
+        "end": 467
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()",
+      "span": {
+        "path": "src/main/java/com/example/api/StockClient.java",
+        "start": 473,
+        "end": 548
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api.AuditClient.record()::rest.postForObject#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api.AuditClient.record()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/AuditClient.java",
+        "start": 459,
+        "end": 518
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api.AuditClient::RestTemplate#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api.AuditClient",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/AuditClient.java",
+        "start": 403,
+        "end": 421
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api::Component#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/AuditClient.java",
+        "start": 271,
+        "end": 281
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.reserve()::audit.record#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.reserve()",
+      "target": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api.AuditClient.record()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/java/com/example/api/OrderController.java",
+        "start": 1130,
+        "end": 1144
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.reserve()::promotions.current#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.reserve()",
+      "target": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient.current()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/java/com/example/api/OrderController.java",
+        "start": 1154,
+        "end": 1174
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.reserve()::reports.send#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.reserve()",
+      "target": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/java/com/example/api/OrderController.java",
+        "start": 1184,
+        "end": 1198
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)::prices.priceOf#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)",
+      "target": "example.com/xlang-java/api::src/main/java/com/example/api/PriceClient.java::com.example.api.PriceClient.priceOf(String)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/java/com/example/api/OrderController.java",
+        "start": 996,
+        "end": 1014
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)::stock.level#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)",
+      "target": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/java/com/example/api/OrderController.java",
+        "start": 1024,
+        "end": 1037
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController::GetMapping#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/OrderController.java",
+        "start": 915,
+        "end": 935
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController::PostMapping#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/OrderController.java",
+        "start": 1069,
+        "end": 1093
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api::RequestMapping#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/OrderController.java",
+        "start": 349,
+        "end": 375
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api::RestController#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/OrderController.java",
+        "start": 333,
+        "end": 348
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/PriceClient.java::com.example.api.PriceClient.priceOf(String)::rest.getForObject#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/PriceClient.java::com.example.api.PriceClient.priceOf(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/PriceClient.java",
+        "start": 475,
+        "end": 537
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/PriceClient.java::com.example.api.PriceClient::RestTemplate#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/PriceClient.java::com.example.api.PriceClient",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/PriceClient.java",
+        "start": 399,
+        "end": 417
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/PriceClient.java::com.example.api::Component#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/PriceClient.java::com.example.api",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/PriceClient.java",
+        "start": 271,
+        "end": 281
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient.current()::rest.getForObject#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient.current()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/PromotionClient.java",
+        "start": 502,
+        "end": 568
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient::RestTemplate#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/PromotionClient.java",
+        "start": 445,
+        "end": 463
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api::Component#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/PromotionClient.java",
+        "start": 274,
+        "end": 284
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()::(method_invocation).build#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/ReportClient.java",
+        "start": 264,
+        "end": 355
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()::(method_invocation).uri#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/ReportClient.java",
+        "start": 264,
+        "end": 347
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()::HttpRequest.newBuilder#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/ReportClient.java",
+        "start": 264,
+        "end": 288
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()::System.getenv#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/ReportClient.java",
+        "start": 304,
+        "end": 328
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()::URI.create#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/ReportClient.java",
+        "start": 293,
+        "end": 346
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api::Component#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/ReportClient.java",
+        "start": 192,
+        "end": 202
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.StockClient(String)::WebClient.create#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.StockClient(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/StockClient.java",
+        "start": 438,
+        "end": 460
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()::(method_invocation).retrieve#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/StockClient.java",
+        "start": 503,
+        "end": 541
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()::(method_invocation).uri#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/StockClient.java",
+        "start": 503,
+        "end": 530
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()::web.get#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/StockClient.java",
+        "start": 503,
+        "end": 512
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api::Component#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/StockClient.java",
+        "start": 286,
+        "end": 296
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "http::GET::/orders/{}",
+      "site": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)"
+    },
+    {
+      "contract": "http::POST::/orders/reserve",
+      "site": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.reserve()"
+    },
+    {
+      "contract": "package::maven::com.example:api",
+      "site": "example.com/xlang-java/api::pom.xml"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "http::POST::/api/audit",
+      "site": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api.AuditClient.record()::rest.postForObject#0",
+      "via": "host:web.example.com"
+    },
+    {
+      "contract": "http::POST::/audit",
+      "site": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api.AuditClient.record()::rest.postForObject#0",
+      "via": "env:AUDIT_URL|host:web.example.com"
+    },
+    {
+      "contract": "http::GET::/api/prices/{}",
+      "site": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)::prices.priceOf#0",
+      "via": "env:WEB_URL"
+    },
+    {
+      "contract": "http::GET::/api/promotions",
+      "site": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient.current()::rest.getForObject#0",
+      "via": "env:PROMO_URL|host:promotions.internal"
+    },
+    {
+      "contract": "http::GET::/v2/api/promotions",
+      "site": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient.current()::rest.getForObject#0",
+      "via": "host:promotions.internal"
+    },
+    {
+      "contract": "http::GET::/api/reports",
+      "site": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()::(method_invocation).build#0",
+      "via": "env:WEB_URL"
+    },
+    {
+      "contract": "http::GET::/api/stock",
+      "site": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()::(method_invocation).uri#0",
+      "via": "host:web.example.com"
+    }
+  ],
+  "packages": [
+    {
+      "name": "com.example:api",
+      "version": "1.0.0",
+      "repository": "example.com/xlang-java/api",
+      "directory": ".",
+      "ecosystem": "maven"
+    }
+  ],
+  "communities": [
+    {
+      "name": "src/main/java/com/example/api",
+      "members": [
+        "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api.AuditClient.record()",
+        "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.reserve()",
+        "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient.current()",
+        "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()"
+      ]
+    },
+    {
+      "name": "src/main/java/com/example/api#2",
+      "members": [
+        "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)",
+        "example.com/xlang-java/api::src/main/java/com/example/api/PriceClient.java::com.example.api.PriceClient.priceOf(String)",
+        "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api.AuditClient.record()::rest.postForObject#0",
+      "provider": "example.com/xlang-java/web::app/api/audit/route.ts::POST",
+      "contract": "http::POST::/api/audit",
+      "level": "exact",
+      "reason": "host web.example.com is served by example.com/xlang-java/web"
+    },
+    {
+      "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)::prices.priceOf#0",
+      "provider": "example.com/xlang-java/web::app/api/prices/[sku]/route.ts::GET",
+      "contract": "http::GET::/api/prices/{}",
+      "level": "inferred",
+      "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-java/web"
+    },
+    {
+      "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient.current()::rest.getForObject#0",
+      "provider": "example.com/xlang-java/web::app/api/promotions/route.ts::GET",
+      "contract": "http::GET::/api/promotions",
+      "level": "inferred",
+      "reason": "base URL from PROMO_URL, a base_url_env of peer example.com/xlang-java/web"
+    },
+    {
+      "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()::(method_invocation).build#0",
+      "provider": "example.com/xlang-java/web::app/api/reports/route.ts::GET",
+      "contract": "http::GET::/api/reports",
+      "level": "inferred",
+      "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-java/web"
+    },
+    {
+      "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()::(method_invocation).uri#0",
+      "provider": "example.com/xlang-java/web::app/api/stock/route.ts::GET",
+      "contract": "http::GET::/api/stock",
+      "level": "exact",
+      "reason": "host web.example.com is served by example.com/xlang-java/web"
+    },
+    {
+      "consumer": "example.com/xlang-java/web::src/orders.ts::reserveOrder::fetch#0",
+      "provider": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.reserve()",
+      "contract": "http::POST::/orders/reserve",
+      "level": "exact",
+      "reason": "host api.example.com is served by example.com/xlang-java/api"
+    },
+    {
+      "consumer": "example.com/xlang-java/web::src/sync.ts::syncOrders::orderStatus#0",
+      "provider": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)",
+      "contract": "http::GET::/orders/{}",
+      "level": "inferred",
+      "reason": "base URL from API_URL, a base_url_env of peer example.com/xlang-java/api"
+    }
+  ]
+}

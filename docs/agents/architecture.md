@@ -773,7 +773,9 @@ one for the area a change touches.
   and `http/rust/axum.rs`, actix-web, Rocket and axum providers; `http/go.rs` and
   `http/go/clients.rs`, net/http, gin, echo, chi and gorilla/mux providers and their consumers
   with resty; `http/java.rs` and `http/java/clients.rs`, Spring MVC providers and the
-  RestTemplate, WebClient, `java.net.http` and OkHttp consumers), resource and channel kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
+  RestTemplate, WebClient, `java.net.http` and OkHttp consumers, whose bases come from the
+  Spring configuration `jvm/spring.rs` reads for the JVM packs' kinds), resource and channel
+  kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
   contracts (specs #22, #24, #30, #25 and #26), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
   [map/contracts.md](map/contracts.md).
@@ -909,8 +911,10 @@ one for the area a change touches.
   language (one module per language: `http/<language>.rs`, `channel/<language>.rs`), never in
   the pack. Three questions are
   required: `prefix`, `extract` (receives `Code`, never the syntax tree, and `Indexed`, what the
-  index read of the repository besides: the manifests and tsconfigs, the exported rows and the
-  files of every pack, which a kind reads when its contracts depend on what the manifests say;
+  index read of the repository besides: the manifests and tsconfigs, the exported rows, the
+  files of every pack and the bytes of the config files the packs list (`Indexed::configs`,
+  never stored: Java's Spring `application.properties` and `application.yml`), which a kind
+  reads when its contracts depend on what the manifests or a configuration say;
   it returns `Found` with a `Site`: `Def`, `Inline`, `File`, `Call`) and
   `link` (receives the whole workspace's providers and exports). The others have a default
   body, and a kind overrides only what it answers differently:
@@ -972,6 +976,17 @@ one for the area a change touches.
   the caller's repository by that name is no member. Only this reading folds a call's
   arguments or makes a `Value::External`: `Expand::Call` and `Code::value` leave them as
   written, so no other reader sees a change.
+  `Code::expand_with` is `Code::expand` with an injector (`resolve::Inject`): what a kind reads
+  off an annotation written on a field or a parameter (`Facts::annotated`, transient, read
+  from the full facts so a file the index kept is parsed again through `Code::misses`). The
+  shared side asks it for a field no file assigns (`Code::field_written`, the `.f` marker
+  constants the Java pack writes for every `f = v` and `x.f = v`) and for a parameter no frame
+  binds of a function no exact call reaches; a function some exact call reaches climbs to its
+  callers as before, so the injected value never stands in for what a caller passes. A
+  constructor's parameter a `final` field holds (`Const::scope`, the constructor the value is
+  written in) is no wrapper's parameter: it is injected or unknown, never climbed. The values
+  an injector gives are transient like the arguments they stand for, so the index stays free of
+  them. `jvm/spring.rs` is the one injector (Spring's `@Value`), shared by the JVM packs.
 - New **Go router** (spec #25; net/http, gin, echo, chi and gorilla): a row of `ROUTERS` in
   `http/go.rs` (the package, the functions that make a router, the methods that make a group
   (a `Form`: `Group(prefix)`, chi's `Group(fn)` and `Route(prefix, fn)`, gorilla's
@@ -1719,13 +1734,27 @@ one for the area a change touches.
   arguments; a client held in a local has an unknown base, so the consumer links by path. The
   Java pack keeps a `final` instance field's one value (its initializer, or the single `this.f =
   v` or `f = v` of all its constructors; two give none) as a `Const` of its class, outside
-  `statics`; a constructor parameter in it is read in the class scope, unknown. A builder
+  `statics`, a constructor's value read in that constructor (`Const::scope`): its parameters
+  are what Spring injects (#89), else unknown. A builder
   (`HttpRequest.newBuilder()`, `new Request.Builder()`) is read only as one chain ending in
   `build()`; one held in a variable between steps is no consumer, and a chain folded short of
   its start names no method. `String.format` puts each `%s` or `%d` argument in place (a
   parameter keeps the wrapper climbing, anything else is a hole) and reads `%%`; any other
   conversion leaves the URL unread. A `HttpMethod.X` names a method only when one spelling
   (`Outside`) is Spring's.
+  Bases from configuration (#89): the reader expands with `jvm::spring::inject`, so a field or a
+  constructor parameter with Spring's `@Value("${key}")` (bound by an import, as for the
+  annotations of #86) holds `key` from the `application.properties` or `application.yml` of its
+  module's `src/main/resources` (`<module>/src/main/...`, properties winning over YAML); a field
+  some file assigns, and one a parameter, a local or a same-name binding hides, hold nothing.
+  A placeholder no key fills is the variable it names (`Part::Env`), and `${X:default}` keeps
+  both (`Part::EnvOr`): `http::fetches` reads such a URL through `X` and, when the default
+  names a host, through that host too, the variable's `via` then `env:X|host:<host>`, which
+  `Http::link` drops when a provider of the workspace serves the host. Both readings stay at
+  the call site, the one that does not apply showing as linking nothing. The Java pack reads
+  `System.getenv("X")` (or `java.lang.System.getenv`) as `Part::Env`, unless the file imports
+  or may declare another `System` (`binds_system`, a word after `class` in a comment counts).
+  Profiles, relaxed binding, YAML lists and a SpEL `#{...}` value are not read.
 - `http/go.rs` (spec #25): a route is read only with a literal path and a literal prefix; a
   group prefix or a pattern Meada cannot read serves nothing. `net/http` reads `{name}`,
   `{name...}` and `{$}` alone: a `:name` segment is a literal no contract can spell, so its route
@@ -2264,6 +2293,13 @@ one for the area a change touches.
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).
 
+- `jvm/spring.rs` (spec #26, #89): `PLACEHOLDER_DEPTH` (32) bounds how many keys deep a
+  placeholder is resolved, a cycle included, and `PLACEHOLDER_BUDGET` (64 KiB) what one value
+  may cost (each placeholder visited, each byte copied); past either the rest is an unknown
+  part. The YAML file goes through the provider documents' reader (`document/yaml.rs`), with its
+  budget and nesting limit; a `.properties` file is bounded by `lang::MAX_BYTES` like every pack
+  config. A same-package `System` type in another file is not seen by the Java pack's
+  `getenv`.
 - `jvm/maven.rs` (spec #26): `XML_DEPTH` (64 nested elements), `XML_NAMESPACES` (16 `xmlns`
   occurrences in the file) and `XML_ATTRIBUTES` (64 per tag) are checked by one linear pass
   before parsing, since roxmltree copies the enclosing namespaces into each element that

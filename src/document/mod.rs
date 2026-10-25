@@ -7,7 +7,7 @@
 mod asyncapi;
 mod openapi;
 mod schema;
-mod yaml;
+pub(crate) mod yaml;
 
 use std::collections::{BTreeMap, BTreeSet};
 
