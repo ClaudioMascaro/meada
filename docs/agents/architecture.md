@@ -992,11 +992,16 @@ one for the area a change touches.
   constructor's parameter a `final` field holds (`Const::scope`, the constructor the value is
   written in) is no wrapper's parameter: it is injected or unknown, never climbed. The values
   an injector gives are transient like the arguments they stand for, so the index stays free of
-  them. `jvm/spring.rs` is the one injector (Spring's `@Value`), shared by the JVM packs;
-  `spring::resolved` resolves the placeholders of any other annotation text Spring resolves (a
-  listener's topic or queue). `jvm/names.rs` holds the name questions the JVM kinds share:
-  `one` (exactly one spelling in the kind's table), `known` (a name an import binds),
-  `spellings` and `typed` (the outside type the source writes for a name).
+  them. `jvm/spring.rs` is the one injector (Spring's `@Value`, `spring::inject`, which is given
+  the annotation with what it marks), shared by the JVM packs; `spring::resolved` is the one
+  rule for an annotation's text Spring resolves (`@Value`, a Feign `url` or `path`, a listener's
+  topic or queue): literal text with its placeholders resolved, an environment read kept, any
+  other part unknown. The list of Spring's config files is the reader's too
+  (`spring::CONFIG_FILES`), which the Java pack returns as its `config_files`. `jvm/names.rs`
+  holds the name questions the JVM kinds share: `one` (exactly one spelling in the kind's
+  table), `known` (a name an import binds), `spellings` and `typed` (the outside type the source
+  writes for a name), and the Java readers' shared filters `java_files` and `is_method` (an
+  annotation on a method of the file).
 - New **Go router** (spec #25; net/http, gin, echo, chi and gorilla): a row of `ROUTERS` in
   `http/go.rs` (the package, the functions that make a router, the methods that make a group
   (a `Form`: `Group(prefix)`, chi's `Group(fn)` and `Route(prefix, fn)`, gorilla's
@@ -1138,7 +1143,9 @@ one for the area a change touches.
     looks the class up by package declaration in the files the artifact owns that are no test
     sources and picks the method by name and argument count among the overloads of the class's
     family (`How::Package`, `Maven::resolutions`; the provider's `families` rows, an opaque
-    ancestor keeping the target from `exact`).
+    ancestor keeping the target from `exact`). `member_of`: none; Maven's constructors and
+    methods of a class, so `context` on a public class lists, once per call, the calls that
+    reach its members (`reached`, at the best level of the call's links into the class).
   - `resolutions`: the single-entry loop (the entries, each provider the entry `reaches`,
     `resolve` in it); PyPI replaces it whole, since its imports name a module and several
     distributions may expose it.
@@ -1816,10 +1823,13 @@ one for the area a change touches.
   Bases from configuration (#89): the reader expands with `jvm::spring::inject`, so a field or a
   constructor parameter with Spring's `@Value("${key}")` (bound by an import, as for the
   annotations of #86) holds `key` from the `application.properties`, `application.yml` or
-  `application.yaml` of its module's `src/main/resources` (`<module>/src/main/...`, in that
-  order of precedence; a file past `lang::MAX_BYTES` is not read, nor a `.properties` past
-  its first `#---`); a `static` field, a field some file assigns, and one a parameter, a local
-  or a same-name binding hides, hold nothing. A placeholder no key fills is the variable it
+  `application.yaml` of its module's `src/main/resources`, in that order of precedence (a file
+  past `lang::MAX_BYTES` is not read, nor a `.properties` past its first `#---`). A source's
+  module is that of the deepest main source root a Maven or Gradle build declares for it
+  (`Indexed::manifests`, a Gradle source set's `srcDirs` included), else the one whose
+  `<module>/src/main/` it is under. The pack records every annotated field with whether it is
+  `static`, and `spring::inject` gives a `static` one nothing; a field some file assigns, and
+  one a parameter, a local or a same-name binding hides, hold nothing too. A placeholder no key fills is the variable it
   names (`Part::Env`), and `${X:default}` keeps both (`Part::EnvOr`): `http::fetches` reads
   such a URL through `X` and, when the default names a host, through that host too, the twins
   marked in their `via` (`env:X|host:<host>` and `host:<host>|default`). `Http::workspace_step`
@@ -1835,19 +1845,26 @@ one for the area a change touches.
   sited at the method (`Site::Def`, built by `http::consumer_at`), not at a call: its callers
   reach it as any call to a definition. Feign: `@FeignClient` from
   `org.springframework.cloud.openfeign` (bound as the Spring annotations of #86, through `known`)
-  on an interface; `url` (empty is none; without a scheme it gets `http://`, as Spring Cloud does) and `path` resolve with `jvm::spring::resolve`
+  on an interface; `url` (empty is none; without a scheme it gets `http://`, as Spring Cloud does) and `path` resolve with `jvm::spring::resolved`
   over the module's configuration, the methods' mappings are `request_methods` and `paths` of
-  `http/java.rs`, a `@RequestMapping` with no `method` meaning GET, as Feign sends it. Without `url` the consumer's `via` is `feign:<name>` (`http::FEIGN_VIA`) and
-  `Http::link` words the unresolved host as `host unresolved (Feign client <name>)`; a name with
+  `http/java.rs`, a `@RequestMapping` with no `method` meaning GET, as Feign sends it. Without
+  `url` the consumer's `via` is `client:Feign client <name>`: `http::CLIENT_VIA` is the prefix of
+  a client that names itself, the rest the words the reader writes, and `Http::link` words the
+  unresolved host as `host unresolved (<words>)`, so the shared code names no library; a name with
   `|` is refused, it would collide with the twin marks. A `@RequestMapping` on the interface,
   `@RequestLine` and other contracts give nothing. Retrofit: the verbs of `retrofit2.http`
   (their names collide with JAX-RS, so `known` accepts both spellings and the result must be
   Retrofit's); the base is the folded `Retrofit.Builder().baseUrl(..)` chain of each
   `retrofit.create(Api.class)` (`Expand::Chain`, climbing wrapper callers while the base holds a
   `Part::Ref`), the receiver proved Retrofit by its type or by its `new Retrofit.Builder()`
-  chain; one consumer per creation, none gives an unknown base. A route from `/` replaces the
+  chain; one consumer per creation, none gives an unknown base. Its annotations name the path by
+  `value` alone, and a route with a brace open past its segment is not read (`balanced`, as for
+  Spring, JAX-RS and Feign). A route from `/` replaces the
   base's path (read over the base's leading text parts, so `HOST + "/v1/"` counts), and an empty
-  route is Retrofit's dynamic `@Url`: a consumer with no contract. The Java pack reads `Api.class` as `Value::Member("Api", "class")`.
+  route is Retrofit's dynamic `@Url`: a consumer with no contract. A consumer at a method is an
+  open item like a call's (`items::list`): its location is the method, its expression the method
+  on one line, and its enclosing symbol the method itself, so `meada decide` sends the method's
+  lines as the minimal excerpt (ADR 0006). The Java pack reads `Api.class` as `Value::Member("Api", "class")`.
   `ContractKind::calls_from_definition` (true for HTTP) tells `trace` that a consumer at a
   symbol is a call to follow, unlike a channel handler, where the link ends.
 - `http/go.rs` (spec #25): a route is read only with a literal path and a literal prefix; a

@@ -376,8 +376,10 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   family, `inferred` beside an opaque base, constructors, on-demand and static imports, two
   on-demand imports that both bring a class, a same-package class and a parameter or local
   that hide the import, test roots and outside types left out); an edited source set
-  relinks like a cold workspace. Goldens `jvm-*.export.json`, `jvm-maven.context-total.txt` and
-  `jvm-client.trace-down.txt`. Unit tests in `package/maven.rs` and `jvm/gradle.rs`.
+  relinks like a cold workspace; `context` on the class `Order` lists the calls that reach its
+  members. Goldens `jvm-*.export.json`, `jvm-maven.context-total.txt`,
+  `jvm-maven.context-order.txt` and `jvm-client.trace-down.txt`. Unit tests in
+  `package/maven.rs` and `jvm/gradle.rs`.
 - **The loopback decider stub** (`tests/it/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500
@@ -422,10 +424,17 @@ interface built by `Remotes`, shadowed annotations and `@RequestLine`, which giv
 `xlang-java-api` fixture calls the TypeScript provider through two Feign clients, and
 `xlang-java.trace-up-feign.txt` is the trace up from the route through the interface method.
 `freshness` edits a Retrofit base and a Feign `path` and compares with a cold index.
+`xlang::a_declarative_client_method_is_an_open_item_at_its_definition` adds a mirror of the web
+app (`common::xlang_java_mirror`), so the Feign client without `url` is ambiguous, and a
+Retrofit method with `@Url`, which is unresolved: both are open items at the method, in
+`search` and `meada decide --list`; `decider::the_excerpt_of_a_declarative_client_method_is_the_method`
+checks the excerpt is the method.
 
 ## Java conformance (#84)
 
-`conformance-java` holds Maven modules and a Gradle source tree. `conformance::java` checks
+`conformance-java` holds Maven modules and a Gradle source tree, with `example.clients.Injected`
+(Spring `@Value` with a literal, a placeholder the module's configuration holds and a placeholder
+with a default) and a computed Gradle coordinate. `conformance::java` checks
 all Java definitions and its golden export; the companion engine tests check package and
 static imports and their priority/ambiguity (including duplicate fully qualified types),
 overloads and constructors in separate namespaces, fully qualified calls with shadowing,

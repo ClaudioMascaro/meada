@@ -91,6 +91,12 @@ in the same change:
   seam's free functions (`programs`, `inherit`, `is_manifest`, `read_manifest`) and imports no
   ecosystem module. Neither names an ecosystem; an arm for one added to the shared code is a
   finding.
+- `jvm/` holds what the JVM ecosystems and kinds share (spec #26, user story 28): the build
+  readers (`jvm/maven.rs`, `jvm/gradle.rs`), the Spring configuration reader with its injector
+  (`jvm/spring.rs`) and the name questions of the JVM forms (`jvm/names.rs`). An ecosystem's
+  rule stays in `package/maven.rs` and a library form in its kind (`http/java*`,
+  `channel/java.rs`); either one in `jvm/` is a finding, and so is a JVM reader a second
+  module copies instead of sharing.
 - A language pack holds syntax and value evaluation, no library table and no library form. The
   forms of the libraries a kind reads (web frameworks and HTTP clients, message brokers) live
   under the kind, one module per language (`http/<language>.rs`, `channel/<language>.rs`); a

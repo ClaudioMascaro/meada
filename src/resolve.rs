@@ -12,7 +12,7 @@ use std::cell::{OnceCell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
+    Annotated, Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
     LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker, Ty, Value,
 };
 
@@ -2862,9 +2862,9 @@ struct Fold<'a, 'i> {
 }
 
 /// What a contract kind reads off one annotation written on a field or a parameter
-/// (`Facts::annotated`), given the file and the annotation: the value it injects there, or
-/// `None` when it is no annotation the kind reads.
-pub type Inject<'a, 'i> = dyn Fn(&Code<'a>, &'a str, &'a Call) -> Option<Value> + 'i;
+/// (`Facts::annotated`), given the file and the annotation with what it marks: the value it
+/// injects there, or `None` when it is no annotation the kind reads or it injects nothing there.
+pub type Inject<'a, 'i> = dyn Fn(&Code<'a>, &'a str, &'a Annotated) -> Option<Value> + 'i;
 
 /// How many calls a builder chain is read through, down to what starts it.
 // ponytail: a chain of more builder calls than this is not read to its start; its calls past
@@ -4469,7 +4469,7 @@ impl<'a> Code<'a> {
         let annotated = &self.full(path)?.annotated;
         (annotated.iter())
             .filter(|a| marks(&a.on))
-            .find_map(|a| inject(self, path, &a.annotation))
+            .find_map(|a| inject(self, path, a))
     }
 
     /// `value` with its names folded. `frames[depth..]` bind the parameters of the function
@@ -4666,8 +4666,7 @@ impl<'a> Code<'a> {
             // A field no file assigns holds what an annotation on it injects.
             Binding::Local(at, class, field) => match fold.inject {
                 Some(inject) if !self.field_written(field) => {
-                    let marks =
-                        |on: &Marked| matches!(on, Marked::Field(c, f) if c == class && f == field);
+                    let marks = |on: &Marked| matches!(on, Marked::Field { class: c, name, .. } if c == class && name == field);
                     self.injected(at, marks, inject).unwrap_or(Value::Unknown)
                 }
                 _ => Value::Unknown,

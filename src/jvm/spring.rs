@@ -1,6 +1,8 @@
 //! Spring Boot configuration (spec #26), shared by the JVM packs' contract kinds: the base
-//! `application.properties` and `application.yml` (or `.yaml`) of a module's `src/main/resources`, read for
-//! the sources of that module (`<module>/src/main/...`), and the placeholders a value holds.
+//! `application.properties` and `application.yml` (or `.yaml`) of a module's
+//! `src/main/resources`, read for the sources of that module (those under a main source root its
+//! Maven or Gradle build declares, else under `<module>/src/main/`), and the placeholders a
+//! value holds.
 //! `.properties` files are read line by line for literal assignments; YAML (`.yml`, `.yaml`)
 //! through the hardened reader of the provider documents, its nested keys joined with dots.
 //! Where a module has several, `.properties` wins, then `.yml`, as in Spring. Profiles
@@ -17,11 +19,22 @@
 
 use std::collections::BTreeMap;
 
-use crate::lang::{Call, Part, Value};
+use crate::jvm::names::known;
+use crate::lang::{Annotated, Marked, Part, Value};
+use crate::package::Manifest;
 use crate::resolve::Code;
 
 /// The keys and raw values of one module's configuration.
 pub type Properties = BTreeMap<String, String>;
+
+/// Spring Boot's base configuration files, which the JVM packs list as their config files
+/// (`LanguagePack::config_files`) so the kinds get them through `Indexed::configs`; imports
+/// do not read them.
+pub const CONFIG_FILES: &[&str] = &[
+    "**/application.properties",
+    "**/application.yml",
+    "**/application.yaml",
+];
 
 /// Spring's annotation that injects a value into a field or a parameter.
 const VALUE: &str = "org.springframework.beans.factory.annotation.Value";
@@ -40,18 +53,22 @@ const PLACEHOLDER_DEPTH: usize = 32;
 const PLACEHOLDER_BUDGET: usize = 1 << 16;
 
 /// The configurations of a repository's modules, by the module's directory (`api/`, or empty
-/// for the repository root).
+/// for the repository root), and the main source roots the builds declare, as
+/// `(module, root/)` paths from the repository root.
 #[derive(Default)]
 pub struct Configs {
     modules: BTreeMap<String, Properties>,
+    roots: Vec<(String, String)>,
 }
 
 impl Configs {
     /// The configurations among `files` (repository path and bytes): those at
     /// `<module>/src/main/resources/application.properties`, `.../application.yml` or
     /// `.../application.yaml`, in Spring's order of precedence (`.properties`, then `.yml`).
-    /// A file past `lang::MAX_BYTES`, which the index reads cut, is not read.
-    pub fn read(files: &[(&str, &[u8])]) -> Self {
+    /// A file past `lang::MAX_BYTES`, which the index reads cut, is not read. The Maven and
+    /// Gradle builds among `manifests` give their modules' main source roots (a Gradle source
+    /// set's `srcDirs` included), which `of` maps a source to its module by.
+    pub fn read(files: &[(&str, &[u8])], manifests: &[Manifest]) -> Self {
         let mut by_rank: [BTreeMap<&str, Properties>; 3] = Default::default();
         for &(path, src) in files {
             if src.len() > crate::lang::MAX_BYTES {
@@ -81,11 +98,32 @@ impl Configs {
                 modules.entry(module.to_string()).or_default().extend(read);
             }
         }
-        Self { modules }
+        let mut roots = Vec::new();
+        for m in manifests {
+            let (dir, name) = m.path.rsplit_once('/').unwrap_or(("", &m.path));
+            if !matches!(name, "pom.xml" | "build.gradle" | "build.gradle.kts") {
+                continue;
+            }
+            let module = match dir {
+                "" => String::new(),
+                dir => format!("{dir}/"),
+            };
+            for root in (m.summary.roots.iter()).filter(|r| !m.summary.test_roots.contains(r)) {
+                roots.push((module.clone(), format!("{module}{root}/")));
+            }
+        }
+        Self { modules, roots }
     }
 
-    /// The configuration of the module whose sources hold `source` (`<module>/src/main/...`).
+    /// The configuration of the module whose sources hold `source`: the module of the deepest
+    /// main source root a build declares for it, else the one whose `src/main/` it is under.
     pub fn of(&self, source: &str) -> Option<&Properties> {
+        let built = (self.roots.iter())
+            .filter(|(_, root)| source.starts_with(root.as_str()))
+            .max_by_key(|(_, root)| root.len());
+        if let Some((module, _)) = built {
+            return self.modules.get(module);
+        }
         let mut from = 0;
         while let Some(at) = source[from..].find("src/main/") {
             let at = from + at;
@@ -292,24 +330,27 @@ fn separator(inner: &str) -> Option<usize> {
     None
 }
 
-/// What Spring's `@Value` written in `path` (the annotation as the pack reads it) injects: its
-/// text, constants folded, with its placeholders resolved against the configuration of the
-/// file's module; unknown when the text cannot be read. `None` for any other annotation: one
-/// counts only when `Code::outside` says an import from Spring binds its name.
+/// What Spring's `@Value` written in `path` (the annotation as the pack reads it, with what it
+/// marks) injects: its text, constants folded, with its placeholders resolved against the
+/// configuration of the file's module (`resolved`). `None` for any other annotation, which
+/// counts only when `Code::outside` says an import from Spring binds its name, and for a
+/// `static` field, which Spring injects nothing into.
 pub fn inject<'a>(
     configs: &Configs,
     code: &Code<'a>,
     path: &'a str,
-    annotation: &'a Call,
+    annotated: &'a Annotated,
 ) -> Option<Value> {
-    let outside = code.outside(path, &annotation.scope, &annotation.callee, false)?;
-    let spellings = match outside.candidates.is_empty() {
-        true => vec![outside.spelled],
-        false => outside.candidates,
-    };
-    if spellings.iter().filter(|s| *s == VALUE).count() != 1 {
+    if let Marked::Field {
+        is_static: true, ..
+    } = annotated.on
+    {
         return None;
     }
+    let annotation = &annotated.annotation;
+    known(code, path, &annotation.scope, &annotation.callee, |s| {
+        s == VALUE
+    })?;
     let written = annotation.args.first().or(annotation.keyword("value"))?;
     Some(resolved(
         &code.value(path, &annotation.scope, written),
@@ -317,23 +358,26 @@ pub fn inject<'a>(
     ))
 }
 
-/// A folded value as Spring reads an annotation's text: a string of literal text with its
-/// placeholders resolved against `config` (`resolve`); unknown for anything else, a string with
-/// a part that is not literal text included.
+/// A folded value as Spring reads an annotation's text: a string's literal text with its
+/// placeholders resolved against `config` (`resolve`) and an environment read kept as it is;
+/// any other part (a parameter, a part not read) is unknown (`Part::Hole`), and so is a value
+/// that is no string. An annotation's value is a constant, so a part that is not text means
+/// the text was not read whole.
 pub fn resolved(value: &Value, config: Option<&Properties>) -> Value {
     let Value::Str(parts) = value else {
         return Value::Unknown;
     };
-    let text: Option<String> = (parts.iter())
-        .map(|p| match p {
-            Part::Text(t) => Some(t.as_str()),
-            _ => None,
-        })
-        .collect();
-    match text {
-        Some(text) => Value::Str(resolve(&text, config)),
-        None => Value::Unknown,
+    let mut out = Vec::new();
+    for part in parts {
+        match part {
+            Part::Text(text) => resolve(text, config)
+                .into_iter()
+                .for_each(|p| push(&mut out, p)),
+            Part::Env(_) | Part::EnvOr(..) => out.push(part.clone()),
+            _ => out.push(Part::Hole),
+        }
     }
+    Value::Str(out)
 }
 
 #[cfg(test)]
@@ -428,7 +472,7 @@ mod tests {
             ("src/main/resources/application.properties", b"a=root\n"),
             ("xsrc/main/resources/application.properties", b"a=no\n"),
         ];
-        let configs = Configs::read(files);
+        let configs = Configs::read(files, &[]);
         let api = configs.of("api/src/main/java/a/B.java").unwrap();
         assert_eq!(
             api,
@@ -444,7 +488,11 @@ mod tests {
         let big = format!("a=cut{}", "x".repeat(crate::lang::MAX_BYTES));
         let path = "src/main/resources/application.properties";
         let files: &[(&str, &[u8])] = &[(path, big.as_bytes())];
-        assert!(Configs::read(files).of("src/main/java/a/B.java").is_none());
+        assert!(
+            Configs::read(files, &[])
+                .of("src/main/java/a/B.java")
+                .is_none()
+        );
     }
 
     #[test]
@@ -526,5 +574,56 @@ mod tests {
             .sum();
         assert!(size <= PLACEHOLDER_BUDGET);
         assert_eq!(parts.last(), Some(&Part::Hole));
+    }
+
+    #[test]
+    fn a_source_root_of_a_build_maps_its_files_to_the_module_of_the_build() {
+        use crate::package::{Manifest, Summary};
+        let files: &[(&str, &[u8])] = &[(
+            "tools/src/main/resources/application.properties",
+            b"a=tools\n",
+        )];
+        let strings = |v: &[&str]| v.iter().map(|s| s.to_string()).collect();
+        let build = Manifest {
+            path: "tools/build.gradle".into(),
+            summary: Summary {
+                roots: strings(&[
+                    "src/core/java",
+                    "src/it/java",
+                    "src/main/java",
+                    "src/test/java",
+                ]),
+                test_roots: strings(&["src/it/java", "src/test/java"]),
+                ..Summary::default()
+            },
+        };
+        let configs = Configs::read(files, std::slice::from_ref(&build));
+        let tools = props(&[("a", "tools")]);
+        assert_eq!(configs.of("tools/src/core/java/a/B.java"), Some(&tools));
+        assert_eq!(configs.of("tools/src/main/java/a/B.java"), Some(&tools));
+        // A test source set takes none, as `src/test` does, and neither does a file outside
+        // every root.
+        assert!(configs.of("tools/src/it/java/a/B.java").is_none());
+        assert!(configs.of("tools/other/a/B.java").is_none());
+        // Without the build, a literal source set is in no module.
+        let bare = Configs::read(files, &[]);
+        assert!(bare.of("tools/src/core/java/a/B.java").is_none());
+    }
+
+    #[test]
+    fn resolved_reads_the_text_keeps_an_environment_read_and_blanks_any_other_part() {
+        let config = props(&[("a", "http://a.example.com")]);
+        let value = Value::Str(vec![text("${a}/x"), env("B"), Part::Ref("p".into())]);
+        let Value::Str(parts) = resolved(&value, Some(&config)) else {
+            panic!("a string stays one");
+        };
+        assert_eq!(
+            parts,
+            [text("http://a.example.com/x"), env("B"), Part::Hole]
+        );
+        assert!(matches!(
+            resolved(&Value::Ref("p".into()), None),
+            Value::Unknown
+        ));
     }
 }

@@ -1879,7 +1879,8 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })?
             .collect::<rusqlite::Result<_>>()?,
     };
-    let exported = match manifests.iter().any(|m| m.summary.name.is_some()) {
+    let provides = manifests.iter().any(|m| m.summary.name.is_some());
+    let exported = match provides {
         false => Vec::new(),
         true => db
             .prepare(&format!(
@@ -1896,7 +1897,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })?
             .collect::<rusqlite::Result<_>>()?,
     };
-    let ancestries = match manifests.iter().any(|m| m.summary.name.is_some()) {
+    let ancestries = match provides {
         false => Vec::new(),
         true => db
             .prepare(&format!(
@@ -1913,7 +1914,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })?
             .collect::<rusqlite::Result<_>>()?,
     };
-    let shapes = match manifests.iter().any(|m| m.summary.name.is_some()) {
+    let shapes = match provides {
         false => Vec::new(),
         true => db
             .prepare(&format!(

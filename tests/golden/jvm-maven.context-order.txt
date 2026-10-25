@@ -1,0 +1,46 @@
+example.com/jvm/maven models/src/main/java/example/models/Order.java:3-34 example.models.Order
+community: none
+processes: none
+public class Order {
+    public Order(int quantity) {
+    }
+
+    public static Order of(int quantity) {
+        return new Order(quantity);
+    }
+
+    public int total() {
+        return tax(subtotal());
+    }
+
+    public int place(int quantity) {
+        return quantity;
+    }
+
+    public int place(String name) {
+        return name.length();
+    }
+
+    public int place(int quantity, int extra) {
+        return quantity + extra;
+    }
+
+    int subtotal() {
+        return 10;
+    }
+
+    private int tax(int amount) {
+        return amount;
+    }
+}
+callers: none
+callees: none
+consumers:
+example.com/jvm/client src/main/java/example/web/Bulk.java:9 example.web.Bulk.total(int) [range unchecked]
+example.com/jvm/client src/main/java/example/web/Bulk.java:13 example.web.Bulk.prepared() [range unchecked]
+example.com/jvm/client src/main/java/example/web/Checkout.java:10 example.web.Checkout.pay(int) [range unchecked]
+example.com/jvm/client src/main/java/example/web/Checkout.java:11 example.web.Checkout.pay(int) [range unchecked]
+example.com/jvm/client src/main/java/example/web/Checkout.java:12 example.web.Checkout.pay(int) [ambiguous, range unchecked]
+example.com/jvm/client src/main/java/example/web/Checkout.java:13 example.web.Checkout.pay(int) [range unchecked]
+example.com/jvm/client src/main/java/example/web/Checkout.java:17 example.web.Checkout.create() [range unchecked]
+example.com/jvm/gradle-client src/main/java/example/worker/Job.java:17 example.worker.Job.count(Order) [range unchecked]

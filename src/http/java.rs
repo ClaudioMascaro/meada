@@ -12,12 +12,12 @@
 mod clients;
 mod declarative;
 
-use super::{ANY, contract, join, path_literal, provider};
+use super::{ANY, METHODS, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
-use crate::jvm::names::known;
-use crate::lang::{Call, Kind, Value};
-use crate::resolve::Code;
+use crate::jvm::names::{is_method, java_files, known, one, typed};
+use crate::lang::{Call, Value};
+use crate::resolve::{Code, Follow, Of, passes_nothing};
 
 const WEB: &str = "org.springframework.web.bind.annotation.";
 const CONTROLLERS: &[&str] = &[
@@ -37,6 +37,9 @@ const SHORTCUTS: &[(&str, &str)] = &[
 const REQUEST_METHODS: &[&str] = &[
     "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE",
 ];
+const REQUEST_METHOD: &str = "org.springframework.web.bind.annotation.RequestMethod.";
+/// What a mapping annotation names its paths by: `value` or its alias `path`.
+const MAPPING_PATHS: &[&str] = &["value", "path"];
 
 /// The consumers of the clients (`clients.rs`) and of the declarative clients (`declarative.rs`).
 pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
@@ -48,10 +51,7 @@ pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
 /// Spring MVC providers: see the module.
 pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
     let mut found = Vec::new();
-    for (&path, facts) in code.files() {
-        if !path.ends_with(".java") {
-            continue;
-        }
+    for (path, facts) in java_files(code) {
         // What Spring annotation a call is, by its name outside the repository.
         let spring = |call: &'a Call| -> Option<String> {
             known(code, path, &call.scope, &call.callee, annotation)
@@ -62,11 +62,7 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
             .collect();
         for (n, call, name) in &annotations {
             // A method's annotation; a class carries the prefix and the controller marker.
-            let Some(target) = call
-                .decorates
-                .as_deref()
-                .filter(|t| (facts.defs.iter()).any(|d| d.kind == Kind::Method && d.name == *t))
-            else {
+            let Some(target) = call.decorates.as_deref().filter(|t| is_method(facts, t)) else {
                 continue;
             };
             let on = |class: &'a str| {
@@ -75,7 +71,7 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
                     .filter(move |(_, c, _)| c.decorates.as_deref() == Some(class))
             };
             // A method of a controller class: its annotation's scope is the class.
-            let shortcut = SHORTCUTS.iter().find(|(s, _)| *name == format!("{WEB}{s}"));
+            let shortcut = shortcut(name);
             if shortcut.is_none() && name != MAPPING
                 || !on(&call.scope).any(|(.., n)| CONTROLLERS.contains(&n.as_str()))
             {
@@ -86,7 +82,7 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
                 continue;
             };
             let methods = match shortcut {
-                Some((_, method)) => vec![method.to_string()],
+                Some(method) => vec![method.to_string()],
                 None => match request_methods(code, path, given) {
                     Some(methods) => methods,
                     None => continue,
@@ -97,7 +93,7 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
                 Some((c, ..)) => match code.call(path, *c) {
                     // A class-level `method` restricts every method of the class: not read.
                     Some(class) if class.keyword("method").is_none() => {
-                        match paths(code, path, class) {
+                        match paths(code, path, class, MAPPING_PATHS) {
                             Some(prefixes) => prefixes,
                             None => continue,
                         }
@@ -105,7 +101,7 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
                     _ => continue,
                 },
             };
-            let Some(routes) = paths(code, path, given) else {
+            let Some(routes) = paths(code, path, given, MAPPING_PATHS) else {
                 continue;
             };
             for prefix in &prefixes {
@@ -131,24 +127,20 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
 
 /// The packages of JAX-RS, before and after the move to Jakarta EE.
 const JAX_RS: &[&str] = &["javax.ws.rs.", "jakarta.ws.rs."];
-/// JAX-RS's method annotations, which are the methods themselves.
-const VERBS: &[&str] = &["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 
-/// Whether `spelled` is a JAX-RS annotation this module reads: `Path` or one of `VERBS`.
+/// Whether `spelled` is a JAX-RS annotation this module reads: `Path` or a method annotation,
+/// which is the HTTP method itself (`METHODS`).
 fn jax_rs_annotation(spelled: &str) -> bool {
     (JAX_RS.iter())
         .filter_map(|p| spelled.strip_prefix(p))
-        .any(|n| n == "Path" || VERBS.contains(&n))
+        .any(|n| n == "Path" || METHODS.contains(&n))
 }
 
 /// JAX-RS providers: a method of a class with `@Path` carrying a method annotation serves the
 /// class path joined to its own `@Path`. A method with only `@Path` is a sub-resource locator,
 /// and `@ApplicationPath` is not applied, and an interface is a client, not a resource. Names count as Spring's do, through `known`.
 fn jax_rs<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
-    for (&path, facts) in code.files() {
-        if !path.ends_with(".java") {
-            continue;
-        }
+    for (path, facts) in java_files(code) {
         let annotations: Vec<(usize, &'a Call, String)> = (facts.calls.iter().enumerate())
             .filter(|(_, c)| c.decorates.is_some())
             .filter_map(|(n, c)| {
@@ -165,17 +157,17 @@ fn jax_rs<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
         for (_, call, name) in &annotations {
             let verb = (JAX_RS.iter())
                 .filter_map(|p| name.strip_prefix(p))
-                .find(|n| VERBS.contains(n));
+                .find(|n| METHODS.contains(n));
             let (Some(verb), Some(target)) = (verb, call.decorates.as_deref()) else {
                 continue;
             };
-            if !(facts.defs.iter()).any(|d| d.kind == Kind::Method && d.name == target) {
+            if !is_method(facts, target) {
                 continue;
             }
             // The index keeps no argument: they come from the full facts of the file.
             let read = |entry: Option<&(usize, &'a Call, String)>| {
                 let given = code.call(path, entry?.0)?;
-                paths(code, path, given)
+                paths(code, path, given, MAPPING_PATHS)
             };
             // An interface with `@Path` is a client (MicroProfile, Quarkus), not a server.
             if facts.interfaces.contains(&call.scope) {
@@ -208,24 +200,63 @@ fn jax_rs<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
 
 /// Whether `spelled` is a Spring annotation this module reads.
 fn annotation(spelled: &str) -> bool {
-    CONTROLLERS.contains(&spelled)
-        || spelled == MAPPING
-        || (SHORTCUTS.iter()).any(|(s, _)| spelled == format!("{WEB}{s}"))
+    CONTROLLERS.contains(&spelled) || mapping(spelled)
 }
 
-/// The member of Spring's `RequestMethod` that `spelled` names.
-fn member_of(spelled: &str) -> Option<&str> {
-    let member = spelled.strip_prefix(&format!("{WEB}RequestMethod."))?;
+/// Whether `spelled` is one of Spring's mapping annotations: `@RequestMapping` or a shortcut.
+fn mapping(spelled: &str) -> bool {
+    spelled == MAPPING || shortcut(spelled).is_some()
+}
+
+/// The one method of the mapping shortcut `spelled` (`@GetMapping`), if it is one.
+fn shortcut(spelled: &str) -> Option<&'static str> {
+    let name = spelled.strip_prefix(WEB)?;
+    (SHORTCUTS.iter())
+        .find(|(s, _)| *s == name)
+        .map(|(_, method)| *method)
+}
+
+/// The member of a Spring method enum that `spelled` names, the enum spelled `of` with its dot:
+/// `RequestMethod` (`REQUEST_METHOD`) or `HttpMethod`, which have the same members.
+fn member_of<'s>(spelled: &'s str, of: &str) -> Option<&'s str> {
+    let member = spelled.strip_prefix(of)?;
     REQUEST_METHODS.contains(&member).then_some(member)
 }
 
-/// The paths of a mapping annotation: `value` or `path` (or the one unnamed argument), a string
-/// or an array of them, constants folded; the root when it gives none. `None` when it gives
-/// both, or a value that is no list of strings; a path that cannot be read yields none.
-fn paths<'a>(code: &Code<'a>, file: &'a str, call: &'a Call) -> Option<Vec<String>> {
+/// Whether `client` (a name, or a call made in place) is of the client type `ty`: written as
+/// one, or made by a call it traces back to that `makes` accepts (`makes(code, path, index)`).
+fn made<'a>(
+    code: &Code<'a>,
+    (path, scope): (&'a str, &'a str),
+    client: &'a Value,
+    ty: &str,
+    makes: impl Fn(&Code<'a>, &'a str, usize) -> bool,
+) -> bool {
+    match client {
+        Value::Ref(name) => {
+            if one(&typed(code, path, scope, name), |t| t == ty).is_some() {
+                return true;
+            }
+            let follow = Follow::Values {
+                passes: passes_nothing,
+            };
+            let origins = code.origins(path, scope, Of::Name(name), follow);
+            (origins.iter().filter_map(|o| o.call)).any(|(at, i)| makes(code, at, i))
+        }
+        Value::Call(inner) => code
+            .call_index(path, &inner.range)
+            .is_some_and(|i| makes(code, path, i)),
+        _ => false,
+    }
+}
+
+/// The paths of a mapping annotation: one of the elements `keys` names (Spring's `value` or
+/// `path`), or the one unnamed argument, a string or an array of them, constants folded; the
+/// root when it gives none. `None` when it gives two, or a value that is no list of strings; a
+/// path that cannot be read yields none.
+fn paths<'a>(code: &Code<'a>, file: &'a str, call: &'a Call, keys: &[&str]) -> Option<Vec<String>> {
     let given: Vec<&Value> = (call.args.iter())
-        .chain(call.keyword("value"))
-        .chain(call.keyword("path"))
+        .chain(keys.iter().filter_map(|k| call.keyword(k)))
         .collect();
     let value = match given.as_slice() {
         [] => return Some(vec![String::new()]),
@@ -247,8 +278,9 @@ fn request_methods<'a>(code: &Code<'a>, file: &'a str, call: &'a Call) -> Option
         let Value::Ref(name) = value else {
             return None;
         };
-        let spelled = known(code, file, &call.scope, name, |s| member_of(s).is_some())?;
-        member_of(&spelled).map(str::to_string)
+        let member = |s: &str| member_of(s, REQUEST_METHOD).is_some();
+        let spelled = known(code, file, &call.scope, name, member)?;
+        member_of(&spelled, REQUEST_METHOD).map(str::to_string)
     };
     let methods: Vec<String> = match call.keyword("method") {
         None => return Some(vec![ANY.into()]),
@@ -378,6 +410,18 @@ mod tests {
         // A nested class's own annotations are not its methods'.
         let nested = "@RestController class C { @RequestMapping(\"/in\") @RestController static class D { @GetMapping(\"/x\") void f() {} } }";
         assert_eq!(served(IMPORTS, nested), ["http::GET::/in/x"]);
+    }
+
+    /// A controller whose base comes from outside the repository serves nothing: a member type
+    /// of that base may be a method annotation's name (#354, "Opaque outside").
+    #[test]
+    fn a_controller_with_an_outside_base_serves_nothing() {
+        let imports = format!("{IMPORTS}import com.corp.shared.BaseController;\n");
+        let based = "@RestController @RequestMapping(\"/orders\") class C extends BaseController { \
+            @GetMapping(\"/{id}\") void get() {} }";
+        assert!(served(&imports, based).is_empty());
+        let own = "@RestController @RequestMapping(\"/orders\") class C { @GetMapping(\"/{id}\") void get() {} }";
+        assert_eq!(served(&imports, own), ["http::GET::/orders/{}"]);
     }
 
     #[test]

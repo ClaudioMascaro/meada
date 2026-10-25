@@ -1,7 +1,11 @@
-//! Literal JVM build readers shared by language packs and the Maven package ecosystem, and what
-//! the JVM packs' contract kinds share: the Spring configuration reader (`spring`) and the
-//! questions they ask of a name a library outside the repository may bind (`names`).
-//! They read only the supplied bytes, never a build tool or another file.
+//! What the JVM ecosystems and contract kinds share, so the Java pack and a Kotlin pack read
+//! alike (spec #26, user story 28): the literal Maven and Gradle build readers (`maven`,
+//! `gradle`), which the Maven package ecosystem (`package/maven.rs`) reads manifests with; the
+//! Spring configuration reader and its `@Value` injector (`spring`), which the HTTP and channel
+//! kinds' JVM forms (`http/java*`, `channel/java.rs`) read bases and names through; and the
+//! questions those forms ask of a name a library outside the repository may bind (`names`).
+//! The ecosystem's rules stay in `package/maven.rs` and the library forms in the kinds. The
+//! readers read only the supplied bytes, never a build tool or another file.
 
 use serde::{Deserialize, Serialize};
 

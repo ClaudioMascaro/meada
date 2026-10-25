@@ -213,6 +213,14 @@ impl Ecosystem for Maven {
     fn uncertainty(&self, via: Option<&str>) -> Option<&'static str> {
         (via == Some("computed")).then_some("computed coordinate")
     }
+    /// A constructor or a method of the class itself, by its id: the class's id, a dot, then a
+    /// signature (`example.models.Order.total()`); a nested class's member is not.
+    fn member_of(&self, target: &str, class: &str) -> bool {
+        (target.strip_prefix(class))
+            .and_then(|rest| rest.strip_prefix('.'))
+            .and_then(|rest| rest.split_once('('))
+            .is_some_and(|(name, _)| !name.is_empty() && !name.contains('.'))
+    }
     fn sources(&self) -> &'static [&'static str] {
         &["java", "kt"]
     }
@@ -432,6 +440,16 @@ mod tests {
         assert!(fits_arity("r::a/B.java::p.B.m(int)", None));
         // A method named after its class carries a mark past its parameters.
         assert!(fits("B(int)#method", 1) && !fits("B(int)#method", 0));
+    }
+
+    #[test]
+    fn a_member_of_a_class_is_its_own_constructor_or_method() {
+        let class = "r::a/Order.java::a.Order";
+        let member = |rest: &str| Maven.member_of(&format!("{class}{rest}"), class);
+        assert!(member(".total()") && member(".Order(int)") && member(".Order(int)#method"));
+        // A nested class, its member, another class with the same start, the class itself.
+        assert!(!member(".Line") && !member(".Line.total()") && !member("s.total()"));
+        assert!(!member("") && !member(".(int)"));
     }
 
     fn manifest(path: &str, roots: &[&str], tests: &[&str]) -> Manifest {

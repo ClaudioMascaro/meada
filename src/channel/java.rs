@@ -32,9 +32,9 @@ use super::message::{
     queue_name,
 };
 use crate::index::Indexed;
-use crate::jvm::names::{declared, known, one, spellings, typed};
+use crate::jvm::names::{declared, java_files, known, one, spellings, typed};
 use crate::jvm::spring::{self, Configs, Properties};
-use crate::lang::{Call, Invocation, Kind, Part, Value};
+use crate::lang::{Annotated, Call, Invocation, Kind, Part, Value};
 use crate::resolve::{Code, Expand, Inject, Keywords, method as member};
 
 const KAFKA_LISTENER: &str = "org.springframework.kafka.annotation.KafkaListener";
@@ -129,15 +129,12 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
     }
     // Read the first time a form needs them: a repository without one parses none.
     let configs = OnceCell::new();
-    let configs = || configs.get_or_init(|| Configs::read(indexed.configs));
-    let inject = |code: &Code<'a>, path: &'a str, annotation: &'a Call| {
-        spring::inject(configs(), code, path, annotation)
+    let configs = || configs.get_or_init(|| Configs::read(indexed.configs, indexed.manifests));
+    let inject = |code: &Code<'a>, path: &'a str, annotated: &'a Annotated| {
+        spring::inject(configs(), code, path, annotated)
     };
     let mut out = Vec::new();
-    for (&path, facts) in code.files() {
-        if !path.ends_with(".java") {
-            continue;
-        }
+    for (path, facts) in java_files(code) {
         // The file's methods, built the first time a listener's annotation is met.
         let methods: OnceCell<HashSet<&str>> = OnceCell::new();
         for (n, stored) in facts.calls.iter().enumerate() {
@@ -177,24 +174,31 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
             let call = || Expand::Call(path, n);
             let chain = || Expand::Chain(path, n);
             let inject = Some(&inject as &Inject<'a, '_>);
+            let broker = broker(client);
             match (client, method) {
                 (Client::Kafka, "send")
                 | (Client::Nats, "publish")
                 | (Client::Jedis | Client::Lettuce, "xadd") => {
-                    let broker = broker(client);
                     out.extend(produce_with(code, call(), inject, broker, &first));
                 }
                 (Client::Nats, "subscribe") => {
-                    out.extend(consume_with(code, call(), inject, "nats", &first, None));
+                    out.extend(consume_with(code, call(), inject, broker, &first, None));
                 }
                 (Client::Jedis, "xreadGroup") | (Client::Lettuce, "xreadgroup") => {
-                    out.extend(consume_with(code, chain(), inject, "redis", &streams, None));
+                    out.extend(consume_with(code, chain(), inject, broker, &streams, None));
                 }
                 (Client::Sqs, "sendMessage") => {
-                    out.extend(produce_with(code, chain(), inject, "sqs", &queue_url));
+                    out.extend(produce_with(code, chain(), inject, broker, &queue_url));
                 }
                 (Client::Sqs, "receiveMessage") => {
-                    out.extend(consume_with(code, chain(), inject, "sqs", &queue_url, None));
+                    out.extend(consume_with(
+                        code,
+                        chain(),
+                        inject,
+                        broker,
+                        &queue_url,
+                        None,
+                    ));
                 }
                 (Client::Rabbit, "convertAndSend") => {
                     let Some(written) = code.call(path, n) else {
@@ -213,7 +217,7 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
                         Some(at) => Some(vec![channel_name(a.get(at)?)?]),
                         None => Some(vec![None]),
                     };
-                    out.extend(produce_with(code, call(), inject, "jms", &read));
+                    out.extend(produce_with(code, call(), inject, broker, &read));
                 }
                 _ => {}
             }
@@ -222,6 +226,7 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
     out
 }
 
+/// The broker kind of `client`'s contracts, its listener's included.
 fn broker(client: Client) -> &'static str {
     match client {
         Client::Kafka => "kafka",
@@ -543,7 +548,7 @@ fn listen<'a>(
                 names.push(element(partition, "topic").and_then(|t| text(t, config)));
             }
             (
-                "kafka",
+                broker(Client::Kafka),
                 names.into_iter().map(|t| message(t, handler())).collect(),
             )
         }
@@ -586,12 +591,12 @@ fn listen<'a>(
                     ));
                 }
             }
-            ("amqp", out)
+            (broker(Client::Rabbit), out)
         }
         _ => {
             let destination = folded("destination");
             let name = destination.and_then(|d| text(&d, config));
-            ("jms", vec![message(name, handler())])
+            (broker(Client::Jms), vec![message(name, handler())])
         }
     };
     if !out.iter().any(|m| matches!(m.role, Side::Consumer(_))) {
@@ -697,6 +702,19 @@ mod tests {
                 "kafka unresolved consumer a.C.pattern(String)",
                 "kafka unresolved consumer a.C.spel(String)",
             ]
+        );
+    }
+
+    /// A listener in a class whose base comes from outside the repository has no handler: a
+    /// member type of that base may be the annotation's name (#354, "Opaque outside").
+    #[test]
+    fn a_listener_in_a_class_with_an_outside_base_has_no_handler() {
+        let imports = format!("{KAFKA}import com.corp.shared.Base;\n");
+        let body = "static class Based extends Base { @KafkaListener(topics = \"t\") void on(String m) {} }\n\
+            static class Own { @KafkaListener(topics = \"t\") void on(String m) {} }";
+        assert_eq!(
+            read(&imports, body),
+            ["kafka t consumer a.C.Own.on(String)"]
         );
     }
 

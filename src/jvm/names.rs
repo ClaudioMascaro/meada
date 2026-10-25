@@ -3,7 +3,21 @@
 //! candidate, not a fact, so a kind accepts a name when exactly one of its spellings is in the
 //! kind's own table (`one`).
 
+use crate::lang::{Facts, Kind};
 use crate::resolve::{Code, Follow, Form, Of, Outside};
+
+/// The Java files of `code`, with their facts: what the Java readers of the kinds read.
+pub fn java_files<'a>(code: &Code<'a>) -> impl Iterator<Item = (&'a str, &'a Facts)> + use<'a> {
+    (code.files().iter())
+        .filter(|(path, _)| path.ends_with(".java"))
+        .map(|(&path, &facts)| (path, facts))
+}
+
+/// Whether `target`, what an annotation of `facts` decorates, is a method of the file: a
+/// method's annotation, not a class's or a field's.
+pub fn is_method(facts: &Facts, target: &str) -> bool {
+    (facts.defs.iter()).any(|d| d.kind == Kind::Method && d.name == target)
+}
 
 /// The one spelling of a name (`Outside`, `Value::External`) that `is_known` accepts: two of
 /// them, or none, is no name the kind knows.

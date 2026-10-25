@@ -7,7 +7,9 @@ use crate::common;
 
 use std::fs;
 
-use common::{assert_golden, without_processes, xlang, xlang_go, xlang_java, xlang_rust};
+use common::{
+    assert_golden, without_processes, xlang, xlang_go, xlang_java, xlang_java_mirror, xlang_rust,
+};
 use meada::engine::{Direction, Engine, Start};
 
 #[test]
@@ -501,25 +503,7 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_java_file() {
 /// reading that applies links ambiguous, and it is one open item, the variable's reading gone.
 #[test]
 fn a_default_whose_host_two_repositories_serve_is_one_open_item() {
-    let (web, api) = xlang_java("xlang_java_ambiguous_default");
-    let mirror = web.parent().unwrap().join("xlang-java-mirror");
-    let _ = fs::remove_dir_all(&mirror);
-    fs::create_dir_all(mirror.join("app/api/audit")).unwrap();
-    fs::write(
-        mirror.join("meada.toml"),
-        "[serve]\nhosts = [\"web.example.com\"]\n",
-    )
-    .unwrap();
-    let route = "app/api/audit/route.ts";
-    fs::copy(web.join(route), mirror.join(route)).unwrap();
-    common::git(&mirror, &["-c", "init.defaultBranch=main", "init", "-q"]);
-    let origin = "https://example.com/xlang-java/mirror.git";
-    common::git(&mirror, &["remote", "add", "origin", origin]);
-    common::git(&mirror, &["add", "-A"]);
-    common::git(&mirror, &["commit", "-q", "-m", "fixture"]);
-    let toml = api.join("meada.toml");
-    let peer = "\n[[peer]]\nrepo = \"example.com/xlang-java/mirror\"\n";
-    fs::write(&toml, fs::read_to_string(&toml).unwrap() + peer).unwrap();
+    let (_, api) = xlang_java_mirror("xlang_java_ambiguous_default", &["app/api/audit/route.ts"]);
 
     let items = Engine::open(&api).unwrap().open_items().unwrap();
 
@@ -533,4 +517,74 @@ fn a_default_whose_host_two_repositories_serve_is_one_open_item() {
         items.iter().map(|i| &i.id).collect::<Vec<_>>()
     );
     assert_eq!(audit[0].candidates.len(), 2);
+}
+
+/// A Feign client without `url` whose path two repositories serve (the web app and its mirror)
+/// and a Retrofit method whose URL is its `@Url` argument: consumers at a definition, which are
+/// open items like a call's, with the method as the excerpt (spec #26, ADR 0006).
+#[test]
+fn a_declarative_client_method_is_an_open_item_at_its_definition() {
+    let (_, api) = xlang_java_mirror("xlang_java_open_declarative", &["app/api/catalog/route.ts"]);
+    let dynamic = "package com.example.api;\n\nimport retrofit2.http.GET;\nimport retrofit2.http.Url;\n\n\
+                   public interface DynamicClient {\n    @GET\n    String fetch(@Url String url);\n}\n";
+    fs::write(
+        api.join("src/main/java/com/example/api/DynamicClient.java"),
+        dynamic,
+    )
+    .unwrap();
+    common::git(&api, &["add", "-A"]);
+    common::git(&api, &["commit", "-q", "-m", "dynamic"]);
+    let engine = Engine::open(&api).unwrap();
+
+    let items = engine.local_items().unwrap();
+
+    let catalog = "example.com/xlang-java/api::src/main/java/com/example/api/CatalogClient.java::com.example.api.CatalogClient.all()";
+    let fetch = "example.com/xlang-java/api::src/main/java/com/example/api/DynamicClient.java::com.example.api.DynamicClient.fetch(String)";
+    let item = |id: &str| {
+        items
+            .iter()
+            .find(|i| i.id == id)
+            .unwrap_or_else(|| panic!("{id}"))
+    };
+    let (ambiguous, unresolved) = (item(catalog), item(fetch));
+    assert_eq!(ambiguous.kind.name(), "ambiguous");
+    assert_eq!(ambiguous.candidates.len(), 2);
+    assert_eq!(
+        ambiguous.location(),
+        "src/main/java/com/example/api/CatalogClient.java:10"
+    );
+    assert_eq!(
+        ambiguous.expression,
+        "@GetMapping(\"/api/catalog\") String all();"
+    );
+    let enclosing = ambiguous.enclosing.as_ref().unwrap();
+    assert_eq!(enclosing.name, "com.example.api.CatalogClient.all()");
+    assert_eq!(unresolved.kind.name(), "unresolved");
+    assert_eq!(unresolved.expression, "@GET String fetch(@Url String url);");
+    let search = |kind| engine.search("", Some(kind), None).unwrap();
+    assert!(
+        search("ambiguous").contains(&format!(
+            "CatalogClient.java:10 (ambiguous) candidates: 2; run `meada decide --item {catalog}`"
+        )),
+        "{}",
+        search("ambiguous")
+    );
+    assert!(
+        search("unresolved").contains("DynamicClient.java:7 (unresolved)"),
+        "{}",
+        search("unresolved")
+    );
+    // The query matches the method's name, as it matches a call's enclosing symbol.
+    assert!(
+        engine
+            .search("fetch", Some("unresolved"), None)
+            .unwrap()
+            .contains(fetch)
+    );
+    let (list, stderr, ok) = common::meada(&api, &["decide", "--list"], "", |c| {
+        c.env("LANG", "en_US.UTF-8");
+    });
+    assert!(ok, "{stderr}");
+    assert!(list.contains(&format!("{catalog}\nsrc/main/java/com/example/api/CatalogClient.java:10  @GetMapping(\"/api/catalog\") String all();\n  1) ")), "{list}");
+    assert!(list.contains(fetch), "{list}");
 }

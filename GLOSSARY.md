@@ -32,6 +32,19 @@ The seam between a language pack and Meada's shared scope and import resolution,
 connects each call to the definitions it reaches and gives the call a level.
 _Avoid_: driver, frontend, bridge
 
+**Family**:
+A class and its ancestors in method resolution order (C3), which is where a member of the class
+is looked up. The index keeps the family of each public class whose overloads merge across it
+(Java) in the `families` table, so an import from another repository picks the method among the
+overloads of the whole family; an ancestor from outside the repository is opaque.
+_Avoid_: hierarchy, inheritance chain
+
+**Injector**:
+What a contract kind reads off an annotation written on a field or a parameter while it folds a
+value (`resolve::Inject`): Spring's `@Value("${key}")` holds the key's value from the module's
+configuration. What it gives lives only while the contracts are extracted.
+_Avoid_: overlay, binder
+
 **Community**:
 A group of symbols in one repository that call each other more than they call the rest, found
 deterministically from the calls at `exact` or `inferred` and named after their most common
@@ -218,6 +231,12 @@ client wrapper arguments, such as a `fetch` of a URL computed at run time. It is
 search, context and the export, never linked.
 _Avoid_: dynamic call, unknown call
 
+**Declarative client**:
+An interface whose methods are the requests, such as an OpenFeign or a Retrofit interface. A
+method of one has no call of its own, so it is the consumer, sited at the method; a caller of the
+method reaches it as any call, and an open item on it shows the method.
+_Avoid_: client interface, proxy
+
 **Client wrapper**:
 A function whose call to an HTTP client (`fetch`, `requests`, `httpx` or `aiohttp` in
 Python, RestTemplate, WebClient, `java.net.http` or OkHttp in Java) or a message client (a Kafka producer) takes its URL, method or channel name from the
@@ -382,7 +401,8 @@ _Avoid_: flow, workflow, execution path
 
 **Open item**:
 An ambiguous link or an unresolved consumer (a dynamic URL) of a repository that no decision
-resolves. Its id is the call-site identity, and its candidates are the providers the link lists
+resolves. Its id is the call-site identity (a declarative client's method for a consumer sited
+there), and its candidates are the providers the link lists
 or the routes the call's method and evaluated URL fragments leave. `search` lists open items
 and `meada decide` resolves them.
 _Avoid_: pending item, todo

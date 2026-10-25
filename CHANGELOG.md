@@ -8,6 +8,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Java OpenFeign or Retrofit method whose link is ambiguous (a Feign client without `url`
+  whose path two repositories serve) or whose URL is unresolved (Retrofit's `@Url`) is an open
+  item at the method: `search` with `kind=ambiguous` or `kind=unresolved` lists it, and
+  `meada decide` resolves it, sending the method as the excerpt.
+- `context` on a public Java class of a shared Maven or Gradle artifact lists the calls in other
+  repositories that reach its constructors and methods, one line per call.
+- A Spring `@Value` in a Gradle source set whose `srcDirs` lies outside `src/main` reads its
+  module's `src/main/resources` configuration.
+- A Retrofit annotation's path is read from `value` alone, and a Retrofit path with a `{` that
+  does not close within its segment gives no consumer, as for Spring, JAX-RS and Feign.
 - A Java field and a method of the same name keep separate namespaces: `repo.save()` and
   `this.repo.save()` read the field `repo`, `repo()` calls the method.
 - Console manifest groups and validation errors respect the viewer's grant; PKCE redirects
@@ -22,7 +32,8 @@ All notable changes to Meada are recorded here. The format follows
   interface with Spring mapping annotations, or of a Retrofit interface with `retrofit2.http`
   verbs, is an HTTP consumer sited at the interface method, so a caller of the method reaches
   the provider in `trace` and `context`. A Feign `url` and `path` resolve through the Spring
-  configuration; without `url` the host is unresolved and the reason names the client
+  configuration; without `url` the host is unresolved, the consumer's `via` is
+  `client:Feign client <name>` and the reason names the client
   (`host unresolved (Feign client <name>)`). A Retrofit base comes from the
   `Retrofit.Builder().baseUrl(base)` that creates the interface, one consumer per creation. The
   Java pack reads `Api.class` as a class literal. `@RequestLine` and other Feign contracts are

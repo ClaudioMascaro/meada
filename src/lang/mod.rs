@@ -327,8 +327,13 @@ pub struct Annotated {
 /// What an annotation marks (`Annotated`).
 #[derive(Clone, PartialEq, Eq)]
 pub enum Marked {
-    /// The field of this name of the class (`Def::name`).
-    Field(String, String),
+    /// The field `name` of the class `class` (`Def::name`), `static` or not: the kind decides
+    /// what each takes.
+    Field {
+        class: String,
+        name: String,
+        is_static: bool,
+    },
     /// The parameter at this position of the function or the constructor (`Def::name`).
     Param(String, usize),
 }
