@@ -1726,7 +1726,11 @@ impl<'a> Resolver<'a> {
                 None => {}
             }
         }
-        None
+        // A Kotlin companion's own fields come after the family's, as its methods do; a base
+        // of the companion's that is not known hides nothing of the names outside.
+        let companion = self.companion(Target { path, name: class }, &mut Work::default())?;
+        (self.inherited_field(companion.path, companion.name, name))
+            .filter(|found| !matches!(found, Binding::Unknown))
     }
 
     /// What a bare method name written in the body of class `class` of `path` names
@@ -2353,7 +2357,7 @@ impl<'a> Resolver<'a> {
         for &at in self.by_local[path].of(&crate::qualify("", "*")) {
             let Imported::Glob {
                 path: target,
-                inside: false,
+                inside,
                 ..
             } = &imports[at].name
             else {
@@ -2369,6 +2373,10 @@ impl<'a> Resolver<'a> {
                 Binding::External(source, Imported::Namespace | Imported::Qualified) => {
                     Some(source)
                 }
+                // An `inside` glob (the own package's; Kotlin's written ones, which see
+                // `internal` members) gives an outside source only, as the repository's names
+                // are bound before this is asked.
+                _ if *inside => None,
                 other => match self.through_glob(other, false, name, work, seen) {
                     Binding::Unknown => None,
                     _ => return Vec::new(),

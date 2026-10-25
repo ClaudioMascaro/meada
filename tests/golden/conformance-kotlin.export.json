@@ -64,6 +64,26 @@
     {
       "path": "src/main/kotlin/example/util/Tools.kt",
       "hash": "e399b3fa0a47e20913ba21aec45334c93389d531f0ed4bec3c5ba7c68e1285f6"
+    },
+    {
+      "path": "src/main/kotlin/example/web/Api.kt",
+      "hash": "05126f2f92420b758b2ba8a2c0388582934935827a5e989cbb628e65006683b9"
+    },
+    {
+      "path": "src/main/kotlin/example/web/OrderController.kt",
+      "hash": "564554781f7a3546d3e98b1e89e31ebdd9713fd5a41e108106fd6dc70e34cff4"
+    },
+    {
+      "path": "src/main/kotlin/example/web/PageController.kt",
+      "hash": "eaa8de4e5be127f855ce6bd0326adb9c02d0a0ba4a5e3882ff4c224ac9e055d6"
+    },
+    {
+      "path": "src/main/kotlin/example/web/StarController.kt",
+      "hash": "3335279efea3ddd31a9ffb98ec9f33115c0f5a609566f6bec78f4ac36b21d4c2"
+    },
+    {
+      "path": "src/main/kotlin/example/web/VarargController.kt",
+      "hash": "58efa9b92dc6783e4f3a5b127a9369589a6fb160537ef62a023ffd2e75bda765"
     }
   ],
   "symbols": [
@@ -1241,6 +1261,174 @@
         "path": "src/main/kotlin/example/util/Tools.kt",
         "start": 136,
         "end": 173
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/Api.kt::example.web.Api",
+      "span": {
+        "path": "src/main/kotlin/example/web/Api.kt",
+        "start": 55,
+        "end": 98
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController",
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 563,
+        "end": 1385
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.Companion",
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 631,
+        "end": 690
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.any()",
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 1333,
+        "end": 1383
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()",
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 827,
+        "end": 897
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.fetch(String)",
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 741,
+        "end": 821
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.flag()",
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 994,
+        "end": 1054
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.list()",
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 696,
+        "end": 735
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.remove()",
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 1060,
+        "end": 1103
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.replace()",
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 903,
+        "end": 988
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.several()",
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 1109,
+        "end": 1225
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.single()",
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 1231,
+        "end": 1327
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web.PageController",
+      "span": {
+        "path": "src/main/kotlin/example/web/PageController.kt",
+        "start": 129,
+        "end": 224
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web.PageController.page()",
+      "span": {
+        "path": "src/main/kotlin/example/web/PageController.kt",
+        "start": 168,
+        "end": 222
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController",
+      "span": {
+        "path": "src/main/kotlin/example/web/StarController.kt",
+        "start": 71,
+        "end": 272
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.one()",
+      "span": {
+        "path": "src/main/kotlin/example/web/StarController.kt",
+        "start": 139,
+        "end": 185
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.removeAll()",
+      "span": {
+        "path": "src/main/kotlin/example/web/StarController.kt",
+        "start": 191,
+        "end": 270
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController",
+      "span": {
+        "path": "src/main/kotlin/example/web/VarargController.kt",
+        "start": 324,
+        "end": 627
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()",
+      "span": {
+        "path": "src/main/kotlin/example/web/VarargController.kt",
+        "start": 454,
+        "end": 525
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()",
+      "span": {
+        "path": "src/main/kotlin/example/web/VarargController.kt",
+        "start": 397,
+        "end": 448
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()",
+      "span": {
+        "path": "src/main/kotlin/example/web/VarargController.kt",
+        "start": 531,
+        "end": 625
       }
     }
   ],
@@ -3221,9 +3409,373 @@
         "start": 120,
         "end": 134
       }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::DeleteMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 1060,
+        "end": 1083
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::GetMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 696,
+        "end": 707
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::GetMapping#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 741,
+        "end": 762
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::PatchMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 994,
+        "end": 1026
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::PostMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 827,
+        "end": 867
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::PutMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 903,
+        "end": 957
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::RequestMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 1109,
+        "end": 1194
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::RequestMapping#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 1231,
+        "end": 1297
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::RequestMapping#2",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 1333,
+        "end": 1356
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web::RequestMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 579,
+        "end": 602
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web::RestController#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/OrderController.kt",
+        "start": 563,
+        "end": 578
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web.PageController::GetMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web.PageController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/PageController.kt",
+        "start": 168,
+        "end": 194
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web::Controller#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/PageController.kt",
+        "start": 129,
+        "end": 140
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController::GetMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/StarController.kt",
+        "start": 139,
+        "end": 158
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController::RequestMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/StarController.kt",
+        "start": 191,
+        "end": 247
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web::RequestMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/StarController.kt",
+        "start": 87,
+        "end": 111
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web::RestController#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/StarController.kt",
+        "start": 71,
+        "end": 86
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()::arrayOf#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/VarargController.kt",
+        "start": 475,
+        "end": 494
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()::arrayOf#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/VarargController.kt",
+        "start": 571,
+        "end": 597
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController::GetMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/VarargController.kt",
+        "start": 397,
+        "end": 420
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController::PostMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/VarargController.kt",
+        "start": 454,
+        "end": 495
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController::RequestMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/VarargController.kt",
+        "start": 531,
+        "end": 598
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web::RequestMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/VarargController.kt",
+        "start": 340,
+        "end": 367
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web::RestController#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/VarargController.kt",
+        "start": 324,
+        "end": 339
+      }
     }
   ],
   "providers": [
+    {
+      "contract": "http::ANY::/api/orders/any",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.any()"
+    },
+    {
+      "contract": "http::DELETE::/api/orders/{}",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.remove()"
+    },
+    {
+      "contract": "http::DELETE::/star/all",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.removeAll()"
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.list()"
+    },
+    {
+      "contract": "http::GET::/api/orders/multi",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.several()"
+    },
+    {
+      "contract": "http::GET::/api/orders/{}",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.fetch(String)"
+    },
+    {
+      "contract": "http::GET::/p/a",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()"
+    },
+    {
+      "contract": "http::GET::/p/b",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()"
+    },
+    {
+      "contract": "http::GET::/pages/{}",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web.PageController.page()"
+    },
+    {
+      "contract": "http::GET::/q/a",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()"
+    },
+    {
+      "contract": "http::GET::/q/b",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()"
+    },
+    {
+      "contract": "http::GET::/star/one",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.one()"
+    },
+    {
+      "contract": "http::HEAD::/api/orders/multi",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.several()"
+    },
+    {
+      "contract": "http::PATCH::/api/orders/{}/flag",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.flag()"
+    },
+    {
+      "contract": "http::POST::/api/orders/create",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()"
+    },
+    {
+      "contract": "http::POST::/api/orders/new",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()"
+    },
+    {
+      "contract": "http::POST::/api/orders/single",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.single()"
+    },
+    {
+      "contract": "http::POST::/p/c",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()"
+    },
+    {
+      "contract": "http::POST::/p/d",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()"
+    },
+    {
+      "contract": "http::POST::/q/c",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()"
+    },
+    {
+      "contract": "http::POST::/q/d",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()"
+    },
+    {
+      "contract": "http::PUT::/api/orders/by-ref/{}",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.replace()"
+    },
+    {
+      "contract": "http::PUT::/api/orders/{}",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.replace()"
+    },
+    {
+      "contract": "http::PUT::/p/e",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()"
+    },
+    {
+      "contract": "http::PUT::/q/e",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()"
+    },
     {
       "contract": "package::maven::example:conformance",
       "site": "example.com/acme/conformance::build.gradle.kts"
@@ -5077,6 +5629,356 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::src/main/kotlin/example/util/Tools.kt::example.util.Tools.doubled()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.any()::http::ANY::/api/orders/any",
+      "kind": "route",
+      "label": "ANY /api/orders/any",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.any()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()::http::POST::/api/orders/create",
+      "kind": "route",
+      "label": "POST /api/orders/create",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()::http::POST::/api/orders/new",
+      "kind": "route",
+      "label": "POST /api/orders/new",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.fetch(String)::http::GET::/api/orders/{}",
+      "kind": "route",
+      "label": "GET /api/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.fetch(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.flag()::http::PATCH::/api/orders/{}/flag",
+      "kind": "route",
+      "label": "PATCH /api/orders/{}/flag",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.flag()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.list()::http::GET::/api/orders",
+      "kind": "route",
+      "label": "GET /api/orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.list()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.remove()::http::DELETE::/api/orders/{}",
+      "kind": "route",
+      "label": "DELETE /api/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.remove()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.replace()::http::PUT::/api/orders/by-ref/{}",
+      "kind": "route",
+      "label": "PUT /api/orders/by-ref/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.replace()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.replace()::http::PUT::/api/orders/{}",
+      "kind": "route",
+      "label": "PUT /api/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.replace()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.several()::http::GET::/api/orders/multi",
+      "kind": "route",
+      "label": "GET /api/orders/multi",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.several()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.several()::http::HEAD::/api/orders/multi",
+      "kind": "route",
+      "label": "HEAD /api/orders/multi",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.several()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.single()::http::POST::/api/orders/single",
+      "kind": "route",
+      "label": "POST /api/orders/single",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.single()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web.PageController.page()::http::GET::/pages/{}",
+      "kind": "route",
+      "label": "GET /pages/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web.PageController.page()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.one()::http::GET::/star/one",
+      "kind": "route",
+      "label": "GET /star/one",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.one()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.removeAll()::http::DELETE::/star/all",
+      "kind": "route",
+      "label": "DELETE /star/all",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.removeAll()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()::http::POST::/p/c",
+      "kind": "route",
+      "label": "POST /p/c",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()::http::POST::/p/d",
+      "kind": "route",
+      "label": "POST /p/d",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()::http::POST::/q/c",
+      "kind": "route",
+      "label": "POST /q/c",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()::http::POST::/q/d",
+      "kind": "route",
+      "label": "POST /q/d",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()::http::GET::/p/a",
+      "kind": "route",
+      "label": "GET /p/a",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()::http::GET::/p/b",
+      "kind": "route",
+      "label": "GET /p/b",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()::http::GET::/q/a",
+      "kind": "route",
+      "label": "GET /q/a",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()::http::GET::/q/b",
+      "kind": "route",
+      "label": "GET /q/b",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()::http::PUT::/p/e",
+      "kind": "route",
+      "label": "PUT /p/e",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()::http::PUT::/q/e",
+      "kind": "route",
+      "label": "PUT /q/e",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()"
         }
       ]
     }
