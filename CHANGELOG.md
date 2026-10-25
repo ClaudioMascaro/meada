@@ -54,6 +54,14 @@ All notable changes to Meada are recorded here. The format follows
   unresolved consumer, never a `GET` guessed. The client may be imported by `*` or held by an
   untyped local `val` (`HttpClient(CIO).use { it.get(..) }` too). `url { path(..) }` builders are
   not read.
+- Kotlin base URLs from Spring configuration and the environment (issue #100): the Ktor client
+  reads a base a property or a constructor property gets from Spring's `@Value("\${key}")` (the
+  `$` escaped in a Kotlin string) in the `application.properties` or `application.yml` of its
+  module, also in a repository with no Java file, with the Java rules: a literal URL links by
+  host, a `${VAR}` placeholder maps through `base_url_env`, and a default whose host a peer
+  serves links by host. `System.getenv("X")` and `System.getenv()["X"]`, through `?:`
+  fallbacks, `!!` and string methods such as `trimEnd` and `removeSuffix`, are the base URL
+  variable `X`. A cross-language fixture links TypeScript and Ktor in both directions.
 - Java OpenFeign and Retrofit clients (issue #90): each method of an `@FeignClient(name, url)`
   interface with Spring mapping annotations, or of a Retrofit interface with `retrofit2.http`
   verbs, is an HTTP consumer sited at the interface method, so a caller of the method reaches

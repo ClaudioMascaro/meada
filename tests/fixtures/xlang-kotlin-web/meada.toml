@@ -1,0 +1,8 @@
+# The web app (TypeScript, Next.js) reaches the api service (Kotlin, Ktor) through a base URL
+# variable and through the api's declared host. The Kotlin repository uses these same keys.
+[serve]
+hosts = ["web.example.com"]
+
+[[peer]]
+repo = "example.com/xlang-kotlin/api"
+base_url_env = ["API_URL"]

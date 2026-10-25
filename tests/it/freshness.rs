@@ -1238,6 +1238,105 @@ fn an_edited_spring_configuration_alone_refreshes_the_java_consumers() {
     assert!(refreshed.contains("\"via\": \"env:SITE_URL\""));
 }
 
+/// Edits, adds and deletes `.kt` and Spring configuration files of the Kotlin api: a placeholder's
+/// default goes, the YAML file that gave a constructor property its literal URL goes (its key
+/// now names a variable), a module appears with a client and a configuration of its own, a
+/// `@Value` key changes, and the file with the environment read goes.
+fn edit_xlang_kotlin((_, api): &(PathBuf, PathBuf)) {
+    let kotlin = "src/main/kotlin/com/example/api";
+    edit_file(
+        api,
+        "src/main/resources/application.properties",
+        "${AUDIT_URL:https://web.example.com/api}",
+        "${AUDIT_URL}",
+    );
+    fs::remove_file(api.join("src/main/resources/application.yml")).unwrap();
+    edit_file(
+        api,
+        &format!("{kotlin}/PromotionClient.kt"),
+        "${PROMO_URL:http://promotions.internal/v2}",
+        "${web.url}",
+    );
+    fs::remove_file(api.join(format!("{kotlin}/ReportClient.kt"))).unwrap();
+    let tools = api.join("tools/src/main");
+    fs::create_dir_all(tools.join("resources")).unwrap();
+    fs::create_dir_all(tools.join("kotlin/com/example/tools")).unwrap();
+    fs::write(
+        tools.join("resources/application.properties"),
+        "tool.url=https://web.example.com/api\n",
+    )
+    .unwrap();
+    fs::write(
+        tools.join("kotlin/com/example/tools/ToolClient.kt"),
+        "package com.example.tools\n\n\
+         import io.ktor.client.HttpClient\n\
+         import io.ktor.client.engine.cio.CIO\n\
+         import io.ktor.client.request.get\n\
+         import org.springframework.beans.factory.annotation.Value\n\n\
+         class ToolClient {\n\
+         \x20   @Value(\"\\${tool.url}\")\n\
+         \x20   private lateinit var toolUrl: String\n\
+         \x20   private val client = HttpClient(CIO)\n\n\
+         \x20   suspend fun level() {\n\
+         \x20       client.get(\"$toolUrl/stock\")\n\
+         \x20   }\n\
+         }\n",
+    )
+    .unwrap();
+}
+
+#[test]
+fn a_refreshed_kotlin_cross_language_pair_exports_what_a_cold_pair_does() {
+    let exports = |(web, api): &(PathBuf, PathBuf)| -> Vec<String> {
+        [web, api]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = common::xlang_kotlin("fresh_xlang_kotlin");
+    [&repos.0, &repos.1].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_xlang_kotlin(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = common::xlang_kotlin("fresh_xlang_kotlin_cold");
+    edit_xlang_kotlin(&cold);
+    assert_eq!(refreshed, exports(&cold));
+    assert_ne!(refreshed[1], before[1]);
+    // The default left the configuration, the literal with its file, and the new module's
+    // configuration gives its client a host.
+    assert!(before[1].contains("\"contract\": \"http::POST::/api/audit\""));
+    assert!(!before[1].contains("env:AUDIT_URL"));
+    assert!(refreshed[1].contains("\"via\": \"env:AUDIT_URL\""));
+    assert!(!refreshed[1].contains("\"contract\": \"http::POST::/api/audit\""));
+    assert!(refreshed[1].contains("\"env:stock.url\""));
+    assert!(refreshed[1].contains("tools/src/main/kotlin/com/example/tools/ToolClient.kt"));
+    assert!(!refreshed[1].contains("ReportClient.kt"));
+    let tool = "\"contract\": \"http::GET::/api/stock\",\n      \"site\": \"example.com/xlang-kotlin/api::tools/";
+    assert!(refreshed[1].contains(tool), "{}", refreshed[1]);
+}
+
+/// A Spring configuration edited alone, with no `.kt` file changed, refreshes the contracts.
+#[test]
+fn an_edited_spring_configuration_alone_refreshes_the_kotlin_consumers() {
+    let (_, api) = common::xlang_kotlin("fresh_xlang_kotlin_config");
+    age(&api);
+    let before = Engine::open(&api).unwrap().export().unwrap();
+    let properties = "src/main/resources/application.properties";
+    edit_file(
+        &api,
+        properties,
+        "web.url=${WEB_URL}",
+        "web.url=${SITE_URL}",
+    );
+
+    let refreshed = Engine::open(&api).unwrap().export().unwrap();
+
+    assert!(before.contains("\"via\": \"env:WEB_URL\""));
+    assert!(refreshed.contains("\"via\": \"env:SITE_URL\""));
+}
+
 #[test]
 fn an_edited_meada_toml_relinks_resources_like_a_cold_chain() {
     let exports = |gateway: &Path| -> Vec<String> {

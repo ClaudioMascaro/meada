@@ -10,8 +10,9 @@ use tree_sitter::{Node, Parser};
 use tree_sitter_language::LanguageFn;
 
 use super::{
-    Binds, Bound, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Invocation, Kind,
-    LanguagePack, Modules, Param, Part, Receiver, Value, children, named, text,
+    Annotated, Binds, Bound, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported,
+    Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Receiver, Value, children, named,
+    text,
 };
 use crate::{Result, qualify};
 
@@ -92,8 +93,10 @@ impl LanguagePack for Kotlin {
         true
     }
 
+    /// Spring's base configuration, as the Java pack lists it: a Kotlin-only repository gives
+    /// `@Value` its keys too.
     fn config_files(&self) -> &'static [&'static str] {
-        &[]
+        crate::jvm::spring::CONFIG_FILES
     }
 
     fn modules(
@@ -196,6 +199,8 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         .parse(src, None)
         .ok_or("tree-sitter returned no tree")?;
     let root = tree.root_node();
+    SYSTEM_BOUND.set(binds_system(root, src));
+    ENV_NAMES.set(env_names(root, src));
     let package = named(root)
         .find(|n| n.kind() == "package_header")
         .and_then(|n| named(n).find(|n| n.kind() == "qualified_identifier"))
@@ -233,6 +238,8 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     // Names a class or the file declares as properties, and the typed locals, which a field of
     // the same name hides where the source does not say which one a use reads.
     let mut fields = BTreeSet::new();
+    // The names some assignment writes, which no one value stands for (`Code::field_written`).
+    let mut writes = BTreeSet::new();
     let mut locals: Vec<Receiver> = Vec::new();
     // The receivers of tracked lambdas, by the lambda's node.
     let mut tracked: HashMap<usize, Tracked> = HashMap::new();
@@ -364,6 +371,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                         });
                     }
                 }
+                annotate_parameters(&mut facts, node, src, &scope, &inner);
                 if let Some(on) = on {
                     extension(
                         &mut facts,
@@ -473,6 +481,12 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                             class: class.clone(),
                         };
                         property(&mut facts, place, bound, constant, initial, src);
+                        let on = Marked::Field {
+                            class: scope.as_ref().clone(),
+                            name: name.to_string(),
+                            is_static: place == Place::Top || in_object(node),
+                        };
+                        mark(&mut facts, on, node, src, &scope, FIELD_TARGETS);
                         if place == Place::Top && constant {
                             publish(&mut facts, own, name, &qualify(&scope, name));
                         }
@@ -487,12 +501,32 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 if let Some(name) = named(node).find(|n| n.kind() == "identifier") {
                     let written = children(node).any(|c| matches!(c.kind(), "val" | "var"));
                     let name = text(name, src);
+                    // The constructor's parameter, and the property it declares.
+                    let at = (node.parent().into_iter().flat_map(named))
+                        .take_while(|n| n.id() != node.id())
+                        .filter(|n| n.kind() == "class_parameter")
+                        .count();
+                    let on = Marked::Param(scope.as_ref().clone(), at);
+                    mark(&mut facts, on, node, src, &scope, PARAM_TARGETS);
+                    if written {
+                        let on = Marked::Field {
+                            class: scope.as_ref().clone(),
+                            name: name.to_string(),
+                            is_static: false,
+                        };
+                        // The parameter's value reaches the property, whatever the target.
+                        let targets = [FIELD_TARGETS, &["param"]].concat();
+                        mark(&mut facts, on, node, src, &scope, &targets);
+                    }
                     let ty = named(node).skip_while(|n| n.kind() != "identifier").nth(1);
                     let class = ty.map_or(Class::Unknown, |ty| {
                         class_of(ty, src, &generics, &mut outside)
                     });
                     if written {
-                        let constant = children(node).any(|c| c.kind() == "val");
+                        // An annotated one is injected, as a `lateinit var` is: no constant
+                        // stands in for what the annotation gives it (`Code::expand_with`).
+                        let constant = children(node).any(|c| c.kind() == "val")
+                            && annotations(node, src, &scope).is_empty();
                         fields.insert(name.to_string());
                         let bound = Receiver {
                             scope: scope.as_ref().clone(),
@@ -614,7 +648,10 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     }
                 }
             }
-            "assignment" => assigned(&mut facts.calls, node, src),
+            "assignment" => {
+                assigned(&mut facts.calls, node, src);
+                writes.extend(assignee(node, src));
+            }
             "call_expression" => {
                 if let Some((lambda, found)) = tracked_call(node, src) {
                     tracked.insert(lambda.id(), found);
@@ -719,6 +756,14 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         if fields.contains(&local.name) {
             local.class = Class::Unknown;
         }
+    }
+    for name in writes {
+        facts.consts.push(Const {
+            name: format!(".{name}"),
+            value: Value::Unknown,
+            ty: None,
+            scope: None,
+        });
     }
     facts.receivers.extend(locals);
     facts.receivers = merge(std::mem::take(&mut facts.receivers));
@@ -1572,6 +1617,17 @@ fn template(parts: &mut Vec<Part>, text: &str) {
 /// Kotlin name, so it matches no parameter.
 const METHOD: &str = "method=";
 
+/// The name an assignment writes: a bare name, or the last of a path (`this.base`, `o.base`).
+fn assignee(node: Node, src: &[u8]) -> Option<String> {
+    let left = node.child_by_field_name("left")?;
+    let name = match left.kind() {
+        "identifier" => Some(left),
+        "navigation_expression" => named(left).last().filter(|n| n.kind() == "identifier"),
+        _ => None,
+    };
+    name.map(|n| text(n, src).to_string())
+}
+
 /// Records `method = value` and `this.method = value`, written in a lambda that is a call's
 /// argument, as the `METHOD` keyword of that call: the setting of a property of the lambda's
 /// receiver, which no call or constant records. The value is kept where the statement is the
@@ -1639,10 +1695,74 @@ fn argument(node: Node) -> bool {
 
 /// The annotations written on the declaration `node`, each a call decorating `inner`.
 fn annotate(facts: &mut Facts, node: Node, src: &[u8], scope: &str, inner: &str) {
-    for annotation in (named(node).filter(|n| n.kind() == "modifiers"))
-        .flat_map(named)
-        .filter(|n| n.kind() == "annotation")
-    {
+    for mut annotation in annotations(node, src, scope) {
+        annotation.decorates = Some(inner.to_string());
+        facts.calls.push(annotation);
+    }
+}
+
+/// The annotations written on the field or the parameter `node`, whose use-site target is one
+/// of `targets` (`""` for none), mark it, as `Facts::annotated` holds them.
+fn mark(facts: &mut Facts, on: Marked, node: Node, src: &[u8], scope: &str, targets: &[&str]) {
+    let modifiers = named(node).filter(|n| n.kind() == "modifiers");
+    for (annotation, target) in modifiers.flat_map(|m| annotations_of(m, src, scope)) {
+        if targets.contains(&target) {
+            let on = on.clone();
+            facts.annotated.push(Annotated { on, annotation });
+        }
+    }
+}
+
+/// What Spring injects through each use-site target: a property gets it as a field, or through
+/// a setter (`set`, `setparam`); a constructor parameter as the parameter. A getter and a
+/// Kotlin property (`get`, `property`, `file`, `receiver`, `delegate`) inject nothing.
+const FIELD_TARGETS: &[&str] = &["", "field", "set", "setparam"];
+const PARAM_TARGETS: &[&str] = &["", "param"];
+
+/// The annotations of the parameters of the function `node` (`inner`), at the position of the
+/// parameter they are written before.
+fn annotate_parameters(facts: &mut Facts, node: Node, src: &[u8], scope: &str, inner: &str) {
+    let Some(list) = named(node).find(|n| n.kind() == "function_value_parameters") else {
+        return;
+    };
+    let (mut at, mut pending) = (0, Vec::new());
+    for child in named(list) {
+        match child.kind() {
+            "parameter_modifiers" => pending.extend(annotations_of(child, src, scope)),
+            "parameter" => {
+                for (annotation, target) in std::mem::take(&mut pending) {
+                    if PARAM_TARGETS.contains(&target) {
+                        let on = Marked::Param(inner.to_string(), at);
+                        facts.annotated.push(Annotated { on, annotation });
+                    }
+                }
+                at += 1;
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Whether a declaration is a member of an object or a companion, which Spring injects nothing
+/// into (a static member on the JVM).
+fn in_object(node: Node) -> bool {
+    let owner = node.parent().and_then(|body| body.parent());
+    owner.is_some_and(|o| matches!(o.kind(), "object_declaration" | "companion_object"))
+}
+
+/// The annotations among the modifiers of the declaration `node`, as calls.
+fn annotations<'t>(node: Node<'t>, src: &[u8], scope: &str) -> Vec<Call> {
+    (named(node).filter(|n| n.kind() == "modifiers"))
+        .flat_map(|modifiers| annotations_of(modifiers, src, scope))
+        .map(|(annotation, _)| annotation)
+        .collect()
+}
+
+/// The annotations that are children of `modifiers`, as calls, each with its use-site target
+/// (`field` of `@field:Value`, empty for none).
+fn annotations_of<'s>(modifiers: Node, src: &'s [u8], scope: &str) -> Vec<(Call, &'s str)> {
+    let mut found = Vec::new();
+    for annotation in named(modifiers).filter(|n| n.kind() == "annotation") {
         let Some(written) =
             named(annotation).find(|n| matches!(n.kind(), "user_type" | "constructor_invocation"))
         else {
@@ -1663,7 +1783,9 @@ fn annotate(facts: &mut Facts, node: Node, src: &[u8], scope: &str, inner: &str)
             continue;
         };
         let (positional, keywords) = arguments(&args, src, 0, None);
-        facts.calls.push(Call {
+        let target = (named(annotation).find(|n| n.kind() == "use_site_target"))
+            .map_or("", |t| text(t, src).trim_end_matches(':').trim());
+        let call = Call {
             scope: scope.to_string(),
             callee: name,
             arity: None,
@@ -1671,15 +1793,17 @@ fn annotate(facts: &mut Facts, node: Node, src: &[u8], scope: &str, inner: &str)
             range: annotation.byte_range(),
             args: positional,
             kwargs: keywords,
-            decorates: Some(inner.to_string()),
+            decorates: None,
             by_path: false,
             root: None,
             on: None,
             receiver: None,
             arg_types: Vec::new(),
             uses: Vec::new(),
-        });
+        };
+        found.push((call, target));
     }
+    found
 }
 
 /// The normalized callee of an expression: `a.b.c` for names and navigation, `this` and `super`
@@ -1715,6 +1839,118 @@ fn callee(node: Node, src: &[u8]) -> String {
     parts.join(".")
 }
 
+/// The string methods an environment read passes through, still the variable's value as far as
+/// the host goes.
+const STRING_METHODS: &[&str] = &[
+    "trim",
+    "trimEnd",
+    "trimStart",
+    "removePrefix",
+    "removeSuffix",
+    "replace",
+    "lowercase",
+    "toString",
+];
+
+thread_local! {
+    /// The properties of the file `parse` reads whose declaration reads `System.getenv`
+    /// (`env_names`), for `reads_environment`.
+    static ENV_NAMES: std::cell::RefCell<HashSet<String>> = std::cell::RefCell::new(HashSet::new());
+    /// Whether the file `parse` reads binds `System` to a type other than `java.lang.System`
+    /// (`binds_system`), for `env`.
+    static SYSTEM_BOUND: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether the file binds `System` to another type: an import of one (also under that alias),
+/// or a type it may declare by that name.
+fn binds_system(root: Node, src: &[u8]) -> bool {
+    let imported = named(root).filter(|n| n.kind() == "import").any(|n| {
+        let import = text(n, src).trim_start_matches("import").trim();
+        import != "java.lang.System"
+            && (import.ends_with(".System") || import.ends_with(" as System"))
+    });
+    let mut words =
+        (src.split(|b| !(b.is_ascii_alphanumeric() || *b == b'_'))).filter(|w| !w.is_empty());
+    let mut before: &[u8] = b"";
+    let declared = words.any(|word| {
+        let declares = matches!(before, b"class" | b"interface" | b"object" | b"typealias");
+        before = word;
+        declares && word == b"System"
+    });
+    imported || declared
+}
+
+/// Whether `callee` is `System.getenv`, unless the file binds `System` to another type.
+// ponytail: a `System` type another file of the package declares is not seen (`binds_system`).
+fn getenv(callee: &str) -> bool {
+    callee == "java.lang.System.getenv" || callee == "System.getenv" && !SYSTEM_BOUND.get()
+}
+
+/// The variable a value is when it is exactly one environment read.
+fn read_variable(value: &Value) -> bool {
+    matches!(value, Value::Str(parts) if matches!(parts[..], [Part::Env(_)]))
+}
+
+/// The name a literal argument or key holds.
+fn name_of(value: &Value) -> Option<&str> {
+    match value {
+        Value::Str(parts) => match &parts[..] {
+            [Part::Text(name)] => Some(name),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Whether a fallback reads the environment too: an environment read, or a name of a property
+/// of the file that holds one (`ENV_NAMES`).
+fn reads_environment(value: &Value) -> bool {
+    let holds = |name: &str| {
+        let name = name.rsplit('.').next().unwrap_or(name);
+        ENV_NAMES.with_borrow(|names| names.contains(name))
+    };
+    match value {
+        Value::Ref(name) => holds(name),
+        Value::Str(parts) => parts.iter().any(|part| match part {
+            Part::Env(_) => true,
+            Part::Ref(name) => holds(name),
+            _ => false,
+        }),
+        _ => false,
+    }
+}
+
+/// The properties of the file whose declaration reads `System.getenv`, by name.
+fn env_names(root: Node, src: &[u8]) -> HashSet<String> {
+    let mut names = HashSet::new();
+    if !src.windows(6).any(|w| w == b"getenv") {
+        return names;
+    }
+    // Each node with the property declaration around it, if the nearest declaration is one.
+    // (A node's parent is found from the root: this walk does not ask for it.)
+    let mut pending = vec![(root, None)];
+    while let Some((node, owner)) = pending.pop() {
+        let owner = match node.kind() {
+            "property_declaration" => named(node)
+                .find(|n| n.kind() == "variable_declaration")
+                .and_then(|d| named(d).find(|n| n.kind() == "identifier"))
+                .map(|n| text(n, src)),
+            "function_declaration" | "class_declaration" => None,
+            _ => owner,
+        };
+        pending.extend(named(node).map(|n| (n, owner)));
+        let function = named(node)
+            .next()
+            .filter(|f| f.kind() == "navigation_expression");
+        if let (Some(owner), "call_expression", Some(function)) = (owner, node.kind(), function)
+            && getenv(&callee(function, src))
+        {
+            names.insert(owner.to_string());
+        }
+    }
+    names
+}
+
 fn value(node: Node, src: &[u8], depth: usize) -> Value {
     if depth >= VALUE_DEPTH {
         return Value::Unknown;
@@ -1728,6 +1964,11 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 match part.kind() {
                     // The grammar reads `$name` as text: a `$` token, then the name's content.
                     "string_content" => pending.push_str(text(part, src)),
+                    // `\$` is a `$` that starts no template (`@Value("\${key}")`).
+                    "escape_sequence" if text(part, src) == "\\$" => {
+                        template(&mut parts, &std::mem::take(&mut pending));
+                        append(&mut parts, vec![Part::Text("$".into())]);
+                    }
                     "interpolation" => {
                         template(&mut parts, &std::mem::take(&mut pending));
                         match named(part).next().map(|n| value(n, src, depth + 1)) {
@@ -1752,15 +1993,85 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             let Some(function) = function else {
                 return Value::Unknown;
             };
+            let callee = callee(function, src);
+            let (args, keywords) = arguments(&args, src, depth + 1, None);
+            let navigation = function.kind() == "navigation_expression";
+            // `System.getenv("X")`.
+            if navigation
+                && getenv(&callee)
+                && keywords.is_empty()
+                && let [arg] = &args[..]
+                && let Some(name) = name_of(arg)
+            {
+                return Value::Str(vec![Part::Env(name.to_string())]);
+            }
+            let receiver = navigation
+                .then(|| named(function).next())
+                .flatten()
+                .map(|n| value(n, src, depth + 1));
+            // A string method on an environment read is still the read.
+            let method = named(function).last().map(|n| text(n, src));
+            if let Some(receiver) = receiver.as_ref().filter(|r| read_variable(r))
+                && navigation
+                && method.is_some_and(|m| STRING_METHODS.contains(&m))
+            {
+                return receiver.clone();
+            }
             Value::Call(Invocation {
-                callee: callee(function, src),
-                receiver: (function.kind() == "navigation_expression")
-                    .then(|| named(function).next())
-                    .flatten()
-                    .map(|n| Box::new(value(n, src, depth + 1))),
-                args: arguments(&args, src, depth + 1, None).0,
+                callee,
+                receiver: receiver.map(Box::new),
+                args,
                 range: node.byte_range(),
             })
+        }
+        // `System.getenv()["X"]`.
+        "index_expression" => {
+            let mut parts = named(node);
+            let (Some(map), Some(key)) = (parts.next(), parts.next()) else {
+                return Value::Unknown;
+            };
+            let (function, args) = self::parts(map);
+            let function = function.filter(|f| f.kind() == "navigation_expression");
+            match function {
+                Some(function)
+                    if map.kind() == "call_expression"
+                        && args.is_empty()
+                        && getenv(&callee(function, src)) =>
+                {
+                    match name_of(&value(key, src, depth + 1)) {
+                        Some(name) => Value::Str(vec![Part::Env(name.to_string())]),
+                        None => Value::Unknown,
+                    }
+                }
+                _ => Value::Unknown,
+            }
+        }
+        // `x!!` is `x` for an environment read.
+        "unary_expression" if children(node).any(|c| c.kind() == "!!") => {
+            let inner = node.child_by_field_name("argument");
+            match inner.map(|n| value(n, src, depth + 1)) {
+                Some(inner) if read_variable(&inner) => inner,
+                _ => Value::Unknown,
+            }
+        }
+        // A fallback keeps the environment read on its left, unless it reads another.
+        "binary_expression"
+            if node
+                .child_by_field_name("operator")
+                .is_some_and(|n| text(n, src) == "?:") =>
+        {
+            let left = node.child_by_field_name("left");
+            let left = left.map(|n| value(n, src, depth + 1));
+            let right = node.child_by_field_name("right");
+            match (left, right) {
+                (Some(left), Some(right)) if read_variable(&left) => {
+                    match reads_environment(&value(right, src, depth + 1)) {
+                        true => Value::Str(vec![Part::Hole]),
+                        false => left,
+                    }
+                }
+                _ => Value::Unknown,
+            }
         }
         "number_literal" => Value::Scalar(text(node, src).parse().ok()),
         // `["/a", "/b"]`, an annotation's array.
@@ -1781,7 +2092,7 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                     .child_by_field_name(side)
                     .map(|n| value(n, src, depth + 1))
                 {
-                    Some(Value::Str(found)) => parts.extend(found),
+                    Some(Value::Str(found)) => append(&mut parts, found),
                     Some(Value::Ref(name)) => parts.push(Part::Ref(name)),
                     _ => parts.push(Part::Hole),
                 }
@@ -1842,6 +2153,242 @@ mod tests {
             panic!("an empty literal folds");
         };
         assert_eq!(parts, [text("")]);
+    }
+
+    /// The parts of the `val x` a source declares, `None` when it is no string.
+    fn parts_of(source: &str) -> Option<Vec<Part>> {
+        let facts = parse(source.as_bytes(), false).unwrap();
+        match facts.consts.into_iter().next()?.value {
+            Value::Str(parts) => Some(parts),
+            _ => None,
+        }
+    }
+
+    /// `\$` is a `$` that starts no template: Spring's `@Value("\${key}")` is the text `${key}`.
+    #[test]
+    fn an_escaped_dollar_is_text() {
+        let of = |literal: &str| parts_of(&format!("package a\nval x = {literal}\n"));
+        let text = |s: &str| Some(vec![Part::Text(s.into())]);
+        assert_eq!(of(r#""\${web.url}""#), text("${web.url}"));
+        assert_eq!(
+            of(r#""\${A:x}/$b""#),
+            Some(vec![Part::Text("${A:x}/".into()), Part::Ref("b".into())])
+        );
+        assert_eq!(of(r#""\$name""#), text("$name"));
+    }
+
+    /// The forms of an environment read that stay the leading term of a URL.
+    #[test]
+    fn an_environment_read_is_one_variable_through_fallbacks_and_string_methods() {
+        let of = |expression: &str, header: &str| {
+            parts_of(&format!("package a\n{header}\nval x = {expression}\n"))
+        };
+        let env = Some(vec![Part::Env("X".into())]);
+        for read in [
+            r#"System.getenv("X")"#,
+            r#"java.lang.System.getenv("X")"#,
+            r#"System.getenv()["X"]"#,
+            r#"System.getenv("X")!!"#,
+            r#"System.getenv("X") ?: "http://localhost""#,
+            r#"System.getenv("X") ?: error("unset")"#,
+            r#"(System.getenv("X") ?: "http://localhost").removeSuffix("/")"#,
+            r#"System.getenv()["X"]?.trimEnd('/') ?: "d""#,
+        ] {
+            assert_eq!(of(read, ""), env, "{read}");
+        }
+        let after = Some(vec![Part::Env("X".into()), Part::Text("/api".into())]);
+        assert_eq!(of(r#"System.getenv("X") + "/api""#, ""), after);
+        assert_eq!(of(r#""${System.getenv("X")}/api""#, ""), after);
+        // A second variable in the fallback is a hole.
+        let two = r#"System.getenv("X") ?: System.getenv("Y")"#;
+        assert_eq!(of(two, ""), Some(vec![Part::Hole]));
+        // A name that is no literal, another call, another type named `System` and a string
+        // method on anything else read no variable.
+        for (read, header) in [
+            (r#"System.getenv(name)"#, ""),
+            (r#"System.getenv("X", "Y")"#, ""),
+            (r#"System.getProperty("X")"#, ""),
+            (r#"System.getenv("X")"#, "import example.System"),
+            (r#"System.getenv("X")"#, "import example.Sys as System"),
+            (r#"System.getenv("X")"#, "object System"),
+            (r#"base.removeSuffix("/")"#, ""),
+        ] {
+            let found = of(read, header);
+            assert!(
+                found
+                    .as_ref()
+                    .is_none_or(|p| !matches!(p[..], [Part::Env(_)])),
+                "{read}"
+            );
+        }
+    }
+
+    /// A read nested deeper than the value limit is no environment read, and costs no more than
+    /// the limit.
+    #[test]
+    fn a_deeply_nested_environment_read_is_bounded() {
+        let chain = format!("System.getenv(\"X\"){}", ".trim()".repeat(VALUE_DEPTH + 8));
+        let nest = format!(
+            "{}System.getenv(\"X\"){}",
+            "(".repeat(VALUE_DEPTH * 4),
+            ")".repeat(VALUE_DEPTH * 4)
+        );
+        for read in [chain, nest] {
+            let found = parts_of(&format!("package a\nval x = {read}\n"));
+            assert!(found.is_none_or(|p| !matches!(p[..], [Part::Env(_)])));
+        }
+    }
+
+    /// A chain of string methods on an environment read costs its length: each link is read
+    /// once, not once per link below it.
+    #[test]
+    fn a_long_chain_of_string_methods_is_read_in_linear_time() {
+        // Each link read once costs about a second here; once per link below it, minutes.
+        for head in [r#"System.getenv("X")"#, "base", r#"foo("X")"#] {
+            let source = format!("package a\nval x = {head}{}\n", ".trim()".repeat(2048));
+            let start = std::time::Instant::now();
+            let found = parts_of(&source);
+            let took = start.elapsed();
+            // Past the value limit the chain is no read, whatever it starts with.
+            assert!(found.is_none(), "{head}");
+            assert!(took.as_secs() < 10, "{head}: {took:?}");
+        }
+    }
+
+    /// Adjacent literal parts join, so a placeholder split by `+` is still one.
+    #[test]
+    fn literals_joined_by_plus_make_one_text() {
+        let found = parts_of(r#"val x = "\$" + "{key}" + "/a""#);
+        assert_eq!(found, Some(vec![Part::Text("${key}/a".into())]));
+    }
+
+    /// A fallback that reads another variable, through a property of the file, is a hole: the
+    /// term comes from exactly one read.
+    #[test]
+    fn a_fallback_that_reads_the_environment_through_a_property_is_a_hole() {
+        let source = |fallback: &str| {
+            let body = format!("val x = System.getenv(\"A\") ?: {fallback}\n");
+            format!("package a\n{body}val other = System.getenv(\"B\")\nval plain = \"u\"\n")
+        };
+        let hole = Some(vec![Part::Hole]);
+        assert_eq!(parts_of(&source("other")), hole);
+        assert_eq!(parts_of(&source("this.other")), hole);
+        assert_eq!(parts_of(&source("\"$other/a\"")), hole);
+        let env = Some(vec![Part::Env("A".into())]);
+        assert_eq!(parts_of(&source("plain")), env);
+    }
+
+    /// A field some code assigns holds no one value, so Spring's injection is not its value
+    /// (`Code::field_written`, which reads the `.name` constants).
+    #[test]
+    fn every_assignment_to_a_name_is_recorded_as_a_write() {
+        let source = br#"package a
+class C {
+    @Value("\${k}") lateinit var base: String
+    var other = 1
+    fun f(o: C) { base = "x"; o.other += 2; this.third = 3; val l = 1 }
+}
+"#;
+        let facts = parse(source, false).unwrap();
+        let mut written: Vec<&str> = (facts.consts.iter())
+            .filter_map(|c| c.name.strip_prefix('.'))
+            .collect();
+        written.sort();
+        assert_eq!(written, ["base", "other", "third"]);
+    }
+
+    /// Spring injects a property annotated with no target or with `field`, `param`, `set` or
+    /// `setparam`, never through its getter or as a Kotlin property; a constructor parameter
+    /// only with no target or `param`, a `val` of it also into the field.
+    #[test]
+    fn a_use_site_target_decides_what_the_annotation_marks() {
+        let source = br#"package a
+class C(
+    @Value("1") val a: String,
+    @param:Value("2") val b: String,
+    @field:Value("3") val c: String,
+    @get:Value("4") val d: String,
+    @property:Value("5") val e: String,
+) {
+    @Value("6") lateinit var f: String
+    @field:Value("7") lateinit var g: String
+    @get:Value("8") lateinit var h: String
+    @set:Value("9") lateinit var i: String
+    @property:Value("10") lateinit var j: String
+    fun m(@Value("11") x: String, @get:Value("12") y: String) {}
+}
+"#;
+        let facts = parse(source, false).unwrap();
+        let marks: Vec<String> = (facts.annotated.iter())
+            .map(|a| {
+                let n = match &a.annotation.args[0] {
+                    Value::Str(p) => format!("{:?}", p[0]),
+                    _ => String::new(),
+                };
+                match &a.on {
+                    Marked::Field { name, .. } => format!("{n} field {name}"),
+                    Marked::Param(_, at) => format!("{n} param {at}"),
+                }
+            })
+            .collect();
+        let expected = [
+            r#"Text("1") param 0"#,
+            r#"Text("1") field a"#,
+            r#"Text("2") param 1"#,
+            r#"Text("2") field b"#,
+            r#"Text("3") field c"#,
+            r#"Text("6") field f"#,
+            r#"Text("7") field g"#,
+            r#"Text("9") field i"#,
+            r#"Text("11") param 0"#,
+        ];
+        assert_eq!(marks, expected);
+    }
+
+    /// Spring's `@Value` on a property, a constructor parameter or property, and a function's
+    /// parameter, with what each marks; nothing on a static (companion or top-level) property.
+    #[test]
+    fn annotations_on_fields_and_parameters_are_recorded_with_what_they_mark() {
+        let source = br#"package a
+class C(@Value("\${a}") private val p: String, q: String, @param:Value("b") r: Int) {
+    @field:Value("\${c}") private lateinit var f: String
+    fun m(x: Int, @Value("\${d}") y: String) {}
+    companion object {
+        @Value("\${e}") lateinit var s: String
+    }
+}
+@Value("\${g}") lateinit var top: String
+"#;
+        let facts = parse(source, false).unwrap();
+        let marks: Vec<String> = (facts.annotated.iter())
+            .map(|a| match &a.on {
+                Marked::Field {
+                    class,
+                    name,
+                    is_static,
+                } => format!("field {class}.{name} {is_static}"),
+                Marked::Param(function, at) => format!("param {function} {at}"),
+            })
+            .collect();
+        assert_eq!(
+            marks,
+            [
+                "param a.C 0",
+                "field a.C.p false",
+                "param a.C 2",
+                "field a.C.f false",
+                "param a.C.m(Int,String) 1",
+                "field a.C.Companion.s true",
+                "field a.top true",
+            ]
+        );
+        // They are not calls decorating a definition twice over: the fields' own are.
+        assert!(
+            facts
+                .annotated
+                .iter()
+                .all(|a| a.annotation.decorates.is_none())
+        );
     }
 
     #[test]

@@ -13,16 +13,20 @@
 //! member is an unknown method, and the consumer is unresolved. A `defaultRequest { url(base)
 //! }` in the configuration of the client the call comes from is the base of its relative URLs.
 //! A client wrapper is read at each of its call sites (`Code::expand`, through any number of
-//! levels), the URL and the method it takes from its parameters substituted there.
+//! levels), the URL and the method it takes from its parameters substituted there. A base
+//! Spring injects with `@Value("\${key}")` into a property or a constructor property is read
+//! from the module's configuration (`jvm::spring::inject`, as the Java clients do).
 
 use super::{external, implicit};
 use crate::contract::Found;
+use crate::index::Indexed;
 use crate::jvm::names::{one, spellings, typed};
-use crate::lang::{Bound, Call, Class, Part, Value};
+use crate::jvm::spring::{self, Configs};
+use crate::lang::{Annotated, Bound, Call, Class, Part, Value};
 use crate::qualify;
 use crate::resolve::{Code, Expand, Expanded, Follow, Of, passes_nothing};
 
-use super::super::{based, consumer, fetch};
+use super::super::{based, consumer, fetches};
 
 /// The package of the request functions.
 const REQUEST: &str = "io.ktor.client.request.";
@@ -235,7 +239,13 @@ fn text(method: String) -> Value {
 }
 
 /// Ktor client consumers: see the module.
-pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
+pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
+    // Read the first time an annotation is injected: a repository without one parses none.
+    let configs = std::cell::OnceCell::new();
+    let inject = |code: &Code<'a>, path: &'a str, annotated: &'a Annotated| {
+        let configs = configs.get_or_init(|| Configs::read(indexed.configs, indexed.manifests));
+        spring::inject(configs, code, path, annotated)
+    };
     let clients = Clients { code };
     let mut found = Vec::new();
     for (&path, facts) in code.files() {
@@ -285,15 +295,15 @@ pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
                     REQUEST_FUNCTION => requested(kwargs, given),
                     verb => text(verb.to_uppercase()),
                 };
-                fetch(&[based(base.as_deref(), &url), method])
+                fetches(&[based(base.as_deref(), &url), method])
             };
             for Expanded {
                 site: (site, at),
                 found: read,
                 ..
-            } in code.expand(Expand::Chain(path, n), &read)
+            } in code.expand_with(Expand::Chain(path, n), Some(&inject), &read)
             {
-                found.push(consumer(site, at, read, None));
+                (read.into_iter()).for_each(|read| found.push(consumer(site, at, read, None)));
             }
         }
     }

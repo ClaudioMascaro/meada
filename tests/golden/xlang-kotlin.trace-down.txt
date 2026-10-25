@@ -1,0 +1,18 @@
+example.com/xlang-kotlin/web src/sync.ts:3 syncOrders
+  example.com/xlang-kotlin/web src/orders.ts:4 orderStatus
+  →[inferred: base URL from API_URL, a base_url_env of peer example.com/xlang-kotlin/api] example.com/xlang-kotlin/api src/main/kotlin/com/example/api/Server.kt:22 com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}
+    example.com/xlang-kotlin/api src/main/kotlin/com/example/api/PriceClient.kt:17 com.example.api.PriceClient.priceOf(String)
+    →[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-kotlin/web] example.com/xlang-kotlin/web app/api/prices/[sku]/route.ts:1 GET
+    example.com/xlang-kotlin/api src/main/kotlin/com/example/api/StockClient.kt:14 com.example.api.StockClient.level()
+      →[exact: host web.example.com is served by example.com/xlang-kotlin/web] example.com/xlang-kotlin/web app/api/stock/route.ts:1 GET
+  example.com/xlang-kotlin/web src/orders.ts:9 reserveOrder
+    →[exact: host api.example.com is served by example.com/xlang-kotlin/api] example.com/xlang-kotlin/api src/main/kotlin/com/example/api/Server.kt:28 com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve
+      example.com/xlang-kotlin/api src/main/kotlin/com/example/api/AuditClient.kt:16 com.example.api.AuditClient.record()
+        →[exact: host web.example.com is served by example.com/xlang-kotlin/web] example.com/xlang-kotlin/web app/api/audit/route.ts:1 POST
+      example.com/xlang-kotlin/api src/main/kotlin/com/example/api/PromotionClient.kt:16 com.example.api.PromotionClient.current()
+        →[inferred: base URL from PROMO_URL, a base_url_env of peer example.com/xlang-kotlin/web] example.com/xlang-kotlin/web app/api/promotions/route.ts:1 GET
+      example.com/xlang-kotlin/api src/main/kotlin/com/example/api/ReportClient.kt:13 com.example.api.ReportClient.send()
+        →[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-kotlin/web] example.com/xlang-kotlin/web app/api/reports/route.ts:1 GET
+      example.com/xlang-kotlin/api src/main/kotlin/com/example/api/InventoryClient.kt:12 com.example.api.InventoryClient.left(String)
+      →[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-kotlin/web] example.com/xlang-kotlin/web app/api/inventory/[sku]/route.ts:1 GET
+chain: inferred · 8 hops · 2 repos · 624 tokens
