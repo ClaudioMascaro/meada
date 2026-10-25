@@ -34,7 +34,7 @@ use crate::contract::{ContractKind, Found, Hit, Level, Link, Role, Search, Site}
 use crate::entry;
 use crate::index::{self, CallSite, Consumer, Export, Indexed, Provider};
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
-use crate::lang::{MAX_BYTES, python};
+use crate::lang::{Call, MAX_BYTES, python};
 use crate::literals::Literals;
 use crate::render::{Files, label, rank, section};
 use crate::resolve::{Code, Exported};
@@ -80,6 +80,15 @@ trait Ecosystem {
 
     /// Whether a bare `specifier` may name one of its packages.
     fn names_package(&self, specifier: &str) -> bool;
+
+    /// The imports a call of the file `path` goes through, as `(specifier, chain)` (`Code::imported`):
+    /// the one import that binds its head.
+    fn imports<'a>(&self, code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
+        let imported = code.imported(path, &call.scope, &call.callee);
+        (imported.into_iter())
+            .map(|(specifier, chain)| (specifier.to_string(), chain))
+            .collect()
+    }
 
     /// The dependency entries an import of `specifier` by the file `from.1` of the repository
     /// `from.0` may name, each with the subpath inside the package.
@@ -336,6 +345,10 @@ pub struct Summary {
     /// Source roots relative to the manifest's directory (PyPI and JVM).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub roots: Vec<String>,
+    /// JVM only: the source roots of `roots` that hold tests or another source set than the
+    /// artifact's `main`, whose classes a dependent never imports.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub test_roots: Vec<String>,
     /// The console scripts a `pyproject.toml` declares, as `(module, function)` (PyPI only).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scripts: Vec<(String, String)>,
@@ -739,6 +752,9 @@ struct Provided<'e> {
     /// The Go source files that are no tests, by directory. Built the first time a Go import
     /// asks (`Go::resolve`), once for all.
     go_dirs: OnceCell<HashMap<&'e str, Vec<&'e str>>>,
+    /// The public classes and methods of the Java files. Built the first time a Java import asks
+    /// (`Maven::resolutions`), once for all.
+    classes: OnceCell<maven::Classes<'e>>,
 }
 
 /// What an import of a package resolved to in one provider: what named the entry, the import's
@@ -769,6 +785,7 @@ impl<'e> Provided<'e> {
                 .collect(),
             owned: Default::default(),
             go_dirs: OnceCell::new(),
+            classes: OnceCell::new(),
         }
     }
 
@@ -1072,6 +1089,8 @@ fn import(exports: &mut [Export], providers: &Providers) {
         export.consumers.extend(consumers);
         index::sort_consumers(&mut export.consumers);
         imports.sort_by(|a, b| (&a.site, &a.target).cmp(&(&b.site, &b.target)));
+        // Several entries of one package (a computed coordinate) reach the same symbol.
+        imports.dedup();
         export.imports = imports;
     }
 }
@@ -1203,6 +1222,7 @@ fn surface(
         shapes: HashMap::new(),
         owned: Default::default(),
         go_dirs: OnceCell::new(),
+        classes: OnceCell::new(),
     };
     let mut queue = Vec::new();
     // Shapes cross through the packages of an ecosystem that says so (`Ecosystem::shapes`).
@@ -1510,25 +1530,23 @@ impl ContractKind for Packages {
             .filter_map(|(&path, facts)| Some((path, facts, of_source(path)?)));
         for (path, facts, ecosystem) in files {
             for (index, call) in facts.calls.iter().enumerate() {
-                let Some((specifier, chain)) = code.imported(path, &call.scope, &call.callee)
-                else {
-                    continue;
-                };
-                if chain.is_empty() || !ecosystem.names_package(specifier) {
-                    continue;
+                for (specifier, chain) in ecosystem.imports(code, path, call) {
+                    if chain.is_empty() || !ecosystem.names_package(&specifier) {
+                        continue;
+                    }
+                    found.push(Found {
+                        role: Role::Import,
+                        site: Site::Call {
+                            path: path.to_string(),
+                            index,
+                        },
+                        contract: None,
+                        via: Some(specifier),
+                        method: Some(chain),
+                        fragments: Vec::new(),
+                        shape: None,
+                    });
                 }
-                found.push(Found {
-                    role: Role::Import,
-                    site: Site::Call {
-                        path: path.to_string(),
-                        index,
-                    },
-                    contract: None,
-                    via: Some(specifier.to_string()),
-                    method: Some(chain),
-                    fragments: Vec::new(),
-                    shape: None,
-                });
             }
         }
         // The files an import of one of the repository's packages reaches: only they keep shapes.
@@ -2630,6 +2648,7 @@ mod tests {
             shapes: HashMap::new(),
             owned: Default::default(),
             go_dirs: OnceCell::new(),
+            classes: OnceCell::new(),
         }
     }
 

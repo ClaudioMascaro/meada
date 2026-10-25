@@ -1794,6 +1794,9 @@ sample.pom.xml
   "roots": [
     "src/main/java",
     "src/test/java"
+  ],
+  "test_roots": [
+    "src/test/java"
   ]
 }
 
@@ -1818,6 +1821,9 @@ sample.build.gradle.kts
   ],
   "roots": [
     "src/main/java",
+    "src/test/java"
+  ],
+  "test_roots": [
     "src/test/java"
   ]
 }

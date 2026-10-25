@@ -32,6 +32,18 @@ All notable changes to Meada are recorded here. The format follows
   literal `group:artifact` providers, Maven modules and parent groups, Gradle project names,
   dependencies with unchecked ranges, and ambiguous candidates for computed coordinates.
   Indexing invokes no JVM toolchain and looks up no registry.
+- Java imports into provider sources (spec #26, #94): a call through an import of a class from a
+  workspace Maven or Gradle artifact the repository depends on (`Type.method()`, `new Type(..)`,
+  a call on a field, parameter or local of the type, on-demand and static imports) reaches the
+  method or constructor in the provider by package declaration, picked by name and argument
+  count, through the package path npm, PyPI, Cargo and Go use. `exact` when one provider
+  declares the package and type, `ambiguous` when several do or overloads of the count remain;
+  the reason ends `; import package` and the export's `how` is `package`. `context` on a public
+  class method lists its consumers in other repositories and `trace` follows the hop. Test
+  source roots (`src/test/java`, and a Gradle `sourceSets` directory of a set other than `main`)
+  are never imported; the Gradle scanner reads literal `srcDirs`, `srcDir` and `srcDirs +=`
+  (Groovy and Kotlin DSL), nothing computed or conditional. The stored manifest summary gains
+  `test_roots`, so existing indexes rebuild.
 - Spring MVC HTTP providers (spec #26, #86): methods of `@RestController` and `@Controller`
   classes with `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping`
   or `@RequestMapping(method = ..)`, under the class `@RequestMapping` prefix, with `static

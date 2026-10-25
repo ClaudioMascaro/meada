@@ -1,0 +1,13 @@
+example.com/jvm/maven models/src/main/java/example/models/Order.java:11-13 example.models.Order.total()
+community: models/src/main/java/example/models#2
+processes: 3 (3 export; 3 repositories): example.web.Checkout.pay(int) (example.com/jvm/client), example.worker.Job.count(Order) (example.com/jvm/gradle-client), example.models.Order.total() (example.com/jvm/maven)
+public int total() {
+        return tax(subtotal());
+    }
+callers: none
+callees:
+example.com/jvm/maven models/src/main/java/example/models/Order.java:27 example.models.Order.subtotal()
+example.com/jvm/maven models/src/main/java/example/models/Order.java:31 example.models.Order.tax(int)
+consumers:
+example.com/jvm/client src/main/java/example/web/Checkout.java:13 example.web.Checkout.pay(int) [range unchecked]
+example.com/jvm/gradle-client src/main/java/example/worker/Job.java:17 example.worker.Job.count(Order) [range unchecked]

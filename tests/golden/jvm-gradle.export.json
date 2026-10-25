@@ -1,8 +1,82 @@
 {
   "repository": "example.com/jvm/gradle",
-  "files": [],
-  "symbols": [],
-  "calls": [],
+  "files": [
+    {
+      "path": "src/main/java/example/shared/Stamp.java",
+      "hash": "e5d3900bc65cfc3e40905f0a81c9d53ede079d9e5b3521fccf079509c7dbb376"
+    },
+    {
+      "path": "tools/src/check/java/example/tools/Checks.java",
+      "hash": "5a00244cc729350bd71391bc4db9810d093fd7740893abbe94137d450ba2aba3"
+    },
+    {
+      "path": "tools/src/core/java/example/tools/Slug.java",
+      "hash": "51aa06dd0d1a7aced542130dd339791dc51802c4836ae80aaf8714a4048fa152"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/jvm/gradle::src/main/java/example/shared/Stamp.java::example.shared.Stamp",
+      "span": {
+        "path": "src/main/java/example/shared/Stamp.java",
+        "start": 25,
+        "end": 108
+      }
+    },
+    {
+      "id": "example.com/jvm/gradle::src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()",
+      "span": {
+        "path": "src/main/java/example/shared/Stamp.java",
+        "start": 50,
+        "end": 106
+      }
+    },
+    {
+      "id": "example.com/jvm/gradle::tools/src/check/java/example/tools/Checks.java::example.tools.Checks",
+      "span": {
+        "path": "tools/src/check/java/example/tools/Checks.java",
+        "start": 24,
+        "end": 107
+      }
+    },
+    {
+      "id": "example.com/jvm/gradle::tools/src/check/java/example/tools/Checks.java::example.tools.Checks.ok()",
+      "span": {
+        "path": "tools/src/check/java/example/tools/Checks.java",
+        "start": 50,
+        "end": 105
+      }
+    },
+    {
+      "id": "example.com/jvm/gradle::tools/src/core/java/example/tools/Slug.java::example.tools.Slug",
+      "span": {
+        "path": "tools/src/core/java/example/tools/Slug.java",
+        "start": 24,
+        "end": 122
+      }
+    },
+    {
+      "id": "example.com/jvm/gradle::tools/src/core/java/example/tools/Slug.java::example.tools.Slug.of(String)",
+      "span": {
+        "path": "tools/src/core/java/example/tools/Slug.java",
+        "start": 48,
+        "end": 120
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/jvm/gradle::tools/src/core/java/example/tools/Slug.java::example.tools.Slug.of(String)::text.trim#0",
+      "caller": "example.com/jvm/gradle::tools/src/core/java/example/tools/Slug.java::example.tools.Slug.of(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "tools/src/core/java/example/tools/Slug.java",
+        "start": 102,
+        "end": 113
+      }
+    }
+  ],
   "providers": [
     {
       "contract": "package::maven::example:kit",
@@ -49,11 +123,69 @@
       "reason": "package::maven::example:kit 2.0 (local 2.0), range unchecked"
     },
     {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()::Stamp.now#0",
+      "provider": "example.com/jvm/gradle::src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()",
+      "contract": "package::maven::example:kit",
+      "level": "ambiguous",
+      "reason": "package::maven::example:kit 2.0 (local 2.0), range unchecked; import package"
+    },
+    {
       "consumer": "example.com/jvm/gradle-client::build.gradle::implementation::example:tools",
       "provider": "example.com/jvm/gradle::tools/build.gradle",
       "contract": "package::maven::example:tools",
       "level": "exact",
       "reason": "package::maven::example:tools 2.0 (local 2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.run(String)::Slug.of#0",
+      "provider": "example.com/jvm/gradle::tools/src/core/java/example/tools/Slug.java::example.tools.Slug.of(String)",
+      "contract": "package::maven::example:tools",
+      "level": "exact",
+      "reason": "package::maven::example:tools 2.0 (local 2.0), range unchecked; import package"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/jvm/gradle::src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()",
+      "kind": "export",
+      "label": "example.shared.Stamp.now()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/gradle",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/gradle::src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/gradle::tools/src/check/java/example/tools/Checks.java::example.tools.Checks.ok()",
+      "kind": "export",
+      "label": "example.tools.Checks.ok()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/gradle",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/gradle::tools/src/check/java/example/tools/Checks.java::example.tools.Checks.ok()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/gradle::tools/src/core/java/example/tools/Slug.java::example.tools.Slug.of(String)",
+      "kind": "export",
+      "label": "example.tools.Slug.of(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/gradle",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/gradle::tools/src/core/java/example/tools/Slug.java::example.tools.Slug.of(String)"
+        }
+      ]
     }
   ]
 }

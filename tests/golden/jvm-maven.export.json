@@ -1,8 +1,182 @@
 {
   "repository": "example.com/jvm/maven",
-  "files": [],
-  "symbols": [],
-  "calls": [],
+  "files": [
+    {
+      "path": "models/src/main/java/example/models/Order.java",
+      "hash": "f42bddbe8d8e5604f15f7a9f76990e2b5533f1b8b967ad6e3cfcaeb3de07e152"
+    },
+    {
+      "path": "models/src/main/java/example/shared/Stamp.java",
+      "hash": "fdf7e9f27a53b5ece787041e557f5b53d1e93548952c9f4d3468e2a22f6ffd73"
+    },
+    {
+      "path": "models/src/test/java/example/models/Fixtures.java",
+      "hash": "3d984badd2ed50e7cfce7ace6e2fcf3c10df3eecc824649f34ecc3259b6f6e77"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order",
+      "span": {
+        "path": "models/src/main/java/example/models/Order.java",
+        "start": 25,
+        "end": 577
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.Order(int)",
+      "span": {
+        "path": "models/src/main/java/example/models/Order.java",
+        "start": 50,
+        "end": 84
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+      "span": {
+        "path": "models/src/main/java/example/models/Order.java",
+        "start": 90,
+        "end": 170
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(String)",
+      "span": {
+        "path": "models/src/main/java/example/models/Order.java",
+        "start": 309,
+        "end": 376
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int)",
+      "span": {
+        "path": "models/src/main/java/example/models/Order.java",
+        "start": 240,
+        "end": 303
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int,int)",
+      "span": {
+        "path": "models/src/main/java/example/models/Order.java",
+        "start": 382,
+        "end": 464
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.subtotal()",
+      "span": {
+        "path": "models/src/main/java/example/models/Order.java",
+        "start": 470,
+        "end": 511
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.tax(int)",
+      "span": {
+        "path": "models/src/main/java/example/models/Order.java",
+        "start": 517,
+        "end": 575
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()",
+      "span": {
+        "path": "models/src/main/java/example/models/Order.java",
+        "start": 176,
+        "end": 234
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp",
+      "span": {
+        "path": "models/src/main/java/example/shared/Stamp.java",
+        "start": 25,
+        "end": 111
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()",
+      "span": {
+        "path": "models/src/main/java/example/shared/Stamp.java",
+        "start": 50,
+        "end": 109
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/test/java/example/models/Fixtures.java::example.models.Fixtures",
+      "span": {
+        "path": "models/src/test/java/example/models/Fixtures.java",
+        "start": 25,
+        "end": 119
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/test/java/example/models/Fixtures.java::example.models.Fixtures.sample()",
+      "span": {
+        "path": "models/src/test/java/example/models/Fixtures.java",
+        "start": 53,
+        "end": 117
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)::Order#0",
+      "caller": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.Order(int)",
+      "level": "exact",
+      "span": {
+        "path": "models/src/main/java/example/models/Order.java",
+        "start": 144,
+        "end": 163
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(String)::name.length#0",
+      "caller": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "models/src/main/java/example/models/Order.java",
+        "start": 356,
+        "end": 369
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()::subtotal#0",
+      "caller": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.subtotal()",
+      "level": "exact",
+      "span": {
+        "path": "models/src/main/java/example/models/Order.java",
+        "start": 216,
+        "end": 226
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()::tax#0",
+      "caller": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.tax(int)",
+      "level": "exact",
+      "span": {
+        "path": "models/src/main/java/example/models/Order.java",
+        "start": 212,
+        "end": 227
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/test/java/example/models/Fixtures.java::example.models.Fixtures.sample()::Order.of#0",
+      "caller": "example.com/jvm/maven::models/src/test/java/example/models/Fixtures.java::example.models.Fixtures.sample()",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+      "level": "exact",
+      "span": {
+        "path": "models/src/test/java/example/models/Fixtures.java",
+        "start": 99,
+        "end": 110
+      }
+    }
+  ],
   "providers": [
     {
       "contract": "package::maven::example:billing",
@@ -41,6 +215,24 @@
       "ecosystem": "maven"
     }
   ],
+  "communities": [
+    {
+      "name": "models/src/main/java/example/models",
+      "members": [
+        "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.Order(int)",
+        "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+        "example.com/jvm/maven::models/src/test/java/example/models/Fixtures.java::example.models.Fixtures.sample()"
+      ]
+    },
+    {
+      "name": "models/src/main/java/example/models#2",
+      "members": [
+        "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.subtotal()",
+        "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.tax(int)",
+        "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/jvm/client::pom.xml::dependencies::example:models",
@@ -50,11 +242,195 @@
       "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked"
     },
     {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.prepared()::of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)::Order.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.create()::Order#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.Order(int)",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::Order.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int,int)",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#1",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(String)",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#1",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int)",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.total#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()::Stamp.now#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
       "consumer": "example.com/jvm/gradle-client::build.gradle::testImplementation::example:models",
       "provider": "example.com/jvm/maven::models/pom.xml",
       "contract": "package::maven::example:models",
       "level": "exact",
       "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.count(Order)::order.total#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(String)",
+      "kind": "export",
+      "label": "example.models.Order.place(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int)",
+      "kind": "export",
+      "label": "example.models.Order.place(int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int,int)",
+      "kind": "export",
+      "label": "example.models.Order.place(int,int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int,int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()",
+      "kind": "export",
+      "label": "example.models.Order.total()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/maven",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.tax(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/maven",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.subtotal()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()",
+      "kind": "export",
+      "label": "example.shared.Stamp.now()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/test/java/example/models/Fixtures.java::example.models.Fixtures.sample()",
+      "kind": "export",
+      "label": "example.models.Fixtures.sample()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/test/java/example/models/Fixtures.java::example.models.Fixtures.sample()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/maven",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/jvm/maven",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.Order(int)"
+        }
+      ]
     }
   ]
 }

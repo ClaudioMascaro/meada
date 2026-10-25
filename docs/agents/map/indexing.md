@@ -481,6 +481,8 @@ modules updates it.
   stored summaries contain coordinate fragments and the literal metadata needed to join a
   Gradle build to its settings, never source text. `package::inherit` runs that join after all
   summaries are loaded; changing any build/settings file refreshes the same workspace links.
+  The summary also keeps the source roots (`roots`, with the test ones in `test_roots`), so an
+  edit to a Gradle `sourceSets` directory changes which provider classes an import reaches.
 
 ## Java receivers and supertypes (#85)
 

@@ -3,8 +3,8 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::common::{assert_golden, fixture_repo};
-use meada::engine::Engine;
+use crate::common::{age, assert_golden, fixture_repo};
+use meada::engine::{Direction, Engine, Start};
 use serde_json::Value;
 
 fn workspace(case: &str) -> [PathBuf; 4] {
@@ -17,13 +17,20 @@ fn workspace(case: &str) -> [PathBuf; 4] {
     })
 }
 
+/// The links of `json` a build file declares: a dependency entry, not a call through an import.
+fn declared(json: &Value) -> Vec<&Value> {
+    (json["links"].as_array().into_iter().flatten())
+        .filter(|l| !l["consumer"].as_str().unwrap().contains(".java::"))
+        .collect()
+}
+
 #[test]
 fn literal_maven_and_gradle_artifacts_link_to_workspace_dependencies() {
     let [maven, gradle, client, gradle_client] = workspace("jvm_packages_literals");
     let engine = Engine::open(&client).unwrap();
     let export = engine.export().unwrap();
     let json: Value = serde_json::from_str(&export).unwrap();
-    let links = json["links"].as_array().unwrap();
+    let links = declared(&json);
     assert!(
         links.iter().any(|l| {
             l["contract"] == "package::maven::example:models" && l["level"] == "exact"
@@ -85,7 +92,7 @@ fn computed_coordinates_keep_literal_parts_and_stay_ambiguous_with_one_provider(
     ] {
         let export = Engine::open(path).unwrap().export().unwrap();
         let json: Value = serde_json::from_str(&export).unwrap();
-        let links = json["links"].as_array().unwrap();
+        let links = declared(&json);
         assert!(!links.is_empty(), "{export}");
         // A computed version alone leaves a literal coordinate: exact, its range as written.
         let literal: Vec<_> = (links.iter())
@@ -155,7 +162,7 @@ tasks.register("fake") {
     let export = Engine::open(&gradle_client).unwrap().export().unwrap();
     let json: Value = serde_json::from_str(&export).unwrap();
     assert_eq!(json["packages"][0]["name"], "example:worker", "{export}");
-    assert_eq!(json["links"].as_array().unwrap().len(), 2, "{export}");
+    assert_eq!(declared(&json).len(), 2, "{export}");
     // Settings still name the projects when comments and literal strings mention fake ones.
     fs::write(gradle.join("settings.gradle.kts"),"rootProject.name = \"kit\"\n/* include(\":fake\") */\nval text = \"include(\\\":fake\\\")\"\ninclude(\n\":tools\",\n\":extras:nested\"\n)\n").unwrap();
     let export = Engine::open(&gradle).unwrap().export().unwrap();
@@ -175,7 +182,7 @@ dependencies { api("example:model${suffix ?: 's:v'}:1") }
     .unwrap();
     let export = Engine::open(&client).unwrap().export().unwrap();
     let json: Value = serde_json::from_str(&export).unwrap();
-    let links = json["links"].as_array().unwrap();
+    let links = declared(&json);
     assert_eq!(links.len(), 1, "{export}");
     assert_eq!(links[0]["contract"], "package::maven::example:model*");
     assert_eq!(
@@ -220,7 +227,7 @@ dependencies { implementation 'example:model\s:1' }
     .unwrap();
     let export = Engine::open(&gradle_client).unwrap().export().unwrap();
     let json: Value = serde_json::from_str(&export).unwrap();
-    assert!(json["links"].as_array().unwrap().is_empty(), "{export}");
+    assert!(declared(&json).is_empty(), "{export}");
     fs::write(
         gradle_client.join("build.gradle"),
         format!("group = 'example'\n/*{}*/", "x".repeat(1_100_000)),
@@ -332,7 +339,7 @@ fn a_foreign_xml_dependency_is_not_a_maven_dependency() {
 </dependencies></project>"#).unwrap();
     let export = Engine::open(&client).unwrap().export().unwrap();
     let json: Value = serde_json::from_str(&export).unwrap();
-    let links = json["links"].as_array().unwrap();
+    let links = declared(&json);
     assert_eq!(links.len(), 1, "{export}");
     assert_eq!(links[0]["contract"], "package::maven::example:models");
 }
@@ -393,10 +400,7 @@ fn a_gradle_declaration_without_a_coordinate_string_is_no_consumer() {
         .unwrap();
         let export = Engine::open(&client).unwrap().export().unwrap();
         let json: Value = serde_json::from_str(&export).unwrap();
-        assert!(
-            json["links"].as_array().unwrap().is_empty(),
-            "{declaration}: {export}"
-        );
+        assert!(declared(&json).is_empty(), "{declaration}: {export}");
     }
 }
 
@@ -437,7 +441,7 @@ fn map_notation_and_configured_declarations_read_their_coordinate() {
         .unwrap();
         let export = Engine::open(&client).unwrap().export().unwrap();
         let json: Value = serde_json::from_str(&export).unwrap();
-        let links: Vec<_> = (json["links"].as_array().unwrap().iter())
+        let links: Vec<_> = (declared(&json).iter())
             .map(|l| {
                 (
                     l["contract"].as_str().unwrap(),
@@ -451,4 +455,187 @@ fn map_notation_and_configured_declarations_read_their_coordinate() {
             "{declaration}: {export}"
         );
     }
+}
+
+const CLIENT: &str = "example.com/jvm/client::src/main/java/example/web/";
+const MODELS: &str = "example.com/jvm/maven::models/src/main/java/example/";
+const KIT: &str = "example.com/jvm/gradle::";
+
+/// The `(call, specifier, name, level, how, target)` of every import of `json` made from a
+/// call site that starts with `site`, the site without it.
+fn imports<'j>(
+    json: &'j Value,
+    site: &str,
+) -> Vec<(&'j str, &'j str, &'j str, &'j str, &'j str, &'j str)> {
+    (json["imports"].as_array().into_iter().flatten())
+        .filter_map(|i| {
+            let at = |k: &str| i[k].as_str().unwrap();
+            Some((
+                at("site").strip_prefix(site)?,
+                at("specifier"),
+                at("name"),
+                at("level"),
+                at("how"),
+                at("target"),
+            ))
+        })
+        .collect()
+}
+
+#[test]
+fn an_import_reaches_the_method_of_the_class_in_the_provider() {
+    let [_, _, client, _] = workspace("jvm_imports");
+    let json: Value =
+        serde_json::from_str(&Engine::open(&client).unwrap().export().unwrap()).unwrap();
+    let at = |caller: &str| imports(&json, &format!("{CLIENT}{caller}"));
+    let order = |member: &str| format!("{MODELS}models/Order.java::example.models.Order.{member}");
+    let model = |call: &str, name: &'static str, level: &'static str, member: &str| {
+        (
+            call.to_string(),
+            "example.models.Order",
+            name,
+            level,
+            "package",
+            order(member),
+        )
+    };
+    let seen = |caller: &str| -> Vec<_> {
+        at(caller)
+            .into_iter()
+            .map(|(c, s, n, l, h, t)| (c.to_string(), s, n, l, h, t.to_string()))
+            .collect()
+    };
+    let pay = "Checkout.java::example.web.Checkout.pay(int)::";
+    // Static and typed-local calls; overloads narrowed by the argument count.
+    assert_eq!(
+        seen(pay),
+        [
+            model("Order.of#0", "of(1)", "exact", "of(int)"),
+            model("order.place#0", "place(2)", "exact", "place(int,int)"),
+            model("order.place#1", "place(1)", "ambiguous", "place(String)"),
+            model("order.place#1", "place(1)", "ambiguous", "place(int)"),
+            model("order.total#0", "total(0)", "exact", "total()"),
+        ]
+    );
+    // A constructor is a method named after its class.
+    assert_eq!(
+        seen("Checkout.java::example.web.Checkout.create()::"),
+        [model("Order#0", "Order(1)", "exact", "Order(int)")]
+    );
+    // Two providers the client depends on declare the class: ambiguous in each.
+    let stamp = at("Checkout.java::example.web.Checkout.stamp()::");
+    assert_eq!(
+        stamp.iter().map(|i| (i.1, i.2, i.3)).collect::<Vec<_>>(),
+        [
+            ("example.shared.Stamp", "now(0)", "ambiguous"),
+            ("example.shared.Stamp", "now(0)", "ambiguous")
+        ]
+    );
+    let mut targets: Vec<_> = stamp.iter().map(|i| i.5).collect();
+    targets.sort();
+    assert_eq!(
+        targets,
+        [
+            format!("{KIT}src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()"),
+            format!("{MODELS}shared/Stamp.java::example.shared.Stamp.now()"),
+        ]
+    );
+    // A class of a test source root, a type outside the workspace: no import.
+    for caller in ["sample", "external"] {
+        assert!(at(&format!("Checkout.java::example.web.Checkout.{caller}()::")).is_empty());
+    }
+    // An on-demand import brings the type, a static import the method.
+    for (caller, call) in [("total(int)", "Order.of#0"), ("prepared()", "of#0")] {
+        assert_eq!(
+            at(&format!("Bulk.java::example.web.Bulk.{caller}::"))
+                .iter()
+                .map(|i| (i.0, i.1, i.2, i.3))
+                .collect::<Vec<_>>(),
+            [(call, "example.models.Order", "of(1)", "exact")]
+        );
+    }
+    // The link's reason says the symbol hop.
+    let reasons: Vec<_> = (json["links"].as_array().unwrap().iter())
+        .filter(|l| l["consumer"].as_str().unwrap().ends_with("order.total#0"))
+        .map(|l| (l["level"].as_str().unwrap(), l["reason"].as_str().unwrap()))
+        .collect();
+    assert_eq!(
+        reasons,
+        [(
+            "exact",
+            "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+        )]
+    );
+}
+
+#[test]
+fn a_gradle_source_set_directory_decides_which_classes_a_dependent_reaches() {
+    let [_, _, _, worker] = workspace("jvm_source_sets");
+    let json: Value =
+        serde_json::from_str(&Engine::open(&worker).unwrap().export().unwrap()).unwrap();
+    let job =
+        "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.";
+    let tools = "example.com/jvm/gradle::tools/src/core/java/example/tools/Slug.java::example.tools.Slug.of(String)";
+    // The `main` literal directory holds `Slug`; the `test` one holds `Checks`.
+    let slug: Vec<_> = imports(&json, &format!("{job}run(String)::"))
+        .into_iter()
+        .map(|i| (i.1, i.2, i.3, i.5))
+        .collect();
+    assert_eq!(slug, [("example.tools.Slug", "of(1)", "exact", tools)]);
+    assert!(imports(&json, &format!("{job}check()::")).is_empty());
+    // `Order` reaches through the `testImplementation` dependency, as any declared field.
+    assert_eq!(imports(&json, &format!("{job}count(Order)::")).len(), 1);
+}
+
+/// Moves the `test` source set of `tools` onto another directory, so `src/check/java` is no
+/// source root: `Checks` is then a class outside any root, which resolves by its package.
+fn move_test_set(gradle: &std::path::Path) {
+    let file = gradle.join("tools/build.gradle");
+    let text = fs::read_to_string(&file).unwrap();
+    assert!(text.contains("src/check/java"));
+    fs::write(file, text.replace("src/check/java", "src/other/java")).unwrap();
+}
+
+#[test]
+fn an_edited_source_set_relinks_like_a_cold_workspace() {
+    let warm = workspace("jvm_source_sets_fresh");
+    age(warm[0].parent().unwrap());
+    let exports = |repos: &[PathBuf; 4]| {
+        repos
+            .each_ref()
+            .map(|p| Engine::open(p).unwrap().export().unwrap())
+    };
+    let before = exports(&warm);
+    move_test_set(&warm[1]);
+    let refreshed = exports(&warm);
+    let cold = workspace("jvm_source_sets_cold");
+    move_test_set(&cold[1]);
+    assert_ne!(before, refreshed);
+    assert_eq!(refreshed, exports(&cold));
+    let json: Value = serde_json::from_str(&refreshed[3]).unwrap();
+    let job = "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.check()::";
+    assert_eq!(imports(&json, job).len(), 1);
+}
+
+const CHECKOUT_TOTAL: &str = "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.total#0";
+const ORDER_TOTAL: &str = "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()";
+
+#[test]
+fn context_on_a_public_class_method_lists_its_consumers_in_other_repositories() {
+    let [maven, ..] = workspace("jvm_context");
+    let found = Engine::open(&maven)
+        .unwrap()
+        .context(ORDER_TOTAL, None)
+        .unwrap();
+    assert_golden("jvm-maven.context-total.txt", &found);
+}
+
+#[test]
+fn trace_down_crosses_the_package_hop_and_onward() {
+    let [_, _, client, _] = workspace("jvm_trace_down");
+    let down = Engine::open(&client)
+        .unwrap()
+        .trace(Start::From(CHECKOUT_TOTAL), Direction::Down, None)
+        .unwrap();
+    assert_golden("jvm-client.trace-down.txt", &down);
 }

@@ -1,0 +1,5 @@
+example.com/jvm/client src/main/java/example/web/Checkout.java:13 order.total
+  →[exact: package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package] example.com/jvm/maven models/src/main/java/example/models/Order.java:11 example.models.Order.total()
+    example.com/jvm/maven models/src/main/java/example/models/Order.java:31 example.models.Order.tax(int)
+    example.com/jvm/maven models/src/main/java/example/models/Order.java:27 example.models.Order.subtotal()
+chain: exact · 1 hops · 2 repos · 135 tokens
