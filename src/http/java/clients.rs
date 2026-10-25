@@ -376,13 +376,23 @@ fn spring_method(value: Option<&Value>) -> Value {
 }
 
 /// How the imports of `path` may spell `name`, written in `scope` (`Outside::spellings`).
-fn spellings<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a str) -> Vec<String> {
+pub(super) fn spellings<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    name: &'a str,
+) -> Vec<String> {
     (code.outside(path, scope, name, false)).map_or_else(Vec::new, Outside::spellings)
 }
 
 /// How the imports may spell the outside type the source writes for `name` (a field, a
 /// parameter, a local): none when it writes no such type.
-fn typed<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a str) -> Vec<String> {
+pub(super) fn typed<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    name: &'a str,
+) -> Vec<String> {
     let found = code.origins(path, scope, Of::Name(name), Follow::Declarations);
     match found.into_iter().next() {
         Some(o) if o.form == Form::Type && o.routes.iter().all(|r| r.steps.is_empty()) => {

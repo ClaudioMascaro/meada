@@ -163,7 +163,11 @@ modules updates it.
   answer pointing to `context`. A package hop is a call-site consumer linked to a symbol, like an
   HTTP call: `call_down` crosses it from the call into the provider's function and on through its
   callees, and `trace` up reaches the call through `into[symbol]`; a hop into another repository
-  counts in the footer's hops and repositories.
+  counts in the footer's hops and repositories. A consumer at a symbol of a kind with
+  `ContractKind::calls_from_definition` (HTTP: a Feign or Retrofit interface method, #90) is
+  followed like a call: `Walk::consumers_down` crosses it from the method into the provider (down
+  from the callers, after the callees), and up the provider reaches the method and its callers;
+  the `calls_on_link` filters keep a reader-style crossing from looping back.
 - `meada-core`'s `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes;
   `DEFAULT_BUDGET` 2000) and the line helpers `label`, `callee`, `unresolved`, `mark` (` [<level>:
   <reason>]` after a call that is not exact, in `trace` and in `context`'s callers and callees;

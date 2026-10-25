@@ -213,6 +213,13 @@ pub trait ContractKind {
     /// the decided links: a pass that sets something on them, such as the drift of a link.
     fn after_links(&self, _links: &mut [Link], _exports: &[Export]) {}
 
+    /// Whether a consumer of the kind at a definition (a method of a declarative client, which
+    /// has no call of its own) calls on the provider it links to, so `trace` follows from the
+    /// definition to it. A channel handler at a definition is where a link ends, not starts.
+    fn calls_from_definition(&self) -> bool {
+        false
+    }
+
     /// Whether the identifier is an unresolved side: one whose name could not be evaluated
     /// (a channel that is only its broker prefix). It never links, is no open item, and is
     /// shown with the unresolved suffix.
@@ -338,6 +345,13 @@ pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel, &Packages]
 pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {
     let (prefix, _) = contract.split_once("::")?;
     KINDS.iter().copied().find(|k| k.prefix() == prefix)
+}
+
+/// Whether a consumer at a definition calls the provider it links to, by the rule of its kind
+/// (`ContractKind::calls_from_definition`). An unresolved consumer has no contract and is read
+/// as a route's, the only kind that leaves its contract out.
+pub fn calls_from_definition(contract: Option<&str>) -> bool {
+    contract.is_none_or(|c| kind_of(c).is_some_and(|k| k.calls_from_definition()))
 }
 
 /// Whether `contract` is an unresolved side, by the rule of its kind.

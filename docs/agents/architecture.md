@@ -931,6 +931,7 @@ one for the area a change touches.
   | `sides`, `view`, `related_sides` | the role words and the carried word of `context` on a contract, and the sides that reach it by another name; a contract listed by its providers alone is followed by the linked consumers that read fields, with their drift (the engine's rule: `View::follows_drift`) |
   | `at_call`, `context_sections` | the lines a call adds to a symbol's `contracts:`, and the sections `context` adds after the callees (packages: `consumers:`) |
   | `starts` | the providers a `trace` start text names |
+  | `calls_from_definition` | whether a consumer at a symbol (a Feign or Retrofit interface method) calls on its provider, so `trace` follows from the method to it (HTTP; a channel handler is where a link ends) |
   | `status` | the lines `meada status` prints |
   | `decidable`, `serves`, `candidate` | whether an ambiguous link is an open item, whether a provider serves a contract (aliases included), whether a provider is a candidate for a consumer with no contract |
 
@@ -1774,6 +1775,25 @@ one for the area a change touches.
   `class` in a comment counts; `import java.lang.System;` does not). Profiles, relaxed binding,
   YAML lists and a SpEL `#{...}` value are not read. The configurations are read once per
   extraction, the first time an annotation is injected.
+- `http/java/declarative.rs` (spec #26, #90): a Feign or Retrofit interface method is a consumer
+  sited at the method (`Site::Def`, built by `http::consumer_at`), not at a call: its callers
+  reach it as any call to a definition. Feign: `@FeignClient` from
+  `org.springframework.cloud.openfeign` (bound as the Spring annotations of #86, through `known`)
+  on an interface; `url` (empty is none; without a scheme it gets `http://`, as Spring Cloud does) and `path` resolve with `jvm::spring::resolve`
+  over the module's configuration, the methods' mappings are `request_methods` and `paths` of
+  `http/java.rs`, a `@RequestMapping` with no `method` meaning GET, as Feign sends it. Without `url` the consumer's `via` is `feign:<name>` (`http::FEIGN_VIA`) and
+  `Http::link` words the unresolved host as `host unresolved (Feign client <name>)`; a name with
+  `|` is refused, it would collide with the twin marks. A `@RequestMapping` on the interface,
+  `@RequestLine` and other contracts give nothing. Retrofit: the verbs of `retrofit2.http`
+  (their names collide with JAX-RS, so `known` accepts both spellings and the result must be
+  Retrofit's); the base is the folded `Retrofit.Builder().baseUrl(..)` chain of each
+  `retrofit.create(Api.class)` (`Expand::Chain`, climbing wrapper callers while the base holds a
+  `Part::Ref`), the receiver proved Retrofit by its type or by its `new Retrofit.Builder()`
+  chain; one consumer per creation, none gives an unknown base. A route from `/` replaces the
+  base's path (read over the base's leading text parts, so `HOST + "/v1/"` counts), and an empty
+  route is Retrofit's dynamic `@Url`: a consumer with no contract. The Java pack reads `Api.class` as `Value::Member("Api", "class")`.
+  `ContractKind::calls_from_definition` (true for HTTP) tells `trace` that a consumer at a
+  symbol is a call to follow, unlike a channel handler, where the link ends.
 - `http/go.rs` (spec #25): a route is read only with a literal path and a literal prefix; a
   group prefix or a pattern Meada cannot read serves nothing. `net/http` reads `{name}`,
   `{name...}` and `{$}` alone: a `:name` segment is a literal no contract can spell, so its route

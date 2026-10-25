@@ -14,14 +14,19 @@ public class OrderController {
     private final AuditClient audit;
     private final PromotionClient promotions;
     private final ReportClient reports;
+    private final InventoryClient inventory;
+    private final CatalogClient catalog;
 
     OrderController(PriceClient prices, StockClient stock, AuditClient audit,
-            PromotionClient promotions, ReportClient reports) {
+            PromotionClient promotions, ReportClient reports, InventoryClient inventory,
+            CatalogClient catalog) {
         this.prices = prices;
         this.stock = stock;
         this.audit = audit;
         this.promotions = promotions;
         this.reports = reports;
+        this.inventory = inventory;
+        this.catalog = catalog;
     }
 
     @GetMapping("/{id}")
@@ -36,5 +41,7 @@ public class OrderController {
         audit.record();
         promotions.current();
         reports.send();
+        inventory.left("sku-1");
+        catalog.all();
     }
 }

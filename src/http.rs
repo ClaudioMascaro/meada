@@ -104,6 +104,10 @@ fn fetches(args: &[Value]) -> Option<Vec<Read>> {
     })
 }
 
+/// The `via` prefix of a consumer of a Feign client without `url`: its host is unresolved, and
+/// the rest is the client's name.
+const FEIGN_VIA: &str = "feign:";
+
 /// The mark of the default's reading of `${X:default}` (`fetches`), after its `host:` `via`.
 const DEFAULT: &str = "|default";
 
@@ -371,12 +375,19 @@ fn provider(site: Site, contract: String) -> Found {
 /// The consumer at the call `index` of `path`, as `read` reads it, with the shape it reads of
 /// the response (spec #23), if any.
 fn consumer(path: &str, index: usize, read: Read, shape: Option<Shape>) -> Found {
+    let site = Site::Call {
+        path: path.into(),
+        index,
+    };
+    consumer_at(site, read, shape)
+}
+
+/// The consumer at `site`, as `read` reads it: a call, or a definition (a method of a declarative
+/// client, which has no call of its own).
+fn consumer_at(site: Site, read: Read, shape: Option<Shape>) -> Found {
     Found {
         role: Role::Consumer,
-        site: Site::Call {
-            path: path.into(),
-            index,
-        },
+        site,
         contract: read.contract,
         via: read.via,
         method: read.method,
@@ -706,9 +717,12 @@ impl ContractKind for Http {
                 let mut repos: Vec<&str> = fits.iter().map(|(m, ..)| m.identity.as_str()).collect();
                 repos.sort();
                 repos.dedup();
-                let why = match var {
-                    Some(var) => format!("base URL from {var}, no peer's base_url_env"),
-                    None => "host unresolved".to_string(),
+                // A Feign client without `url` says its name (`java/declarative.rs`).
+                let feign = via.and_then(|v| v.strip_prefix(FEIGN_VIA));
+                let why = match (var, feign) {
+                    (Some(var), _) => format!("base URL from {var}, no peer's base_url_env"),
+                    (None, Some(name)) => format!("host unresolved (Feign client {name})"),
+                    (None, None) => "host unresolved".to_string(),
                 };
                 let reason = match repos.len() {
                     1 => format!("{why}; the only repository serving it is"),
@@ -747,6 +761,11 @@ impl ContractKind for Http {
                 }
             })
             .collect()
+    }
+
+    /// A method of a Feign or Retrofit interface calls on the route it consumes.
+    fn calls_from_definition(&self) -> bool {
+        true
     }
 
     /// The drift of the links, once the decisions are replayed (`drift`).
