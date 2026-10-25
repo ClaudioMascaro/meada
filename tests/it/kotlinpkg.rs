@@ -42,43 +42,93 @@ fn kotlin_dsl_builds_export_packages_and_link_literal_dependencies() {
     let export = engine.export().unwrap();
     let json: Value = serde_json::from_str(&export).unwrap();
     let links = json["links"].as_array().unwrap();
-    let exact: Vec<_> = (links.iter())
-        .filter(|l| l["level"] == "exact")
-        .map(|l| l["contract"].as_str().unwrap())
+    // Each declaration, by its configuration: a contract with several sources loses none of them.
+    let declared = |l: &Value| {
+        let site = l["consumer"].as_str().unwrap();
+        let mut parts = site.split("::").skip(2);
+        let field = parts.next().unwrap().to_string();
+        (field, l["contract"].as_str().unwrap().to_string())
+    };
+    let mut found: Vec<_> = (links.iter())
+        .map(|l| {
+            let (field, contract) = declared(l);
+            let provider = l["provider"].as_str().unwrap().split_once("::").unwrap().1;
+            let level = l["level"].as_str().unwrap();
+            let reason = l["reason"].as_str().unwrap();
+            format!("{field} {contract} {level} {provider} | {reason}")
+        })
         .collect();
-    for wanted in [
-        "package::maven::dev.kt:toolbox",
-        "package::maven::dev.kt.core:core",
-        "package::maven::dev.kt.http:client",
-        "package::maven::dev.kt:util",
-    ] {
-        assert!(exact.contains(&wanted), "{wanted}: {export}");
-    }
-    // project(":web") stays inside the repository; okhttp is external.
+    found.sort();
+    let exact = |field: &str, contract: &str, provider: &str, range: &str| {
+        let reason = format!("package::maven::{contract} {range} (local 3.1), range unchecked");
+        format!("{field} package::maven::{contract} exact {provider} | {reason}")
+    };
+    let guessed = |provider: &str| {
+        let reason = "2 providers fit; computed coordinate; package::maven::dev.kt:* 3.1 (local 3.1), range unchecked";
+        format!("implementation package::maven::dev.kt:* ambiguous {provider} | {reason}")
+    };
+    let mut expected = vec![
+        exact("api", "dev.kt.core:core", "core/build.gradle.kts", "3.1"),
+        exact("api", "dev.kt:toolbox", "build.gradle.kts", "3.1"),
+        exact(
+            "compileOnly",
+            "dev.kt.http:client",
+            "http/client/build.gradle.kts",
+            "3.1",
+        ),
+        exact(
+            "implementation",
+            "dev.kt:toolbox",
+            "build.gradle.kts",
+            "3.1",
+        ),
+        exact(
+            "runtimeOnly",
+            "dev.kt:util",
+            "util/build.gradle.kts",
+            "none",
+        ),
+        exact(
+            "testCompileOnly",
+            "dev.kt.core:core",
+            "core/build.gradle.kts",
+            "3.1",
+        ),
+        exact(
+            "testImplementation",
+            "dev.kt:toolbox",
+            "build.gradle.kts",
+            "3.1",
+        ),
+        exact(
+            "testRuntimeOnly",
+            "dev.kt.http:client",
+            "http/client/build.gradle.kts",
+            "3.1",
+        ),
+        // Every provider whose literal parts fit, and no other.
+        guessed("build.gradle.kts"),
+        guessed("util/build.gradle.kts"),
+    ];
+    expected.sort();
+    // project(":web") and okhttp declare no coordinate; nor does a Kotlin comment, which nests.
+    assert_eq!(found, expected, "{export}");
+    assert!(!export.contains("9.9"), "{export}");
+    // `api(project(":util"))` in core stays inside the repository although `:util` is a provider.
+    let lib_json: Value = serde_json::from_str(&lib_export).unwrap();
     assert!(
-        !export.contains("okhttp") && !export.contains("project"),
-        "{export}"
+        (lib_json["consumers"].as_array().unwrap().iter()).all(|c| !c["site"]
+            .as_str()
+            .unwrap()
+            .contains("core/build.gradle.kts")),
+        "{lib_export}"
     );
     assert!(
-        (links.iter().filter(|l| l["level"] == "exact"))
-            .all(|l| l["reason"].as_str().unwrap().contains("range unchecked")),
-        "{export}"
-    );
-    let computed: Vec<_> = (links.iter())
-        .filter(|l| l["contract"] == "package::maven::dev.kt:*")
-        .collect();
-    // Every provider whose literal parts fit, and no other.
-    let candidates: Vec<_> = (computed.iter())
-        .map(|l| l["provider"].as_str().unwrap().split_once("::").unwrap().1)
-        .collect();
-    assert_eq!(
-        candidates,
-        ["build.gradle.kts", "util/build.gradle.kts"],
-        "{export}"
-    );
-    assert!(
-        computed.iter().all(|l| l["level"] == "ambiguous"),
-        "{export}"
+        (lib_json["links"].as_array().unwrap().iter()).all(|l| l["consumer"]
+            .as_str()
+            .unwrap()
+            .starts_with("example.com/kotlin/app::")),
+        "{lib_export}"
     );
     assert_golden("kotlin-pkg-app.export.json", &export);
     assert_golden(
@@ -103,8 +153,8 @@ fn change_manifests(repos: &[PathBuf; 2]) {
     );
     replace(
         app.join("settings.gradle.kts"),
-        "include(\":web\")",
-        "include(\":web\", \":api\")",
+        "rootProject.name = \"app\"",
+        "rootProject.name = \"shop\"",
     );
 }
 

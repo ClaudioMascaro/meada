@@ -2516,5 +2516,12 @@ one for the area a change touches.
   strings, and reads a triple-quoted string as quoted pairs. It keeps at most `MAX_ROOTS` (64)
   source directories. The Groovy and the Kotlin DSL files (`*.gradle`, `*.gradle.kts`) go
   through this one scanner (spec #27: `tests/it/kotlinpkg.rs`); a `project(":x")` dependency
-  declares no coordinate. JVM coordinate names share
+  declares no coordinate. A block comment nests, as Kotlin's does (Groovy's does not, so a
+  nested opener there turns a coordinate into a miss, never a wrong `exact`). Ceilings, all
+  misses: a version catalog (`libs.x`), a `dependencies` block nested deeper than one block
+  (`subprojects`, `constraints`, `sourceSets { commonMain { dependencies } }`), a configuration
+  called as a string (`"implementation"("g:a:1")`), a positional `implementation("g", "a",
+  "1")`, a `group` set only in `subprojects`/`allprojects`, and a top-level `val group`. A
+  `group` reset in `afterEvaluate` is not seen, and `publishing { artifactId = .. }` is
+  ignored, so the announced package may differ from the published one. JVM coordinate names share
   `package::MAX_NAME` (214 bytes). These readers never run Maven, Gradle or a JDK.

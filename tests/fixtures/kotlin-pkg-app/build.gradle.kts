@@ -14,6 +14,11 @@ dependencies {
     testImplementation("dev.kt:toolbox:3.1")
     testCompileOnly("dev.kt.core:core:3.1")
     testRuntimeOnly("dev.kt.http:client:3.1")
+    /*
+     * Kotlin block comments nest.
+     /* old */
+     runtimeOnly("dev.kt.core:core:9.9")
+     */
     implementation(project(":web"))
     implementation(kotlin("stdlib"))
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
