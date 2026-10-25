@@ -1,8 +1,9 @@
 # Provenance
 
 The Kotlin grammar Meada compiles (`build.rs`, ADR 0017): the published tree-sitter-kotlin-ng
-1.1.0 with two upstream pull requests not merged at the time of vendoring. Every file is a byte
-copy of an upstream file; none is edited by hand.
+1.1.0 with two upstream pull requests not merged at the time of vendoring, and one local patch
+(below). Every file but `src/scanner.c` is a byte copy of an upstream file; `src/scanner.c` is
+PR #13's head plus the patch, which is kept as a file and applied, never edited in place.
 
 - Upstream: https://github.com/tree-sitter-grammars/tree-sitter-kotlin (MIT, `LICENSE`).
 - Base: tag `v1.1.0`, commit `77dd60ea0a9003ce062c9728a513ffe1aaff8c82`, the source of the
@@ -18,11 +19,33 @@ copy of an upstream file; none is edited by hand.
 | File | Taken from | SHA-256 |
 | --- | --- | --- |
 | `src/parser.c` | PR #21 head | `bdd6e68b193a4d92a5ba4350a0d896aed408f63041467edc87ccf6ff5f135f6d` |
-| `src/scanner.c` | PR #13 head | `c739ec29bffff4a445963d461c906634d418b828998de6a8df3c0e5d438703a9` |
+| `src/scanner.c` | PR #13 head, plus `patches/0001-call-after-local-property.diff` | `6c6ff798d3f9ae2c20a55532d282a6e5cf8033fd22edd76de7641466ff9a7baa` |
 | `src/tree_sitter/alloc.h` | `v1.1.0` | `b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea` |
 | `src/tree_sitter/array.h` | `v1.1.0` | `5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94` |
 | `src/tree_sitter/parser.h` | `v1.1.0` | `a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a` |
+| `patches/0001-call-after-local-property.diff` | local, against PR #13's `src/scanner.c` | `9afc9aeb2c1af2ae7405d911a5cd0afc5ae1c65cf5172cca066a017a3ce69016` |
 | `LICENSE` | `v1.1.0` | `0eea8dc45e89deeb03c7799bbbc7b4688f365fb274562f4540ecfebdea82e727` |
 
-To check: `sha256sum -c` over the table, and for each file
-`git diff v1.1.0 <head> -- <path>` in a clone of the upstream repository.
+## Local patches
+
+Each is a unified diff in `patches/`, made against the upstream file named in the table
+(`patch -p1` from the `vendor/tree-sitter-kotlin-ng` directory reproduces the vendored file), and
+is to be offered upstream. A patch is dropped when upstream ships it.
+
+- `0001-call-after-local-property.diff` (`src/scanner.c`, +34 lines, no new external token, no
+  `parser.c` change): after a local `val`, a line starting with `get` or `set` was read as the
+  property's accessor, so `val x = Service()` then `get("/x") { }` (a Ktor route), `get { }` or
+  `set { }` made an ERROR from the enclosing declaration to the end of the file: the declarations
+  after it vanished, and a false symbol could appear. kotlinc reads accessors on members and
+  top-level properties only. The scanner now reads `get` at a line start as a getter only when it
+  stands alone or is `get()`, and `set` only when it stands alone or is followed by `(` and a
+  name or annotation (`set(value)`, `set(@Ann v)`); anything else inserts the statement
+  separator. The accessor forms of `src/lang/kotlin.rs`'s `accessors_stay_accessors_beside_the_scanner_patch` parse as before.
+  Measured on the 1,691-file corpus of ADR 0017: files with an ERROR 71 to 69, the only
+  declaration change a false `P /list` removed, and the trees of the other fixtures unchanged.
+  Not upstream yet (no issue or pull request); the infix `get` shape of upstream PR #22 is a
+  separate, unpatched defect.
+
+To check: `sha256sum -c` over the table, and for each upstream copy
+`git diff v1.1.0 <head> -- <path>` in a clone of the upstream repository; for `src/scanner.c`, that
+the PR #13 head with the patch applied equals the vendored file.

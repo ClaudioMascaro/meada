@@ -1583,6 +1583,13 @@ fn kotlin() {
             "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Routing.top().GET /top",
             "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.again()",
             "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.again().GET /cyc/loop",
+            // A local `val` before a line starting with `get` or `set` (ADR 0017's scanner patch).
+            "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()",
+            "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /local",
+            "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /",
+            "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.stored()",
+            "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.configured()",
+            "src/main/kotlin/example/ktor/Locals.kt::example.ktor.afterLocals()",
         ],
         &["src/main/kotlin/example/Main.kt::example.main(Array<String>)"],
         &[
@@ -2260,6 +2267,7 @@ fn kotlin_ktor_routes_take_every_enclosing_prefix() {
     let admin = format!("{server}.Route.adminRoutes()");
     let hidden = "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden".to_string();
     let orders = "src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()";
+    let locals = "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()";
     let site = |scope: &str, name: &str| format!("{scope}.{name}");
     let expected: Vec<(String, String)> = pairs(&[
         ("http::GET::/health", &site(&module, "GET /health")),
@@ -2272,6 +2280,9 @@ fn kotlin_ktor_routes_take_every_enclosing_prefix() {
         ("http::GET::/api/named", &site(&module, "GET /api/named")),
         ("http::GET::/api/kw", &site(&module, "GET /api/kw")),
         ("http::GET::/top", &site(&hidden, "Routing.top().GET /top")),
+        // A route after a local `val`, with and without a path (ADR 0017's scanner patch).
+        ("http::GET::/local", &site(locals, "GET /local")),
+        ("http::GET::/", &site(locals, "GET /")),
         (
             "http::GET::/cyc/loop",
             &site(&hidden, "Route.again().GET /cyc/loop"),

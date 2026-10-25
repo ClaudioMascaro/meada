@@ -318,10 +318,35 @@ bool tree_sitter_kotlin_external_scanner_scan(void *payload, TSLexer *lexer, con
                 else if (index == 3 && (!valid_symbols[GET] || lexer->lookahead == '[')) {
                     return true;
                 }
+                // A getter is `get` alone on its line or `get()`: anything else (`get("/a") {`, `get {`,
+                // `get<T>()`, `get_x`) is a call on a new statement.
+                else if (index == 3) {
+                    while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+                        skip(lexer);
+                    }
+                    if (lexer->lookahead == '(') {
+                        skip(lexer);
+                        while (iswspace(lexer->lookahead)) {
+                            skip(lexer);
+                        }
+                        return lexer->lookahead != ')';
+                    }
+                    return !(lexer->lookahead == '\n' || lexer->lookahead == '\r' || lexer->lookahead == ';' ||
+                             lexer->lookahead == '}' || lexer->lookahead == '/' || lexer->eof(lexer));
+                }
                 // If `set` was found and the keyword is not valid, return a semi since it's being used as an identifier
                 else if (index == 4 && (!valid_symbols[SET] || lexer->lookahead == '[' || lexer->lookahead == '(' ||
                                         lexer->lookahead == '.')) {
                     if (lexer->lookahead == '(' && valid_symbols[SET]) {
+                        // A setter's parameter is a name, possibly annotated: `set("k") {` is a call.
+                        skip(lexer);
+                        while (iswspace(lexer->lookahead)) {
+                            skip(lexer);
+                        }
+                        if (!(iswalpha(lexer->lookahead) || lexer->lookahead == '_' || lexer->lookahead == '`' ||
+                              lexer->lookahead == '@')) {
+                            return true;
+                        }
                         // skip until the closing parenthesis
                         while (lexer->lookahead != ')' && !lexer->eof(lexer)) {
                             skip(lexer);
@@ -337,6 +362,15 @@ bool tree_sitter_kotlin_external_scanner_scan(void *payload, TSLexer *lexer, con
                         return false;
                     }
                     return true;
+                }
+                // A setter is `set` alone on its line or `set(name)`: `set {` is a call on a new statement.
+                else if (index == 4) {
+                    while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+                        skip(lexer);
+                    }
+                    return !(lexer->lookahead == '(' || lexer->lookahead == '\n' || lexer->lookahead == '\r' ||
+                             lexer->lookahead == ';' || lexer->lookahead == '}' || lexer->lookahead == '/' ||
+                             lexer->eof(lexer));
                 }
                 // If `in` was found and this specific external keyword is valid,
                 // return a semi since it's being used in a range test
