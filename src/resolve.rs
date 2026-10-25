@@ -12,8 +12,9 @@ use std::cell::{OnceCell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Annotated, Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
-    LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker, Ty, Value,
+    Annotated, Assigned, Binds, Call, Class, Const, Def, Export, Facts, Import, Imported,
+    Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker, Ty,
+    Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -3737,6 +3738,12 @@ impl<'a> Code<'a> {
     /// The value the call at `index` of `path` is made on (`Call::receiver`).
     pub fn receiver(&self, path: &'a str, index: usize) -> Option<&'a Value> {
         self.call(path, index)?.receiver.as_ref()
+    }
+
+    /// The `name = value` statements written in lambdas that are call arguments in `path`
+    /// (`Facts::assigned`).
+    pub fn assigned(&self, path: &'a str) -> &'a [Assigned] {
+        self.full(path).map_or(&[], |f| f.assigned.as_slice())
     }
 
     /// The values the call at `index` of `path` may return, when a function of the repository

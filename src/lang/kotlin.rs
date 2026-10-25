@@ -10,8 +10,8 @@ use tree_sitter::{Node, Parser};
 use tree_sitter_language::LanguageFn;
 
 use super::{
-    Binds, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Invocation, Kind,
-    LanguagePack, Modules, Param, Part, Receiver, Value, children, named, text,
+    Assigned, Binds, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Invocation,
+    Kind, LanguagePack, Modules, Param, Part, Receiver, Value, children, named, text,
 };
 use crate::{Result, qualify};
 
@@ -603,6 +603,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     }
                 }
             }
+            "assignment" => assigned(&mut facts, node, src, &scope),
             "call_expression" => {
                 if let Some((lambda, found)) = tracked_call(node, src) {
                     tracked.insert(lambda.id(), found);
@@ -1508,6 +1509,66 @@ fn stores(kind: &str) -> bool {
     )
 }
 
+/// Appends `found` to `parts`, joining the text at the seam.
+fn append(parts: &mut Vec<Part>, found: Vec<Part>) {
+    for part in found {
+        match (parts.last_mut(), part) {
+            (_, Part::Text(next)) if next.is_empty() => {}
+            (Some(Part::Text(last)), Part::Text(next)) => last.push_str(&next),
+            (_, part) => parts.push(part),
+        }
+    }
+}
+
+/// The parts of the text `text` of a string literal: a `$` followed by a name is that name.
+fn template(parts: &mut Vec<Part>, text: &str) {
+    let mut rest = text;
+    while let Some(at) = rest.find('$') {
+        let name = &rest[at + 1..];
+        let end = name
+            .find(|c: char| !(c.is_alphanumeric() || c == '_'))
+            .unwrap_or(name.len());
+        let starts = name
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_alphabetic() || c == '_');
+        if !starts {
+            // A `$` that starts no name is text.
+            append(parts, vec![Part::Text(rest[..=at].into())]);
+            rest = name;
+            continue;
+        }
+        append(parts, vec![Part::Text(rest[..at].into())]);
+        parts.push(Part::Ref(name[..end].into()));
+        rest = &name[end..];
+    }
+    append(parts, vec![Part::Text(rest.into())]);
+}
+
+/// Records `name = value` written as a statement of the lambda `scope` (`Facts::assigned`).
+fn assigned(facts: &mut Facts, node: Node, src: &[u8], scope: &str) {
+    let last = &scope[crate::parent(scope).len()..];
+    let operator = node.child_by_field_name("operator");
+    if !last.trim_start_matches('.').starts_with('@')
+        || operator.is_none_or(|o| text(o, src) != "=")
+    {
+        return;
+    }
+    let (Some(left), Some(right)) = (
+        node.child_by_field_name("left"),
+        node.child_by_field_name("right"),
+    ) else {
+        return;
+    };
+    if left.kind() == "identifier" {
+        facts.assigned.push(Assigned {
+            scope: scope.to_string(),
+            name: text(left, src).to_string(),
+            value: value(right, src, 0),
+        });
+    }
+}
+
 /// Whether `node` is a lambda written as an argument of a call, trailing or in parentheses.
 fn argument(node: Node) -> bool {
     node.kind() == "lambda_literal"
@@ -1598,17 +1659,30 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
         return Value::Unknown;
     }
     match node.kind() {
-        // A literal without templates or escapes; the rest is read by the kinds that need it.
-        "string_literal" => {
-            let mut text_parts = String::new();
+        // A literal: its text, and its templates as the names and holes they read. One with an
+        // escape is unknown (the kinds that need it read it themselves).
+        "string_literal" | "multiline_string_literal" => {
+            let (mut parts, mut pending) = (Vec::new(), String::new());
             for part in named(node) {
-                let content = text(part, src);
-                if part.kind() != "string_content" || content.contains('$') {
-                    return Value::Unknown;
+                match part.kind() {
+                    // The grammar reads `$name` as text: a `$` token, then the name's content.
+                    "string_content" => pending.push_str(text(part, src)),
+                    "interpolation" => {
+                        template(&mut parts, &std::mem::take(&mut pending));
+                        match named(part).next().map(|n| value(n, src, depth + 1)) {
+                            Some(Value::Str(found)) => append(&mut parts, found),
+                            Some(Value::Ref(name)) => parts.push(Part::Ref(name)),
+                            _ => parts.push(Part::Hole),
+                        }
+                    }
+                    _ => return Value::Unknown,
                 }
-                text_parts.push_str(content);
             }
-            Value::Str(vec![Part::Text(text_parts)])
+            template(&mut parts, &pending);
+            if parts.is_empty() {
+                parts.push(Part::Text(String::new()));
+            }
+            Value::Str(parts)
         }
         "identifier" | "navigation_expression" => Value::Ref(callee(node, src)),
         "this_expression" => Value::Ref("this".into()),
@@ -1673,5 +1747,39 @@ mod tests {
             false,
         );
         assert!(!facts.unwrap().unbuilt);
+    }
+
+    /// The parts a string literal's value is: `$name` and `${name}` are names, any other
+    /// expression a hole, a `$` that starts no name text, and an escape leaves it unknown.
+    #[test]
+    fn a_string_template_is_text_names_and_holes() {
+        let text = |s: &str| Part::Text(s.into());
+        let name = |s: &str| Part::Ref(s.into());
+        let value_of = |literal: &str| {
+            let facts = parse(
+                format!("package a\nconst val x = {literal}\n").as_bytes(),
+                false,
+            );
+            facts.unwrap().consts.remove(0).value
+        };
+        let Value::Str(parts) = value_of("\"$base/u/${id}/${a.b}/${f(1)}/$5 and $\"") else {
+            panic!("a template folds");
+        };
+        let expected = [
+            name("base"),
+            text("/u/"),
+            name("id"),
+            text("/"),
+            name("a.b"),
+            text("/"),
+            Part::Hole,
+            text("/$5 and $"),
+        ];
+        assert_eq!(parts, expected);
+        assert!(matches!(value_of("\"a\\nb\""), Value::Unknown));
+        let Value::Str(parts) = value_of("\"\"") else {
+            panic!("an empty literal folds");
+        };
+        assert_eq!(parts, [text("")]);
     }
 }

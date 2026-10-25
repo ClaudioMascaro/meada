@@ -1,0 +1,12 @@
+example.com/acme/conformance src/main/kotlin/example/clients/Client.kt:58-60 example.clients.lookup()
+community: none
+processes: 1 (1 export; 1 repository): example.clients.lookup() (example.com/acme/conformance)
+suspend fun lookup() {
+    orders.get(System.getProperty("orders.url"))
+}
+callers: none
+callees:
+example.com/acme/conformance src/main/kotlin/example/clients/Client.kt:59 (unresolved) System.getProperty
+example.com/acme/conformance src/main/kotlin/example/clients/Client.kt:59 (unresolved) orders.get
+contracts:
+example.com/acme/conformance src/main/kotlin/example/clients/Client.kt:59 consumes (unresolved) orders.get

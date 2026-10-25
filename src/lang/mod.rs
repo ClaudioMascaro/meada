@@ -350,9 +350,22 @@ pub struct Facts {
     /// Not kept in the index (see `Call::args`).
     #[serde(skip)]
     pub annotated: Vec<Annotated>,
+    /// The `name = value` statements written directly in a lambda that is a call's argument
+    /// (Kotlin's `method = HttpMethod.Post` in a Ktor request block): the setting of a property
+    /// of the lambda's receiver, which no call or constant records. Not kept in the index (see
+    /// `Call::args`).
+    #[serde(skip)]
+    pub assigned: Vec<Assigned>,
     /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,
+}
+
+/// A `name = value` statement written in `scope` (`Facts::assigned`).
+pub struct Assigned {
+    pub scope: String,
+    pub name: String,
+    pub value: Value,
 }
 
 /// An annotation written on a field or a parameter: the binding it marks and the annotation as

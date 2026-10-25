@@ -1414,6 +1414,30 @@ fn kotlin() {
             "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()",
             "src/main/kotlin/example/Same.kt::example.notSecret()",
             "src/main/kotlin/example/Same.kt::example.same()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.Gateway",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.Gateway.health()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.based()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.builder()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.count()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.folds()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.lookup()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.reassigned()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.verbs()",
+            "src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByLocal()",
+            "src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByParameter(Map<String,String>)",
+            "src/main/kotlin/example/clients/Probes.kt::example.clients.otherLibrary()",
+            "src/main/kotlin/example/clients/Probes.kt::example.clients.typed(HttpClient)",
+            "src/main/kotlin/example/clients/Wrappers.kt::example.clients.fetch(HttpClient,String)",
+            "src/main/kotlin/example/clients/Wrappers.kt::example.clients.order(String)",
+            "src/main/kotlin/example/clients/Wrappers.kt::example.clients.ping(String)",
+            "src/main/kotlin/example/clients/Wrappers.kt::example.clients.pong(String)",
+            "src/main/kotlin/example/clients/Wrappers.kt::example.clients.report()",
+            "src/main/kotlin/example/clients/Wrappers.kt::example.clients.start()",
+            "src/main/kotlin/example/clients/Wrappers.kt::example.clients.user(Int)",
+            "src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.HttpClient",
+            "src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.HttpClient.options(String)",
+            "src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.fake(HttpClient,Map<String,String>)",
+            "src/main/kotlin/example/clients/urls/Urls.kt::example.clients.urls.Paths",
             "src/main/kotlin/example/Shapes.kt::example.Box",
             "src/main/kotlin/example/Shapes.kt::example.Box.Factory",
             "src/main/kotlin/example/Shapes.kt::example.Box.Factory.create()",
@@ -2304,6 +2328,166 @@ fn kotlin_ktor_routes_take_every_enclosing_prefix() {
     let audit = format!("{module}.POST /api/v1/items/{{}}::(anonymous).audit#0");
     let found = call(&audit).unwrap_or_else(|| panic!("no call {audit}"));
     assert_eq!(found["target"], format!("{REPO}::{server}.audit()"));
+}
+
+/// Ktor client calls are consumers with their URLs folded: every verb and `request` with the
+/// method its block sets, a `defaultRequest` base joined in front, strings, templates, `+` and
+/// constants folded (a hole that does not fold is a parameter), a wrapper read at each of its
+/// call sites through two levels (a cycle adds none), and a path that cannot be evaluated left
+/// unresolved. A name Ktor's `get` shares with a repository class, a map, a hidden client or another
+/// library's client is no consumer.
+#[test]
+fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
+    let repo = fixture_repo("kotlin_ktor_client", "conformance-kotlin", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let (orders, billing, other, gateway) = (
+        "host:orders.example.com",
+        "host:billing.example.com",
+        "host:other.example.com",
+        "host:gateway.example.com",
+    );
+    let at = |function: &str, call: &str| {
+        format!("src/main/kotlin/example/clients/Client.kt::example.clients.{function}::{call}")
+    };
+    let wrapper = |function: &str, call: &str| {
+        format!("src/main/kotlin/example/clients/Wrappers.kt::example.clients.{function}::{call}")
+    };
+    let probe = |function: &str, call: &str| {
+        format!("src/main/kotlin/example/clients/Probes.kt::example.clients.{function}::{call}")
+    };
+    let expected = triples(&[
+        // Every verb, and `request` with the method its block sets.
+        ("http::GET::/orders", orders, &at("verbs()", "orders.get#0")),
+        (
+            "http::POST::/orders",
+            orders,
+            &at("verbs()", "orders.post#0"),
+        ),
+        (
+            "http::PUT::/orders/1",
+            orders,
+            &at("verbs()", "orders.put#0"),
+        ),
+        (
+            "http::PATCH::/orders/1",
+            orders,
+            &at("verbs()", "orders.patch#0"),
+        ),
+        (
+            "http::DELETE::/orders/1",
+            orders,
+            &at("verbs()", "orders.delete#0"),
+        ),
+        (
+            "http::HEAD::/orders/head",
+            orders,
+            &at("verbs()", "orders.head#0"),
+        ),
+        (
+            "http::OPTIONS::/orders/options",
+            orders,
+            &at("verbs()", "orders.options#0"),
+        ),
+        (
+            "http::PUT::/orders/request",
+            orders,
+            &at("verbs()", "orders.request#0"),
+        ),
+        (
+            "http::GET::/orders/default",
+            orders,
+            &at("verbs()", "orders.request#1"),
+        ),
+        // A `defaultRequest` base: joined, ignored by an absolute URL, folded from a template.
+        (
+            "http::GET::/api/invoices",
+            billing,
+            &at("based()", "billing.get#0"),
+        ),
+        (
+            "http::GET::/absolute",
+            other,
+            &at("based()", "billing.get#1"),
+        ),
+        (
+            "http::POST::/v2/things",
+            orders,
+            &at("based()", "versioned.post#0"),
+        ),
+        (
+            "http::GET::/health",
+            gateway,
+            &at("Gateway.health()", "client.get#0"),
+        ),
+        // Constants, templates and `+`; a hole that does not fold is a parameter.
+        ("http::GET::/users", orders, &at("folds()", "orders.get#0")),
+        (
+            "http::GET::/users/me",
+            orders,
+            &at("folds()", "orders.get#1"),
+        ),
+        ("http::GET::/items", orders, &at("folds()", "orders.get#2")),
+        (
+            "http::GET::/items/stock",
+            orders,
+            &at("folds()", "orders.get#3"),
+        ),
+        (
+            "http::GET::/users/{}/profile",
+            orders,
+            &at("folds()", "orders.get#4"),
+        ),
+        // A path that cannot be evaluated, a `var` and a `url { path(..) }` builder.
+        ("unresolved", "", &at("lookup()", "orders.get#0")),
+        ("unresolved", "", &at("reassigned()", "orders.get#0")),
+        ("unresolved", "", &at("builder()", "orders.get#0")),
+        // A client known by its written type alone.
+        (
+            "http::GET::/typed",
+            orders,
+            &probe("typed(HttpClient)", "client.get#0"),
+        ),
+        // A wrapper at the call site that determines it, through two levels (`order` reaches
+        // `fetch`); a cycle reads the entry alone; an uncalled one has a hole.
+        (
+            "http::GET::/orders/a1",
+            orders,
+            &wrapper("report()", "order#0"),
+        ),
+        (
+            "http::GET::/orders/b2",
+            orders,
+            &wrapper("report()", "order#1"),
+        ),
+        ("http::GET::/loop", orders, &wrapper("start()", "ping#0")),
+        (
+            "http::GET::/users/{}",
+            orders,
+            &wrapper("user(Int)", "orders.get#0"),
+        ),
+    ]);
+    assert_eq!(
+        consumers(&json, "src/main/kotlin/example/clients/"),
+        expected
+    );
+}
+
+/// Context lists the consumer a Ktor call that cannot be evaluated is, unresolved.
+#[test]
+fn kotlin_context_shows_an_unresolved_consumer() {
+    let repo = fixture_repo(
+        "kotlin_unresolved_consumer",
+        "conformance-kotlin",
+        Some(ORIGIN),
+    );
+    assert_golden(
+        "conformance-kotlin.context-unresolved.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .context("example.clients.lookup()", None)
+            .unwrap(),
+    );
 }
 
 /// Search finds an extension function by name.

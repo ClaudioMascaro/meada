@@ -1937,6 +1937,23 @@ qualification budget does (ADR 0017).
   `HttpMethod` from `io.ktor.http`; a name a star import of `io.ktor.server.resources` may bind
   too is no route, so type-safe routing is not read. Ktor parameters (`{id}`, `{id?}`, `{...}`)
   fold as actix-web's (`actix_path`).
+- `http/kotlin/client.rs` (spec #27, #99): Ktor client calls (`get`, `post`, `put`, `patch`,
+  `delete`, `head`, `options` and `request` of `io.ktor.client.request`, counted by the import
+  `Code::outside` says binds the verb) on a receiver that is an `io.ktor.client.HttpClient`: one
+  `Code::origins` (`Follow::Values`) traces to a call to it, or one whose written type is it
+  (`jvm::names::typed`); a map, another library's client and a name a local hides are none. The
+  URL (first argument, or `urlString`) goes through `Code::expand` (`Expand::Call`), as the Go
+  clients do, so a wrapper is read at each call site of the function that determines the URL,
+  through any number of levels, with cycle detection; a call with no URL argument
+  (`get { url { .. } }`) is an unresolved consumer. The base of a client made by a call is the
+  `url(..)` of the `defaultRequest { }` in the configuration lambda of that call, folded in its
+  scope: a hole when it is set more than once or not by a string, none for a client known by
+  its type alone. `request` sends the method its block assigns (`method = HttpMethod.X`, from
+  `Facts::assigned`, the `name = value` statements of the lambdas that are arguments, read from
+  the full facts by `Code::assigned`; `GET` when it assigns none, unknown for any other form).
+  The Kotlin pack folds a string literal's templates into parts (`$name`, `${name}` as names,
+  any other `${expr}` as a hole); the grammar reads `$name` as text, so the pack finds the name
+  in the text. A literal with an escape (`\$`) is still unknown.
 - `http/java/clients.rs` (spec #26, #88): a RestTemplate or a WebClient counts by the type the
   source writes for the receiver (`Follow::Declarations`), or, for a WebClient, by the
   `WebClient.create` or `WebClient.builder()` chain it traces to (`Follow::Values`); a name
@@ -2466,9 +2483,15 @@ qualification budget does (ADR 0017).
   local function of the name mounts nothing. Routes nested in `route(path, HttpMethod.X) { }`
   (its lambda is the handler), `method(HttpMethod.X) { }`, `install(Routing)`, a lambda passed
   by name (`body = { }`), any named argument other than `path` and `method`, and a path with a
-  string template are not read. A Ktor verb inside a lambda (`get`, `put`) is a call the
+  string template that does not fold are not read. A Ktor verb inside a lambda (`get`, `put`) is a call the
   resolver reads as a name match, as any call there is, so it may match a repository method of
   the same name: that method then has a caller and loses its export door.
+- `http/kotlin/client.rs` (spec #27, #99): a method a wrapper takes as a parameter and a `request`
+  block assigns (`method = m`) is not substituted, since the assignment is no argument of the
+  call: the consumer's method is unknown. `url { path(..) }`, `url(..)` and `takeFrom` inside a
+  request block, `HttpRequestBuilder` values, `submitForm`, the `prepare*` forms, an aliased
+  import (`import .. as k`) and a client the call reaches through `with(client) { get(..) }`
+  are not read. A `defaultRequest` base given by a parameter of a client factory is a hole.
 - Rust values (`lang/rust/values.rs`, `lang/rust/builders.rs`, spec #30 #131): `BUILDER_BUDGET`
   (2^20 syntax nodes per file, over every `let mut`, block by block in the order the blocks
   open), `BUILDER_DEPTH` (64 builders read within

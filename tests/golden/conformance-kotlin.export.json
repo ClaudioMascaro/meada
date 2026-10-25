@@ -50,6 +50,26 @@
       "hash": "f37b52596fe8d745413d3158ae9e46bb74d0b961ea85783da90459380ef325d1"
     },
     {
+      "path": "src/main/kotlin/example/clients/Client.kt",
+      "hash": "294bebbfa1e94db7021efe9bf85eef7fc62e084fe8de15bdf4a6a4263da84381"
+    },
+    {
+      "path": "src/main/kotlin/example/clients/Probes.kt",
+      "hash": "313278ade90d3148c3a812f01c25979bcd2782db8d669d5bfe235a937900a05f"
+    },
+    {
+      "path": "src/main/kotlin/example/clients/Wrappers.kt",
+      "hash": "d798d4b6615e16c6692cb0ae53618e1f9a0934e49d1bc3a194a8397fa70adb45"
+    },
+    {
+      "path": "src/main/kotlin/example/clients/fake/Fake.kt",
+      "hash": "e790d023665c0cf335ddbacf9c142f0f2bb24e07962aea5bab7db08153d40c18"
+    },
+    {
+      "path": "src/main/kotlin/example/clients/urls/Urls.kt",
+      "hash": "084e4c3dff96e3483352596b36ce76377c3f596ab172c391f8c961f4d0417e2c"
+    },
+    {
       "path": "src/main/kotlin/example/ext/Extensions.kt",
       "hash": "d699e6d11262d8ddf57d989928a2fda03a01ef58e3ec2bf3820992cfa8390b88"
     },
@@ -1153,6 +1173,198 @@
         "path": "src/main/kotlin/example/calls/Other.kt",
         "start": 111,
         "end": 131
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1931,
+        "end": 2109
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway.health()",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 2063,
+        "end": 2107
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1100,
+        "end": 1236
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.builder()",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1789,
+        "end": 1869
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.count()",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1529,
+        "end": 1549
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1327,
+        "end": 1527
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.lookup()",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1608,
+        "end": 1681
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.reassigned()",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1683,
+        "end": 1742
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 424,
+        "end": 826
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByLocal()",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Probes.kt",
+        "start": 422,
+        "end": 531
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByParameter(Map<String,String>)",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Probes.kt",
+        "start": 315,
+        "end": 420
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.otherLibrary()",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Probes.kt",
+        "start": 596,
+        "end": 723
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.typed(HttpClient)",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Probes.kt",
+        "start": 166,
+        "end": 252
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.fetch(HttpClient,String)",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 241,
+        "end": 321
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.order(String)",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 323,
+        "end": 383
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.ping(String)",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 483,
+        "end": 531
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.pong(String)",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 533,
+        "end": 625
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.report()",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 385,
+        "end": 441
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.start()",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 627,
+        "end": 668
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.user(Int)",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 715,
+        "end": 774
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.HttpClient",
+      "span": {
+        "path": "src/main/kotlin/example/clients/fake/Fake.kt",
+        "start": 141,
+        "end": 196
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.HttpClient.options(String)",
+      "span": {
+        "path": "src/main/kotlin/example/clients/fake/Fake.kt",
+        "start": 164,
+        "end": 194
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.fake(HttpClient,Map<String,String>)",
+      "span": {
+        "path": "src/main/kotlin/example/clients/fake/Fake.kt",
+        "start": 198,
+        "end": 356
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/urls/Urls.kt::example.clients.urls.Paths",
+      "span": {
+        "path": "src/main/kotlin/example/clients/urls/Urls.kt",
+        "start": 179,
+        "end": 365
       }
     },
     {
@@ -3691,6 +3903,588 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway.health()::client.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway.health()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 2086,
+        "end": 2107
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway::(anonymous).defaultRequest#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1998,
+        "end": 2051
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway::(anonymous).url#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 2015,
+        "end": 2049
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway::HttpClient#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1972,
+        "end": 2057
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()::billing.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1126,
+        "end": 1150
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()::billing.get#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1155,
+        "end": 1204
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()::versioned.post#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1209,
+        "end": 1234
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.builder()::(anonymous).path#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.builder()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1844,
+        "end": 1859
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.builder()::(anonymous).url#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.builder()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1838,
+        "end": 1861
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.builder()::orders.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.builder()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1817,
+        "end": 1867
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::count#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.count()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1507,
+        "end": 1514
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::orders.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1353,
+        "end": 1370
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::orders.get#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1375,
+        "end": 1400
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::orders.get#2",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1405,
+        "end": 1437
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::orders.get#3",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1442,
+        "end": 1474
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::orders.get#4",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1479,
+        "end": 1525
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.lookup()::System.getProperty#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.lookup()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1646,
+        "end": 1678
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.lookup()::orders.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.lookup()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1635,
+        "end": 1679
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.reassigned()::orders.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.reassigned()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1714,
+        "end": 1740
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.delete#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 589,
+        "end": 622
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 450,
+        "end": 478
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.head#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 627,
+        "end": 661
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.options#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 666,
+        "end": 706
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.patch#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 552,
+        "end": 584
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.post#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 483,
+        "end": 512
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.put#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 517,
+        "end": 547
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.request#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 711,
+        "end": 779
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.request#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 784,
+        "end": 824
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients::(anonymous).defaultRequest#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 937,
+        "end": 1006
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients::(anonymous).defaultRequest#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1048,
+        "end": 1096
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients::(anonymous).url#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 962,
+        "end": 1000
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients::(anonymous).url#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1073,
+        "end": 1090
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients::HttpClient#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 320,
+        "end": 335
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients::HttpClient#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 915,
+        "end": 1008
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients::HttpClient#2",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Client.kt",
+        "start": 1026,
+        "end": 1098
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByLocal()::mapOf#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByLocal()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Probes.kt",
+        "start": 461,
+        "end": 478
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByLocal()::orders.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByLocal()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.get(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Mixed.get(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Store.get(String)"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/clients/Probes.kt",
+        "start": 483,
+        "end": 529
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByParameter(Map<String,String>)::orders.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByParameter(Map<String,String>)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Probes.kt",
+        "start": 372,
+        "end": 418
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.otherLibrary()::http.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.otherLibrary()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.get(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Mixed.get(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Store.get(String)"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/clients/Probes.kt",
+        "start": 677,
+        "end": 721
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.otherLibrary()::java.net.http.HttpClient.newHttpClient#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.otherLibrary()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Probes.kt",
+        "start": 632,
+        "end": 672
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.typed(HttpClient)::client.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.typed(HttpClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Probes.kt",
+        "start": 206,
+        "end": 252
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.fetch(HttpClient,String)::client.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.fetch(HttpClient,String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 295,
+        "end": 321
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.order(String)::fetch#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.order(String)",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.fetch(HttpClient,String)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 355,
+        "end": 383
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.ping(String)::pong#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.ping(String)",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.pong(String)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 521,
+        "end": 531
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.pong(String)::orders.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.pong(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 575,
+        "end": 601
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.pong(String)::ping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.pong(String)",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.ping(String)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 613,
+        "end": 623
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.report()::order#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.report()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.order(String)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 412,
+        "end": 423
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.report()::order#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.report()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.order(String)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 428,
+        "end": 439
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.start()::ping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.start()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.ping(String)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 653,
+        "end": 666
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.user(Int)::orders.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.user(Int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Wrappers.kt",
+        "start": 743,
+        "end": 774
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.fake(HttpClient,Map<String,String>)::client.options#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.fake(HttpClient,Map<String,String>)",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.HttpClient.options(String)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/clients/fake/Fake.kt",
+        "start": 259,
+        "end": 308
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.fake(HttpClient,Map<String,String>)::map.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.fake(HttpClient,Map<String,String>)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/fake/Fake.kt",
+        "start": 313,
+        "end": 354
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/v1::call.respondText#0",
       "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/v1",
       "target": null,
@@ -4833,7 +5627,138 @@
       "site": "example.com/acme/conformance::build.gradle.kts"
     }
   ],
-  "consumers": [],
+  "consumers": [
+    {
+      "contract": "http::GET::/health",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway.health()::client.get#0",
+      "via": "host:gateway.example.com"
+    },
+    {
+      "contract": "http::GET::/api/invoices",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()::billing.get#0",
+      "via": "host:billing.example.com"
+    },
+    {
+      "contract": "http::GET::/absolute",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()::billing.get#1",
+      "via": "host:other.example.com"
+    },
+    {
+      "contract": "http::POST::/v2/things",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()::versioned.post#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": null,
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.builder()::orders.get#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/users",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::orders.get#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::GET::/users/me",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::orders.get#1",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::GET::/items",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::orders.get#2",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::GET::/items/stock",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::orders.get#3",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::GET::/users/{}/profile",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::orders.get#4",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": null,
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.lookup()::orders.get#0",
+      "via": null
+    },
+    {
+      "contract": null,
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.reassigned()::orders.get#0",
+      "via": null
+    },
+    {
+      "contract": "http::DELETE::/orders/1",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.delete#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.get#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::HEAD::/orders/head",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.head#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::OPTIONS::/orders/options",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.options#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::PATCH::/orders/1",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.patch#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::POST::/orders",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.post#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::PUT::/orders/1",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.put#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::PUT::/orders/request",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.request#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::GET::/orders/default",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.request#1",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::GET::/typed",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.typed(HttpClient)::client.get#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::GET::/orders/a1",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.report()::order#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::GET::/orders/b2",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.report()::order#1",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::GET::/loop",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.start()::ping#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::GET::/users/{}",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.user(Int)::orders.get#0",
+      "via": "host:orders.example.com"
+    }
+  ],
   "packages": [
     {
       "name": "example:conformance",
@@ -5000,6 +5925,36 @@
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.CharSequence.blankish()",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.T.logged()",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.general(Cache,String)"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/example/clients",
+      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.count()",
+        "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/example/clients#2",
+      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.fetch(HttpClient,String)",
+        "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.order(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.report()"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/example/clients#3",
+      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.ping(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.pong(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.start()"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/example/clients/fake",
+      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.HttpClient.options(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.fake(HttpClient,Map<String,String>)"
       ]
     },
     {
@@ -6638,6 +7593,523 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/main/kotlin/example/calls/Imports.kt::example.calls.unknown()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway.health()",
+      "kind": "export",
+      "label": "example.clients.Gateway.health()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway.health()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway.health()::client.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/health"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()",
+      "kind": "export",
+      "label": "example.clients.based()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()::billing.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/api/invoices"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()::billing.get#1",
+          "mark": "no-provider",
+          "contract": "http::GET::/absolute"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()::versioned.post#0",
+          "mark": "no-provider",
+          "contract": "http::POST::/v2/things"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.builder()",
+      "kind": "export",
+      "label": "example.clients.builder()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.builder()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.builder()::orders.get#0",
+          "mark": "unresolved"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()",
+      "kind": "export",
+      "label": "example.clients.folds()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::orders.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/users"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::orders.get#1",
+          "mark": "no-provider",
+          "contract": "http::GET::/users/me"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::orders.get#2",
+          "mark": "no-provider",
+          "contract": "http::GET::/items"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::orders.get#3",
+          "mark": "no-provider",
+          "contract": "http::GET::/items/stock"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()::orders.get#4",
+          "mark": "no-provider",
+          "contract": "http::GET::/users/{}/profile"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.count()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.lookup()",
+      "kind": "export",
+      "label": "example.clients.lookup()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.lookup()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.lookup()::orders.get#0",
+          "mark": "unresolved"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.reassigned()",
+      "kind": "export",
+      "label": "example.clients.reassigned()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.reassigned()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.reassigned()::orders.get#0",
+          "mark": "unresolved"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()",
+      "kind": "export",
+      "label": "example.clients.verbs()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.post#0",
+          "mark": "no-provider",
+          "contract": "http::POST::/orders"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.put#0",
+          "mark": "no-provider",
+          "contract": "http::PUT::/orders/1"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.patch#0",
+          "mark": "no-provider",
+          "contract": "http::PATCH::/orders/1"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.delete#0",
+          "mark": "no-provider",
+          "contract": "http::DELETE::/orders/1"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.head#0",
+          "mark": "no-provider",
+          "contract": "http::HEAD::/orders/head"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.options#0",
+          "mark": "no-provider",
+          "contract": "http::OPTIONS::/orders/options"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.request#0",
+          "mark": "no-provider",
+          "contract": "http::PUT::/orders/request"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()::orders.request#1",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders/default"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByLocal()",
+      "kind": "export",
+      "label": "example.clients.hiddenByLocal()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByLocal()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByLocal()::orders.get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.get(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Mixed.get(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Store.get(String)"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByParameter(Map<String,String>)",
+      "kind": "export",
+      "label": "example.clients.hiddenByParameter(Map<String,String>)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByParameter(Map<String,String>)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.otherLibrary()",
+      "kind": "export",
+      "label": "example.clients.otherLibrary()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.otherLibrary()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.otherLibrary()::http.get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.get(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Mixed.get(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Store.get(String)"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.typed(HttpClient)",
+      "kind": "export",
+      "label": "example.clients.typed(HttpClient)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.typed(HttpClient)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.typed(HttpClient)::client.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/typed"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.report()",
+      "kind": "export",
+      "label": "example.clients.report()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.report()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.order(String)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.fetch(HttpClient,String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.report()::order#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders/a1"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.report()::order#1",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders/b2"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.start()",
+      "kind": "export",
+      "label": "example.clients.start()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.start()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.ping(String)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.pong(String)"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.ping(String)",
+          "mark": "cycle"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.start()::ping#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/loop"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.user(Int)",
+      "kind": "export",
+      "label": "example.clients.user(Int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.user(Int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.user(Int)::orders.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/users/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.fake(HttpClient,Map<String,String>)",
+      "kind": "export",
+      "label": "example.clients.fake.fake(HttpClient,Map<String,String>)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.fake(HttpClient,Map<String,String>)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.HttpClient.options(String)"
         }
       ]
     },

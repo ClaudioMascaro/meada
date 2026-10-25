@@ -568,6 +568,7 @@ impl ContractKind for Http {
         found.extend(python::providers(code));
         found.extend(java::providers(code));
         found.extend(kotlin::providers(code));
+        found.extend(kotlin::consumers(code));
         found.extend(java::consumers(code, indexed));
         found
     }
