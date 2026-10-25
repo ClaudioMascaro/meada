@@ -350,9 +350,22 @@ pub struct Facts {
     /// Not kept in the index (see `Call::args`).
     #[serde(skip)]
     pub annotated: Vec<Annotated>,
+    /// The value each Kotlin local, or the parameter of a tracked lambda, was given, where no
+    /// constant records it: the call a `val` holds, the receiver `use` passes on. Not kept in
+    /// the index (see `Call::args`).
+    #[serde(skip)]
+    pub bound: Vec<Bound>,
     /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,
+}
+
+/// The value a name bound in `scope` holds, written in `within` (`Facts::bound`).
+pub struct Bound {
+    pub scope: String,
+    pub within: String,
+    pub name: String,
+    pub value: Value,
 }
 
 /// An annotation written on a field or a parameter: the binding it marks and the annotation as

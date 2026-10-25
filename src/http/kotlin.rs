@@ -1,4 +1,4 @@
-//! Ktor server providers (spec #27, #98). A routing scope is the lambda of a `routing { }` or a
+//! Ktor server providers (spec #27, #98); the Ktor client's consumers are in `client` (#99). A routing scope is the lambda of a `routing { }` or a
 //! `route(prefix) { }` call, or the body of an extension function on Ktor's `Route` or `Routing`
 //! (`fun Route.orders()`). A `route` block is mounted on the routing scope around it under its
 //! prefix, and such an extension function called there with the implicit receiver is mounted
@@ -15,6 +15,9 @@
 //! `io.ktor.server.resources`) is not read, and a name its star import may bind is no route.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+
+mod client;
+pub(super) use client::consumers;
 
 use super::rust::actix_path;
 use super::{METHODS, Mounts, contract, handler_site, join, normalize_path, path_literal};
@@ -59,11 +62,8 @@ fn given(call: &Call) -> Option<(Option<&Value>, Option<&Value>, &str)> {
         return None;
     };
     let named = |key: &str| call.kwargs.iter().find(|(k, _)| k == key).map(|(_, v)| v);
-    if call
-        .kwargs
-        .iter()
-        .any(|(k, _)| k != "path" && k != "method")
-    {
+    // A key ending in `=` is an assignment in the lambda (`Call::kwargs`), no argument.
+    if (call.kwargs.iter()).any(|(k, _)| k != "path" && k != "method" && !k.ends_with('=')) {
         return None;
     }
     let mut rest = rest.map_or(&[][..], |(_, rest)| rest).iter();
@@ -104,6 +104,29 @@ fn ktor<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a str) -> bo
 fn is_lambda(def: &str) -> bool {
     let parent = crate::parent(def);
     def[parent.len()..].trim_start_matches('.').starts_with('@')
+}
+
+/// The method `HttpMethod.X`, written in `scope` of `path`, names, upper-case, when `HttpMethod`
+/// is Ktor's.
+fn method<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, value: &'a Value) -> Option<String> {
+    let Value::Ref(name) = value else {
+        return None;
+    };
+    let (head, member) = name.rsplit_once('.')?;
+    one(&spellings(code, path, scope, head), |s| s == HTTP_METHOD)?;
+    let method = member.to_uppercase();
+    METHODS.contains(&method.as_str()).then_some(method)
+}
+
+/// The method `HttpMethod.X` names, upper-case, when one of the `spelled` names of an outside
+/// value (`Value::External`) is Ktor's.
+fn external(spelled: &[String]) -> Option<String> {
+    let known = |s: &str| {
+        s.strip_prefix(HTTP_METHOD)
+            .is_some_and(|m| m.starts_with('.'))
+    };
+    let method = one(spelled, known)?[HTTP_METHOD.len() + 1..].to_uppercase();
+    METHODS.contains(&method.as_str()).then_some(method)
 }
 
 struct Ktor<'c, 'a> {
@@ -223,15 +246,7 @@ impl<'c, 'a> Ktor<'c, 'a> {
 
     /// The method `route(path, HttpMethod.X)` names, upper-case.
     fn method(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Option<String> {
-        let Value::Ref(name) = value else {
-            return None;
-        };
-        let (head, member) = name.rsplit_once('.')?;
-        one(&spellings(self.code, path, scope, head), |s| {
-            s == HTTP_METHOD
-        })?;
-        let method = member.to_uppercase();
-        METHODS.contains(&method.as_str()).then_some(method)
+        method(self.code, path, scope, value)
     }
 
     /// The path a call's argument `value` gives, a Ktor parameter (`{id}`, `{id?}`, `{...}`)

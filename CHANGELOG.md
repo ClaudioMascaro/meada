@@ -44,6 +44,16 @@ All notable changes to Meada are recorded here. The format follows
   route's lambda is its handler, named for the route. Ktor names count only with Ktor's import;
   type-safe routing is not read. A Kotlin lambda passed as an argument, and a function declared
   inside one, is now a scope of its own.
+- Ktor client consumers (issue #99): `get`, `post`, `put`, `patch`, `delete`, `head`, `options`
+  and `request(url) { method = HttpMethod.X }` on an `HttpClient` are HTTP consumers, with a
+  `defaultRequest { url(base) }` of the client as the base of its relative URLs. String
+  templates (`"$base/users/${id}"`), `+`, `const val` and properties fold, also from other
+  files, and a hole that does not fold is a parameter; a function that wraps the client is read
+  at each of its call sites, the URL and the method (`method = m`, `this.method = m`) it takes
+  from its parameters substituted there, and a call whose URL or method cannot be evaluated is an
+  unresolved consumer, never a `GET` guessed. The client may be imported by `*` or held by an
+  untyped local `val` (`HttpClient(CIO).use { it.get(..) }` too). `url { path(..) }` builders are
+  not read.
 - Java OpenFeign and Retrofit clients (issue #90): each method of an `@FeignClient(name, url)`
   interface with Spring mapping annotations, or of a Retrofit interface with `retrofit2.http`
   verbs, is an HTTP consumer sited at the interface method, so a caller of the method reaches
