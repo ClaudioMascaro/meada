@@ -13,14 +13,19 @@
 //! client the folded chain is made on (`WebClient.create(base)`, `builder().baseUrl(base)`,
 //! through constants and `final` fields), so a client a wrapper takes as a parameter has the base
 //! each caller passes; one not read has an unknown base. The URL folds `+`, constants,
-//! `URI.create(..)` and `String.format`; the root's `fetch` reads it.
+//! `URI.create(..)` and `String.format`; the root's `fetches` reads it. A base a Spring
+//! `@Value("${key}")` field or constructor parameter holds comes from the module's
+//! configuration (`jvm::spring::inject`, through `Code::expand_with`), and
+//! `System.getenv("X")` is the variable `X`.
 // ponytail: a client or a builder held in a local is read by its written type alone (a
 // WebClient's base unknown, a builder not at all); constants, `final` fields and chains written
 // in place are read through.
 
-use super::super::{based, consumer, fetch};
+use super::super::{based, consumer, fetches};
 use super::{REQUEST_METHODS, one};
 use crate::contract::Found;
+use crate::index::Indexed;
+use crate::jvm::spring::{self, Configs};
 use crate::lang::{Call, Invocation, Part, Value};
 use crate::resolve::{
     Code, Expand, Expanded, FLUENT_CHAIN, Follow, Form, Of, Outside, method as member,
@@ -86,7 +91,13 @@ enum Client {
 }
 
 /// Java HTTP consumers: see the module.
-pub(in crate::http) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
+pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
+    // Read the first time an annotation is injected: a repository without one parses none.
+    let configs = std::cell::OnceCell::new();
+    let inject = |code: &Code<'a>, path: &'a str, annotation: &'a Call| {
+        let configs = configs.get_or_init(|| Configs::read(indexed.configs));
+        spring::inject(configs, code, path, annotation)
+    };
     let mut found = Vec::new();
     for (&path, facts) in code.files() {
         if !path.ends_with(".java") {
@@ -101,15 +112,15 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
                     return None;
                 };
                 let (url, method) = sends(&client, call);
-                fetch(&[url, method])
+                fetches(&[url, method])
             };
             for Expanded {
                 site: (site, at),
-                found: read,
+                found: reads,
                 ..
-            } in code.expand(Expand::Chain(path, n), &read)
+            } in code.expand_with(Expand::Chain(path, n), Some(&inject), &read)
             {
-                found.push(consumer(site, at, read, None));
+                (reads.into_iter()).for_each(|read| found.push(consumer(site, at, read, None)));
             }
         }
     }
@@ -447,8 +458,19 @@ mod tests {
 
     /// The consumers of the class body `body` in `a/C.java`, with other files of the repository.
     fn sent_with(imports: &str, body: &str, others: &[(&str, &str)]) -> Vec<Sent> {
+        sent_in("a/C.java", imports, body, others, &[])
+    }
+
+    /// `sent_with`, the class at `path`, with the config files `configs` (path and content).
+    fn sent_in(
+        path: &str,
+        imports: &str,
+        body: &str,
+        others: &[(&str, &str)],
+        configs: &[(&str, &str)],
+    ) -> Vec<Sent> {
         let src = format!("package a;\n{imports}\nclass C {{\n{body}\n}}\n");
-        let mut parsed = vec![("a/C.java", Java.parse("a/C.java", src.as_bytes()).unwrap())];
+        let mut parsed = vec![(path, Java.parse(path, src.as_bytes()).unwrap())];
         for (path, source) in others {
             parsed.push((path, Java.parse(path, source.as_bytes()).unwrap()));
         }
@@ -456,7 +478,16 @@ mod tests {
         let layout = Java.layout(&[], &files).unwrap();
         let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
         let code = Code::new(&resolver, &files, &Java);
-        let mut found: Vec<Sent> = (consumers(&code).into_iter())
+        let configs: Vec<(&str, &[u8])> =
+            (configs.iter()).map(|(p, c)| (*p, c.as_bytes())).collect();
+        let indexed = Indexed {
+            manifests: &[],
+            tsconfigs: &[],
+            exported: &[],
+            files: &[],
+            configs: &configs,
+        };
+        let mut found: Vec<Sent> = (consumers(&code, &indexed).into_iter())
             .map(|f| (f.contract, f.via, f.method))
             .collect();
         found.sort();
@@ -826,6 +857,221 @@ mod tests {
         assert_eq!(
             sent_with(IMPORTS, &body, &others),
             [open(None), to("http::PUT::/y")]
+        );
+    }
+
+    const SPRING: &str = "import org.springframework.beans.factory.annotation.Value;\n";
+    const MODULE: &str = "api/src/main/java/a/C.java";
+    const CONFIG: &str = "api/src/main/resources/application.properties";
+
+    /// The consumers of `body` in the module `api/`, whose `application.properties` is `config`.
+    fn injected(body: &str, config: &str, others: &[(&str, &str)]) -> Vec<Sent> {
+        let imports = format!("{IMPORTS}{SPRING}");
+        sent_in(MODULE, &imports, body, others, &[(CONFIG, config)])
+    }
+
+    fn via(contract: &str, via: &str) -> Sent {
+        (Some(contract.into()), Some(via.into()), None)
+    }
+
+    const CONFIGURED: &str = "lit.url=http://lit.example.com\n\
+        env.url=${API_URL}/v1\n\
+        served.url=${AUDIT_URL:https://web.example.com/api}\n";
+
+    #[test]
+    fn a_value_field_reads_its_key_from_the_configuration_of_its_module() {
+        let body = format!(
+            "{REST}@Value(\"${{lit.url}}\") private String lit;\n\
+             @Value(\"${{env.url}}\") private String env;\n\
+             @Value(\"${{served.url}}\") private String served;\n\
+             @Value(\"${{RAW_URL}}\") private String raw;\n\
+             @Value(\"http://inline.example.com\") private String inline;\n\
+             void f() {{\n\
+             rest.getForObject(lit + \"/a\", String.class);\n\
+             rest.getForObject(this.env + \"/b\", String.class);\n\
+             rest.getForObject(served + \"/c\", String.class);\n\
+             rest.getForObject(raw + \"/d\", String.class);\n\
+             rest.getForObject(inline + \"/e\", String.class);\n}}"
+        );
+        assert_eq!(
+            injected(&body, CONFIGURED, &[]),
+            [
+                via("http::GET::/a", "host:lit.example.com"),
+                via("http::GET::/api/c", "host:web.example.com|default"),
+                via("http::GET::/c", "env:AUDIT_URL|host:web.example.com"),
+                via("http::GET::/d", "env:RAW_URL"),
+                via("http::GET::/e", "host:inline.example.com"),
+                via("http::GET::/v1/b", "env:API_URL"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_value_field_another_binding_hides_or_a_file_assigns_reads_nothing() {
+        let body = format!(
+            "{REST}@Value(\"${{lit.url}}\") private String lit;\n\
+             @Value(\"${{lit.url}}\") private String moved;\n\
+             @Value(\"${{lit.url}}\") private String named;\n\
+             @Value(\"${{lit.url}}\") private static String shared;\n\
+             String named() {{ return null; }}\n\
+             void reset() {{ moved = \"http://other.example.com\"; }}\n\
+             void param(String lit) {{ rest.getForObject(lit + \"/p\", String.class); }}\n\
+             void local() {{ String lit = x(); rest.getForObject(lit + \"/l\", String.class); }}\n\
+             void f() {{\n\
+             rest.getForObject(moved + \"/m\", String.class);\n\
+             rest.getForObject(named + \"/n\", String.class);\n\
+             rest.getForObject(shared + \"/s\", String.class);\n}}"
+        );
+        // Spring injects no `static` field.
+        assert_eq!(
+            injected(&body, CONFIGURED, &[]),
+            [
+                to("http::GET::/l"),
+                to("http::GET::/m"),
+                via("http::GET::/n", "host:lit.example.com"),
+                to("http::GET::/p"),
+                to("http::GET::/s"),
+            ]
+        );
+        // Another `Value` annotation, and a module without the key's configuration.
+        let other = format!(
+            "{REST}@Value(\"${{lit.url}}\") String lit;\nvoid f() {{ rest.getForObject(lit + \"/o\", String.class); }}"
+        );
+        let imports = format!("{IMPORTS}import org.acme.Value;\n");
+        let configs = [(CONFIG, CONFIGURED)];
+        assert_eq!(
+            sent_in(MODULE, &imports, &other, &[], &configs),
+            [to("http::GET::/o")]
+        );
+        let elsewhere = "web/src/main/java/a/C.java";
+        let spring = format!("{IMPORTS}{SPRING}");
+        assert_eq!(
+            sent_in(elsewhere, &spring, &other, &[], &configs),
+            [via("http::GET::/o", "env:lit.url")]
+        );
+    }
+
+    #[test]
+    fn a_value_constructor_parameter_stands_in_only_where_no_caller_passes_one() {
+        let client = |name: &str| {
+            format!(
+                "package a;\n{IMPORTS}{SPRING}\nclass {name} {{\n\
+                 private final WebClient web;\n\
+                 private final String base;\n\
+                 private final RestTemplate rest = new RestTemplate();\n\
+                 {name}(@Value(\"${{lit.url}}\") String url) {{\n\
+                   this.web = WebClient.create(url);\n\
+                   this.base = url;\n\
+                 }}\n\
+                 void f() {{ web.get().uri(\"/w\").retrieve(); }}\n\
+                 void g() {{ rest.getForObject(base + \"/r\", String.class); }}\n}}\n"
+            )
+        };
+        let (injected_by_spring, called) = (client("Injected"), client("Called"));
+        let others = [
+            (
+                "api/src/main/java/a/Injected.java",
+                injected_by_spring.as_str(),
+            ),
+            ("api/src/main/java/a/Called.java", called.as_str()),
+        ];
+        // `C` calls `Called`, with a URL and with one it cannot read: Spring's value stands in
+        // for neither, and the fields do not follow the callers. Nothing calls `Injected`.
+        let body = "void make(String any) {\n\
+             new Called(\"http://given.example.com\");\n\
+             new Called(any);\n}";
+        let found = injected(body, CONFIGURED, &others);
+        // A consumer in a wrapper that callers climb still reads the injected base.
+        let wrapped = format!(
+            "{REST}private final WebClient web;\n\
+             C(@Value(\"${{lit.url}}\") String url) {{ this.web = WebClient.create(url); }}\n\
+             void send(String path) {{ web.get().uri(path).retrieve(); }}\n\
+             void go() {{ send(\"/x\"); }}"
+        );
+        assert_eq!(
+            injected(&wrapped, CONFIGURED, &[]),
+            [via("http::GET::/x", "host:lit.example.com")]
+        );
+        assert_eq!(
+            found,
+            [
+                to("http::GET::/r"),
+                via("http::GET::/r", "host:lit.example.com"),
+                to("http::GET::/w"),
+                via("http::GET::/w", "host:lit.example.com"),
+            ]
+        );
+    }
+
+    #[test]
+    fn an_environment_read_names_the_variable_unless_system_is_another_type() {
+        let body = format!(
+            "{REST}void f() {{\n\
+             rest.getForObject(System.getenv(\"WEB_URL\") + \"/a\", String.class);\n\
+             rest.getForObject(java.lang.System.getenv(\"WEB_URL\") + \"/b\", String.class);\n\
+             rest.getForObject(System.getenv(name()) + \"/c\", String.class);\n}}"
+        );
+        // A read Meada cannot name is an unknown base.
+        assert_eq!(
+            sent(&body),
+            [
+                via("http::GET::/a", "env:WEB_URL"),
+                via("http::GET::/b", "env:WEB_URL"),
+                to("http::GET::/c"),
+            ]
+        );
+        let hidden = [
+            to("http::GET::/a"),
+            via("http::GET::/b", "env:WEB_URL"),
+            to("http::GET::/c"),
+        ];
+        let imports = format!("{IMPORTS}import org.acme.System;\n");
+        assert_eq!(sent_with(&imports, &body, &[]), hidden);
+        assert_eq!(sent(&format!("{body}\nstatic class System {{}}")), hidden);
+        // Importing `java.lang.System` itself hides nothing.
+        let imports = format!("{IMPORTS}import java.lang.System;\n");
+        assert_eq!(sent_with(&imports, &body, &[]), sent(&body));
+    }
+
+    #[test]
+    fn a_constructor_any_call_may_reach_takes_no_injected_value() {
+        let client = |name: &str, more: &str| {
+            format!(
+                "package a;\n{IMPORTS}{SPRING}\nclass {name} {{\n\
+                 private final WebClient web;\n\
+                 {name}(@Value(\"${{lit.url}}\") String url) {{ this.web = WebClient.create(url); }}\n\
+                 {more}\n\
+                 void f() {{ web.get().uri(\"/{name}\").retrieve(); }}\n}}\n"
+            )
+        };
+        // `this(..)`, `super(..)` and a `new` inside an anonymous class pass their own URL.
+        let delegated = client(
+            "Delegated",
+            "Delegated() { this(\"http://localhost:8080\"); }",
+        );
+        let base = client("Base", "");
+        let anonymous = client("Anonymous", "");
+        let others = [
+            ("api/src/main/java/a/Delegated.java", delegated.as_str()),
+            ("api/src/main/java/a/Base.java", base.as_str()),
+            (
+                "api/src/main/java/a/Sub.java",
+                "package a;\nclass Sub extends Base { Sub() { super(\"http://other.example.com\"); } }\n",
+            ),
+            ("api/src/main/java/a/Anonymous.java", anonymous.as_str()),
+            (
+                "api/src/main/java/a/Maker.java",
+                "package a;\nclass Maker { Object m() { return new Object() {\n\
+                 Object o = new Anonymous(\"http://x.example.com\"); }; } }\n",
+            ),
+        ];
+        assert_eq!(
+            injected("", CONFIGURED, &others),
+            [
+                to("http::GET::/Anonymous"),
+                to("http::GET::/Base"),
+                to("http::GET::/Delegated"),
+            ]
         );
     }
 

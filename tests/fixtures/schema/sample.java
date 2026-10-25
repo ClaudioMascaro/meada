@@ -10,4 +10,5 @@ public class Store extends Base implements Comparable<Store> {
     public String get(String key) { return Client.read(key); }
     protected String get(String key, int count) { return get(key); }
     private void hidden() { var copy = new Store(); copy.hidden(); }
+    void reset() { client = null; }
 }

@@ -145,6 +145,7 @@ impl LanguagePack for TsJs {
                             name: qualify(&scope, text(name, src)),
                             value: Value::Type(types::declaration(node, src, &parents, &mut 0)),
                             ty: None,
+                            scope: None,
                         });
                     }
                 }
@@ -194,6 +195,7 @@ impl LanguagePack for TsJs {
                     name: qualify(&scope, name),
                     value,
                     ty,
+                    scope: None,
                 });
             }
             let children: Vec<Node> = node.children(&mut node.walk()).collect();

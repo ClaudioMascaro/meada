@@ -1029,6 +1029,7 @@ impl Locals {
                 name: qualify(&homes[at].0, &homes[at].1),
                 value,
                 ty: None,
+                scope: None,
             })
             .collect();
         let mut bound: BTreeMap<(String, String), (Class, Evidence)> = BTreeMap::new();
