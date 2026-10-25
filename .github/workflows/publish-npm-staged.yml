@@ -1,0 +1,41 @@
+# Custom cargo-dist publish job (dist-workspace.toml `publish-jobs`): stages the npm package
+# built by the release instead of publishing it. A staged version stays private until a
+# maintainer approves it with 2FA (`npm stage approve <stage-id>` or the package's Staged
+# Packages tab on npmjs.com), so the NPM_TOKEN in this workflow can never make a version public.
+name: Stage npm package
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+# Permissions come from the caller job (dist-workspace.toml `github-custom-job-permissions`).
+
+jobs:
+  stage-npm:
+    runs-on: ubuntu-24.04
+    env:
+      PLAN: ${{ inputs.plan }}
+    steps:
+      - name: Fetch npm packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: artifacts-*
+          path: npm/
+          merge-multiple: true
+      # Staged publishing needs Node >= 22.14.0 and npm >= 11.15.0.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.x'
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm install --global npm@11.21.0
+      - name: Stage npm packages
+        run: |
+          for release in $(echo "$PLAN" | jq --compact-output '.releases[] | select([.artifacts[] | endswith("-npm-package.tar.gz")] | any)'); do
+            pkg=$(echo "$release" | jq '.artifacts[] | select(endswith("-npm-package.tar.gz"))' --raw-output)
+            npm stage publish --access public "./npm/${pkg}"
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
