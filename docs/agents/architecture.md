@@ -1978,13 +1978,21 @@ qualification budget does (ADR 0017).
   `static` at the top level or in an object or a companion, where Spring injects nothing), a
   constructor parameter (`Marked::Param` of the class, and the `Marked::Field` of the property
   a `val` or `var` declares, whose `Const` is dropped when annotated, as a `lateinit var` has
-  none, so the annotation is what it holds) and a function's parameter. It reads
-  `System.getenv("X")`, `java.lang.System.getenv("X")` and `System.getenv()["X"]` as `Part::Env`
-  (`lang/kotlin.rs::env`), through `!!`, parentheses, `?:` fallbacks (a hole when the fallback
-  reads a second variable) and the string methods of `STRING_METHODS` (`trimEnd`,
-  `removeSuffix`, ...), unless the file binds `System` to another type (`SYSTEM_BOUND`, as
-  Java's); the variable maps through `base_url_env` as in the trunk. A function-local `val` is
-  no constant in the Kotlin pack, so the read must stand in a property or the URL expression.
+  none, so the annotation is what it holds) and a function's parameter, by use-site target: none,
+  `field`, `set` and `setparam` for a property, none and `param` for a parameter; `get`,
+  `property` and the others inject nothing. Every assignment to a name (`base = ..`,
+  `this.base += ..`, `o.base = ..`) is a `.name` constant, as Java's, which `Code::field_written`
+  reads: a field some code assigns holds no injected value. `value()` reads
+  `System.getenv("X")`, `java.lang.System.getenv("X")` and `System.getenv()["X"]` as `Part::Env`,
+  through `!!`, parentheses, `?:` fallbacks and the string methods of `STRING_METHODS`
+  (`trimEnd`, `removeSuffix`, ...), unless the file binds `System` to another type
+  (`SYSTEM_BOUND`, as Java's); each node is read once, a string method passing on the
+  `Part::Env` its receiver already evaluated to. A fallback that reads the environment too (a
+  `System.getenv` call, or a property of the file whose declaration holds one, `ENV_NAMES`) makes
+  the term a hole: exactly one read. Adjacent literal parts of a `+` join, so `"\$" + "{key}"`
+  is a placeholder. The variable maps through `base_url_env` as in the trunk. A function-local
+  `val` is no constant in the Kotlin pack, so the read must stand in a property or the URL
+  expression.
 - `http/java/clients.rs` (spec #26, #88): a RestTemplate or a WebClient counts by the type the
   source writes for the receiver (`Follow::Declarations`), or, for a WebClient, by the
   `WebClient.create` or `WebClient.builder()` chain it traces to (`Follow::Values`); a name
@@ -2526,6 +2534,17 @@ qualification budget does (ADR 0017).
   property of its file is typed unknown by the pack, so it is not either. A nested lambda's
   `method = X` makes the outer request's method unknown even when the inner lambda always runs
   (`headers { }`).
+- Kotlin base URLs (spec #27, #100): `STRING_METHODS` also lets `replace`, `lowercase` and the
+  others of the trunk packs' lists pass an environment read through, beyond `trimEnd` and
+  `removeSuffix`. A fallback that reads the environment through a name of another file, a
+  function or a local is not seen (`ENV_NAMES` is the file's properties). An environment read
+  kept in a local `val` (`val raw = System.getenv(..) ?: ..; raw.trimEnd('/')`) or in a
+  function stays open: the consumer is open, never a wrong link. Parity with Java, not
+  regressions: a constructor parameter without `val` used in an initializer stays open; a
+  call that constructs the class in the source (`ExplicitClient("http://localhost:1")`) does not
+  stop injection into the constructor's property; `@Value` on a plain function's parameter is
+  injected as if the function were a bean's. A secondary constructor's `@Value` parameters are
+  not read, and a `@set:Value` property is taken as injected into its field.
 - Rust values (`lang/rust/values.rs`, `lang/rust/builders.rs`, spec #30 #131): `BUILDER_BUDGET`
   (2^20 syntax nodes per file, over every `let mut`, block by block in the order the blocks
   open), `BUILDER_DEPTH` (64 builders read within

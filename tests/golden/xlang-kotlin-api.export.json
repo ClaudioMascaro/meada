@@ -10,6 +10,10 @@
       "hash": "e8eda934a8be2e6b447d412af40d16e029fd9eacf6b8c3a38c8eee1a36abedf2"
     },
     {
+      "path": "src/main/kotlin/com/example/api/MirrorClient.kt",
+      "hash": "88531871e07ce77592312e37fa7d742a8dd0234c2c2b8d2d022db4ab3cc54481"
+    },
+    {
       "path": "src/main/kotlin/com/example/api/PriceClient.kt",
       "hash": "aff01b483d073906e042e38be4cb4abab90ae67e555320d74d47835dfd713dd5"
     },
@@ -61,6 +65,30 @@
         "path": "src/main/kotlin/com/example/api/InventoryClient.kt",
         "start": 363,
         "end": 447
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/MirrorClient.kt::com.example.api.MirrorClient",
+      "span": {
+        "path": "src/main/kotlin/com/example/api/MirrorClient.kt",
+        "start": 358,
+        "end": 650
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/MirrorClient.kt::com.example.api.MirrorClient.mirror()",
+      "span": {
+        "path": "src/main/kotlin/com/example/api/MirrorClient.kt",
+        "start": 576,
+        "end": 648
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/MirrorClient.kt::com.example.api.MirrorClient.reset()",
+      "span": {
+        "path": "src/main/kotlin/com/example/api/MirrorClient.kt",
+        "start": 507,
+        "end": 570
       }
     },
     {
@@ -228,6 +256,39 @@
         "path": "src/main/kotlin/com/example/api/InventoryClient.kt",
         "start": 290,
         "end": 305
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/MirrorClient.kt::com.example.api.MirrorClient.mirror()::client.get#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/MirrorClient.kt::com.example.api.MirrorClient.mirror()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/com/example/api/MirrorClient.kt",
+        "start": 607,
+        "end": 642
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/MirrorClient.kt::com.example.api.MirrorClient::HttpClient#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/MirrorClient.kt::com.example.api.MirrorClient",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/com/example/api/MirrorClient.kt",
+        "start": 486,
+        "end": 501
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/MirrorClient.kt::com.example.api::Component#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/MirrorClient.kt::com.example.api",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/com/example/api/MirrorClient.kt",
+        "start": 358,
+        "end": 368
       }
     },
     {
@@ -525,6 +586,11 @@
       "contract": "http::POST::/api/audit",
       "site": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/AuditClient.kt::com.example.api.AuditClient.record()::client.post#0",
       "via": "host:web.example.com"
+    },
+    {
+      "contract": "http::GET::/api/mirror",
+      "site": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/MirrorClient.kt::com.example.api.MirrorClient.mirror()::client.get#0",
+      "via": null
     },
     {
       "contract": "http::GET::/api/promotions",
