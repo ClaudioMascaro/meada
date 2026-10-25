@@ -253,6 +253,10 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     .entry(family.clone())
                     .or_default()
                     .push(inner.as_ref().clone());
+                // A top-level `fun main` (not a script's, not an extension) starts a program.
+                if place == Place::Top && !script && base == "main" {
+                    facts.programs.push(inner.as_ref().clone());
+                }
                 if place == Place::Top {
                     publish(&mut facts, inner_access, &base, &family);
                 } else if inner_access != Access::Public {
