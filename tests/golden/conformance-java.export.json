@@ -62,6 +62,38 @@
       "hash": "6ae86852c50673e7053e4e813b26080adfda50d1f12507f1f809b8fe56751ab2"
     },
     {
+      "path": "maven/api/src/main/java/example/declarative/BillingClient.java",
+      "hash": "c503e7df5e2f46ed8aec8751a3e5bb71c609d3057e288c4f825a0a52997ec34c"
+    },
+    {
+      "path": "maven/api/src/main/java/example/declarative/Ledger.java",
+      "hash": "33d0432fe899dc63c205a95a79ea096a2fd558c173e774eb03917993d849677f"
+    },
+    {
+      "path": "maven/api/src/main/java/example/declarative/OrdersClient.java",
+      "hash": "86fa7519dda8e53b81442fdadc1f96cc2657a7f123352880b52e844b48513c67"
+    },
+    {
+      "path": "maven/api/src/main/java/example/declarative/Remotes.java",
+      "hash": "b7f50f0b81a815d288e3f51361421130f58dc3b831118016b0b3d5fb5e69dcf0"
+    },
+    {
+      "path": "maven/api/src/main/java/example/declarative/Statements.java",
+      "hash": "1e0254a1029d35f5f7ea2a6a1056ade456d66a838f8e259d962ec93ba2491611"
+    },
+    {
+      "path": "maven/api/src/main/java/example/declarative/shadow/Contract.java",
+      "hash": "e686755f865ced51f23545761de9b67e05055d4cbaba4ba63fd83e6802707bec"
+    },
+    {
+      "path": "maven/api/src/main/java/example/declarative/shadow/GetMapping.java",
+      "hash": "05defd7a7ec36240e4db9ce93e1601bd6151b9d12fde48fbb68ee972cdf24531"
+    },
+    {
+      "path": "maven/api/src/main/java/example/declarative/shadow/Hidden.java",
+      "hash": "915b7358ef997824313c630d0b6e26372477306c68622cc2dd34dfea9b4fedd4"
+    },
+    {
       "path": "maven/api/src/main/java/example/stars/Wave.java",
       "hash": "dfa9b17bf44a8c0344cc3beea02314f809e37e6502bcc3f826d1a24099dd302c"
     },
@@ -945,6 +977,158 @@
         "path": "maven/api/src/main/java/example/clients/Rest.java",
         "start": 724,
         "end": 836
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/BillingClient.java",
+        "start": 426,
+        "end": 640
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient.invoice(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/BillingClient.java",
+        "start": 487,
+        "end": 547
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient.purge()",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/BillingClient.java",
+        "start": 553,
+        "end": 638
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Ledger.java",
+        "start": 250,
+        "end": 398
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger.entry(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Ledger.java",
+        "start": 280,
+        "end": 347
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger.record()",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Ledger.java",
+        "start": 353,
+        "end": 396
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/OrdersClient.java",
+        "start": 339,
+        "end": 595
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient.find(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/OrdersClient.java",
+        "start": 457,
+        "end": 532
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient.place(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/OrdersClient.java",
+        "start": 538,
+        "end": 593
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Remotes.java",
+        "start": 58,
+        "end": 433
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes.ledger()",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Remotes.java",
+        "start": 252,
+        "end": 431
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Statements.java",
+        "start": 117,
+        "end": 545
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.Statements(OrdersClient,BillingClient)",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Statements.java",
+        "start": 280,
+        "end": 411
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.report(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Statements.java",
+        "start": 417,
+        "end": 543
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Contract.java::example.declarative.shadow.Contract",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/shadow/Contract.java",
+        "start": 172,
+        "end": 312
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Contract.java::example.declarative.shadow.Contract.line()",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/shadow/Contract.java",
+        "start": 266,
+        "end": 310
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/GetMapping.java::example.declarative.shadow.GetMapping",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/shadow/GetMapping.java",
+        "start": 132,
+        "end": 158
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Hidden.java::example.declarative.shadow.Hidden",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/shadow/Hidden.java",
+        "start": 212,
+        "end": 353
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Hidden.java::example.declarative.shadow.Hidden.hidden()",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/shadow/Hidden.java",
+        "start": 308,
+        "end": 351
       }
     },
     {
@@ -2566,6 +2750,226 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient::GetMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/BillingClient.java",
+        "start": 487,
+        "end": 516
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient::RequestMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/BillingClient.java",
+        "start": 553,
+        "end": 620
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative::FeignClient#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/BillingClient.java",
+        "start": 426,
+        "end": 449
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger::GET#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Ledger.java",
+        "start": 280,
+        "end": 300
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger::POST#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Ledger.java",
+        "start": 353,
+        "end": 369
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient::GetMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/OrdersClient.java",
+        "start": 457,
+        "end": 484
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient::PostMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/OrdersClient.java",
+        "start": 538,
+        "end": 561
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative::FeignClient#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/OrdersClient.java",
+        "start": 339,
+        "end": 420
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes.ledger()::(expression).baseUrl#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes.ledger()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Remotes.java",
+        "start": 299,
+        "end": 361
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes.ledger()::(method_invocation).build#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes.ledger()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Remotes.java",
+        "start": 299,
+        "end": 386
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes.ledger()::(method_invocation).create#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes.ledger()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Remotes.java",
+        "start": 299,
+        "end": 424
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes.ledger()::Retrofit.Builder#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes.ledger()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Remotes.java",
+        "start": 299,
+        "end": 321
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.report(String)::billing.invoice#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.report(String)",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient.invoice(String)",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Statements.java",
+        "start": 485,
+        "end": 504
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.report(String)::ledger.entry#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.report(String)",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger.entry(String)",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Statements.java",
+        "start": 459,
+        "end": 475
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.report(String)::orders.find#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.report(String)",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient.find(String)",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Statements.java",
+        "start": 521,
+        "end": 536
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements::Remotes.ledger#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes.ledger()",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Statements.java",
+        "start": 257,
+        "end": 273
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Contract.java::example.declarative.shadow.Contract::RequestLine#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Contract.java::example.declarative.shadow.Contract",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/shadow/Contract.java",
+        "start": 266,
+        "end": 291
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Contract.java::example.declarative.shadow::FeignClient#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Contract.java::example.declarative.shadow",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/shadow/Contract.java",
+        "start": 172,
+        "end": 233
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Hidden.java::example.declarative.shadow.Hidden::GetMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Hidden.java::example.declarative.shadow.Hidden",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/GetMapping.java::example.declarative.shadow.GetMapping",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/shadow/Hidden.java",
+        "start": 308,
+        "end": 330
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Hidden.java::example.declarative.shadow::FeignClient#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Hidden.java::example.declarative.shadow",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/shadow/Hidden.java",
+        "start": 212,
+        "end": 277
+      }
+    },
+    {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()::doubled#0",
       "caller": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()",
       "target": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.doubled()",
@@ -3542,6 +3946,36 @@
       "contract": "http::POST::/api/orders/single",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.single()::rest.exchange#0",
       "via": null
+    },
+    {
+      "contract": "http::GET::/invoices/{}",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient.invoice(String)",
+      "via": "feign:billing"
+    },
+    {
+      "contract": "http::DELETE::/invoices",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient.purge()",
+      "via": "feign:billing"
+    },
+    {
+      "contract": "http::GET::/v1/entries/{}",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger.entry(String)",
+      "via": "host:ledger.example.com"
+    },
+    {
+      "contract": "http::POST::/v1/entries",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger.record()",
+      "via": "host:ledger.example.com"
+    },
+    {
+      "contract": "http::GET::/api/orders/{}",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient.find(String)",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::POST::/api/orders",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient.place(String)",
+      "via": "host:orders.example.com"
     }
   ],
   "packages": [
@@ -3630,6 +4064,29 @@
         "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.drop()",
         "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.remove(String)",
         "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.send(HttpMethod,String)"
+      ]
+    },
+    {
+      "name": "maven/api/src/main/java/example/declarative",
+      "members": [
+        "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient.invoice(String)",
+        "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger.entry(String)",
+        "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient.find(String)",
+        "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.report(String)"
+      ]
+    },
+    {
+      "name": "maven/api/src/main/java/example/declarative#2",
+      "members": [
+        "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes.ledger()",
+        "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements"
+      ]
+    },
+    {
+      "name": "maven/api/src/main/java/example/declarative/shadow",
+      "members": [
+        "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/GetMapping.java::example.declarative.shadow.GetMapping",
+        "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Hidden.java::example.declarative.shadow.Hidden"
       ]
     },
     {
@@ -4708,6 +5165,179 @@
           "via": "link",
           "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.single()",
           "reason": "host unresolved; the only repository serving it is example.com/acme/conformance"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient.purge()",
+      "kind": "export",
+      "label": "example.declarative.BillingClient.purge()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient.purge()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient.purge()",
+          "mark": "no-provider",
+          "contract": "http::DELETE::/invoices"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger.record()",
+      "kind": "export",
+      "label": "example.declarative.Ledger.record()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger.record()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger.record()",
+          "mark": "no-provider",
+          "contract": "http::POST::/v1/entries"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient.place(String)",
+      "kind": "export",
+      "label": "example.declarative.OrdersClient.place(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient.place(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient.place(String)",
+          "mark": "no-provider",
+          "contract": "http::POST::/api/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.Statements(OrdersClient,BillingClient)",
+      "kind": "export",
+      "label": "example.declarative.Statements.Statements(OrdersClient,BillingClient)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.Statements(OrdersClient,BillingClient)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.report(String)",
+      "kind": "export",
+      "label": "example.declarative.Statements.report(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.report(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger.entry(String)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger.entry(String)",
+          "mark": "no-provider",
+          "contract": "http::GET::/v1/entries/{}"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient.invoice(String)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient.invoice(String)",
+          "mark": "no-provider",
+          "contract": "http::GET::/invoices/{}"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient.find(String)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient.find(String)",
+          "mark": "no-provider",
+          "contract": "http::GET::/api/orders/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Contract.java::example.declarative.shadow.Contract.line()",
+      "kind": "export",
+      "label": "example.declarative.shadow.Contract.line()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Contract.java::example.declarative.shadow.Contract.line()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Hidden.java::example.declarative.shadow.Hidden.hidden()",
+      "kind": "export",
+      "label": "example.declarative.shadow.Hidden.hidden()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Hidden.java::example.declarative.shadow.Hidden.hidden()"
         }
       ]
     },

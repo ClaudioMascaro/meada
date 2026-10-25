@@ -213,6 +213,13 @@ pub trait ContractKind {
     /// the decided links: a pass that sets something on them, such as the drift of a link.
     fn after_links(&self, _links: &mut [Link], _exports: &[Export]) {}
 
+    /// Whether a consumer of the kind at a definition (a method of a declarative client, which
+    /// has no call of its own) calls on the provider it links to, so `trace` follows from the
+    /// definition to it. A channel handler at a definition is where a link ends, not starts.
+    fn calls_from_definition(&self) -> bool {
+        false
+    }
+
     /// Whether the identifier is an unresolved side: one whose name could not be evaluated
     /// (a channel that is only its broker prefix). It never links, is no open item, and is
     /// shown with the unresolved suffix.

@@ -6,14 +6,15 @@
 //! `Code::outside` says an import from Spring binds its name (a class or an enum of the
 //! repository with the same name hides it), and a path folds `static final` constants and `+`
 //! through `Code::value`. `@RequestMapping` without `method` serves every method (`ANY`).
-//! `server.servlet.context-path` is not applied. The consumers are `clients.rs`'s.
+//! `server.servlet.context-path` is not applied.
+//! The consumers are `clients.rs`'s and `declarative.rs`'s.
 
 mod clients;
-
-pub(super) use clients::consumers;
+mod declarative;
 
 use super::{ANY, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
+use crate::index::Indexed;
 use crate::lang::{Call, Kind, Value};
 use crate::resolve::Code;
 
@@ -35,6 +36,13 @@ const SHORTCUTS: &[(&str, &str)] = &[
 const REQUEST_METHODS: &[&str] = &[
     "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE",
 ];
+
+/// The consumers of the clients (`clients.rs`) and of the declarative clients (`declarative.rs`).
+pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
+    let mut found = clients::consumers(code, indexed);
+    found.extend(declarative::consumers(code, indexed));
+    found
+}
 
 /// Spring MVC providers: see the module.
 pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {

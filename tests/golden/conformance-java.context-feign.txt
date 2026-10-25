@@ -1,0 +1,10 @@
+example.com/acme/conformance maven/api/src/main/java/example/declarative/BillingClient.java:12-13 example.declarative.BillingClient.invoice(String)
+community: maven/api/src/main/java/example/declarative
+processes: 1 (1 export; 1 repository): example.declarative.Statements.report(String) (example.com/acme/conformance)
+@GetMapping("/invoices/{id}")
+    String invoice(String id);
+callers:
+example.com/acme/conformance maven/api/src/main/java/example/declarative/Statements.java:16 example.declarative.Statements.report(String)
+callees: none
+contracts:
+example.com/acme/conformance maven/api/src/main/java/example/declarative/BillingClient.java:12 consumes http::GET::/invoices/{}
