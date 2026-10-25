@@ -347,6 +347,13 @@ pub struct Resolver<'a> {
     /// The blocks that add members to a type from outside the repository, by file and scope
     /// (`impl Trait for reqwest::Client`): what `self` and `Self` name in them is opaque.
     outside: HashSet<(&'a str, &'a str)>,
+    /// The blocks whose type is no class of the repository, by file and scope: what a bare call
+    /// in one reaches is not known (Kotlin's `apply` on a value of an unread type).
+    unread: HashSet<(&'a str, &'a str)>,
+    /// The blocks of functions that add members to a type from outside the repository (Kotlin's
+    /// `fun String.shout()`), by the last name of the type as written, where their file
+    /// declares overload families: a call on a receiver of that outside type reaches them.
+    foreign: HashMap<&'a str, Vec<Block<'a>>>,
     /// The files whose exports other packages can import, when the pack says which
     /// (`Layout::published`).
     published: Option<BTreeSet<String>>,
@@ -670,6 +677,8 @@ impl<'a> Resolver<'a> {
             impls: HashMap::new(),
             blocks: HashMap::new(),
             outside: HashSet::new(),
+            unread: HashSet::new(),
+            foreign: HashMap::new(),
             published: None,
             reaches: None,
             stars_bind,
@@ -694,6 +703,8 @@ impl<'a> Resolver<'a> {
         let mut impls: HashMap<Target, Vec<Block>> = HashMap::new();
         let mut blocks = HashMap::new();
         let mut outside = HashSet::new();
+        let mut unread = HashSet::new();
+        let mut foreign: HashMap<&str, Vec<Block>> = HashMap::new();
         for (path, facts) in files {
             for block in &facts.impls {
                 let class = |name: &'a str| match resolver.path_binding(path, &block.within, name) {
@@ -704,7 +715,17 @@ impl<'a> Resolver<'a> {
                     let ty = resolver.path_binding(path, &block.within, &block.ty);
                     if matches!(ty, Binding::External(..)) {
                         outside.insert((*path, block.scope.as_str()));
+                        if !resolver.overloads[path].is_empty() {
+                            let head = block.ty.split('.').next().unwrap_or(&block.ty);
+                            foreign.entry(head).or_default().push(Block {
+                                path,
+                                scope: &block.scope,
+                                of_trait: false,
+                                of: None,
+                            });
+                        }
                     }
+                    unread.insert((*path, block.scope.as_str()));
                     continue;
                 };
                 blocks.insert((*path, block.scope.as_str()), ty);
@@ -720,6 +741,7 @@ impl<'a> Resolver<'a> {
             .values_mut()
             .for_each(|b| b.sort_by_key(|b| b.of_trait));
         (resolver.impls, resolver.blocks, resolver.outside) = (impls, blocks, outside);
+        (resolver.unread, resolver.foreign) = (unread, foreign);
         let mut callers: HashMap<Target, Vec<Caller>> = HashMap::new();
         for (path, facts) in files {
             for (index, call) in facts.calls.iter().enumerate() {
@@ -812,7 +834,7 @@ impl<'a> Resolver<'a> {
         match binding {
             Binding::Def(t) => Resolution::Exact(t),
             Binding::Several(all) => Resolution::Ambiguous(all),
-            Binding::External(..) => Resolution::Unresolved,
+            Binding::External(name, _) => self.foreign_member(name, call),
             Binding::Unknown if self.owned_outside(path, call) || self.lacks(path, call) => {
                 Resolution::Unresolved
             }
@@ -976,6 +998,34 @@ impl<'a> Resolver<'a> {
                 ref several => Binding::Several(several.to_vec()),
             },
             found => found,
+        }
+    }
+
+    /// A call whose receiver is of a type from outside the repository (`text.shout()`, with
+    /// `text: String`): the repository's functions that extend that type by its name
+    /// (`Resolver::foreign`), narrowed by argument count; none, nothing.
+    fn foreign_member(&self, ty: &str, call: &'a Call) -> Resolution<'a> {
+        let Some((_, member)) = call.callee.rsplit_once('.') else {
+            return Resolution::Unresolved;
+        };
+        let ty = ty.rsplit('.').next().unwrap_or(ty);
+        let mut found = Vec::new();
+        for block in self.foreign.get(ty).into_iter().flatten() {
+            let qualified = format!("{}.{member}", block.scope);
+            let all = self.overloads[block.path].get(qualified.as_str());
+            found.extend(all.into_iter().flatten().copied());
+        }
+        found.sort();
+        found.dedup();
+        let binding = match found[..] {
+            [] => return Resolution::Unresolved,
+            [one] => Binding::Def(one),
+            _ => Binding::Several(found),
+        };
+        match self.narrow(binding, call.arity) {
+            Binding::Def(t) => Resolution::Exact(t),
+            Binding::Several(all) => Resolution::Ambiguous(all),
+            _ => Resolution::Unresolved,
         }
     }
 
@@ -1441,20 +1491,33 @@ impl<'a> Resolver<'a> {
                 opaque = true;
                 continue;
             };
-            if self.overloads[c.path].is_empty() {
-                continue;
-            }
             let qualified = format!("{}.{member}", c.name);
-            if self.defs[c.path].contains_key(qualified.as_str()) {
-                continue;
-            }
-            let Some(all) = self.overloads[c.path].get(qualified.as_str()) else {
-                continue;
-            };
-            for t in all {
+            let own = (!self.overloads[c.path].is_empty())
+                .then(|| self.overloads[c.path].get(qualified.as_str()))
+                .flatten()
+                .filter(|_| !self.defs[c.path].contains_key(qualified.as_str()));
+            for t in own.into_iter().flatten() {
                 if signatures.insert(t.name.strip_prefix(c.name).unwrap_or(t.name)) {
                     found.push(*t);
                 }
+            }
+            // The functions the blocks of the class declare (Kotlin's extensions) are its
+            // members too, after the class's own: a signature a member or a nearer ancestor
+            // gave hides them, and two blocks that declare one stay several.
+            let mut blocked = Vec::new();
+            for block in (self.impls.get(&c).into_iter().flatten()).filter(|b| !b.of_trait) {
+                let qualified = format!("{}.{member}", block.scope);
+                let all = self.overloads[block.path].get(qualified.as_str());
+                for t in all.into_iter().flatten() {
+                    let signature = t.name.strip_prefix(block.scope).unwrap_or(t.name);
+                    if !signatures.contains(signature) && !found.contains(t) {
+                        blocked.push((*t, signature));
+                    }
+                }
+            }
+            for (t, signature) in blocked {
+                signatures.insert(signature);
+                found.push(t);
             }
         }
         found.sort();
@@ -1884,6 +1947,16 @@ impl<'a> Resolver<'a> {
                             && let Some(found) = self.inherited(path, s, name)
                         {
                             return found;
+                        }
+                        // A block of a class reaches its members; one of an unread type, whatever.
+                        if reading == Reading::Method {
+                            if let Some(class) = self.blocks.get(&(path, s)) {
+                                if let Some(found) = self.inherited(class.path, class.name, name) {
+                                    return found;
+                                }
+                            } else if self.unread.contains(&(path, s)) {
+                                return Binding::Unknown;
+                            }
                         }
                         if reading != Reading::Type
                             && let Some(overloads) = self.overloads[path].get(candidate.as_str())

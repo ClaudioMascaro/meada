@@ -2,14 +2,14 @@
 //! Its files resolve with the Java pack's (`LanguagePack::resolves_with`), so the two share one
 //! layout of packages and types and call each other by fully qualified name.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 use std::rc::Rc;
 
 use tree_sitter::{Node, Parser};
 
 use super::{
-    Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
+    Binds, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Invocation, Kind,
     LanguagePack, Modules, Param, Part, Receiver, Value, children, named, text,
 };
 use crate::{Result, qualify};
@@ -104,11 +104,54 @@ struct Visit<'t> {
     scope: Rc<String>,
     place: Place,
     access: Access,
-    /// Inside a lambda, an object literal or an enum entry's body: whatever the source calls
-    /// there may be a member of an implicit receiver no syntax names, so a bare or `this` call
-    /// is read as a name match, and declarations there are no definitions.
+    /// Inside a lambda, an object literal or an enum entry's body: declarations there are no
+    /// definitions.
     opaque: bool,
+    /// Whom a bare or `this` call reaches there.
+    implicit: Implicit,
+    /// The type parameters in scope, which name no class.
+    generics: Rc<Vec<String>>,
     depth: usize,
+}
+
+/// Whom a bare call or a call on `this` reaches in a piece of code.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Implicit {
+    /// The class around it, or the file: the call is read as written.
+    Enclosing,
+    /// The receiver of an `apply`, `run` or `with` block (the scope is a block of its type,
+    /// `Facts::impls`), whose members a bare call reaches before the names around it. `super` is
+    /// still the enclosing class's.
+    Receiver,
+    /// A lambda, an object literal or an enum entry's body may have a receiver no syntax names,
+    /// whose members come first: the call is read as a name match.
+    Unknown,
+}
+
+/// What a scope function's receiver is, as far as the syntax says.
+#[derive(Clone)]
+enum Held {
+    Class(Class),
+    /// A name, whose declared type is read once the whole file is.
+    Name(String),
+    Unknown,
+}
+
+/// A lambda passed to `apply`, `run` or `with` (`receiver`: its `this` is the receiver), or to
+/// `let` or `also` (its parameter is); `run { }` alone is a block with neither.
+struct Tracked {
+    receiver: bool,
+    parameter: bool,
+    held: Held,
+}
+
+/// What a tracked lambda's scope `at` takes from a name declared elsewhere in the file: the
+/// type of its `this` (`name` none) or of its parameter.
+struct Later {
+    at: String,
+    within: String,
+    name: Option<String>,
+    held: Held,
 }
 
 /// One file's facts; a `script`'s declarations are its own, exported to no other file.
@@ -144,15 +187,29 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         place: Place::Top,
         access: Access::Public,
         opaque: false,
+        implicit: Implicit::Enclosing,
+        generics: Rc::new(Vec::new()),
         depth: 0,
     }];
     let mut budget = QUALIFICATION_BYTES;
+    // Type names written in the file, which nothing binds when they are not the repository's.
+    let mut outside = BTreeSet::new();
+    // Names a class or the file declares as properties, and the typed locals, which a field of
+    // the same name hides where the source does not say which one a use reads.
+    let mut fields = BTreeSet::new();
+    let mut locals: Vec<Receiver> = Vec::new();
+    // The receivers of tracked lambdas, by the lambda's node.
+    let mut tracked: HashMap<usize, Tracked> = HashMap::new();
+    let mut later: Vec<Later> = Vec::new();
+    let mut extensions: BTreeSet<(String, String)> = BTreeSet::new();
     while let Some(Visit {
         node,
         scope,
         place,
         access,
         opaque,
+        implicit,
+        generics,
         depth,
     }) = stack.pop()
     {
@@ -166,6 +223,8 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         budget = left;
         let (mut inner, mut inner_place, mut inner_access, mut inner_opaque, mut nested) =
             (scope.clone(), place, access, opaque, depth);
+        let (mut inner_implicit, mut inner_generics) = (implicit, generics.clone());
+        let mut skip_parameters = false;
         let defining = !opaque && depth < DEFINITION_DEPTH && place != Place::Init;
         match node.kind() {
             "class_declaration" | "object_declaration" | "companion_object" if defining => {
@@ -177,6 +236,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 inner = Rc::new(qualify(&scope, &name));
                 inner_access = access.max(own_access(node, src));
                 inner_place = Place::Class;
+                inner_generics = with_parameters(&generics, node, src);
                 nested += 1;
                 let mut bases = bases(node, src);
                 // A companion's members are called on the class's name (`Point.origin()`) and
@@ -230,15 +290,36 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 let Some(name) = node.child_by_field_name("name") else {
                     continue;
                 };
-                let base = match receiver(node, src) {
+                let on = receiver(node, src);
+                let base = match &on {
                     Some(on) => format!("{on}.{}", text(name, src)),
                     None => text(name, src).to_string(),
                 };
-                let (params, types) = parameters(node, src);
+                inner_generics = with_parameters(&generics, node, src);
+                let (params, types, classes) = parameters(node, src, &inner_generics, &mut outside);
                 inner = Rc::new(qualify(&scope, &format!("{base}({})", types.join(","))));
                 inner_access = access.max(own_access(node, src));
                 inner_place = Place::Code;
                 nested += 1;
+                for (param, class) in params.iter().zip(classes) {
+                    if class != Class::Unknown {
+                        facts.receivers.push(Receiver {
+                            scope: inner.as_ref().clone(),
+                            name: param.name.clone(),
+                            class,
+                        });
+                    }
+                }
+                if let Some(on) = on {
+                    extension(
+                        &mut facts,
+                        &mut extensions,
+                        &mut outside,
+                        &scope,
+                        &on,
+                        &inner_generics,
+                    );
+                }
                 let kind = if place == Place::Class {
                     Kind::Method
                 } else {
@@ -274,10 +355,21 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     && let [name] = names[..]
                 {
                     // A property with a getter is a definition, its calls the getter's.
-                    let base = match receiver(node, src) {
+                    let on = receiver(node, src);
+                    let base = match &on {
                         Some(on) => format!("{on}.{}", text(name, src)),
                         None => text(name, src).to_string(),
                     };
+                    if let Some(on) = on {
+                        extension(
+                            &mut facts,
+                            &mut extensions,
+                            &mut outside,
+                            &scope,
+                            &on,
+                            &generics,
+                        );
+                    }
                     inner = Rc::new(qualify(&scope, &base));
                     inner_access = own;
                     inner_place = Place::Code;
@@ -301,9 +393,19 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     let initial = (named(node))
                         .find(|n| !matches!(n.kind(), "modifiers" | "variable_declaration"))
                         .filter(|_| constant && names.len() == 1);
+                    let class = match names.len() {
+                        1 => declared(node, &generics, &mut outside, src),
+                        _ => Class::Unknown,
+                    };
                     for name in names {
                         let name = text(name, src);
-                        property(&mut facts, &scope, place, name, constant, initial, src);
+                        fields.insert(name.to_string());
+                        let bound = Receiver {
+                            scope: scope.as_ref().clone(),
+                            name: name.to_string(),
+                            class: class.clone(),
+                        };
+                        property(&mut facts, place, bound, constant, initial, src);
                         if place == Place::Top && constant {
                             publish(&mut facts, own, name, &qualify(&scope, name));
                         }
@@ -316,11 +418,24 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
             // are seen by its initializers.
             "class_parameter" if defining => {
                 if let Some(name) = named(node).find(|n| n.kind() == "identifier") {
-                    let declared = children(node).any(|c| matches!(c.kind(), "val" | "var"));
+                    let written = children(node).any(|c| matches!(c.kind(), "val" | "var"));
                     let name = text(name, src);
-                    if declared {
+                    let ty = named(node).skip_while(|n| n.kind() != "identifier").nth(1);
+                    let class = ty.map_or(Class::Unknown, |ty| {
+                        class_of(ty, src, &generics, &mut outside)
+                    });
+                    if written {
                         let constant = children(node).any(|c| c.kind() == "val");
-                        property(&mut facts, &scope, Place::Class, name, constant, None, src);
+                        fields.insert(name.to_string());
+                        let bound = Receiver {
+                            scope: scope.as_ref().clone(),
+                            name: name.to_string(),
+                            class,
+                        };
+                        property(&mut facts, Place::Class, bound, constant, None, src);
+                    } else if class != Class::Unknown {
+                        let (scope, name) = (scope.as_ref().clone(), name.to_string());
+                        locals.push(Receiver { scope, name, class });
                     } else {
                         facts.locals.push(qualify(&scope, name));
                     }
@@ -340,19 +455,79 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
             // An enum entry's arguments are read in the enum's scope, its body as an object's.
             "class_body" if node.parent().is_some_and(|p| p.kind() == "enum_entry") => {
                 inner_opaque = true;
+                inner_implicit = Implicit::Unknown;
             }
             "lambda_literal" | "anonymous_function" | "object_literal" => {
                 inner_opaque = true;
                 inner_place = Place::Code;
-                // `it` is a lambda's one parameter when it declares none.
-                if node.kind() == "lambda_literal"
-                    && named(node).all(|n| n.kind() != "lambda_parameters")
+                let given = tracked
+                    .remove(&node.id())
+                    .filter(|_| depth < DEFINITION_DEPTH);
+                if let Some(Tracked {
+                    receiver,
+                    parameter,
+                    held,
+                }) = given
                 {
-                    facts.locals.push(qualify(&scope, "it"));
+                    // The lambda is a scope of its own, a definition that folds into the
+                    // one around it: its `this` and its parameter are bound there.
+                    inner = Rc::new(qualify(&scope, &format!("@{}", node.start_byte())));
+                    let range = node.byte_range();
+                    facts
+                        .defs
+                        .push(definition(&inner, Kind::Inline, range, Vec::new()));
+                    nested += 1;
+                    let (at, within) = (inner.as_ref().clone(), scope.as_ref().clone());
+                    if receiver {
+                        inner_implicit = Implicit::Receiver;
+                        let held = held.clone();
+                        later.push(Later {
+                            at: at.clone(),
+                            within: within.clone(),
+                            name: None,
+                            held,
+                        });
+                    }
+                    if parameter && let Some((name, ty)) = lambda_parameter(node, src) {
+                        skip_parameters = true;
+                        let written = ty.map_or(Class::Unknown, |t| {
+                            class_of(t, src, &generics, &mut outside)
+                        });
+                        match held {
+                            _ if written != Class::Unknown => locals.push(Receiver {
+                                scope: at,
+                                name,
+                                class: written,
+                            }),
+                            Held::Class(class) => locals.push(Receiver {
+                                scope: at,
+                                name,
+                                class,
+                            }),
+                            Held::Name(_) => later.push(Later {
+                                at,
+                                within,
+                                name: Some(name),
+                                held,
+                            }),
+                            Held::Unknown => facts.locals.push(qualify(&at, &name)),
+                        }
+                    }
+                } else {
+                    inner_implicit = Implicit::Unknown;
+                    // `it` is a lambda's one parameter when it declares none.
+                    if node.kind() == "lambda_literal"
+                        && named(node).all(|n| n.kind() != "lambda_parameters")
+                    {
+                        facts.locals.push(qualify(&scope, "it"));
+                    }
                 }
             }
             "call_expression" => {
-                if let Some(at) = call(node, src, &scope, opaque) {
+                if let Some((lambda, found)) = tracked_call(node, src) {
+                    tracked.insert(lambda.id(), found);
+                }
+                if let Some(at) = call(node, src, &scope, implicit) {
                     facts.calls.push(at);
                 }
             }
@@ -373,7 +548,22 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
             _ => None,
         };
         if let Some(name) = binds.filter(|n| n.kind() == "identifier") {
-            facts.locals.push(qualify(&scope, text(name, src)));
+            let class = match (node.kind(), node.parent()) {
+                ("variable_declaration", Some(p)) if p.kind() == "property_declaration" => {
+                    declared(p, &generics, &mut outside, src)
+                }
+                ("variable_declaration", _) => written(node, &generics, &mut outside, src),
+                ("parameter", _) if !vararg(node, src) => {
+                    written(node, &generics, &mut outside, src)
+                }
+                _ => Class::Unknown,
+            };
+            if class == Class::Unknown {
+                facts.locals.push(qualify(&scope, text(name, src)));
+            } else {
+                let (scope, name) = (scope.as_ref().clone(), text(name, src).to_string());
+                locals.push(Receiver { scope, name, class });
+            }
         }
         let mut pushed: Vec<Node> = named(node).collect();
         // A property's own names are no locals of the code its initializer or getter is.
@@ -392,6 +582,9 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         {
             pushed.splice(0..1, named(first));
         }
+        if skip_parameters {
+            pushed.retain(|n| n.kind() != "lambda_parameters");
+        }
         for child in pushed.into_iter().rev() {
             stack.push(Visit {
                 node: child,
@@ -399,6 +592,8 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 place: inner_place,
                 access: inner_access,
                 opaque: inner_opaque,
+                implicit: inner_implicit,
+                generics: inner_generics.clone(),
                 depth: nested,
             });
         }
@@ -407,6 +602,17 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         facts.exports.clear();
         facts.private.clear();
     }
+    // A local is typed only where it is the one binding of its name in its scope; one named
+    // like a property may be read as the property, so its class is unknown.
+    for local in &mut locals {
+        if fields.contains(&local.name) {
+            local.class = Class::Unknown;
+        }
+    }
+    facts.receivers.extend(locals);
+    facts.receivers = merge(std::mem::take(&mut facts.receivers));
+    scoped(&mut facts, later);
+    facts.externs = outside.into_iter().collect();
     bare_calls(&mut facts);
     let private: std::collections::BTreeSet<&str> =
         facts.private.iter().map(String::as_str).collect();
@@ -519,29 +725,24 @@ fn publish(facts: &mut Facts, access: Access, exported: &str, local: &str) {
 /// declared), and a class's property hides an outer name in the class.
 fn property(
     facts: &mut Facts,
-    scope: &str,
     place: Place,
-    name: &str,
+    bound: Receiver,
     constant: bool,
     initial: Option<Node>,
     src: &[u8],
 ) {
     if constant {
         facts.consts.push(Const {
-            name: qualify(scope, name),
+            name: qualify(&bound.scope, &bound.name),
             value: initial.map_or(Value::Unknown, |n| value(n, src, 0)),
             ty: None,
             scope: None,
         });
     }
-    if place == Place::Class {
-        facts.receivers.push(Receiver {
-            scope: scope.to_string(),
-            name: name.to_string(),
-            class: Class::Unknown,
-        });
+    if place == Place::Class || bound.class != Class::Unknown {
+        facts.receivers.push(bound);
     } else if !constant {
-        facts.locals.push(qualify(scope, name));
+        facts.locals.push(qualify(&bound.scope, &bound.name));
     }
 }
 
@@ -644,10 +845,15 @@ fn type_name(ty: Node, src: &[u8]) -> Option<String> {
 
 /// A function's parameters and their types as written: a `vararg` one takes any number of
 /// arguments (`Binds::Rest`, spelled `vararg T`), one with a default value may be left out.
-fn parameters(node: Node, src: &[u8]) -> (Vec<Param>, Vec<String>) {
-    let (mut params, mut types) = (Vec::new(), Vec::new());
+fn parameters(
+    node: Node,
+    src: &[u8],
+    generics: &[String],
+    outside: &mut BTreeSet<String>,
+) -> (Vec<Param>, Vec<String>, Vec<Class>) {
+    let (mut params, mut types, mut classes) = (Vec::new(), Vec::new(), Vec::new());
     let Some(list) = named(node).find(|n| n.kind() == "function_value_parameters") else {
-        return (params, types);
+        return (params, types, classes);
     };
     let mut vararg = false;
     for child in children(list) {
@@ -661,6 +867,10 @@ fn parameters(node: Node, src: &[u8]) -> (Vec<Param>, Vec<String>) {
                     spelled = format!("vararg {spelled}");
                 }
                 types.push(spelled);
+                classes.push(match ty {
+                    Some(t) if !vararg => class_of(t, src, generics, outside),
+                    _ => Class::Unknown,
+                });
                 params.push(Param {
                     name: name.map_or("", |n| text(n, src)).to_string(),
                     binds: if vararg { Binds::Rest } else { Binds::Any },
@@ -677,7 +887,7 @@ fn parameters(node: Node, src: &[u8]) -> (Vec<Param>, Vec<String>) {
             _ => {}
         }
     }
-    (params, types)
+    (params, types, classes)
 }
 
 /// A type's tokens as written, without annotations or comments, a space only between words.
@@ -705,6 +915,320 @@ fn spelling(node: Node, src: &[u8]) -> String {
         }
     }
     spelled
+}
+
+/// The type parameters in scope inside the declaration `node`, with those it declares.
+fn with_parameters(outer: &Rc<Vec<String>>, node: Node, src: &[u8]) -> Rc<Vec<String>> {
+    let Some(list) = named(node).find(|n| n.kind() == "type_parameters") else {
+        return outer.clone();
+    };
+    let mut all = outer.as_ref().clone();
+    all.extend(
+        (named(list).filter(|n| n.kind() == "type_parameter"))
+            .filter_map(|p| named(p).find(|n| n.kind() == "identifier"))
+            .map(|n| text(n, src).to_string()),
+    );
+    Rc::new(all)
+}
+
+/// The class a written type names, as a path read among types: unknown for a function type, a
+/// type parameter, or a path with type arguments inside it (`Outer<T>.Inner`). A nullable type
+/// names the class of its type. The head of the path is noted in `outside`: a type nothing in
+/// the repository binds comes from outside it.
+fn class_of(ty: Node, src: &[u8], generics: &[String], outside: &mut BTreeSet<String>) -> Class {
+    let mut ty = ty;
+    while matches!(ty.kind(), "nullable_type" | "parenthesized_type") {
+        let inner = named(ty).find(|n| {
+            matches!(
+                n.kind(),
+                "user_type" | "nullable_type" | "parenthesized_type"
+            )
+        });
+        match inner {
+            Some(inner) => ty = inner,
+            None => return Class::Unknown,
+        }
+    }
+    if ty.kind() != "user_type" {
+        return Class::Unknown;
+    }
+    let (mut path, mut arguments) = (Vec::new(), false);
+    for part in named(ty) {
+        match part.kind() {
+            "identifier" if !arguments => path.push(text(part, src)),
+            "type_arguments" => arguments = true,
+            "line_comment" | "block_comment" => {}
+            _ => return Class::Unknown,
+        }
+    }
+    match path.first() {
+        Some(head) if !generics.iter().any(|g| g == head) => {
+            outside.insert(head.to_string());
+            Class::Type(path.join("."))
+        }
+        _ => Class::Unknown,
+    }
+}
+
+/// The class a variable declaration writes as its type.
+fn written(var: Node, generics: &[String], outside: &mut BTreeSet<String>, src: &[u8]) -> Class {
+    (named(var).nth(1)).map_or(Class::Unknown, |ty| class_of(ty, src, generics, outside))
+}
+
+/// Whether the parameter `node` takes any number of arguments.
+fn vararg(node: Node, src: &[u8]) -> bool {
+    (node.prev_named_sibling())
+        .is_some_and(|p| p.kind() == "parameter_modifiers" && text(p, src).contains("vararg"))
+}
+
+/// The class the one variable a property declares has: its written type, else the class a
+/// constructor call initializes it with.
+fn declared(
+    property: Node,
+    generics: &[String],
+    outside: &mut BTreeSet<String>,
+    src: &[u8],
+) -> Class {
+    let mut vars = named(property).filter(|n| n.kind() == "variable_declaration");
+    let (Some(var), None) = (vars.next(), vars.next()) else {
+        return Class::Unknown;
+    };
+    if named(var).nth(1).is_some() {
+        return written(var, generics, outside, src);
+    }
+    let mut after = false;
+    for child in children(property) {
+        if child.kind() == "=" {
+            after = true;
+        } else if after && child.is_named() {
+            return match held(child, src, 0) {
+                Held::Class(class) => class,
+                _ => Class::Unknown,
+            };
+        }
+    }
+    Class::Unknown
+}
+
+/// What an expression holds, as far as the syntax says: the class a constructor call `T(..)`
+/// gives, which `apply` and `also` pass on, or a name to read the declared type of.
+fn held(node: Node, src: &[u8], depth: usize) -> Held {
+    let mut node = node;
+    while node.kind() == "parenthesized_expression" {
+        match named(node).next() {
+            Some(inner) => node = inner,
+            None => return Held::Unknown,
+        }
+    }
+    if depth >= VALUE_DEPTH {
+        return Held::Unknown;
+    }
+    match node.kind() {
+        "identifier" => Held::Name(text(node, src).to_string()),
+        "call_expression" => {
+            let (function, args) = parts(node);
+            let Some(function) = function else {
+                return Held::Unknown;
+            };
+            match function.kind() {
+                "identifier" => Held::Class(Class::Named(text(function, src).to_string())),
+                "navigation_expression" => {
+                    let last = named(function).last().map(|n| text(n, src));
+                    let on = named(function).next();
+                    if let (Some("apply" | "also"), [lambda], Some(on)) = (last, &args[..], on)
+                        && lambda.kind() == "annotated_lambda"
+                    {
+                        return held(on, src, depth + 1);
+                    }
+                    let path = callee(function, src);
+                    if path.contains('(') {
+                        Held::Unknown
+                    } else {
+                        Held::Class(Class::Named(path))
+                    }
+                }
+                _ => Held::Unknown,
+            }
+        }
+        _ => Held::Unknown,
+    }
+}
+
+/// The lambda a call of `apply`, `run`, `with`, `let` or `also` passes, and what it takes from
+/// the receiver. Any other function that takes a lambda is not tracked, nor is one whose
+/// receiver is not known: its lambda keeps a receiver the syntax does not name.
+fn tracked_call<'t>(node: Node<'t>, src: &[u8]) -> Option<(Node<'t>, Tracked)> {
+    let (function, args) = parts(node);
+    let function = function?;
+    let lambda = args.last().filter(|a| a.kind() == "annotated_lambda")?;
+    let lambda = named(*lambda).find(|n| n.kind() == "lambda_literal")?;
+    let (receiver, parameter, held) = match function.kind() {
+        "navigation_expression"
+            if args.len() == 1 && children(function).all(|c| c.kind() != "::") =>
+        {
+            let on = named(function).next()?;
+            let name = named(function).last().map(|n| text(n, src))?;
+            let held = held(on, src, 0);
+            match name {
+                "apply" | "run" => (true, false, held),
+                "let" | "also" => (false, true, held),
+                _ => return None,
+            }
+        }
+        "identifier" => match (text(function, src), &args[..]) {
+            ("with", [arg, _]) if arg.kind() == "value_argument" => {
+                let mut parts = named(*arg);
+                match (parts.next(), parts.next()) {
+                    (Some(on), None) => (true, false, held(on, src, 0)),
+                    _ => return None,
+                }
+            }
+            ("run", [_]) => (false, false, Held::Unknown),
+            _ => return None,
+        },
+        _ => return None,
+    };
+    if receiver && matches!(held, Held::Unknown) {
+        return None;
+    }
+    Some((
+        lambda,
+        Tracked {
+            receiver,
+            parameter,
+            held,
+        },
+    ))
+}
+
+/// The name and written type of the one parameter a lambda declares, `it` when it declares
+/// none; `None` for several or a destructured one.
+fn lambda_parameter<'t>(lambda: Node<'t>, src: &[u8]) -> Option<(String, Option<Node<'t>>)> {
+    let params: Vec<Node> = (named(lambda).filter(|n| n.kind() == "lambda_parameters"))
+        .flat_map(named)
+        .collect();
+    match params[..] {
+        [] => Some(("it".into(), None)),
+        [var] if var.kind() == "variable_declaration" => {
+            let name = named(var).find(|n| n.kind() == "identifier")?;
+            Some((text(name, src).to_string(), named(var).nth(1)))
+        }
+        _ => None,
+    }
+}
+
+/// An extension function or property adds a member to its receiver's type: a block of that
+/// type, whose definitions are named under the receiver's name where the extension is written.
+fn extension(
+    facts: &mut Facts,
+    seen: &mut BTreeSet<(String, String)>,
+    outside: &mut BTreeSet<String>,
+    scope: &str,
+    on: &str,
+    generics: &[String],
+) {
+    let head = on.split('.').next().unwrap_or(on);
+    if generics.iter().any(|g| g == head) {
+        return;
+    }
+    outside.insert(head.to_string());
+    if seen.insert((scope.to_string(), on.to_string())) {
+        facts.impls.push(Impl {
+            scope: qualify(scope, on),
+            ty: on.to_string(),
+            of: None,
+            within: scope.to_string(),
+        });
+    }
+}
+
+/// The receivers with one entry per name and scope: a name bound twice with different classes
+/// holds an unknown one.
+fn merge(all: Vec<Receiver>) -> Vec<Receiver> {
+    let mut at = HashMap::new();
+    let mut receivers: Vec<Receiver> = Vec::new();
+    for receiver in all {
+        let key = (receiver.scope.clone(), receiver.name.clone());
+        match at.get(&key) {
+            Some(&n) => {
+                let kept: &mut Receiver = &mut receivers[n];
+                if kept.class != receiver.class {
+                    kept.class = Class::Unknown;
+                }
+            }
+            None => {
+                at.insert(key, receivers.len());
+                receivers.push(receiver);
+            }
+        }
+    }
+    receivers
+}
+
+/// Binds what tracked lambdas take from a name declared in the file: the nearest declaration
+/// of the name around the lambda, unless a binding of an unknown class is nearer.
+fn scoped(facts: &mut Facts, later: Vec<Later>) {
+    let mut bound: HashMap<(&str, &str), Class> = HashMap::new();
+    for r in &facts.receivers {
+        bound.insert((r.scope.as_str(), r.name.as_str()), r.class.clone());
+    }
+    for d in &facts.defs {
+        for p in &d.params {
+            bound
+                .entry((d.name.as_str(), p.name.as_str()))
+                .or_insert(Class::Unknown);
+        }
+    }
+    let hidden: HashSet<&str> = (facts.locals.iter().map(String::as_str))
+        .chain(facts.consts.iter().map(|c| c.name.as_str()))
+        .collect();
+    let find = |within: &str, name: &str| {
+        let mut at = Some(within);
+        while let Some(s) = at {
+            if let Some(class) = bound.get(&(s, name)) {
+                return class.clone();
+            }
+            if hidden.contains(qualify(s, name).as_str()) {
+                break;
+            }
+            at = (!s.is_empty()).then(|| crate::parent(s));
+        }
+        Class::Unknown
+    };
+    let (mut receivers, mut impls, mut locals) = (Vec::new(), Vec::new(), Vec::new());
+    for Later {
+        at,
+        within,
+        name,
+        held,
+    } in later
+    {
+        let class = match held {
+            Held::Class(class) => class,
+            Held::Name(held) => find(&within, &held),
+            Held::Unknown => Class::Unknown,
+        };
+        match (name, class) {
+            (None, class) => impls.push(Impl {
+                scope: at,
+                ty: match class {
+                    Class::Type(ty) | Class::Named(ty) => ty,
+                    _ => "(unknown)".into(),
+                },
+                of: None,
+                within,
+            }),
+            (Some(name), Class::Unknown) => locals.push(qualify(&at, &name)),
+            (Some(name), class) => receivers.push(Receiver {
+                scope: at,
+                name,
+                class,
+            }),
+        }
+    }
+    facts.receivers.extend(receivers);
+    facts.impls.extend(impls);
+    facts.locals.extend(locals);
 }
 
 fn import(node: Node, src: &[u8], facts: &mut Facts) {
@@ -776,18 +1300,27 @@ fn parts<'t>(node: Node<'t>) -> (Option<Node<'t>>, Vec<Node<'t>>) {
 }
 
 /// The call `node` is, written in `scope`.
-fn call(node: Node, src: &[u8], scope: &str, opaque: bool) -> Option<Call> {
+fn call(node: Node, src: &[u8], scope: &str, implicit: Implicit) -> Option<Call> {
     let (function, args) = parts(node);
     let function = function?;
     let mut callee = callee(function, src);
-    // A lambda may have a receiver no syntax names, whose members a bare or `this` call
-    // reaches first: such a call is read as a name match.
-    if opaque {
-        if let Some(rest) = callee.strip_prefix("this.") {
-            callee = format!("(anonymous).{rest}");
-        } else if !callee.contains('.') {
-            callee = format!("(anonymous).{callee}");
+    match implicit {
+        // A lambda may have a receiver no syntax names, whose members a bare or `this` call
+        // reaches first: such a call is read as a name match.
+        Implicit::Unknown => {
+            if let Some(rest) = callee.strip_prefix("this.") {
+                callee = format!("(anonymous).{rest}");
+            } else if !callee.contains('.') {
+                callee = format!("(anonymous).{callee}");
+            }
         }
+        // `super` in a block is the class around it, not the block's receiver's.
+        Implicit::Receiver => {
+            if let Some(rest) = callee.strip_prefix("super.") {
+                callee = format!("(anonymous).{rest}");
+            }
+        }
+        Implicit::Enclosing => {}
     }
     let mut at = Call {
         scope: scope.to_string(),

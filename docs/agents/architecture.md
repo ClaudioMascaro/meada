@@ -1327,6 +1327,21 @@ one for the area a change touches.
   top-level declaration of the same fully qualified name, and leaves `.kts` scripts out of every
   package, since a script's declarations are its own (the Kotlin pack exports none of them). A
   Kotlin `object` has an `INSTANCE` property of its own type, which Java calls go through.
+  Kotlin writes its receivers as Java does: a property, parameter or local typed by its written
+  type (`Class::Type`) or initialized with a constructor call `T(..)` (`Class::Named`), where
+  the one binding of its name says so; `Facts::externs` lists the type heads written in the
+  file, so a type nothing binds is outside the repository (Opaque outside). An extension
+  function or property is a `Facts::impls` block of its receiver's type, named as the function
+  is (`pkg.Receiver.f()`): `Resolver::overloaded` reads the blocks of each ancestor of the
+  receiver's family after its members, a signature a member or a nearer ancestor gave hiding
+  it and two blocks that declare one staying several. A block whose type is outside the
+  repository (`fun String.shout()`) is in `Resolver::foreign` by the type's name, which
+  `foreign_member` reaches from a receiver typed by that outside name. A lambda passed to
+  `apply`, `run` or `with` is a `Kind::Inline` definition of its own (`@<offset>`, folded into
+  the one around it) and an `Impl` block of the receiver's type: `this` and a bare call there
+  read that type's family first (`lexical_as` through `blocks`) and the names around it after,
+  or stay a name match when the block's type is no class of the repository (`unread`). The
+  lambda of `let` or `also` is such a scope too, with its parameter (`it`) typed and no block.
   `LanguagePack::is_code` drops from the walk the files of a pack's
   extensions that are no code (Kotlin's `build.gradle.kts` and `settings.gradle.kts`, which the
   package ecosystems read as manifests). A pack that
@@ -1631,9 +1646,19 @@ one for the area a change touches.
 - `lang/kotlin.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the Kotlin pack as they bound the Java pack's, with the same
   outcome past each; the Kotlin hostile-depth and long-prefix engine fixtures exceed them. Beyond
-  the limits, what the pack leaves out (spec #27, #95): a bare or `this` call inside a lambda, an
-  object literal or an enum entry's body may reach an implicit receiver no syntax names, so it is
-  read as a name match (`(anonymous).f`), never `exact`; scope functions are #96. A companion is
+  the limits, what the pack leaves out (spec #27, #95, #96): a bare or `this` call inside a lambda
+  other than the five scope functions', an object literal or an enum entry's body may reach an
+  implicit receiver no syntax names, so it is read as a name match (`(anonymous).f`), never
+  `exact`; so is one in a lambda nested in an `apply`, `run` or `with` block. Those five are
+  told by name (a function of the repository called `apply` is not told apart), and a receiver
+  is known when it is a name with a written type, a constructor call `T(..)` or an `apply` or
+  `also` chain of them; any other (a call's result, a property chain) leaves the lambda as any
+  other. A function's result type is not read (`Def::result` is empty), so `make().m()` and a
+  local initialized with `make()` are name matches. A typealias is no class of the repository:
+  a receiver typed by one is outside it, and resolves to nothing. A name bound twice in one
+  scope with different types, or named like a property, holds an unknown type. An extension is
+  matched by the receiver type's name from any package, imported or not (no scope check), and
+  one of an outside type by that name's last segment. A companion is
   its class's last base, so `Type.m()` reads the class's own instance member first when both
   declare `m` with one signature. A star import of a class (`import a.C.*`) reads every export of
   the class's file. A fully qualified function call (`example.helper()`) is a name match. A class
