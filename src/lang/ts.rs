@@ -114,6 +114,8 @@ impl LanguagePack for TsJs {
                             node.start_byte()
                         };
                         facts.calls.push(Call {
+                            arity: None,
+                            constructs: false,
                             scope: scope.clone(),
                             callee: callee(function, src),
                             range: start..node.end_byte(),
@@ -128,6 +130,7 @@ impl LanguagePack for TsJs {
                             decorates: None,
                             by_path: false,
                             root: None,
+                            on: None,
                             receiver: None,
                             arg_types: arguments
                                 .map(|a| named(a).map(|arg| cast(arg, src, &parents)).collect())
@@ -142,6 +145,7 @@ impl LanguagePack for TsJs {
                             name: qualify(&scope, text(name, src)),
                             value: Value::Type(types::declaration(node, src, &parents, &mut 0)),
                             ty: None,
+                            scope: None,
                         });
                     }
                 }
@@ -191,6 +195,7 @@ impl LanguagePack for TsJs {
                     name: qualify(&scope, name),
                     value,
                     ty,
+                    scope: None,
                 });
             }
             let children: Vec<Node> = node.children(&mut node.walk()).collect();

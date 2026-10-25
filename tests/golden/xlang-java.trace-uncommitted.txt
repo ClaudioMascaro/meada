@@ -1,0 +1,4 @@
+example.com/xlang-java/api src/main/java/com/example/api/OrderController.java:9 com.example.api.OrderController
+example.com/xlang-java/api src/main/java/com/example/api/OrderController.java:32 com.example.api.OrderController.status(String,int)
+  →[inferred: base URL from API_URL, a base_url_env of peer example.com/xlang-java/api] example.com/xlang-java/web src/sync.ts:4 syncOrders
+chain: inferred · 1 hops · 2 repos · 110 tokens

@@ -47,7 +47,7 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `freshness` moves a `mod`, declares the orphan, adds a module, drops the `[[bin]]`, edits a
   `pub use`, moves an item between files and renames a package, and
   exports it with the walk reversed), `xlang` (a TypeScript and a Python repository linked both ways, over HTTP
-  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files), `index` (export, schema rebuild, writes only in `.meada/`), `self_index` (a copy of this repository's tracked files, indexed in about 6 s in debug: no call from `src/` reaches `tests/fixtures/`, and `Resolver.call` has an `exact` caller), `hostile` (per pack, repositories of pathological files sized past the limits of Known ceilings: deep nesting, long chains, wide files and manifests, values traced through chains and lattices of constants, wrappers, parameters and return values; each indexed on a thread with a small stack within a time budget, so a recursion with no limit aborts the run and a loop with none fails it; `--nocapture` names each case as it starts), `query` (search/context), `workspace` (peers, status, config errors), `manifest` (server mode's workspace manifest: `index`, `status` and `export --repo` with `--workspace`, the refused entries, manifest errors, entry blocks configuring mirrors with no `meada.toml` and ignored under one, decisions replayed, reads that write nothing and see the index until `meada index` refreshes it, nothing written into a mirror, refreshed equals cold, `[workspace]`'s unknown key and source, `source = "file"` as before, `source = "store"` naming `generation-pointer` without it and its sections or `[[repository]]` with it; with `snapshot`, a bad `[snapshot] node_name` naming the file, the line and the key), `gateway`
+  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files; and a TypeScript and a Java one, `xlang-java-web` and `xlang-java-api`, the Java bases from Spring `@Value` fields and a constructor parameter (a placeholder, a literal URL, a placeholder with a default a peer serves and one no peer serves) and `System.getenv`, and a Kafka topic produced in TypeScript and consumed by a `@KafkaListener` whose topic the configuration names: exports, `trace` down (also from the producer, `xlang-java.trace-channel-down.txt`), up and from uncommitted changes, `freshness` editing, adding and deleting `.java` and configuration files, and a configuration edited alone), `index` (export, schema rebuild, writes only in `.meada/`), `self_index` (a copy of this repository's tracked files, indexed in about 6 s in debug: no call from `src/` reaches `tests/fixtures/`, and `Resolver.call` has an `exact` caller), `hostile` (per pack, repositories of pathological files sized past the limits of Known ceilings: deep nesting, long chains, wide files and manifests, values traced through chains and lattices of constants, wrappers, parameters and return values; each indexed on a thread with a small stack within a time budget, so a recursion with no limit aborts the run and a loop with none fails it; `--nocapture` names each case as it starts), `query` (search/context), `workspace` (peers, status, config errors), `manifest` (server mode's workspace manifest: `index`, `status` and `export --repo` with `--workspace`, the refused entries, manifest errors, entry blocks configuring mirrors with no `meada.toml` and ignored under one, decisions replayed, reads that write nothing and see the index until `meada index` refreshes it, nothing written into a mirror, refreshed equals cold, `[workspace]`'s unknown key and source, `source = "file"` as before, `source = "store"` naming `generation-pointer` without it and its sections or `[[repository]]` with it; with `snapshot`, a bad `[snapshot] node_name` naming the file, the line and the key), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export
   carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a channel handler's process, a cycle, an
@@ -365,6 +365,21 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   module outside the workspace, a local that hides the import, a name only a test file, a file built for another target or two files of the directory define, a directory of a nested module, and a `replace` by another module (no link), a module path with no dot, and the freshness of
   an edited `go.mod`. Goldens `gopkg-{web,lib}.export.json`, `gopkg-lib.context-greet.txt` and
   `gopkg-web.trace-down.txt`. Unit tests in `package/go.rs` and `lang/go/modfile.rs`.
+
+- `tests/it/jvmpkg.rs` (specs #26, tickets #93 and #94): the Maven and Gradle fixtures `jvm-maven`
+  (modules `models` with `Order`, `Repo extends Base`, `Event` with an opaque base, `Note` with
+  a method named after it, `Ledger`, a second `example.shared.Stamp` and a test-only
+  `Fixtures`), `jvm-gradle` (`kit` with a second `Ledger` in another package, and `tools` whose
+  `main` and `test` source sets are literal directories), `jvm-client` and `jvm-gradle-client`
+  as the dependents. Manifest links (build files) and imports into provider classes (exact,
+  ambiguous by provider, by type and by overload, overloads merged over the provider-side
+  family, `inferred` beside an opaque base, constructors, on-demand and static imports, two
+  on-demand imports that both bring a class, a same-package class and a parameter or local
+  that hide the import, test roots and outside types left out); an edited source set
+  relinks like a cold workspace; `context` on the class `Order` lists the calls that reach its
+  members. Goldens `jvm-*.export.json`, `jvm-maven.context-total.txt`,
+  `jvm-maven.context-order.txt` and `jvm-client.trace-down.txt`. Unit tests in
+  `package/maven.rs` and `jvm/gradle.rs`.
 - **The loopback decider stub** (`tests/it/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500
@@ -400,3 +415,54 @@ identities in validation errors), issuer query preservation at `Auth.login`, exa
 ceilings through CLI and HTTP, and live-heartbeat selection with a controlled RESP `TIME`
 response while all other commands reach the real Valkey fixture. The ceiling tests preserve
 one final locked publish and compare English and Brazilian Portuguese refusals.
+
+## Java declarative clients (#90)
+
+`conformance-java` gains `example.declarative` (Feign with and without `url`, a Retrofit
+interface built by `Remotes`, shadowed annotations and `@RequestLine`, which give nothing);
+`conformance::java` keeps the export and `conformance-java.context-feign.txt`. The
+`xlang-java-api` fixture calls the TypeScript provider through two Feign clients, and
+`xlang-java.trace-up-feign.txt` is the trace up from the route through the interface method.
+`freshness` edits a Retrofit base and a Feign `path` and compares with a cold index.
+`xlang::a_declarative_client_method_is_an_open_item_at_its_definition` adds a mirror of the web
+app (`common::xlang_java_mirror`), so the Feign client without `url` is ambiguous, and a
+Retrofit method with `@Url`, which is unresolved: both are open items at the method, in
+`search` and `meada decide --list`; `decider::the_excerpt_of_a_declarative_client_method_is_the_method`
+checks the excerpt is the method.
+
+## Java conformance (#84)
+
+`conformance-java` holds Maven modules and a Gradle source tree, with `example.clients.Injected`
+(Spring `@Value` with a literal, a placeholder the module's configuration holds and a placeholder
+with a default) and a computed Gradle coordinate. `conformance::java` checks
+all Java definitions and its golden export; the companion engine tests check package and
+static imports and their priority/ambiguity (including duplicate fully qualified types),
+overloads and constructors in separate namespaces, fully qualified calls with shadowing,
+class-named method identities, qualified parameter types, visibility, anonymous
+class and lambda ownership, and search/context goldens. `index` checks byte-identical exports
+from independent copies; `freshness` edits, adds and deletes sources and compares the refreshed
+export with a cold one, including overload arity from an unchanged file's cached facts.
+The hostile-depth tests exceed Java's definition, value and member-path limits and reject
+exact links that escape an omitted scope. A long package prefix exceeds the qualification
+budget and leaves the whole file out; annotation values, comments and malformed type literals
+never enter exported names. `schema` has a Java sample for the adapter facts the index persists.
+The `example.channels` package (#92) holds a client of each broker kind (Spring Kafka, Spring
+AMQP with a listener's and a configuration's bindings, JMS, SQS, jnats, Jedis and Lettuce), a
+topic from a `${key}` placeholder and one that cannot be evaluated;
+`java_channel_clients_link_their_producers_to_their_handlers` checks every link and the
+unresolved sides, and `freshness` edits the configuration key and a topic constant.
+
+The `example.calls` package (#85) adds `JAVA_CALLS`, each receiver form at each level: field,
+`this.field`, parameter, local, `var` with `new T(...)` and with a call's declared return type, a
+fully qualified field type, an interface receiver, a parameter and a type-named local that
+shadow, inherited overloads of another arity, a written-signature override, a same-count tie
+across the family, an outside base, and unknown receivers matched in the calling family or
+across the repository; `conformance-java.context-ping.txt` lists exact, inferred and ambiguous
+callers, with a narrowed match's "one of several" reason; the fixture also has a chain and a
+`super` call. Resolver unit tests (`java_calls`) cover strict outside bases (`ArrayList`'s
+`add`), Python's first-defining-class rule, a redundant interface and its subclass, name matches
+through the receiver's family and never the caller, an inherited field against an outer one,
+chains and `var` through the overload called, `super`, initializer locals, `Object`'s implicit
+members, and receivers left unknown: a type parameter, a local named like a field, same-named
+locals of different types, an anonymous class and a cyclic family. `java_static_imports_an_outside_base_may_shadow_are_name_matches` keeps a static import `exact` in a plain class and
+`inferred` under an outside base.

@@ -221,6 +221,7 @@ fn broker(protocol: &str) -> Option<&'static str> {
     Some(match protocol {
         "kafka" | "kafka-secure" => "kafka",
         "amqp" | "amqps" => "amqp",
+        "jms" => "jms",
         "nats" => "nats",
         "redis" => "redis",
         "sqs" => "sqs",
@@ -367,6 +368,7 @@ components:
             ("kafka-secure", Some("kafka")),
             ("amqp", Some("amqp")),
             ("AMQPS", Some("amqp")),
+            ("jms", Some("jms")),
             ("nats", Some("nats")),
             ("redis", Some("redis")),
             ("sqs", Some("sqs")),

@@ -125,6 +125,9 @@ pub struct CallSite {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub candidates: Vec<String>,
     pub span: Span,
+    /// An `inferred` name match narrowed to one of several definitions of its name.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub narrowed: bool,
 }
 
 /// The provider side of a contract: a symbol that serves it, a file, a repository, the call
@@ -235,7 +238,8 @@ pub struct Dependency {
 /// field or rule whose entry could not be followed to a source file. A PyPI import is named by
 /// the module it imports: the distribution's own name (`ModuleName`) or one of its top-level
 /// modules (`TopLevel`); a Rust `use` by the crate's name (`CrateName`); a Go import by the
-/// module path it starts with (`ModulePath`).
+/// module path it starts with (`ModulePath`); a Java import by the package that declares its
+/// class (`Package`).
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum How {
@@ -249,6 +253,7 @@ pub enum How {
     TopLevel,
     CrateName,
     ModulePath,
+    Package,
 }
 
 impl How {
@@ -264,6 +269,7 @@ impl How {
             How::TopLevel => "top-level module",
             How::CrateName => "crate name",
             How::ModulePath => "module path",
+            How::Package => "package",
         }
     }
 }

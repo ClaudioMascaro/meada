@@ -25,6 +25,7 @@ mod gopkg;
 mod hostile;
 mod index;
 mod items;
+mod jvmpkg;
 mod manifest;
 mod mcp;
 mod oidc;

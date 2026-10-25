@@ -107,6 +107,51 @@ pub fn xlang_go(case: &str) -> (PathBuf, PathBuf) {
     )
 }
 
+/// The web app (TypeScript) and the api service (Java, Spring) of spec #26, in a workspace of
+/// their own under `case`: web first, then api.
+pub fn xlang_java(case: &str) -> (PathBuf, PathBuf) {
+    (
+        fixture_repo(
+            case,
+            "xlang-java-web",
+            Some("https://example.com/xlang-java/web.git"),
+        ),
+        fixture_repo(
+            case,
+            "xlang-java-api",
+            Some("git@example.com:xlang-java/api.git"),
+        ),
+    )
+}
+
+/// The Java chain with a mirror of the web app beside it, serving the web app's `routes` under
+/// its own host, and a peer of the api: a consumer that leaves its host open links to both.
+pub fn xlang_java_mirror(case: &str, routes: &[&str]) -> (PathBuf, PathBuf) {
+    let (web, api) = xlang_java(case);
+    let mirror = web.parent().unwrap().join("xlang-java-mirror");
+    let _ = fs::remove_dir_all(&mirror);
+    fs::create_dir_all(&mirror).unwrap();
+    fs::write(
+        mirror.join("meada.toml"),
+        "[serve]\nhosts = [\"web.example.com\"]\n",
+    )
+    .unwrap();
+    for route in routes {
+        let to = mirror.join(route);
+        fs::create_dir_all(to.parent().unwrap()).unwrap();
+        fs::copy(web.join(route), to).unwrap();
+    }
+    git(&mirror, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    let origin = "https://example.com/xlang-java/mirror.git";
+    git(&mirror, &["remote", "add", "origin", origin]);
+    git(&mirror, &["add", "-A"]);
+    git(&mirror, &["commit", "-q", "-m", "fixture"]);
+    let toml = api.join("meada.toml");
+    let peer = "\n[[peer]]\nrepo = \"example.com/xlang-java/mirror\"\n";
+    fs::write(&toml, fs::read_to_string(&toml).unwrap() + peer).unwrap();
+    (web, api)
+}
+
 /// The chain with two loose ends added to the catalog's `meada.toml`: a bucket only the
 /// catalog declares, and a write of `orders` through a symbol it does not have. Returns the
 /// gateway, whose workspace holds all four repositories.

@@ -18,6 +18,7 @@ use crate::shape::Shape;
 use crate::workspace::Repository;
 
 mod go;
+mod java;
 mod message;
 mod python;
 mod rust;
@@ -179,13 +180,14 @@ impl ContractKind for Channel {
         parse(contract).map_or((None, None), |(broker, name)| (Some(broker), name))
     }
 
-    fn extract(&self, code: &Code, _: &Indexed) -> Vec<Found> {
+    fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
         // Each reader answers for its own pack only; the order is the order found.
         let messages: Vec<Message> = [
             ts::messages(code),
             python::messages(code),
             rust::messages(code),
             go::messages(code),
+            java::messages(code, indexed),
         ]
         .into_iter()
         .flatten()
@@ -699,6 +701,7 @@ export async function listen() {
             tsconfigs: &[],
             exported: &[],
             files: &["a.ts"],
+            configs: &[],
         };
         let sites: Vec<_> = Channel
             .extract(&code, &indexed)

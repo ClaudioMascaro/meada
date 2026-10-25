@@ -15,6 +15,171 @@ use meada::engine::Engine;
 const ORIGIN: Option<&str> = Some("https://example.com/acme/conformance.git");
 const WEB: Option<&str> = Some("https://example.com/acme/web.git");
 
+#[test]
+fn java_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
+    let edit = |repo: &Path| {
+        let path = repo.join("maven/api/src/main/java/example/util/Tools.java");
+        let before = fs::read_to_string(&path).unwrap();
+        fs::write(&path, before.replace("single()", "single(int count)")).unwrap();
+        fs::write(
+            repo.join("Extra.java"),
+            "package example; public class Extra { public static void wave() {} }\n",
+        )
+        .unwrap();
+        fs::remove_file(repo.join("maven/api/src/main/java/example/stars/Wave.java")).unwrap();
+    };
+    let repo = fixture_repo("fresh_java", "conformance-java", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_java_cold", "conformance-java", ORIGIN, edit)
+    );
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    let called = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| {
+            c["id"]
+                .as_str()
+                .unwrap()
+                .ends_with("example.Orders.start()::Orders.place#0")
+        })
+        .unwrap();
+    assert_eq!(called["level"], "exact");
+    assert!(
+        called["target"]
+            .as_str()
+            .unwrap()
+            .ends_with("place(String,int)")
+    );
+}
+
+#[test]
+fn java_consumers_follow_an_edited_constant_of_another_file_like_a_cold_index() {
+    let edit = |repo: &Path| {
+        let path = repo.join("maven/api/src/main/java/example/web/Api.java");
+        let before = fs::read_to_string(&path).unwrap();
+        fs::write(&path, before.replace("\"/api\"", "\"/v2\"")).unwrap();
+    };
+    let repo = fixture_repo("fresh_java_consumers", "conformance-java", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_java_consumers_cold",
+            "conformance-java",
+            ORIGIN,
+            edit
+        )
+    );
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    let consumed = |site: &str| {
+        (json["consumers"].as_array().unwrap().iter())
+            .find(|c| c["site"].as_str().unwrap().ends_with(site))
+            .map(|c| c["contract"].clone())
+    };
+    let list = "example.clients.Rest.list()::rest.getForObject#0";
+    assert_eq!(consumed(list), Some("http::GET::/v2/orders".into()));
+}
+
+/// A listener's topic follows an edited key of the Spring configuration, and a producer's an
+/// edited constant, as a cold index reads them (spec #26, #92).
+#[test]
+fn java_channels_follow_an_edited_configuration_key_and_constant_like_a_cold_index() {
+    let edit = |repo: &Path| {
+        let replace = |file: &str, from: &str, to: &str| {
+            let path = repo.join("maven/api/src/main").join(file);
+            let text = fs::read_to_string(&path).unwrap();
+            assert!(text.contains(from), "{from} in {file}");
+            fs::write(&path, text.replace(from, to)).unwrap();
+        };
+        replace(
+            "resources/application.properties",
+            "channels.topic=orders.paid",
+            "channels.topic=orders.settled",
+        );
+        replace(
+            "java/example/channels/Sales.java",
+            "CREATED = \"orders.created\"",
+            "CREATED = \"orders.placed\"",
+        );
+    };
+    let repo = fixture_repo("fresh_java_channels", "conformance-java", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    for contract in [
+        "channel::kafka::orders.settled",
+        "channel::kafka::orders.placed",
+    ] {
+        assert!(refreshed.contains(contract), "{contract}");
+    }
+    assert!(!refreshed.contains("channel::kafka::orders.created"));
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_java_channels_cold", "conformance-java", ORIGIN, edit)
+    );
+}
+
+#[test]
+fn java_declarative_clients_follow_edited_files_like_a_cold_index() {
+    // The base lives in `Remotes`, the interface in `Ledger`: the edit is in another file.
+    let edit = |repo: &Path| {
+        let dir = repo.join("maven/api/src/main/java/example/declarative");
+        for (file, from, to) in [
+            ("Remotes.java", "\"/v1/\"", "\"/v2/\""),
+            ("OrdersClient.java", "path = \"/api\"", "path = \"/v3\""),
+        ] {
+            let before = fs::read_to_string(dir.join(file)).unwrap();
+            fs::write(dir.join(file), before.replace(from, to)).unwrap();
+        }
+    };
+    let repo = fixture_repo("fresh_java_declarative", "conformance-java", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_java_declarative_cold",
+            "conformance-java",
+            ORIGIN,
+            edit
+        )
+    );
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    let consumed = |site: &str| {
+        (json["consumers"].as_array().unwrap().iter())
+            .find(|c| c["site"].as_str().unwrap().ends_with(site))
+            .map(|c| c["contract"].clone())
+    };
+    assert_eq!(
+        consumed("Ledger.entry(String)"),
+        Some("http::GET::/v2/entries/{}".into())
+    );
+    assert_eq!(
+        consumed("OrdersClient.find(String)"),
+        Some("http::GET::/v3/orders/{}".into())
+    );
+}
+
 /// Edits a file whose exports others import, adds a file whose definition turns an inferred
 /// call in an unrelated file into an ambiguous one, deletes a file, and drops the tsconfig
 /// path alias.
@@ -922,6 +1087,103 @@ fn a_refreshed_go_cross_language_pair_exports_what_a_cold_pair_does() {
     assert!(before[1].contains("env:WEB_URL"));
     assert!(refreshed[1].contains("env:SITE_URL"));
     assert!(!refreshed[1].contains("env:WEB_URL"));
+}
+
+/// Edits, adds and deletes `.java` and Spring configuration files of the api: a placeholder's
+/// default goes, the YAML file that gave a constructor parameter its literal URL goes (its key
+/// now names a variable), a module appears with a client and a configuration of its own, a
+/// `@Value` key changes, and the file with the environment read goes.
+fn edit_xlang_java((_, api): &(PathBuf, PathBuf)) {
+    let java = "src/main/java/com/example/api";
+    edit_file(
+        api,
+        "src/main/resources/application.properties",
+        "${AUDIT_URL:https://web.example.com/api}",
+        "${AUDIT_URL}",
+    );
+    fs::remove_file(api.join("src/main/resources/application.yml")).unwrap();
+    edit_file(
+        api,
+        &format!("{java}/PromotionClient.java"),
+        "${PROMO_URL:http://promotions.internal/v2}",
+        "${web.url}",
+    );
+    fs::remove_file(api.join(format!("{java}/ReportClient.java"))).unwrap();
+    let tools = api.join("tools/src/main");
+    fs::create_dir_all(tools.join("resources")).unwrap();
+    fs::create_dir_all(tools.join("java/com/example/tools")).unwrap();
+    fs::write(
+        tools.join("resources/application.properties"),
+        "tool.url=https://web.example.com/api\n",
+    )
+    .unwrap();
+    fs::write(
+        tools.join("java/com/example/tools/ToolClient.java"),
+        "package com.example.tools;\n\n\
+         import org.springframework.beans.factory.annotation.Value;\n\
+         import org.springframework.web.client.RestTemplate;\n\n\
+         public class ToolClient {\n\
+         \x20   @Value(\"${tool.url}\")\n\
+         \x20   private String toolUrl;\n\
+         \x20   private final RestTemplate rest = new RestTemplate();\n\n\
+         \x20   public void level() {\n\
+         \x20       rest.getForObject(toolUrl + \"/stock\", String.class);\n\
+         \x20   }\n\
+         }\n",
+    )
+    .unwrap();
+}
+
+#[test]
+fn a_refreshed_java_cross_language_pair_exports_what_a_cold_pair_does() {
+    let exports = |(web, api): &(PathBuf, PathBuf)| -> Vec<String> {
+        [web, api]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = common::xlang_java("fresh_xlang_java");
+    [&repos.0, &repos.1].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_xlang_java(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = common::xlang_java("fresh_xlang_java_cold");
+    edit_xlang_java(&cold);
+    assert_eq!(refreshed, exports(&cold));
+    assert_ne!(refreshed[1], before[1]);
+    // The default left the configuration, the literal with its file, and the new module's
+    // configuration gives its client a host.
+    assert!(before[1].contains("\"contract\": \"http::POST::/api/audit\""));
+    assert!(!before[1].contains("env:AUDIT_URL"));
+    assert!(refreshed[1].contains("\"via\": \"env:AUDIT_URL\""));
+    assert!(!refreshed[1].contains("\"contract\": \"http::POST::/api/audit\""));
+    assert!(refreshed[1].contains("\"env:stock.url\""));
+    assert!(refreshed[1].contains("tools/src/main/java/com/example/tools/ToolClient.java"));
+    assert!(!refreshed[1].contains("ReportClient.java"));
+    let tool = "\"contract\": \"http::GET::/api/stock\",\n      \"site\": \"example.com/xlang-java/api::tools/";
+    assert!(refreshed[1].contains(tool), "{}", refreshed[1]);
+}
+
+/// A Spring configuration edited alone, with no `.java` file changed, refreshes the contracts.
+#[test]
+fn an_edited_spring_configuration_alone_refreshes_the_java_consumers() {
+    let (_, api) = common::xlang_java("fresh_xlang_java_config");
+    age(&api);
+    let before = Engine::open(&api).unwrap().export().unwrap();
+    let properties = "src/main/resources/application.properties";
+    edit_file(
+        &api,
+        properties,
+        "web.url=${WEB_URL}",
+        "web.url=${SITE_URL}",
+    );
+
+    let refreshed = Engine::open(&api).unwrap().export().unwrap();
+
+    assert!(before.contains("\"via\": \"env:WEB_URL\""));
+    assert!(refreshed.contains("\"via\": \"env:SITE_URL\""));
 }
 
 #[test]

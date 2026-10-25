@@ -8,6 +8,18 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Java OpenFeign or Retrofit method whose link is ambiguous (a Feign client without `url`
+  whose path two repositories serve) or whose URL is unresolved (Retrofit's `@Url`) is an open
+  item at the method: `search` with `kind=ambiguous` or `kind=unresolved` lists it, and
+  `meada decide` resolves it, sending the method as the excerpt.
+- `context` on a public Java class of a shared Maven or Gradle artifact lists the calls in other
+  repositories that reach its constructors and methods, one line per call.
+- A Spring `@Value` in a Gradle source set whose `srcDirs` lies outside `src/main` reads its
+  module's `src/main/resources` configuration.
+- A Retrofit annotation's path is read from `value` alone, and a Retrofit path with a `{` that
+  does not close within its segment gives no consumer, as for Spring, JAX-RS and Feign.
+- A Java field and a method of the same name keep separate namespaces: `repo.save()` and
+  `this.repo.save()` read the field `repo`, `repo()` calls the method.
 - Console manifest groups and validation errors respect the viewer's grant; PKCE redirects
   retain issuer query parameters while replacing generated OAuth keys.
 - Fence recovery shares the fleet reader's Valkey clock and complete heartbeat validation,
@@ -15,6 +27,104 @@ All notable changes to Meada are recorded here. The format follows
   transport remains supported, with bilingual operational refusals at the signed ceiling.
 
 ### Added
+
+- Java OpenFeign and Retrofit clients (issue #90): each method of an `@FeignClient(name, url)`
+  interface with Spring mapping annotations, or of a Retrofit interface with `retrofit2.http`
+  verbs, is an HTTP consumer sited at the interface method, so a caller of the method reaches
+  the provider in `trace` and `context`. A Feign `url` and `path` resolve through the Spring
+  configuration; without `url` the host is unresolved, the consumer's `via` is
+  `client:Feign client <name>` and the reason names the client
+  (`host unresolved (Feign client <name>)`). A Retrofit base comes from the
+  `Retrofit.Builder().baseUrl(base)` that creates the interface, one consumer per creation. The
+  Java pack reads `Api.class` as a class literal. `@RequestLine` and other Feign contracts are
+  not read.
+- Java program entry points (issue #91): a `public static void main(String[])` or
+  `String...` method is a program with its own process.
+- Java source indexing (issue #84): package-qualified types and method signatures, overloads
+  narrowed by argument count, package and static imports, and conformance, determinism and
+  incremental-refresh coverage, without a JDK or build tool.
+- Java method calls (issue #85) through the types the source writes: fields, parameters,
+  locals, `var` with `new T(...)` or a call, chains `f().g()` through the declared return type,
+  `super.f()`, and the supertypes written in `extends` and `implements`. Overload families are
+  read per signature across a class family, an interface receiver stops at the interface, an
+  outside base anywhere in a family keeps its methods from `exact`, and a call on an unknown
+  receiver is a name match that prefers the one candidate in the owning family; a narrowed match
+  says "one of several" in its reason.
+- Maven and Gradle artifact contracts (spec #26, #93), using shared JVM manifest readers:
+  literal `group:artifact` providers, Maven modules and parent groups, Gradle project names,
+  dependencies with unchecked ranges, and ambiguous candidates for computed coordinates.
+  Indexing invokes no JVM toolchain and looks up no registry.
+- Java imports into provider sources (spec #26, #94): a call through an import of a class from a
+  workspace Maven or Gradle artifact the repository depends on (`Type.method()`, `new Type(..)`,
+  a call on a field, parameter or local of the type, on-demand and static imports) reaches the
+  method or constructor in the provider by package declaration, picked by name and argument
+  count, through the package path npm, PyPI, Cargo and Go use. `exact` when one provider
+  declares the package and type, `ambiguous` when several do or overloads of the count remain;
+  the reason ends `; import package` and the export's `how` is `package`. `context` on a public
+  class method lists its consumers in other repositories and `trace` follows the hop. Test
+  source roots (`src/test/java`, and a Gradle `sourceSets` directory of a set other than `main`)
+  are never imported; the Gradle scanner reads literal `srcDirs`, `srcDir` and `srcDirs +=`
+  (Groovy and Kotlin DSL), nothing computed or conditional. A method is picked among the
+  overloads of the class's family in the provider, as Java merges them (an inherited `find(long)`
+  stays beside a declared `find(String)`); an ancestor outside the provider's repository keeps
+  the link from `exact` (`inferred`). Two on-demand imports that both bring a class some
+  provider declares give no link. The stored manifest summary gains `test_roots` and the index
+  a `families` table, so existing indexes rebuild.
+- Spring MVC HTTP providers (spec #26, #86): methods of `@RestController` and `@Controller`
+  classes with `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping`
+  or `@RequestMapping(method = ..)`, under the class `@RequestMapping` prefix, with `static
+  final` constants and `+` folded across classes and one provider per path of an array. A
+  `@RequestMapping` without `method` is an `http::ANY::<path>` provider. Annotations and
+  `RequestMethod` count only through a Spring import (single-type, static or on-demand, the
+  latter through the new `Outside::candidates`, which every Java kind can use); a shadowing
+  repository type, a competing import and `server.servlet.context-path` give no route.
+- JAX-RS HTTP providers (spec #26, #87): methods with `@GET`, `@POST`, `@PUT`, `@PATCH`,
+  `@DELETE`, `@HEAD` or `@OPTIONS` in a class with `@Path`, under `javax.ws.rs` or
+  `jakarta.ws.rs`, at the class path joined to the method `@Path` with constants folded and
+  `{id:regex}` as a parameter. Names count only through an import, as for Spring; a method with
+  only `@Path` and `@ApplicationPath` give no route.
+- Java HTTP consumers (spec #26, #88): RestTemplate methods, WebClient requests (base from
+  `WebClient.create` or `builder().baseUrl`, through constants, `final` fields and each caller
+  of a wrapper), `HttpRequest.newBuilder()` and OkHttp `Request.Builder` chains, `GET` when a
+  whole chain names no method. Clients count through single-type imports and the one candidate
+  of on-demand ones. URLs fold `+`, constants, `URI.create`, `String.format` (each `%s` or `%d`
+  its argument) and `{id}` templates; wrappers are read at each call site
+  through any number of levels, and an unreadable URL is an unresolved consumer. A new
+  `Expand::Chain` reads a call whole, its builder chain and arguments folded at the callers,
+  and carries an outside name such as `HttpMethod.GET` as a `Value::External` spelled by the
+  writing file's imports, so a shadowing type is no method. The written type of a field typed
+  by a single-type import is now spelled as that import names it, and the Java pack keeps a
+  `final` field's one value (its initializer or a single constructor assignment) as a constant
+  of its class.
+- Java base URLs from Spring configuration (spec #26, #89): a field or a constructor parameter
+  with `@Value("${key}")` holds `key` from the `application.properties`, `application.yml` or
+  `application.yaml` of its module's `src/main/resources` (a shared `jvm::spring` reader the
+  Kotlin pack can call). A literal URL links by host; a `${VAR}` placeholder, and `System.getenv("VAR")`, map
+  through `base_url_env`; with `${VAR:default}`, the default links by host when a peer serves
+  it, otherwise `VAR` maps as before. Meada reads no environment value, and profiles and
+  relaxed binding are not read. A constructor parameter takes Spring's value only when no call
+  in the source creates the class (`this(..)` and `super(..)`, now constructor calls,
+  included). A cross-language chain fixture (TypeScript and Java) is
+  golden for its exports and `trace` both ways.
+- Java channels (spec #26, #92): Spring Kafka (`KafkaTemplate.send`, `@KafkaListener`), Spring
+  AMQP (`RabbitTemplate.convertAndSend` by its overload, the default exchange reaching the queue
+  its key names, `@RabbitListener` with `@QueueBinding` bindings and
+  `BindingBuilder.bind(..).to(..).with(..)`), JMS (`JmsTemplate.send` and `convertAndSend`,
+  `@JmsListener`) under the new broker kind `jms` (also an AsyncAPI protocol), the SQS client of
+  the AWS SDK v2 (the queue the last segment of `queueUrl`), jnats `publish` and `subscribe`,
+  and the Redis streams of Jedis and Lettuce (`xadd`, `xreadGroup`, `xreadgroup`). A client
+  counts by the type the source writes for it; names fold like URLs, the `${key}` placeholders
+  of annotations and `@Value` fields read from the module's Spring configuration. An annotated
+  listener's handler is the annotated method, a polling client's the method that names the
+  topic or queue. The Java pack reads an annotation written as an element value
+  (`@Queue("orders")`) as its name and elements, kept only while contracts are extracted. The
+  cross-language chain reaches a `@KafkaListener` from a kafkajs producer. The overload of
+  `convertAndSend` follows the written type of its third argument (`MessagePostProcessor`,
+  `CorrelationData`), and an argument of untold type leaves the producer unresolved; an
+  `@Exchange` is `direct` unless its `type` says otherwise, so a wildcard key binds only on a
+  topic exchange. The Java pack indexes an annotation type (`@interface`) as an interface, so a
+  repository's own annotation hides Spring's of the same name for routes, channels and
+  `@Value`.
 
 - A multilingual documentation site (issue #320), with the README reference migrated to
   Portuguese, English and Spanish guides, React Flow maps and roadmap, accessible static and

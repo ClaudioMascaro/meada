@@ -56,16 +56,18 @@ impl Candidate {
     }
 }
 
-/// The symbol a call sits in.
+/// The symbol a call sits in; for a consumer at a definition, the definition itself.
 pub struct Enclosing {
     pub name: String,
     /// Byte range in the call's file.
     pub span: Range<usize>,
 }
 
-/// A call of a repository that Meada could not link to one provider.
+/// A call of a repository that Meada could not link to one provider, or a consumer at a
+/// definition (a method of a declarative client), which stands for its call.
 pub struct OpenItem {
-    /// The call-site identity, as `meada export` writes it.
+    /// The call-site identity, as `meada export` writes it (the definition's for a consumer at
+    /// one).
     pub id: String,
     pub kind: ItemKind,
     /// The identity of the repository that holds the call.
@@ -74,7 +76,8 @@ pub struct OpenItem {
     pub path: String,
     /// 1-based line of the call, from the file as it is now; `None` when it cannot be read.
     pub line: Option<usize>,
-    /// The call as written, on one line; the callee when the file cannot be read.
+    /// The call (or the definition) as written, on one line; the callee when the file cannot be
+    /// read.
     pub expression: String,
     /// `None` for a call at the top level of its file.
     pub enclosing: Option<Enclosing>,
@@ -147,12 +150,18 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                     }
                     _ => continue,
                 };
-            let Some(call) = calls.get(consumer.site.as_str()) else {
-                continue;
+            // A consumer at a definition (a method of a declarative client, which has no call
+            // of its own) is the definition: its lines are the excerpt (ADR 0006).
+            let (span, caller) = match calls.get(consumer.site.as_str()) {
+                Some(call) => (&call.span, symbols.get(call.caller.as_str())),
+                None => match symbols.get(consumer.site.as_str()) {
+                    Some(def) => (&def.span, Some(def)),
+                    None => continue,
+                },
             };
             let range = |start: i64, end: i64| start as usize..end as usize;
-            let expression = (files.get(&call.span.path))
-                .and_then(|src| src.get(range(call.span.start, call.span.end)))
+            let expression = (files.get(&span.path))
+                .and_then(|src| src.get(range(span.start, span.end)))
                 .map(|text| {
                     String::from_utf8_lossy(text)
                         .split_whitespace()
@@ -176,11 +185,11 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                 kind,
                 repository: export.repository.clone(),
                 line: files
-                    .get(&call.span.path)
-                    .map(|src| crate::render::line_of(src, call.span.start)),
-                path: call.span.path.clone(),
+                    .get(&span.path)
+                    .map(|src| crate::render::line_of(src, span.start)),
+                path: span.path.clone(),
                 expression,
-                enclosing: symbols.get(call.caller.as_str()).map(|s| Enclosing {
+                enclosing: caller.map(|s| Enclosing {
                     name: crate::render::label(&s.id).to_string(),
                     span: range(s.span.start, s.span.end),
                 }),

@@ -1,0 +1,1808 @@
+{
+  "repository": "example.com/jvm/client",
+  "files": [
+    {
+      "path": "src/main/java/example/batch/Wild.java",
+      "hash": "e2315b6002829e387c49f15cf02ed2206a5ab6475f2ae337faa4342071e3ff17"
+    },
+    {
+      "path": "src/main/java/example/web/Bulk.java",
+      "hash": "a41107eb1d4dd30e1c95549c7e523a74812419e9c0c4df59333bc452dac039c8"
+    },
+    {
+      "path": "src/main/java/example/web/Checkout.java",
+      "hash": "c7e4ea5d046d72e09eab23105b9955451cd8bdd721c285ea42f510fcdb588082"
+    },
+    {
+      "path": "src/main/java/example/web/Family.java",
+      "hash": "5082b2a618b7590dd5b7c1fc8cf00c133032b2362073c23ac1ef42372427f4cd"
+    },
+    {
+      "path": "src/main/java/example/web/Ledger.java",
+      "hash": "5b29a96d3aa308eb1d59fa287e41daba531e43d7cac455f15554e8dd155ddd3b"
+    },
+    {
+      "path": "src/main/java/example/web/Probes.java",
+      "hash": "20c0be9e5ae8c73ac86338676b37febce59ca47027e5ab0ecd4b8601d119fea5"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/jvm/client::src/main/java/example/batch/Wild.java::example.batch.Wild",
+      "span": {
+        "path": "src/main/java/example/batch/Wild.java",
+        "start": 72,
+        "end": 212
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/batch/Wild.java::example.batch.Wild.both()",
+      "span": {
+        "path": "src/main/java/example/batch/Wild.java",
+        "start": 96,
+        "end": 150
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/batch/Wild.java::example.batch.Wild.one()",
+      "span": {
+        "path": "src/main/java/example/batch/Wild.java",
+        "start": 156,
+        "end": 210
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk",
+      "span": {
+        "path": "src/main/java/example/web/Bulk.java",
+        "start": 88,
+        "end": 246
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.prepared()",
+      "span": {
+        "path": "src/main/java/example/web/Bulk.java",
+        "start": 199,
+        "end": 244
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)",
+      "span": {
+        "path": "src/main/java/example/web/Bulk.java",
+        "start": 112,
+        "end": 193
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout",
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 142,
+        "end": 663
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.create()",
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 349,
+        "end": 407
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.external()",
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 610,
+        "end": 661
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.later()",
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 476,
+        "end": 535
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)",
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 170,
+        "end": 343
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.sample()",
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 541,
+        "end": 604
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()",
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 413,
+        "end": 470
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family",
+      "span": {
+        "path": "src/main/java/example/web/Family.java",
+        "start": 108,
+        "end": 536
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.coded(Event)",
+      "span": {
+        "path": "src/main/java/example/web/Family.java",
+        "start": 408,
+        "end": 474
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)",
+      "span": {
+        "path": "src/main/java/example/web/Family.java",
+        "start": 134,
+        "end": 200
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()",
+      "span": {
+        "path": "src/main/java/example/web/Family.java",
+        "start": 206,
+        "end": 261
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.named(Repo)",
+      "span": {
+        "path": "src/main/java/example/web/Family.java",
+        "start": 267,
+        "end": 333
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.noted()",
+      "span": {
+        "path": "src/main/java/example/web/Family.java",
+        "start": 480,
+        "end": 534
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.sized(Repo)",
+      "span": {
+        "path": "src/main/java/example/web/Family.java",
+        "start": 339,
+        "end": 402
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Ledger.java::example.web.Ledger",
+      "span": {
+        "path": "src/main/java/example/web/Ledger.java",
+        "start": 22,
+        "end": 111
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Ledger.java::example.web.Ledger.of(int)",
+      "span": {
+        "path": "src/main/java/example/web/Ledger.java",
+        "start": 48,
+        "end": 109
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes",
+      "span": {
+        "path": "src/main/java/example/web/Probes.java",
+        "start": 48,
+        "end": 366
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.hidden(java.util.Optional<Integer>)",
+      "span": {
+        "path": "src/main/java/example/web/Probes.java",
+        "start": 138,
+        "end": 229
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.local()",
+      "span": {
+        "path": "src/main/java/example/web/Probes.java",
+        "start": 235,
+        "end": 364
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.shadowed()",
+      "span": {
+        "path": "src/main/java/example/web/Probes.java",
+        "start": 74,
+        "end": 132
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/jvm/client::src/main/java/example/batch/Wild.java::example.batch.Wild.both()::Ledger.of#0",
+      "caller": "example.com/jvm/client::src/main/java/example/batch/Wild.java::example.batch.Wild.both()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/batch/Wild.java",
+        "start": 131,
+        "end": 143
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/batch/Wild.java::example.batch.Wild.one()::Ledger.open#0",
+      "caller": "example.com/jvm/client::src/main/java/example/batch/Wild.java::example.batch.Wild.one()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/batch/Wild.java",
+        "start": 190,
+        "end": 203
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.prepared()::of#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.prepared()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Bulk.java",
+        "start": 232,
+        "end": 237
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)::(method_invocation).total#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Bulk.java",
+        "start": 160,
+        "end": 186
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)::Order.of#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Bulk.java",
+        "start": 160,
+        "end": 178
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.create()::Order#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.create()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 388,
+        "end": 400
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.external()::Thing.run#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.external()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 643,
+        "end": 654
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.later()::Stamp.later#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.later()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 515,
+        "end": 528
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::Order.of#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 223,
+        "end": 241
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 251,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#1",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 285,
+        "end": 306
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.total#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 323,
+        "end": 336
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.sample()::Fixtures.sample#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.sample()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 580,
+        "end": 597
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()::Stamp.now#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Checkout.java",
+        "start": 452,
+        "end": 463
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.coded(Event)::event.code#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.coded(Event)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Family.java",
+        "start": 455,
+        "end": 467
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)::repo.find#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Family.java",
+        "start": 179,
+        "end": 193
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()::Repo.of#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Family.java",
+        "start": 244,
+        "end": 254
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.named(Repo)::repo.name#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.named(Repo)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Family.java",
+        "start": 315,
+        "end": 326
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.noted()::Note#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.noted()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Family.java",
+        "start": 517,
+        "end": 527
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.sized(Repo)::repo.size#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.sized(Repo)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Family.java",
+        "start": 384,
+        "end": 395
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.hidden(java.util.Optional<Integer>)::Order.of#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.hidden(java.util.Optional<Integer>)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Probes.java",
+        "start": 211,
+        "end": 222
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.local()::Order.of#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.local()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Probes.java",
+        "start": 346,
+        "end": 357
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.local()::java.util.Optional.empty#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.local()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/web/Probes.java",
+        "start": 303,
+        "end": 329
+      }
+    },
+    {
+      "id": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.shadowed()::Ledger.of#0",
+      "caller": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.shadowed()",
+      "target": "example.com/jvm/client::src/main/java/example/web/Ledger.java::example.web.Ledger.of(int)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/java/example/web/Probes.java",
+        "start": 113,
+        "end": 125
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::maven::example:web",
+      "site": "example.com/jvm/client::pom.xml"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "package::maven::*:tools",
+      "site": "example.com/jvm/client::pom.xml::dependencies::*:tools",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::pom.xml::dependencies::example:model*",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::pom.xml::dependencies::example:models",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.prepared()::of#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.prepared()::of#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.prepared()::of#0",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)::Order.of#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)::Order.of#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)::Order.of#0",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.create()::Order#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.create()::Order#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.create()::Order#0",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.later()::Stamp.later#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.later()::Stamp.later#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.later()::Stamp.later#0",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::Order.of#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::Order.of#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::Order.of#0",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#0",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#1",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#1",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#1",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.total#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.total#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.total#0",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()::Stamp.now#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()::Stamp.now#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()::Stamp.now#0",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.coded(Event)::event.code#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.coded(Event)::event.code#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.coded(Event)::event.code#0",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)::repo.find#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)::repo.find#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)::repo.find#0",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()::Repo.of#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()::Repo.of#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()::Repo.of#0",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.named(Repo)::repo.name#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.named(Repo)::repo.name#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.named(Repo)::repo.name#0",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.sized(Repo)::repo.size#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:model*",
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.sized(Repo)::repo.size#0",
+      "via": "computed"
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.sized(Repo)::repo.size#0",
+      "via": null
+    }
+  ],
+  "packages": [
+    {
+      "name": "example:web",
+      "repository": "example.com/jvm/client",
+      "directory": ".",
+      "ecosystem": "maven"
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "pom.xml",
+      "field": "dependencies",
+      "name": "*:tools",
+      "range": "2"
+    },
+    {
+      "manifest": "pom.xml",
+      "field": "dependencies",
+      "name": "example:*",
+      "range": "3"
+    },
+    {
+      "manifest": "pom.xml",
+      "field": "dependencies",
+      "name": "example:model*",
+      "range": "1"
+    },
+    {
+      "manifest": "pom.xml",
+      "field": "dependencies",
+      "name": "example:models",
+      "range": "${version}"
+    }
+  ],
+  "imports": [
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.prepared()::of#0",
+      "specifier": "example.models.Order",
+      "name": "of(1)",
+      "level": "exact",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)::Order.of#0",
+      "specifier": "example.models.Order",
+      "name": "of(1)",
+      "level": "exact",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.create()::Order#0",
+      "specifier": "example.models.Order",
+      "name": "Order(1)",
+      "level": "exact",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.Order(int)"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.later()::Stamp.later#0",
+      "specifier": "example.shared.Stamp",
+      "name": "later(0)",
+      "level": "ambiguous",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.later()"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::Order.of#0",
+      "specifier": "example.models.Order",
+      "name": "of(1)",
+      "level": "exact",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#0",
+      "specifier": "example.models.Order",
+      "name": "place(2)",
+      "level": "exact",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int,int)"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#1",
+      "specifier": "example.models.Order",
+      "name": "place(1)",
+      "level": "ambiguous",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(String)"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#1",
+      "specifier": "example.models.Order",
+      "name": "place(1)",
+      "level": "ambiguous",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int)"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.total#0",
+      "specifier": "example.models.Order",
+      "name": "total(0)",
+      "level": "exact",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()::Stamp.now#0",
+      "specifier": "example.shared.Stamp",
+      "name": "now(0)",
+      "level": "ambiguous",
+      "how": "package",
+      "target": "example.com/jvm/gradle::src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()::Stamp.now#0",
+      "specifier": "example.shared.Stamp",
+      "name": "now(0)",
+      "level": "ambiguous",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.coded(Event)::event.code#0",
+      "specifier": "example.models.Event",
+      "name": "code(0)",
+      "level": "inferred",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Event.java::example.models.Event.code()"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)::repo.find#0",
+      "specifier": "example.models.Repo",
+      "name": "find(1)",
+      "level": "ambiguous",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.find(long)"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)::repo.find#0",
+      "specifier": "example.models.Repo",
+      "name": "find(1)",
+      "level": "ambiguous",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.find(String)"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()::Repo.of#0",
+      "specifier": "example.models.Repo",
+      "name": "of(1)",
+      "level": "ambiguous",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.of(int)"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()::Repo.of#0",
+      "specifier": "example.models.Repo",
+      "name": "of(1)",
+      "level": "ambiguous",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.of(String)"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.named(Repo)::repo.name#0",
+      "specifier": "example.models.Repo",
+      "name": "name(0)",
+      "level": "exact",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.name()"
+    },
+    {
+      "site": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.sized(Repo)::repo.size#0",
+      "specifier": "example.models.Repo",
+      "name": "size(0)",
+      "level": "exact",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.size()"
+    }
+  ],
+  "communities": [
+    {
+      "name": "src/main/java/example/web",
+      "members": [
+        "example.com/jvm/client::src/main/java/example/web/Ledger.java::example.web.Ledger.of(int)",
+        "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.shadowed()"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::*:tools",
+      "provider": "example.com/jvm/gradle::tools/build.gradle",
+      "contract": "package::maven::*:tools",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::*:tools 2 (local 2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "provider": "example.com/jvm/gradle-client::build.gradle",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "provider": "example.com/jvm/gradle::build.gradle.kts",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "provider": "example.com/jvm/gradle::extras/nested/build.gradle.kts",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "provider": "example.com/jvm/gradle::tools/build.gradle",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "provider": "example.com/jvm/maven::billing/pom.xml",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "provider": "example.com/jvm/maven::models/pom.xml",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:*",
+      "provider": "example.com/jvm/maven::pom.xml",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:model*",
+      "provider": "example.com/jvm/maven::models/pom.xml",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::pom.xml::dependencies::example:models",
+      "provider": "example.com/jvm/maven::models/pom.xml",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.prepared()::of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.prepared()::of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.prepared()::of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)::Order.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)::Order.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)::Order.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.create()::Order#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.Order(int)",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.create()::Order#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.Order(int)",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.create()::Order#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.Order(int)",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.later()::Stamp.later#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.later()",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.later()::Stamp.later#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.later()",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.later()::Stamp.later#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.later()",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::Order.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::Order.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::Order.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int,int)",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int,int)",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int,int)",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#1",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(String)",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#1",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(String)",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#1",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(String)",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#1",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int)",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#1",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int)",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#1",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int)",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.total#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.total#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.total#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()::Stamp.now#0",
+      "provider": "example.com/jvm/gradle::src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()::Stamp.now#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()::Stamp.now#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()::Stamp.now#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.coded(Event)::event.code#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Event.java::example.models.Event.code()",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.coded(Event)::event.code#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Event.java::example.models.Event.code()",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.coded(Event)::event.code#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Event.java::example.models.Event.code()",
+      "contract": "package::maven::example:models",
+      "level": "inferred",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)::repo.find#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.find(long)",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)::repo.find#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.find(long)",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)::repo.find#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.find(long)",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)::repo.find#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.find(String)",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)::repo.find#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.find(String)",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)::repo.find#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.find(String)",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()::Repo.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.of(int)",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()::Repo.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.of(int)",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()::Repo.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.of(int)",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()::Repo.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.of(String)",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()::Repo.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.of(String)",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()::Repo.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.of(String)",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.named(Repo)::repo.name#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.name()",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.named(Repo)::repo.name#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.name()",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.named(Repo)::repo.name#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.name()",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.sized(Repo)::repo.size#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.size()",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "8 providers fit; computed coordinate; package::maven::example:* 3 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.sized(Repo)::repo.size#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.size()",
+      "contract": "package::maven::example:model*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:model* 1 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.sized(Repo)::repo.size#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.size()",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models ${version} (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::build.gradle::runtimeOnly::example:*",
+      "provider": "example.com/jvm/client::pom.xml",
+      "contract": "package::maven::example:*",
+      "level": "ambiguous",
+      "reason": "7 providers fit; computed coordinate; package::maven::example:* 3 (local none), range unchecked"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/batch/Wild.java::example.batch.Wild.both()",
+      "kind": "export",
+      "label": "example.batch.Wild.both()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/batch/Wild.java::example.batch.Wild.both()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/batch/Wild.java::example.batch.Wild.one()",
+      "kind": "export",
+      "label": "example.batch.Wild.one()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/batch/Wild.java::example.batch.Wild.one()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.prepared()",
+      "kind": "export",
+      "label": "example.web.Bulk.prepared()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.prepared()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/client",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.prepared()::of#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)",
+      "kind": "export",
+      "label": "example.web.Bulk.total(int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/client",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)::Order.of#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.create()",
+      "kind": "export",
+      "label": "example.web.Checkout.create()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.create()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/client",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.create()::Order#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.Order(int)"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.external()",
+      "kind": "export",
+      "label": "example.web.Checkout.external()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.external()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.later()",
+      "kind": "export",
+      "label": "example.web.Checkout.later()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.later()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/client",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.later()::Stamp.later#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.later()"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)",
+      "kind": "export",
+      "label": "example.web.Checkout.pay(int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/client",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::Order.of#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/client",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int,int)"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/client",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.place#1",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(String)",
+            "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int)"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/client",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)::order.total#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.sample()",
+      "kind": "export",
+      "label": "example.web.Checkout.sample()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.sample()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()",
+      "kind": "export",
+      "label": "example.web.Checkout.stamp()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/client",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()::Stamp.now#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/jvm/gradle::src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()",
+            "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.coded(Event)",
+      "kind": "export",
+      "label": "example.web.Family.coded(Event)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.coded(Event)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/client",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.coded(Event)::event.code#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/jvm/maven::models/src/main/java/example/models/Event.java::example.models.Event.code()"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)",
+      "kind": "export",
+      "label": "example.web.Family.find(Repo)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/client",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)::repo.find#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.find(long)",
+            "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.find(String)"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()",
+      "kind": "export",
+      "label": "example.web.Family.made()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/client",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()::Repo.of#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.of(int)",
+            "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.of(String)"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.named(Repo)",
+      "kind": "export",
+      "label": "example.web.Family.named(Repo)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.named(Repo)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/client",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.named(Repo)::repo.name#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.name()"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.noted()",
+      "kind": "export",
+      "label": "example.web.Family.noted()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.noted()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.sized(Repo)",
+      "kind": "export",
+      "label": "example.web.Family.sized(Repo)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.sized(Repo)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/client",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.sized(Repo)::repo.size#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.size()"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.hidden(java.util.Optional<Integer>)",
+      "kind": "export",
+      "label": "example.web.Probes.hidden(java.util.Optional<Integer>)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.hidden(java.util.Optional<Integer>)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.local()",
+      "kind": "export",
+      "label": "example.web.Probes.local()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.local()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.shadowed()",
+      "kind": "export",
+      "label": "example.web.Probes.shadowed()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.shadowed()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/client",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/jvm/client::src/main/java/example/web/Ledger.java::example.web.Ledger.of(int)"
+        }
+      ]
+    }
+  ]
+}

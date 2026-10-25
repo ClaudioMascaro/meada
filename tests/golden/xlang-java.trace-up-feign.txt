@@ -1,0 +1,6 @@
+example.com/xlang-java/web app/api/inventory/[sku]/route.ts:1 GET
+  →[exact: host web.example.com is served by example.com/xlang-java/web] example.com/xlang-java/api src/main/java/com/example/api/InventoryClient.java:11 com.example.api.InventoryClient.left(String)
+    example.com/xlang-java/api src/main/java/com/example/api/OrderController.java:44 com.example.api.OrderController.reserve()
+      →[exact: host api.example.com is served by example.com/xlang-java/api] example.com/xlang-java/web src/orders.ts:10 reserveOrder
+        example.com/xlang-java/web src/sync.ts:5 syncOrders
+chain: exact · 2 hops · 2 repos · 160 tokens

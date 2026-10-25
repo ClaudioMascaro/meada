@@ -1,0 +1,489 @@
+{
+  "repository": "example.com/xlang-java/web",
+  "files": [
+    {
+      "path": "app/api/audit/route.ts",
+      "hash": "646000f05a54a28b0fb8c1e897114cc25c059a12b6198b4cdb34ece09d6830d4"
+    },
+    {
+      "path": "app/api/catalog/route.ts",
+      "hash": "e4dcd4a1eac15dcb79254b7175ad12eebdfcb0889c88de5852ab456e118e0b08"
+    },
+    {
+      "path": "app/api/inventory/[sku]/route.ts",
+      "hash": "42b6b93fec6956c15d6fef8c405fb62f7f7a654ba9fc8673cd66ad6fef3f21c8"
+    },
+    {
+      "path": "app/api/prices/[sku]/route.ts",
+      "hash": "864cec176aff35f6914c56db5d229d7318eeb37dc5b6e5c84930d8d1ee37ed67"
+    },
+    {
+      "path": "app/api/promotions/route.ts",
+      "hash": "e4dcd4a1eac15dcb79254b7175ad12eebdfcb0889c88de5852ab456e118e0b08"
+    },
+    {
+      "path": "app/api/reports/route.ts",
+      "hash": "e4dcd4a1eac15dcb79254b7175ad12eebdfcb0889c88de5852ab456e118e0b08"
+    },
+    {
+      "path": "app/api/stock/route.ts",
+      "hash": "4455f21194764169c5e5fe0c8dc6bb4024ddbc6d76ce4fa47030e343a0d60f14"
+    },
+    {
+      "path": "src/events.ts",
+      "hash": "aa885823926b01bb9f51e97ceb75e6a4ab04aabd9f6e0841faeb4f53358b1b5a"
+    },
+    {
+      "path": "src/orders.ts",
+      "hash": "7e3a8c701891319bf6227916a09aa12b5886d937d7086e69863b67b971e73f79"
+    },
+    {
+      "path": "src/sync.ts",
+      "hash": "fe6ce37d2379c6fa9ebd6bb0a41fee2d5d1798cd6a51d834dcdd2d5c9648ba59"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/xlang-java/web::app/api/audit/route.ts::POST",
+      "span": {
+        "path": "app/api/audit/route.ts",
+        "start": 7,
+        "end": 78
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::app/api/catalog/route.ts::GET",
+      "span": {
+        "path": "app/api/catalog/route.ts",
+        "start": 7,
+        "end": 59
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::app/api/inventory/[sku]/route.ts::GET",
+      "span": {
+        "path": "app/api/inventory/[sku]/route.ts",
+        "start": 7,
+        "end": 68
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::app/api/prices/[sku]/route.ts::GET",
+      "span": {
+        "path": "app/api/prices/[sku]/route.ts",
+        "start": 7,
+        "end": 145
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::app/api/promotions/route.ts::GET",
+      "span": {
+        "path": "app/api/promotions/route.ts",
+        "start": 7,
+        "end": 59
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::app/api/reports/route.ts::GET",
+      "span": {
+        "path": "app/api/reports/route.ts",
+        "start": 7,
+        "end": 59
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::app/api/stock/route.ts::GET",
+      "span": {
+        "path": "app/api/stock/route.ts",
+        "start": 7,
+        "end": 69
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::src/events.ts::announceShipment",
+      "span": {
+        "path": "src/events.ts",
+        "start": 208,
+        "end": 334
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::src/orders.ts::orderStatus",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 75,
+        "end": 150
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::src/orders.ts::reserveOrder",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 195,
+        "end": 300
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::src/sync.ts::syncOrders",
+      "span": {
+        "path": "src/sync.ts",
+        "start": 62,
+        "end": 153
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/xlang-java/web::app/api/audit/route.ts::POST::Response#0",
+      "caller": "example.com/xlang-java/web::app/api/audit/route.ts::POST",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/audit/route.ts",
+        "start": 40,
+        "end": 75
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::app/api/catalog/route.ts::GET::Response.json#0",
+      "caller": "example.com/xlang-java/web::app/api/catalog/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/catalog/route.ts",
+        "start": 39,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::app/api/inventory/[sku]/route.ts::GET::Response.json#0",
+      "caller": "example.com/xlang-java/web::app/api/inventory/[sku]/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/inventory/[sku]/route.ts",
+        "start": 39,
+        "end": 65
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::app/api/prices/[sku]/route.ts::GET::Response.json#0",
+      "caller": "example.com/xlang-java/web::app/api/prices/[sku]/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/prices/[sku]/route.ts",
+        "start": 97,
+        "end": 142
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::app/api/promotions/route.ts::GET::Response.json#0",
+      "caller": "example.com/xlang-java/web::app/api/promotions/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/promotions/route.ts",
+        "start": 39,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::app/api/reports/route.ts::GET::Response.json#0",
+      "caller": "example.com/xlang-java/web::app/api/reports/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/reports/route.ts",
+        "start": 39,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::app/api/stock/route.ts::GET::Response.json#0",
+      "caller": "example.com/xlang-java/web::app/api/stock/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/stock/route.ts",
+        "start": 39,
+        "end": 66
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::src/events.ts::Kafka#0",
+      "caller": "example.com/xlang-java/web::src/events.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.ts",
+        "start": 48,
+        "end": 103
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::src/events.ts::announceShipment::producer.send#0",
+      "caller": "example.com/xlang-java/web::src/events.ts::announceShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.ts",
+        "start": 262,
+        "end": 331
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::src/events.ts::kafka.producer#0",
+      "caller": "example.com/xlang-java/web::src/events.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.ts",
+        "start": 122,
+        "end": 138
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::src/orders.ts::orderStatus::fetch#0",
+      "caller": "example.com/xlang-java/web::src/orders.ts::orderStatus",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/orders.ts",
+        "start": 119,
+        "end": 147
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::src/orders.ts::reserveOrder::fetch#0",
+      "caller": "example.com/xlang-java/web::src/orders.ts::reserveOrder",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/orders.ts",
+        "start": 230,
+        "end": 297
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::src/sync.ts::syncOrders::orderStatus#0",
+      "caller": "example.com/xlang-java/web::src/sync.ts::syncOrders",
+      "target": "example.com/xlang-java/web::src/orders.ts::orderStatus",
+      "level": "exact",
+      "span": {
+        "path": "src/sync.ts",
+        "start": 110,
+        "end": 125
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::src/sync.ts::syncOrders::reserveOrder#0",
+      "caller": "example.com/xlang-java/web::src/sync.ts::syncOrders",
+      "target": "example.com/xlang-java/web::src/orders.ts::reserveOrder",
+      "level": "exact",
+      "span": {
+        "path": "src/sync.ts",
+        "start": 136,
+        "end": 150
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::kafka::orders.shipped",
+      "site": "example.com/xlang-java/web::src/events.ts::announceShipment::producer.send#0"
+    },
+    {
+      "contract": "http::GET::/api/catalog",
+      "site": "example.com/xlang-java/web::app/api/catalog/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/catalog/route.ts"
+        },
+        "fields": [
+          "[]"
+        ],
+        "open": [
+          "[]"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/inventory/{}",
+      "site": "example.com/xlang-java/web::app/api/inventory/[sku]/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/inventory/[sku]/route.ts"
+        },
+        "fields": [
+          "left"
+        ],
+        "scalars": [
+          "left"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/prices/{}",
+      "site": "example.com/xlang-java/web::app/api/prices/[sku]/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/prices/[sku]/route.ts"
+        },
+        "fields": [
+          "price",
+          "sku"
+        ],
+        "open": [
+          "sku"
+        ],
+        "scalars": [
+          "price"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/promotions",
+      "site": "example.com/xlang-java/web::app/api/promotions/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/promotions/route.ts"
+        },
+        "fields": [
+          "[]"
+        ],
+        "open": [
+          "[]"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/reports",
+      "site": "example.com/xlang-java/web::app/api/reports/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/reports/route.ts"
+        },
+        "fields": [
+          "[]"
+        ],
+        "open": [
+          "[]"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/stock",
+      "site": "example.com/xlang-java/web::app/api/stock/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/stock/route.ts"
+        },
+        "fields": [
+          "level"
+        ],
+        "scalars": [
+          "level"
+        ]
+      }
+    },
+    {
+      "contract": "http::POST::/api/audit",
+      "site": "example.com/xlang-java/web::app/api/audit/route.ts::POST"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "http::POST::/orders/reserve",
+      "site": "example.com/xlang-java/web::src/orders.ts::reserveOrder::fetch#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/orders/{}",
+      "site": "example.com/xlang-java/web::src/sync.ts::syncOrders::orderStatus#0",
+      "via": "env:API_URL"
+    }
+  ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/xlang-java/web::src/orders.ts::orderStatus",
+        "example.com/xlang-java/web::src/orders.ts::reserveOrder",
+        "example.com/xlang-java/web::src/sync.ts::syncOrders"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api.AuditClient.record()::rest.postForObject#0",
+      "provider": "example.com/xlang-java/web::app/api/audit/route.ts::POST",
+      "contract": "http::POST::/api/audit",
+      "level": "exact",
+      "reason": "host web.example.com is served by example.com/xlang-java/web"
+    },
+    {
+      "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/CatalogClient.java::com.example.api.CatalogClient.all()",
+      "provider": "example.com/xlang-java/web::app/api/catalog/route.ts::GET",
+      "contract": "http::GET::/api/catalog",
+      "level": "inferred",
+      "reason": "host unresolved (Feign client catalog); the only repository serving it is example.com/xlang-java/web"
+    },
+    {
+      "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/InventoryClient.java::com.example.api.InventoryClient.left(String)",
+      "provider": "example.com/xlang-java/web::app/api/inventory/[sku]/route.ts::GET",
+      "contract": "http::GET::/api/inventory/{}",
+      "level": "exact",
+      "reason": "host web.example.com is served by example.com/xlang-java/web"
+    },
+    {
+      "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)::prices.priceOf#0",
+      "provider": "example.com/xlang-java/web::app/api/prices/[sku]/route.ts::GET",
+      "contract": "http::GET::/api/prices/{}",
+      "level": "inferred",
+      "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-java/web"
+    },
+    {
+      "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient.current()::rest.getForObject#0",
+      "provider": "example.com/xlang-java/web::app/api/promotions/route.ts::GET",
+      "contract": "http::GET::/api/promotions",
+      "level": "inferred",
+      "reason": "base URL from PROMO_URL, a base_url_env of peer example.com/xlang-java/web"
+    },
+    {
+      "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()::(method_invocation).build#0",
+      "provider": "example.com/xlang-java/web::app/api/reports/route.ts::GET",
+      "contract": "http::GET::/api/reports",
+      "level": "inferred",
+      "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-java/web"
+    },
+    {
+      "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener.onShipment(String)",
+      "provider": "example.com/xlang-java/web::src/events.ts::announceShipment::producer.send#0",
+      "contract": "channel::kafka::orders.shipped",
+      "level": "exact",
+      "reason": "channel::kafka::orders.shipped"
+    },
+    {
+      "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()::(method_invocation).uri#0",
+      "provider": "example.com/xlang-java/web::app/api/stock/route.ts::GET",
+      "contract": "http::GET::/api/stock",
+      "level": "exact",
+      "reason": "host web.example.com is served by example.com/xlang-java/web"
+    },
+    {
+      "consumer": "example.com/xlang-java/web::src/orders.ts::reserveOrder::fetch#0",
+      "provider": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.reserve()",
+      "contract": "http::POST::/orders/reserve",
+      "level": "exact",
+      "reason": "host api.example.com is served by example.com/xlang-java/api"
+    },
+    {
+      "consumer": "example.com/xlang-java/web::src/sync.ts::syncOrders::orderStatus#0",
+      "provider": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)",
+      "contract": "http::GET::/orders/{}",
+      "level": "inferred",
+      "reason": "base URL from API_URL, a base_url_env of peer example.com/xlang-java/api"
+    }
+  ]
+}

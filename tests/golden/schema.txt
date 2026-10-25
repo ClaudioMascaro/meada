@@ -7,7 +7,7 @@ CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NU
 CREATE INDEX symbols_path ON symbols (path);
 CREATE TABLE calls (
     id TEXT NOT NULL, caller TEXT NOT NULL, target TEXT, level TEXT,
-    path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL
+    path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, narrowed INTEGER NOT NULL
 );
 CREATE INDEX calls_path ON calls (path);
 CREATE TABLE candidates (call TEXT NOT NULL, target TEXT NOT NULL);
@@ -26,6 +26,7 @@ CREATE TABLE manifests (
     summary TEXT NOT NULL
 );
 CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
+CREATE TABLE families (path TEXT NOT NULL, class TEXT NOT NULL, ancestors TEXT);
 CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL, site TEXT NOT NULL);
 CREATE TABLE communities (name TEXT NOT NULL, member TEXT NOT NULL);
 
@@ -1265,6 +1266,289 @@ sample.go
   "package": "store"
 }
 
+sample.java
+{
+  "defs": [
+    {
+      "name": "example.Store",
+      "kind": "Class",
+      "range": {
+        "start": 89,
+        "end": 489
+      },
+      "params": [],
+      "bases": [
+        "Base",
+        "Comparable"
+      ]
+    },
+    {
+      "name": "example.Store.Store()",
+      "kind": "Method",
+      "range": {
+        "start": 233,
+        "end": 250
+      },
+      "params": []
+    },
+    {
+      "name": "example.Store.get(String)",
+      "kind": "Method",
+      "range": {
+        "start": 255,
+        "end": 313
+      },
+      "params": [
+        {
+          "name": "key",
+          "binds": "Any"
+        }
+      ],
+      "result": {
+        "Type": "String"
+      }
+    },
+    {
+      "name": "example.Store.get(String,int)",
+      "kind": "Method",
+      "range": {
+        "start": 318,
+        "end": 382
+      },
+      "params": [
+        {
+          "name": "key",
+          "binds": "Any"
+        },
+        {
+          "name": "count",
+          "binds": "Any"
+        }
+      ],
+      "result": {
+        "Type": "String"
+      }
+    },
+    {
+      "name": "example.Store.hidden()",
+      "kind": "Method",
+      "range": {
+        "start": 387,
+        "end": 451
+      },
+      "params": []
+    },
+    {
+      "name": "example.Store.reset()",
+      "kind": "Method",
+      "range": {
+        "start": 456,
+        "end": 487
+      },
+      "params": []
+    }
+  ],
+  "overloads": {
+    "example.Store.get": [
+      "example.Store.get(String)",
+      "example.Store.get(String,int)"
+    ],
+    "example.Store.hidden": [
+      "example.Store.hidden()"
+    ],
+    "example.Store.reset": [
+      "example.Store.reset()"
+    ]
+  },
+  "constructors": {
+    "example.Store": [
+      "example.Store.Store()"
+    ]
+  },
+  "statics": [
+    "example.Store.PREFIX"
+  ],
+  "imports": [
+    {
+      "local": "@glob0",
+      "source": "java.lang",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob0",
+          "inside": false,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "@glob2",
+      "source": "example",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob2",
+          "inside": true,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "Client",
+      "source": "example.shared.Client",
+      "name": "Qualified"
+    },
+    {
+      "local": "@static5",
+      "source": "example.shared.Helpers",
+      "name": "Qualified"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@static5",
+          "inside": false,
+          "public": false
+        }
+      }
+    }
+  ],
+  "exports": [
+    {
+      "Local": {
+        "exported": "Store",
+        "local": "example.Store"
+      }
+    },
+    {
+      "Local": {
+        "exported": "example.Store",
+        "local": "example.Store"
+      }
+    }
+  ],
+  "star": {
+    "Only": [
+      "Store",
+      "example.Store"
+    ]
+  },
+  "calls": [
+    {
+      "scope": "example.Store.get(String)",
+      "callee": "Client.read",
+      "arity": 1,
+      "range": {
+        "start": 294,
+        "end": 310
+      }
+    },
+    {
+      "scope": "example.Store.get(String,int)",
+      "callee": "get",
+      "arity": 1,
+      "range": {
+        "start": 371,
+        "end": 379
+      },
+      "by_path": true
+    },
+    {
+      "scope": "example.Store.hidden()",
+      "callee": "Store",
+      "arity": 0,
+      "constructs": true,
+      "range": {
+        "start": 422,
+        "end": 433
+      },
+      "by_path": true
+    },
+    {
+      "scope": "example.Store.hidden()",
+      "callee": "copy.hidden",
+      "arity": 0,
+      "range": {
+        "start": 435,
+        "end": 448
+      }
+    }
+  ],
+  "consts": [
+    {
+      "name": "example.Store.PREFIX"
+    },
+    {
+      "name": ".client"
+    }
+  ],
+  "receivers": [
+    {
+      "scope": "example.Store",
+      "name": "client",
+      "class": {
+        "Type": "Client"
+      }
+    },
+    {
+      "scope": "example.Store",
+      "name": "PREFIX",
+      "class": {
+        "Type": "String"
+      }
+    },
+    {
+      "scope": "example.Store.get(String)",
+      "name": "key",
+      "class": {
+        "Type": "String"
+      }
+    },
+    {
+      "scope": "example.Store.get(String,int)",
+      "name": "key",
+      "class": {
+        "Type": "String"
+      }
+    },
+    {
+      "scope": "example.Store.get(String,int)",
+      "name": "count",
+      "class": "Unknown"
+    },
+    {
+      "scope": "example.Store.hidden()",
+      "name": "copy",
+      "class": {
+        "Type": "Store"
+      }
+    }
+  ],
+  "externs": [
+    "Base",
+    "Client",
+    "Comparable",
+    "Store",
+    "String",
+    "var"
+  ],
+  "hidden": [
+    "example.Store.hidden()",
+    "example.Store.reset()"
+  ],
+  "package": "example"
+}
+
 sample.openapi.yaml
 {
   "format": "openapi",
@@ -1510,6 +1794,72 @@ sample.requirements.txt
       "range": "==0.3.0"
     }
   ]
+}
+
+sample.pom.xml
+{
+  "name": "example:models",
+  "version": "1.0",
+  "dependencies": [
+    {
+      "field": "dependencies",
+      "name": "example:shared*",
+      "range": "${release}",
+      "via": "computed"
+    }
+  ],
+  "roots": [
+    "src/main/java",
+    "src/test/java"
+  ],
+  "test_roots": [
+    "src/test/java"
+  ]
+}
+
+sample.build.gradle.kts
+{
+  "build": {
+    "group": "example"
+  },
+  "version": "1.0",
+  "dependencies": [
+    {
+      "field": "implementation",
+      "name": "example:models",
+      "range": "1.0"
+    },
+    {
+      "field": "runtimeOnly",
+      "name": "example:*",
+      "range": "$version",
+      "via": "computed"
+    }
+  ],
+  "roots": [
+    "src/main/java",
+    "src/test/java"
+  ],
+  "test_roots": [
+    "src/test/java"
+  ]
+}
+
+sample.settings.gradle.kts
+{
+  "build": {
+    "project": "kit",
+    "includes": [
+      [
+        "nested",
+        "extras/nested"
+      ],
+      [
+        "tools",
+        "tools"
+      ]
+    ]
+  }
 }
 
 sample.tsconfig.json

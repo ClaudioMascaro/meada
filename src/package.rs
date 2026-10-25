@@ -1,6 +1,7 @@
 //! Packages (spec #22): every manifest of a workspace repository with a valid name provides
 //! `package::<ecosystem>::<name>` (`package.json`: `npm`; `pyproject.toml`: `pypi`, spec #24;
-//! `Cargo.toml`: `cargo`, spec #30; `go.mod`: `go`, spec #25),
+//! `Cargo.toml`: `cargo`, spec #30; `go.mod`: `go`, spec #25; `pom.xml` and the Gradle build and
+//! settings files: `maven`, spec #26),
 //! and every dependency entry that names a package of the workspace, in the same ecosystem,
 //! consumes it. `refresh` reads each manifest into a `Summary`, derived from its bytes
 //! alone and stored in the index; `Packages::declare` turns the named ones into providers and
@@ -11,7 +12,7 @@
 //! This file holds what the ecosystems share: the `Ecosystem` trait with its defaults (Node's
 //! rule for the ways in, the candidates and the provider view), the list `ECOSYSTEMS`, the
 //! summary types and the workspace steps. Each ecosystem's own rules live in its module under
-//! `package/` (`npm`, `pypi`, `cargo`, `go`).
+//! `package/` (`npm`, `pypi`, `cargo`, `go`, `maven`).
 //!
 //! Imports cross too: `extract` stores every call through a binding imported from a bare
 //! specifier, and `import`, a workspace step after `consume`, resolves those whose package the
@@ -33,20 +34,22 @@ use crate::contract::{ContractKind, Found, Hit, Level, Link, Role, Search, Site}
 use crate::entry;
 use crate::index::{self, CallSite, Consumer, Export, Indexed, Provider};
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
-use crate::lang::{MAX_BYTES, python};
+use crate::lang::{Call, MAX_BYTES, python};
 use crate::literals::Literals;
 use crate::render::{Files, label, rank, section};
-use crate::resolve::{Code, Exported};
+use crate::resolve::{Ancestry, Code, Exported};
 use crate::shape::{self, Shape, Want};
 use crate::workspace::Repository;
 
 mod cargo;
 mod go;
+mod maven;
 mod npm;
 mod pypi;
 
 use cargo::Cargo;
 use go::Go;
+use maven::Maven;
 use npm::{Npm, exported};
 use pypi::Pypi;
 
@@ -78,6 +81,15 @@ trait Ecosystem {
     /// Whether a bare `specifier` may name one of its packages.
     fn names_package(&self, specifier: &str) -> bool;
 
+    /// The imports a call of the file `path` goes through, as `(specifier, chain)` (`Code::imported`):
+    /// the one import that binds its head.
+    fn imports<'a>(&self, code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
+        let imported = code.imported(path, &call.scope, &call.callee);
+        (imported.into_iter())
+            .map(|(specifier, chain)| (specifier.to_string(), chain))
+            .collect()
+    }
+
     /// The dependency entries an import of `specifier` by the file `from.1` of the repository
     /// `from.0` may name, each with the subpath inside the package.
     fn entries<'e>(
@@ -91,6 +103,25 @@ trait Ecosystem {
     /// The start of its contract identifiers.
     fn prefix(&self) -> String {
         format!("{PREFIX}{}::", self.name())
+    }
+
+    /// Whether an uncertain dependency name may name a provider: literal equality.
+    /// Certain names use the provider index directly.
+    fn fits(&self, wanted: &str, provided: &str) -> bool {
+        wanted == provided
+    }
+
+    /// Why the dependency's source cannot establish an exact coordinate, if any.
+    fn uncertainty(&self, _via: Option<&str>) -> Option<&'static str> {
+        None
+    }
+
+    /// Whether `target`, a symbol an import reaches, is a member of the class `class` (a
+    /// constructor or a method of its own), so the call reaching it is a consumer of the class
+    /// too (`context` on a public class). An ecosystem whose imports reach a class itself has
+    /// none.
+    fn member_of(&self, _target: &str, _class: &str) -> bool {
+        false
     }
 
     /// What the dependency `range` says of the provider's `version`: never evaluated.
@@ -173,7 +204,7 @@ trait Ecosystem {
         let mut out = Vec::new();
         for (entry, subpath) in self.entries(exports, providers, (n, from), specifier) {
             let mut resolved = Vec::new();
-            for &(m, i) in providers.of(self.name(), &entry.name) {
+            for (m, i) in providers.matching(self, entry) {
                 let manifest = &exports[m].manifests[i];
                 let source = (entry.via.as_deref(), entry.range.as_deref());
                 let to = (exports[m].place(), manifest.path.as_str());
@@ -194,6 +225,22 @@ trait Ecosystem {
         out
     }
 
+    /// Whether a provider of an artifact the file `from.1` of the repository `from.0` depends on
+    /// declares `specifier` itself, whatever the import's chain names there: of the calls one
+    /// site makes through several candidates (`imports`, Java's on-demand imports), the one a
+    /// provider declares enters only when it is alone (`import`). An ecosystem whose `imports`
+    /// gives one at most per call never asks.
+    fn declares<'e>(
+        &self,
+        _exports: &'e [Export],
+        _providers: &Providers,
+        _at: &dyn Fn(usize) -> &'e Provided<'e>,
+        _from: (usize, &str),
+        _specifier: &str,
+    ) -> bool {
+        true
+    }
+
     /// Whether shapes cross its packages (`surface`).
     fn shapes(&self) -> bool {
         false
@@ -210,7 +257,7 @@ trait Ecosystem {
 }
 
 /// Every ecosystem, in the order `of` and `of_contract` search and `inherit` runs.
-const ECOSYSTEMS: &[&dyn Ecosystem] = &[&Npm, &Pypi, &Cargo, &Go];
+const ECOSYSTEMS: &[&dyn Ecosystem] = &[&Npm, &Pypi, &Cargo, &Go, &Maven];
 
 /// The ecosystem of the manifest at `path`, by its file name (`Ecosystem::is_manifest`); `None`
 /// for any other file.
@@ -283,7 +330,7 @@ pub fn read_manifest(path: &str, src: &[u8]) -> Summary {
 
 /// The longest package name read, in bytes; a longer one makes no provider.
 // ponytail: npm's own limit, for PyPI names too; a name past it is not a package.
-const MAX_NAME: usize = 214;
+pub(crate) const MAX_NAME: usize = 214;
 
 /// The longest chain of `export *` a lookup in a provider follows; a name further down is not
 /// found.
@@ -295,6 +342,9 @@ const MAX_REEXPORTS: usize = 64;
 /// the ecosystem has no use for stays empty.
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
 pub struct Summary {
+    /// JVM build metadata needed to join Gradle settings and project manifests.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<crate::jvm::Build>,
     /// The package's name as its ecosystem spells it; `None` when absent, not a string or not
     /// valid there, which makes no provider.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -316,9 +366,13 @@ pub struct Summary {
     pub module: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub main: Option<String>,
-    /// The source roots a `pyproject.toml` declares, relative to its directory (PyPI only).
+    /// Source roots relative to the manifest's directory (PyPI and JVM).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub roots: Vec<String>,
+    /// JVM only: the source roots of `roots` that hold tests or another source set than the
+    /// artifact's `main`, whose classes a dependent never imports.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub test_roots: Vec<String>,
     /// The console scripts a `pyproject.toml` declares, as `(module, function)` (PyPI only).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scripts: Vec<(String, String)>,
@@ -348,8 +402,8 @@ pub struct Entry {
     /// Cargo only: the key the entry is written under when it renames the package.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
-    /// Cargo only: where the package comes from, `path <manifest>` or `git <identity>`; none
-    /// for a version.
+    /// Where the package comes from: Cargo's `path <manifest>` or `git <identity>`,
+    /// or `computed` for a coordinate whose literal fragments only constrain candidates.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub via: Option<String>,
     /// Cargo only: `workspace = true`, until the seam's `inherit` fills the entry.
@@ -722,6 +776,11 @@ struct Provided<'e> {
     /// The Go source files that are no tests, by directory. Built the first time a Go import
     /// asks (`Go::resolve`), once for all.
     go_dirs: OnceCell<HashMap<&'e str, Vec<&'e str>>>,
+    /// The public classes and methods of the Java files. Built the first time a Java import asks
+    /// (`Maven::resolutions`), once for all.
+    classes: OnceCell<maven::Classes<'e>>,
+    /// The families of the public classes (`Ancestry`), for `Classes`.
+    ancestries: &'e [Ancestry],
 }
 
 /// What an import of a package resolved to in one provider: what named the entry, the import's
@@ -752,6 +811,8 @@ impl<'e> Provided<'e> {
                 .collect(),
             owned: Default::default(),
             go_dirs: OnceCell::new(),
+            classes: OnceCell::new(),
+            ancestries: &export.ancestries,
         }
     }
 
@@ -952,6 +1013,24 @@ impl Providers {
         Self(providers)
     }
 
+    /// Providers of a literal name, or candidates of an uncertain coordinate, sorted.
+    fn matching<E: Ecosystem + ?Sized>(&self, ecosystem: &E, entry: &Entry) -> Vec<(usize, usize)> {
+        if ecosystem.uncertainty(entry.via.as_deref()).is_none() {
+            return self.of(ecosystem.name(), &entry.name).to_vec();
+        }
+        let name = &entry.name;
+        let mut found: Vec<_> = self
+            .0
+            .iter()
+            .filter(|((kind, provided), _)| {
+                *kind == ecosystem.name() && ecosystem.fits(name, provided)
+            })
+            .flat_map(|(_, locations)| locations.iter().copied())
+            .collect();
+        found.sort();
+        found
+    }
+
     /// The providers of the package `name` of the ecosystem named `ecosystem`.
     fn of(&self, ecosystem: &'static str, name: &str) -> &[(usize, usize)] {
         (self.0.get(&(ecosystem, name.to_string()))).map_or(&[], Vec::as_slice)
@@ -965,7 +1044,9 @@ impl Providers {
 /// package at its site, the range of the entry in `Consumer::method` and where it resolves in
 /// `Consumer::hops` (`Packages::link` derives its links), and adds an `imports` row per
 /// provider; a Python import several depended-on packages expose is a consumer of each. Any
-/// other, an import of a package outside the workspace included, adds nothing.
+/// other, an import of a package outside the workspace included, adds nothing. Of the
+/// candidates one site goes through (`Ecosystem::imports`), none enters when several name a
+/// class some provider declares (`Ecosystem::declares`), as `Outside::candidates` says.
 fn import(exports: &mut [Export], providers: &Providers) {
     // Built for a provider the first time an import reaches it.
     let provided: Vec<OnceCell<Provided>> = exports.iter().map(|_| OnceCell::new()).collect();
@@ -973,7 +1054,15 @@ fn import(exports: &mut [Export], providers: &Providers) {
     for (n, export) in exports.iter().enumerate() {
         let mut consumers = Vec::new();
         let mut imports = Vec::new();
-        for call in &export.import_calls {
+        let sites = export.import_calls.chunk_by(|a, b| a.site == b.site);
+        let declared = |call: &ImportCall| {
+            let from = (n, call.path.as_str());
+            declares(exports, providers, &provided, from, &call.specifier)
+        };
+        let calls = sites
+            .filter(|calls| calls.len() < 2 || calls.iter().filter(|c| declared(c)).count() < 2)
+            .flatten();
+        for call in calls {
             let (from, chain) = ((n, call.path.as_str()), call.chain.as_str());
             let symbol = |at: &Provided, id: &str| at.symbol(id);
             let Some(ecosystem) = of_source(&call.path) else {
@@ -1037,6 +1126,8 @@ fn import(exports: &mut [Export], providers: &Providers) {
         export.consumers.extend(consumers);
         index::sort_consumers(&mut export.consumers);
         imports.sort_by(|a, b| (&a.site, &a.target).cmp(&(&b.site, &b.target)));
+        // Several entries of one package (a computed coordinate) reach the same symbol.
+        imports.dedup();
         export.imports = imports;
     }
 }
@@ -1144,6 +1235,22 @@ fn resolutions<'e>(
     ecosystem.resolutions(exports, providers, &at, from, (specifier, chain), &known)
 }
 
+/// Whether a provider of an artifact the file `from.1` of the repository `from.0` depends on
+/// declares `specifier`, by the rules of the file's ecosystem (`Ecosystem::declares`).
+fn declares<'e>(
+    exports: &'e [Export],
+    providers: &Providers,
+    provided: &'e [OnceCell<Provided<'e>>],
+    from: (usize, &str),
+    specifier: &str,
+) -> bool {
+    let Some(ecosystem) = of_source(from.1) else {
+        return false;
+    };
+    let at = |m: usize| provided[m].get_or_init(|| Provided::new(&exports[m]));
+    ecosystem.declares(exports, providers, &at, from, specifier)
+}
+
 /// The files of a repository an import of one of its packages can reach (issue #175), so the
 /// ones whose exported constants and types keep a shape: for each named manifest, the entry
 /// file (`Provided::entry`, as an import resolves it) of the bare name and of each subpath its
@@ -1168,6 +1275,8 @@ fn surface(
         shapes: HashMap::new(),
         owned: Default::default(),
         go_dirs: OnceCell::new(),
+        classes: OnceCell::new(),
+        ancestries: &[],
     };
     let mut queue = Vec::new();
     // Shapes cross through the packages of an ecosystem that says so (`Ecosystem::shapes`).
@@ -1251,17 +1360,19 @@ fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
 /// `dependencies` row. An entry whose package is outside the workspace, or a `workspace:` one
 /// whose package is outside its own repository, adds nothing.
 fn consume(exports: &mut [Export], providers: &Providers) {
-    let found: Vec<_> = (exports.iter())
-        .map(|export| {
+    let found: Vec<_> = (exports.iter().enumerate())
+        .map(|(n, export)| {
             let mut consumers = Vec::new();
             let mut dependencies = Vec::new();
-            for manifest in &export.manifests {
+            for (i, manifest) in export.manifests.iter().enumerate() {
                 let Some(ecosystem) = of(&manifest.path) else {
                     continue;
                 };
                 for e in &manifest.summary.dependencies {
                     let source = (e.via.as_deref(), e.range.as_deref());
-                    let of = providers.of(ecosystem.name(), &e.name);
+                    // A manifest is never a candidate of its own dependency.
+                    let mut of = providers.matching(ecosystem, e);
+                    of.retain(|&p| p != (n, i));
                     let reaches = |&&(m, i): &&(usize, usize)| {
                         let at = &exports[m].manifests[i];
                         ecosystem.reaches(source, export.place(), (exports[m].place(), &at.path))
@@ -1363,12 +1474,18 @@ struct Reach<'e> {
 }
 
 /// The calls that reach `symbol` through a package import, from `links` (the workspace's): each
-/// with the link's level and the range flag of the dependency entry it went through.
+/// with the link's level and the range flag of the dependency entry it went through. A class is
+/// reached by the calls that reach its members (`Ecosystem::member_of`), once per call at the
+/// best level of its links into the class.
 fn reached<'e>(exports: &'e [Export], links: &[Link], symbol: &str) -> Vec<Reach<'e>> {
-    let mut found = Vec::new();
+    let mut found: Vec<Reach> = Vec::new();
+    let into = |l: &Link| {
+        l.provider == symbol
+            || of_contract(&l.contract).is_some_and(|e| e.member_of(&l.provider, symbol))
+    };
     for link in links
         .iter()
-        .filter(|l| l.provider == symbol && l.contract.starts_with(PREFIX))
+        .filter(|l| l.contract.starts_with(PREFIX) && into(l))
     {
         let Some((repository, consumer)) = (exports.iter().enumerate())
             .flat_map(|(n, e)| e.consumers.iter().map(move |c| (n, c)))
@@ -1385,18 +1502,23 @@ fn reached<'e>(exports: &'e [Export], links: &[Link], symbol: &str) -> Vec<Reach
         };
         // The manifest the hop went through holds the provider's version.
         let version = (consumer.hops.iter())
-            .find(|h| h.target == symbol)
+            .find(|h| h.target == link.provider)
             .and_then(|h| {
                 (exports.iter().flat_map(|e| &e.providers))
                     .find(|p| p.site == h.manifest && p.contract == link.contract)
             })
             .and_then(|p| p.version.as_deref());
-        found.push(Reach {
+        let reach = Reach {
             repository,
             call,
             level: link.level,
             flag: flag_of(&link.contract, consumer.method.as_deref(), version),
-        });
+        };
+        match found.iter_mut().find(|r| r.call.id == call.id) {
+            Some(r) if reach.level < r.level => *r = reach,
+            Some(_) => {}
+            None => found.push(reach),
+        }
     }
     found
 }
@@ -1473,25 +1595,23 @@ impl ContractKind for Packages {
             .filter_map(|(&path, facts)| Some((path, facts, of_source(path)?)));
         for (path, facts, ecosystem) in files {
             for (index, call) in facts.calls.iter().enumerate() {
-                let Some((specifier, chain)) = code.imported(path, &call.scope, &call.callee)
-                else {
-                    continue;
-                };
-                if chain.is_empty() || !ecosystem.names_package(specifier) {
-                    continue;
+                for (specifier, chain) in ecosystem.imports(code, path, call) {
+                    if chain.is_empty() || !ecosystem.names_package(&specifier) {
+                        continue;
+                    }
+                    found.push(Found {
+                        role: Role::Import,
+                        site: Site::Call {
+                            path: path.to_string(),
+                            index,
+                        },
+                        contract: None,
+                        via: Some(specifier),
+                        method: Some(chain),
+                        fragments: Vec::new(),
+                        shape: None,
+                    });
                 }
-                found.push(Found {
-                    role: Role::Import,
-                    site: Site::Call {
-                        path: path.to_string(),
-                        index,
-                    },
-                    contract: None,
-                    via: Some(specifier.to_string()),
-                    method: Some(chain),
-                    fragments: Vec::new(),
-                    shape: None,
-                });
             }
         }
         // The files an import of one of the repository's packages reaches: only they keep shapes.
@@ -1624,24 +1744,37 @@ impl ContractKind for Packages {
         };
         let source = (consumer.via.as_deref(), range);
         let fits: Vec<_> = (providers.iter())
+            // A manifest is never a candidate of its own dependency.
+            .filter(|(_, p)| !consumer.site.starts_with(&format!("{}::", p.site)))
             .filter(|(repo, p)| {
                 let at = (p.site.strip_prefix(&repo.identity)).and_then(|s| s.strip_prefix("::"));
                 let (from, to) = (
                     (&*from.identity, &*from.root),
                     (&*repo.identity, &*repo.root),
                 );
-                p.contract == *contract
+                p.contract
+                    .strip_prefix(&ecosystem.prefix())
+                    .is_some_and(|provided| {
+                        let wanted = contract.strip_prefix(&ecosystem.prefix()).unwrap();
+                        ecosystem.fits(wanted, provided)
+                    })
                     && at.is_some_and(|manifest| ecosystem.reaches(source, from, (to, manifest)))
             })
             .collect();
+        let uncertain = ecosystem.uncertainty(consumer.via.as_deref());
         let (level, n) = match fits.len() {
             0 => return Vec::new(),
-            1 => (Level::Exact, None),
+            1 if uncertain.is_none() => (Level::Exact, None),
+            1 => (Level::Ambiguous, None),
             n => (Level::Ambiguous, Some(n)),
         };
         fits.into_iter()
             .flat_map(|(_, p)| {
                 let said = reason(contract, range, p.version.as_deref());
+                let said = match uncertain {
+                    Some(why) => format!("{why}; {said}"),
+                    None => said,
+                };
                 let link = Link {
                     consumer: consumer.site.clone(),
                     provider: p.site.clone(),
@@ -1710,6 +1843,7 @@ mod tests {
                 target: None,
                 level: None,
                 candidates: Vec::new(),
+                narrowed: false,
                 span: Span {
                     path: "web/app.ts".into(),
                     start: 0,
@@ -1930,6 +2064,7 @@ mod tests {
                 tsconfigs: &[],
                 exported: &exported,
                 files: &names,
+                configs: &[],
             };
             let found = Packages.extract(&code, &indexed);
             let mut rows: Vec<_> = (found.iter())
@@ -2188,7 +2323,7 @@ mod tests {
     #[test]
     fn the_list_names_each_ecosystem_once_in_its_order() {
         let names: Vec<_> = ECOSYSTEMS.iter().map(|e| e.name()).collect();
-        assert_eq!(names, ["npm", "pypi", "cargo", "go"]);
+        assert_eq!(names, ["npm", "pypi", "cargo", "go", "maven"]);
         let prefixes: Vec<_> = ECOSYSTEMS.iter().map(|e| e.prefix()).collect();
         assert_eq!(
             prefixes,
@@ -2196,7 +2331,8 @@ mod tests {
                 "package::npm::",
                 "package::pypi::",
                 "package::cargo::",
-                "package::go::"
+                "package::go::",
+                "package::maven::"
             ]
         );
     }
@@ -2259,26 +2395,26 @@ mod tests {
     #[test]
     fn a_file_no_ecosystem_claims_is_none() {
         for path in [
-            "A.java",
+            "A.unknown",
             "notes.txt",
             "Makefile",
             "tsconfig.json",
-            "pom.xml",
+            "unknown.xml",
         ] {
             assert!(of_source(path).is_none(), "{path}");
             assert!(of(path).is_none(), "{path}");
         }
-        assert!(of_contract("package::maven::x").is_none());
+        assert!(of_contract("package::unknown::x").is_none());
     }
 
     #[test]
     fn a_contract_of_no_ecosystem_has_no_flag_no_suffix_and_no_link() {
-        let contract = "package::maven::x";
+        let contract = "package::unknown::x";
         assert!(of_contract(contract).is_none());
         assert_eq!(flag_of(contract, Some("1"), Some("2")), None);
         assert_eq!(
             reason(contract, Some("1"), Some("2")),
-            "package::maven::x 1 (local 2)"
+            "package::unknown::x 1 (local 2)"
         );
         let consumer = Consumer {
             contract: Some(contract.into()),
@@ -2504,6 +2640,7 @@ mod tests {
             dependencies: Vec::new(),
             import_calls: Vec::new(),
             communities: Vec::new(),
+            ancestries: Vec::new(),
             exported: (files.iter())
                 .map(|(p, _)| row(p, Some("S"), Some(p), Some("S")))
                 .collect(),
@@ -2578,6 +2715,8 @@ mod tests {
             shapes: HashMap::new(),
             owned: Default::default(),
             go_dirs: OnceCell::new(),
+            classes: OnceCell::new(),
+            ancestries: &[],
         }
     }
 

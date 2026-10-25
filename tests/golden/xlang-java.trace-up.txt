@@ -1,0 +1,4 @@
+example.com/xlang-java/web app/api/prices/[sku]/route.ts:1 GET
+  →[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-java/web] example.com/xlang-java/api src/main/java/com/example/api/OrderController.java:34 com.example.api.OrderController.status(String)
+    →[inferred: base URL from API_URL, a base_url_env of peer example.com/xlang-java/api] example.com/xlang-java/web src/sync.ts:4 syncOrders
+chain: inferred · 2 hops · 2 repos · 119 tokens

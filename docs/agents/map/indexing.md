@@ -63,8 +63,10 @@ modules updates it.
   rewrites the `exports` table (`Resolver::exported` of every pack: per file, each exported
   name with the `file` and `target` definition, constant or type it names, `target` NULL for a whole file and
   `file` NULL for nothing the repository holds, and each `export * from` a repository file as a
-  row with `name` NULL), which `export` loads as `Export::exported`, and the `import` rows of
-  `contracts`, loaded as `Export::import_calls` (both `serde(skip)`). Before extracting,
+  row with `name` NULL), which `export` loads as `Export::exported`, the `families` table
+  (`Resolver::ancestries`: each public class of a pack whose overloads merge across its family,
+  Java, with its ancestors in method resolution order), loaded as `Export::ancestries`, and the
+  `import` rows of `contracts`, loaded as `Export::import_calls` (all `serde(skip)`). Before extracting,
   `refresh` builds `Indexed` once (the `manifests` and tsconfigs as `read_manifests` returns
   them, the `exports` rows of every pack and the files), and the extraction loop runs only
   `contract::KINDS`, each `extract` taking the pack's `Code` and `Indexed`: the package kind
@@ -458,7 +460,13 @@ modules updates it.
   call it was declared from through the methods called on the way. `Code::outside(path, scope,
   name, by_path)` names what an import from outside the repository binds a name to
   (`fastapi.APIRouter`, `express.default`): the package and name there, the name as the file's
-  imports spell it and whether its head is the import itself. Contract kinds recognize framework
+  imports spell it and whether its head is the import itself. A pack with `unordered_globs()`
+  (Java) adds `Outside::candidates` for a name nothing else binds: one spelling per top-level
+  on-demand import from outside (`import a.b.*;`, `import static a.B.*;`, the implicit
+  `java.lang`), sorted (`Resolver::on_demand`, which asks `through_glob`, the per-glob step of
+  `globs`, whether any repository glob may give the name). Compiling code has at most one real
+  candidate, so a kind accepts the name when exactly one candidate is in its table; a repository
+  type, an ambiguity among globs or a cut link leaves none. Contract kinds recognize framework
   constructors with it; with `by_path` the name is a path (Rust's `a::b::f()`) whose head is read
   among types and modules. `Code::expand(Expand::Constructed { held, at }, read)` is the
   expansion over the arguments of the `new` a `held` constant holds, on behalf of the call `at`
@@ -469,3 +477,66 @@ modules updates it.
   `Code::imported(path, scope, chain)` reads the head alone, without `const`s: the specifier and
   spelled chain when the chain's head is itself an import from outside the repository (what `Packages::extract` stores). `Resolver::exported()` is
   what each file exports, as `export` reads it, for the `exports` table.
+
+- JVM build files (spec #26, ticket #93) join the existing `manifests` pass through the package
+  ecosystem seam: Maven POMs and Gradle settings/build files, including nested modules. Their
+  stored summaries contain coordinate fragments and the literal metadata needed to join a
+  Gradle build to its settings, never source text. `package::inherit` runs that join after all
+  summaries are loaded; changing any build/settings file refreshes the same workspace links.
+  The summary also keeps the source roots (`roots`, with the test ones in `test_roots`), so an
+  edit to a Gradle `sourceSets` directory changes which provider classes an import reaches.
+
+## Java receivers and supertypes (#85)
+
+Each class writes `Def::bases` from `extends` and `implements` (type arguments dropped; an
+unreadable base is `(type)`, opaque), and each method its declared return class as
+`Def::result`. Fields, parameters and locals become `Facts::receivers` with `Class::Type` of
+their written type; `var` takes the class of `new T(...)` without a body, or the result of
+a call (`Class::Result`, the initializer call's place). A chained call (`make().save()`)
+writes `Call::on`. Primitives, arrays, varargs and type parameters are `Class::Unknown`. A local is
+typed only when it is the one binding of its name in its method scope, not when a field of the
+file has its name (a use before the declaration reads the field), and not in an initializer
+block or a field's lambda. The pack sets `base_receiver` (`super`), `unordered_bases` and
+`implicit_members` (`java.lang.Object`'s methods). The shared resolver reads overload families
+per signature across the C3 family (`Resolver::overloaded`, strict about opaque bases), bare
+calls through `Reading::Method` (`Resolver::inherited`), bare fields through
+`Resolver::inherited_field`, and name matches through the owning family (`Resolver::matched`).
+Fields and methods are separate namespaces where class members are in scope: a name read, not
+called (`Reading::Read`: the head of `repo.save()`, a member read on the way in
+`this.repo.save()`, and every value `Code` folds or traces), sees the field `repo`, never a
+method `repo()`, while a call (`repo()`, `this.repo()`) sees the method (#89).
+
+## Java source facts (#84)
+
+`lang/java.rs` reads `.java` with tree-sitter-java, with no JDK or build tool. Types carry their
+package-qualified names; methods and constructors carry the parameter types as written.
+`Facts::overloads` maps method names to their definitions with signatures; `Facts::constructors`
+keeps constructor families under their class names. The shared resolver selects the family by
+the stored `Call::constructs` and narrows it by `Call::arity`, so cached and cold resolutions
+agree. Comments do not count as arguments, and type-use annotations and comments do not enter
+written signatures; literals recovered from malformed types are excluded too.
+`members_in_scope` admits bare class members, and `Imported::Qualified`
+resolves a class import to its full name while preserving the exact outside spelling.
+`qualified_types` admits a fully qualified repository type without an import only when lexical
+lookup leaves the path head unbound. Enum and interface constants bind values too.
+Constructor calls read the type namespace, so methods and values of the same name do not hide
+an imported class. Only class candidates can supply constructor families, including after a
+static wildcard import yields several bindings. A method named after its own class has `#method` after its written signature,
+even when that class declares no constructor, keeping its identity distinct and stable when
+a constructor is added. Constructors keep their class-named signatures.
+Package groups come from `Facts::package`, independently of directory layout. The package's
+inside glob sees its non-public types; public star sets and hidden members define the exported
+surface. Static class globs take `Facts::statics` alone. `unordered_globs` combines candidates from
+on-demand imports, explicit imports take priority, and the current package takes priority over
+public package globs including `java.lang`. A shared package checks each declaring file's star
+set, so its first file does not hide another file's public types. Qualified imports go through
+shared exports, preserving duplicate fully qualified types as ambiguous candidates. `meada-core::parent` ignores dots
+inside signatures when finding the enclosing scope. Calls in lambdas and anonymous classes
+stay with the enclosing definition. Generic annotation calls carry `decorates`, positional
+values and named arguments for the contract kinds to read. The annotations of a field or a
+parameter, which no definition carries, are `Facts::annotated` (transient: the binding they
+mark and the annotation as a call), and every name a file assigns (`f = v`, `x.f = v`) is a
+marker constant `.f` (stored, like Go's), which `Code::field_written` reads (#89). A `static`
+field's annotations are not recorded. A `final` field a constructor assigns keeps that
+constructor as `Const::scope`. `this(..)` and `super(..)` are constructor calls
+(`Call::constructs`) of the class's own name and of its `extends` type.

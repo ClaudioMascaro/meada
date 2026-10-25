@@ -20,6 +20,7 @@ mod index;
 #[doc(hidden)]
 pub use index::{with_busy_timeout, with_reversed_walk};
 mod items;
+mod jvm;
 mod lang;
 mod literals;
 pub mod mcp;

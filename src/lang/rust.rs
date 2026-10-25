@@ -533,6 +533,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                                 paths.push((Slot::Call(at), path));
                             }
                             facts.calls.push(Call {
+                                arity: None,
+                                constructs: false,
                                 scope: scope.clone(),
                                 callee: callee.unwrap_or_default(),
                                 range: item.byte_range(),
@@ -541,6 +543,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                                 decorates: Some(qualified.clone()),
                                 by_path,
                                 root: None,
+                                on: None,
                                 receiver: None,
                                 arg_types: Vec::new(),
                                 uses: Vec::new(),
@@ -746,6 +749,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 let put = Put::Call(facts.calls.len());
                 held.push(Held { at, node, put });
                 facts.calls.push(Call {
+                    arity: None,
+                    constructs: false,
                     scope: scope.clone(),
                     callee,
                     range: node.byte_range(),
@@ -754,6 +759,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     decorates: None,
                     by_path,
                     root: chain_root(function, src),
+                    on: None,
                     receiver: None,
                     arg_types: Vec::new(),
                     uses: Vec::new(),
@@ -985,6 +991,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     name,
                     value,
                     ty: None,
+                    scope: None,
                 });
             }
             Put::Let(name) => {
@@ -1003,6 +1010,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     name,
                     value,
                     ty: None,
+                    scope: None,
                 });
             }
             Put::Returns(def) => facts.defs[def].return_values = reader.returns(&at, node),
@@ -1898,7 +1906,7 @@ mod tests {
                     Part::Text(t) => t.clone(),
                     Part::Ref(r) => format!("<{r}>"),
                     Part::Env(e) => format!("env:{e}"),
-                    Part::Hole => "{}".into(),
+                    Part::EnvOr(..) | Part::Hole => "{}".into(),
                 })
                 .collect::<String>(),
             Value::Ref(name) => format!("@{name}"),
@@ -2506,6 +2514,7 @@ mod tests {
                     Class::Enclosing => "Self".to_string(),
                     Class::Named(n) | Class::Type(n) => n,
                     Class::Returned(n) | Class::Called(n) => format!("{n}()"),
+                    Class::Result(n) => format!("#{n}()"),
                     Class::Imported => "imported".into(),
                     Class::Unknown => "?".into(),
                 };

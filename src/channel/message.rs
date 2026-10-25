@@ -3,11 +3,11 @@
 //! bind) read through `Code::expand`.
 
 use crate::lang::{Part, Value, literal};
-use crate::resolve::{Code, Expand, Expanded, Keywords};
+use crate::resolve::{Code, Expand, Expanded, Inject, Keywords};
 
 /// A call that produces to or consumes from a channel: a queue or topic of one broker kind.
 pub struct Message {
-    /// `kafka`, `amqp`, `sqs`, `nats`, `bullmq` or `redis`.
+    /// `kafka`, `amqp`, `jms`, `sqs`, `nats`, `bullmq` or `redis`.
     pub broker: &'static str,
     /// The channel name as evaluated, kept as it is; `None` when it cannot be evaluated (an
     /// unresolved side, never linked).
@@ -94,7 +94,18 @@ pub fn produce<'a>(
     broker: &'static str,
     read: Read,
 ) -> Vec<Message> {
-    (code.expand(Expand::Call(path, n), read).into_iter())
+    produce_with(code, Expand::Call(path, n), None, broker, read)
+}
+
+/// `produce` from any start, with what `inject` reads off annotations (`Code::expand_with`).
+pub fn produce_with<'a>(
+    code: &Code<'a>,
+    from: Expand<'a>,
+    inject: Option<&Inject<'a, '_>>,
+    broker: &'static str,
+    read: Read,
+) -> Vec<Message> {
+    (code.expand_with(from, inject, read).into_iter())
         .flat_map(
             |Expanded {
                  site: (site, at),
@@ -123,7 +134,19 @@ pub fn consume<'a>(
     read: Read,
     handler: Option<Handler>,
 ) -> Vec<Message> {
-    (code.expand(Expand::Call(path, n), read).into_iter())
+    consume_with(code, Expand::Call(path, n), None, broker, read, handler)
+}
+
+/// `consume` from any start, with what `inject` reads off annotations (`Code::expand_with`).
+pub fn consume_with<'a>(
+    code: &Code<'a>,
+    from: Expand<'a>,
+    inject: Option<&Inject<'a, '_>>,
+    broker: &'static str,
+    read: Read,
+    handler: Option<Handler>,
+) -> Vec<Message> {
+    (code.expand_with(from, inject, read).into_iter())
         .flat_map(
             |Expanded {
                  site: (site, at),
@@ -172,7 +195,17 @@ pub type ReadBinding<'a> =
 
 /// An AMQP publish at each site an expansion found (`publication`).
 pub fn publish<'a>(code: &Code<'a>, path: &'a str, n: usize, read: ReadPublish) -> Vec<Message> {
-    (code.expand(Expand::Call(path, n), read).into_iter())
+    publish_with(code, Expand::Call(path, n), None, read)
+}
+
+/// `publish` from any start, with what `inject` reads off annotations (`Code::expand_with`).
+pub fn publish_with<'a>(
+    code: &Code<'a>,
+    from: Expand<'a>,
+    inject: Option<&Inject<'a, '_>>,
+    read: ReadPublish,
+) -> Vec<Message> {
+    (code.expand_with(from, inject, read).into_iter())
         .map(
             |Expanded {
                  site: (site, at),
@@ -194,7 +227,17 @@ pub fn publish<'a>(code: &Code<'a>, path: &'a str, n: usize, read: ReadPublish) 
 
 /// An AMQP binding of a queue to an exchange at each site an expansion found.
 pub fn bind<'a>(code: &Code<'a>, path: &'a str, n: usize, read: ReadBinding) -> Vec<Message> {
-    (code.expand(Expand::Call(path, n), read).into_iter())
+    bind_with(code, Expand::Call(path, n), None, read)
+}
+
+/// `bind` from any start, with what `inject` reads off annotations (`Code::expand_with`).
+pub fn bind_with<'a>(
+    code: &Code<'a>,
+    from: Expand<'a>,
+    inject: Option<&Inject<'a, '_>>,
+    read: ReadBinding,
+) -> Vec<Message> {
+    (code.expand_with(from, inject, read).into_iter())
         .filter_map(
             |Expanded {
                  site: (site, at),
@@ -231,7 +274,7 @@ pub fn publication(exchange: Option<String>, key: Option<String>) -> (Option<Str
 
 /// The messages as lines, for the readers' tests: broker, name (or `unresolved`), role and, for a
 /// consumer, its handler (`path::name` for a definition, `inline path::def` for an anonymous
-/// function).
+/// function), for a publish its exchange, and for a binding its exchange and pattern.
 #[cfg(test)]
 pub fn lines(messages: Vec<Message>) -> Vec<String> {
     (messages.into_iter())
@@ -243,7 +286,8 @@ pub fn lines(messages: Vec<Message>) -> Vec<String> {
                 Side::Consumer(Handler::Inline { path, def }) => {
                     format!("consumer inline {path}::{def}")
                 }
-                _ => "other".to_string(),
+                Side::Publish { exchange } => format!("publish {exchange}"),
+                Side::Binding { exchange, pattern } => format!("binding {exchange} {pattern}"),
             };
             format!("{} {name} {role}", m.broker)
         })

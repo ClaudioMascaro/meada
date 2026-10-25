@@ -314,6 +314,12 @@ impl<'a> Graph<'a> {
     }
 }
 
+/// Whether the consumer of `link` calls its provider, so the provider is not a writer that goes
+/// on to a reader.
+fn calls_on_link(link: &Link) -> bool {
+    contract::calls_from_definition(Some(&link.contract))
+}
+
 /// What a `from` names.
 enum Lookup<'a> {
     /// Symbols, or files serving a route, to start from.
@@ -391,9 +397,15 @@ impl<'a> Walk<'_, 'a> {
                 for &call in graph.callees.get(id).into_iter().flatten() {
                     self.call_down(call, depth + 1, &mut shown);
                 }
+                // A method of a declarative client is a consumer with no call of its own.
+                if graph.symbols.contains_key(id) && graph.consumers.contains_key(id) {
+                    let (n, place) = (graph.repo(id), self.place(id));
+                    self.consumers_down(id, n, &place, depth + 1, true, &mut shown);
+                }
                 // A writer goes on to the readers of what it writes; a repository-level reader
                 // ends the branch.
-                for link in graph.into.get(id).into_iter().flatten() {
+                for link in (graph.into.get(id).into_iter().flatten()).filter(|l| !calls_on_link(l))
+                {
                     let reader = link.consumer.as_str();
                     let ends = graph.ends(reader);
                     if (ends || graph.symbols.contains_key(reader)) && shown.insert((reader, true))
@@ -412,6 +424,14 @@ impl<'a> Walk<'_, 'a> {
                 }
                 for link in graph.into.get(id).into_iter().flatten() {
                     let Some(&call @ (n, c)) = graph.calls.get(link.consumer.as_str()) else {
+                        // A method of a declarative client consumes the route.
+                        let method = link.consumer.as_str();
+                        if graph.symbols.contains_key(method)
+                            && calls_on_link(link)
+                            && shown.insert((method, true))
+                        {
+                            self.reach(method, depth + 1, link);
+                        }
                         continue;
                     };
                     if !shown.insert((c.caller.as_str(), true)) {
@@ -423,7 +443,8 @@ impl<'a> Walk<'_, 'a> {
                 // A reader goes back to the writers of what it reads, and a channel handler to
                 // the calls that produce what it handles, then to their callers; a
                 // repository-level writer ends the branch.
-                for link in graph.out.get(id).into_iter().flatten() {
+                for link in (graph.out.get(id).into_iter().flatten()).filter(|l| !calls_on_link(l))
+                {
                     let writer = link.provider.as_str();
                     if let Some(&call @ (n, c)) = graph.calls.get(writer) {
                         if shown.insert((c.caller.as_str(), true)) {
@@ -467,26 +488,37 @@ impl<'a> Walk<'_, 'a> {
             let text = self.node(&s.id).1 + &mark(c);
             self.enter(&s.id, depth, Row::call(text, m, c.level));
         }
-        let consumers = graph.consumers.get(c.id.as_str());
-        for consumer in consumers.into_iter().flatten() {
-            let site = self.site(call);
-            let out = graph.out.get(c.id.as_str()).into_iter().flatten();
-            let links: Vec<&Link> = match &consumer.contract {
-                Some(contract) => out.filter(|l| l.contract == *contract).copied().collect(),
-                // An unresolved consumer has links only through a decision, on a contract no
-                // other consumer of the site has.
-                None => {
-                    let others = |l: &&&Link| {
-                        let mut all = consumers.into_iter().flatten();
-                        all.any(|o| o.contract.as_deref() == Some(l.contract.as_str()))
-                    };
-                    out.filter(|l| !others(l)).copied().collect()
-                }
-            };
+        let place = self.site(call);
+        self.consumers_down(&c.id, n, &place, depth, false, shown);
+        self.unresolved_sides(&c.id, depth, n, &place);
+        // A call that produces to a channel goes on to the handlers of its consumers.
+        for link in graph.into.get(c.id.as_str()).into_iter().flatten() {
+            let handler = link.consumer.as_str();
+            if shown.insert((handler, true)) {
+                self.reach(handler, depth, link);
+            }
+        }
+    }
+
+    /// What the consumers at `site` (in repository `n`, written `place`) reach: the providers
+    /// they link to, or a line saying one is unresolved or links to none. At a definition (a
+    /// method of a declarative client, which has no call) only the consumers whose kind calls
+    /// on from one (`ContractKind::calls_from_definition`) count.
+    fn consumers_down(
+        &mut self,
+        site: &'a str,
+        n: usize,
+        place: &str,
+        depth: usize,
+        at_definition: bool,
+        shown: &mut HashSet<(&'a str, bool)>,
+    ) {
+        let graph = self.graph;
+        for (consumer, links) in graph.consumer_links(site, at_definition) {
             if links.is_empty() {
                 let text = match &consumer.contract {
-                    Some(contract) => format!("{site} consumes {contract}, no provider"),
-                    None => format!("{site} {}", unresolved(&c.id)),
+                    Some(contract) => format!("{place} consumes {contract}, no provider"),
+                    None => format!("{place} {}", unresolved(site)),
                 };
                 self.push(depth, Row::call(text, n, None));
             }
@@ -494,15 +526,6 @@ impl<'a> Walk<'_, 'a> {
                 if shown.insert((&link.provider, true)) {
                     self.reach(&link.provider, depth, link);
                 }
-            }
-        }
-        let place = self.site(call);
-        self.unresolved_sides(&c.id, depth, n, &place);
-        // A call that produces to a channel goes on to the handlers of its consumers.
-        for link in graph.into.get(c.id.as_str()).into_iter().flatten() {
-            let handler = link.consumer.as_str();
-            if shown.insert((handler, true)) {
-                self.reach(handler, depth, link);
             }
         }
     }
@@ -682,9 +705,13 @@ impl<'a> Graph<'a> {
         for &call in self.callees.get(id).into_iter().flatten() {
             self.call_edges(call, &mut shown, &mut edges);
         }
+        // A method of a declarative client is a consumer with no call of its own.
+        if self.symbols.contains_key(id) {
+            self.consumer_edges(id, self.repo(id), true, &mut shown, &mut edges);
+        }
         // A writer goes on to the readers of what it writes; a repository-level reader ends
         // the branch.
-        for link in self.into.get(id).into_iter().flatten() {
+        for link in (self.into.get(id).into_iter().flatten()).filter(|l| !calls_on_link(l)) {
             let reader = link.consumer.as_str();
             let reaches = self.ends(reader) || self.symbols.contains_key(reader);
             if reaches && shown.insert((reader, true)) {
@@ -719,24 +746,31 @@ impl<'a> Graph<'a> {
                 level: c.level,
             });
         }
-        let consumers = self.consumers.get(c.id.as_str());
-        for consumer in consumers.into_iter().flatten() {
-            let out = self.out.get(c.id.as_str()).into_iter().flatten();
-            let links: Vec<&Link> = match &consumer.contract {
-                Some(contract) => out.filter(|l| l.contract == *contract).copied().collect(),
-                // An unresolved consumer has links only through a decision, on a contract no
-                // other consumer of the site has.
-                None => {
-                    let others = |l: &&&Link| {
-                        let mut all = consumers.into_iter().flatten();
-                        all.any(|o| o.contract.as_deref() == Some(l.contract.as_str()))
-                    };
-                    out.filter(|l| !others(l)).copied().collect()
-                }
-            };
+        self.consumer_edges(&c.id, n, false, shown, edges);
+        self.sides_at(&c.id, n, edges);
+        // A call that produces to a channel goes on to the handlers of its consumers.
+        for link in self.into.get(c.id.as_str()).into_iter().flatten() {
+            let handler = link.consumer.as_str();
+            if shown.insert((handler, true)) {
+                edges.push(Edge::Link { to: handler, link });
+            }
+        }
+    }
+
+    /// What the consumers at `site` reach, as `Walk::consumers_down` finds it, but an ambiguous
+    /// link is one guess.
+    fn consumer_edges(
+        &self,
+        site: &'a str,
+        n: usize,
+        at_definition: bool,
+        shown: &mut HashSet<(&'a str, bool)>,
+        edges: &mut Vec<Edge<'a>>,
+    ) {
+        for (consumer, links) in self.consumer_links(site, at_definition) {
             if links.is_empty() {
                 edges.push(Edge::Dead {
-                    at: &c.id,
+                    at: site,
                     repo: n,
                     contract: consumer.contract.as_deref(),
                 });
@@ -749,7 +783,7 @@ impl<'a> Graph<'a> {
                 .collect();
             if !candidates.is_empty() {
                 edges.push(Edge::Guess {
-                    at: &c.id,
+                    at: site,
                     repo: n,
                     level: Some(Level::Ambiguous),
                     candidates,
@@ -764,14 +798,37 @@ impl<'a> Graph<'a> {
                 }
             }
         }
-        self.sides_at(&c.id, n, edges);
-        // A call that produces to a channel goes on to the handlers of its consumers.
-        for link in self.into.get(c.id.as_str()).into_iter().flatten() {
-            let handler = link.consumer.as_str();
-            if shown.insert((handler, true)) {
-                edges.push(Edge::Link { to: handler, link });
-            }
-        }
+    }
+
+    /// The consumers at `site`, each with the links it has: those on its contract, and for an
+    /// unresolved one those of a decision, on a contract no other consumer of the site has. At
+    /// a definition (a method of a declarative client, which has no call) only the consumers
+    /// whose kind calls on from one (`ContractKind::calls_from_definition`) count.
+    fn consumer_links(
+        &self,
+        site: &str,
+        at_definition: bool,
+    ) -> Vec<(&'a Consumer, Vec<&'a Link>)> {
+        let consumers = self.consumers.get(site).into_iter().flatten();
+        let consumers = consumers
+            .copied()
+            .filter(|c| !at_definition || contract::calls_from_definition(c.contract.as_deref()));
+        consumers
+            .map(|consumer| {
+                let out = self.out.get(site).into_iter().flatten().copied();
+                let links = match &consumer.contract {
+                    Some(contract) => out.filter(|l| l.contract == *contract).collect(),
+                    None => {
+                        let others = |l: &Link| {
+                            let mut all = self.consumers.get(site).into_iter().flatten();
+                            all.any(|o| o.contract.as_deref() == Some(l.contract.as_str()))
+                        };
+                        out.filter(|l| !others(l)).collect()
+                    }
+                };
+                (consumer, links)
+            })
+            .collect()
     }
 
     /// The unresolved channel sides at `site`, one edge each.
@@ -1060,6 +1117,7 @@ mod tests {
                     target: Some(id(n + 1)),
                     level: Some(Level::Exact),
                     candidates: Vec::new(),
+                    narrowed: false,
                     span: span(),
                 })
                 .collect(),

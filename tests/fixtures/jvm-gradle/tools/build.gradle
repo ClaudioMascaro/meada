@@ -1,0 +1,14 @@
+group = 'example'
+version = '2.0'
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/core/java']
+        }
+    }
+    test {
+        java {
+            srcDirs = ['src/check/java']
+        }
+    }
+}

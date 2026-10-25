@@ -352,6 +352,7 @@ impl Walk<'_> {
                 name,
                 value,
                 ty: None,
+                scope: None,
             });
         }
         for name in elsewhere {
@@ -360,6 +361,7 @@ impl Walk<'_> {
                 name,
                 value,
                 ty: None,
+                scope: None,
             });
         }
         let mut constants = HashSet::new();
@@ -373,6 +375,7 @@ impl Walk<'_> {
                     name: local,
                     value,
                     ty: None,
+                    scope: None,
                 });
             }
         }
@@ -670,6 +673,7 @@ impl Walk<'_> {
             name: qualify(scope, &format!("{{{}}}", field.unwrap_or("*"))),
             value: Value::New(ty.unwrap_or("?").to_string(), vec![value]),
             ty: None,
+            scope: None,
         };
         // ponytail: a literal nested deeper than the value depth sets fields of a type not read.
         if level >= values::VALUE_DEPTH {
@@ -935,6 +939,8 @@ fn result_list(node: Node) -> Option<Node> {
 
 fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
     Call {
+        arity: None,
+        constructs: false,
         scope: scope.to_string(),
         callee,
         range,
@@ -943,6 +949,7 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
         decorates: None,
         by_path: false,
         root: None,
+        on: None,
         receiver: None,
         arg_types: Vec::new(),
         uses: Vec::new(),
@@ -1305,6 +1312,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                             name: name.to_string(),
                             value,
                             ty: None,
+                            scope: None,
                         });
                         top.push(name.to_string());
                     }

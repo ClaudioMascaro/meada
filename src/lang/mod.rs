@@ -11,6 +11,7 @@ use tree_sitter::Node;
 use crate::Result;
 
 pub mod go;
+pub mod java;
 pub mod python;
 pub mod rust;
 pub mod ts;
@@ -36,7 +37,9 @@ pub trait LanguagePack {
     }
 
     /// Repository-relative files that configure how imports name files, such as
-    /// `tsconfig.json`. The shared side reads those present and hands them to `layout`. A name starting with `**/` names every file of that name the walk finds, at
+    /// `tsconfig.json`, or what the pack's contract kinds read (Java's Spring
+    /// `application.properties`, through `Indexed::configs`). The shared side reads those
+    /// present, hands them to `layout` and refreshes the contracts when one changes. A name starting with `**/` names every file of that name the walk finds, at
     /// any depth, in path order (`**/Cargo.toml`: a Cargo workspace's members).
     fn config_files(&self) -> &'static [&'static str];
 
@@ -68,10 +71,43 @@ pub trait LanguagePack {
         None
     }
 
+    /// Whether bare names in a method can name the enclosing class's members (Java).
+    fn members_in_scope(&self) -> bool {
+        false
+    }
+
+    /// Whether wildcard imports combine their candidates rather than the latest one winning.
+    /// An inside glob has priority over public globs (the class's own package in Java).
+    fn unordered_globs(&self) -> bool {
+        false
+    }
+
+    /// Whether a dotted type name may bind through the layout without an import, when no
+    /// lexical value hides its head (Java's fully qualified types).
+    fn qualified_types(&self) -> bool {
+        false
+    }
+
     /// A keyword naming the base of the enclosing class, such as `super`: what its members
-    /// are is not resolved.
+    /// are is not resolved, except an overload family (`Facts::overloads`), read through the
+    /// class's family past the class itself.
     fn base_receiver(&self) -> Option<&'static str> {
         None
+    }
+
+    /// Whether the order of a class's written bases says nothing about precedence (Java's
+    /// `implements I, J`): C3 then merges the bases' families without the written list, so a
+    /// redundant interface (`J extends I`) is no conflict. A subtype still comes before its
+    /// supertypes, and the first base written before the next.
+    fn unordered_bases(&self) -> bool {
+        false
+    }
+
+    /// Methods every class has without declaring them (Java's `java.lang.Object` members): a
+    /// bare call of one that the class's family does not declare is unknown, and the climb to
+    /// outer classes and imports stops there.
+    fn implicit_members(&self) -> &'static [&'static str] {
+        &[]
     }
 
     /// Whether a method call that no function of the repository answers may hand back the
@@ -148,7 +184,13 @@ pub struct Layout {
 }
 
 /// Every pack Meada ships, in a fixed order.
-const PACKS: &[&dyn LanguagePack] = &[&ts::TsJs, &python::Python, &rust::Rust, &go::Go];
+const PACKS: &[&dyn LanguagePack] = &[
+    &ts::TsJs,
+    &python::Python,
+    &rust::Rust,
+    &go::Go,
+    &java::Java,
+];
 
 /// The index of the pack that parses `path`, if any.
 pub fn pack_for(path: &str) -> Option<usize> {
@@ -173,6 +215,16 @@ pub fn packs() -> impl Iterator<Item = &'static dyn LanguagePack> {
 #[derive(Default, Serialize, Deserialize)]
 pub struct Facts {
     pub defs: Vec<Def>,
+    /// Callable names whose definitions carry distinct written signatures. A call resolves
+    /// to their definitions after narrowing by its argument count.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub overloads: BTreeMap<String, Vec<String>>,
+    /// Constructor families, separate from methods of the same name in the enclosing type.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub constructors: BTreeMap<String, Vec<String>>,
+    /// The members a class makes available through a static wildcard import.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub statics: Vec<String>,
     pub imports: Vec<Import>,
     /// Everything an explicit import can name: `exports` lists every binding the file makes
     /// available, and `star` narrows what a star import takes from them.
@@ -243,6 +295,9 @@ pub struct Facts {
     /// lower-case methods of an exported type).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden: Vec<String>,
+    /// The interfaces of the file (Java's `interface`), by qualified name.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub interfaces: Vec<String>,
     /// Whether the file is left out of the build for the target: a Rust file that opens with an
     /// inner `#![cfg(..)]` that is false (as if no `mod` reached it), a Go file whose build
     /// constraints exclude it.
@@ -252,9 +307,35 @@ pub struct Facts {
     /// (`Layout::shared`).
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub package: String,
+    /// The annotations written on fields and parameters (Java's `@Value("${key}") String base`),
+    /// which no definition carries: contract kinds read what they inject (`Code::expand_with`).
+    /// Not kept in the index (see `Call::args`).
+    #[serde(skip)]
+    pub annotated: Vec<Annotated>,
     /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,
+}
+
+/// An annotation written on a field or a parameter: the binding it marks and the annotation as
+/// a call (`callee` its name, `args` and `kwargs` its arguments, `scope` the class around it).
+pub struct Annotated {
+    pub on: Marked,
+    pub annotation: Call,
+}
+
+/// What an annotation marks (`Annotated`).
+#[derive(Clone, PartialEq, Eq)]
+pub enum Marked {
+    /// The field `name` of the class `class` (`Def::name`), `static` or not: the kind decides
+    /// what each takes.
+    Field {
+        class: String,
+        name: String,
+        is_static: bool,
+    },
+    /// The parameter at this position of the function or the constructor (`Def::name`).
+    Param(String, usize),
 }
 
 /// A block whose definitions are members of a type: those named `scope.<member>`. An inherent
@@ -302,6 +383,10 @@ pub enum Class {
     /// name is read as an expression, so its head may be a local or a parameter whose class
     /// the source writes, and a method of that class is the function called.
     Called(String),
+    /// What the call at this place of the file's `Facts::calls` gives (Java's `var x =
+    /// make(1)`): as `Call::on` reads it, so the overload the call's argument count picks
+    /// decides.
+    Result(usize),
     /// Bound by an import in the scope: what the file's imports bind the name to.
     Imported,
     /// Bound otherwise, so an outer binding of the name is hidden.
@@ -321,6 +406,9 @@ pub struct Import {
 
 #[derive(Serialize, Deserialize)]
 pub enum Imported {
+    /// The fully qualified definition named by `source`, rather than an export of a module
+    /// (`import example.Tools`). Outside the repository its spelling is `source` itself.
+    Qualified,
     /// One exported name; a default import is the name `default`.
     Name(String),
     /// A name the module exports or, when it exports none (or the module is not a file of
@@ -529,6 +617,11 @@ pub struct Const {
     /// Not kept in the index, like `value`.
     #[serde(skip)]
     pub ty: Option<Ty>,
+    /// The scope `value` is written in when it is not the constant's own (`scope_of(name)`):
+    /// a Java `final` field one constructor assigns holds a value written in that constructor.
+    /// Not kept in the index, like `value`.
+    #[serde(skip)]
+    pub scope: Option<String>,
 }
 
 fn unknown() -> Value {
@@ -542,6 +635,14 @@ fn unknown() -> Value {
 pub struct Call {
     pub scope: String,
     pub callee: String,
+    /// Argument count for languages that narrow overloads by arity. Unlike values it survives
+    /// a cached file's facts, so a refreshed resolution agrees with a cold one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arity: Option<usize>,
+    /// Whether this call uses constructor syntax, in languages with a distinct constructor
+    /// namespace. Kept with its argument count in cached facts.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub constructs: bool,
     pub range: Range<usize>,
     /// The arguments, as far as the call's own syntax tells: what contract kinds read URLs
     /// and options from. Not kept in the index: they hold string literals, so the index
@@ -559,6 +660,12 @@ pub struct Call {
     /// that does not resolve falls back to takes functions as well as methods.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub by_path: bool,
+    /// The call of the same file whose result this call is made on (`make()` in
+    /// `make().save()`, whose callee is `(method_invocation).save`), by its place in
+    /// `Facts::calls`, when the pack gives it: the receiver is an instance of the class the
+    /// declared result of that call's exact target names.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on: Option<usize>,
     /// The name a method call on a call chain starts at (`client` in `client.get(u).send()`,
     /// whose callee is `(call_expression).send`), when it is a plain name or a member chain of
     /// them. An outside type owns the whole chain, so the resolver reads the call as one on
@@ -692,7 +799,10 @@ pub enum Value {
     /// (spec #23): the name of the schema.
     Schema(String),
     /// The result of `new` on the normalized callee, such as `Kafka` for `new Kafka(...)`, with
-    /// the arguments.
+    /// the arguments. A value written with its type and its fields is one too, the fields as
+    /// one `Object`: a Go composite literal, and a Java annotation written as an element value
+    /// (`@Queue("orders")`, its unnamed element as `value`), which only an annotation's
+    /// arguments hold and the index never keeps.
     New(String, Vec<Value>),
     /// An array, list or tuple literal's items.
     List(Vec<Value>),
@@ -705,6 +815,11 @@ pub enum Value {
     /// An anonymous function written in place, by the qualified name of its `Kind::Inline`
     /// definition.
     Function(String),
+    /// A name an import from outside the repository binds (`HttpMethod.GET`), as each import
+    /// that may bind it spells it where it is written: one spelling when an import binds it, the
+    /// candidates of the on-demand imports otherwise (`resolve::Outside`). Only a chain read by
+    /// `resolve::Expand::Chain` holds one; no pack writes it.
+    External(Vec<String>),
     /// Anything else.
     Unknown,
 }
@@ -760,7 +875,7 @@ pub fn literal(parts: &[Part]) -> Option<String> {
         .collect()
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Part {
     Text(String),
     /// A name inside a string, folded like `Value::Ref`.
@@ -768,6 +883,10 @@ pub enum Part {
     /// A read of one environment variable, such as `process.env.X`, through `||`/`??`
     /// fallbacks and string method calls. Its value is never known.
     Env(String),
+    /// A read of one environment variable with the default the source writes for it when the
+    /// variable is unset (Spring's `${X:http://api.example.com}`): the variable and the default's
+    /// parts. Its value is never known, as `Env`'s.
+    EnvOr(String, Vec<Part>),
     /// Any other expression inside a string.
     Hole,
 }

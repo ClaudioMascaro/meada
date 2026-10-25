@@ -196,6 +196,8 @@ impl LanguagePack for Python {
                         }
                         let (args, kwargs) = arguments(node, src);
                         facts.calls.push(Call {
+                            arity: None,
+                            constructs: false,
                             scope: scope.clone(),
                             callee,
                             range: node.byte_range(),
@@ -204,6 +206,7 @@ impl LanguagePack for Python {
                             decorates: decorators.remove(&node.id()),
                             by_path: false,
                             root: None,
+                            on: None,
                             receiver: None,
                             arg_types: Vec::new(),
                             uses: Vec::new(),
@@ -1026,6 +1029,7 @@ impl Locals {
                 name: qualify(&homes[at].0, &homes[at].1),
                 value,
                 ty: None,
+                scope: None,
             })
             .collect();
         let mut bound: BTreeMap<(String, String), (Class, Evidence)> = BTreeMap::new();

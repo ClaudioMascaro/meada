@@ -756,14 +756,14 @@ one for the area a change touches.
   one, never a missing or empty file; `refresh` stays one transaction in place. An operator
   renames an index in (built elsewhere) only while no `meada index` writes that index, one
   writer per index: a refresh's live `index.db-journal` would be taken for the new file's. `lang/`: the
-  language adapter and the TS/JS, Python, Rust and Go packs. `resolve.rs`: calls to definitions (`Resolver`), values
+  language adapter and the TS/JS, Python, Rust, Go and Java packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`: `Code::origins`, the one origin question, with three evidence policies
   (`Values`, `Constants` for the TypeScript forms, `Declarations` for Go's typed clients and
   forms), `Code::outside` for what an import from outside binds a name to, and `Code::expand`
-  for wrappers). `community.rs`: the deterministic Leiden behind communities (spec
+  for wrappers, `Expand::Chain` reading a call whole). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs` and its `channel/` submodules
-  (`channel/message.rs`: the message types and broker helpers; `channel/{ts,python,rust,go}.rs`:
+  (`channel/message.rs`: the message types and broker helpers; `channel/{ts,python,rust,go,java}.rs`:
   the message libraries of each language): the
   `ContractKind` trait and the HTTP kind (`http.rs`: the contract and path rules, the mount
   machinery and the shared consumer readers; one submodule per language: `http/ts.rs` and
@@ -772,8 +772,11 @@ one for the area a change touches.
   requests, httpx and aiohttp consumers, whose rows also list reqwest and ureq; `http/rust.rs`
   and `http/rust/axum.rs`, actix-web, Rocket and axum providers; `http/go.rs` and
   `http/go/clients.rs`, net/http, gin, echo, chi and gorilla/mux providers and their consumers
-  with resty), resource and channel kinds. `package.rs` and `package/`: npm, PyPI, Cargo and Go packages as
-  contracts (specs #22, #24, #30 and #25), the shared steps and one module per ecosystem behind
+  with resty; `http/java.rs` and `http/java/clients.rs`, Spring MVC providers and the
+  RestTemplate, WebClient, `java.net.http` and OkHttp consumers, whose bases come from the
+  Spring configuration `jvm/spring.rs` reads for the JVM packs' kinds), resource and channel
+  kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
+  contracts (specs #22, #24, #30, #25 and #26), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `literals.rs`, `zod.rs` (and `meada-core`'s `shape.rs`): OpenAPI and AsyncAPI
@@ -821,7 +824,8 @@ one for the area a change touches.
   from its own repository (a monorepo), at any level.
 - Package: `package::npm::<name>`, `package::pypi::<name>` (the PEP 503 normalized name) or
   `package::cargo::<name>` (the `[package] name`; a dependent's site names the key it writes, so
-  a renamed crate has its own site) or `package::go::<module path>` (the `module` of a `go.mod`),
+  a renamed crate has its own site) or `package::go::<module path>` (the `module` of a `go.mod`), or
+  `package::maven::<group>:<artifact>` (a Maven or Gradle artifact),
   provided at `<repository>::<manifest path>` (such as `example.com/pkg/shared::package.json` or
   `example.com/pkg/pylib::pyproject.toml`) and consumed at `<repository>::<manifest
   path>::<field>::<name>` (PyPI fields: `project.dependencies`, `tool.poetry.dependencies`, and
@@ -907,8 +911,10 @@ one for the area a change touches.
   language (one module per language: `http/<language>.rs`, `channel/<language>.rs`), never in
   the pack. Three questions are
   required: `prefix`, `extract` (receives `Code`, never the syntax tree, and `Indexed`, what the
-  index read of the repository besides: the manifests and tsconfigs, the exported rows and the
-  files of every pack, which a kind reads when its contracts depend on what the manifests say;
+  index read of the repository besides: the manifests and tsconfigs, the exported rows, the
+  files of every pack and the bytes of the config files the packs list (`Indexed::configs`,
+  never stored: Java's Spring `application.properties` and `application.yml`), which a kind
+  reads when its contracts depend on what the manifests or a configuration say;
   it returns `Found` with a `Site`: `Def`, `Inline`, `File`, `Call`) and
   `link` (receives the whole workspace's providers and exports). The others have a default
   body, and a kind overrides only what it answers differently:
@@ -925,6 +931,7 @@ one for the area a change touches.
   | `sides`, `view`, `related_sides` | the role words and the carried word of `context` on a contract, and the sides that reach it by another name; a contract listed by its providers alone is followed by the linked consumers that read fields, with their drift (the engine's rule: `View::follows_drift`) |
   | `at_call`, `context_sections` | the lines a call adds to a symbol's `contracts:`, and the sections `context` adds after the callees (packages: `consumers:`) |
   | `starts` | the providers a `trace` start text names |
+  | `calls_from_definition` | whether a consumer at a symbol (a Feign or Retrofit interface method) calls on its provider, so `trace` follows from the method to it (HTTP; a channel handler is where a link ends) |
   | `status` | the lines `meada status` prints |
   | `decidable`, `serves`, `candidate` | whether an ambiguous link is an open item, whether a provider serves a contract (aliases included), whether a provider is a candidate for a consumer with no contract |
 
@@ -962,6 +969,39 @@ one for the area a change touches.
   `routes![..]` the Rust pack reads as a list of the handlers' paths).
   `Code::returned` and `Code::constant` give a kind the values a call may return and a
   constant holds, for what it must not leave unmounted.
+  `Expand::Chain` is `Code::expand` for a request built by a chain (`http/java/clients.rs`; in
+  `channel/java.rs` an SQS request, the stream maps of a Redis group read and a
+  `BindingBuilder` chain):
+  the reader gets the call as one `Value::Call`, its receivers and every argument along the
+  chain folded with the wrapper's callers bound, and a name an import from outside binds as a
+  `Value::External`, spelled (`Outside`, candidates included) in the file that writes it. An
+  enum member passed through a wrapper so keeps the caller's import evidence, and a type of
+  the caller's repository by that name is no member. Only this reading folds a call's
+  arguments or makes a `Value::External`: `Expand::Call` and `Code::value` leave them as
+  written, so no other reader sees a change.
+  `Code::expand_with` is `Code::expand` with an injector (`resolve::Inject`): what a kind reads
+  off an annotation written on a field or a parameter (`Facts::annotated`, transient, read
+  from the full facts so a file the index kept is parsed again through `Code::misses`). The
+  shared side asks it for a field no file assigns (`Code::field_written`, the `.f` marker
+  constants the Java pack writes for every `f = v` and `x.f = v`) and for a parameter no frame
+  binds of a function no call of the repository may reach (`Code::may_be_called`: an exact
+  caller, or any callee ending in its name, so a name match, a call on an opaque receiver, a
+  `new` inside an anonymous class and `this(..)` or `super(..)`, which the Java pack emits as
+  constructor calls, all count); a function some exact call reaches climbs to its callers as
+  before, so the injected value never stands in for what a caller passes. A
+  constructor's parameter a `final` field holds (`Const::scope`, the constructor the value is
+  written in) is no wrapper's parameter: it is injected or unknown, never climbed. The values
+  an injector gives are transient like the arguments they stand for, so the index stays free of
+  them. `jvm/spring.rs` is the one injector (Spring's `@Value`, `spring::inject`, which is given
+  the annotation with what it marks), shared by the JVM packs; `spring::resolved` is the one
+  rule for an annotation's text Spring resolves (`@Value`, a Feign `url` or `path`, a listener's
+  topic or queue): literal text with its placeholders resolved, an environment read kept, any
+  other part unknown. The list of Spring's config files is the reader's too
+  (`spring::CONFIG_FILES`), which the Java pack returns as its `config_files`. `jvm/names.rs`
+  holds the name questions the JVM kinds share: `one` (exactly one spelling in the kind's
+  table), `known` (a name an import binds), `spellings` and `typed` (the outside type the source
+  writes for a name), and the Java readers' shared filters `java_files` and `is_method` (an
+  annotation on a method of the file).
 - New **Go router** (spec #25; net/http, gin, echo, chi and gorilla): a row of `ROUTERS` in
   `http/go.rs` (the package, the functions that make a router, the methods that make a group
   (a `Form`: `Group(prefix)`, chi's `Group(fn)` and `Route(prefix, fn)`, gorilla's
@@ -1032,10 +1072,43 @@ one for the area a change touches.
   `Code::constant` of the writer's name, and a `Topic` field written anywhere in the repository
   (`Code::field_written`, the markers of #79) leaves it unresolved; a writer a function made, or one with no topic, is read from each message. The
   `xlang-go-*` fixtures carry a TypeScript producer to the Go consumer group.
+- **Java channels** (spec #26, #92): `channel/java.rs` lists each client by the outside types
+  the source may write for its receiver (`CLIENTS`: `KafkaTemplate`, `RabbitTemplate`,
+  `JmsTemplate`, the SQS clients, jnats `Connection` and `Dispatcher`, the Jedis clients and
+  Lettuce's `RedisCommands`), read through `jvm::names::typed` and `one`, and the listener
+  annotations (`@KafkaListener`, `@RabbitListener`, `@JmsListener`) through `jvm::names::known`
+  on a method's `Call::decorates`. Names fold through `Code::expand_with` with
+  `jvm::spring::inject` (`Expand::Chain` for an SQS request, a Redis group read and a
+  `BindingBuilder` chain); an annotation's values fold through `Code::value` and its placeholders
+  resolve through `jvm::spring::resolved`. An annotated listener's handler is the method
+  (`Handler::Def`); every other client takes `consume`'s default, the method holding the call
+  that names the topic or queue (the Java pack keeps a lambda's calls in the method that writes
+  it, so a jnats callback is that method too). The overload of `RabbitTemplate.convertAndSend`
+  and `JmsTemplate.convertAndSend` is told by the type of the argument a `MessagePostProcessor`
+  would take (`of`, through `jvm::names::declared`): a name the source types as one, or a `new`
+  of one, picks the routing-key form, and so does a `CorrelationData` there
+  (`(routingKey, message, correlation)`) unless a `MessagePostProcessor` before it makes it
+  `(message, postProcessor, correlation)`; an argument whose type the source does not tell (a
+  lambda, a call, a name with no written type, anything the pack cannot read) leaves the
+  producer unresolved, and a literal or a name of another written type is the message. The two-argument AMQP form publishes to the
+  template's exchange: `spring.rabbitmq.template.exchange` of the module's configuration, else
+  the default exchange, a producer of the queue the key names. An `@Exchange` is `direct`
+  unless its `type` (a string, or a member of `ExchangeTypes` bound by an import) says
+  otherwise: a direct or fanout exchange keeps only the keys with no wildcard word, a headers or
+  custom one none, a topic one, or one whose type is not read, every key; a `DirectExchange` in
+  `BindingBuilder` keeps only a key with no wildcard. The listener annotation is asked first
+  (`jvm::names::known`), and only then whether it is on a method (a set of the file's methods,
+  built once), so a file of many `@Override` methods is read in linear time. The Java pack reads an
+  annotation written as an element value as `Value::New(name, [Object(elements)])`, its unnamed
+  element as `value` (the shape of a Go composite literal; `Code::eval` folds it), only inside
+  an annotation's arguments, which the index never keeps; `channel/java.rs` reads a nested
+  `@QueueBinding`, `@Queue`, `@Exchange` or `@TopicPartition` by its element's key, since Java
+  types an element by the annotation that declares it. `jms` is a broker kind of its own (also
+  AsyncAPI's `jms` protocol), which the Kotlin pack reuses.
 - New **package ecosystem** (spec #22 user story 26, spec #225; track B packs): implement the
   `Ecosystem` trait of `package.rs` in a module of its own under `package/` (`npm`, `pypi`,
-  `cargo`, `go` today) and add it to `ECOSYSTEMS`; the package kind, the index writer and the
-  packs learn no name. An arm for one ecosystem added to the shared code is a finding. It plugs
+  `cargo`, `go`, `maven` today) and add it to `ECOSYSTEMS`; the package kind, the index writer
+  and the packs learn no name. An arm for one ecosystem added to the shared code is a finding. It plugs
   in another manifest format (`Cargo.toml`, `go.mod`) without a new kind of contract: the
   contract `package::<name>::<package>` (`Ecosystem::prefix`, derived from `name`) still routes
   to the same `Packages` steps (`declare`, `consume`, `import`, `shapes`, `link`, `place`,
@@ -1048,7 +1121,14 @@ one for the area a change touches.
     version, dependency entries, entry fields, source roots, console scripts; it never fails,
     hostile bytes read as empty); `sources()` (the extensions of the source files whose imports
     name its packages); `names_package(specifier)`; `entries(..)` (the dependency entries an
-    import of a file may name, each with the subpath inside the package).
+    import of a file may name, each with the subpath inside the package). `imports(..)` (the
+    `(specifier, chain)` pairs a call goes through) has a default, `Code::imported`; Maven
+    overrides it (the class and `name(arity)`, from the head's import or the receiver's type,
+    one pair per on-demand candidate, `Outside::spellings`). `declares(..)` (whether a provider
+    declares the specifier itself) defaults to `true`: `import` lets none of one site's pairs
+    enter when two are declared, so only an ecosystem with several pairs per call answers it.
+  - `fits`: literal package-name equality; Maven matches the literal fragments of a computed
+    coordinate. `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
   - `flag`: the range is unchecked (`range unchecked`); npm checks semver.
   - `reaches`: every provider; npm's `workspace:` keeps the dependent's own repository, Cargo
     and Go share `sourced`, in the seam (a `path` by the folded location, a `git` by the
@@ -1059,7 +1139,13 @@ one for the area a change touches.
     subpath as a path, or `index.<ext>` for the bare name when none of the three exists, `exact`;
     then the candidates among the files the manifest owns); Cargo follows the crate's library root alone
     (`How::CrateName`, no candidates, and the library-head check of an entry that does not
-    rename its crate); Go looks in the one directory the subpath names (`How::ModulePath`).
+    rename its crate); Go looks in the one directory the subpath names (`How::ModulePath`); Maven
+    looks the class up by package declaration in the files the artifact owns that are no test
+    sources and picks the method by name and argument count among the overloads of the class's
+    family (`How::Package`, `Maven::resolutions`; the provider's `families` rows, an opaque
+    ancestor keeping the target from `exact`). `member_of`: none; Maven's constructors and
+    methods of a class, so `context` on a public class lists, once per call, the calls that
+    reach its members (`reached`, at the best level of the call's links into the class).
   - `resolutions`: the single-entry loop (the entries, each provider the entry `reaches`,
     `resolve` in it); PyPI replaces it whole, since its imports name a module and several
     distributions may expose it.
@@ -1095,9 +1181,9 @@ one for the area a change touches.
   as paths, never opening one, so a symlink changes nothing. A change to what is stored
   re-blesses `tests/golden/schema.txt`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the
-  channel kind's module for that language (TS/JS: `channel/ts.rs`; Python: `channel/python.rs`; Rust: `channel/rust.rs`; Go: `channel/go.rs`), never in the pack, matching a call's
+  channel kind's module for that language (TS/JS: `channel/ts.rs`; Python: `channel/python.rs`; Rust: `channel/rust.rs`; Go: `channel/go.rs`; Java: `channel/java.rs`), never in the pack, matching a call's
   method and the `Code::origins` of its receiver, asked with the policy its language needs (TS/JS:
-  `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Python and Rust:
+  `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Java: the written type, `jvm::names::typed`; Python and Rust:
   `Values`, the constructors named by the file's imports), reading the name through `Code::expand` (a reader that
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
   and giving the handler. A wildcard match (`inferred`, reason `<producer contract> wildcard
@@ -1205,7 +1291,16 @@ one for the area a change touches.
   (Rust's default features) also gives `settings` (a string per file path, stored as
   `files.setting` and `Facts::setting`) and takes it in `parse_with`; a file whose setting
   changed is parsed again, whatever its content. Besides `parse` and `modules`, it says what the
-  shared resolution cannot guess: `receiver` and `base_receiver` (keywords for the enclosing
+  shared resolution cannot guess: `members_in_scope` (bare names may name class members),
+  `unordered_globs` (combine wildcard candidates, with an inside glob taking priority),
+  `qualified_types` (an unbound path head may name a repository type through its layout),
+  `Facts::overloads` and `Facts::constructors` (separate method and constructor families with
+  written signatures), `Call::arity` and `Call::constructs`
+  (the argument count and constructor call form, kept in cached facts), `Facts::statics` (members a class wildcard
+  import takes), `Imported::Qualified` (a fully qualified definition import),
+  with Java parameter types spelled from syntax tokens, excluding annotations and comments,
+  and `#method` after a class-named method's signature to distinguish it from a constructor,
+  `receiver` and `base_receiver` (keywords for the enclosing
   class and its base), `globals` (names bound everywhere), `Def::bases` (a class's bases, for
   its family), `Facts::receivers` (the class each binding gives a name), `Facts::star` (what a
   star import takes), `stars_bind` (whether a star import rebinds names in statement order, as
@@ -1224,8 +1319,7 @@ one for the area a change touches.
   and `Layout::programs` (both below), and `Layout::reaches` (default: none, every file), the
   files a name match may reach from a caller (`Resolver::reaching`, called by `refresh`):
   Rust's are its crate's and those of the repository's libraries it depends on. A language whose
-  files share one scope (a Go package: the files of one directory that declare one package; Java,
-  Kotlin and C# packages next) says which through `Layout::shared`, groups of files that
+  files share one scope (a Go package: the files of one directory that declare one package; Java packages; Kotlin and C# packages next) says which through `Layout::shared`, groups of files that
   `Resolver::with_shared` takes: a name a file and its imports leave unbound is looked up
   among the top-level definitions and constants of the others in its group, private ones
   included (`Resolver::sibling`, at the end of `lexical_as`), and an import that names any
@@ -1235,7 +1329,27 @@ one for the area a change touches.
   (`Resolver::sibling_method`, in `member`); files that define one name apart are `Binding::Several`, an `ambiguous`
   call. The group is built from `Facts::package`, the package each file declares. A member
   lookup (`Resolver::member`) reads the class's own file, then the group's others for a method
-  (`sibling_method`). A language whose imports name a path rather than a file (Rust's
+  (`sibling_method`). A name a class family declares as an overload family (`Facts::overloads`)
+  is read per signature instead (`Resolver::overloaded`): in C3 order, each written signature
+  from the first class that declares it, so an override replaces its base's signature and an
+  inherited overload of another arity stays; a class past an opaque base that declares the name
+  leaves it unknown. A pack with `members_in_scope` reads a bare called name with
+  `Reading::Method`, which at each class body takes that family's overloads
+  (`Resolver::inherited`) and stops, unknown, at a class whose family is absent or has an
+  opaque base and declares none, or that does not declare a name every class has
+  (`LanguagePack::implicit_members`); a bare field name reads the family's fields first
+  (`Resolver::inherited_field`). Overloads merge across the family, so an opaque base anywhere
+  in it keeps them from `exact` (Opaque outside, strict; #353 tracks a relaxation).
+  `LanguagePack::unordered_bases` drops the written base list from the C3 merge (Java's
+  `implements I, J` with `J extends I`), and a `base_receiver` call reads the overloads of the
+  family past the class (`Resolver::base_member`). A call made on a call's result names it
+  (`Call::on`), as a local may (`Class::Result`): the receiver is the class the declared result
+  of that call's exact target names (`Resolver::result_of`, bounded by `RECEIVER_DEPTH`). A name
+  match of a call narrowed by `Call::arity` (`Resolver::matched`) reads the family that owns it:
+  a typed receiver, `this` or a bare call match within that family alone, a bare call past an
+  opaque base falls back to what its scope binds, and any other receiver takes, from several,
+  the one declared in the family of the class around the call other than the caller; a match
+  narrowed from several is `Resolution::Narrowed`, stored as `inferred` with `calls.narrowed`. A language whose imports name a path rather than a file (Rust's
   `use a::b as c`) writes `Imported::Path` (what the dotted callee-like name gives, resolved
   from the scope of the import's own `local`, which a pack qualifies by the scope that holds
   it: `inner.c`, `f.c`) and `Imported::Glob` (every name the module the path gives takes:
@@ -1320,7 +1434,12 @@ one for the area a change touches.
   unreadable one, is rebuilt beside it and renamed over it, and `status` says so. One whose stored facts do not
   parse is rebuilt by the first refresh that reads them (when a file changed), which `status`
   cannot tell.
-- The index holds no source text and no values, apart from the literal URL path fragments and the
+- The index holds no source text and no values, apart from the argument count and constructor
+  form of an overloaded call (`Call::arity`, `Call::constructs`), the place of the call a
+  chained call is made on (`Call::on`), whether an `inferred` call was narrowed from several
+  definitions of its name (`calls.narrowed`), callable-to-signature and
+  static-member names (`Facts::overloads`, `Facts::constructors` and
+  `Facts::statics`), the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
   consumer reads from the parsed response, and those of the zod schema or object literals a
@@ -1346,9 +1465,15 @@ one for the area a change touches.
   entries with the version requirement as written, the `alias` when the key renames the crate
   and the `via`: a `path` folded from the manifest's directory, which keeps its leading `../`
   when it leaves the repository, or the normalized `git` URL; `workspace = true` as a flag; the
-  `[workspace.dependencies]` entries; the `[workspace.package]` version), the `tsconfig.json` rows
+  `[workspace.dependencies]` entries; the `[workspace.package]` version), and of JVM build files
+  (spec #26: literal Maven coordinates and versions, dependency coordinate fragments with `*`
+  for computed parts, declared ranges and a `computed` source flag, source roots with the test ones marked, and Gradle's
+  literal group, root project name and included project names/directories in `Summary::build`),
+  the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
-  the definition, constant, type or file they name), the `entry_points` table (spec #31:
+  the definition, constant, type or file they name), the `families` table (spec #26: each public
+  Java class's ancestors past it, `Resolver::ancestries`, a repository class by file and name and
+  an opaque one as `null`), the `entry_points` table (spec #31:
   each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
   each community's name and member identities (`communities`, spec #31). `Call::args`,
   `Call::kwargs`, `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::return_values`, `Def::type_params`, `Param::default`,
@@ -1469,6 +1594,15 @@ one for the area a change touches.
   first and lists each call's level and target, its providers, consumers and links (needs `jq`).
 
 ## Known ceilings
+
+- `lang/java.rs`: `DEFINITION_DEPTH` (128) bounds nested named types; deeper definitions and
+  their bindings stay with the enclosing symbol. `VALUE_DEPTH` (64) bounds nested values and
+  `PATH_DEPTH` (256) bounds callee segments; deeper values or callees are unknown.
+  `QUALIFICATION_BYTES` (4 MiB) bounds enclosing-name bytes across syntax visits, before each
+  visit's bounded metadata fanout. Pending visits share their scope strings. A file that
+  exceeds this budget contributes no facts or package layout, so an incomplete overload
+  family cannot produce an exact link; other files still index. The Java hostile-depth and
+  long-prefix engine fixtures exceed these limits.
 
 - `snapshot/pull.rs`: a generation's bundles hold at most `GENERATION_BYTES_MAX` (256 GiB)
   together, as the document records their sizes (checked before any download) and as the
@@ -1628,6 +1762,111 @@ one for the area a change touches.
   is found when its third argument is a literal or a name that holds one; any other leaves the
   consumer on the function that calls `Consume`. A queue name is the last segment of the SQS
   queue URL.
+- `channel/java.rs` (spec #26, #92): a client counts only by the type the source writes for its
+  receiver: one a call returns in place (`connection.sync().xadd(..)`), an interface the table
+  does not list (`KafkaOperations`, `AmqpTemplate`, `RedisStreamCommands`) and a `var` with no
+  readable type make no side. A listener annotation on a class (`@KafkaHandler`,
+  `@RabbitHandler` methods), a composed annotation, `@KafkaListeners`, `topicPattern` and an
+  `id`-only listener read no name (one unresolved consumer when the annotation is on a method).
+  A placeholder that resolves to a comma-separated list stays one name. A `RabbitTemplate`
+  whose exchange or routing key the code sets (`setExchange`, `setRoutingKey`) is not read:
+  only the module's `spring.rabbitmq.template.exchange` replaces the default exchange; the
+  one-argument forms and a JMS default destination are unresolved. `BindingBuilder` is read
+  only as `bind(q).to(e).with(key)` with the queue and the exchange written as a `new Queue`,
+  `new TopicExchange` or `new DirectExchange` (through constants and `final` fields); a `@Bean`
+  method's parameter, `QueueBuilder`, `ExchangeBuilder` and a fanout `to(..)` bind nothing, and
+  neither does a `@QueueBinding` without a key. An SQS request built in a lambda
+  (`sendMessage(b -> b.queueUrl(..))`) or held in a local, and Redis streams held in a map
+  variable, are unresolved.
+- `http/java.rs` (spec #26, #86): a Spring MVC route is read from `Call::decorates` on a method
+  of a `@RestController` or `@Controller` class, under the class's `@RequestMapping` prefix
+  (nested classes do not inherit the outer prefix). An annotation or `RequestMethod.X` counts
+  only when `Code::outside` says an import from Spring binds its name: single-type, static, or
+  the one on-demand candidate in the kind's table (`Outside::candidates`: `...bind.annotation.*`
+  alone or beside `java.util.*`). A type of the repository with the same name (a class, an
+  interface or an annotation type, which the Java pack indexes as an interface; a nested,
+  same-package or repository-wildcard `GetMapping` or `RequestMethod`), a single-type import of
+  another package and two candidates in the table yield no route; the kind reads the enum
+  member off the written `Value::Ref`, with no table in the pack. A path folds constants and
+  `+` through `Code::value`; one that does not fold, a `value` with a `path`, a class-level
+  `method`, a `method` with no readable element, or a pattern with a `/` inside braces
+  (`{id:a/b}`) serves nothing. An unreadable element beside readable ones of a `method` or a
+  path array is dropped: the others still serve. Interface-declared mappings, composed annotations
+  and `server.servlet.context-path` are not read.
+  JAX-RS (#87, `jax_rs` in the same file): a method with a verb annotation (`GET` ... `OPTIONS`)
+  of a class with `@Path`, from `javax.ws.rs` or `jakarta.ws.rs`, joined to the method's own
+  `@Path`; both packages through the same `known`, so `import javax.ws.rs.*` beside
+  `jakarta.ws.rs.*` is two candidates and serves nothing. A `@Path`-only method and
+  `@ApplicationPath` are not routes, and neither is a method of an interface (`Facts::interfaces`):
+  a `@Path` interface is a MicroProfile or Quarkus client. A controller or resource class whose
+  family has an outside base (`extends com.corp.Base`, top-level or nested) gives no provider
+  (#354), since its annotations are read in the class scope, where an inherited member type
+  could shadow the import. A fully qualified annotation without an import (`@javax.ws.rs.GET`)
+  and annotations an implementation inherits from an interface are not read.
+- `http/java/clients.rs` (spec #26, #88): a RestTemplate or a WebClient counts by the type the
+  source writes for the receiver (`Follow::Declarations`), or, for a WebClient, by the
+  `WebClient.create` or `WebClient.builder()` chain it traces to (`Follow::Values`); a name
+  imported on demand counts through its one candidate in the kind's table (`Outside::candidates`,
+  now also for a head only the file's outside names bind). A WebClient's base is read off the
+  folded chain (`Expand::Chain`), through constants, `final` fields and a wrapper parameter's
+  arguments; a client held in a local has an unknown base, so the consumer links by path. The
+  Java pack keeps a `final` instance field's one value (its initializer, or the single `this.f =
+  v` or `f = v` of all its constructors; two give none) as a `Const` of its class, outside
+  `statics`, a constructor's value read in that constructor (`Const::scope`): its parameters
+  are what Spring injects (#89), else unknown. A builder
+  (`HttpRequest.newBuilder()`, `new Request.Builder()`) is read only as one chain ending in
+  `build()`; one held in a variable between steps is no consumer, and a chain folded short of
+  its start names no method. `String.format` puts each `%s` or `%d` argument in place (a
+  parameter keeps the wrapper climbing, anything else is a hole) and reads `%%`; any other
+  conversion leaves the URL unread. A `HttpMethod.X` names a method only when one spelling
+  (`Outside`) is Spring's.
+  Bases from configuration (#89): the reader expands with `jvm::spring::inject`, so a field or a
+  constructor parameter with Spring's `@Value("${key}")` (bound by an import, as for the
+  annotations of #86) holds `key` from the `application.properties`, `application.yml` or
+  `application.yaml` of its module's `src/main/resources`, in that order of precedence (a file
+  past `lang::MAX_BYTES` is not read, nor a `.properties` past its first `#---`). A source's
+  module is that of the deepest main source root a Maven or Gradle build declares for it
+  (`Indexed::manifests`, a Gradle source set's `srcDirs` included), else the one whose
+  `<module>/src/main/` it is under. The pack records every annotated field with whether it is
+  `static`, and `spring::inject` gives a `static` one nothing; a field some file assigns, and
+  one a parameter, a local or a same-name binding hides, hold nothing too. A placeholder no key fills is the variable it
+  names (`Part::Env`), and `${X:default}` keeps both (`Part::EnvOr`): `http::fetches` reads
+  such a URL through `X` and, when the default names a host, through that host too, the twins
+  marked in their `via` (`env:X|host:<host>` and `host:<host>|default`). `Http::workspace_step`
+  (`keep_applicable`), after every `declare` filled `Provider::hosts`, keeps the one that
+  applies, its mark dropped: the default's when a provider of the workspace serves its host,
+  else the variable's. Links, `context`, `trace` and the open items see one consumer per call.
+  The Java pack reads `System.getenv("X")` (or `java.lang.System.getenv`) as `Part::Env`,
+  unless the file imports or may declare another `System` (`binds_system`, a word after
+  `class` in a comment counts; `import java.lang.System;` does not). Profiles, relaxed binding,
+  YAML lists and a SpEL `#{...}` value are not read. The configurations are read once per
+  extraction, the first time an annotation is injected.
+- `http/java/declarative.rs` (spec #26, #90): a Feign or Retrofit interface method is a consumer
+  sited at the method (`Site::Def`, built by `http::consumer_at`), not at a call: its callers
+  reach it as any call to a definition. Feign: `@FeignClient` from
+  `org.springframework.cloud.openfeign` (bound as the Spring annotations of #86, through `known`)
+  on an interface; `url` (empty is none; without a scheme it gets `http://`, as Spring Cloud does) and `path` resolve with `jvm::spring::resolved`
+  over the module's configuration, the methods' mappings are `request_methods` and `paths` of
+  `http/java.rs`, a `@RequestMapping` with no `method` meaning GET, as Feign sends it. Without
+  `url` the consumer's `via` is `client:Feign client <name>`: `http::CLIENT_VIA` is the prefix of
+  a client that names itself, the rest the words the reader writes, and `Http::link` words the
+  unresolved host as `host unresolved (<words>)`, so the shared code names no library; a name with
+  `|` is refused, it would collide with the twin marks. A `@RequestMapping` on the interface,
+  `@RequestLine` and other contracts give nothing. Retrofit: the verbs of `retrofit2.http`
+  (their names collide with JAX-RS, so `known` accepts both spellings and the result must be
+  Retrofit's); the base is the folded `Retrofit.Builder().baseUrl(..)` chain of each
+  `retrofit.create(Api.class)` (`Expand::Chain`, climbing wrapper callers while the base holds a
+  `Part::Ref`), the receiver proved Retrofit by its type or by its `new Retrofit.Builder()`
+  chain; one consumer per creation, none gives an unknown base. Its annotations name the path by
+  `value` alone, and a route with a brace open past its segment is not read (`balanced`, as for
+  Spring, JAX-RS and Feign). A route from `/` replaces the
+  base's path (read over the base's leading text parts, so `HOST + "/v1/"` counts), and an empty
+  route is Retrofit's dynamic `@Url`: a consumer with no contract. A consumer at a method is an
+  open item like a call's (`items::list`): its location is the method, its expression the method
+  on one line, and its enclosing symbol the method itself, so `meada decide` sends the method's
+  lines as the minimal excerpt (ADR 0006). The Java pack reads `Api.class` as `Value::Member("Api", "class")`.
+  `ContractKind::calls_from_definition` (true for HTTP) tells `trace` that a consumer at a
+  symbol is a call to follow, unlike a channel handler, where the link ends.
 - `http/go.rs` (spec #25): a route is read only with a literal path and a literal prefix; a
   group prefix or a pattern Meada cannot read serves nothing. `net/http` reads `{name}`,
   `{name...}` and `{$}` alone: a `:name` segment is a literal no contract can spell, so its route
@@ -2165,3 +2404,22 @@ one for the area a change touches.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).
+
+- `jvm/spring.rs` (spec #26, #89): `PLACEHOLDER_DEPTH` (32) bounds how many keys deep a
+  placeholder is resolved, a cycle included, and `PLACEHOLDER_BUDGET` (64 KiB) what one value
+  may cost (each placeholder visited, each byte copied); past either the rest is an unknown
+  part. The YAML file goes through the provider documents' reader (`document/yaml.rs`), with its
+  budget and nesting limit; a `.properties` file is bounded by `lang::MAX_BYTES` like every pack
+  config. A same-package `System` type in another file is not seen by the Java pack's
+  `getenv`.
+- `jvm/maven.rs` (spec #26): `XML_DEPTH` (64 nested elements), `XML_NAMESPACES` (16 `xmlns`
+  occurrences in the file) and `XML_ATTRIBUTES` (64 per tag) are checked by one linear pass
+  before parsing, since roxmltree copies the enclosing namespaces into each element that
+  declares one and checks a tag's attributes pairwise; `XML_NODES` (65,536) bounds the parsed
+  tree, in addition to `lang::MAX_BYTES`. `roxmltree` rejects DTDs and never loads external
+  entities. An over-limit, unterminated or malformed manifest reads as an empty summary;
+  indexing continues. `jvm/gradle.rs`: `GRADLE_DEPTH` (64) bounds nested blocks; a deeper build
+  or settings file reads as an empty summary. The Gradle scanner does not read Groovy slashy
+  strings, and reads a triple-quoted string as quoted pairs. It keeps at most `MAX_ROOTS` (64)
+  source directories. JVM coordinate names share
+  `package::MAX_NAME` (214 bytes). These readers never run Maven, Gradle or a JDK.

@@ -39,3 +39,9 @@ Every writer links to every reader of the same resource in another repository, a
 Meada finds peers by their git remote, even when the clone sits at a different path on each
 machine. An unknown or misspelled key gives an error naming the file, the line and the key.
 Without a `meada.toml`, the repository declares no peers.
+
+## JVM artifacts
+
+JVM package contracts are discovered from manifests: `pom.xml`, `settings.gradle`, `settings.gradle.kts`, `build.gradle` and `build.gradle.kts`. They need no additional `meada.toml` key. Declare other repositories in `[[peer]]` as in the examples above. Use literal coordinates for `exact` links; Maven properties and Gradle expressions remain unevaluated, and those that make up the group or artifact produce `ambiguous` candidates.
+
+In Java with Spring, the base URL may come from `@Value("${key}")`, read from the `application.properties`, `application.yml` or `application.yaml` in each module's `src/main/resources`, with no new `meada.toml` key. A literal URL links by host in `[serve] hosts`; a `${VAR}` placeholder (with or without `:default`) uses the same `[[peer]]` `base_url_env` keys. A default whose host some peer serves links by that host.

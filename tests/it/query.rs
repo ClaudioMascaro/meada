@@ -218,6 +218,22 @@ fn rust_programs_are_found_as_processes() {
 }
 
 #[test]
+fn java_programs_are_found_as_processes() {
+    let repo = fixture_repo(
+        "search_java_programs",
+        "conformance-java",
+        Some("https://example.com/acme/conformance.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    // Only `public static void main(String[])` and `String...` start a program.
+    assert_golden(
+        "conformance-java.search-process-main.txt",
+        &engine.search("main", Some("process"), None).unwrap(),
+    );
+}
+
+#[test]
 fn go_programs_are_found_as_processes() {
     let repo = fixture_repo(
         "context_go_programs",

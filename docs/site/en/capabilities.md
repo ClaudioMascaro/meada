@@ -1,6 +1,6 @@
 # Capabilities and limits
 
-Meada 0.1 indexes TypeScript, JavaScript, Python, Rust and Go. It finds calls in code and connects repositories through HTTP, packages and messaging channels. Each link reports its confidence level.
+Meada 0.1 indexes TypeScript, JavaScript, Python, Rust, Go and Java. It finds calls in code and connects repositories through HTTP, packages and messaging channels. Each link reports its confidence level.
 
 Server mode includes the [console](console.md), [snapshots](snapshots.md), [retention](generations.md) and [managed workspace](workspaces.md) through optional modules. The console has an editor, diff, playground and graph. [Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/) and [Helm](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/) provide deployment examples.
 
@@ -12,6 +12,7 @@ Server mode includes the [console](console.md), [snapshots](snapshots.md), [rete
 | Python | `.py` |
 | Rust | `.rs` reachable through each crate's module tree |
 | Go | `.go` included by the package's build rules |
+| Java | `.java`, resolved by their `package` declarations |
 
 ### Rust
 
@@ -31,6 +32,18 @@ Analysis targets linux/amd64. Files named `_windows.go`, with a false `//go:buil
 
 A `recv.M()` call is `exact` when the code supplies its type in a parameter, field, `var`, composite literal or function result. Otherwise, name resolution is `inferred` or `ambiguous`. A call through an interface stops at its interface method.
 
+### Java
+
+Meada reads classes, interfaces, enums, records, methods and constructors, including nested types. Names include the package and, for methods, the written parameter types: `example.Orders.place(String,int)`. Calls in lambdas and anonymous classes belong to the enclosing symbol.
+
+Single-type, package and static imports, including `*`, resolve through package declarations. Bare, `this` and static calls are `exact` when argument count leaves one method; overloads with the same argument count stay `ambiguous`. External types stay external.
+
+A call on a field, parameter or local variable whose type is written resolves within that type and the supertypes written in `extends` and `implements`, and so do `var x = new T(...)`, `var x = f()` and `f().g()` through the declared return type of `f`, `super.f()`, and bare and `this` calls. Each signature comes from the first class that declares it, so a class's `f(int)` overrides its base's and an inherited `f()` stays visible. A call through an interface-typed receiver stops at the interface method. A supertype from outside the repository has unknown members: with one anywhere in the hierarchy, none of its methods is `exact`, and the call resolves by name within the hierarchy. With an unknown receiver, the call resolves by name: `inferred` when one method has that name in the repository or, other than the calling method itself, in the calling class's hierarchy, `ambiguous` with every candidate when several do.
+
+Public types and their public or protected members form the exported surface.
+
+Indexing needs no JDK, Maven or Gradle and executes no repository code.
+
 ## HTTP and contract documents
 
 Meada connects consumers and providers across languages, including behind gateways:
@@ -41,8 +54,19 @@ Meada connects consumers and providers across languages, including behind gatewa
 | Python | `requests`, `httpx`, `aiohttp` | FastAPI, Flask, Django |
 | Rust | `reqwest`, `ureq` | axum, actix-web, Rocket |
 | Go | `net/http`, resty | `net/http`, gin, echo, chi, gorilla/mux |
+| Java | RestTemplate, WebClient, `java.net.http`, OkHttp, OpenFeign, Retrofit | Spring MVC, JAX-RS |
+
+In Java, a method of a `@RestController` or `@Controller` class with `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping` or `@RequestMapping(method = RequestMethod.X)` becomes a provider under the class's `@RequestMapping` prefix. Paths fold `static final` constants (also from other classes) and `+`; each path of an array is one provider. A `@RequestMapping` without `method` serves every method (`http::ANY::<path>`) and links to consumers of any method, with "any method" in the reason. `server.servlet.context-path` is not applied. Annotations and `RequestMethod` count through a Spring import, single-type, static or `import ...bind.annotation.*`; a repository class with the same name, or an import that could also bring the name, hides them. In `method` or a path array, an unreadable element is ignored and the others count.
+
+In Java, a class with `@Path` (`javax.ws.rs` or `jakarta.ws.rs`) is a JAX-RS resource: a method with `@GET`, `@POST`, `@PUT`, `@PATCH`, `@DELETE`, `@HEAD` or `@OPTIONS` becomes a provider at the class path joined to the method `@Path`, with constants folded and `{id}` or `{id:regex}` as the parameter. A method with only `@Path` (a sub-resource locator) is no route, and `@ApplicationPath` is not applied. Names count through an import, as in Spring. A controller or resource class whose family has an outside base (`extends com.corp.Base`) gives no provider (#354), and a `@Path` interface is a client, not a server. A fully qualified annotation without an import and annotations inherited from an interface are not read.
+
+Java consumers are the `RestTemplate` methods (`getForObject`, `getForEntity`, `postForObject`, `postForEntity`, `put`, `patchForObject`, `delete` and `exchange(url, HttpMethod.X, ...)`), the `.uri(...)` of a WebClient request (`.get()`, `.post()` and the others, or `.method(HttpMethod.X)`), and the `build()` of an `HttpRequest.newBuilder()` chain (`.uri(URI.create(url))`, `.GET()`, `.POST(...)`, `.PUT(...)`, `.DELETE()`, `.HEAD()` or `.method("X", ...)`) or of an OkHttp `new Request.Builder()` (`.url(url)`, `.get()`, `.post(...)` and the others or `.method("X", ...)`); a chain without a method sends `GET`. The client counts by the type the code writes (a field, a parameter, a variable), imported by name or by an `import ...*` that is the only one that could bring it, or by the call that makes it, and a WebClient's base comes from the `WebClient.create(base)` or `WebClient.builder().baseUrl(base)` it comes from, also through a constant, a `final` field with a single value or the argument each caller passes to a wrapper; for a WebClient held in a local variable only the type is read, and the base stays unknown. The URL folds literals, `+`, `static final` constants (also from other classes), `URI.create(...)`, `String.format` (each `%s` or `%d` takes the matching argument, and becomes a parameter when that cannot be read) and template variables (`{id}`). A method that builds the URL or the method from its parameters is a wrapper: each of its calls becomes a consumer with the arguments substituted, through any number of levels. `HttpMethod.X` counts through a Spring import, read in the file that writes it, also when it arrives through a wrapper; a repository type with the same name hides it. A call whose URL cannot be read is an unresolved consumer.
+
+In Java, an `@FeignClient(name = "x", url = "...")` interface (`org.springframework.cloud.openfeign`) with methods annotated as in Spring MVC (`@GetMapping`, `@RequestMapping(method = ...)` and the others) has each method as a consumer, at the interface method itself: its callers reach the provider, and `trace` and `context` pass through it. The base comes from `url` and the prefix from `path`, both with `${key}` placeholders resolved through the Spring configuration, as in `@Value`. A `url` without a scheme gets `http://`, as in Spring Cloud. A `@RequestMapping` without `method` means `GET`, as Feign sends it. Without `url` the host is unresolved, and the link's reason carries the `name` (`host unresolved (Feign client x)`); the provider serving the path and method counts. `@RequestLine`, other Feign contracts and a `@RequestMapping` on the interface are not read. In Retrofit, an interface whose methods carry `@GET("x")`, `@POST` and the others from `retrofit2.http` has each method as a consumer; the base comes from the `Retrofit.Builder().baseUrl(base)` that creates the interface (`retrofit.create(Api.class)`), also through a constant or a wrapper, one consumer per creation, and without a creation the base is unknown. A path starting with `/` replaces the base's path (also when the base is concatenated), and a relative one follows it; an empty path is Retrofit's dynamic `@Url` and gives a consumer with no contract. A Retrofit annotation names its path in `value` alone, and a path with a `{` that does not close within its segment is not read. `@HTTP` is not read. Annotations count through an import, with the same hiding rules as Spring. An ambiguous Feign or Retrofit method (for example, without `url` and with two repositories serving the path) or an unresolved one is an open item at the method itself: `search` with `kind=ambiguous` or `kind=unresolved` lists it, and `meada decide` resolves it with the method as the excerpt.
 
 In Rust, `base_url_env` can link a base URL read through `std::env::var`, `env!` or `dotenvy::var`. In Go, it covers `os.Getenv` and `os.LookupEnv`, including defaults with `if v == ""`, `len(v) == 0`, `!ok` or `!ok || v == ""` when `ok` comes from the same `os.LookupEnv`. It also follows `strings.TrimSuffix`, `TrimRight` and `TrimSpace`.
+
+In Java, `base_url_env` links the base URL of `System.getenv("X")` and that of a field or constructor parameter with Spring's `@Value("${key}")`. The key comes from the `application.properties`, `application.yml` or `application.yaml` in the `src/main/resources` of the file's module (the module of the main source root its Maven or Gradle build declares for it, a Gradle `srcDirs` included, or else of the `src/main/` it sits under); with more than one, `.properties` wins, then `.yml`. In a `.properties` file, what follows `#---` is not read. A literal URL links by host to the peers' `[serve] hosts`. A `${VAR}` placeholder no key fills is the variable `VAR`, mapped through `base_url_env`. With a default (`${VAR:https://web.example.com/api}`), the default links by host when some peer serves that host; otherwise `VAR` applies, as without a default. Meada never reads a variable's value. A `static` field, a field some file assigns, or one a parameter or a local hides, gets no value. A constructor parameter gets Spring's value only when no call in the code creates the class, `this(..)`, `super(..)` and a `new` inside an anonymous class included; with calls, the caller's value prevails. Profiles (`application-<profile>`), relaxed binding of variables and SpEL (`#{...}`) are not read.
 
 Resources declared in `meada.toml` also produce contracts. With a `[serve]` table, the repository reads OpenAPI 3.0/3.1 and AsyncAPI 2.x/3.0, found by name or listed in `[serve] documents`. Routes and channels become contracts with response or payload fields. `meada status` reports what was read and ignored.
 
@@ -50,15 +74,18 @@ Resources declared in `meada.toml` also produce contracts. With a `[serve]` tabl
 
 Each producer links to its consumer handlers, including within the same repository.
 
-| Channel | TypeScript / JavaScript | Python | Rust | Go |
-| --- | --- | --- | --- | --- |
-| Kafka | `kafkajs` | `confluent-kafka`, `kafka-python` | `rdkafka` | `segmentio/kafka-go`, `confluent-kafka-go`, `sarama` |
-| RabbitMQ | `amqplib` | `pika` | `lapin` | `amqp091-go` |
-| Amazon SQS | AWS SDK v3, `sqs-consumer` | `boto3` | `aws-sdk-sqs` | `aws-sdk-go-v2` |
-| NATS | `nats` | `nats-py` | `async-nats` | `nats.go` |
-| Redis streams | `ioredis`, `node-redis` | `redis-py` | crate `redis` | `go-redis` |
+| Channel | TypeScript / JavaScript | Python | Rust | Go | Java |
+| --- | --- | --- | --- | --- | --- |
+| Kafka | `kafkajs` | `confluent-kafka`, `kafka-python` | `rdkafka` | `segmentio/kafka-go`, `confluent-kafka-go`, `sarama` | Spring Kafka |
+| RabbitMQ | `amqplib` | `pika` | `lapin` | `amqp091-go` | Spring AMQP |
+| Amazon SQS | AWS SDK v3, `sqs-consumer` | `boto3` | `aws-sdk-sqs` | `aws-sdk-go-v2` | AWS SDK v2 |
+| NATS | `nats` | `nats-py` | `async-nats` | `nats.go` | jnats |
+| Redis streams | `ioredis`, `node-redis` | `redis-py` | crate `redis` | `go-redis` | Jedis, Lettuce |
+| JMS | | | | | Spring JMS |
 
 BullMQ jobs are supported too. In RabbitMQ, a `publish` to an exchange reaches queues through their bindings. NATS supports `*` and `>` wildcards. Broker clusters are not modeled: same-named topics in different clusters can link as though they belonged to one cluster.
+
+In Java, a client counts by the type the code writes for it (`KafkaTemplate`, `RabbitTemplate`, `JmsTemplate`, `SqsClient` or `SqsAsyncClient`, jnats `Connection` or `Dispatcher`, `Jedis`, `JedisPooled`, `UnifiedJedis`, `JedisCluster` and Lettuce's `RedisCommands`, `RedisAsyncCommands` and `RedisReactiveCommands`), and a listener annotation by its Spring import; a repository type with the same name (a class, an interface or an `@interface` annotation) hides it. Producers are `KafkaTemplate.send(topic, ...)`, `RabbitTemplate.convertAndSend(exchange, routingKey, ...)` (with two arguments, or with a `MessagePostProcessor`, it publishes to the default exchange and reaches the queue its key names, or to the configuration's `spring.rabbitmq.template.exchange`), `JmsTemplate.send` and `convertAndSend` with the destination, `sendMessage` with the request's `queueUrl` (the queue is the URL's last segment), `publish(subject, ...)` and `xadd(key, ...)`. Consumers are `@KafkaListener(topics = ...)`, also through `topicPartitions`, `@RabbitListener(queues = ...)`, `queuesToDeclare` and `bindings = @QueueBinding(...)`, whose keys become bindings (on a `direct` `@Exchange`, the default, or a `fanout` one, only keys with no wildcard; on a `headers` one, none), `@JmsListener(destination = ...)`, `receiveMessage`, `subscribe(subject)` and the streams of `xreadGroup` (Jedis, from a `Map.of`) and `xreadgroup` (Lettuce, from `StreamOffset`). `BindingBuilder.bind(new Queue(..)).to(new TopicExchange(..)).with(key)` binds a queue too. An annotation's handler is the annotated method; a polling client's is the method holding the call that names the topic or the queue, even when the receive loop runs in another. Names are evaluated like URLs: constants, `final` fields, a wrapper's arguments, a field with `@Value("${key}")` and the `${key}` placeholders of annotations, read from the module's Spring configuration. A name that does not evaluate (an environment variable, SpEL, an overload the arguments do not tell apart) is an unresolved side.
 
 ## npm packages
 
@@ -91,6 +118,14 @@ Each `go.mod` with `module` produces `package::go::<module path>`. `require` and
 The link is `exact`, with the `require` version as its range, `(local none)` as the local version and `range unchecked`. An import of `<module>/<directory>` reaches the directory's exported functions, types and methods. When the directory exists, the link is `exact`, with `; import module path` in its reason.
 
 Meada reads neither `go.sum` nor lockfiles, including `Cargo.lock`. It queries no module proxy, npm registry, PyPI or crates.io.
+
+## Maven and Gradle packages
+
+Each `pom.xml` with literal coordinates and each Gradle project with a literal `group` and name provides `package::maven::<group>:<artifact>`. Maven inherits the literal `<parent>` group when needed; every module is an artifact. For Gradle, `rootProject.name` and `include` in `settings.gradle` or `settings.gradle.kts` name the projects of `build.gradle` or `build.gradle.kts` files. A project renamed or moved in `settings.gradle` (`project(":app").name`, `.projectDir`) and a `group` set in `allprojects` provide no artifact.
+
+Maven and Gradle dependencies, map notation (`group: 'g', name: 'a'`) included, link to workspace artifacts at `exact` with `range unchecked`. A computed version (`${project.version}`, `$v`) keeps the link `exact`, with the version as written. A group or artifact using a property or variable stays `ambiguous`, even with one candidate; its literal fragments filter candidates, and a coordinate with no literal fragment is no dependency. A Gradle declaration without a coordinate, such as `project(":tools")`, `files(...)`, `platform(...)` or `libs.models`, is no dependency. External dependencies stay out. The readers are shared with Kotlin and invoke no JDK, Maven or Gradle and query no registry.
+
+An `import` of a class from a workspace artifact the repository depends on reaches the class in the provider through the files' `package` declaration, not a path: `context` on a public method lists the calls from other repositories that reach it, and on a public class those that reach its constructors and methods, one line per call, and `trace` crosses the hop. It covers `Type.method()` calls, `new Type(...)`, calls on a variable, field or parameter of the imported type, `import a.b.*` and static imports. The method is picked by name and argument count among the overloads of the class and of the superclasses and interfaces it has in the provider, as Java merges them. The link is `exact` when one provider declares the package and type, `ambiguous` when several do or when overloads with the same argument count remain, and `inferred` when an ancestor of the class comes from outside the provider's repository, since it may declare a better overload; the reason ends with `; import package`. Two `import a.*` imports that bring a class of the same name give no link. Source roots are `src/main/java` and `src/test/java` of each Maven module and the literal directories of Gradle `sourceSets { ... java { srcDirs = [...] } }` (`srcDir`, `srcDirs +=` and the Kotlin DSL form too). Classes under a test root, or a source set other than `main`, are never imported by a dependent; a file outside any root still resolves by its `package` declaration. Computed directories, and those inside `allprojects`, `subprojects`, `project(':x')`, `configure(...)` or a conditional block, are not read.
 
 ## Shape drift
 

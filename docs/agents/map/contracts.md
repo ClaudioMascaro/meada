@@ -25,7 +25,7 @@ modules updates it.
   function making the `fetch` and in each wrapper up to the site, a wrapper passing on the
   response, the body or a path below it when it returns that one thing from the function its
   caller reaches), Python client consumers (`http/python/clients.rs`, below), Next.js app-router
-  and Express (`http/ts.rs`), FastAPI, Flask and Django (`http/python.rs`), axum
+  and Express (`http/ts.rs`), FastAPI, Flask and Django (`http/python.rs`), Spring MVC (`http/java.rs`), Feign and Retrofit interface methods (`http/java/declarative.rs`, consumers at a `Site::Def`), axum
   (`http/rust/axum.rs`) and actix-web and Rocket (`http/rust.rs`) providers (Next.js and
   Express ones each with a `Found::shape` from `http::ts::provider_shape`, the one place that picks a route's code source: `zod::Zod::returned`
   first, else `literals::Literals::shape` (spec #23; both read the 2xx bodies `provider_shape`
@@ -158,7 +158,15 @@ modules updates it.
   read on the left, no other variable on the right), a default argument (ignored, unless it
   reads another variable) and string methods (`strip`, `rstrip`, `replace`, ...). A leading
   `Part::Env` is `via = env:X` in `http::locate`, linked through `base_url_env`; Meada never
-  reads the value. `Code::expand` follows a function whose URL
+  reads the value. Java (#89): `System.getenv("X")` is a `Part::Env` in the pack, and a Spring
+  `@Value("${key}")` field or constructor parameter holds what `jvm/spring.rs` reads of the
+  module's `application.properties`, `application.yml` or `application.yaml` (the module of the
+  main source root a Maven or Gradle build declares for the file, else of its `src/main/`)
+  (`Code::expand_with`): a literal URL links by host, a placeholder no key fills is
+  `Part::Env`, and `${X:default}` is `Part::EnvOr`, read both ways by `http::fetches` as twins
+  (`via = env:X|host:<default host>` and `host:<default host>|default`), of which
+  `Http::workspace_step` keeps the default's when a provider of the workspace serves that host,
+  else the variable's. `Code::expand` follows a function whose URL
   or method depends on its parameters, so each of its call sites is a consumer (an argument
   it leaves out takes the parameter's default). In Express `use(first,
   ...)`, `first` has no path only when it is a router (a call, also one `Code::origins` reaches
@@ -171,7 +179,7 @@ modules updates it.
   the side: the `site` is the bare repository identity (no `::`), the **repository-level** side.
   `report` gives the status lines per repository: each unmatched `via`, the fallback to repository
   level, and a resource with no link in the workspace (unlinked). `channel.rs` (spec #20):
-  `extract` calls the four readers (`channel/{ts,python,rust,go}.rs`), each answering for its own pack only (`code.pack().extensions()`), in that order; the message types and broker helpers live in `channel/message.rs`; a producer is a provider at its call site, a
+  `extract` calls the five readers (`channel/{ts,python,rust,go,java}.rs`), each answering for its own pack only (`code.pack().extensions()`), in that order; the message types and broker helpers live in `channel/message.rs`; a producer is a provider at its call site, a
   consumer a consumer at its handler (an inline handler is named `<broker> <names in order>`,
   such as `kafka orders.created`). `contract(broker, name)` is `channel::<broker>::<name>`, or
   `channel::<broker>` for an unresolved side (`channel::parse`, `Channel::unresolved`, and the seam's `shown`, which
@@ -395,3 +403,48 @@ modules updates it.
   (`; import crate name`) and no `ambiguous` fallback. A crate of the repository itself is
   reached through the module tree instead, so a path or version dependency inside the repository
   links at the manifest only.
+
+- JVM artifacts (spec #26, ticket #93): `package/maven.rs` implements `Ecosystem` for
+  `pom.xml`, `settings.gradle{,.kts}` and `build.gradle{,.kts}`. Grammar-independent readers
+  in `jvm/{maven,gradle}.rs` are shared with Kotlin: the Maven reader takes direct project
+  dependencies and literal parent group/version values; the Gradle scanner separates quoted
+  strings, comments and block boundaries, without loading a grammar. `Summary::build` holds
+  only literal group/project/include metadata, which `inherit` joins with build files.
+  Each named manifest provides `package::maven::<group>:<artifact>`. Dependencies use the
+  existing package reason with `range unchecked`; properties and variables stay unevaluated.
+  The generic `fits` question matches candidate names, and `uncertainty` keeps a computed
+  group or artifact ambiguous even with one provider; a computed version alone stays exact,
+  its range as written. Literal coordinate fragments filter those candidates, a coordinate
+  with none (`*:*`) is no consumer, and a manifest is never a candidate of its own
+  dependency (`consume` and `link` drop it). Gradle map notation (`group:`/`name:`/`version:`)
+  is read as a coordinate; a call (`project(...)`, `platform(...)`), a catalog accessor and
+  a configuration block's contents are not. A settings assignment to a project's `name` or
+  `projectDir`, and a `group` set in `allprojects`, drop the affected provider.
+  Dependencies outside the workspace add nothing.
+  Imports (ticket #94): `Maven::imports` turns a Java call into `(class, name(arity))`: the
+  type the call's head names (`Code::outside`, which also brings the candidates of on-demand
+  and static imports; a JDK `java.` class is none), else the type the source writes for its
+  receiver (`Code::origins`, `Follow::Declarations`); a constructor is the class's own name.
+  Each on-demand candidate is its own pair (`Outside::spellings`); `import` groups one site's
+  pairs and lets none enter when two name a class some provider declares
+  (`Ecosystem::declares`), as `Outside::candidates` and the HTTP kinds' `one()` read them.
+  It reuses the package path: `Packages::extract` stores the `import` row, `import` resolves it
+  through `Maven::resolutions`, which looks the class up in the provider's `exports` rows
+  under its qualified name (the row whose `name` is its `target`), keeps the files the artifact
+  owns (`Provided::owned_source`) that are no test sources (`tested`: under a
+  `Summary::test_roots` root and no deeper `main` one), and picks the symbols named so (`Classes`,
+  built once per provider) that fit the argument count. A method is looked up through the
+  class's family, as Java merges overloads: the provider's `families` rows
+  (`Resolver::ancestries`, resolved in the provider) give the ancestors in method resolution
+  order, each signature comes from the first class that declares it (an override hides the
+  base's), and an opaque ancestor or a family not known keeps one target `inferred` (the strict
+  "Opaque outside" rule of #85, issue #353). A constructor is the class's own, never a method
+  named after it (`#method`). `exact` for one target of one provider, `ambiguous` for several
+  (overloads, or several providers declaring the class, whether or not they declare the
+  method), `How::Package`. The Gradle scanner
+  keeps the literal `srcDirs` and `srcDir` of `sourceSets.<set>.java` as `Summary::roots`
+  (`test_roots` for a set other than `main`); a directory that is computed, has `..`, or sits in
+  a block that configures other projects (`allprojects`, `subprojects` and their `.each`,
+  `project(':x')`, `configure(..)`) or a conditional is not kept; `named("set")` and
+  `getByName("set")` name the set by their literal. The source directories past `MAX_ROOTS` are
+  dropped before the defaults join, so the test roots are always among the kept ones.

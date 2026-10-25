@@ -14,6 +14,7 @@ use crate::shape::{self, Shape};
 use crate::workspace::Repository;
 
 mod go;
+mod java;
 mod python;
 mod rust;
 mod ts;
@@ -61,6 +62,84 @@ fn fetch(args: &[Value]) -> Option<Read> {
         method,
         fragments: texts,
     })
+}
+
+/// `fetch`, with a URL whose base is an environment read with a default (`Part::EnvOr`, Spring's
+/// `${X:http://api.example.com}`) read both ways: through the variable, as `Part::Env`, and,
+/// when the default names a host, through the default by that host. The two readings are
+/// twins marked in their `via` (`env:X|host:api.example.com` and `host:api.example.com|default`)
+/// until `Http::workspace_step` keeps the one that applies (`DEFAULT`).
+fn fetches(args: &[Value]) -> Option<Vec<Read>> {
+    let Some(Value::Str(parts)) = args.first() else {
+        return Some(vec![fetch(args)?]);
+    };
+    let Some((Part::EnvOr(var, default), tail)) = parts.split_first() else {
+        return Some(vec![fetch(args)?]);
+    };
+    let with = |mut head: Vec<Part>| {
+        head.extend(tail.iter().cloned());
+        let mut args = args.to_vec();
+        args[0] = Value::Str(head);
+        args
+    };
+    let mut through = fetch(&with(vec![Part::Env(var.clone())]))?;
+    // `${X:http://h/}` + `/path` joins with one `/`.
+    let mut default = default.clone();
+    if let (Some(Part::Text(end)), Some(Part::Text(next))) = (default.last_mut(), tail.first())
+        && next.starts_with('/')
+    {
+        *end = end.trim_end_matches('/').to_string();
+    }
+    let by_default =
+        fetch(&with(default)).filter(|d| d.via.as_deref().is_some_and(|v| v.starts_with("host:")));
+    Some(match by_default {
+        Some(host) => {
+            let via = (through.via.as_deref()).zip(host.via.as_deref());
+            through.via = via.map(|(env, host)| format!("{env}|{host}"));
+            let mut host = host;
+            host.via = host.via.map(|v| format!("{v}{DEFAULT}"));
+            vec![through, host]
+        }
+        None => vec![through],
+    })
+}
+
+/// The `via` prefix of a consumer whose host is unresolved but whose client names itself (a
+/// declarative client without a base URL): the rest is how the reason names the client, as the
+/// language's reader writes it.
+const CLIENT_VIA: &str = "client:";
+
+/// The mark of the default's reading of `${X:default}` (`fetches`), after its `host:` `via`.
+const DEFAULT: &str = "|default";
+
+/// Of the twin readings of each `${X:default}` (`fetches`), the one that applies, its mark
+/// dropped from its `via`: the default's when a provider of the workspace serves its host
+/// (`Provider::hosts`, as `declare` filled them), else the variable's.
+fn keep_applicable(exports: &mut [IndexExport]) {
+    let served: HashSet<String> = (exports.iter().flat_map(|e| &e.providers))
+        .flat_map(|p| &p.hosts)
+        .map(|h| h.to_lowercase())
+        .collect();
+    let served = |host: &str| {
+        host.strip_prefix("host:")
+            .is_some_and(|h| served.contains(h))
+    };
+    for export in exports {
+        export.consumers.retain_mut(|c| {
+            let Some(via) = c.via.as_deref() else {
+                return true;
+            };
+            let (keep, via) = match (via.strip_suffix(DEFAULT), via.split_once('|')) {
+                (Some(host), _) => (served(host), host.to_string()),
+                (None, Some((env, host))) => (!served(host), env.to_string()),
+                (None, None) => return true,
+            };
+            c.via = Some(via);
+            keep
+        });
+        (export.consumers)
+            .sort_by(|a, b| (&a.site, &a.contract, &a.via).cmp(&(&b.site, &b.contract, &b.via)));
+    }
 }
 
 /// The literal parts of the path of a URL, in order: what is left of `parts` once its scheme
@@ -183,7 +262,9 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>)> {
         _ => return Some((None, None)),
     };
     let (via, path) = match parts.split_first() {
-        Some((Part::Env(var), rest)) => (Some(format!("env:{var}")), Some(render(rest))),
+        Some((Part::Env(var) | Part::EnvOr(var, _), rest)) => {
+            (Some(format!("env:{var}")), Some(render(rest)))
+        }
         _ => {
             let url = render(parts);
             match url.split_once("://") {
@@ -295,12 +376,19 @@ fn provider(site: Site, contract: String) -> Found {
 /// The consumer at the call `index` of `path`, as `read` reads it, with the shape it reads of
 /// the response (spec #23), if any.
 fn consumer(path: &str, index: usize, read: Read, shape: Option<Shape>) -> Found {
+    let site = Site::Call {
+        path: path.into(),
+        index,
+    };
+    consumer_at(site, read, shape)
+}
+
+/// The consumer at `site`, as `read` reads it: a call, or a definition (a method of a declarative
+/// client, which has no call of its own).
+fn consumer_at(site: Site, read: Read, shape: Option<Shape>) -> Found {
     Found {
         role: Role::Consumer,
-        site: Site::Call {
-            path: path.into(),
-            index,
-        },
+        site,
         contract: read.contract,
         via: read.via,
         method: read.method,
@@ -315,7 +403,7 @@ fn render(parts: &[Part]) -> String {
         .iter()
         .map(|p| match p {
             Part::Text(t) => t.as_str(),
-            Part::Env(_) | Part::Ref(_) | Part::Hole => PARAM,
+            Part::Env(_) | Part::EnvOr(..) | Part::Ref(_) | Part::Hole => PARAM,
         })
         .collect()
 }
@@ -466,7 +554,7 @@ impl ContractKind for Http {
         })
     }
 
-    fn extract(&self, code: &Code, _: &Indexed) -> Vec<Found> {
+    fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
         let mut found = Vec::new();
         // One reader of each shape source for the whole extraction: each budget per file once.
         let mut literals = Literals::default();
@@ -477,7 +565,15 @@ impl ContractKind for Http {
         found.extend(go::providers(code));
         found.extend(go::consumers(code));
         found.extend(python::providers(code));
+        found.extend(java::providers(code));
+        found.extend(java::consumers(code, indexed));
         found
+    }
+
+    /// Keeps, of the two readings of a `${X:default}` base, the one that applies
+    /// (`keep_applicable`), once every repository declared its hosts.
+    fn workspace_step(&self, exports: &mut [IndexExport]) {
+        keep_applicable(exports);
     }
 
     /// Adds the routes of the repository's documents (spec #21), then the gateway paths and
@@ -622,9 +718,12 @@ impl ContractKind for Http {
                 let mut repos: Vec<&str> = fits.iter().map(|(m, ..)| m.identity.as_str()).collect();
                 repos.sort();
                 repos.dedup();
-                let why = match var {
-                    Some(var) => format!("base URL from {var}, no peer's base_url_env"),
-                    None => "host unresolved".to_string(),
+                // A client that names itself says so (`CLIENT_VIA`).
+                let client = via.and_then(|v| v.strip_prefix(CLIENT_VIA));
+                let why = match (var, client) {
+                    (Some(var), _) => format!("base URL from {var}, no peer's base_url_env"),
+                    (None, Some(client)) => format!("host unresolved ({client})"),
+                    (None, None) => "host unresolved".to_string(),
                 };
                 let reason = match repos.len() {
                     1 => format!("{why}; the only repository serving it is"),
@@ -663,6 +762,12 @@ impl ContractKind for Http {
                 }
             })
             .collect()
+    }
+
+    /// A method of a declarative client (an interface whose methods are the requests) calls on
+    /// the route it consumes.
+    fn calls_from_definition(&self) -> bool {
+        true
     }
 
     /// The drift of the links, once the decisions are replayed (`drift`).

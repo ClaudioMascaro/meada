@@ -7,7 +7,9 @@ use crate::common;
 
 use std::fs;
 
-use common::{assert_golden, without_processes, xlang, xlang_go, xlang_rust};
+use common::{
+    assert_golden, without_processes, xlang, xlang_go, xlang_java, xlang_java_mirror, xlang_rust,
+};
 use meada::engine::{Direction, Engine, Start};
 
 #[test]
@@ -372,4 +374,217 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_go_file() {
         .unwrap();
 
     assert_golden("xlang-go.trace-uncommitted.txt", &answer);
+}
+
+/// The same chain with a Java service (spec #26): the web app (TypeScript, Next.js) reaches the
+/// api (Spring MVC) through `API_URL` and through the api's declared host; the api reaches the
+/// web app with RestTemplate, WebClient and `java.net.http` through bases its Spring
+/// configuration gives `@Value` fields and a constructor parameter (a placeholder, a literal
+/// URL, a placeholder with a default a peer serves and one no peer serves) and through
+/// `System.getenv`.
+#[test]
+fn java_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_host() {
+    let (web, api) = xlang_java("xlang_java_export");
+
+    for (repo, name) in [(web, "web"), (api, "api")] {
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        assert_golden(
+            &format!("xlang-java-{name}.export.json"),
+            &without_processes(&export),
+        );
+    }
+}
+
+#[test]
+fn two_exports_of_the_java_cross_language_fixture_are_byte_identical() {
+    let export = |case| {
+        let (web, api) = xlang_java(case);
+        [web, api].map(|r| Engine::open(&r).unwrap().export().unwrap())
+    };
+
+    assert_eq!(export("xlang_java_twice_a"), export("xlang_java_twice_b"));
+}
+
+#[test]
+fn trace_down_crosses_into_java_and_back_to_typescript() {
+    let (web, _) = xlang_java("xlang_java_down");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("syncOrders"), Direction::Down, None)
+        .unwrap();
+
+    assert_golden("xlang-java.trace-down.txt", &answer);
+}
+
+/// The web app produces the Kafka topic `orders.shipped` in TypeScript (kafkajs); the api
+/// service consumes it with a Spring `@KafkaListener` whose topic its configuration names, the
+/// annotated method being the handler (spec #26, #92).
+#[test]
+fn trace_down_from_a_typescript_producer_reaches_the_java_kafka_listener() {
+    let (web, _) = xlang_java("xlang_java_channel_down");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("announceShipment"), Direction::Down, None)
+        .unwrap();
+
+    assert!(
+        answer.contains(
+            "→[exact: channel::kafka::orders.shipped] example.com/xlang-java/api \
+             src/main/java/com/example/api/ShipmentListener.java:7 \
+             com.example.api.ShipmentListener.onShipment(String)"
+        ),
+        "{answer}"
+    );
+    assert_golden("xlang-java.trace-channel-down.txt", &answer);
+}
+
+#[test]
+fn trace_up_crosses_into_java_and_back_to_typescript() {
+    let (web, _) = xlang_java("xlang_java_up");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(
+            Start::From("http::GET::/api/prices/{}"),
+            Direction::Up,
+            None,
+        )
+        .unwrap();
+
+    assert_golden("xlang-java.trace-up.txt", &answer);
+}
+
+/// A route a Feign client calls: up from the route, through the interface method (a consumer at
+/// a definition), to the caller of the method and on to the web app that reaches it.
+#[test]
+fn trace_up_from_a_route_goes_through_the_feign_interface_method() {
+    let (web, _) = xlang_java("xlang_java_up_feign");
+    let up = |route: &str| {
+        Engine::open(&web)
+            .unwrap()
+            .trace(Start::From(route), Direction::Up, None)
+            .unwrap()
+    };
+
+    assert_golden(
+        "xlang-java.trace-up-feign.txt",
+        &up("http::GET::/api/inventory/{}"),
+    );
+    // Without `url` the host is unresolved and the client's name is in the reason.
+    let catalog = up("http::GET::/api/catalog");
+    assert!(
+        catalog.contains("host unresolved (Feign client catalog); the only repository serving it is example.com/xlang-java/web"),
+        "{catalog}"
+    );
+    assert!(catalog.contains("CatalogClient.all()"), "{catalog}");
+}
+
+#[test]
+fn trace_from_uncommitted_changes_starts_at_an_edited_java_file() {
+    let (_, api) = xlang_java("xlang_java_uncommitted");
+    let controller = api.join("src/main/java/com/example/api/OrderController.java");
+    let edited = fs::read_to_string(&controller).unwrap().replace(
+        "status(@PathVariable String id)",
+        "status(@PathVariable String id, int at)",
+    );
+    fs::write(&controller, edited).unwrap();
+
+    let answer = Engine::open(&api)
+        .unwrap()
+        .trace(Start::Uncommitted, Direction::Up, None)
+        .unwrap();
+
+    assert_golden("xlang-java.trace-uncommitted.txt", &answer);
+}
+
+/// The default's host two repositories serve (a mirror of the web app beside it): the one
+/// reading that applies links ambiguous, and it is one open item, the variable's reading gone.
+#[test]
+fn a_default_whose_host_two_repositories_serve_is_one_open_item() {
+    let (_, api) = xlang_java_mirror("xlang_java_ambiguous_default", &["app/api/audit/route.ts"]);
+
+    let items = Engine::open(&api).unwrap().open_items().unwrap();
+
+    let audit: Vec<_> = (items.iter())
+        .filter(|i| i.path.ends_with("AuditClient.java"))
+        .collect();
+    assert_eq!(
+        audit.len(),
+        1,
+        "{:?}",
+        items.iter().map(|i| &i.id).collect::<Vec<_>>()
+    );
+    assert_eq!(audit[0].candidates.len(), 2);
+}
+
+/// A Feign client without `url` whose path two repositories serve (the web app and its mirror)
+/// and a Retrofit method whose URL is its `@Url` argument: consumers at a definition, which are
+/// open items like a call's, with the method as the excerpt (spec #26, ADR 0006).
+#[test]
+fn a_declarative_client_method_is_an_open_item_at_its_definition() {
+    let (_, api) = xlang_java_mirror("xlang_java_open_declarative", &["app/api/catalog/route.ts"]);
+    let dynamic = "package com.example.api;\n\nimport retrofit2.http.GET;\nimport retrofit2.http.Url;\n\n\
+                   public interface DynamicClient {\n    @GET\n    String fetch(@Url String url);\n}\n";
+    fs::write(
+        api.join("src/main/java/com/example/api/DynamicClient.java"),
+        dynamic,
+    )
+    .unwrap();
+    common::git(&api, &["add", "-A"]);
+    common::git(&api, &["commit", "-q", "-m", "dynamic"]);
+    let engine = Engine::open(&api).unwrap();
+
+    let items = engine.local_items().unwrap();
+
+    let catalog = "example.com/xlang-java/api::src/main/java/com/example/api/CatalogClient.java::com.example.api.CatalogClient.all()";
+    let fetch = "example.com/xlang-java/api::src/main/java/com/example/api/DynamicClient.java::com.example.api.DynamicClient.fetch(String)";
+    let item = |id: &str| {
+        items
+            .iter()
+            .find(|i| i.id == id)
+            .unwrap_or_else(|| panic!("{id}"))
+    };
+    let (ambiguous, unresolved) = (item(catalog), item(fetch));
+    assert_eq!(ambiguous.kind.name(), "ambiguous");
+    assert_eq!(ambiguous.candidates.len(), 2);
+    assert_eq!(
+        ambiguous.location(),
+        "src/main/java/com/example/api/CatalogClient.java:10"
+    );
+    assert_eq!(
+        ambiguous.expression,
+        "@GetMapping(\"/api/catalog\") String all();"
+    );
+    let enclosing = ambiguous.enclosing.as_ref().unwrap();
+    assert_eq!(enclosing.name, "com.example.api.CatalogClient.all()");
+    assert_eq!(unresolved.kind.name(), "unresolved");
+    assert_eq!(unresolved.expression, "@GET String fetch(@Url String url);");
+    let search = |kind| engine.search("", Some(kind), None).unwrap();
+    assert!(
+        search("ambiguous").contains(&format!(
+            "CatalogClient.java:10 (ambiguous) candidates: 2; run `meada decide --item {catalog}`"
+        )),
+        "{}",
+        search("ambiguous")
+    );
+    assert!(
+        search("unresolved").contains("DynamicClient.java:7 (unresolved)"),
+        "{}",
+        search("unresolved")
+    );
+    // The query matches the method's name, as it matches a call's enclosing symbol.
+    assert!(
+        engine
+            .search("fetch", Some("unresolved"), None)
+            .unwrap()
+            .contains(fetch)
+    );
+    let (list, stderr, ok) = common::meada(&api, &["decide", "--list"], "", |c| {
+        c.env("LANG", "en_US.UTF-8");
+    });
+    assert!(ok, "{stderr}");
+    assert!(list.contains(&format!("{catalog}\nsrc/main/java/com/example/api/CatalogClient.java:10  @GetMapping(\"/api/catalog\") String all();\n  1) ")), "{list}");
+    assert!(list.contains(fetch), "{list}");
 }

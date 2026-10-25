@@ -5,7 +5,8 @@ use crate::export::{CallSite, Level};
 
 /// ` [<level>: <reason>]` after a call that is not exact. Only a name match makes a call
 /// inferred or ambiguous, so the reason is how many definitions have its name: methods for a
-/// member call, top-level functions and classes for a plain one.
+/// member call, top-level functions and classes for a plain one, and "one of several" for a
+/// match narrowed to one (`CallSite::narrowed`).
 pub fn mark(call: &CallSite) -> String {
     let count = match call.level {
         Some(Level::Exact) | None => return String::new(),
@@ -19,6 +20,7 @@ pub fn mark(call: &CallSite) -> String {
         None => ("function or class", "functions or classes", callee),
     };
     let what = match count {
+        1 if call.narrowed => format!("one of several {many}"),
         1 => format!("one {one}"),
         n => format!("{n} {many}"),
     };
