@@ -34,11 +34,12 @@ reach `cargo install meada`, which builds from the registry.
   `tree_sitter_language::LanguageFn`, so the pack calls the grammar as it calls a crate's. The
   published crate carries the sources (about 1.2 MB of the compressed `.crate`), and the
   container build copies them.
-- A misparse the fixes miss stays visible: a declaration's hard keyword (`class`, `fun`,
-  `interface`, `object`, `typealias`, `val`, `var`) as an operand of an `infix_expression`
-  leaves the whole file out (`Facts::unbuilt`), as a file over the qualification budget is. Valid
-  Kotlin never names anything with a hard keyword, and the patched grammar produces the shape
-  nowhere in the corpus.
+- A misparse the fixes miss never yields a wrong symbol: a declaration's hard keyword (`class`,
+  `fun`, `interface`, `object`, `typealias`, `val`, `var`) as an operand of an
+  `infix_expression` leaves the whole file out (`Facts::unbuilt`), as a file over the
+  qualification budget is. Valid Kotlin never names anything with a hard keyword, and the patched
+  grammar produces the shape nowhere in the corpus. No diagnostic names such a file yet: it is
+  simply absent from the index.
 
 ## Updating or dropping it
 
@@ -70,6 +71,7 @@ reach `cargo install meada`, which builds from the registry.
 
 - `tree-sitter-kotlin-sg` 0.4.1: fewer ERROR files, but it still misparses both shapes, has
   silent losses of its own, and changes the node names the pack reads.
-- Staying on 1.1.0 with only the guard: the loss becomes visible, and nothing is recovered.
+- Staying on 1.1.0 with only the guard: a misparsed file is left out whole instead of losing
+  declarations silently, and nothing is recovered.
 - A fork published to crates.io: the same sources under a name and a release Meada would have
   to maintain, for a grammar upstream is expected to fix.

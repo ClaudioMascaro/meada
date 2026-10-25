@@ -72,6 +72,10 @@ jobs:
             if grep -qx "$c" <<<"$crates"; then echo "default build lists $c"; status=1; fi
           done
           exit $status
+      - name: No Kotlin grammar crate beside the vendored one
+        # ADR 0017: every Kotlin grammar exports `tree_sitter_kotlin`, and the linker keeps one
+        # silently. The lock covers every feature and dependency kind.
+        run: "! grep -q '^name = \"tree-sitter-kotlin' Cargo.lock"
       - name: Wait for the services
         run: |
           for port in 6379 9000; do
