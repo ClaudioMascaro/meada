@@ -2,6 +2,7 @@ package example.channels;
 
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.ExchangeTypes;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.annotation.Exchange;
@@ -32,7 +33,7 @@ public class Billing {
 
     @RabbitListener(bindings = @QueueBinding(
             value = @org.springframework.amqp.rabbit.annotation.Queue("invoices"),
-            exchange = @Exchange("billing"),
+            exchange = @Exchange(value = "billing", type = ExchangeTypes.TOPIC),
             key = "invoice.*"))
     public void onInvoice(String message) {}
 

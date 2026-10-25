@@ -213,6 +213,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         let kind = match node.kind() {
             "class_declaration"
             | "interface_declaration"
+            | "annotation_type_declaration"
             | "enum_declaration"
             | "record_declaration" => Some(Kind::Class),
             "method_declaration"
@@ -362,7 +363,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         || interface
                         || matches!(
                             node.kind(),
-                            "interface_declaration" | "enum_declaration" | "record_declaration"
+                            "interface_declaration"
+                                | "annotation_type_declaration"
+                                | "enum_declaration"
+                                | "record_declaration"
                         ))
                 {
                     facts.statics.push(inner.as_ref().clone());
@@ -393,7 +397,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 at.decorates = Some(inner.as_ref().clone());
                 facts.calls.push(at);
             }
-            in_interface = node.kind() == "interface_declaration";
+            // An annotation type is an interface (JLS 9.6).
+            in_interface = matches!(
+                node.kind(),
+                "interface_declaration" | "annotation_type_declaration"
+            );
             if in_interface {
                 facts.interfaces.push(inner.as_ref().clone());
             }

@@ -39,11 +39,22 @@ pub fn spellings<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a s
 /// How the imports may spell the outside type the source writes for `name` (a field, a
 /// parameter, a local): none when it writes no such type.
 pub fn typed<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a str) -> Vec<String> {
+    declared(code, path, scope, name).unwrap_or_default()
+}
+
+/// `typed`, telling a name the source writes no type for (`None`) from one whose type is of
+/// the repository (no spelling).
+pub fn declared<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    name: &'a str,
+) -> Option<Vec<String>> {
     let found = code.origins(path, scope, Of::Name(name), Follow::Declarations);
     match found.into_iter().next() {
         Some(o) if o.form == Form::Type && o.routes.iter().all(|r| r.steps.is_empty()) => {
-            o.outside.map_or_else(Vec::new, Outside::spellings)
+            Some(o.outside.map_or_else(Vec::new, Outside::spellings))
         }
-        _ => Vec::new(),
+        _ => None,
     }
 }

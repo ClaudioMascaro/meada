@@ -434,6 +434,12 @@ mod tests {
         // and a static on-demand import of an outside class: any of them may be the name.
         let same = [("a/GetMapping.java", "package a; class GetMapping {}")];
         assert_eq!(served_with(WILD, ROUTE, &same), POST);
+        // An annotation type of the package hides it too.
+        let annotation = [(
+            "a/GetMapping.java",
+            "package a; @interface GetMapping { String[] value(); }",
+        )];
+        assert_eq!(served_with(WILD, ROUTE, &annotation), POST);
         let single = format!("{WILD}import org.acme.GetMapping;\n");
         assert_eq!(served(&single, ROUTE), POST);
         let other = [("b/GetMapping.java", "package b; public class GetMapping {}")];

@@ -43,7 +43,7 @@
     },
     {
       "path": "maven/api/src/main/java/example/channels/Billing.java",
-      "hash": "2b98838f75f46b741d252a769fbdcb0347ddaf8f5e0f7bc84f87cf101f6f6260"
+      "hash": "489fb361b1e682ac123fafd16cc8bd714bb66ce4257ef29f50f23731a247bd08"
     },
     {
       "path": "maven/api/src/main/java/example/channels/Delivery.java",
@@ -807,56 +807,56 @@
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 603,
-        "end": 1438
+        "start": 655,
+        "end": 1526
       }
     },
     {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.Billing(RabbitTemplate)",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 672,
-        "end": 747
+        "start": 724,
+        "end": 799
       }
     },
     {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 951,
-        "end": 1088
+        "start": 1003,
+        "end": 1140
       }
     },
     {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.invoice(String)",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 753,
-        "end": 856
+        "start": 805,
+        "end": 908
       }
     },
     {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onInvoice(String)",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1094,
-        "end": 1340
+        "start": 1146,
+        "end": 1428
       }
     },
     {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1346,
-        "end": 1436
+        "start": 1434,
+        "end": 1524
       }
     },
     {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.refund(String)",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 862,
-        "end": 945
+        "start": 914,
+        "end": 997
       }
     },
     {
@@ -2523,8 +2523,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 991,
-        "end": 1063
+        "start": 1043,
+        "end": 1115
       }
     },
     {
@@ -2534,8 +2534,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 991,
-        "end": 1081
+        "start": 1043,
+        "end": 1133
       }
     },
     {
@@ -2545,8 +2545,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 991,
-        "end": 1030
+        "start": 1043,
+        "end": 1082
       }
     },
     {
@@ -2556,8 +2556,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1011,
-        "end": 1029
+        "start": 1063,
+        "end": 1081
       }
     },
     {
@@ -2567,8 +2567,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1034,
-        "end": 1062
+        "start": 1086,
+        "end": 1114
       }
     },
     {
@@ -2578,8 +2578,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 794,
-        "end": 849
+        "start": 846,
+        "end": 901
       }
     },
     {
@@ -2589,8 +2589,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 902,
-        "end": 938
+        "start": 954,
+        "end": 990
       }
     },
     {
@@ -2600,8 +2600,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1094,
-        "end": 1295
+        "start": 1146,
+        "end": 1383
       }
     },
     {
@@ -2611,8 +2611,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1346,
-        "end": 1392
+        "start": 1434,
+        "end": 1480
       }
     },
     {

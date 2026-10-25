@@ -1079,12 +1079,21 @@ one for the area a change touches.
   (`Handler::Def`); every other client takes `consume`'s default, the method holding the call
   that names the topic or queue (the Java pack keeps a lambda's calls in the method that writes
   it, so a jnats callback is that method too). The overload of `RabbitTemplate.convertAndSend`
-  and `JmsTemplate.convertAndSend` is told by the argument a `MessagePostProcessor` would take
-  (`Post`): a name the source types as one, or a `new` of one, picks the routing-key form, an
-  argument the pack cannot read (`Value::Unknown`, a lambda included) leaves the producer
-  unresolved, anything else is the message. The two-argument AMQP form publishes to the
+  and `JmsTemplate.convertAndSend` is told by the type of the argument a `MessagePostProcessor`
+  would take (`of`, through `jvm::names::declared`): a name the source types as one, or a `new`
+  of one, picks the routing-key form, and so does a `CorrelationData` there
+  (`(routingKey, message, correlation)`) unless a `MessagePostProcessor` before it makes it
+  `(message, postProcessor, correlation)`; an argument whose type the source does not tell (a
+  lambda, a call, a name with no written type, anything the pack cannot read) leaves the
+  producer unresolved, and a literal or a name of another written type is the message. The two-argument AMQP form publishes to the
   template's exchange: `spring.rabbitmq.template.exchange` of the module's configuration, else
-  the default exchange, a producer of the queue the key names. The Java pack reads an
+  the default exchange, a producer of the queue the key names. An `@Exchange` is `direct`
+  unless its `type` (a string, or a member of `ExchangeTypes` bound by an import) says
+  otherwise: a direct or fanout exchange keeps only the keys with no wildcard word, a headers or
+  custom one none, a topic one, or one whose type is not read, every key; a `DirectExchange` in
+  `BindingBuilder` keeps only a key with no wildcard. The listener annotation is asked first
+  (`jvm::names::known`), and only then whether it is on a method (a set of the file's methods,
+  built once), so a file of many `@Override` methods is read in linear time. The Java pack reads an
   annotation written as an element value as `Value::New(name, [Object(elements)])`, its unnamed
   element as `value` (the shape of a Go composite literal; `Code::eval` folds it), only inside
   an annotation's arguments, which the index never keeps; `channel/java.rs` reads a nested
@@ -1761,15 +1770,14 @@ one for the area a change touches.
   method's parameter, `QueueBuilder`, `ExchangeBuilder` and a fanout `to(..)` bind nothing, and
   neither does a `@QueueBinding` without a key. An SQS request built in a lambda
   (`sendMessage(b -> b.queueUrl(..))`) or held in a local, and Redis streams held in a map
-  variable, are unresolved. The Java pack does not index an annotation type declaration
-  (`@interface`), so a repository's own annotation by a listener's name hides it only when
-  declared as a class.
+  variable, are unresolved.
 - `http/java.rs` (spec #26, #86): a Spring MVC route is read from `Call::decorates` on a method
   of a `@RestController` or `@Controller` class, under the class's `@RequestMapping` prefix
   (nested classes do not inherit the outer prefix). An annotation or `RequestMethod.X` counts
   only when `Code::outside` says an import from Spring binds its name: single-type, static, or
   the one on-demand candidate in the kind's table (`Outside::candidates`: `...bind.annotation.*`
-  alone or beside `java.util.*`). A type of the repository with the same name (a nested,
+  alone or beside `java.util.*`). A type of the repository with the same name (a class, an
+  interface or an annotation type, which the Java pack indexes as an interface; a nested,
   same-package or repository-wildcard `GetMapping` or `RequestMethod`), a single-type import of
   another package and two candidates in the table yield no route; the kind reads the enum
   member off the written `Value::Ref`, with no table in the pack. A path folds constants and

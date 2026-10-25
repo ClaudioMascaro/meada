@@ -25,13 +25,14 @@
 //! element's key, never by its own name.
 
 use std::cell::OnceCell;
+use std::collections::HashSet;
 
 use super::message::{
     Handler, Message, Side, bind_with, channel_name, consume_with, produce_with, publish_with,
     queue_name,
 };
 use crate::index::Indexed;
-use crate::jvm::names::{known, one, spellings, typed};
+use crate::jvm::names::{declared, known, one, spellings, typed};
 use crate::jvm::spring::{self, Configs, Properties};
 use crate::lang::{Call, Invocation, Kind, Part, Value};
 use crate::resolve::{Code, Expand, Inject, Keywords, method as member};
@@ -50,7 +51,10 @@ const EXCHANGES: &[&str] = &["TopicExchange", "DirectExchange"];
 /// The exchange Spring Boot gives the `RabbitTemplate` it configures; empty, the default one.
 const TEMPLATE_EXCHANGE: &str = "spring.rabbitmq.template.exchange";
 const AMQP_POST_PROCESSOR: &str = "org.springframework.amqp.core.MessagePostProcessor";
+const CORRELATION_DATA: &str = "org.springframework.amqp.rabbit.connection.CorrelationData";
 const JMS_POST_PROCESSOR: &str = "org.springframework.jms.core.MessagePostProcessor";
+/// Spring AMQP's constants of the exchange types, the value of `@Exchange(type = ..)`.
+const EXCHANGE_TYPES: &str = "org.springframework.amqp.core.ExchangeTypes.";
 const STREAM_OFFSET: &str = "io.lettuce.core.XReadArgs.StreamOffset";
 
 #[derive(Clone, Copy, PartialEq)]
@@ -134,17 +138,26 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
         if !path.ends_with(".java") {
             continue;
         }
+        // The file's methods, built the first time a listener's annotation is met.
+        let methods: OnceCell<HashSet<&str>> = OnceCell::new();
         for (n, stored) in facts.calls.iter().enumerate() {
             if let Some(target) = &stored.decorates {
-                // A method's annotation; one on a class is not read.
-                let on_method =
-                    (facts.defs.iter()).any(|d| d.kind == Kind::Method && d.name == *target);
-                let listener = on_method.then(|| {
-                    known(code, path, &stored.scope, &stored.callee, |s| {
-                        LISTENERS.contains(&s)
-                    })
+                // A listener's annotation on a method; one on a class is not read. The
+                // annotation is asked first: most are no listener's (`@Override`).
+                let listener = known(code, path, &stored.scope, &stored.callee, |s| {
+                    LISTENERS.contains(&s)
                 });
-                if let Some(listener) = listener.flatten() {
+                let methods = || {
+                    methods.get_or_init(|| {
+                        (facts.defs.iter())
+                            .filter(|d| d.kind == Kind::Method)
+                            .map(|d| d.name.as_str())
+                            .collect()
+                    })
+                };
+                if let Some(listener) = listener
+                    && methods().contains(target.as_str())
+                {
                     let config = configs().of(path);
                     out.extend(listen(code, path, n, target, &listener, config));
                 }
@@ -303,31 +316,23 @@ fn streams(a: &[Value], _: &Keywords) -> Option<Vec<Option<String>>> {
     Some(names)
 }
 
-/// Whether an argument, as written, is a `MessagePostProcessor` of `class`: what picks the
-/// overload of `convertAndSend`.
-#[derive(PartialEq)]
-enum Post {
-    Yes,
-    No,
-    /// A lambda, or any expression the pack cannot read: either overload.
-    Maybe,
-}
-
-fn post<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, at: usize, class: &str) -> Post {
-    let is = |spelled: Vec<String>| match one(&spelled, |s| s == class) {
-        Some(_) => Post::Yes,
-        None => Post::No,
+/// Whether the argument at `at` of `call`, as written, is of the outside type `class`: what
+/// picks the overload of `convertAndSend`. `Some(false)` for a literal, a `new` of another type
+/// and a name the source writes another type for; `None` (either overload) for a lambda, a call,
+/// a name with no written type and any expression the pack cannot read.
+fn of<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, at: usize, class: &str) -> Option<bool> {
+    let spelled = match call.args.get(at)? {
+        Value::Unknown | Value::Call(_) => return None,
+        Value::Ref(name) => declared(code, path, &call.scope, name)?,
+        Value::New(ty, _) => spellings(code, path, &call.scope, ty),
+        _ => return Some(false),
     };
-    match call.args.get(at) {
-        Some(Value::Unknown) => Post::Maybe,
-        Some(Value::Ref(name)) => is(typed(code, path, &call.scope, name)),
-        Some(Value::New(ty, _)) => is(spellings(code, path, &call.scope, ty)),
-        _ => Post::No,
-    }
+    Some(one(&spelled, |s| s == class).is_some())
 }
 
 /// What a `RabbitTemplate.convertAndSend` reads, by its overload: `(exchange, routingKey,
-/// message, ..)`, or `(routingKey, message)` and `(routingKey, message, postProcessor, ..)` to
+/// message, ..)`, or `(routingKey, message)`, `(routingKey, message, correlation)` and
+/// `(routingKey, message, postProcessor, ..)` to
 /// the template's exchange (the default one, unless the module's configuration names one).
 /// `(message)` and `(message, postProcessor)` use the template's routing key, and an overload
 /// the arguments do not tell, an unresolved producer.
@@ -338,13 +343,18 @@ fn rabbit<'a>(
     call: &'a Call,
     config: Option<&Properties>,
 ) -> Box<dyn Fn(&[Value], &Keywords) -> Option<(Option<String>, Option<String>)>> {
-    // Whether the exchange is the first argument; `None` for no routing key the call gives.
+    let post = |at| of(code, path, call, at, AMQP_POST_PROCESSOR);
+    // Whether the exchange is the first argument; `None` for no routing key the call gives. The
+    // third argument tells: a `MessagePostProcessor` is `(routingKey, message, postProcessor,
+    // ..)`, a `CorrelationData` `(routingKey, message, correlation)` unless a
+    // `MessagePostProcessor` before it makes it `(message, postProcessor, correlation)`.
     let exchanged = match call.args.len() {
-        2 => (post(code, path, call, 1, AMQP_POST_PROCESSOR) == Post::No).then_some(false),
-        3.. => match post(code, path, call, 2, AMQP_POST_PROCESSOR) {
-            Post::No => Some(true),
-            Post::Yes => Some(false),
-            Post::Maybe => None,
+        2 => (post(1) == Some(false)).then_some(false),
+        3.. => match (post(2), of(code, path, call, 2, CORRELATION_DATA)) {
+            (Some(true), _) => Some(false),
+            (_, Some(true)) => (post(1) == Some(false)).then_some(false),
+            (Some(false), _) => Some(true),
+            (None, _) => None,
         },
         _ => None,
     };
@@ -370,7 +380,7 @@ fn rabbit<'a>(
 fn jms<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, method: &str) -> Option<usize> {
     let named = match (method, call.args.len()) {
         ("send", 2) | ("convertAndSend", 3) => true,
-        ("convertAndSend", 2) => post(code, path, call, 1, JMS_POST_PROCESSOR) == Post::No,
+        ("convertAndSend", 2) => of(code, path, call, 1, JMS_POST_PROCESSOR) == Some(false),
         _ => false,
     };
     named.then_some(0)
@@ -403,13 +413,25 @@ fn binding<'a>(code: &Code<'a>, path: &'a str, n: usize, inject: &Inject<'a, '_>
         let (Some(to), Some(bind)) = (steps.next(), steps.next()) else {
             return Some((None, None, None));
         };
-        Some((
+        let found = (
             made(bind.args.first(), QUEUES)?,
             made(to.args.first(), EXCHANGES)?,
             channel_name(with.args.first()?)?,
-        ))
+        );
+        // A direct exchange routes by the key as written.
+        let direct = matches!(to.args.first(),
+            Some(Value::New(ty, _)) if ty.rsplit('.').next() == Some("DirectExchange"));
+        match found.2.as_deref() {
+            Some(key) if direct && wildcard(key) => Some((None, None, None)),
+            _ => Some(found),
+        }
     };
     bind_with(code, Expand::Chain(path, n), Some(inject), &read)
+}
+
+/// Whether a routing key holds a word a topic exchange reads as a wildcard (`*`, `#`).
+fn wildcard(key: &str) -> bool {
+    key.split('.').any(|w| w == "*" || w == "#")
 }
 
 /// The name a `new` of one of `types` (by its last segment) gives as its first argument: `None`
@@ -454,6 +476,29 @@ fn element<'v>(annotation: &'v Value, key: &str) -> Option<&'v Value> {
 fn named(annotation: &Value, config: Option<&Properties>) -> Option<String> {
     let given = element(annotation, "value").or(element(annotation, "name"))?;
     text(given, config).filter(|n| !n.is_empty())
+}
+
+/// The type of the `@Exchange` written as `exchange` in the annotation `call` of `path`: its
+/// `type`, a string or a member of Spring's `ExchangeTypes` (lower-cased, as its value is), and
+/// `direct` without one; `None` when it cannot be read.
+fn exchange_type<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    call: &'a Call,
+    exchange: &'a Value,
+    config: Option<&Properties>,
+) -> Option<String> {
+    let Some(written) = element(exchange, "type") else {
+        return Some("direct".into());
+    };
+    if let Value::Ref(name) = written
+        && let Some(spelled) = known(code, path, &call.scope, name, |s| {
+            s.starts_with(EXCHANGE_TYPES)
+        })
+    {
+        return Some(spelled[EXCHANGE_TYPES.len()..].to_lowercase());
+    }
+    text(&code.value(path, &call.scope, written), config)
 }
 
 /// The sides the listener annotation `listener` at `n` of `path` gives the method `target`: a
@@ -510,18 +555,30 @@ fn listen<'a>(
             for queue in declared.iter().flat_map(items) {
                 out.push(message(named(queue, config), handler()));
             }
-            let bindings = folded("bindings");
-            for b in bindings.iter().flat_map(items) {
+            let written = call.keyword("bindings").into_iter().flat_map(items);
+            for written in written {
+                let b = &code.value(path, &call.scope, written);
                 let queue = element(b, "value").and_then(|q| named(q, config));
                 let exchange = element(b, "exchange").and_then(|e| named(e, config));
                 out.push(message(queue.clone(), handler()));
                 let (Some(queue), Some(exchange)) = (queue, exchange) else {
                     continue;
                 };
+                let kind = element(written, "exchange")
+                    .and_then(|e| exchange_type(code, path, call, e, config));
+                // The keys the exchange routes by: a direct or fanout exchange reads a key as
+                // written, a headers or custom one reads none, and one whose type is not read
+                // follows topic rules.
+                let routes = |key: &String| match kind.as_deref() {
+                    None | Some("topic") => true,
+                    Some("direct" | "fanout") => !wildcard(key),
+                    Some(_) => false,
+                };
                 // ponytail: a binding without a key, which Spring declares with an empty
                 // one, is dropped.
                 let keys = element(b, "key").into_iter().flat_map(items);
-                for pattern in keys.filter_map(|k| text(k, config)) {
+                let keys = keys.filter_map(|k| text(k, config)).filter(routes);
+                for pattern in keys {
                     let exchange = exchange.clone();
                     out.push(message(
                         Some(queue.clone()),
@@ -664,6 +721,13 @@ mod tests {
         let spring = "import org.springframework.kafka.annotation.*;\n\
             import org.springframework.kafka.core.*;\n";
         assert!(sides(spring, body, &others, "").is_empty());
+        // An annotation type of the package hides Spring's annotation as a class does.
+        let annotation = [(
+            "api/src/main/java/a/KafkaListener.java",
+            "package a;\npublic @interface KafkaListener { String[] topics(); }\n",
+        )];
+        let listener = "@KafkaListener(topics = \"orders.paid\") void paid(String m) {}";
+        assert!(sides(spring, listener, &annotation, "").is_empty());
         assert_eq!(sides(spring, body, &[], "").len(), 2);
         let wild = "import org.springframework.kafka.annotation.*;\nimport b.*;\n";
         let body = "@KafkaListener(topics = \"orders.paid\") void paid(String m) {}";
@@ -718,6 +782,88 @@ mod tests {
                 "amqp unresolved producer",
                 "amqp unresolved producer",
                 "amqp unresolved producer",
+            ]
+        );
+    }
+
+    /// A `CorrelationData` at the third place is `(routingKey, message, correlation)`, unless a
+    /// `MessagePostProcessor` before it makes it `(message, postProcessor, correlation)`; with
+    /// four and five arguments the third place decides as with three.
+    #[test]
+    fn a_correlation_data_takes_the_routing_key_form() {
+        let imports =
+            format!("{RABBIT}import org.springframework.amqp.rabbit.connection.CorrelationData;\n");
+        let body = "RabbitTemplate rabbit;\n\
+            void f(Order o, MessagePostProcessor mpp, CorrelationData cd) {\n\
+            rabbit.convertAndSend(\"orders\", o, new CorrelationData(\"1\"));\n\
+            rabbit.convertAndSend(\"orders\", o, cd);\n\
+            rabbit.convertAndSend(o, mpp, cd);\n\
+            rabbit.convertAndSend(\"events\", \"order.paid\", o, cd);\n\
+            rabbit.convertAndSend(\"retries\", o, mpp, cd);\n\
+            rabbit.convertAndSend(\"events\", \"order.paid\", o, mpp, cd);\n}";
+        assert_eq!(
+            read(&imports, body),
+            [
+                "amqp orders producer",
+                "amqp orders producer",
+                "amqp unresolved producer",
+                "amqp order.paid publish events",
+                "amqp retries producer",
+                "amqp order.paid publish events",
+            ]
+        );
+    }
+
+    /// A call, or a name the source writes no type for, may be a `MessagePostProcessor`: the
+    /// overload is not told, so the producer is unresolved.
+    #[test]
+    fn an_argument_of_unknown_type_does_not_tell_the_overload() {
+        let body = "static final String PAYLOAD = \"p\";\n\
+            RabbitTemplate rabbit;\n\
+            void f(Order o) {\n\
+            rabbit.convertAndSend(PAYLOAD, postProcessor());\n\
+            rabbit.convertAndSend(PAYLOAD, tracing);\n\
+            rabbit.convertAndSend(\"orders\", o);\n}";
+        assert_eq!(
+            read(RABBIT, body),
+            [
+                "amqp unresolved producer",
+                "amqp unresolved producer",
+                "amqp orders producer",
+            ]
+        );
+    }
+
+    /// An `@Exchange` is `direct` unless its `type` says otherwise, and a `DirectExchange`
+    /// routes by the key as written: a wildcard key binds only on a topic exchange (or one whose
+    /// type is not read), and a headers exchange routes by no key.
+    #[test]
+    fn a_wildcard_key_binds_only_on_a_topic_exchange() {
+        let imports = format!(
+            "{RABBIT}import org.springframework.amqp.core.ExchangeTypes;\n\
+             import org.springframework.amqp.core.DirectExchange;\n"
+        );
+        let body = "@RabbitListener(bindings = @QueueBinding(value = @Queue(\"a\"), exchange = @Exchange(\"ex\"), key = {\"x.*\", \"x.y\"}))\n\
+            void a(String m) {}\n\
+            @RabbitListener(bindings = @QueueBinding(value = @Queue(\"b\"), exchange = @Exchange(value = \"ex\", type = ExchangeTypes.TOPIC), key = \"x.*\"))\n\
+            void b(String m) {}\n\
+            @RabbitListener(bindings = @QueueBinding(value = @Queue(\"c\"), exchange = @Exchange(value = \"ex\", type = \"headers\"), key = \"x.y\"))\n\
+            void c(String m) {}\n\
+            @RabbitListener(bindings = @QueueBinding(value = @Queue(\"d\"), exchange = @Exchange(value = \"ex\", type = TYPE), key = \"x.*\"))\n\
+            void d(String m) {}\n\
+            Object e() { return BindingBuilder.bind(new org.springframework.amqp.core.Queue(\"e\")).to(new DirectExchange(\"ex\")).with(\"x.#\"); }\n\
+            Object f() { return BindingBuilder.bind(new org.springframework.amqp.core.Queue(\"f\")).to(new DirectExchange(\"ex\")).with(\"x.y\"); }";
+        assert_eq!(
+            read(&imports, body),
+            [
+                "amqp a consumer a.C.a(String)",
+                "amqp a binding ex x.y",
+                "amqp b consumer a.C.b(String)",
+                "amqp b binding ex x.*",
+                "amqp c consumer a.C.c(String)",
+                "amqp d consumer a.C.d(String)",
+                "amqp d binding ex x.*",
+                "amqp f binding ex x.y",
             ]
         );
     }
@@ -783,6 +929,7 @@ mod tests {
     }
 
     const JMS: &str = "import org.springframework.jms.core.JmsTemplate;\n\
+        import org.springframework.jms.core.MessagePostProcessor;\n\
         import org.springframework.jms.annotation.JmsListener;\n";
 
     #[test]
@@ -794,7 +941,8 @@ mod tests {
             jms.convertAndSend(\"invoices\", o, m -> m);\n\
             jms.convertAndSend(o, m -> m);\n\
             jms.convertAndSend(o);\n}\n\
-            @JmsListener(destination = \"${app.queue}\") void on(String m) {}";
+            @JmsListener(destination = \"${app.queue}\") void on(String m) {}\n\
+            void g(Order o, MessagePostProcessor mpp) { jms.convertAndSend(o, mpp); }";
         assert_eq!(
             read(JMS, body),
             [
@@ -804,6 +952,7 @@ mod tests {
                 "jms unresolved producer",
                 "jms unresolved producer",
                 "jms billing consumer a.C.on(String)",
+                "jms unresolved producer",
             ]
         );
     }
@@ -904,6 +1053,87 @@ mod tests {
                 "nats orders.created producer",
             ]
         );
+    }
+
+    #[test]
+    fn redis_streams_are_read_from_each_written_form() {
+        let imports = format!("{REDIS}import java.util.Collections;\n");
+        let body = "JedisPooled jedis;\n\
+            RedisCommands<String, String> lettuce;\n\
+            void f() {\n\
+            jedis.xreadGroup(\"g\", \"c\", null, Map.entry(\"a\", StreamEntryID.UNRECEIVED_ENTRY));\n\
+            jedis.xreadGroup(\"g\", \"c\", null, Collections.singletonMap(\"b\", StreamEntryID.UNRECEIVED_ENTRY));\n\
+            lettuce.xreadgroup(Consumer.from(\"g\", \"c\"), XReadArgs.StreamOffset.from(\"c\", \"0\"), XReadArgs.StreamOffset.latest(\"d\"));\n}\n\
+            void poll(String stream) { lettuce.xreadgroup(Consumer.from(\"g\", \"c\"), XReadArgs.StreamOffset.lastConsumed(stream)); }\n\
+            void run() { poll(\"e\"); }\n\
+            void each(Map<String, StreamEntryID> streams) { jedis.xreadGroup(\"g\", \"c\", null, streams); }\n\
+            void start() { each(Map.of(\"h\", StreamEntryID.UNRECEIVED_ENTRY)); }";
+        assert_eq!(
+            read(&imports, body),
+            [
+                "redis a consumer a.C.f()",
+                "redis b consumer a.C.f()",
+                "redis c consumer a.C.f()",
+                "redis d consumer a.C.f()",
+                "redis e consumer a.C.run()",
+                "redis h consumer a.C.start()",
+            ]
+        );
+    }
+
+    /// A request a wrapper takes as its parameter is read at each caller.
+    #[test]
+    fn an_sqs_request_a_wrapper_takes_is_read_at_each_caller() {
+        let body = "SqsClient sqs;\n\
+            void send(SendMessageRequest request) { sqs.sendMessage(request); }\n\
+            void ship() { send(SendMessageRequest.builder().queueUrl(\"https://sqs/1/shipments\").build()); }";
+        assert_eq!(read(SQS, body), ["sqs shipments producer"]);
+    }
+
+    /// A wrapper reached only by a name match (a call on a receiver whose type the source does
+    /// not tell) is read where it stands, its parameter unknown: the caller's argument never
+    /// names the channel.
+    #[test]
+    fn a_wrapper_reached_by_a_name_match_feeds_no_channel() {
+        let body = "Connection nc;\n\
+            void emit(String subject) { nc.publish(subject, new byte[0]); }\n\
+            void run(Object other) { ((C) other).emit(\"orders.created\"); }";
+        assert_eq!(read(NATS, body), ["nats unresolved producer"]);
+    }
+
+    /// Many annotated methods are read in time linear in their number: a method's annotation
+    /// is asked whether it is a listener's before its method is looked up.
+    #[test]
+    fn many_annotated_methods_are_read_in_linear_time() {
+        let time = |n: usize| {
+            let body: String = (0..n)
+                .map(|i| format!("@Override void m{i}() {{}}\n"))
+                .collect();
+            let src = format!("package a;\n{KAFKA}\nclass C {{\n{body}}}\n");
+            let facts = Java.parse(MODULE, src.as_bytes()).unwrap();
+            let files = BTreeMap::from([(MODULE, &facts)]);
+            let layout = Java.layout(&[], &files).unwrap();
+            let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
+            let code = Code::new(&resolver, &files, &Java);
+            let indexed = Indexed {
+                manifests: &[],
+                tsconfigs: &[],
+                exported: &[],
+                files: &[],
+                configs: &[],
+            };
+            (0..3)
+                .map(|_| {
+                    let at = std::time::Instant::now();
+                    assert!(messages(&code, &indexed).is_empty());
+                    at.elapsed()
+                })
+                .min()
+                .unwrap()
+        };
+        let (small, large) = (time(8000), time(32000));
+        // Linear is about 4x; reading every method per annotation would be about 16x.
+        assert!(large < small * 9, "{small:?} then {large:?}");
     }
 
     /// An annotation written as an element value is its name and its elements, the unnamed one
