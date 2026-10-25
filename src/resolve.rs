@@ -367,6 +367,11 @@ pub struct Resolver<'a> {
     groups: Vec<Group<'a>>,
 }
 
+/// Whether `inner` is a class nested directly in the class `outer`.
+fn nested_in(inner: Target, outer: Target) -> bool {
+    inner.path == outer.path && crate::parent(inner.name) == outer.name
+}
+
 /// The argument counts a function takes: one per parameter, fewer for the ones a call may leave
 /// out (`Binds::Optional`), and any number more for a `Binds::Rest` one (Kotlin's `vararg`).
 #[derive(Clone, Copy)]
@@ -1416,7 +1421,10 @@ impl<'a> Resolver<'a> {
                 return Binding::Local(c.path, c.name, member);
             }
         }
-        Binding::Unknown
+        match self.companion(class, work) {
+            Some(companion) => self.member(companion, member, read, work),
+            None => Binding::Unknown,
+        }
     }
 
     /// The overloads of `member` a family declares (`Facts::overloads`), as `member` reads a
@@ -1519,8 +1527,33 @@ impl<'a> Resolver<'a> {
             {
                 Some(Binding::Unknown)
             }
+            None => {
+                let class = Target { path, name: class };
+                let companion = self.companion(class, &mut Work::default())?;
+                self.inherited(companion.path, companion.name, name)
+            }
             found => found,
         }
+    }
+
+    /// The class nested in `class` that `class` writes as a base: a Kotlin companion object,
+    /// whose members a call on the class's name and a bare call in it reach after the class's
+    /// own family. No other language can write one (a class extending its own nested class is a
+    /// cycle in Java), so the written bases are checked by name before any is resolved.
+    fn companion(&self, class: Target<'a>, work: &mut Work<'a>) -> Option<Target<'a>> {
+        let defs = &self.defs[class.path];
+        let nested = |b: &String| {
+            b.rsplit_once('.').is_some_and(|(_, last)| {
+                defs.contains_key(format!("{}.{last}", class.name).as_str())
+            })
+        };
+        if !defs[class.name].bases.iter().any(nested) {
+            return None;
+        }
+        (self.bases(class, work).into_iter()).find_map(|b| match b {
+            Ancestor::Class(b) if nested_in(b, class) => Some(b),
+            _ => None,
+        })
     }
 
     /// The method `qualified` (`Type.method`) of `class` that another file of its package
@@ -1599,11 +1632,14 @@ impl<'a> Resolver<'a> {
             return Err(Cut);
         }
         work.busy.push(key);
-        let bases = self.bases(class, work);
+        let mut bases = self.bases(class, work);
         if work.cut {
             work.busy.pop();
             return Err(Cut);
         }
+        // A class nested in the class and written as its base (a Kotlin companion object) is
+        // no ancestor of its instances: `Resolver::companion` reads it after the family.
+        bases.retain(|b| !matches!(b, Ancestor::Class(b) if nested_in(*b, class)));
         let mut lists = Vec::new();
         for base in &bases {
             lists.push(match base {

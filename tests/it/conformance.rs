@@ -1377,6 +1377,33 @@ fn kotlin() {
         "conformance-kotlin",
         &[
             "scripts/seed.kts::seed()",
+            "src/main/kotlin/example/Members.kt::example.Base",
+            "src/main/kotlin/example/Members.kt::example.Base.log(String)",
+            "src/main/kotlin/example/Members.kt::example.log(String)",
+            "src/main/kotlin/example/Members.kt::example.origin()",
+            "src/main/kotlin/example/Members.kt::example.Derived",
+            "src/main/kotlin/example/Members.kt::example.Derived.go()",
+            "src/main/kotlin/example/Members.kt::example.Derived.first()",
+            "src/main/kotlin/example/Members.kt::example.Derived.Companion",
+            "src/main/kotlin/example/Members.kt::example.Derived.Companion.origin()",
+            "src/main/kotlin/example/Members.kt::example.Logged",
+            "src/main/kotlin/example/Members.kt::example.Logged.go()",
+            "src/main/kotlin/example/Members.kt::example.Logged.self()",
+            "src/main/kotlin/example/Members.kt::example.Logged.own()",
+            "src/main/kotlin/example/Members.kt::example.Quiet",
+            "src/main/kotlin/example/Members.kt::example.Quiet.go()",
+            "src/main/kotlin/example/Members.kt::example.Quiet.own()",
+            "src/main/kotlin/example/Members.kt::example.Quiet.make()",
+            "src/main/kotlin/example/Members.kt::example.Quiet.Companion",
+            "src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
+            "src/main/kotlin/example/Members.kt::example.util()",
+            "src/main/kotlin/example/Members.kt::example.Init",
+            "src/main/kotlin/example/Members.kt::example.Level",
+            "src/main/kotlin/example/Members.kt::example.Level.label()",
+            "src/main/kotlin/example/Shapes.kt::example.Point.fromOrigin()",
+            "src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.visible()",
+            "src/main/kotlin/example/util/Hidden.kt::example.util.viaPackage()",
+            "src/main/kotlin/example/calls/Other.kt::example.calls.greet()",
             "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy",
             "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()",
             "src/main/kotlin/example/Same.kt::example.notSecret()",
@@ -1654,12 +1681,109 @@ fn kotlin() {
                 &[],
             ),
             (
+                "src/main/kotlin/example/Members.kt::example.Derived.go()::log#0",
+                EXACT,
+                &["src/main/kotlin/example/Members.kt::example.Base.log(String)"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Derived.first()::origin#0",
+                EXACT,
+                &["src/main/kotlin/example/Members.kt::example.Derived.Companion.origin()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.Point.fromOrigin()::origin#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Logged.self()::this.own#0",
+                INFERRED,
+                &["src/main/kotlin/example/Members.kt::example.Logged.own()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Quiet.go()::this.own#0",
+                EXACT,
+                &["src/main/kotlin/example/Members.kt::example.Quiet.own()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Quiet.make()::Quiet.build#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Logged.go()::log#0",
+                INFERRED,
+                &["src/main/kotlin/example/Members.kt::example.log(String)"],
+            ),
+            (
+                "src/main/kotlin/example/util/Hidden.kt::example.util.viaPackage()::tool#0",
+                EXACT,
+                &["src/main/kotlin/example/util/Tools.kt::example.util.tool()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Init::helper#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.helper()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Init::local#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Level::helper#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.helper()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Level::(anonymous).label#0",
+                INFERRED,
+                &["src/main/kotlin/example/Members.kt::example.Level.label()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::greet#0",
+                INFERRED,
+                &["src/main/kotlin/example/calls/Other.kt::example.calls.greet()"],
+            ),
+            (
+                "scripts/run.kts::seed#0",
+                INFERRED,
+                &["scripts/seed.kts::seed()"],
+            ),
+            (
+                "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()::Registry.INSTANCE.all#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Registry.all()"],
+            ),
+            (
+                "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()::Registry.INSTANCE.find#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Registry.find(String)"],
+            ),
+            (
                 "scripts/seed.kts::seed#0",
                 EXACT,
                 &["scripts/seed.kts::seed()"],
             ),
         ],
     );
+}
+
+/// A `private` or `internal` member is no export door, and a public one is (export doors are
+/// the processes of kind `export`).
+#[test]
+fn kotlin_private_and_internal_members_are_no_export_doors() {
+    let repo = fixture_repo("kotlin_doors", "conformance-kotlin", Some(ORIGIN));
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let doors: Vec<&str> = (json["processes"].as_array().unwrap().iter())
+        .filter(|p| p["kind"] == "export")
+        .map(|p| p["entry_point"].as_str().unwrap())
+        .collect();
+    let door = |name: &str| doors.iter().any(|d| d.ends_with(name));
+    assert!(door("::example.util.Hidden.visible()"), "{doors:?}");
+    assert!(!door("::example.util.Hidden.shared()"), "{doors:?}");
+    assert!(!door("::example.util.Hidden.closed()"), "{doors:?}");
 }
 
 /// Search finds an extension function by name.

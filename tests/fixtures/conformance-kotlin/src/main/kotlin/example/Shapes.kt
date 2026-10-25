@@ -7,6 +7,8 @@ data class Point(val x: Int, val y: Int) {
     // A class-qualified companion call and a bare one, both to the unnamed companion.
     fun twice(): Point = Point.origin().scaled(2)
 
+    fun fromOrigin(): Point = origin()
+
     fun scaled(factor: Int): Point = Point(x * factor, y * factor)
 
     companion object {

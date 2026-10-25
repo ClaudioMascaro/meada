@@ -2,7 +2,7 @@
 //! Its files resolve with the Java pack's (`LanguagePack::resolves_with`), so the two share one
 //! layout of packages and types and call each other by fully qualified name.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Range;
 use std::rc::Rc;
 
@@ -62,8 +62,8 @@ impl LanguagePack for Kotlin {
         Some(&super::java::Java)
     }
 
-    fn parse(&self, _path: &str, src: &[u8]) -> Result<Facts> {
-        parse(src)
+    fn parse(&self, path: &str, src: &[u8]) -> Result<Facts> {
+        parse(src, path.ends_with(".kts"))
     }
 
     fn config_files(&self) -> &'static [&'static str] {
@@ -88,13 +88,15 @@ enum Access {
     Private,
 }
 
-/// Where a node sits: at a file's top level, directly in a class body, or in code (a function
-/// body, an initializer, a getter).
+/// Where a node sits: at a file's top level, directly in a class body, in code (a function
+/// body, a getter), or in code whose scope is a class or the file (an `init` block, a secondary
+/// constructor, a property's initializer), where a declaration is no definition.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Place {
     Top,
     Class,
     Code,
+    Init,
 }
 
 struct Visit<'t> {
@@ -109,7 +111,8 @@ struct Visit<'t> {
     depth: usize,
 }
 
-fn parse(src: &[u8]) -> Result<Facts> {
+/// One file's facts; a `script`'s declarations are its own, exported to no other file.
+fn parse(src: &[u8], script: bool) -> Result<Facts> {
     let mut parser = Parser::new();
     parser.set_language(&tree_sitter_kotlin_ng::LANGUAGE.into())?;
     let tree = parser
@@ -163,7 +166,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         budget = left;
         let (mut inner, mut inner_place, mut inner_access, mut inner_opaque, mut nested) =
             (scope.clone(), place, access, opaque, depth);
-        let defining = !opaque && depth < DEFINITION_DEPTH;
+        let defining = !opaque && depth < DEFINITION_DEPTH && place != Place::Init;
         match node.kind() {
             "class_declaration" | "object_declaration" | "companion_object" if defining => {
                 let name = match node.child_by_field_name("name") {
@@ -207,6 +210,14 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 if children(node).any(|c| c.kind() == "interface") {
                     facts.interfaces.push(inner.as_ref().clone());
                 }
+                // Java reaches an object through its `INSTANCE` field.
+                if node.kind() == "object_declaration" {
+                    facts.receivers.push(Receiver {
+                        scope: inner.as_ref().clone(),
+                        name: "INSTANCE".into(),
+                        class: Class::Type(name.clone()),
+                    });
+                }
                 if place != Place::Code {
                     let relative = (inner.strip_prefix(&format!("{}.", facts.package)))
                         .unwrap_or(&inner)
@@ -244,10 +255,12 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     .push(inner.as_ref().clone());
                 if place == Place::Top {
                     publish(&mut facts, inner_access, &base, &family);
+                } else if inner_access != Access::Public {
+                    facts.hidden.push(inner.as_ref().clone());
                 }
                 annotate(&mut facts, node, src, &scope, &inner);
             }
-            "property_declaration" if place != Place::Code && defining => {
+            "property_declaration" if matches!(place, Place::Top | Place::Class) && defining => {
                 let names: Vec<Node> = (named(node))
                     .filter(|n| matches!(n.kind(), "variable_declaration"))
                     .filter_map(|n| named(n).find(|n| n.kind() == "identifier"))
@@ -275,6 +288,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         .push(definition(&inner, kind, node.byte_range(), Vec::new()));
                     if place == Place::Top {
                         publish(&mut facts, own, &base, &inner);
+                    } else if own != Access::Public {
+                        facts.hidden.push(inner.as_ref().clone());
                     }
                     annotate(&mut facts, node, src, &scope, &inner);
                 } else {
@@ -290,7 +305,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         }
                     }
                     // The initializer's calls belong to the declaration around it.
-                    inner_place = Place::Code;
+                    inner_place = Place::Init;
                 }
             }
             // A constructor's `val` and `var` parameters are properties of the class; the others
@@ -306,8 +321,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         facts.locals.push(qualify(&scope, name));
                     }
                 }
-                inner_place = Place::Code;
+                inner_place = Place::Init;
             }
+            "anonymous_initializer" | "secondary_constructor" => inner_place = Place::Init,
             "enum_entry" => {
                 if let Some(name) = named(node).find(|n| n.kind() == "identifier") {
                     facts.receivers.push(Receiver {
@@ -316,6 +332,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         class: Class::Unknown,
                     });
                 }
+            }
+            // An enum entry's arguments are read in the enum's scope, its body as an object's.
+            "class_body" if node.parent().is_some_and(|p| p.kind() == "enum_entry") => {
                 inner_opaque = true;
             }
             "lambda_literal" | "anonymous_function" | "object_literal" => {
@@ -338,7 +357,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
         // Names code binds: locals, loop and lambda variables, `catch` parameters and the
         // parameters of functions that are no definitions.
         let binds = match node.kind() {
-            "variable_declaration" if place == Place::Code => named(node).next(),
+            "variable_declaration" if matches!(place, Place::Code | Place::Init) => {
+                named(node).next()
+            }
             "catch_block" => named(node).find(|n| n.kind() == "identifier"),
             "parameter" if !defining => named(node).next(),
             // A function or class declared where it is no definition binds its name.
@@ -352,7 +373,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         }
         let mut pushed: Vec<Node> = named(node).collect();
         // A property's own names are no locals of the code its initializer or getter is.
-        if node.kind() == "property_declaration" && place != Place::Code {
+        if node.kind() == "property_declaration" && matches!(place, Place::Top | Place::Class) {
             pushed.retain(|n| {
                 !matches!(
                     n.kind(),
@@ -378,6 +399,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
             });
         }
     }
+    if script {
+        facts.exports.clear();
+        facts.private.clear();
+    }
+    bare_calls(&mut facts);
     let private: std::collections::BTreeSet<&str> =
         facts.private.iter().map(String::as_str).collect();
     facts.star = super::Star::Only(
@@ -396,6 +422,52 @@ fn parse(src: &[u8]) -> Result<Facts> {
         names.sort();
     }
     Ok(facts)
+}
+
+/// Marks each bare call (`f()`, not in a lambda) as Java's are (`Call::by_path`): the class
+/// members around it, inherited and companion ones included, come before the names outside the
+/// class. Unless a binding of the code around it holds what it invokes: a local, a parameter, a
+/// property, a constant of its name in any scope from the call's out.
+fn bare_calls(facts: &mut Facts) {
+    let locals: HashSet<&str> = facts.locals.iter().map(String::as_str).collect();
+    let consts: HashSet<&str> = facts.consts.iter().map(|c| c.name.as_str()).collect();
+    let properties: HashSet<(&str, &str)> = (facts.receivers.iter())
+        .map(|r| (r.scope.as_str(), r.name.as_str()))
+        .collect();
+    let params: HashMap<&str, Vec<&str>> = (facts.defs.iter())
+        .map(|d| {
+            (
+                d.name.as_str(),
+                d.params.iter().map(|p| p.name.as_str()).collect(),
+            )
+        })
+        .collect();
+    let bound = |scope: &str, name: &str| {
+        let mut at = Some(scope);
+        while let Some(s) = at {
+            let qualified = qualify(s, name);
+            if locals.contains(qualified.as_str())
+                || consts.contains(qualified.as_str())
+                || properties.contains(&(s, name))
+                || params.get(s).is_some_and(|p| p.contains(&name))
+            {
+                return true;
+            }
+            at = (!s.is_empty()).then(|| crate::parent(s));
+        }
+        false
+    };
+    let bare: Vec<bool> = (facts.calls.iter())
+        .map(|c| {
+            c.decorates.is_none()
+                && !c.callee.contains('.')
+                && !c.callee.starts_with('(')
+                && !bound(&c.scope, &c.callee)
+        })
+        .collect();
+    for (call, bare) in facts.calls.iter_mut().zip(bare) {
+        call.by_path = bare;
+    }
 }
 
 fn definition(name: &str, kind: Kind, range: Range<usize>, params: Vec<Param>) -> Def {

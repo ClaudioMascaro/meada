@@ -1875,7 +1875,8 @@ sample.kt
       "range": {
         "start": 200,
         "end": 207
-      }
+      },
+      "by_path": true
     },
     {
       "scope": "example.helper()",

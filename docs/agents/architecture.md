@@ -1316,9 +1316,18 @@ one for the area a change touches.
   and pack group, with no new invariant (ADR 0002). Java's `layout` therefore also maps a Kotlin
   file's top-level overload families and constants by fully qualified name, and a Kotlin class
   joins its own name's overload family with its primary constructor's parameters, so calling the
-  class constructs it. A companion object is written as its class's last base; `Resolver::member`
-  finds a class nested in a class while that class's family is still being linearized, which
-  resolving such a base needs. `LanguagePack::is_code` drops from the walk the files of a pack's
+  class constructs it. A companion object is written as its class's last base: `Resolver::lineage`
+  keeps a class's own nested class out of its family, so the companion's bases lend nothing to
+  instances, and `Resolver::companion` reads it after the family, for a bare call in the class
+  (`inherited`) and a member of the class (`member`, so `Type.create()`); `Resolver::member` finds
+  a class nested in a class while that class's family is still being linearized, which resolving
+  such a base needs. A bare Kotlin call is `Call::by_path`, as Java's, so it reads the class family
+  first, unless a local, parameter, property or constant of its name in a scope around it holds
+  what it invokes (`bare_calls`). Java's `layout` gives a package's files before a Kotlin
+  top-level declaration of the same fully qualified name, and leaves `.kts` scripts out of every
+  package, since a script's declarations are its own (the Kotlin pack exports none of them). A
+  Kotlin `object` has an `INSTANCE` property of its own type, which Java calls go through.
+  `LanguagePack::is_code` drops from the walk the files of a pack's
   extensions that are no code (Kotlin's `build.gradle.kts` and `settings.gradle.kts`, which the
   package ecosystems read as manifests). A pack that
   writes none of them (TypeScript writes no bases or receivers) gets name matches where those
@@ -1628,9 +1637,14 @@ one for the area a change touches.
   its class's last base, so `Type.m()` reads the class's own instance member first when both
   declare `m` with one signature. A star import of a class (`import a.C.*`) reads every export of
   the class's file. A fully qualified function call (`example.helper()`) is a name match. A class
-  with a secondary constructor is not in its name's overload family, so calling it is a name
-  match. Kotlin files resolve with Java's flags, so `java.lang.Object`'s members are the implicit
-  members of a Kotlin class too. A star import of a Java package from Kotlin sees its
+  with a secondary constructor is not in its name's overload family, so calling it resolves to
+  nothing. A single import of a top-level declaration named like a package of the repository
+  (`import app.config` beside package `app.config`) binds nothing, since the package keeps the
+  name. A property of function type that a base class declares, invoked by bare name, is read as
+  a method call. A companion's outside base leaves the companion's members unknown, so
+  `Type.create()` then resolves to nothing (Opaque outside, strict, as Java's #353). Kotlin files
+  resolve with Java's flags, so `java.lang.Object`'s members are the implicit members of a Kotlin
+  class too: a bare `notify()` in a class is unknown. A star import of a Java package from Kotlin sees its
   package-private classes. The Spring configuration files are read for the Java pack only
   (`config_files` is empty) until a Kotlin form needs them.
 

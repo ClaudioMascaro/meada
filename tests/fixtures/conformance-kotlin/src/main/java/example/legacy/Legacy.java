@@ -9,6 +9,7 @@ public class Legacy {
         Box box = new Box();
         box.label();
         Registry.INSTANCE.all();
+        Registry.INSTANCE.find("a");
         return 0;
     }
 }
