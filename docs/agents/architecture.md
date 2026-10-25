@@ -1700,6 +1700,16 @@ one for the area a change touches.
   (`{id:a/b}`) serves nothing. An unreadable element beside readable ones of a `method` or a
   path array is dropped: the others still serve. Interface-declared mappings, composed annotations
   and `server.servlet.context-path` are not read.
+  JAX-RS (#87, `jax_rs` in the same file): a method with a verb annotation (`GET` ... `OPTIONS`)
+  of a class with `@Path`, from `javax.ws.rs` or `jakarta.ws.rs`, joined to the method's own
+  `@Path`; both packages through the same `known`, so `import javax.ws.rs.*` beside
+  `jakarta.ws.rs.*` is two candidates and serves nothing. A `@Path`-only method and
+  `@ApplicationPath` are not routes, and neither is a method of an interface (`Facts::interfaces`):
+  a `@Path` interface is a MicroProfile or Quarkus client. A controller or resource class whose
+  family has an outside base (`extends com.corp.Base`, top-level or nested) gives no provider
+  (#354), since its annotations are read in the class scope, where an inherited member type
+  could shadow the import. A fully qualified annotation without an import (`@javax.ws.rs.GET`)
+  and annotations an implementation inherits from an interface are not read.
 - `http/java/clients.rs` (spec #26, #88): a RestTemplate or a WebClient counts by the type the
   source writes for the receiver (`Follow::Declarations`), or, for a WebClient, by the
   `WebClient.create` or `WebClient.builder()` chain it traces to (`Follow::Values`); a name

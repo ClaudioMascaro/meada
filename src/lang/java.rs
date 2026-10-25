@@ -376,6 +376,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
             }
             annotations(node, src, &scope, &inner, &mut facts);
             in_interface = node.kind() == "interface_declaration";
+            if in_interface {
+                facts.interfaces.push(inner.as_ref().clone());
+            }
         }
         if kind.is_some() && !defining {
             if let Some(name) = node.child_by_field_name("name") {

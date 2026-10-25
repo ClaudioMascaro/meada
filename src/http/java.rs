@@ -1,4 +1,4 @@
-//! Spring MVC providers (spec #26): a method of a `@RestController` or `@Controller` class
+//! Spring MVC and JAX-RS (`jax_rs`, #87) providers (spec #26): a method of a `@RestController` or `@Controller` class
 //! carrying a mapping annotation serves the class prefix (`@RequestMapping`) joined to each of
 //! its paths. The pack reads an annotation as a call decorating its target (`Call::decorates`,
 //! the target a class or a method), so the annotations, `RequestMethod.X` and the constants of
@@ -116,7 +116,85 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
             }
         }
     }
+    jax_rs(code, &mut found);
     found
+}
+
+/// The packages of JAX-RS, before and after the move to Jakarta EE.
+const JAX_RS: &[&str] = &["javax.ws.rs.", "jakarta.ws.rs."];
+/// JAX-RS's method annotations, which are the methods themselves.
+const VERBS: &[&str] = &["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+
+/// Whether `spelled` is a JAX-RS annotation this module reads: `Path` or one of `VERBS`.
+fn jax_rs_annotation(spelled: &str) -> bool {
+    (JAX_RS.iter())
+        .filter_map(|p| spelled.strip_prefix(p))
+        .any(|n| n == "Path" || VERBS.contains(&n))
+}
+
+/// JAX-RS providers: a method of a class with `@Path` carrying a method annotation serves the
+/// class path joined to its own `@Path`. A method with only `@Path` is a sub-resource locator,
+/// and `@ApplicationPath` is not applied, and an interface is a client, not a resource. Names count as Spring's do, through `known`.
+fn jax_rs<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
+    for (&path, facts) in code.files() {
+        if !path.ends_with(".java") {
+            continue;
+        }
+        let annotations: Vec<(usize, &'a Call, String)> = (facts.calls.iter().enumerate())
+            .filter(|(_, c)| c.decorates.is_some())
+            .filter_map(|(n, c)| {
+                let name = known(code, path, &c.scope, &c.callee, jax_rs_annotation)?;
+                Some((n, c, name))
+            })
+            .collect();
+        let path_of = |target: &str| {
+            (annotations.iter()).find(|(_, c, n)| {
+                c.decorates.as_deref() == Some(target)
+                    && (JAX_RS.iter()).any(|p| n.strip_prefix(p) == Some("Path"))
+            })
+        };
+        for (_, call, name) in &annotations {
+            let verb = (JAX_RS.iter())
+                .filter_map(|p| name.strip_prefix(p))
+                .find(|n| VERBS.contains(n));
+            let (Some(verb), Some(target)) = (verb, call.decorates.as_deref()) else {
+                continue;
+            };
+            if !(facts.defs.iter()).any(|d| d.kind == Kind::Method && d.name == target) {
+                continue;
+            }
+            // The index keeps no argument: they come from the full facts of the file.
+            let read = |entry: Option<&(usize, &'a Call, String)>| {
+                let given = code.call(path, entry?.0)?;
+                paths(code, path, given)
+            };
+            // An interface with `@Path` is a client (MicroProfile, Quarkus), not a server.
+            if facts.interfaces.contains(&call.scope) {
+                continue;
+            }
+            let Some(prefixes) = read(path_of(&call.scope)) else {
+                continue;
+            };
+            let routes = match path_of(target) {
+                None => Some(vec![String::new()]),
+                some => read(some),
+            };
+            let Some(routes) = routes else { continue };
+            for (prefix, route) in prefixes
+                .iter()
+                .flat_map(|p| routes.iter().map(move |r| (p, r)))
+            {
+                let full = join(prefix, route);
+                if balanced(&full) {
+                    let site = Site::Def {
+                        path: path.into(),
+                        name: target.into(),
+                    };
+                    found.push(provider(site, contract(verb, &full)));
+                }
+            }
+        }
+    }
 }
 
 /// The name `name`, written in `scope` of `file`, as a Spring name `is_known` accepts: bound by
@@ -413,5 +491,105 @@ mod tests {
             "@RequestMapping(value = {\"/a\", Api.NOT_A_CONSTANT}, method = {RequestMethod.GET, Missing.X}) void f() {}",
         );
         assert_eq!(found, ["http::GET::/a"]);
+    }
+
+    const JAXRS: &str = "import javax.ws.rs.GET;\nimport javax.ws.rs.Path;\n";
+
+    fn resource(imports: &str, body: &str) -> Vec<String> {
+        served(imports, body)
+    }
+
+    #[test]
+    fn a_jax_rs_resource_joins_the_class_path_and_the_method_path() {
+        let body = "@Path(\"/items\") class C { @GET @Path(\"{id:[0-9]{3}}\") void f() {} @GET void g() {} }";
+        assert_eq!(
+            resource(JAXRS, body),
+            ["http::GET::/items", "http::GET::/items/{}"]
+        );
+        let jakarta = JAXRS.replace("javax", "jakarta");
+        assert_eq!(resource(&jakarta, body).len(), 2);
+    }
+
+    #[test]
+    fn each_jax_rs_method_annotation_gives_its_method() {
+        let verbs = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+        let imports: String = (verbs.iter())
+            .map(|v| format!("import jakarta.ws.rs.{v};\n"))
+            .collect::<String>()
+            + "import jakarta.ws.rs.Path;\n";
+        let methods: String = (verbs.iter())
+            .map(|v| format!("@{v} @Path(\"/{v}\") void m{v}() {{}} "))
+            .collect();
+        let found = resource(&imports, &format!("@Path(\"/r\") class C {{ {methods} }}"));
+        let mut want: Vec<String> = (verbs.iter())
+            .map(|v| format!("http::{v}::/r/{v}"))
+            .collect();
+        want.sort();
+        assert_eq!(found, want);
+    }
+
+    #[test]
+    fn jax_rs_paths_fold_constants() {
+        let body = "@Path(Api.BASE + \"/x\") class C { @GET @Path(Api.ID) void f() {} }";
+        let api = [(
+            "a/Api.java",
+            "package a; class Api { static final String BASE = \"/b\"; static final String ID = \"{id}\"; }",
+        )];
+        assert_eq!(served_with(JAXRS, body, &api), ["http::GET::/b/x/{}"]);
+    }
+
+    #[test]
+    fn jax_rs_names_count_only_through_an_import_and_a_resource_class() {
+        let body = "@Path(\"/x\") class C { @GET void f() {} }";
+        // A package that is no JAX-RS, a shadowing type, no class @Path, no import at all.
+        let other = JAXRS.replace("javax.ws.rs.GET", "org.acme.GET");
+        assert!(resource(&other, body).is_empty());
+        let shadow = [("a/GET.java", "package a; class GET {}")];
+        // A single-type import wins over the package's own class; an on-demand one does not.
+        assert_eq!(served_with(JAXRS, body, &shadow), ["http::GET::/x"]);
+        let wild = "import javax.ws.rs.*;\n";
+        assert!(served_with(wild, body, &shadow).is_empty());
+        let nested =
+            "import javax.ws.rs.*;\n@Path(\"/x\") class C { class GET {} @GET void f() {} }";
+        assert!(resource("", nested).is_empty());
+        let single = format!("{JAXRS}import org.acme.GET;\n");
+        assert!(resource(&single, body).is_empty());
+        assert!(resource(JAXRS, "class C { @GET void f() {} }").is_empty());
+        assert!(resource("", body).is_empty());
+        // A method with only @Path is a sub-resource locator, not a route.
+        assert!(resource(JAXRS, "@Path(\"/x\") class C { @Path(\"/y\") void f() {} }").is_empty());
+    }
+
+    #[test]
+    fn a_jax_rs_interface_is_a_client_and_serves_nothing() {
+        let client = "@Path(\"/users\") interface I { @GET void f(); }";
+        assert!(resource(JAXRS, client).is_empty());
+        let nested = "@Path(\"/x\") class C { @GET void g() {} @Path(\"/in\") interface I { @GET void f(); } }";
+        assert_eq!(resource(JAXRS, nested), ["http::GET::/x"]);
+    }
+
+    #[test]
+    fn a_jax_rs_wildcard_binds_through_one_package_only() {
+        let body = "@Path(\"/x\") class C { @GET void f() {} }";
+        assert_eq!(resource("import javax.ws.rs.*;\n", body), ["http::GET::/x"]);
+        assert_eq!(
+            resource("import jakarta.ws.rs.*;\n", body),
+            ["http::GET::/x"]
+        );
+        let both = "import javax.ws.rs.*;\nimport jakarta.ws.rs.*;\n";
+        assert!(resource(both, body).is_empty());
+    }
+
+    #[test]
+    fn application_path_is_not_applied() {
+        let imports = format!(
+            "{JAXRS}import javax.ws.rs.ApplicationPath;\nimport javax.ws.rs.core.Application;\n"
+        );
+        let body = "@ApplicationPath(\"/api\") class App extends Application {} \
+            @Path(\"/x\") class C { @GET void f() {} }";
+        assert_eq!(resource(&imports, body), ["http::GET::/x"]);
+        let nested =
+            "class App { @Path(\"/app\") static class P { @GET @Path(\"/y\") void f() {} } }";
+        assert_eq!(resource(&imports, nested), ["http::GET::/app/y"]);
     }
 }
