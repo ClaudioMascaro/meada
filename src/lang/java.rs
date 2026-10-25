@@ -1174,6 +1174,11 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             .map_or(Value::Unknown, |ty| {
                 Value::New(type_name(ty, src), arguments(node, src, depth + 1))
             }),
+        // `Api.class`: the member `class` of the type, which a call such as Retrofit's
+        // `create(Api.class)` names its interface by.
+        "class_literal" => named(node).next().map_or(Value::Unknown, |ty| {
+            Value::Member(type_name(ty, src), "class".into())
+        }),
         "array_initializer" | "element_value_array_initializer" => {
             Value::List(named(node).map(|n| value(n, src, depth + 1)).collect())
         }

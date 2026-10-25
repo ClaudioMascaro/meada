@@ -454,6 +454,31 @@ fn trace_up_crosses_into_java_and_back_to_typescript() {
     assert_golden("xlang-java.trace-up.txt", &answer);
 }
 
+/// A route a Feign client calls: up from the route, through the interface method (a consumer at
+/// a definition), to the caller of the method and on to the web app that reaches it.
+#[test]
+fn trace_up_from_a_route_goes_through_the_feign_interface_method() {
+    let (web, _) = xlang_java("xlang_java_up_feign");
+    let up = |route: &str| {
+        Engine::open(&web)
+            .unwrap()
+            .trace(Start::From(route), Direction::Up, None)
+            .unwrap()
+    };
+
+    assert_golden(
+        "xlang-java.trace-up-feign.txt",
+        &up("http::GET::/api/inventory/{}"),
+    );
+    // Without `url` the host is unresolved and the client's name is in the reason.
+    let catalog = up("http::GET::/api/catalog");
+    assert!(
+        catalog.contains("host unresolved (Feign client catalog); the only repository serving it is example.com/xlang-java/web"),
+        "{catalog}"
+    );
+    assert!(catalog.contains("CatalogClient.all()"), "{catalog}");
+}
+
 #[test]
 fn trace_from_uncommitted_changes_starts_at_an_edited_java_file() {
     let (_, api) = xlang_java("xlang_java_uncommitted");

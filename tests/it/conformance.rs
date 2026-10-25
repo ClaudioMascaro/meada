@@ -170,6 +170,25 @@ fn java() {
             "maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.ok()",
             "maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.local()",
             "maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.outside()",
+            "maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient",
+            "maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient.invoice(String)",
+            "maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient.purge()",
+            "maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger",
+            "maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger.entry(String)",
+            "maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger.record()",
+            "maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes",
+            "maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes.ledger()",
+            "maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient",
+            "maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient.find(String)",
+            "maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient.place(String)",
+            "maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements",
+            "maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.Statements(OrdersClient,BillingClient)",
+            "maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.report(String)",
+            "maven/api/src/main/java/example/declarative/shadow/Contract.java::example.declarative.shadow.Contract",
+            "maven/api/src/main/java/example/declarative/shadow/Contract.java::example.declarative.shadow.Contract.line()",
+            "maven/api/src/main/java/example/declarative/shadow/GetMapping.java::example.declarative.shadow.GetMapping",
+            "maven/api/src/main/java/example/declarative/shadow/Hidden.java::example.declarative.shadow.Hidden",
+            "maven/api/src/main/java/example/declarative/shadow/Hidden.java::example.declarative.shadow.Hidden.hidden()",
             "maven/api/src/main/java/example/web/shadow/Shadowed.java::example.web.shadow.Shadowed.anno()",
             "maven/api/src/main/java/example/web/jaxrs/Items.java::example.web.jaxrs.Items",
             "maven/api/src/main/java/example/web/jaxrs/Items.java::example.web.jaxrs.Items.list()",
@@ -380,6 +399,18 @@ const JAVA_CALLS: &[ExpectedCall] = &[
         ],
     ),
 ];
+
+#[test]
+fn java_context_shows_a_declarative_client_method_as_a_consumer_its_caller_reaches() {
+    let repo = fixture_repo("java_declarative_context", "conformance-java", Some(ORIGIN));
+    assert_golden(
+        "conformance-java.context-feign.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .context("example.declarative.BillingClient.invoice(String)", None)
+            .unwrap(),
+    );
+}
 
 #[test]
 fn java_context_shows_an_unresolved_consumer() {

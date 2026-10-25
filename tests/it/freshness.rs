@@ -135,6 +135,51 @@ fn java_channels_follow_an_edited_configuration_key_and_constant_like_a_cold_ind
     );
 }
 
+#[test]
+fn java_declarative_clients_follow_edited_files_like_a_cold_index() {
+    // The base lives in `Remotes`, the interface in `Ledger`: the edit is in another file.
+    let edit = |repo: &Path| {
+        let dir = repo.join("maven/api/src/main/java/example/declarative");
+        for (file, from, to) in [
+            ("Remotes.java", "\"/v1/\"", "\"/v2/\""),
+            ("OrdersClient.java", "path = \"/api\"", "path = \"/v3\""),
+        ] {
+            let before = fs::read_to_string(dir.join(file)).unwrap();
+            fs::write(dir.join(file), before.replace(from, to)).unwrap();
+        }
+    };
+    let repo = fixture_repo("fresh_java_declarative", "conformance-java", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_java_declarative_cold",
+            "conformance-java",
+            ORIGIN,
+            edit
+        )
+    );
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    let consumed = |site: &str| {
+        (json["consumers"].as_array().unwrap().iter())
+            .find(|c| c["site"].as_str().unwrap().ends_with(site))
+            .map(|c| c["contract"].clone())
+    };
+    assert_eq!(
+        consumed("Ledger.entry(String)"),
+        Some("http::GET::/v2/entries/{}".into())
+    );
+    assert_eq!(
+        consumed("OrdersClient.find(String)"),
+        Some("http::GET::/v3/orders/{}".into())
+    );
+}
+
 /// Edits a file whose exports others import, adds a file whose definition turns an inferred
 /// call in an unrelated file into an ambiguous one, deletes a file, and drops the tsconfig
 /// path alias.

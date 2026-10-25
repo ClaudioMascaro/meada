@@ -18,6 +18,15 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Java OpenFeign and Retrofit clients (issue #90): each method of an `@FeignClient(name, url)`
+  interface with Spring mapping annotations, or of a Retrofit interface with `retrofit2.http`
+  verbs, is an HTTP consumer sited at the interface method, so a caller of the method reaches
+  the provider in `trace` and `context`. A Feign `url` and `path` resolve through the Spring
+  configuration; without `url` the host is unresolved and the reason names the client
+  (`host unresolved (Feign client <name>)`). A Retrofit base comes from the
+  `Retrofit.Builder().baseUrl(base)` that creates the interface, one consumer per creation. The
+  Java pack reads `Api.class` as a class literal. `@RequestLine` and other Feign contracts are
+  not read.
 - Java program entry points (issue #91): a `public static void main(String[])` or
   `String...` method is a program with its own process.
 - Java source indexing (issue #84): package-qualified types and method signatures, overloads

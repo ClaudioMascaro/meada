@@ -25,7 +25,7 @@ modules updates it.
   function making the `fetch` and in each wrapper up to the site, a wrapper passing on the
   response, the body or a path below it when it returns that one thing from the function its
   caller reaches), Python client consumers (`http/python/clients.rs`, below), Next.js app-router
-  and Express (`http/ts.rs`), FastAPI, Flask and Django (`http/python.rs`), Spring MVC (`http/java.rs`), axum
+  and Express (`http/ts.rs`), FastAPI, Flask and Django (`http/python.rs`), Spring MVC (`http/java.rs`), Feign and Retrofit interface methods (`http/java/declarative.rs`, consumers at a `Site::Def`), axum
   (`http/rust/axum.rs`) and actix-web and Rocket (`http/rust.rs`) providers (Next.js and
   Express ones each with a `Found::shape` from `http::ts::provider_shape`, the one place that picks a route's code source: `zod::Zod::returned`
   first, else `literals::Literals::shape` (spec #23; both read the 2xx bodies `provider_shape`

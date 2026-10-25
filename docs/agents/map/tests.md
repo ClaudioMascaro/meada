@@ -414,6 +414,15 @@ ceilings through CLI and HTTP, and live-heartbeat selection with a controlled RE
 response while all other commands reach the real Valkey fixture. The ceiling tests preserve
 one final locked publish and compare English and Brazilian Portuguese refusals.
 
+## Java declarative clients (#90)
+
+`conformance-java` gains `example.declarative` (Feign with and without `url`, a Retrofit
+interface built by `Remotes`, shadowed annotations and `@RequestLine`, which give nothing);
+`conformance::java` keeps the export and `conformance-java.context-feign.txt`. The
+`xlang-java-api` fixture calls the TypeScript provider through two Feign clients, and
+`xlang-java.trace-up-feign.txt` is the trace up from the route through the interface method.
+`freshness` edits a Retrofit base and a Feign `path` and compares with a cold index.
+
 ## Java conformance (#84)
 
 `conformance-java` holds Maven modules and a Gradle source tree. `conformance::java` checks
