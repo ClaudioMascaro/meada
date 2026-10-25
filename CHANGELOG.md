@@ -37,6 +37,13 @@ All notable changes to Meada are recorded here. The format follows
   Java files of one repository call each other by fully qualified name. No Kotlin compiler, JDK
   or Gradle is involved.
 
+- Ktor server providers (issue #98): routes inside `routing { }` (`get`, `post`, `put`, `patch`,
+  `delete`, `head`, `options`, with a path or none, and `route(path, HttpMethod.X)`) serve the
+  prefix of every enclosing `route(prefix) { }` block, through extension functions on `Route` or
+  `Routing` called inside a block, in any file and once per prefix they are called under. Each
+  route's lambda is its handler, named for the route. Ktor names count only with Ktor's import;
+  type-safe routing is not read. A Kotlin lambda passed as an argument, and a function declared
+  inside one, is now a scope of its own.
 - Java OpenFeign and Retrofit clients (issue #90): each method of an `@FeignClient(name, url)`
   interface with Spring mapping annotations, or of a Retrofit interface with `retrofit2.http`
   verbs, is an HTTP consumer sited at the interface method, so a caller of the method reaches

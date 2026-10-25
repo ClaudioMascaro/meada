@@ -4552,6 +4552,55 @@ impl<'a> Code<'a> {
         }
     }
 
+    /// The extension functions named `name` that a call of it with `arity` arguments, written in
+    /// `scope` of `path`, has in scope, whatever type they extend, sorted: each with where Kotlin
+    /// finds it, the nearest first (`Resolver::visible`). A local or a parameter of the name in a
+    /// scope around the call hides those declared outside that scope, as Kotlin calls it first.
+    /// A kind that knows the implicit receiver keeps the nearest of those that extend it.
+    pub fn extensions(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &str,
+        arity: Option<usize>,
+    ) -> Vec<(u8, Target<'a>)> {
+        let r = self.resolver;
+        let defs = &r.defs[path];
+        // The nearest scope around the call that binds the name to a value of its own.
+        let mut hiding = None;
+        let mut at = Some(scope);
+        while let Some(s) = at.filter(|s| !s.is_empty()) {
+            let class = defs.get(s).is_some_and(|d| d.kind == Kind::Class);
+            let param = defs
+                .get(s)
+                .is_some_and(|d| d.params.iter().any(|p| p.name == name));
+            if !class
+                && (param
+                    || r.locals[path].contains(crate::qualify(s, name).as_str())
+                    || r.receivers[path].contains_key(&(s, name)))
+            {
+                hiding = Some(s);
+                break;
+            }
+            at = Some(crate::parent(s));
+        }
+        // Whether the binding is inside the scope an extension is declared in.
+        let hidden = |within: &str| {
+            hiding.is_some_and(|h: &str| {
+                within.is_empty() || h.strip_prefix(within).is_some_and(|r| r.starts_with('.'))
+            })
+        };
+        let fits =
+            |t: &Target<'a>| arity.is_none_or(|n| r.arities.get(t).is_none_or(|a| a.fits(n)));
+        let mut found: Vec<(u8, Target<'a>)> = (r.extensions.get(name).into_iter().flatten())
+            .filter(|e| fits(&e.target) && !hidden(e.within))
+            .filter_map(|e| Some((r.visible(path, scope, name, e)?, e.target)))
+            .collect();
+        found.sort();
+        found.dedup();
+        found
+    }
+
     /// The method `method` of the class that `name` (a type, or a name whose class the source
     /// writes), written in `scope` of `path`, is an instance of: looked up through its family and
     /// the other files of its package.

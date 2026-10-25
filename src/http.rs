@@ -15,6 +15,7 @@ use crate::workspace::Repository;
 
 mod go;
 mod java;
+mod kotlin;
 mod python;
 mod rust;
 mod ts;
@@ -566,6 +567,7 @@ impl ContractKind for Http {
         found.extend(go::consumers(code));
         found.extend(python::providers(code));
         found.extend(java::providers(code));
+        found.extend(kotlin::providers(code));
         found.extend(java::consumers(code, indexed));
         found
     }
