@@ -1400,6 +1400,12 @@ fn kotlin() {
             "src/main/kotlin/example/Members.kt::example.Init",
             "src/main/kotlin/example/Members.kt::example.Level",
             "src/main/kotlin/example/Members.kt::example.Level.label()",
+            "src/main/kotlin/example/Main.kt::example.main(Array<String>)",
+            "src/main/kotlin/example/Main.kt::example.Runner",
+            "src/main/kotlin/example/Main.kt::example.Runner.main()",
+            "src/main/kotlin/example/Main.kt::example.Launcher",
+            "src/main/kotlin/example/Main.kt::example.Launcher.main()",
+            "src/main/kotlin/example/Main.kt::example.String.main()",
             "src/main/kotlin/example/Shapes.kt::example.Point.fromOrigin()",
             "src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.visible()",
             "src/main/kotlin/example/util/Hidden.kt::example.util.viaPackage()",
@@ -1465,7 +1471,7 @@ fn kotlin() {
             "src/main/kotlin/example/util/Tools.kt::example.util.tool()",
             "src/main/kotlin/example/util/Tools.kt::example.util.tool(Int,Int)",
         ],
-        &[],
+        &["src/main/kotlin/example/Main.kt::example.main(Array<String>)"],
         &[
             (
                 "src/main/kotlin/example/Shapes.kt::example.calls()::helper#0",

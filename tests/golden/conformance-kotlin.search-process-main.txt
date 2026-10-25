@@ -1,0 +1,1 @@
+example.com/acme/conformance example.main(Array<String>) process::example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.main(Array<String>) (program)
