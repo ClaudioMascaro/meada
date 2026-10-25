@@ -116,6 +116,14 @@ trait Ecosystem {
         None
     }
 
+    /// Whether `target`, a symbol an import reaches, is a member of the class `class` (a
+    /// constructor or a method of its own), so the call reaching it is a consumer of the class
+    /// too (`context` on a public class). An ecosystem whose imports reach a class itself has
+    /// none.
+    fn member_of(&self, _target: &str, _class: &str) -> bool {
+        false
+    }
+
     /// What the dependency `range` says of the provider's `version`: never evaluated.
     fn flag(&self, _range: Option<&str>, _version: Option<&str>) -> Option<Flag> {
         Some(Flag::Unchecked)
@@ -1466,12 +1474,18 @@ struct Reach<'e> {
 }
 
 /// The calls that reach `symbol` through a package import, from `links` (the workspace's): each
-/// with the link's level and the range flag of the dependency entry it went through.
+/// with the link's level and the range flag of the dependency entry it went through. A class is
+/// reached by the calls that reach its members (`Ecosystem::member_of`), once per call at the
+/// best level of its links into the class.
 fn reached<'e>(exports: &'e [Export], links: &[Link], symbol: &str) -> Vec<Reach<'e>> {
-    let mut found = Vec::new();
+    let mut found: Vec<Reach> = Vec::new();
+    let into = |l: &Link| {
+        l.provider == symbol
+            || of_contract(&l.contract).is_some_and(|e| e.member_of(&l.provider, symbol))
+    };
     for link in links
         .iter()
-        .filter(|l| l.provider == symbol && l.contract.starts_with(PREFIX))
+        .filter(|l| l.contract.starts_with(PREFIX) && into(l))
     {
         let Some((repository, consumer)) = (exports.iter().enumerate())
             .flat_map(|(n, e)| e.consumers.iter().map(move |c| (n, c)))
@@ -1488,18 +1502,23 @@ fn reached<'e>(exports: &'e [Export], links: &[Link], symbol: &str) -> Vec<Reach
         };
         // The manifest the hop went through holds the provider's version.
         let version = (consumer.hops.iter())
-            .find(|h| h.target == symbol)
+            .find(|h| h.target == link.provider)
             .and_then(|h| {
                 (exports.iter().flat_map(|e| &e.providers))
                     .find(|p| p.site == h.manifest && p.contract == link.contract)
             })
             .and_then(|p| p.version.as_deref());
-        found.push(Reach {
+        let reach = Reach {
             repository,
             call,
             level: link.level,
             flag: flag_of(&link.contract, consumer.method.as_deref(), version),
-        });
+        };
+        match found.iter_mut().find(|r| r.call.id == call.id) {
+            Some(r) if reach.level < r.level => *r = reach,
+            Some(_) => {}
+            None => found.push(reach),
+        }
     }
     found
 }

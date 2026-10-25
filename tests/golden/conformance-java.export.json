@@ -58,6 +58,10 @@
       "hash": "5bc6892f1b1fdbe871098baf313e97681020e62668aded5d4550598d5538a160"
     },
     {
+      "path": "maven/api/src/main/java/example/clients/Injected.java",
+      "hash": "e0de97c5824025bb623486684903688c66ff11fc5b158c714b511a5e52d3516f"
+    },
+    {
       "path": "maven/api/src/main/java/example/clients/Jdk.java",
       "hash": "84f66ed40638f115653e9593533e60b6d87d754f0bc9d0616bde5e8c53f41a61"
     },
@@ -1025,6 +1029,30 @@
         "path": "maven/api/src/main/java/example/channels/Streams.java",
         "start": 555,
         "end": 715
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Injected.java",
+        "start": 274,
+        "end": 835
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.Injected(RestTemplate)",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Injected.java",
+        "start": 558,
+        "end": 626
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Injected.java",
+        "start": 632,
+        "end": 833
       }
     },
     {
@@ -2957,6 +2985,39 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()::rest.getForObject#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Injected.java",
+        "start": 661,
+        "end": 708
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()::rest.getForObject#1",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Injected.java",
+        "start": 718,
+        "end": 768
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()::rest.getForObject#2",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Injected.java",
+        "start": 778,
+        "end": 826
+      }
+    },
+    {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()::(method_invocation).POST#0",
       "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()",
       "target": null,
@@ -4589,6 +4650,11 @@
   ],
   "consumers": [
     {
+      "contract": "package::maven::example:a*",
+      "site": "example.com/acme/conformance::gradle/build.gradle::implementation::example:a*",
+      "via": "computed"
+    },
+    {
       "contract": "channel::amqp::invoices",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onInvoice(String)",
       "via": null
@@ -4642,6 +4708,21 @@
       "contract": "channel::redis::events",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()",
       "via": null
+    },
+    {
+      "contract": "http::GET::/a",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()::rest.getForObject#0",
+      "via": "host:literal.example.com"
+    },
+    {
+      "contract": "http::GET::/b",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()::rest.getForObject#1",
+      "via": "host:billing.example.com"
+    },
+    {
+      "contract": "http::GET::/c",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()::rest.getForObject#2",
+      "via": "env:BILLING_URL"
     },
     {
       "contract": "http::POST::/api/orders/new",
@@ -4721,12 +4802,12 @@
     {
       "contract": "http::GET::/invoices/{}",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient.invoice(String)",
-      "via": "feign:billing"
+      "via": "client:Feign client billing"
     },
     {
       "contract": "http::DELETE::/invoices",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/BillingClient.java::example.declarative.BillingClient.purge()",
-      "via": "feign:billing"
+      "via": "client:Feign client billing"
     },
     {
       "contract": "http::GET::/v1/entries/{}",
@@ -4788,6 +4869,13 @@
       "repository": "example.com/acme/conformance",
       "directory": "maven",
       "ecosystem": "maven"
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "gradle/build.gradle",
+      "field": "implementation",
+      "name": "example:a*"
     }
   ],
   "communities": [
@@ -4906,6 +4994,13 @@
     }
   ],
   "links": [
+    {
+      "consumer": "example.com/acme/conformance::gradle/build.gradle::implementation::example:a*",
+      "provider": "example.com/acme/conformance::maven/api/pom.xml",
+      "contract": "package::maven::example:a*",
+      "level": "ambiguous",
+      "reason": "computed coordinate; package::maven::example:a* none (local none), range unchecked"
+    },
     {
       "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onInvoice(String)",
       "provider": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.invoice(String)::rabbit.convertAndSend#0",
@@ -6137,6 +6232,61 @@
           "via": "link",
           "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()",
           "reason": "channel::redis::events"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.Injected(RestTemplate)",
+      "kind": "export",
+      "label": "example.clients.Injected.Injected(RestTemplate)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.Injected(RestTemplate)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()",
+      "kind": "export",
+      "label": "example.clients.Injected.send()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()::rest.getForObject#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/a"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()::rest.getForObject#1",
+          "mark": "no-provider",
+          "contract": "http::GET::/b"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()::rest.getForObject#2",
+          "mark": "no-provider",
+          "contract": "http::GET::/c"
         }
       ]
     },

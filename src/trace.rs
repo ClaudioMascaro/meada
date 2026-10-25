@@ -317,7 +317,7 @@ impl<'a> Graph<'a> {
 /// Whether the consumer of `link` calls its provider, so the provider is not a writer that goes
 /// on to a reader.
 fn calls_on_link(link: &Link) -> bool {
-    contract::kind_of(&link.contract).is_some_and(|k| k.calls_from_definition())
+    contract::calls_from_definition(Some(&link.contract))
 }
 
 /// What a `from` names.
@@ -514,23 +514,7 @@ impl<'a> Walk<'_, 'a> {
         shown: &mut HashSet<(&'a str, bool)>,
     ) {
         let graph = self.graph;
-        let consumers = graph.consumers.get(site);
-        for consumer in (consumers.into_iter().flatten())
-            .filter(|c| !at_definition || contract::calls_from_definition(c.contract.as_deref()))
-        {
-            let out = graph.out.get(site).into_iter().flatten();
-            let links: Vec<&Link> = match &consumer.contract {
-                Some(contract) => out.filter(|l| l.contract == *contract).copied().collect(),
-                // An unresolved consumer has links only through a decision, on a contract no
-                // other consumer of the site has.
-                None => {
-                    let others = |l: &&&Link| {
-                        let mut all = consumers.into_iter().flatten();
-                        all.any(|o| o.contract.as_deref() == Some(l.contract.as_str()))
-                    };
-                    out.filter(|l| !others(l)).copied().collect()
-                }
-            };
+        for (consumer, links) in graph.consumer_links(site, at_definition) {
             if links.is_empty() {
                 let text = match &consumer.contract {
                     Some(contract) => format!("{place} consumes {contract}, no provider"),
@@ -783,23 +767,7 @@ impl<'a> Graph<'a> {
         shown: &mut HashSet<(&'a str, bool)>,
         edges: &mut Vec<Edge<'a>>,
     ) {
-        let consumers = self.consumers.get(site);
-        for consumer in (consumers.into_iter().flatten())
-            .filter(|c| !at_definition || contract::calls_from_definition(c.contract.as_deref()))
-        {
-            let out = self.out.get(site).into_iter().flatten();
-            let links: Vec<&Link> = match &consumer.contract {
-                Some(contract) => out.filter(|l| l.contract == *contract).copied().collect(),
-                // An unresolved consumer has links only through a decision, on a contract no
-                // other consumer of the site has.
-                None => {
-                    let others = |l: &&&Link| {
-                        let mut all = consumers.into_iter().flatten();
-                        all.any(|o| o.contract.as_deref() == Some(l.contract.as_str()))
-                    };
-                    out.filter(|l| !others(l)).copied().collect()
-                }
-            };
+        for (consumer, links) in self.consumer_links(site, at_definition) {
             if links.is_empty() {
                 edges.push(Edge::Dead {
                     at: site,
@@ -830,6 +798,37 @@ impl<'a> Graph<'a> {
                 }
             }
         }
+    }
+
+    /// The consumers at `site`, each with the links it has: those on its contract, and for an
+    /// unresolved one those of a decision, on a contract no other consumer of the site has. At
+    /// a definition (a method of a declarative client, which has no call) only the consumers
+    /// whose kind calls on from one (`ContractKind::calls_from_definition`) count.
+    fn consumer_links(
+        &self,
+        site: &str,
+        at_definition: bool,
+    ) -> Vec<(&'a Consumer, Vec<&'a Link>)> {
+        let consumers = self.consumers.get(site).into_iter().flatten();
+        let consumers = consumers
+            .copied()
+            .filter(|c| !at_definition || contract::calls_from_definition(c.contract.as_deref()));
+        consumers
+            .map(|consumer| {
+                let out = self.out.get(site).into_iter().flatten().copied();
+                let links = match &consumer.contract {
+                    Some(contract) => out.filter(|l| l.contract == *contract).collect(),
+                    None => {
+                        let others = |l: &Link| {
+                            let mut all = self.consumers.get(site).into_iter().flatten();
+                            all.any(|o| o.contract.as_deref() == Some(l.contract.as_str()))
+                        };
+                        out.filter(|l| !others(l)).collect()
+                    }
+                };
+                (consumer, links)
+            })
+            .collect()
     }
 
     /// The unresolved channel sides at `site`, one edge each.

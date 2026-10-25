@@ -7,8 +7,8 @@
 //! methods carry Spring's mapping annotations, read as a controller's are (path folding,
 //! `RequestMethod`, the shadow rules). The base is `url` with its placeholders resolved against
 //! the module's Spring configuration (`jvm::spring::resolve`), `path` a prefix of every route. A
-//! client without `url` has an unresolved host: its consumers carry `feign:<name>`, which
-//! `Http::link` puts in the reason. An interface with a class-level `@RequestMapping` is not
+//! client without `url` has an unresolved host: its consumers' `via` names the client
+//! (`client:Feign client <name>`, `http::CLIENT_VIA`), which `Http::link` puts in the reason. An interface with a class-level `@RequestMapping` is not
 //! read (Spring Cloud no longer honours it), and neither are `@RequestLine` and the other Feign
 //! contracts: only Spring's annotations count.
 //!
@@ -22,18 +22,26 @@
 // ponytail: `name` is the literal one (`value`, or the first argument); a placeholder in it is
 // kept as written.
 
-use super::{MAPPING, SHORTCUTS, VERBS, WEB, balanced, jax_rs_annotation, paths, request_methods};
+use super::{
+    MAPPING, MAPPING_PATHS, balanced, jax_rs_annotation, made, mapping, paths, request_methods,
+    shortcut,
+};
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
-use crate::jvm::names::{known, one, spellings, typed};
+use crate::jvm::names::{is_method, java_files, known, one, spellings};
 use crate::jvm::spring::{self, Configs};
-use crate::lang::{Call, Facts, Invocation, Kind, Part, Value, literal};
+use crate::lang::{Call, Facts, Invocation, Part, Value, literal};
 use crate::resolve::Code;
-use crate::resolve::{Expand, Follow, Of, method as member, passes_nothing};
+use crate::resolve::{Expand, method as member};
 use std::cell::OnceCell;
 use std::collections::BTreeMap;
 
-use super::super::{ANY, FEIGN_VIA, based, consumer_at, fetches, join};
+use super::super::{ANY, CLIENT_VIA, METHODS, based, consumer_at, fetches, join};
+
+/// A string of the text `t`.
+fn text(t: &str) -> Value {
+    Value::Str(vec![Part::Text(t.to_string())])
+}
 
 const FEIGN: &str = "org.springframework.cloud.openfeign.FeignClient";
 
@@ -42,10 +50,7 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
     // Read the first time a client is found: a repository without one parses none.
     let configs = OnceCell::new();
     let mut found = Vec::new();
-    for (&path, facts) in code.files() {
-        if !path.ends_with(".java") {
-            continue;
-        }
+    for (path, facts) in java_files(code) {
         let annotations: Vec<(usize, &'a Call, String)> = (facts.calls.iter().enumerate())
             .filter(|(_, c)| c.decorates.is_some())
             .filter_map(|(n, c)| Some((n, c, known(code, path, &c.scope, &c.callee, is_feign)?)))
@@ -66,9 +71,7 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
 /// Whether `spelled` is an annotation of OpenFeign this module reads: the client marker, or one
 /// of Spring's mapping annotations.
 fn is_feign(spelled: &str) -> bool {
-    spelled == FEIGN
-        || spelled == MAPPING
-        || (SHORTCUTS.iter()).any(|(s, _)| spelled == format!("{WEB}{s}"))
+    spelled == FEIGN || mapping(spelled)
 }
 
 /// The consumers of the `@FeignClient` interfaces of `path`.
@@ -104,12 +107,12 @@ fn feign_clients<'a>(
             let Some(target) = call
                 .decorates
                 .as_deref()
-                .filter(|t| (facts.defs.iter()).any(|d| d.kind == Kind::Method && d.name == *t))
+                .filter(|t| is_method(facts, t))
                 .filter(|_| call.scope == *interface)
             else {
                 continue;
             };
-            let shortcut = SHORTCUTS.iter().find(|(s, _)| *name == format!("{WEB}{s}"));
+            let shortcut = shortcut(name);
             if shortcut.is_none() && name != MAPPING {
                 continue;
             }
@@ -117,7 +120,7 @@ fn feign_clients<'a>(
                 continue;
             };
             let methods = match shortcut {
-                Some((_, verb)) => vec![verb.to_string()],
+                Some(verb) => vec![verb.to_string()],
                 None => match request_methods(code, path, given) {
                     // Feign sends GET when the mapping names no method (`SpringMvcContract`).
                     Some(methods) => methods
@@ -127,7 +130,7 @@ fn feign_clients<'a>(
                     None => continue,
                 },
             };
-            let Some(routes) = paths(code, path, given) else {
+            let Some(routes) = paths(code, path, given, MAPPING_PATHS) else {
                 continue;
             };
             for route in &routes {
@@ -136,7 +139,6 @@ fn feign_clients<'a>(
                     continue;
                 }
                 for method in &methods {
-                    let text = |t: &str| Value::Str(vec![Part::Text(t.to_string())]);
                     let url = based(base.url.as_deref(), &text(&full));
                     let Some(reads) = fetches(&[url, text(method)]) else {
                         continue;
@@ -174,36 +176,41 @@ impl Base {
         client: &'a Call,
         (cell, indexed): (&OnceCell<Configs>, &Indexed),
     ) -> Option<Self> {
-        let configs = cell.get_or_init(|| Configs::read(indexed.configs));
-        let text = |value: &'a Value| match code.value(file, &client.scope, value) {
+        let configs = cell.get_or_init(|| Configs::read(indexed.configs, indexed.manifests));
+        // Spring resolves the placeholders of `url` and `path`, not of `name`.
+        let folded = |value: &'a Value| code.value(file, &client.scope, value);
+        let resolved = |value: &'a Value| match spring::resolved(&folded(value), configs.of(file)) {
             Value::Str(parts) => Some(parts),
             _ => None,
         };
-        let url = match client.keyword("url").map(text) {
+        let url = match client.keyword("url").map(resolved) {
             None => None,
             // An empty `url` is none.
             Some(Some(parts)) if literal(&parts).is_some_and(|u| u.is_empty()) => None,
-            Some(Some(parts)) => Some(schemed(resolved(parts, configs.of(file)))),
+            Some(Some(parts)) => Some(schemed(parts)),
             Some(None) => Some(vec![Part::Hole]),
         };
-        let prefix = match client.keyword("path").map(text) {
+        let prefix = match client.keyword("path").map(resolved) {
             None => String::new(),
-            Some(parts) => {
-                let parts = resolved(parts?, configs.of(file));
-                literal(&parts)?
-            }
+            Some(parts) => literal(&parts?)?,
         };
         let name = (client.keyword("name").or(client.keyword("value")))
             .or(client.args.first())
-            .and_then(text)
-            .and_then(|parts| literal(&parts))
+            .map(folded)
+            .and_then(|value| match value {
+                Value::Str(parts) => literal(&parts),
+                _ => None,
+            })
             .filter(|n| !n.is_empty() && !n.contains('|'));
         Some(Self { url, prefix, name })
     }
 
-    /// The `via` of a consumer whose host is unresolved: the client's name.
+    /// The `via` of a consumer whose host is unresolved: the client's name, as the reason
+    /// says it.
     fn named(&self) -> Option<String> {
-        self.name.as_ref().map(|n| format!("{FEIGN_VIA}{n}"))
+        self.name
+            .as_ref()
+            .map(|n| format!("{CLIENT_VIA}Feign client {n}"))
     }
 }
 
@@ -219,19 +226,6 @@ fn schemed(mut url: Vec<Part>) -> Vec<Part> {
     url
 }
 
-/// `parts` with the placeholders of its text resolved against `config`.
-fn resolved(parts: Vec<Part>, config: Option<&spring::Properties>) -> Vec<Part> {
-    let mut out: Vec<Part> = Vec::new();
-    for part in parts {
-        match part {
-            Part::Text(text) => out.extend(spring::resolve(&text, config)),
-            Part::Env(_) | Part::EnvOr(..) => out.push(part),
-            _ => out.push(Part::Hole),
-        }
-    }
-    out
-}
-
 const RETROFIT: &str = "retrofit2.Retrofit";
 const RETROFIT_BUILDER: &str = "retrofit2.Retrofit.Builder";
 const RETROFIT_HTTP: &str = "retrofit2.http.";
@@ -239,7 +233,7 @@ const RETROFIT_HTTP: &str = "retrofit2.http.";
 /// The verb of Retrofit's annotation `spelled`.
 fn retrofit_verb(spelled: &str) -> Option<&str> {
     let verb = spelled.strip_prefix(RETROFIT_HTTP)?;
-    VERBS.contains(&verb).then_some(verb)
+    METHODS.contains(&verb).then_some(verb)
 }
 
 /// A method of a Retrofit interface: its definition, the verb and the paths its annotation gives.
@@ -255,8 +249,8 @@ type Interface<'a> = (&'a str, &'a str);
 /// The consumers of the Retrofit interfaces of the repository, one per base each is created with.
 fn retrofit_clients<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
     let mut interfaces: BTreeMap<Interface, Vec<Endpoint>> = BTreeMap::new();
-    for (&path, facts) in code.files() {
-        if !path.ends_with(".java") || facts.interfaces.is_empty() {
+    for (path, facts) in java_files(code) {
+        if facts.interfaces.is_empty() {
             continue;
         }
         // A Feign interface is read by its Spring annotations alone.
@@ -272,20 +266,25 @@ fn retrofit_clients<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
             if !facts.interfaces.contains(&call.scope) || feign.contains(&interface) {
                 continue;
             }
-            if !(facts.defs.iter()).any(|d| d.kind == Kind::Method && d.name == target) {
+            if !is_method(facts, target) {
                 continue;
             }
             // A verb JAX-RS may also bind is no Retrofit's: `known` accepts one spelling only.
             let verb = |s: &str| retrofit_verb(s).is_some() || jax_rs_annotation(s);
             let spelled = known(code, path, &call.scope, &call.callee, verb);
             let named = spelled.as_deref().and_then(retrofit_verb);
-            let Some(verb) = VERBS.iter().copied().find(|v| Some(*v) == named) else {
+            let Some(verb) = METHODS.iter().copied().find(|v| Some(*v) == named) else {
                 continue;
             };
-            // The index keeps no argument: they come from the full facts of the file.
-            let Some(routes) = code.call(path, n).and_then(|c| paths(code, path, c)) else {
+            // The index keeps no argument: they come from the full facts of the file. Retrofit's
+            // annotations name their path by `value` alone.
+            let routes = code
+                .call(path, n)
+                .and_then(|c| paths(code, path, c, &["value"]));
+            let Some(mut routes) = routes else {
                 continue;
             };
+            routes.retain(|r| balanced(r));
             let endpoint = Endpoint {
                 target,
                 verb,
@@ -299,9 +298,9 @@ fn retrofit_clients<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
     }
     // The bases each interface is created with: `retrofit.create(Api.class)`.
     let mut bases: BTreeMap<Interface, Vec<Vec<Part>>> = BTreeMap::new();
-    for (&path, facts) in code.files() {
-        if !path.ends_with(".java") || interfaces.is_empty() {
-            continue;
+    for (path, facts) in java_files(code) {
+        if interfaces.is_empty() {
+            break;
         }
         for (n, stored) in facts.calls.iter().enumerate() {
             if member(&stored.callee) != "create" || stored.decorates.is_some() {
@@ -338,7 +337,6 @@ fn retrofit_clients<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
             }
         }
     }
-    let text = |t: &str| Value::Str(vec![Part::Text(t.to_string())]);
     for (&(path, interface), endpoints) in &interfaces {
         // An interface no `create` names has an unknown base.
         let created = bases.get(&(path, interface)).filter(|b| !b.is_empty());
@@ -373,22 +371,7 @@ fn retrofit_clients<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
 /// Whether `client`, read in `scope` of `path`, is a `retrofit2.Retrofit`: typed as one, or made
 /// by a `new Retrofit.Builder()` chain ending in `build()` it traces back to.
 fn is_retrofit<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, client: &'a Value) -> bool {
-    match client {
-        Value::Ref(name) => {
-            if one(&typed(code, path, scope, name), |t| t == RETROFIT).is_some() {
-                return true;
-            }
-            let follow = Follow::Values {
-                passes: passes_nothing,
-            };
-            let origins = code.origins(path, scope, Of::Name(name), follow);
-            (origins.iter().filter_map(|o| o.call)).any(|(at, i)| builds(code, at, i))
-        }
-        Value::Call(inner) => code
-            .call_index(path, &inner.range)
-            .is_some_and(|i| builds(code, path, i)),
-        _ => false,
-    }
+    made(code, (path, scope), client, RETROFIT, builds)
 }
 
 /// Whether the call at `index` of `path` is the `build()` of a chain that starts at
@@ -440,7 +423,6 @@ fn base(create: &Invocation) -> Vec<Part> {
 /// The URL of the endpoint `route` of a Retrofit with `base`. A route from the root replaces the
 /// path of the base; a relative one follows it; an absolute URL stands as it is.
 fn retrofit_url(base: Option<&[Part]>, route: &str) -> Value {
-    let text = |t: &str| Value::Str(vec![Part::Text(t.to_string())]);
     let Some(base) = base else {
         return text(&join("", route));
     };
@@ -608,7 +590,7 @@ mod tests {
     #[test]
     fn a_client_without_url_has_an_unresolved_host_and_names_itself() {
         let named = |args: &str| sent(FEIGN, &client(args, GET));
-        let want = [to(LIST, "http::GET::/orders", "feign:orders")];
+        let want = [to(LIST, "http::GET::/orders", "client:Feign client orders")];
         assert_eq!(named("name = \"orders\""), want);
         assert_eq!(named("value = \"orders\""), want);
         assert_eq!(named("\"orders\""), want);
@@ -617,7 +599,11 @@ mod tests {
         let prefixed = named("name = \"orders\", path = \"/v1/\"");
         assert_eq!(
             prefixed,
-            [to(LIST, "http::GET::/v1/orders", "feign:orders")]
+            [to(
+                LIST,
+                "http::GET::/v1/orders",
+                "client:Feign client orders"
+            )]
         );
         let both = named("name = \"orders\", url = \"https://h.example.com/api\", path = \"v1\"");
         assert_eq!(
@@ -714,7 +700,7 @@ mod tests {
         let body = client("name = \"orders\"", GET);
         assert_eq!(
             sent(wild, &body),
-            [to(LIST, "http::GET::/orders", "feign:orders")]
+            [to(LIST, "http::GET::/orders", "client:Feign client orders")]
         );
     }
 
@@ -908,5 +894,22 @@ mod tests {
         );
         let feign = format!("{FEIGN}{RETROFIT}");
         assert!(sent(&feign, &format!("@FeignClient(\"o\") {API}")).is_empty());
+    }
+
+    #[test]
+    fn a_retrofit_route_with_a_brace_open_past_its_segment_is_not_read() {
+        let body =
+            "interface Api { @GET(\"/a/{id:x/y}\") Object a(); @GET(\"/b/{id}\") Object b(); }";
+        let found: Vec<_> = sent(RETROFIT, body).into_iter().map(|s| s.0).collect();
+        assert_eq!(found, ["a.Api.b()"]);
+    }
+
+    #[test]
+    fn a_retrofit_annotation_reads_its_value_alone() {
+        // Retrofit's annotations have no `path`: one written there is no route.
+        let body =
+            "interface Api { @GET(path = \"/a\") Object a(); @GET(value = \"/b\") Object b(); }";
+        let found: Vec<_> = sent(RETROFIT, body).into_iter().map(|s| s.1).collect();
+        assert_eq!(found, [None, Some("http::GET::/b".to_string())]);
     }
 }

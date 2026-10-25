@@ -107,6 +107,22 @@ fn the_excerpt_sends_the_enclosing_function_but_never_a_whole_class() {
     assert!(!stdout.contains("not for the model"), "{stdout}");
 }
 
+/// A Feign method is an item at its definition: the excerpt is the method, which is all the
+/// judgment needs (spec #26).
+#[test]
+fn the_excerpt_of_a_declarative_client_method_is_the_method() {
+    let routes = ["app/api/catalog/route.ts"];
+    let (_, api) = common::xlang_java_mirror("decider_excerpt_feign", &routes);
+    let stub = Stub::start(vec![]);
+    let show = ["decide", "--decider", "--show-request"];
+
+    let (stdout, stderr, ok) = meada(&api, &show, &chat(&stub), "", Some(&stub));
+
+    assert!(ok, "{stderr}");
+    let method = r#""content": "Call:\n@GetMapping(\"/api/catalog\") String all();\n\nIn:\n@GetMapping(\"/api/catalog\")\n    String all();\n"#;
+    assert!(stdout.contains(method), "{stdout}");
+}
+
 /// The `decisions` configuration against `stub`: the protocol and the model are the defaults.
 fn decisions(stub: &Stub) -> Vec<(&'static str, String)> {
     vec![

@@ -76,13 +76,10 @@ impl LanguagePack for Java {
         ]
     }
 
-    /// Spring's base configuration, which the kinds read (`jvm::spring`) and imports do not.
+    /// What the kinds read through `Indexed::configs`: Spring's base configuration, which its
+    /// reader lists (`jvm::spring::CONFIG_FILES`).
     fn config_files(&self) -> &'static [&'static str] {
-        &[
-            "**/application.properties",
-            "**/application.yml",
-            "**/application.yaml",
-        ]
+        crate::jvm::spring::CONFIG_FILES
     }
 
     fn modules(
@@ -616,10 +613,14 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         _ => Class::Unknown,
                     };
                     fields.insert(text(name, src).to_string());
-                    // Spring injects no `static` field.
-                    if definitions && !modifiers(node).contains(&"static") {
+                    if definitions {
+                        let is_static = modifiers(node).contains(&"static");
                         for annotation in annotations(node, src, &scope) {
-                            let on = Marked::Field(scope.as_ref().clone(), text(name, src).into());
+                            let on = Marked::Field {
+                                class: scope.as_ref().clone(),
+                                name: text(name, src).into(),
+                                is_static,
+                            };
                             facts.annotated.push(Annotated { on, annotation });
                         }
                     }
@@ -1228,5 +1229,26 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             Value::Str(parts)
         }
         _ => Value::Unknown,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_annotated_field_is_recorded_with_whether_it_is_static() {
+        // The kind decides what a `static` field takes (Spring injects none).
+        let src = "class C { @Value(\"a\") static String s; @Value(\"b\") String t; }";
+        let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
+        let fields: Vec<_> = (facts.annotated.iter())
+            .filter_map(|a| match &a.on {
+                Marked::Field {
+                    name, is_static, ..
+                } => Some((name.as_str(), *is_static)),
+                Marked::Param(..) => None,
+            })
+            .collect();
+        assert_eq!(fields, [("s", true), ("t", false)]);
     }
 }

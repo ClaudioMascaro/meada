@@ -748,6 +748,23 @@ fn context_on_a_public_class_method_lists_its_consumers_in_other_repositories() 
     assert_golden("jvm-maven.context-total.txt", &found);
 }
 
+/// A public class lists as consumers the calls in other repositories that reach it through its
+/// import (spec #26, user story 10): those that reach its constructors and methods, one line per
+/// call, at its link's level.
+#[test]
+fn context_on_a_public_class_lists_the_calls_that_reach_it_in_other_repositories() {
+    let [maven, ..] = workspace("jvm_context_class");
+    let order = "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order";
+
+    let found = Engine::open(&maven).unwrap().context(order, None).unwrap();
+
+    assert!(
+        found.contains("example.com/jvm/client src/main/java/example/web/Checkout.java:10 example.web.Checkout.pay(int)"),
+        "{found}"
+    );
+    assert_golden("jvm-maven.context-order.txt", &found);
+}
+
 #[test]
 fn trace_down_crosses_the_package_hop_and_onward() {
     let [_, _, client, _] = workspace("jvm_trace_down");

@@ -1,1 +1,7 @@
 group = 'example'
+
+// A computed coordinate: every artifact of the workspace whose literal parts fit, ambiguous.
+def suffix = 'pi'
+dependencies {
+    implementation "example:a${suffix}"
+}

@@ -22,15 +22,13 @@
 // in place are read through.
 
 use super::super::{based, consumer, fetches};
-use super::REQUEST_METHODS;
+use super::{made, member_of};
 use crate::contract::Found;
 use crate::index::Indexed;
-use crate::jvm::names::{one, spellings, typed};
+use crate::jvm::names::{java_files, one, spellings, typed};
 use crate::jvm::spring::{self, Configs};
-use crate::lang::{Call, Invocation, Part, Value};
-use crate::resolve::{
-    Code, Expand, Expanded, FLUENT_CHAIN, Follow, Of, method as member, passes_nothing,
-};
+use crate::lang::{Annotated, Call, Invocation, Part, Value};
+use crate::resolve::{Code, Expand, Expanded, FLUENT_CHAIN, method as member};
 
 const REST_TEMPLATE: &str = "org.springframework.web.client.RestTemplate";
 /// The methods of a RestTemplate that send one method; `exchange` names it.
@@ -94,15 +92,12 @@ enum Client {
 pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
     // Read the first time an annotation is injected: a repository without one parses none.
     let configs = std::cell::OnceCell::new();
-    let inject = |code: &Code<'a>, path: &'a str, annotation: &'a Call| {
-        let configs = configs.get_or_init(|| Configs::read(indexed.configs));
-        spring::inject(configs, code, path, annotation)
+    let inject = |code: &Code<'a>, path: &'a str, annotated: &'a Annotated| {
+        let configs = configs.get_or_init(|| Configs::read(indexed.configs, indexed.manifests));
+        spring::inject(configs, code, path, annotated)
     };
     let mut found = Vec::new();
-    for (&path, facts) in code.files() {
-        if !path.ends_with(".java") {
-            continue;
-        }
+    for (path, facts) in java_files(code) {
         for n in 0..facts.calls.len() {
             let Some(client) = client(code, path, &facts.calls, n) else {
                 continue;
@@ -362,8 +357,7 @@ fn format(args: &[Value]) -> Value {
 /// (the call is a wrapper's), anything else unknown.
 fn spring_method(value: Option<&Value>) -> Value {
     fn member(s: &str) -> Option<&str> {
-        let m = s.strip_prefix(HTTP_METHOD)?;
-        REQUEST_METHODS.contains(&m).then_some(m)
+        member_of(s, HTTP_METHOD)
     }
     match value {
         Some(Value::External(spellings)) => match one(spellings, |s| member(s).is_some()) {
@@ -378,22 +372,7 @@ fn spring_method(value: Option<&Value>) -> Value {
 /// Whether `client` (a name, or a call made in place) is a WebClient: written as one, or made
 /// by a `WebClient.create` or `WebClient.builder()` it traces back to.
 fn web_client<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, client: &'a Value) -> bool {
-    match client {
-        Value::Ref(name) => {
-            if one(&typed(code, path, scope, name), |t| t == WEB_CLIENT).is_some() {
-                return true;
-            }
-            let follow = Follow::Values {
-                passes: passes_nothing,
-            };
-            let origins = code.origins(path, scope, Of::Name(name), follow);
-            (origins.iter().filter_map(|o| o.call)).any(|(at, i)| makes(code, at, i))
-        }
-        Value::Call(inner) => code
-            .call_index(path, &inner.range)
-            .is_some_and(|i| makes(code, path, i)),
-        _ => false,
-    }
+    made(code, (path, scope), client, WEB_CLIENT, makes)
 }
 
 /// Whether the call at `index` of `path` makes a WebClient: `WebClient.create(..)`, or a

@@ -160,7 +160,8 @@ modules updates it.
   `Part::Env` is `via = env:X` in `http::locate`, linked through `base_url_env`; Meada never
   reads the value. Java (#89): `System.getenv("X")` is a `Part::Env` in the pack, and a Spring
   `@Value("${key}")` field or constructor parameter holds what `jvm/spring.rs` reads of the
-  module's `application.properties`, `application.yml` or `application.yaml`
+  module's `application.properties`, `application.yml` or `application.yaml` (the module of the
+  main source root a Maven or Gradle build declares for the file, else of its `src/main/`)
   (`Code::expand_with`): a literal URL links by host, a placeholder no key fills is
   `Part::Env`, and `${X:default}` is `Part::EnvOr`, read both ways by `http::fetches` as twins
   (`via = env:X|host:<default host>` and `host:<default host>|default`), of which

@@ -104,9 +104,10 @@ fn fetches(args: &[Value]) -> Option<Vec<Read>> {
     })
 }
 
-/// The `via` prefix of a consumer of a Feign client without `url`: its host is unresolved, and
-/// the rest is the client's name.
-const FEIGN_VIA: &str = "feign:";
+/// The `via` prefix of a consumer whose host is unresolved but whose client names itself (a
+/// declarative client without a base URL): the rest is how the reason names the client, as the
+/// language's reader writes it.
+const CLIENT_VIA: &str = "client:";
 
 /// The mark of the default's reading of `${X:default}` (`fetches`), after its `host:` `via`.
 const DEFAULT: &str = "|default";
@@ -717,11 +718,11 @@ impl ContractKind for Http {
                 let mut repos: Vec<&str> = fits.iter().map(|(m, ..)| m.identity.as_str()).collect();
                 repos.sort();
                 repos.dedup();
-                // A Feign client without `url` says its name (`java/declarative.rs`).
-                let feign = via.and_then(|v| v.strip_prefix(FEIGN_VIA));
-                let why = match (var, feign) {
+                // A client that names itself says so (`CLIENT_VIA`).
+                let client = via.and_then(|v| v.strip_prefix(CLIENT_VIA));
+                let why = match (var, client) {
                     (Some(var), _) => format!("base URL from {var}, no peer's base_url_env"),
-                    (None, Some(name)) => format!("host unresolved (Feign client {name})"),
+                    (None, Some(client)) => format!("host unresolved ({client})"),
                     (None, None) => "host unresolved".to_string(),
                 };
                 let reason = match repos.len() {
@@ -763,7 +764,8 @@ impl ContractKind for Http {
             .collect()
     }
 
-    /// A method of a Feign or Retrofit interface calls on the route it consumes.
+    /// A method of a declarative client (an interface whose methods are the requests) calls on
+    /// the route it consumes.
     fn calls_from_definition(&self) -> bool {
         true
     }
