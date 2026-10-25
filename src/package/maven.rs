@@ -6,7 +6,9 @@
 //! types, in the files of the depended-on artifact that are not test sources (`tested`), and the
 //! method is picked by name and argument count among the overloads of the class's family (the
 //! provider's `families` rows, as Java merges them), a constructor among the class's own. The
-//! chain of such an import is `name(arity)`.
+//! chain of such an import is `name(arity)`. A Kotlin import names a package as well: the
+//! chain then picks a top-level function of that package by name and argument count, a class
+//! (its constructor), or, written `.name(arity)` after a receiver, an extension function.
 
 use std::collections::{HashMap, HashSet};
 
@@ -31,6 +33,12 @@ pub struct Classes<'e> {
     /// The ancestors of the public classes with a base, by `(file, qualified name)`
     /// (`Ancestry::ancestors`: `None` for a family not known).
     families: HashMap<(&'e str, &'e str), Option<Ancestors<'e>>>,
+    /// The names the Kotlin files export, by file: a top-level declaration is the one exported
+    /// both as written (`Money.format`) and with its package (`dev.kt.core.Money.format`).
+    published: HashMap<&'e str, HashSet<&'e str>>,
+    /// The functions and classes of Kotlin files by simple name, as `(qualified name, file,
+    /// id)`.
+    named: HashMap<&'e str, Vec<(&'e str, &'e str, &'e str)>>,
 }
 
 impl<'e> Classes<'e> {
@@ -56,6 +64,30 @@ impl<'e> Classes<'e> {
             }
         }
         types.values_mut().for_each(|files| files.sort());
+        let published = (at.exported.iter())
+            .filter(|(path, _)| path.ends_with(".kt"))
+            .map(|(&path, rows)| {
+                (
+                    path,
+                    rows.iter().filter_map(|e| e.name.as_deref()).collect(),
+                )
+            })
+            .collect();
+        let mut named: HashMap<&str, Vec<(&str, &str, &str)>> = HashMap::new();
+        for &id in at.symbols.iter().filter(|id| id.contains(".kt::")) {
+            // `<repository>::<file>.kt::<qualified name>[(<parameters>)]`
+            if let Some(end) = id.find(".kt::").map(|i| i + ".kt".len())
+                && let Some(start) = id[..end].find("::").map(|i| i + 2)
+            {
+                let qualified = id[end + 2..].split('(').next().unwrap_or("");
+                let simple = qualified.rsplit('.').next().unwrap_or(qualified);
+                named
+                    .entry(simple)
+                    .or_default()
+                    .push((qualified, &id[start..end], id));
+            }
+        }
+        named.values_mut().for_each(|all| all.sort());
         let mut methods: HashMap<&str, Vec<&str>> = HashMap::new();
         for &id in at
             .symbols
@@ -74,6 +106,8 @@ impl<'e> Classes<'e> {
             types,
             methods,
             families,
+            published,
+            named,
         }
     }
 }
@@ -143,6 +177,36 @@ fn declaring<'e>(at: &Provided<'e>, manifest: &Manifest, class: &str) -> Vec<(&'
         .collect()
 }
 
+/// The symbols named `name` that the package `package` holds at its top level, in the files the
+/// artifact at `manifest` owns that are no test sources: its functions and, as the class
+/// itself, its classes (by the capital of their name), or with `extension` its extension
+/// functions, whatever their receiver. A declaration is top-level and public when its file
+/// exports it as written and with the package (`Classes::published`).
+fn top_level<'e>(
+    at: &Provided<'e>,
+    manifest: &Manifest,
+    (package, name): (&str, &str),
+    extension: bool,
+) -> Vec<&'e str> {
+    let classes = at.classes.get_or_init(|| Classes::new(at));
+    (classes.named.get(name).into_iter().flatten())
+        .filter(|(qualified, file, id)| {
+            let written = qualified
+                .strip_prefix(package)
+                .and_then(|rest| rest.strip_prefix('.'));
+            let class = !id.contains('(') && name.starts_with(char::is_uppercase);
+            written.is_some_and(|w| {
+                w.contains('.') == extension
+                    && (id.contains('(') || class && !extension)
+                    && (classes.published.get(file))
+                        .is_some_and(|p| p.contains(w) && p.contains(qualified))
+            }) && at.owned_source(manifest, file)
+                && !tested(manifest, file)
+        })
+        .map(|(_, _, id)| *id)
+        .collect()
+}
+
 /// The ids of the methods named `method` that fit `arity` in the class `class` that `file` of
 /// the provider `at` of `repository` declares, sorted, and whether an ancestor of the class is
 /// opaque. Java merges overloads across the family: each signature comes from the first class of
@@ -168,16 +232,21 @@ fn methods(
     let own = std::iter::once(Some((file, class)));
     let rest = (ancestors.iter()).map(|a| a.as_ref().map(|(f, c)| (f.as_str(), c.as_str())));
     let (mut ids, mut signatures) = (Vec::new(), HashSet::new());
-    for ancestor in own.chain(rest) {
+    for (n, ancestor) in own.chain(rest).enumerate() {
         let Some((file, class)) = ancestor else {
             opaque = true;
             continue;
         };
         let key = format!("{repository}::{file}::{class}.{method}");
-        for &id in classes.methods.get(key.as_str()).into_iter().flatten() {
-            let fits = !(constructs && id.ends_with("#method")) && fits_arity(id, arity);
-            if fits && known(id) && signatures.insert(&id[key.len()..]) {
-                ids.push(id.to_string());
+        // A Kotlin class's unnamed companion holds what its name calls (`Money.of(1)`).
+        let companion = (n == 0 && file.ends_with(".kt") && !constructs)
+            .then(|| format!("{repository}::{file}::{class}.Companion.{method}"));
+        for key in std::iter::once(&key).chain(&companion) {
+            for &id in classes.methods.get(key.as_str()).into_iter().flatten() {
+                let fits = !(constructs && id.ends_with("#method")) && fits_arity(id, arity);
+                if fits && known(id) && signatures.insert(&id[key.len()..]) {
+                    ids.push(id.to_string());
+                }
             }
         }
     }
@@ -214,10 +283,13 @@ impl Ecosystem for Maven {
         (via == Some("computed")).then_some("computed coordinate")
     }
     /// A constructor or a method of the class itself, by its id: the class's id, a dot, then a
-    /// signature (`example.models.Order.total()`); a nested class's member is not.
+    /// signature (`example.models.Order.total()`, a companion's `Money.Companion.of(Int)`); a
+    /// nested class's member is not.
     fn member_of(&self, target: &str, class: &str) -> bool {
         (target.strip_prefix(class))
             .and_then(|rest| rest.strip_prefix('.'))
+            // A Kotlin companion's member is called on the class's name.
+            .map(|rest| rest.strip_prefix("Companion.").unwrap_or(rest))
             .and_then(|rest| rest.split_once('('))
             .is_some_and(|(name, _)| !name.is_empty() && !name.contains('.'))
     }
@@ -229,16 +301,22 @@ impl Ecosystem for Maven {
     }
     /// The class and the method a call names through an import, as `(class, name(arity))`: a
     /// type the call's head names (`Order.of(1)`, `new Order(1)`, an on-demand import's), else
-    /// the type the source writes for its receiver (`order.total()`). A JDK class is none.
+    /// the type the source writes for its receiver (`order.total()`). A JDK class is none. Kotlin
+    /// adds the top-level function or class a bare name imports (`greet(..)`: the package, then
+    /// the name), and for a call on a receiver of no class of the repository the extension
+    /// function its name imports, as `(package, .name(arity))`.
     fn imports<'a>(&self, code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
         let callee = call.callee.as_str();
         let mut found = Vec::new();
         // The type the source writes for the receiver comes first: a local named like a package
         // (`order.total()`) is no type the on-demand imports bring.
+        let mut local = false;
         if let (false, Some((receiver, method))) = (call.constructs, callee.rsplit_once('.')) {
             let origins = code.origins(path, &call.scope, Of::Name(receiver), Follow::Declarations);
             let typed = (origins.into_iter().next())
                 .filter(|o| o.form == Form::Type && o.routes.iter().all(|r| r.steps.is_empty()));
+            // A type of the repository: its members and extensions are the repository's.
+            local = typed.as_ref().is_some_and(|o| o.outside.is_none());
             let classes = (typed.and_then(|o| o.outside)).map_or_else(Vec::new, Outside::spellings);
             found.extend(classes.into_iter().map(|c| (c, method.to_string())));
         }
@@ -254,8 +332,26 @@ impl Ecosystem for Maven {
             }
         }
         found.retain(|(class, _)| {
-            class.contains('.') && !class.contains('(') && !class.starts_with("java.")
+            class.contains('.')
+                && !class.contains('(')
+                && !class.starts_with("java.")
+                && !class.starts_with("kotlin.")
         });
+        // An extension function is called on a receiver, and imported by its name alone.
+        if let (true, false, Some((_, name))) = (
+            found.is_empty() && path.ends_with(".kt"),
+            local,
+            callee.rsplit_once('.'),
+        ) {
+            let outside = code.outside(path, &call.scope, name, false);
+            for spelled in outside.map_or_else(Vec::new, Outside::spellings) {
+                found.extend(
+                    spelled
+                        .rsplit_once('.')
+                        .map(|(p, n)| (p.into(), format!(".{n}"))),
+                );
+            }
+        }
         found.sort();
         found.dedup();
         (found.into_iter())
@@ -297,27 +393,47 @@ impl Ecosystem for Maven {
         (specifier, chain): (&str, &str),
         known: &dyn Fn(&Provided<'e>, &str) -> bool,
     ) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
+        // A chain written `.name(arity)` is a call on a receiver: an extension function.
+        let (extension, chain) = chain
+            .strip_prefix('.')
+            .map_or((false, chain), |c| (true, c));
         let wanted = call(chain);
         let (mut out, mut reached) = (Vec::new(), HashSet::new());
         for (entry, _) in self.entries(exports, providers, from, specifier) {
             let mut resolved = Vec::new();
             for (m, i) in providers.matching(self, entry) {
                 let (at, manifest) = (at(m), &exports[m].manifests[i]);
-                let declared = declaring(at, manifest, specifier);
-                if declared.is_empty() {
-                    continue;
-                }
-                reached.insert((m, i));
+                let repository = &exports[m].repository;
                 let known = |id: &str| known(at, id);
                 let (mut targets, mut opaque) = (Vec::new(), false);
-                for class in declared {
-                    let (ids, beside) = methods(at, &exports[m].repository, class, wanted, &known);
+                let declared = match extension {
+                    true => Vec::new(),
+                    false => declaring(at, manifest, specifier),
+                };
+                for class in &declared {
+                    let (ids, beside) = methods(at, repository, *class, wanted, &known);
                     targets.extend(ids);
                     opaque |= beside;
                 }
+                let mut found = !declared.is_empty();
+                // A package holds functions, classes (their constructors) and extensions.
+                if !found {
+                    for id in top_level(at, manifest, (specifier, wanted.0), extension) {
+                        if (!id.contains('(') || fits_arity(id, wanted.1)) && known(id) {
+                            targets.push(id.to_string());
+                        }
+                    }
+                    found = !targets.is_empty();
+                }
+                if !found {
+                    continue;
+                }
+                reached.insert((m, i));
                 targets.sort();
                 targets.dedup();
-                let level = match (targets.len(), opaque) {
+                // An extension may be shadowed by a member of a receiver's type that is not
+                // read (Kotlin picks the member).
+                let level = match (targets.len(), opaque || extension) {
                     (0, _) => continue,
                     (1, false) => Level::Exact,
                     (1, true) => Level::Inferred,
@@ -343,21 +459,29 @@ impl Ecosystem for Maven {
         }
         out
     }
-    /// Whether a provider of an artifact the file depends on declares the class `specifier`
-    /// (`declaring`), whatever method it declares.
+    /// Whether a provider of an artifact the file depends on declares what the import names: the
+    /// class `specifier` (`declaring`), whatever method it declares, or what the package
+    /// `specifier` holds under the chain's name (`top_level`).
     fn declares<'e>(
         &self,
         exports: &'e [Export],
         providers: &Providers,
         at: &dyn Fn(usize) -> &'e Provided<'e>,
         from: (usize, &str),
-        specifier: &str,
+        (specifier, chain): (&str, &str),
     ) -> bool {
+        let (extension, chain) = chain
+            .strip_prefix('.')
+            .map_or((false, chain), |c| (true, c));
         (self
             .entries(exports, providers, from, specifier)
             .into_iter())
         .flat_map(|(entry, _)| providers.matching(self, entry))
-        .any(|(m, i)| !declaring(at(m), &exports[m].manifests[i], specifier).is_empty())
+        .any(|(m, i)| {
+            let (at, manifest) = (at(m), &exports[m].manifests[i]);
+            !extension && !declaring(at, manifest, specifier).is_empty()
+                || !top_level(at, manifest, (specifier, call(chain).0), extension).is_empty()
+        })
     }
     fn inherit(&self, manifests: &mut [Manifest]) {
         let settings: Vec<_> = manifests
@@ -447,6 +571,8 @@ mod tests {
         let class = "r::a/Order.java::a.Order";
         let member = |rest: &str| Maven.member_of(&format!("{class}{rest}"), class);
         assert!(member(".total()") && member(".Order(int)") && member(".Order(int)#method"));
+        // A Kotlin companion's member is called on the class's name.
+        assert!(member(".Companion.of(Int)") && !member(".Companion") && !member(".Other.of(Int)"));
         // A nested class, its member, another class with the same start, the class itself.
         assert!(!member(".Line") && !member(".Line.total()") && !member("s.total()"));
         assert!(!member("") && !member(".(int)"));

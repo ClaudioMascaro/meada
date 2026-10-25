@@ -1,4 +1,5 @@
 example.com/kotlin/app . dev.shop:app@1.0 (maven) (consumers: 0)
+example.com/kotlin/kit . dev.kit:kit@1.0 (maven) (consumers: 1)
 example.com/kotlin/lib . dev.kt:toolbox@3.1 (maven) (consumers: 4)
 example.com/kotlin/lib core dev.kt.core:core@3.1 (maven) (consumers: 2)
 example.com/kotlin/lib http/client dev.kt.http:client@3.1 (maven) (consumers: 2)

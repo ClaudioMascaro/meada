@@ -1131,9 +1131,13 @@ one for the area a change touches.
     import of a file may name, each with the subpath inside the package). `imports(..)` (the
     `(specifier, chain)` pairs a call goes through) has a default, `Code::imported`; Maven
     overrides it (the class and `name(arity)`, from the head's import or the receiver's type,
-    one pair per on-demand candidate, `Outside::spellings`). `declares(..)` (whether a provider
-    declares the specifier itself) defaults to `true`: `import` lets none of one site's pairs
-    enter when two are declared, so only an ecosystem with several pairs per call answers it.
+    one pair per on-demand candidate, `Outside::spellings`; a Kotlin file adds the package and
+    the name of a top-level function or class a bare name imports, and for a call on a receiver
+    that is no class of the repository the package and `.name(arity)` of the extension function
+    its name imports; `kotlin.` and `java.` packages are none). `declares(..)` (whether a
+    provider declares what the `(specifier, chain)` names, whatever its signature) defaults to
+    `true`: `import` lets none of one site's pairs enter when two are declared, so only an
+    ecosystem with several pairs per call answers it.
   - `fits`: literal package-name equality; Maven matches the literal fragments of a computed
     coordinate. `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
   - `flag`: the range is unchecked (`range unchecked`); npm checks semver.
@@ -1150,9 +1154,18 @@ one for the area a change touches.
     looks the class up by package declaration in the files the artifact owns that are no test
     sources and picks the method by name and argument count among the overloads of the class's
     family (`How::Package`, `Maven::resolutions`; the provider's `families` rows, an opaque
-    ancestor keeping the target from `exact`). `member_of`: none; Maven's constructors and
-    methods of a class, so `context` on a public class lists, once per call, the calls that
-    reach its members (`reached`, at the best level of the call's links into the class).
+    ancestor keeping the target from `exact`). Where no class is the specifier, Maven reads it
+    as a Kotlin package (`top_level`: the symbols of `Classes::named` that the file exports both
+    as written and with its package, which is what makes a declaration top-level and public): a
+    function by name and argument count (`ambiguous` when several fit), a class by its capital,
+    as the class itself (its constructor), an extension function (`.name(arity)`) as a name
+    match, `inferred`, since a member of a receiver's type that is not read would win. A class
+    also answers for the members of its unnamed `Companion`. `member_of`: none; Maven's
+    constructors and methods of a class (a companion's too), so `context` on a public class
+    lists, once per call, the calls that reach its members (`reached`, at the best level of the
+    call's links into the class). `JVM` source roots (`jvm::ROOTS`, `jvm::TEST_ROOTS`) are
+    `src/{main,test}/{java,kotlin}`, and the Gradle scanner reads the `java` and the `kotlin`
+    directory sets, `sourceSets["main"]` and `named("main")` heads included.
   - `resolutions`: the single-entry loop (the entries, each provider the entry `reaches`,
     `resolve` in it); PyPI replaces it whole, since its imports name a module and several
     distributions may expose it.

@@ -1,0 +1,28 @@
+example.com/kotlin/lib core/src/main/kotlin/dev/kt/core/Money.kt:3-11 dev.kt.core.Money
+community: core/src/main/kotlin/dev/kt/core
+processes: 11 (11 export; 2 repositories): dev.shop.bulk() (example.com/kotlin/app), dev.shop.aliased() (example.com/kotlin/app), dev.shop.loosely() (example.com/kotlin/app), dev.shop.pay(Int) (example.com/kotlin/app), dev.shop.reached() (example.com/kotlin/app), dev.kt.core.loose() (example.com/kotlin/lib), dev.kt.core.checked() (example.com/kotlin/lib), dev.kt.core.Money.Companion.of(Int) (example.com/kotlin/lib), dev.kt.core.Money.plus(Money) (example.com/kotlin/lib), dev.kt.core.sample() (example.com/kotlin/lib), dev.kt.core.extras() (example.com/kotlin/lib)
+class Money(val cents: Int) {
+    fun plus(other: Money): Money = Money(cents + other.cents)
+
+    fun total(): Int = cents
+
+    companion object {
+        fun of(cents: Int): Money = Money(cents)
+    }
+}
+callers:
+example.com/kotlin/lib core/loose/dev/kt/core/Loose.kt:3 dev.kt.core.loose()
+example.com/kotlin/lib core/src/check/kotlin/dev/kt/core/Checks.kt:3 dev.kt.core.checked()
+example.com/kotlin/lib core/src/main/kotlin/dev/kt/core/Money.kt:4 dev.kt.core.Money.plus(Money)
+example.com/kotlin/lib core/src/main/kotlin/dev/kt/core/Money.kt:9 dev.kt.core.Money.Companion.of(Int)
+example.com/kotlin/lib core/src/test/kotlin/dev/kt/core/Samples.kt:3 dev.kt.core.sample()
+example.com/kotlin/lib core/src/test/kotlin/shared/dev/kt/core/Extras.kt:3 dev.kt.core.extras()
+callees: none
+consumers:
+example.com/kotlin/app src/main/kotlin/dev/shop/Bulk.kt:5 dev.shop.bulk() [range unchecked]
+example.com/kotlin/app src/main/kotlin/dev/shop/Shop.kt:18 dev.shop.pay(Int) [range unchecked]
+example.com/kotlin/app src/main/kotlin/dev/shop/Shop.kt:19 dev.shop.pay(Int) [range unchecked]
+example.com/kotlin/app src/main/kotlin/dev/shop/Shop.kt:19 dev.shop.pay(Int) [range unchecked]
+example.com/kotlin/app src/main/kotlin/dev/shop/Shop.kt:20 dev.shop.pay(Int) [range unchecked]
+example.com/kotlin/app src/main/kotlin/dev/shop/Shop.kt:20 dev.shop.pay(Int) [range unchecked]
+example.com/kotlin/app src/main/kotlin/dev/shop/Shop.kt:28 dev.shop.aliased() [range unchecked]

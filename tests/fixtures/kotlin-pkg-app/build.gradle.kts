@@ -5,6 +5,7 @@ val artifact = "util"
 
 dependencies {
     implementation("dev.kt:toolbox:3.1")
+    implementation("dev.kit:kit:1.0")
     api(group = "dev.kt.core", name = "core", version = "3.1")
     api("dev.kt:toolbox:3.1") {
         exclude(group = "org.slf4j")
