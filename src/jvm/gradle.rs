@@ -1,12 +1,15 @@
 //! A line-oriented scanner for Gradle's literal assignments and dependency coordinates.
 //! Tokens only separate strings, comments and block boundaries; no build grammar is loaded.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::package::{Entry, Summary};
 
 // ponytail: build scripts nest a few blocks; a deeper file reads as nothing.
 const GRADLE_DEPTH: usize = 64;
+
+// ponytail: a project names a few source directories; the rest of a hostile file is dropped.
+const MAX_ROOTS: usize = 64;
 
 #[derive(Debug, PartialEq)]
 enum Token {
@@ -317,6 +320,73 @@ fn included(args: &[Token]) -> Vec<&str> {
         .collect()
 }
 
+/// The literal directories a statement adds to a source set of `sourceSets`, with whether the
+/// set is `main`: `srcDirs = ['a']`, `srcDirs += 'a'`, `srcDir 'a'`, `srcDirs("a", "b")`, inside
+/// `sourceSets { main { java { ... } } }` or written with the dotted path. A directory that is not
+/// a literal relative path (`file(..)`, `..`, a variable) is not read.
+fn source_dirs(tokens: &[Token], blocks: &[String]) -> Option<(bool, Vec<String>)> {
+    let head = tokens.first()?.word()?;
+    let path: Vec<&str> = (blocks.iter().map(String::as_str))
+        .chain([head])
+        .flat_map(|s| s.split('.'))
+        .collect();
+    let at = path.iter().position(|s| *s == "sourceSets")?;
+    let [set, "java", "srcDirs" | "srcDir"] = path[at + 1..] else {
+        return None;
+    };
+    // `named(set)` or `getByName(set)` with no literal name (`block_head`) is no known set.
+    if matches!(set, "named" | "getByName") {
+        return None;
+    }
+    let mut rest = &tokens[1..];
+    if let [Token::Mark('+'), tail @ ..] = rest {
+        rest = tail;
+    }
+    if let [Token::Mark('='), tail @ ..] = rest {
+        rest = tail;
+    }
+    if let [Token::Mark('['), inner @ .., Token::Mark(']')] = rest {
+        rest = inner;
+    }
+    let relative = |dir: &str| {
+        let dir = dir.strip_suffix('/').unwrap_or(dir);
+        !dir.is_empty()
+            && !dir.contains('\\')
+            && dir.split('/').all(|s| !matches!(s, "" | "." | ".."))
+    };
+    let dirs = (arguments(rest).into_iter())
+        .filter_map(|arg| match arg {
+            [Token::String(s, false)] if relative(s) => {
+                Some(s.strip_suffix('/').unwrap_or(s).to_string())
+            }
+            _ => None,
+        })
+        .collect();
+    Some((set == "main", dirs))
+}
+
+/// The name a block's head line gives it: its first word, with a `named(..)` or `getByName(..)`
+/// of a literal set read as that set (`sourceSets.named("main")` is `sourceSets.main`).
+fn block_head(line: &[Token]) -> String {
+    let head = line.iter().find_map(Token::word).unwrap_or("");
+    if let [
+        Token::Word(_),
+        Token::Mark('('),
+        Token::String(set, false),
+        Token::Mark(')'),
+    ] = line
+    {
+        let (before, last) = head.rsplit_once('.').unwrap_or(("", head));
+        if matches!(last, "named" | "getByName") && super::literal(set) {
+            return match before {
+                "" => set.clone(),
+                before => format!("{before}.{set}"),
+            };
+        }
+    }
+    head.to_string()
+}
+
 /// What a scan has read so far.
 #[derive(Default)]
 struct Scan {
@@ -326,6 +396,8 @@ struct Scan {
     moved: BTreeSet<String>,
     /// Some assignment changes a project's name or directory without saying which.
     unplaced: bool,
+    /// The literal source directories of the source sets, with whether the set is `main`.
+    sources: Vec<(bool, String)>,
 }
 
 fn statement(tokens: &[Token], blocks: &[String], controlled: bool, scan: &mut Scan) {
@@ -369,6 +441,22 @@ fn statement(tokens: &[Token], blocks: &[String], controlled: bool, scan: &mut S
         {
             *value = None;
         }
+    }
+    // Like the coordinates, a source directory counts only where it is certain to apply here:
+    // never in a block that configures other projects (`allprojects`, `subprojects` and their
+    // `.each`, `project(':x')`, `configure(..)`).
+    let shared = blocks.iter().any(|b| {
+        let head = b.split('.').next().unwrap_or(b);
+        matches!(
+            head,
+            "allprojects" | "subprojects" | "project" | "configure"
+        )
+    });
+    if !conditional
+        && !shared
+        && let Some((main, dirs)) = source_dirs(tokens, blocks)
+    {
+        scan.sources.extend(dirs.into_iter().map(|d| (main, d)));
     }
     let member = |t: &Token| {
         t.word().is_some_and(|w| {
@@ -425,7 +513,7 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
                 if blocks.len() == GRADLE_DEPTH {
                     return Summary::default();
                 }
-                let head = line.iter().find_map(Token::word).unwrap_or("").to_string();
+                let head = block_head(&line);
                 controls += usize::from(control(&head));
                 blocks.push(head);
                 line.clear();
@@ -459,13 +547,32 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
         mut summary,
         moved,
         unplaced,
+        sources,
     } = scan;
     let settings = path
         .rsplit('/')
         .next()
         .is_some_and(|p| p.starts_with("settings."));
     if !settings {
-        summary.roots = vec!["src/main/java".into(), "src/test/java".into()];
+        // Each directory once, a test one when any set other than `main` lists it; the defaults
+        // stay past the limit, and the test roots are among the kept ones.
+        let mut dirs: BTreeMap<String, bool> = BTreeMap::new();
+        for (main, dir) in sources {
+            *dirs.entry(dir).or_insert(true) &= main;
+        }
+        let mut roots = vec!["src/main/java".to_string(), "src/test/java".to_string()];
+        let mut tests = vec!["src/test/java".to_string()];
+        for (dir, main) in dirs.into_iter().take(MAX_ROOTS - roots.len()) {
+            if !main {
+                tests.push(dir.clone());
+            }
+            roots.push(dir);
+        }
+        for list in [&mut roots, &mut tests] {
+            list.sort();
+            list.dedup();
+        }
+        (summary.roots, summary.test_roots) = (roots, tests);
     }
     // A renamed or moved project is not where, or not what, `include` says.
     build
@@ -550,5 +657,120 @@ mod tests {
         assert_eq!(names("project(':app').projectDir = file('x')\n"), ["tools"]);
         assert!(names("rootProject.children.each { it.name = 'x' }\n").is_empty());
         assert!(names("findProject(':app')?.name = 'svc'\n").is_empty());
+    }
+
+    fn roots(src: &str) -> (Vec<String>, Vec<String>) {
+        let summary = read("build.gradle", src.as_bytes());
+        (summary.roots, summary.test_roots)
+    }
+
+    #[test]
+    fn a_literal_source_set_directory_adds_a_root_main_or_not() {
+        let defaults = ["src/main/java", "src/test/java"];
+        let with = |extra: &[&str]| -> Vec<String> {
+            let mut all: Vec<String> = defaults
+                .iter()
+                .chain(extra)
+                .map(|s| s.to_string())
+                .collect();
+            all.sort();
+            all
+        };
+        assert_eq!(roots(""), (with(&[]), vec!["src/test/java".to_string()]));
+        // Groovy and Kotlin forms, nested or dotted, replacing or adding.
+        for (src, main, test) in [
+            (
+                "sourceSets { main { java { srcDirs = ['src/a', \"src/b/\"] } } }",
+                &["src/a", "src/b"][..],
+                &[][..],
+            ),
+            (
+                "sourceSets {\n main {\n java.srcDirs(\"src/a\")\n }\n test { java { srcDir 'src/t' } }\n}",
+                &["src/a"],
+                &["src/t"],
+            ),
+            (
+                "sourceSets.main.java.srcDirs += 'src/a'\nsourceSets.integration.java.srcDirs = ['src/i']",
+                &["src/a"],
+                &["src/i"],
+            ),
+        ] {
+            let (all, tests) = roots(src);
+            let expected: Vec<_> = main.iter().chain(test).copied().collect();
+            assert_eq!(all, with(&expected), "{src}");
+            let mut want: Vec<_> = ["src/test/java"]
+                .iter()
+                .chain(test)
+                .map(|s| s.to_string())
+                .collect();
+            want.sort();
+            assert_eq!(tests, want, "{src}");
+        }
+    }
+
+    #[test]
+    fn a_source_directory_that_is_not_certain_adds_no_root() {
+        for src in [
+            "sourceSets { main { java { srcDirs = [dir] } } }",
+            "sourceSets { main { java { srcDirs = [file('src/a')] } } }",
+            "sourceSets { main { java { srcDirs = [\"$dir/a\"] } } }",
+            "sourceSets { main { java { srcDirs = ['../a', '/abs', 'a/../b', './c', ''] } } }",
+            "if (flag) { sourceSets { main { java { srcDirs = ['src/a'] } } } }",
+            "allprojects { sourceSets { main { java { srcDirs = ['src/a'] } } } }",
+            "subprojects { sourceSets.main.java.srcDir 'src/a' }",
+            "sourceSets { main { resources { srcDirs = ['src/a'] } } }",
+            "sourceSets { main { kotlin { srcDirs = ['src/a'] } } }",
+            "project(':app') { sourceSets { main { java { srcDirs = ['src/a'] } } } }",
+            "configure(subprojects) { sourceSets.main.java.srcDir 'src/a' }",
+            "subprojects.each { sourceSets.main.java.srcDir 'src/a' }",
+            "allprojects.forEach { sourceSets.main.java.srcDir 'src/a' }",
+            "sourceSets.named(set) { java.srcDir 'src/a' }",
+            "other { main { java { srcDirs = ['src/a'] } } }",
+        ] {
+            assert_eq!(
+                roots(src),
+                (
+                    vec!["src/main/java".to_string(), "src/test/java".to_string()],
+                    vec!["src/test/java".to_string()]
+                ),
+                "{src}"
+            );
+        }
+    }
+
+    #[test]
+    fn source_directories_past_the_limit_are_dropped() {
+        let dirs: Vec<_> = (0..MAX_ROOTS + 10).map(|i| format!("'d{i:03}'")).collect();
+        let src = format!(
+            "sourceSets {{ main {{ java {{ srcDirs = [{}] }} }} }}",
+            dirs.join(", ")
+        );
+        assert_eq!(roots(&src).0.len(), MAX_ROOTS);
+        // The defaults stay, and every test root is a kept root.
+        let (all, tests) = roots(&src);
+        assert!(all.iter().any(|r| r == "src/main/java"), "{all:?}");
+        assert!(tests.iter().all(|t| all.contains(t)), "{tests:?}");
+        let src = format!(
+            "sourceSets {{ main {{ java {{ srcDirs = [{}] }} }}\n test {{ java {{ srcDirs = [{}] }} }} }}",
+            dirs.join(", "),
+            dirs.join(", ").replace("'d", "'t"),
+        );
+        let (all, tests) = roots(&src);
+        assert_eq!(all.len(), MAX_ROOTS);
+        assert!(tests.iter().all(|t| all.contains(t)), "{tests:?}");
+    }
+
+    #[test]
+    fn a_source_set_named_by_a_literal_is_that_set() {
+        for src in [
+            "sourceSets.named('main') { java.srcDir 'src/a' }",
+            "sourceSets { getByName(\"main\") { java.srcDir(\"src/a\") } }",
+        ] {
+            let (all, tests) = roots(src);
+            assert!(all.iter().any(|r| r == "src/a"), "{src}");
+            assert_eq!(tests, ["src/test/java"], "{src}");
+        }
+        let (all, tests) = roots("sourceSets.named('it') { java.srcDir 'src/i' }");
+        assert!(all.iter().any(|r| r == "src/i") && tests.iter().any(|t| t == "src/i"));
     }
 }

@@ -365,6 +365,19 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   module outside the workspace, a local that hides the import, a name only a test file, a file built for another target or two files of the directory define, a directory of a nested module, and a `replace` by another module (no link), a module path with no dot, and the freshness of
   an edited `go.mod`. Goldens `gopkg-{web,lib}.export.json`, `gopkg-lib.context-greet.txt` and
   `gopkg-web.trace-down.txt`. Unit tests in `package/go.rs` and `lang/go/modfile.rs`.
+
+- `tests/it/jvmpkg.rs` (specs #26, tickets #93 and #94): the Maven and Gradle fixtures `jvm-maven`
+  (modules `models` with `Order`, `Repo extends Base`, `Event` with an opaque base, `Note` with
+  a method named after it, `Ledger`, a second `example.shared.Stamp` and a test-only
+  `Fixtures`), `jvm-gradle` (`kit` with a second `Ledger` in another package, and `tools` whose
+  `main` and `test` source sets are literal directories), `jvm-client` and `jvm-gradle-client`
+  as the dependents. Manifest links (build files) and imports into provider classes (exact,
+  ambiguous by provider, by type and by overload, overloads merged over the provider-side
+  family, `inferred` beside an opaque base, constructors, on-demand and static imports, two
+  on-demand imports that both bring a class, a same-package class and a parameter or local
+  that hide the import, test roots and outside types left out); an edited source set
+  relinks like a cold workspace. Goldens `jvm-*.export.json`, `jvm-maven.context-total.txt` and
+  `jvm-client.trace-down.txt`. Unit tests in `package/maven.rs` and `jvm/gradle.rs`.
 - **The loopback decider stub** (`tests/it/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500

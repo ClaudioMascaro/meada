@@ -1,8 +1,80 @@
 {
   "repository": "example.com/jvm/gradle-client",
-  "files": [],
-  "symbols": [],
-  "calls": [],
+  "files": [
+    {
+      "path": "src/main/java/example/worker/Job.java",
+      "hash": "57a46866a5f0a1e4107fa9c4721f00eaf04c8ff82ba28ff9cbe6aad5d21eb98f"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job",
+      "span": {
+        "path": "src/main/java/example/worker/Job.java",
+        "start": 111,
+        "end": 341
+      }
+    },
+    {
+      "id": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.check()",
+      "span": {
+        "path": "src/main/java/example/worker/Job.java",
+        "start": 208,
+        "end": 266
+      }
+    },
+    {
+      "id": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.count(Order)",
+      "span": {
+        "path": "src/main/java/example/worker/Job.java",
+        "start": 272,
+        "end": 339
+      }
+    },
+    {
+      "id": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.run(String)",
+      "span": {
+        "path": "src/main/java/example/worker/Job.java",
+        "start": 134,
+        "end": 202
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.check()::Checks.ok#0",
+      "caller": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.check()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/worker/Job.java",
+        "start": 248,
+        "end": 259
+      }
+    },
+    {
+      "id": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.count(Order)::order.total#0",
+      "caller": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.count(Order)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/worker/Job.java",
+        "start": 319,
+        "end": 332
+      }
+    },
+    {
+      "id": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.run(String)::Slug.of#0",
+      "caller": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.run(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/worker/Job.java",
+        "start": 182,
+        "end": 195
+      }
+    }
+  ],
   "providers": [
     {
       "contract": "package::maven::example:worker",
@@ -18,6 +90,16 @@
     {
       "contract": "package::maven::example:models",
       "site": "example.com/jvm/gradle-client::build.gradle::testImplementation::example:models",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:models",
+      "site": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.count(Order)::order.total#0",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:tools",
+      "site": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.run(String)::Slug.of#0",
       "via": null
     }
   ],
@@ -43,6 +125,24 @@
       "range": "1.2.0"
     }
   ],
+  "imports": [
+    {
+      "site": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.count(Order)::order.total#0",
+      "specifier": "example.models.Order",
+      "name": "total(0)",
+      "level": "exact",
+      "how": "package",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()"
+    },
+    {
+      "site": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.run(String)::Slug.of#0",
+      "specifier": "example.tools.Slug",
+      "name": "of(1)",
+      "level": "exact",
+      "how": "package",
+      "target": "example.com/jvm/gradle::tools/src/core/java/example/tools/Slug.java::example.tools.Slug.of(String)"
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/jvm/gradle-client::build.gradle::implementation::example:tools",
@@ -57,6 +157,94 @@
       "contract": "package::maven::example:models",
       "level": "exact",
       "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.count(Order)::order.total#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.run(String)::Slug.of#0",
+      "provider": "example.com/jvm/gradle::tools/src/core/java/example/tools/Slug.java::example.tools.Slug.of(String)",
+      "contract": "package::maven::example:tools",
+      "level": "exact",
+      "reason": "package::maven::example:tools 2.0 (local 2.0), range unchecked; import package"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.check()",
+      "kind": "export",
+      "label": "example.worker.Job.check()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/gradle-client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.check()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.count(Order)",
+      "kind": "export",
+      "label": "example.worker.Job.count(Order)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/gradle-client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.count(Order)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/maven",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()",
+          "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/jvm/maven",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.tax(int)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/jvm/maven",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.subtotal()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.run(String)",
+      "kind": "export",
+      "label": "example.worker.Job.run(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/gradle-client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.run(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/gradle",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/jvm/gradle::tools/src/core/java/example/tools/Slug.java::example.tools.Slug.of(String)",
+          "reason": "package::maven::example:tools 2.0 (local 2.0), range unchecked; import package"
+        }
+      ]
     }
   ]
 }

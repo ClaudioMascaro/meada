@@ -23,7 +23,7 @@ use crate::entry::{self, EntryKind, EntryPoint};
 use crate::lang::{self, Facts};
 use crate::msg::{Fix, Msg};
 use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package};
-use crate::resolve::{Code, Exported, Resolution, Resolver, Target};
+use crate::resolve::{Ancestry, Code, Exported, Resolution, Resolver, Target};
 use crate::shape::{Shape, Want};
 pub(crate) use meada_core::export as written;
 pub(crate) use meada_core::export::{Binding, CallSite, File, Process, Publish, Span, Symbol};
@@ -73,8 +73,13 @@ pub(crate) fn schema_version() -> i32 {
 /// an `export * from` the file `file`. Both are rewritten with the contracts, and read at query
 /// time to resolve imports of a package into another repository (spec #22). `communities`
 /// holds one row per member of each community (spec #31): its name and the member's symbol
-/// identity, recomputed from the `calls` rows whenever the code rows change.
-/// `entry_points` holds the repository's doors (spec #31, `entry`): the `identity`, the `kind`
+/// identity, recomputed from the `calls` rows whenever the code rows change. `families` holds
+/// the family of each public class of a pack whose overloads merge across it (Java,
+/// `resolve::Ancestry`): the class's `path` and qualified name, and its `ancestors` past it as a
+/// JSON array of `[file, qualified name]` for a class of the repository and `null` for an
+/// opaque one (`ancestors` NULL when the family is not known); a class with no base has no row.
+/// Rewritten with the contracts, and read at query time to merge a provider class's overloads
+/// over its family (spec #26). `entry_points` holds the repository's doors (spec #31, `entry`): the `identity`, the `kind`
 /// (`route`, `export`, `channel` or `program`), the `label` that names its process and the `site` the process starts
 /// from; rewritten with the contracts.
 const SCHEMA: &str = "
@@ -106,6 +111,7 @@ CREATE TABLE manifests (
     summary TEXT NOT NULL
 );
 CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
+CREATE TABLE families (path TEXT NOT NULL, class TEXT NOT NULL, ancestors TEXT);
 CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL, site TEXT NOT NULL);
 CREATE TABLE communities (name TEXT NOT NULL, member TEXT NOT NULL);
 ";
@@ -599,7 +605,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
                 "DELETE FROM meta; DELETE FROM files; DELETE FROM symbols; \
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
                  DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports; \
-                 DELETE FROM entry_points; DELETE FROM communities;",
+                 DELETE FROM families; DELETE FROM entry_points; DELETE FROM communities;",
             )?;
             None
         }
@@ -936,6 +942,18 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         tx.execute(
             "INSERT INTO exports VALUES (?1, ?2, ?3, ?4)",
             params![e.path, e.name, e.file, e.target],
+        )?;
+    }
+    tx.execute("DELETE FROM families", [])?;
+    for a in resolvers.values().flat_map(Resolver::ancestries) {
+        let ancestors = a
+            .ancestors
+            .as_ref()
+            .map(serde_json::to_string)
+            .transpose()?;
+        tx.execute(
+            "INSERT INTO families VALUES (?1, ?2, ?3)",
+            params![a.path, a.class, ancestors],
         )?;
     }
     let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
@@ -1543,6 +1561,9 @@ pub(crate) struct Export {
     pub(crate) import_calls: Vec<ImportCall>,
     /// What each file exports (the `exports` table), sorted, for `package::import`.
     pub(crate) exported: Vec<Exported>,
+    /// The families of the public classes (the `families` table), sorted, for
+    /// `package::import`.
+    pub(crate) ancestries: Vec<Ancestry>,
     /// The shapes kept for what each file exports (`shape` rows, issue #175), for
     /// `package::shapes`.
     pub(crate) shapes: Vec<package::ExportedShape>,
@@ -1875,6 +1896,23 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })?
             .collect::<rusqlite::Result<_>>()?,
     };
+    let ancestries = match manifests.iter().any(|m| m.summary.name.is_some()) {
+        false => Vec::new(),
+        true => db
+            .prepare(&format!(
+                "SELECT path, class, ancestors FROM {schema}.families ORDER BY path, class"
+            ))?
+            .query_map([], |r| {
+                let ancestors: Option<String> = r.get(2)?;
+                Ok(Ancestry {
+                    path: r.get(0)?,
+                    class: r.get(1)?,
+                    // ponytail: written by `refresh` only; an unreadable family is one not known.
+                    ancestors: ancestors.and_then(|a| serde_json::from_str(&a).ok()),
+                })
+            })?
+            .collect::<rusqlite::Result<_>>()?,
+    };
     let shapes = match manifests.iter().any(|m| m.summary.name.is_some()) {
         false => Vec::new(),
         true => db
@@ -1954,6 +1992,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         dependencies: Vec::new(),
         import_calls,
         exported,
+        ancestries,
         shapes,
         imports: Vec::new(),
         communities,

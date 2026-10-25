@@ -63,8 +63,10 @@ modules updates it.
   rewrites the `exports` table (`Resolver::exported` of every pack: per file, each exported
   name with the `file` and `target` definition, constant or type it names, `target` NULL for a whole file and
   `file` NULL for nothing the repository holds, and each `export * from` a repository file as a
-  row with `name` NULL), which `export` loads as `Export::exported`, and the `import` rows of
-  `contracts`, loaded as `Export::import_calls` (both `serde(skip)`). Before extracting,
+  row with `name` NULL), which `export` loads as `Export::exported`, the `families` table
+  (`Resolver::ancestries`: each public class of a pack whose overloads merge across its family,
+  Java, with its ancestors in method resolution order), loaded as `Export::ancestries`, and the
+  `import` rows of `contracts`, loaded as `Export::import_calls` (all `serde(skip)`). Before extracting,
   `refresh` builds `Indexed` once (the `manifests` and tsconfigs as `read_manifests` returns
   them, the `exports` rows of every pack and the files), and the extraction loop runs only
   `contract::KINDS`, each `extract` taking the pack's `Code` and `Indexed`: the package kind
@@ -481,6 +483,8 @@ modules updates it.
   stored summaries contain coordinate fragments and the literal metadata needed to join a
   Gradle build to its settings, never source text. `package::inherit` runs that join after all
   summaries are loaded; changing any build/settings file refreshes the same workspace links.
+  The summary also keeps the source roots (`roots`, with the test ones in `test_roots`), so an
+  edit to a Gradle `sourceSets` directory changes which provider classes an import reaches.
 
 ## Java receivers and supertypes (#85)
 

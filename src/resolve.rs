@@ -2470,6 +2470,49 @@ impl<'a> Resolver<'a> {
         })
     }
 
+    /// The family of each public class past the class itself, for a pack whose overloads merge
+    /// across it (one that declares `Facts::overloads`, Java): what an import of the repository
+    /// as a package merges the class's overloads over (spec #26). A class with no base has none.
+    /// Sorted.
+    pub fn ancestries(&self) -> Vec<Ancestry> {
+        if self.overloads.values().all(HashMap::is_empty) {
+            return Vec::new();
+        }
+        let mut rows = Vec::new();
+        for (&path, facts) in self.files {
+            for def in facts.defs.iter().filter(|d| d.kind == Kind::Class) {
+                if facts.hidden.contains(&def.name) {
+                    continue;
+                }
+                let class = Target {
+                    path,
+                    name: &def.name,
+                };
+                let ancestors = match self.families.get(&class) {
+                    Some(Some(family)) if family.len() < 2 => continue,
+                    Some(Some(family)) => Some(
+                        (family[1..].iter())
+                            .map(|a| match a {
+                                Ancestor::Class(t) => {
+                                    Some((t.path.to_string(), t.name.to_string()))
+                                }
+                                Ancestor::Opaque(_) => None,
+                            })
+                            .collect(),
+                    ),
+                    _ => None,
+                };
+                rows.push(Ancestry {
+                    path: path.to_string(),
+                    class: def.name.clone(),
+                    ancestors,
+                });
+            }
+        }
+        rows.sort_by(|a, b| (&a.path, &a.class).cmp(&(&b.path, &b.class)));
+        rows
+    }
+
     /// What each file exports, for an import of the repository as a package (spec #22), as
     /// `export` reads it: for each name a file exports, the definition, the module-level
     /// constant or type (issue #175) or the whole file it names, or nothing when that is outside
@@ -2716,6 +2759,19 @@ pub struct Exported {
     /// The qualified name of the definition, constant or type in `file`; `None` when `name` is
     /// the whole file.
     pub target: Option<String>,
+}
+
+/// A public class's family past the class itself (`Resolver::ancestries`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Ancestry {
+    /// The file declaring the class.
+    pub path: String,
+    /// The class's qualified name.
+    pub class: String,
+    /// Its ancestors in method resolution order: a class of the repository as `(file, qualified
+    /// name)`, one outside it or not resolved (opaque) as `None`. `None` for a family C3 rejects
+    /// or that is cut, whose members are not known.
+    pub ancestors: Option<Vec<Option<(String, String)>>>,
 }
 
 /// A call whose arguments bind the parameters of `def`, the function it reaches.
@@ -3012,6 +3068,18 @@ pub struct Outside<'a> {
     /// binds the name by itself, and when a repository type, an ambiguity or a cut link may
     /// take it.
     pub candidates: Vec<String>,
+}
+
+impl Outside<'_> {
+    /// The spellings the name may have: the on-demand candidates when only they may bind it,
+    /// else the import's own when the name's head is the import itself; none otherwise.
+    pub fn spellings(self) -> Vec<String> {
+        match self {
+            o if !o.candidates.is_empty() => o.candidates,
+            o if o.direct => vec![o.spelled],
+            _ => Vec::new(),
+        }
+    }
 }
 
 /// What the constants walk found: the form of the call that made the value, what it names

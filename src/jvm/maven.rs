@@ -187,6 +187,7 @@ pub fn read(src: &[u8]) -> Summary {
         version,
         dependencies,
         roots: vec!["src/main/java".into(), "src/test/java".into()],
+        test_roots: vec!["src/test/java".into()],
         ..Summary::default()
     }
 }
@@ -203,6 +204,13 @@ mod tests {
         format!(
             "<project{attributes}><groupId>example</groupId><artifactId>web</artifactId>{body}</project>"
         )
+    }
+
+    #[test]
+    fn the_source_roots_are_main_and_test_and_the_test_one_is_marked() {
+        let summary = read(project("", "").as_bytes());
+        assert_eq!(summary.roots, ["src/main/java", "src/test/java"]);
+        assert_eq!(summary.test_roots, ["src/test/java"]);
     }
 
     #[test]
