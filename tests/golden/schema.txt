@@ -1897,8 +1897,21 @@ sample.kt
     {
       "scope": "example.Store",
       "name": "name",
-      "class": "Unknown"
+      "class": {
+        "Type": "String"
+      }
+    },
+    {
+      "scope": "example.Store.save(Int,vararg String)",
+      "name": "id",
+      "class": {
+        "Type": "Int"
+      }
     }
+  ],
+  "externs": [
+    "Int",
+    "String"
   ],
   "private": [
     "helper",
