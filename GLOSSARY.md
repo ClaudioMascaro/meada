@@ -219,8 +219,8 @@ search, context and the export, never linked.
 _Avoid_: dynamic call, unknown call
 
 **Client wrapper**:
-A function whose call to an HTTP client (`fetch`, or `requests`, `httpx` or `aiohttp` in
-Python) or a message client (a Kafka producer) takes its URL, method or channel name from the
+A function whose call to an HTTP client (`fetch`, `requests`, `httpx` or `aiohttp` in
+Python, RestTemplate, WebClient, `java.net.http` or OkHttp in Java) or a message client (a Kafka producer) takes its URL, method or channel name from the
 function's own parameters. Each call site of the wrapper is a consumer or producer, read with its
 arguments in place of the parameters, through any number of wrapper levels.
 _Avoid_: API client, helper, fetcher

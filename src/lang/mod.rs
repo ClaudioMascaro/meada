@@ -776,6 +776,11 @@ pub enum Value {
     /// An anonymous function written in place, by the qualified name of its `Kind::Inline`
     /// definition.
     Function(String),
+    /// A name an import from outside the repository binds (`HttpMethod.GET`), as each import
+    /// that may bind it spells it where it is written: one spelling when an import binds it, the
+    /// candidates of the on-demand imports otherwise (`resolve::Outside`). Only a chain read by
+    /// `resolve::Expand::Chain` holds one; no pack writes it.
+    External(Vec<String>),
     /// Anything else.
     Unknown,
 }
