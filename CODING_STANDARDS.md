@@ -54,6 +54,10 @@ indexing carries on.
 
 - Recursion over nested input stops at a depth limit; deeper parts are open, or the file is
   unreadable at that line.
+- Evaluation visits each node once: a value read through a chain (`a().b().c()`, a `+` fold, a
+  wrapper's arguments) costs the chain's length, never a factor per link, so a chain up to the
+  depth limit stays cheap. A unit test feeds such a chain and bounds its time, as the
+  `*_in_linear_time` tests do.
 - Expansion (aliases, `$ref`s, variable substitution) is charged to a budget per file, and
   substitution runs once over the original text.
 - A path read from a file or a config stays inside the repository root: relative, without `..`,
