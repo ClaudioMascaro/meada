@@ -44,10 +44,23 @@ fn tokens(src: &str) -> Vec<Token> {
             }
             '/' if chars.peek() == Some(&'*') => {
                 chars.next();
+                // Kotlin block comments nest; read so for Groovy too, where a nested opener is
+                // rare and only turns a coordinate into a miss, never into a wrong `exact`.
+                let mut depth = 1usize;
                 while let Some(c) = chars.next() {
-                    if c == '*' && chars.peek() == Some(&'/') {
-                        chars.next();
-                        break;
+                    match (c, chars.peek()) {
+                        ('*', Some('/')) => {
+                            chars.next();
+                            depth -= 1;
+                            if depth == 0 {
+                                break;
+                            }
+                        }
+                        ('/', Some('*')) => {
+                            chars.next();
+                            depth += 1;
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -594,6 +607,13 @@ mod tests {
 
     fn build(path: &str, src: &str) -> super::super::Build {
         read(path, src.as_bytes()).build.unwrap_or_default()
+    }
+
+    #[test]
+    fn block_comments_nest() {
+        let found = tokens("a /* b /* c */ d */ e /* f */ g /*/ h */ i");
+        let words: Vec<_> = found.iter().filter_map(Token::word).collect();
+        assert_eq!(words, ["a", "e", "g", "i"]);
     }
 
     #[test]
