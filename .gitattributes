@@ -1,3 +1,5 @@
 # Fixtures and golden files are compared byte for byte (BLAKE3 hashes, byte ranges).
 tests/fixtures/** -text
 tests/golden/** -text
+# The vendored Kotlin grammar is compiled byte for byte as upstream wrote it (PROVENANCE.md).
+vendor/tree-sitter-kotlin-ng/** -text

@@ -1544,6 +1544,13 @@ fn kotlin() {
             "src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()",
             "src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()",
             "src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()",
+            // Shapes the published grammar lost (ADR 0017).
+            "src/main/kotlin/example/web/HealthController.kt::example.web.HealthController",
+            "src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.Companion",
+            "src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.live()",
+            "src/main/kotlin/example/OneLine.kt::example.Twins",
+            "src/main/kotlin/example/OneLine.kt::example.Twins.left()",
+            "src/main/kotlin/example/OneLine.kt::example.Twins.right()",
         ],
         &["src/main/kotlin/example/Main.kt::example.main(Array<String>)"],
         &[
@@ -2185,6 +2192,22 @@ fn kotlin_private_and_internal_members_are_no_export_doors() {
     assert!(door("::example.util.Hidden.visible()"), "{doors:?}");
     assert!(!door("::example.util.Hidden.shared()"), "{doors:?}");
     assert!(!door("::example.util.Hidden.closed()"), "{doors:?}");
+}
+
+/// A Spring controller with two annotations, no constructor and a one-line companion body
+/// provides its mapping (the published grammar read the class as an infix call, ADR 0017).
+#[test]
+fn kotlin_annotated_class_with_a_one_line_companion_provides_its_mapping() {
+    let (_, actual) = providers(
+        "kotlin_health",
+        "conformance-kotlin",
+        "src/main/kotlin/example/web/HealthController.kt",
+    );
+    let expected = pairs(&[(
+        "http::GET::/health/live",
+        "src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.live()",
+    )]);
+    assert_eq!(actual, expected);
 }
 
 /// Search finds an extension function by name.

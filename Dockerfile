@@ -37,6 +37,8 @@ COPY meada-core/ meada-core/
 COPY src/ src/
 COPY examples/golden_diff.rs examples/golden_diff.rs
 COPY tests/golden/schema.txt tests/golden/schema.txt
+COPY build.rs ./
+COPY vendor/tree-sitter-kotlin-ng/ vendor/tree-sitter-kotlin-ng/
 ARG FEATURES=""
 RUN cargo build --release --locked --features "$FEATURES"
 
