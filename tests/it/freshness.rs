@@ -93,6 +93,48 @@ fn java_consumers_follow_an_edited_constant_of_another_file_like_a_cold_index() 
     assert_eq!(consumed(list), Some("http::GET::/v2/orders".into()));
 }
 
+/// A listener's topic follows an edited key of the Spring configuration, and a producer's an
+/// edited constant, as a cold index reads them (spec #26, #92).
+#[test]
+fn java_channels_follow_an_edited_configuration_key_and_constant_like_a_cold_index() {
+    let edit = |repo: &Path| {
+        let replace = |file: &str, from: &str, to: &str| {
+            let path = repo.join("maven/api/src/main").join(file);
+            let text = fs::read_to_string(&path).unwrap();
+            assert!(text.contains(from), "{from} in {file}");
+            fs::write(&path, text.replace(from, to)).unwrap();
+        };
+        replace(
+            "resources/application.properties",
+            "channels.topic=orders.paid",
+            "channels.topic=orders.settled",
+        );
+        replace(
+            "java/example/channels/Sales.java",
+            "CREATED = \"orders.created\"",
+            "CREATED = \"orders.placed\"",
+        );
+    };
+    let repo = fixture_repo("fresh_java_channels", "conformance-java", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    for contract in [
+        "channel::kafka::orders.settled",
+        "channel::kafka::orders.placed",
+    ] {
+        assert!(refreshed.contains(contract), "{contract}");
+    }
+    assert!(!refreshed.contains("channel::kafka::orders.created"));
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_java_channels_cold", "conformance-java", ORIGIN, edit)
+    );
+}
+
 /// Edits a file whose exports others import, adds a file whose definition turns an inferred
 /// call in an unrelated file into an ambiguous one, deletes a file, and drops the tsconfig
 /// path alias.

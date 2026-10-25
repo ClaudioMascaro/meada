@@ -42,6 +42,22 @@
       "hash": "81fdcf704e3c82a4e6cecc3761dc7b02677db43c19b2cf9a3ac54a2da1341ae3"
     },
     {
+      "path": "maven/api/src/main/java/example/channels/Billing.java",
+      "hash": "2b98838f75f46b741d252a769fbdcb0347ddaf8f5e0f7bc84f87cf101f6f6260"
+    },
+    {
+      "path": "maven/api/src/main/java/example/channels/Delivery.java",
+      "hash": "2e694aa804b3c18fe6bb2ee432dc9dd18785a5926d54fb05278e625b555961bb"
+    },
+    {
+      "path": "maven/api/src/main/java/example/channels/Sales.java",
+      "hash": "4123b46765ac682721b672aaaa895abc2eda78cf6a15e897daaa5b0f0d1fbe25"
+    },
+    {
+      "path": "maven/api/src/main/java/example/channels/Streams.java",
+      "hash": "5bc6892f1b1fdbe871098baf313e97681020e62668aded5d4550598d5538a160"
+    },
+    {
       "path": "maven/api/src/main/java/example/clients/Jdk.java",
       "hash": "84f66ed40638f115653e9593533e60b6d87d754f0bc9d0616bde5e8c53f41a61"
     },
@@ -753,6 +769,230 @@
         "path": "maven/api/src/main/java/example/calls/Store.java",
         "start": 81,
         "end": 109
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 603,
+        "end": 1438
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.Billing(RabbitTemplate)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 672,
+        "end": 747
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 951,
+        "end": 1088
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.invoice(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 753,
+        "end": 856
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onInvoice(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 1094,
+        "end": 1340
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 1346,
+        "end": 1436
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.refund(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 862,
+        "end": 945
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 532,
+        "end": 1697
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.Delivery(JmsTemplate,SqsClient,Connection)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 759,
+        "end": 905
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.loop(Object)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1443,
+        "end": 1472
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.notifyCustomer(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 911,
+        "end": 1005
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.onNotification(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1011,
+        "end": 1104
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.receive(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1246,
+        "end": 1370
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1110,
+        "end": 1240
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.shipments()",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1376,
+        "end": 1437
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.track(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1478,
+        "end": 1574
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.watch(Dispatcher)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1580,
+        "end": 1695
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Sales.java",
+        "start": 256,
+        "end": 933
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.Sales(KafkaTemplate<String,String>)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Sales.java",
+        "start": 390,
+        "end": 475
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.created(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Sales.java",
+        "start": 481,
+        "end": 552
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.dynamic(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Sales.java",
+        "start": 638,
+        "end": 731
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onMissing(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Sales.java",
+        "start": 840,
+        "end": 931
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onSale(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Sales.java",
+        "start": 737,
+        "end": 834
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.paid(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Sales.java",
+        "start": 558,
+        "end": 632
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Streams.java",
+        "start": 287,
+        "end": 944
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.Streams(JedisPooled,RedisCommands<String,String>)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Streams.java",
+        "start": 409,
+        "end": 549
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Streams.java",
+        "start": 721,
+        "end": 942
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Streams.java",
+        "start": 555,
+        "end": 715
       }
     },
     {
@@ -2093,6 +2333,446 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()::(method_invocation).to#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 991,
+        "end": 1063
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()::(method_invocation).with#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 991,
+        "end": 1081
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()::BindingBuilder.bind#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 991,
+        "end": 1030
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()::Queue#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 1011,
+        "end": 1029
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()::TopicExchange#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 1034,
+        "end": 1062
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.invoice(String)::rabbit.convertAndSend#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.invoice(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 794,
+        "end": 849
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.refund(String)::rabbit.convertAndSend#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.refund(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 902,
+        "end": 938
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing::RabbitListener#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 1094,
+        "end": 1295
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing::RabbitListener#1",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 1346,
+        "end": 1392
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.notifyCustomer(String)::jms.convertAndSend#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.notifyCustomer(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 959,
+        "end": 998
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.receive(String)::(method_invocation).build#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.receive(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1309,
+        "end": 1362
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.receive(String)::(method_invocation).queueUrl#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.receive(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1309,
+        "end": 1354
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.receive(String)::ReceiveMessageRequest.builder#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.receive(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1309,
+        "end": 1340
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.receive(String)::sqs.receiveMessage#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.receive(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1290,
+        "end": 1363
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)::(method_invocation).build#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1164,
+        "end": 1232
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)::(method_invocation).messageBody#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1164,
+        "end": 1224
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)::(method_invocation).queueUrl#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1164,
+        "end": 1208
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)::SendMessageRequest.builder#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1164,
+        "end": 1192
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)::sqs.sendMessage#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1148,
+        "end": 1233
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.shipments()::loop#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.shipments()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.loop(Object)",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1410,
+        "end": 1430
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.shipments()::receive#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.shipments()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.receive(String)",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1415,
+        "end": 1429
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.track(String)::id.getBytes#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.track(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1553,
+        "end": 1566
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.track(String)::nats.publish#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.track(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1517,
+        "end": 1567
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.watch(Dispatcher)::dispatcher.subscribe#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.watch(Dispatcher)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1631,
+        "end": 1688
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery::JmsListener#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 1011,
+        "end": 1054
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.created(String)::kafka.send#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.created(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Sales.java",
+        "start": 522,
+        "end": 545
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.dynamic(String)::System.getenv#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.dynamic(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Sales.java",
+        "start": 690,
+        "end": 719
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.dynamic(String)::kafka.send#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.dynamic(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Sales.java",
+        "start": 679,
+        "end": 724
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.paid(String)::kafka.send#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.paid(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Sales.java",
+        "start": 596,
+        "end": 625
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales::KafkaListener#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Sales.java",
+        "start": 737,
+        "end": 792
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales::KafkaListener#1",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Sales.java",
+        "start": 840,
+        "end": 886
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()::Consumer.from#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Streams.java",
+        "start": 864,
+        "end": 887
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()::Map.of#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Streams.java",
+        "start": 786,
+        "end": 834
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()::XReadArgs.StreamOffset.lastConsumed#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Streams.java",
+        "start": 889,
+        "end": 934
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()::jedis.xreadGroup#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Streams.java",
+        "start": 753,
+        "end": 835
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()::lettuce.xreadgroup#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Streams.java",
+        "start": 845,
+        "end": 935
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)::Map.of#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Streams.java",
+        "start": 641,
+        "end": 657
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)::Map.of#1",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Streams.java",
+        "start": 691,
+        "end": 707
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)::jedis.xadd#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Streams.java",
+        "start": 595,
+        "end": 658
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)::lettuce.xadd#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Streams.java",
+        "start": 668,
+        "end": 708
+      }
+    },
+    {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()::(method_invocation).POST#0",
       "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()",
       "target": null,
@@ -3327,6 +4007,42 @@
   ],
   "providers": [
     {
+      "contract": "channel::amqp::refunds",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.refund(String)::rabbit.convertAndSend#0"
+    },
+    {
+      "contract": "channel::jms::notifications",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.notifyCustomer(String)::jms.convertAndSend#0"
+    },
+    {
+      "contract": "channel::kafka",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.dynamic(String)::kafka.send#0"
+    },
+    {
+      "contract": "channel::kafka::orders.created",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.created(String)::kafka.send#0"
+    },
+    {
+      "contract": "channel::kafka::orders.paid",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.paid(String)::kafka.send#0"
+    },
+    {
+      "contract": "channel::nats::delivery.eu.tracked",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.track(String)::nats.publish#0"
+    },
+    {
+      "contract": "channel::redis::audits",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)::lettuce.xadd#0"
+    },
+    {
+      "contract": "channel::redis::events",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)::jedis.xadd#0"
+    },
+    {
+      "contract": "channel::sqs::shipments",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)::sqs.sendMessage#0"
+    },
+    {
       "contract": "http::ANY::/api/orders/any",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.any()"
     },
@@ -3469,6 +4185,61 @@
   ],
   "consumers": [
     {
+      "contract": "channel::amqp::invoices",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onInvoice(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::audit",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::refunds",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::jms::notifications",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.onNotification(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::sqs::shipments",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.shipments()",
+      "via": null
+    },
+    {
+      "contract": "channel::nats::delivery.*.tracked",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.watch(Dispatcher)",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onMissing(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::orders.created",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onSale(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::orders.paid",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onSale(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::audits",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::events",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()",
+      "via": null
+    },
+    {
       "contract": "http::POST::/api/orders/new",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()::(method_invocation).build#0",
       "via": "host:orders.example.com"
@@ -3542,6 +4313,27 @@
       "contract": "http::POST::/api/orders/single",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.single()::rest.exchange#0",
       "via": null
+    }
+  ],
+  "bindings": [
+    {
+      "contract": "channel::amqp::audit",
+      "exchange": "billing",
+      "pattern": "invoice.#",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()::(method_invocation).with#0"
+    },
+    {
+      "contract": "channel::amqp::invoices",
+      "exchange": "billing",
+      "pattern": "invoice.*",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing::RabbitListener#0"
+    }
+  ],
+  "publishes": [
+    {
+      "exchange": "billing",
+      "key": "invoice.created",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.invoice(String)::rabbit.convertAndSend#0"
     }
   ],
   "packages": [
@@ -3625,6 +4417,14 @@
       ]
     },
     {
+      "name": "maven/api/src/main/java/example/channels",
+      "members": [
+        "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.loop(Object)",
+        "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.receive(String)",
+        "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.shipments()"
+      ]
+    },
+    {
       "name": "maven/api/src/main/java/example/clients",
       "members": [
         "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.drop()",
@@ -3649,6 +4449,76 @@
     }
   ],
   "links": [
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onInvoice(String)",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.invoice(String)::rabbit.convertAndSend#0",
+      "contract": "channel::amqp::invoices",
+      "level": "inferred",
+      "reason": "channel::amqp::invoices binding billing invoice.*"
+    },
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.invoice(String)::rabbit.convertAndSend#0",
+      "contract": "channel::amqp::audit",
+      "level": "inferred",
+      "reason": "channel::amqp::audit binding billing invoice.#"
+    },
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.refund(String)::rabbit.convertAndSend#0",
+      "contract": "channel::amqp::refunds",
+      "level": "exact",
+      "reason": "channel::amqp::refunds"
+    },
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.onNotification(String)",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.notifyCustomer(String)::jms.convertAndSend#0",
+      "contract": "channel::jms::notifications",
+      "level": "exact",
+      "reason": "channel::jms::notifications"
+    },
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.shipments()",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)::sqs.sendMessage#0",
+      "contract": "channel::sqs::shipments",
+      "level": "exact",
+      "reason": "channel::sqs::shipments"
+    },
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.watch(Dispatcher)",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.track(String)::nats.publish#0",
+      "contract": "channel::nats::delivery.*.tracked",
+      "level": "inferred",
+      "reason": "channel::nats::delivery.eu.tracked wildcard delivery.*.tracked"
+    },
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onSale(String)",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.created(String)::kafka.send#0",
+      "contract": "channel::kafka::orders.created",
+      "level": "exact",
+      "reason": "channel::kafka::orders.created"
+    },
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onSale(String)",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.paid(String)::kafka.send#0",
+      "contract": "channel::kafka::orders.paid",
+      "level": "exact",
+      "reason": "channel::kafka::orders.paid"
+    },
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)::jedis.xadd#0",
+      "contract": "channel::redis::events",
+      "level": "exact",
+      "reason": "channel::redis::events"
+    },
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)::lettuce.xadd#0",
+      "contract": "channel::redis::audits",
+      "level": "exact",
+      "reason": "channel::redis::audits"
+    },
     {
       "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.create()::rest.postForObject#0",
       "provider": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.create()",
@@ -4342,6 +5212,474 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.send(String,int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.Billing(RabbitTemplate)",
+      "kind": "export",
+      "label": "example.channels.Billing.Billing(RabbitTemplate)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.Billing(RabbitTemplate)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()",
+      "kind": "export",
+      "label": "example.channels.Billing.audit()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.invoice(String)",
+      "kind": "export",
+      "label": "example.channels.Billing.invoice(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.invoice(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onInvoice(String)",
+          "reason": "channel::amqp::invoices binding billing invoice.*"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)",
+          "reason": "channel::amqp::audit binding billing invoice.#"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onInvoice(String)::channel::amqp::invoices",
+      "kind": "channel",
+      "label": "channel::amqp::invoices",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onInvoice(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)::channel::amqp::audit",
+      "kind": "channel",
+      "label": "channel::amqp::audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)::channel::amqp::refunds",
+      "kind": "channel",
+      "label": "channel::amqp::refunds",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.refund(String)",
+      "kind": "export",
+      "label": "example.channels.Billing.refund(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.refund(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)",
+          "reason": "channel::amqp::refunds"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.Delivery(JmsTemplate,SqsClient,Connection)",
+      "kind": "export",
+      "label": "example.channels.Delivery.Delivery(JmsTemplate,SqsClient,Connection)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.Delivery(JmsTemplate,SqsClient,Connection)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.notifyCustomer(String)",
+      "kind": "export",
+      "label": "example.channels.Delivery.notifyCustomer(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.notifyCustomer(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.onNotification(String)",
+          "reason": "channel::jms::notifications"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.onNotification(String)::channel::jms::notifications",
+      "kind": "channel",
+      "label": "channel::jms::notifications",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.onNotification(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)",
+      "kind": "export",
+      "label": "example.channels.Delivery.ship(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.shipments()",
+          "reason": "channel::sqs::shipments"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.loop(Object)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.receive(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.shipments()::channel::sqs::shipments",
+      "kind": "channel",
+      "label": "channel::sqs::shipments",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.shipments()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.loop(Object)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.receive(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.track(String)",
+      "kind": "export",
+      "label": "example.channels.Delivery.track(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.track(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.watch(Dispatcher)",
+          "reason": "channel::nats::delivery.eu.tracked wildcard delivery.*.tracked"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.watch(Dispatcher)::channel::nats::delivery.*.tracked",
+      "kind": "channel",
+      "label": "channel::nats::delivery.*.tracked",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.watch(Dispatcher)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.Sales(KafkaTemplate<String,String>)",
+      "kind": "export",
+      "label": "example.channels.Sales.Sales(KafkaTemplate<String,String>)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.Sales(KafkaTemplate<String,String>)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.created(String)",
+      "kind": "export",
+      "label": "example.channels.Sales.created(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.created(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onSale(String)",
+          "reason": "channel::kafka::orders.created"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.dynamic(String)",
+      "kind": "export",
+      "label": "example.channels.Sales.dynamic(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.dynamic(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.dynamic(String)::kafka.send#0",
+          "mark": "produces",
+          "contract": "channel::kafka"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onMissing(String)::channel::kafka",
+      "kind": "channel",
+      "label": "channel::kafka (unresolved)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onMissing(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onMissing(String)",
+          "mark": "consumes",
+          "contract": "channel::kafka"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onSale(String)::channel::kafka::orders.created",
+      "kind": "channel",
+      "label": "channel::kafka::orders.created",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onSale(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onSale(String)::channel::kafka::orders.paid",
+      "kind": "channel",
+      "label": "channel::kafka::orders.paid",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onSale(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.paid(String)",
+      "kind": "export",
+      "label": "example.channels.Sales.paid(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.paid(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onSale(String)",
+          "reason": "channel::kafka::orders.paid"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.Streams(JedisPooled,RedisCommands<String,String>)",
+      "kind": "export",
+      "label": "example.channels.Streams.Streams(JedisPooled,RedisCommands<String,String>)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.Streams(JedisPooled,RedisCommands<String,String>)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()::channel::redis::audits",
+      "kind": "channel",
+      "label": "channel::redis::audits",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()::channel::redis::events",
+      "kind": "channel",
+      "label": "channel::redis::events",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)",
+      "kind": "export",
+      "label": "example.channels.Streams.record(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()",
+          "reason": "channel::redis::events"
         }
       ]
     },

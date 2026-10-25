@@ -86,6 +86,19 @@ All notable changes to Meada are recorded here. The format follows
   in the source creates the class (`this(..)` and `super(..)`, now constructor calls,
   included). A cross-language chain fixture (TypeScript and Java) is
   golden for its exports and `trace` both ways.
+- Java channels (spec #26, #92): Spring Kafka (`KafkaTemplate.send`, `@KafkaListener`), Spring
+  AMQP (`RabbitTemplate.convertAndSend` by its overload, the default exchange reaching the queue
+  its key names, `@RabbitListener` with `@QueueBinding` bindings and
+  `BindingBuilder.bind(..).to(..).with(..)`), JMS (`JmsTemplate.send` and `convertAndSend`,
+  `@JmsListener`) under the new broker kind `jms` (also an AsyncAPI protocol), the SQS client of
+  the AWS SDK v2 (the queue the last segment of `queueUrl`), jnats `publish` and `subscribe`,
+  and the Redis streams of Jedis and Lettuce (`xadd`, `xreadGroup`, `xreadgroup`). A client
+  counts by the type the source writes for it; names fold like URLs, the `${key}` placeholders
+  of annotations and `@Value` fields read from the module's Spring configuration. An annotated
+  listener's handler is the annotated method, a polling client's the method that names the
+  topic or queue. The Java pack reads an annotation written as an element value
+  (`@Queue("orders")`) as its name and elements, kept only while contracts are extracted. The
+  cross-language chain reaches a `@KafkaListener` from a kafkajs producer.
 
 - A multilingual documentation site (issue #320), with the README reference migrated to
   Portuguese, English and Spanish guides, React Flow maps and roadmap, accessible static and

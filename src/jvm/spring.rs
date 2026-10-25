@@ -12,7 +12,8 @@
 //! A placeholder `${key}` takes the value of `key` when the module's configuration holds one;
 //! otherwise it names the environment variable `key` (`Part::Env`), whose value Meada never
 //! reads, and `${key:default}` names it with the default (`Part::EnvOr`). `inject` reads Spring's
-//! `@Value("${key}")` on a field or a parameter that way (`Code::expand_with`).
+//! `@Value("${key}")` on a field or a parameter that way (`Code::expand_with`), and `resolved` the
+//! text of any other annotation Spring resolves (a listener's topic or queue).
 
 use std::collections::BTreeMap;
 
@@ -310,8 +311,18 @@ pub fn inject<'a>(
         return None;
     }
     let written = annotation.args.first().or(annotation.keyword("value"))?;
-    let Value::Str(parts) = code.value(path, &annotation.scope, written) else {
-        return Some(Value::Unknown);
+    Some(resolved(
+        &code.value(path, &annotation.scope, written),
+        configs.of(path),
+    ))
+}
+
+/// A folded value as Spring reads an annotation's text: a string of literal text with its
+/// placeholders resolved against `config` (`resolve`); unknown for anything else, a string with
+/// a part that is not literal text included.
+pub fn resolved(value: &Value, config: Option<&Properties>) -> Value {
+    let Value::Str(parts) = value else {
+        return Value::Unknown;
     };
     let text: Option<String> = (parts.iter())
         .map(|p| match p {
@@ -319,10 +330,10 @@ pub fn inject<'a>(
             _ => None,
         })
         .collect();
-    Some(match text {
-        Some(text) => Value::Str(resolve(&text, configs.of(path))),
+    match text {
+        Some(text) => Value::Str(resolve(&text, config)),
         None => Value::Unknown,
-    })
+    }
 }
 
 #[cfg(test)]

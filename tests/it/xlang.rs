@@ -415,6 +415,29 @@ fn trace_down_crosses_into_java_and_back_to_typescript() {
     assert_golden("xlang-java.trace-down.txt", &answer);
 }
 
+/// The web app produces the Kafka topic `orders.shipped` in TypeScript (kafkajs); the api
+/// service consumes it with a Spring `@KafkaListener` whose topic its configuration names, the
+/// annotated method being the handler (spec #26, #92).
+#[test]
+fn trace_down_from_a_typescript_producer_reaches_the_java_kafka_listener() {
+    let (web, _) = xlang_java("xlang_java_channel_down");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("announceShipment"), Direction::Down, None)
+        .unwrap();
+
+    assert!(
+        answer.contains(
+            "→[exact: channel::kafka::orders.shipped] example.com/xlang-java/api \
+             src/main/java/com/example/api/ShipmentListener.java:7 \
+             com.example.api.ShipmentListener.onShipment(String)"
+        ),
+        "{answer}"
+    );
+    assert_golden("xlang-java.trace-channel-down.txt", &answer);
+}
+
 #[test]
 fn trace_up_crosses_into_java_and_back_to_typescript() {
     let (web, _) = xlang_java("xlang_java_up");

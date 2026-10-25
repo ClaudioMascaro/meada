@@ -915,24 +915,33 @@ fn annotations(node: Node, src: &[u8], scope: &str) -> Vec<Call> {
             continue;
         };
         let mut at = call(scope, callee(name, src), annotation.byte_range());
-        if let Some(args) = annotation.child_by_field_name("arguments") {
-            for argument in named(args) {
-                if argument.kind() == "element_value_pair" {
-                    if let (Some(key), Some(v)) = (
-                        argument.child_by_field_name("key"),
-                        argument.child_by_field_name("value"),
-                    ) {
-                        at.kwargs
-                            .push((text(key, src).to_string(), value(v, src, 0)));
-                    }
-                } else {
-                    at.args.push(value(argument, src, 0));
-                }
-            }
-        }
+        (at.args, at.kwargs) = elements(annotation, src, 0);
         out.push(at);
     }
     out
+}
+
+/// The elements of the annotation `node` as written: the unnamed one and the named ones
+/// (`key = value`).
+fn elements(node: Node, src: &[u8], depth: usize) -> (Vec<Value>, Vec<(String, Value)>) {
+    let (mut args, mut kwargs) = (Vec::new(), Vec::new());
+    for argument in node
+        .child_by_field_name("arguments")
+        .into_iter()
+        .flat_map(named)
+    {
+        if argument.kind() == "element_value_pair" {
+            if let (Some(key), Some(v)) = (
+                argument.child_by_field_name("key"),
+                argument.child_by_field_name("value"),
+            ) {
+                kwargs.push((text(key, src).to_string(), value(v, src, depth)));
+            }
+        } else {
+            args.push(value(argument, src, depth));
+        }
+    }
+    (args, kwargs)
 }
 
 fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
@@ -1167,6 +1176,19 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             }),
         "array_initializer" | "element_value_array_initializer" => {
             Value::List(named(node).map(|n| value(n, src, depth + 1)).collect())
+        }
+        // An annotation written as an element value (`@Queue("orders")` inside `@QueueBinding`):
+        // its name and its elements, the unnamed one as `value`, as Java reads it.
+        "annotation" | "marker_annotation" => {
+            let Some(name) = node.child_by_field_name("name") else {
+                return Value::Unknown;
+            };
+            let (args, kwargs) = elements(node, src, depth + 1);
+            let named = args.into_iter().map(|v| ("value".to_string(), v));
+            Value::New(
+                callee(name, src),
+                vec![Value::Object(named.chain(kwargs).collect())],
+            )
         }
         "decimal_integer_literal" => Value::Scalar(text(node, src).parse().ok()),
         "true" | "false" => Value::Scalar(None),

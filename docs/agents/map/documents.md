@@ -65,7 +65,7 @@ modules updates it.
   `messages` when it lists them, else every message of its channel; the channel's `servers` are
   `$ref`s to `#/servers/<name>`. A channel uses the servers it lists, else every server of the
   document; the lower-cased `protocol` gives the broker kind (`kafka`, `kafka-secure` ->
-  `kafka`; `amqp`, `amqps` -> `amqp`; `nats`; `redis`; `sqs`), any other is a `Problem::Protocol`
+  `kafka`; `amqp`, `amqps` -> `amqp`; `jms`; `nats`; `redis`; `sqs`), any other is a `Problem::Protocol`
   once and its channels are ignored. A document with channels and no root `servers` is a
   `Problem::NoServers` (every channel ignored), a server a channel uses without `protocol` a
   `Problem::NoProtocol`, and a server name a channel lists that the document lacks a
