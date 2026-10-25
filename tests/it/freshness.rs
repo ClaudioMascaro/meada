@@ -16,6 +16,58 @@ const ORIGIN: Option<&str> = Some("https://example.com/acme/conformance.git");
 const WEB: Option<&str> = Some("https://example.com/acme/web.git");
 
 #[test]
+fn kotlin_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
+    let edit = |repo: &Path| {
+        let path = repo.join("src/main/kotlin/example/util/Tools.kt");
+        let before = fs::read_to_string(&path).unwrap();
+        fs::write(
+            &path,
+            before.replace("fun tool(): Int", "fun tool(count: Int): Int"),
+        )
+        .unwrap();
+        let script = repo.join("scripts/seed.kts");
+        let before = fs::read_to_string(&script).unwrap();
+        fs::write(
+            &script,
+            before.replace("seed()\n", "seed()\nexample.same()\n"),
+        )
+        .unwrap();
+        fs::write(
+            repo.join("Extra.kt"),
+            "package example\n\nfun extra(): Int = helper()\n",
+        )
+        .unwrap();
+        fs::write(repo.join("extra.kts"), "example.helper()\n").unwrap();
+        fs::remove_file(repo.join("src/main/kotlin/example/Same.kt")).unwrap();
+    };
+    let repo = fixture_repo("fresh_kotlin", "conformance-kotlin", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_kotlin_cold", "conformance-kotlin", ORIGIN, edit)
+    );
+    // The edited overload takes one argument now: `tool()` no longer fits it.
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    let called = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| {
+            c["id"]
+                .as_str()
+                .unwrap()
+                .ends_with("example.calls.imported()::tool#0")
+        })
+        .unwrap();
+    assert!(called["target"].is_null());
+}
+
+#[test]
 fn java_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
     let edit = |repo: &Path| {
         let path = repo.join("maven/api/src/main/java/example/util/Tools.java");

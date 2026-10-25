@@ -1,6 +1,6 @@
 # Capabilities and limits
 
-Meada 0.1 indexes TypeScript, JavaScript, Python, Rust, Go and Java. It finds calls in code and connects repositories through HTTP, packages and messaging channels. Each link reports its confidence level.
+Meada 0.1 indexes TypeScript, JavaScript, Python, Rust, Go, Java and Kotlin. It finds calls in code and connects repositories through HTTP, packages and messaging channels. Each link reports its confidence level.
 
 Server mode includes the [console](console.md), [snapshots](snapshots.md), [retention](generations.md) and [managed workspace](workspaces.md) through optional modules. The console has an editor, diff, playground and graph. [Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/) and [Helm](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/) provide deployment examples.
 
@@ -13,6 +13,7 @@ Server mode includes the [console](console.md), [snapshots](snapshots.md), [rete
 | Rust | `.rs` reachable through each crate's module tree |
 | Go | `.go` included by the package's build rules |
 | Java | `.java`, resolved by their `package` declarations |
+| Kotlin | `.kt` and `.kts` (but `build.gradle.kts` and `settings.gradle.kts`), resolved by their `package` declarations |
 
 ### Rust
 
@@ -43,6 +44,14 @@ A call on a field, parameter or local variable whose type is written resolves wi
 Public types and their public or protected members form the exported surface.
 
 Indexing needs no JDK, Maven or Gradle and executes no repository code.
+
+### Kotlin
+
+Meada reads classes (including `data`, `sealed`, `enum` and `annotation` classes), interfaces, objects, companions, top-level functions, extension functions, properties with getters and methods, including nested ones. Names include the package and, for functions, the written parameter types: `example.helper(Int)`. An unnamed companion is `Class.Companion`, and an extension function carries its receiver type: `example.Point.norm()`. Calls in a lambda belong to the enclosing symbol.
+
+Single, aliased (`as`) and `*` imports resolve through package declarations, and the file's own package is visible without an import. Bare, `this`, object (`Registry.find()`) and companion (`Point.origin()`) calls are `exact` when argument count leaves one function, counting parameters with default values and `vararg`; overloads with the same argument count stay `ambiguous`. Calling a class's name constructs it. Inside a lambda, a bare or `this` call may belong to an implicit receiver, and resolves by name only. Kotlin and Java in one repository call each other by fully qualified name. Names outside the repository stay external.
+
+Declarations that are neither `private` nor `internal` form the exported surface; an `internal` one is visible across the repository, and a top-level `private` one in its own file only. Indexing needs no Kotlin compiler, JDK or Gradle.
 
 ## HTTP and contract documents
 

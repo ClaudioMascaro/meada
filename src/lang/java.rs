@@ -101,11 +101,19 @@ impl LanguagePack for Java {
                 .entry(facts.package.clone())
                 .or_default()
                 .push(path.to_string());
-            for def in facts.defs.iter().filter(|d| d.kind == Kind::Class) {
-                types
-                    .entry(def.name.clone())
-                    .or_default()
-                    .push(path.to_string());
+            // Types, and what a Kotlin file declares at its top level: functions (by overload
+            // family) and constants, which an import names by fully qualified name too.
+            let classes = (facts.defs.iter())
+                .filter(|d| d.kind == Kind::Class)
+                .map(|d| &d.name);
+            let tops = (facts.overloads.keys())
+                .chain(facts.consts.iter().map(|c| &c.name))
+                .filter(|n| !n.starts_with('.') && crate::parent(n) == facts.package);
+            for name in classes.chain(tops) {
+                let found = types.entry(name.clone()).or_default();
+                if found.last().map(String::as_str) != Some(path) {
+                    found.push(path.to_string());
+                }
             }
         }
         let modules: BTreeMap<String, Vec<String>> = packages

@@ -1,0 +1,12 @@
+example.com/acme/conformance src/main/kotlin/example/Shapes.kt:71-71 example.helper()
+community: src/main/kotlin/example
+processes: 5 (5 export; 1 repository): example.notSecret() (example.com/acme/conformance), example.calls() (example.com/acme/conformance), example.hiding((Int)->Int,List<()->Int>) (example.com/acme/conformance), example.open() (example.com/acme/conformance), example.calls.qualified() (example.com/acme/conformance)
+fun helper(): Int = Registry.all().size
+callers:
+example.com/acme/conformance scripts/seed.kts:2 seed() [inferred: one method named helper]
+example.com/acme/conformance src/main/kotlin/example/Same.kt:4 example.same()
+example.com/acme/conformance src/main/kotlin/example/Shapes.kt:82 example.calls()
+example.com/acme/conformance src/main/kotlin/example/Shapes.kt:98 example.inside()
+example.com/acme/conformance src/main/kotlin/example/calls/Imports.kt:27 example.calls.qualified() [inferred: one method named helper]
+callees:
+example.com/acme/conformance src/main/kotlin/example/Shapes.kt:60 example.Registry.all()

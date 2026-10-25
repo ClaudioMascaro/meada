@@ -293,7 +293,8 @@ pub struct Resolver<'a> {
     defs: HashMap<&'a str, HashMap<&'a str, &'a Def>>,
     overloads: HashMap<&'a str, HashMap<&'a str, Vec<Target<'a>>>>,
     constructors: HashMap<&'a str, HashMap<&'a str, Vec<Target<'a>>>>,
-    arities: HashMap<Target<'a>, usize>,
+    /// The argument counts each overload takes, fewest to most (`Arity`).
+    arities: HashMap<Target<'a>, Arity>,
     statics: HashSet<Target<'a>>,
     members_in_scope: bool,
     unordered_globs: bool,
@@ -366,6 +367,28 @@ pub struct Resolver<'a> {
     groups: Vec<Group<'a>>,
 }
 
+/// The argument counts a function takes: one per parameter, fewer for the ones a call may leave
+/// out (`Binds::Optional`), and any number more for a `Binds::Rest` one (Kotlin's `vararg`).
+#[derive(Clone, Copy)]
+struct Arity {
+    least: usize,
+    most: Option<usize>,
+}
+
+impl Arity {
+    fn of(params: &[Param]) -> Self {
+        let required = |p: &&Param| !matches!(p.binds, Binds::Optional | Binds::Rest);
+        Arity {
+            least: params.iter().filter(required).count(),
+            most: (!params.iter().any(|p| p.binds == Binds::Rest)).then_some(params.len()),
+        }
+    }
+
+    fn fits(self, arity: usize) -> bool {
+        self.least <= arity && self.most.is_none_or(|most| arity <= most)
+    }
+}
+
 /// Files that share one top-level scope (`Layout::shared`), sorted, and the files whose top
 /// level binds each name: a definition that is no method, or a constant.
 struct Group<'a> {
@@ -427,7 +450,7 @@ impl<'a> Resolver<'a> {
                                 .filter_map(|name| {
                                     let (&name, def) = defs[path].get_key_value(name.as_str())?;
                                     let target = Target { path, name };
-                                    arities.insert(target, def.params.len());
+                                    arities.insert(target, Arity::of(&def.params));
                                     Some(target)
                                 })
                                 .collect();
@@ -939,7 +962,7 @@ impl<'a> Resolver<'a> {
 
     fn narrow(&self, binding: Binding<'a>, arity: Option<usize>) -> Binding<'a> {
         let Some(arity) = arity else { return binding };
-        let fits = |t: &Target<'a>| self.arities.get(t).is_none_or(|n| *n == arity);
+        let fits = |t: &Target<'a>| self.arities.get(t).is_none_or(|n| n.fits(arity));
         match binding {
             Binding::Def(t) if !fits(&t) => Binding::Unknown,
             Binding::Several(all) => match all.into_iter().filter(fits).collect::<Vec<_>>()[..] {
@@ -1353,7 +1376,16 @@ impl<'a> Resolver<'a> {
         work: &mut Work<'a>,
     ) -> Binding<'a> {
         let Some(family) = self.family(class, work) else {
-            return Binding::Unknown;
+            // A class nested in the class is its own, whatever its bases: found while the family
+            // is being linearized too (a Kotlin companion, written as a base of its class).
+            let qualified = format!("{}.{member}", class.name);
+            return match self.defs[class.path].get_key_value(qualified.as_str()) {
+                Some((name, def)) if def.kind == Kind::Class => Binding::Def(Target {
+                    path: class.path,
+                    name,
+                }),
+                _ => Binding::Unknown,
+            };
         };
         if !read && let Some(found) = self.overloaded(&family, member) {
             return found;
@@ -1698,7 +1730,7 @@ impl<'a> Resolver<'a> {
             found.retain(|t| reaches(path, t.path));
         }
         if let Some(arity) = arity {
-            found.retain(|t| self.arities.get(t).is_none_or(|n| *n == arity));
+            found.retain(|t| self.arities.get(t).is_none_or(|n| n.fits(arity)));
         }
         found
     }
@@ -3742,7 +3774,7 @@ impl<'a> Code<'a> {
         match param.binds {
             Binds::Rest => None,
             Binds::Keyword => call.keyword(&param.name),
-            Binds::Any | Binds::Instance | Binds::Class => (position)
+            Binds::Any | Binds::Optional | Binds::Instance | Binds::Class => (position)
                 .and_then(|at| call.args.get(at))
                 .or_else(|| call.keyword(&param.name)),
         }

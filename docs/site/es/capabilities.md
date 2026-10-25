@@ -1,6 +1,6 @@
 # Capacidades y límites
 
-Meada 0.1 indexa TypeScript, JavaScript, Python, Rust, Go y Java. Encuentra llamadas en el código y conecta repositorios mediante HTTP, paquetes y canales de mensajes. Cada vínculo indica su nivel de certeza.
+Meada 0.1 indexa TypeScript, JavaScript, Python, Rust, Go, Java y Kotlin. Encuentra llamadas en el código y conecta repositorios mediante HTTP, paquetes y canales de mensajes. Cada vínculo indica su nivel de certeza.
 
 El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [retención](generations.md) y [workspace gestionado](workspaces.md) mediante módulos opcionales. La consola tiene editor, diff, playground y grafo. [Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/) y [Helm](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/) ofrecen ejemplos de despliegue.
 
@@ -13,6 +13,7 @@ El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [rete
 | Rust | `.rs` alcanzados por el árbol de módulos de cada crate |
 | Go | `.go` incluidos por las reglas de build del paquete |
 | Java | `.java`, resueltos por sus declaraciones de `package` |
+| Kotlin | `.kt` y `.kts` (salvo `build.gradle.kts` y `settings.gradle.kts`), resueltos por sus declaraciones de `package` |
 
 ### Rust
 
@@ -43,6 +44,14 @@ Una llamada sobre un campo, parámetro o variable local de tipo escrito se resue
 Los tipos públicos y sus miembros públicos o protegidos forman la superficie exportada.
 
 La indexación no necesita JDK, Maven ni Gradle y no ejecuta código del repositorio.
+
+### Kotlin
+
+Meada lee clases (también `data`, `sealed`, `enum` y `annotation`), interfaces, objetos, companions, funciones de nivel superior, funciones de extensión, propiedades con getter y métodos, también anidados. Los nombres incluyen el paquete y, en las funciones, los tipos escritos de los parámetros: `example.helper(Int)`. Un companion sin nombre es `Clase.Companion`, y una función de extensión lleva el tipo de su receptor: `example.Point.norm()`. Las llamadas de una lambda pertenecen al símbolo que la contiene.
+
+Los imports simples, con `as` y con `*` se resuelven por las declaraciones de paquete, y el propio paquete es visible sin import. Las llamadas sin receptor, con `this`, sobre un objeto (`Registry.find()`) o sobre un companion (`Point.origin()`) son `exact` cuando la cantidad de argumentos deja una sola función, contando los parámetros con valor por defecto y `vararg`; las sobrecargas con la misma cantidad quedan `ambiguous`. Llamar al nombre de una clase la construye. Dentro de una lambda, una llamada sin receptor o con `this` puede ser de un receptor implícito, y se resuelve solo por nombre. Kotlin y Java del mismo repositorio se llaman por el nombre totalmente calificado. Los nombres de fuera del repositorio siguen siendo externos.
+
+Las declaraciones que no son `private` ni `internal` forman la superficie exportada; una `internal` es visible en todo el repositorio, y una `private` de nivel superior solo en su propio archivo. La indexación no necesita compilador de Kotlin, JDK ni Gradle.
 
 ## HTTP y documentos de contrato
 

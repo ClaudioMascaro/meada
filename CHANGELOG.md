@@ -28,6 +28,15 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Kotlin source indexing (issue #95): `.kt` and `.kts` files (Gradle's `build.gradle.kts` and
+  `settings.gradle.kts` stay manifests) yield package-qualified classes, interfaces, objects,
+  companions (`Class.Companion` when unnamed), top-level and extension functions, properties
+  with getters and methods, with written parameter types. Single, aliased and star imports
+  resolve through package declarations; bare, `this`, object and companion calls are `exact`
+  when the argument count, counting default values and `vararg`, leaves one function. Kotlin and
+  Java files of one repository call each other by fully qualified name. No Kotlin compiler, JDK
+  or Gradle is involved.
+
 - Java OpenFeign and Retrofit clients (issue #90): each method of an `@FeignClient(name, url)`
   interface with Spring mapping annotations, or of a Retrofit interface with `retrofit2.http`
   verbs, is an HTTP consumer sited at the interface method, so a caller of the method reaches

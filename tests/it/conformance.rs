@@ -1371,6 +1371,405 @@ fn java_qualification_expansion_discards_the_whole_file_and_keeps_other_files() 
     assert!(called["level"].is_null());
 }
 
+#[test]
+fn kotlin() {
+    conform(
+        "conformance-kotlin",
+        &[
+            "scripts/seed.kts::seed()",
+            "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy",
+            "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()",
+            "src/main/kotlin/example/Same.kt::example.notSecret()",
+            "src/main/kotlin/example/Same.kt::example.same()",
+            "src/main/kotlin/example/Shapes.kt::example.Box",
+            "src/main/kotlin/example/Shapes.kt::example.Box.Factory",
+            "src/main/kotlin/example/Shapes.kt::example.Box.Factory.create()",
+            "src/main/kotlin/example/Shapes.kt::example.Box.label()",
+            "src/main/kotlin/example/Shapes.kt::example.Box.later()",
+            "src/main/kotlin/example/Shapes.kt::example.Box.name()",
+            "src/main/kotlin/example/Shapes.kt::example.Box.relabel()",
+            "src/main/kotlin/example/Shapes.kt::example.Color",
+            "src/main/kotlin/example/Shapes.kt::example.Marker",
+            "src/main/kotlin/example/Shapes.kt::example.Named",
+            "src/main/kotlin/example/Shapes.kt::example.Named.name()",
+            "src/main/kotlin/example/Shapes.kt::example.Point",
+            "src/main/kotlin/example/Shapes.kt::example.Point.Companion",
+            "src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin()",
+            "src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin(Int)",
+            "src/main/kotlin/example/Shapes.kt::example.Point.moved(Int)",
+            "src/main/kotlin/example/Shapes.kt::example.Point.norm()",
+            "src/main/kotlin/example/Shapes.kt::example.Point.scaled(Int)",
+            "src/main/kotlin/example/Shapes.kt::example.Point.twice()",
+            "src/main/kotlin/example/Shapes.kt::example.Registry",
+            "src/main/kotlin/example/Shapes.kt::example.Registry.all()",
+            "src/main/kotlin/example/Shapes.kt::example.Registry.find(String)",
+            "src/main/kotlin/example/Shapes.kt::example.Registry.find(String,Point)",
+            "src/main/kotlin/example/Shapes.kt::example.Shape",
+            "src/main/kotlin/example/Shapes.kt::example.Shape.Square",
+            "src/main/kotlin/example/Shapes.kt::example.Shape.Square.Corner",
+            "src/main/kotlin/example/Shapes.kt::example.Shape.Square.Corner.area()",
+            "src/main/kotlin/example/Shapes.kt::example.Shape.Square.area()",
+            "src/main/kotlin/example/Shapes.kt::example.Shape.area()",
+            "src/main/kotlin/example/Shapes.kt::example.String.shout()",
+            "src/main/kotlin/example/Shapes.kt::example.calls()",
+            "src/main/kotlin/example/Shapes.kt::example.defaults(Int,Int)",
+            "src/main/kotlin/example/Shapes.kt::example.greeting",
+            "src/main/kotlin/example/Shapes.kt::example.helper()",
+            "src/main/kotlin/example/Shapes.kt::example.helper(Int)",
+            "src/main/kotlin/example/Shapes.kt::example.helper(String)",
+            "src/main/kotlin/example/Shapes.kt::example.hiding((Int)->Int,List<()->Int>)",
+            "src/main/kotlin/example/Shapes.kt::example.hiding((Int)->Int,List<()->Int>).inside()",
+            "src/main/kotlin/example/Shapes.kt::example.inside()",
+            "src/main/kotlin/example/Shapes.kt::example.many(vararg Int)",
+            "src/main/kotlin/example/Shapes.kt::example.open()",
+            "src/main/kotlin/example/Shapes.kt::example.secret()",
+            "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()",
+            "src/main/kotlin/example/calls/Imports.kt::example.calls.qualified()",
+            "src/main/kotlin/example/calls/Imports.kt::example.calls.shadowed(()->Int)",
+            "src/main/kotlin/example/calls/Imports.kt::example.calls.unknown()",
+            "src/main/kotlin/example/util/Hidden.kt::example.util.FilePrivate",
+            "src/main/kotlin/example/util/Hidden.kt::example.util.Hidden",
+            "src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.closed()",
+            "src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.shared()",
+            "src/main/kotlin/example/util/Tools.kt::example.util.Tools",
+            "src/main/kotlin/example/util/Tools.kt::example.util.Tools.doubled()",
+            "src/main/kotlin/example/util/Tools.kt::example.util.Tools.single()",
+            "src/main/kotlin/example/util/Tools.kt::example.util.internalTool()",
+            "src/main/kotlin/example/util/Tools.kt::example.util.tool()",
+            "src/main/kotlin/example/util/Tools.kt::example.util.tool(Int,Int)",
+        ],
+        &[],
+        &[
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::helper#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.helper()"],
+            ),
+            (
+                "src/main/kotlin/example/Same.kt::example.same()::helper#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.helper()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::helper#1",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/Shapes.kt::example.helper(Int)",
+                    "src/main/kotlin/example/Shapes.kt::example.helper(String)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.Registry.find(String,Point)::find#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Registry.find(String)"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::defaults#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.defaults(Int,Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::defaults#1",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.defaults(Int,Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::many#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.many(vararg Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.Box.relabel()::this.label#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Box.label()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.Box.name()::label#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Box.label()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Registry.find#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Registry.find(String)"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Registry.find#1",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Registry.find(String,Point)"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Point.origin#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Point.origin#1",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin(Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.Point.twice()::Point.origin#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Box.create#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Box.Factory.create()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Box.Factory.create#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Box.Factory.create()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Point#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Point"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Shape.Square#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Shape.Square"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example::Marker#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Marker"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::(anonymous).helper#0",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/Shapes.kt::example.helper(Int)",
+                    "src/main/kotlin/example/Shapes.kt::example.helper(String)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.Box.later()::(anonymous).label#0",
+                INFERRED,
+                &["src/main/kotlin/example/Shapes.kt::example.Box.label()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.greeting::Registry.all#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Registry.all()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.open()::secret#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.secret()"],
+            ),
+            (
+                "src/main/kotlin/example/Same.kt::example.notSecret()::secret#0",
+                INFERRED,
+                &["src/main/kotlin/example/Shapes.kt::example.secret()"],
+            ),
+            (
+                "src/main/kotlin/example/Same.kt::example.same()::inside#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.inside()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::internalTool#0",
+                EXACT,
+                &["src/main/kotlin/example/util/Tools.kt::example.util.internalTool()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::Point.origin#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::Lookup.find#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Registry.find(String)"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::tool#0",
+                EXACT,
+                &["src/main/kotlin/example/util/Tools.kt::example.util.tool()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::run#0",
+                EXACT,
+                &["src/main/kotlin/example/util/Tools.kt::example.util.tool(Int,Int)"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::Tools.single#0",
+                EXACT,
+                &["src/main/kotlin/example/util/Tools.kt::example.util.Tools.single()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.qualified()::example.util.Tools.doubled#0",
+                EXACT,
+                &["src/main/kotlin/example/util/Tools.kt::example.util.Tools.doubled()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::Legacy.make#0",
+                EXACT,
+                &["src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()"],
+            ),
+            (
+                "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()::Box#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Box"],
+            ),
+            (
+                "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()::box.label#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Box.label()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.hiding((Int)->Int,List<()->Int>)::inside#0",
+                EXACT,
+                &[
+                    "src/main/kotlin/example/Shapes.kt::example.hiding((Int)->Int,List<()->Int>).inside()",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.hiding((Int)->Int,List<()->Int>)::same#0",
+                INFERRED,
+                &["src/main/kotlin/example/Same.kt::example.same()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.shadowed(()->Int)::run#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.unknown()::outside#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.unknown()::Missing.call#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::println#0",
+                None,
+                &[],
+            ),
+            (
+                "scripts/seed.kts::seed#0",
+                EXACT,
+                &["scripts/seed.kts::seed()"],
+            ),
+        ],
+    );
+}
+
+/// Search finds an extension function by name.
+#[test]
+fn kotlin_search_finds_an_extension_function() {
+    let repo = fixture_repo(
+        "kotlin_search_extension",
+        "conformance-kotlin",
+        Some(ORIGIN),
+    );
+    assert_golden(
+        "conformance-kotlin.search-norm.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .search("norm", None, None)
+            .unwrap(),
+    );
+}
+
+/// Context lists a function's callers and callees.
+#[test]
+fn kotlin_context_lists_callers_and_callees() {
+    let repo = fixture_repo("kotlin_context_helper", "conformance-kotlin", Some(ORIGIN));
+    assert_golden(
+        "conformance-kotlin.context-helper.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .context("example.helper()", None)
+            .unwrap(),
+    );
+}
+
+#[test]
+fn kotlin_hostile_definition_value_and_member_depths_remain_bounded() {
+    let repo = fixture_repo("kotlin_depths", "conformance-kotlin", Some(ORIGIN));
+    let mut deep = String::from("package hostile\nclass Deep { fun ping() {}\n");
+    for n in 0..132 {
+        deep.push_str(&format!("class Inner{n} {{\n"));
+    }
+    deep.push_str("fun ping() {}\nfun leaf() { ping(); this.ping(); missing() }\n");
+    deep.push_str(&"}\n".repeat(133));
+    std::fs::write(repo.join("Deep.kt"), deep).unwrap();
+    let expression = format!("{}\"value\"{}", "(".repeat(1024), ")".repeat(1024));
+    let member = format!("root{}.send()", ".part".repeat(300));
+    let values = format!("package hostile\nval V = {expression}\nfun run() {{ {member} }}\n");
+    std::fs::write(repo.join("Values.kt"), values).unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let definitions = json["symbols"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|s| s["span"]["path"] == "Deep.kt")
+        .count();
+    assert_eq!(definitions, 129);
+    assert!(
+        json["calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|c| c["span"]["path"] == "Deep.kt")
+            .all(|c| c["level"] != "exact")
+    );
+    assert!(
+        json["calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["span"]["path"] == "Values.kt" && c["target"].is_null())
+    );
+}
+
+#[test]
+fn kotlin_qualification_expansion_discards_the_whole_file_and_keeps_other_files() {
+    let repo = fixture_repo(
+        "kotlin_qualification_budget",
+        "conformance-kotlin",
+        Some(ORIGIN),
+    );
+    let package = format!("p{}", "a".repeat(4096));
+    let mut source =
+        format!("package {package}\nobject Expanded {{\nfun overloaded(value: String) {{}}\n");
+    for n in 0..600 {
+        source.push_str(&format!("fun method{n}() {{}}\n"));
+    }
+    source.push_str("fun overloaded(value: Int) {}\n}\n");
+    std::fs::write(repo.join("Expanded.kt"), source).unwrap();
+    let caller = format!(
+        "package example\nimport {package}.Expanded\nfun budget() {{ Expanded.overloaded(\"value\") }}\n"
+    );
+    std::fs::write(repo.join("Budget.kt"), caller).unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let symbols = json["symbols"].as_array().unwrap();
+    assert!(symbols.iter().all(|s| s["span"]["path"] != "Expanded.kt"));
+    assert!(
+        symbols
+            .iter()
+            .any(|s| s["id"].as_str().unwrap().ends_with("example.budget()"))
+    );
+    let called = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["caller"].as_str().unwrap().ends_with("example.budget()"))
+        .unwrap();
+    assert!(called["target"].is_null());
+    assert!(called["level"].is_null());
+}
+
 /// `programs` are the program entry points the pack declares (spec #31), as identities relative
 /// to the repository, sorted; a pack with none passes an empty list.
 fn conform(fixture: &str, symbols: &[&str], programs: &[&str], calls: &[ExpectedCall]) {
