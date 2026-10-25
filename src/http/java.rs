@@ -6,7 +6,11 @@
 //! `Code::outside` says an import from Spring binds its name (a class or an enum of the
 //! repository with the same name hides it), and a path folds `static final` constants and `+`
 //! through `Code::value`. `@RequestMapping` without `method` serves every method (`ANY`).
-//! `server.servlet.context-path` is not applied.
+//! `server.servlet.context-path` is not applied. The consumers are `clients.rs`'s.
+
+mod clients;
+
+pub(super) use clients::consumers;
 
 use super::{ANY, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
@@ -27,7 +31,7 @@ const SHORTCUTS: &[(&str, &str)] = &[
     ("PatchMapping", "PATCH"),
     ("DeleteMapping", "DELETE"),
 ];
-/// The members of Spring's `RequestMethod`.
+/// The members of Spring's `RequestMethod`, which its `HttpMethod` has too.
 const REQUEST_METHODS: &[&str] = &[
     "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE",
 ];
@@ -130,9 +134,15 @@ fn known<'a>(
         true => vec![outside.spelled],
         false => outside.candidates,
     };
-    let mut hits = spellings.into_iter().filter(|s| is_known(s));
+    one(&spellings, is_known).map(str::to_string)
+}
+
+/// The one spelling of a name (`Outside`, `Value::External`) that `is_known` accepts: two of
+/// them, or none, is no name the module knows.
+fn one(spellings: &[String], is_known: impl Fn(&str) -> bool) -> Option<&str> {
+    let mut hits = spellings.iter().filter(|s| is_known(s));
     let found = hits.next()?;
-    hits.next().is_none().then_some(found)
+    hits.next().is_none().then_some(found.as_str())
 }
 
 /// Whether `spelled` is a Spring annotation this module reads.

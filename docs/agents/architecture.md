@@ -760,7 +760,7 @@ one for the area a change touches.
   and receivers (`Code`: `Code::origins`, the one origin question, with three evidence policies
   (`Values`, `Constants` for the TypeScript forms, `Declarations` for Go's typed clients and
   forms), `Code::outside` for what an import from outside binds a name to, and `Code::expand`
-  for wrappers). `community.rs`: the deterministic Leiden behind communities (spec
+  for wrappers, `Expand::Chain` reading a call whole). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs` and its `channel/` submodules
   (`channel/message.rs`: the message types and broker helpers; `channel/{ts,python,rust,go}.rs`:
@@ -772,7 +772,8 @@ one for the area a change touches.
   requests, httpx and aiohttp consumers, whose rows also list reqwest and ureq; `http/rust.rs`
   and `http/rust/axum.rs`, actix-web, Rocket and axum providers; `http/go.rs` and
   `http/go/clients.rs`, net/http, gin, echo, chi and gorilla/mux providers and their consumers
-  with resty; `http/java.rs`, Spring MVC providers), resource and channel kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
+  with resty; `http/java.rs` and `http/java/clients.rs`, Spring MVC providers and the
+  RestTemplate, WebClient, `java.net.http` and OkHttp consumers), resource and channel kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
   contracts (specs #22, #24, #30, #25 and #26), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
   [map/contracts.md](map/contracts.md).
@@ -963,6 +964,14 @@ one for the area a change touches.
   `routes![..]` the Rust pack reads as a list of the handlers' paths).
   `Code::returned` and `Code::constant` give a kind the values a call may return and a
   constant holds, for what it must not leave unmounted.
+  `Expand::Chain` is `Code::expand` for a request built by a chain (`http/java/clients.rs`):
+  the reader gets the call as one `Value::Call`, its receivers and every argument along the
+  chain folded with the wrapper's callers bound, and a name an import from outside binds as a
+  `Value::External`, spelled (`Outside`, candidates included) in the file that writes it. An
+  enum member passed through a wrapper so keeps the caller's import evidence, and a type of
+  the caller's repository by that name is no member. Only this reading folds a call's
+  arguments or makes a `Value::External`: `Expand::Call` and `Code::value` leave them as
+  written, so no other reader sees a change.
 - New **Go router** (spec #25; net/http, gin, echo, chi and gorilla): a row of `ROUTERS` in
   `http/go.rs` (the package, the functions that make a router, the methods that make a group
   (a `Form`: `Group(prefix)`, chi's `Group(fn)` and `Route(prefix, fn)`, gorilla's
@@ -1691,6 +1700,18 @@ one for the area a change touches.
   (`{id:a/b}`) serves nothing. An unreadable element beside readable ones of a `method` or a
   path array is dropped: the others still serve. Interface-declared mappings, composed annotations
   and `server.servlet.context-path` are not read.
+- `http/java/clients.rs` (spec #26, #88): a RestTemplate or a WebClient counts by the type the
+  source writes for the receiver through a single-type import (`Follow::Declarations`), or, for a
+  WebClient, by the `WebClient.create` or `WebClient.builder()` chain it traces to
+  (`Follow::Values`, through `static final` fields and chains written in place); a client held
+  in an instance field or a local is read by its type alone, so its base is unknown and the
+  consumer links by path. A builder (`HttpRequest.newBuilder()`, `new Request.Builder()`) is
+  read only as one chain ending in `build()`; one held in a variable between steps is no
+  consumer. A static call on a class an on-demand import brings (`WebClient.create` under
+  `import ...client.*`) is no client: the pack reads such a receiver as an outside name of its
+  own, with no candidates. `String.format` reads `%s`, `%d` and `%%`; any other conversion
+  leaves the URL unread. A `HttpMethod.X` names a method only when one spelling (`Outside`) is
+  Spring's.
 - `http/go.rs` (spec #25): a route is read only with a literal path and a literal prefix; a
   group prefix or a pattern Meada cannot read serves nothing. `net/http` reads `{name}`,
   `{name...}` and `{$}` alone: a `:name` segment is a literal no contract can spell, so its route

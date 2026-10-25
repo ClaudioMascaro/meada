@@ -251,3 +251,44 @@ fn a_spring_route_of_every_method_links_a_consumer_of_any_method() {
         ]
     );
 }
+
+#[test]
+fn a_java_consumer_through_a_wrapper_links_a_spring_route_of_a_peer() {
+    let case = "urls_java_client";
+    let client = fixture_repo(
+        case,
+        "http-java-client",
+        Some("https://example.com/acme/client.git"),
+    );
+    fixture_repo(
+        case,
+        "conformance-java",
+        Some("https://example.com/acme/conformance.git"),
+    );
+
+    let export = Engine::open(&client).unwrap().export().unwrap();
+
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let links: Vec<(&str, &str, &str)> = (json["links"].as_array().unwrap().iter())
+        .map(|l| {
+            let text = |key| l[key].as_str().unwrap();
+            (text("contract"), text("level"), text("reason"))
+        })
+        .collect();
+    let peer = "the only repository serving it is example.com/acme/conformance";
+    assert_eq!(
+        links,
+        [
+            (
+                "http::DELETE::/api/orders/any",
+                "inferred",
+                &format!("host unresolved; {peer}; any method")[..]
+            ),
+            (
+                "http::PUT::/api/orders/{}",
+                "inferred",
+                &format!("host unresolved; {peer}")[..]
+            ),
+        ]
+    );
+}

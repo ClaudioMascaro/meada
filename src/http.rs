@@ -479,6 +479,7 @@ impl ContractKind for Http {
         found.extend(go::consumers(code));
         found.extend(python::providers(code));
         found.extend(java::providers(code));
+        found.extend(java::consumers(code));
         found
     }
 

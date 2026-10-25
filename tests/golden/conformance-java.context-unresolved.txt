@@ -1,0 +1,12 @@
+example.com/acme/conformance maven/api/src/main/java/example/clients/Rest.java:48-50 example.clients.Rest.lookup()
+community: none
+processes: 1 (1 export; 1 repository): example.clients.Rest.lookup() (example.com/acme/conformance)
+public String lookup() {
+        return rest.getForObject(System.getProperty("orders.url"), String.class);
+    }
+callers: none
+callees:
+example.com/acme/conformance maven/api/src/main/java/example/clients/Rest.java:49 (unresolved) System.getProperty
+example.com/acme/conformance maven/api/src/main/java/example/clients/Rest.java:49 (unresolved) rest.getForObject
+contracts:
+example.com/acme/conformance maven/api/src/main/java/example/clients/Rest.java:49 consumes (unresolved) rest.getForObject

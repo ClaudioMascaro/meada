@@ -40,6 +40,15 @@ All notable changes to Meada are recorded here. The format follows
   `RequestMethod` count only through a Spring import (single-type, static or on-demand, the
   latter through the new `Outside::candidates`, which every Java kind can use); a shadowing
   repository type, a competing import and `server.servlet.context-path` give no route.
+- Java HTTP consumers (spec #26, #88): RestTemplate methods, WebClient requests (base from
+  `WebClient.create` or `builder().baseUrl`), `HttpRequest.newBuilder()` and OkHttp
+  `Request.Builder` chains, `GET` when a chain names no method. URLs fold `+`, constants,
+  `URI.create`, `String.format` and `{id}` templates; wrappers are read at each call site
+  through any number of levels, and an unreadable URL is an unresolved consumer. A new
+  `Expand::Chain` reads a call whole, its builder chain and arguments folded at the callers,
+  and carries an outside name such as `HttpMethod.GET` as a `Value::External` spelled by the
+  writing file's imports, so a shadowing type is no method. The written type of a field typed
+  by a single-type import is now spelled as that import names it.
 
 - A multilingual documentation site (issue #320), with the README reference migrated to
   Portuguese, English and Spanish guides, React Flow maps and roadmap, accessible static and
