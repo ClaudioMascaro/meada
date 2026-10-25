@@ -172,6 +172,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
     let mut results: Vec<Range<usize>> = Vec::new();
     let mut chains: Vec<(usize, Range<usize>)> = Vec::new();
     let mut outside = BTreeSet::new();
+    // The instance `final` fields (class, name, initializer) and what constructors assign to
+    // fields, by class and field.
+    let mut finals: Vec<(String, String, Option<Value>)> = Vec::new();
+    let mut assigned: BTreeMap<(String, String), Vec<Value>> = BTreeMap::new();
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
         node,
@@ -227,6 +231,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 generics = Rc::new(names);
             }
             let parameters = parameters(node, src, &generics);
+            if node.kind() == "constructor_declaration" {
+                let names: Vec<&str> = parameters.iter().map(|(n, _, _)| n.as_str()).collect();
+                assignments(node, src, &scope, &names, &mut assigned);
+            }
             let written = if kind == Kind::Method {
                 let signature = format!(
                     "{name}({})",
@@ -368,6 +376,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
             }
             annotations(node, src, &scope, &inner, &mut facts);
             in_interface = node.kind() == "interface_declaration";
+            if in_interface {
+                facts.interfaces.push(inner.as_ref().clone());
+            }
         }
         if kind.is_some() && !defining {
             if let Some(name) = node.child_by_field_name("name") {
@@ -519,6 +530,19 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     }
                 }
             }
+            "field_declaration"
+                if definitions
+                    && modifiers(node).contains(&"final")
+                    && !modifiers(node).contains(&"static") =>
+            {
+                for declaration in named(node).filter(|n| n.kind() == "variable_declarator") {
+                    if let Some(name) = declaration.child_by_field_name("name") {
+                        let initial = declaration.child_by_field_name("value");
+                        let initial = initial.map(|n| value(n, src, 0));
+                        finals.push((scope.as_ref().clone(), text(name, src).into(), initial));
+                    }
+                }
+            }
             "type_identifier" => {
                 outside.insert(text(node, src).to_string());
             }
@@ -573,6 +597,20 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 definitions: definitions && !anonymous && (kind.is_none() || defining),
                 depth: nested,
                 generics: generics.clone(),
+            });
+        }
+    }
+    // A `final` field holds the one value its initializer or a constructor gives it: a constant
+    // of the class, which no static context reads (it is no `statics`). Two values give none.
+    for (class, name, initial) in finals {
+        let given = assigned.remove(&(class.clone(), name.clone()));
+        let mut values = initial.into_iter().chain(given.into_iter().flatten());
+        if let (Some(value), None) = (values.next(), values.next()) {
+            let name = qualify(&class, &name);
+            facts.consts.push(Const {
+                name,
+                value,
+                ty: None,
             });
         }
     }
@@ -699,6 +737,49 @@ fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
             public: false,
         },
     });
+}
+
+/// What the constructor `node` of `class` assigns to fields (`this.f = v`, or `f = v` when no
+/// parameter is `f`), by class and field. Lambdas and class bodies inside assign none of them.
+// ponytail: a local of the constructor named like a field and assigned with `f = v` counts as
+// the field; the field then holds two values or a wrong one only in such code.
+fn assignments(
+    node: Node,
+    src: &[u8],
+    class: &str,
+    params: &[&str],
+    out: &mut BTreeMap<(String, String), Vec<Value>>,
+) {
+    let mut pending: Vec<Node> = node.child_by_field_name("body").into_iter().collect();
+    while let Some(n) = pending.pop() {
+        match n.kind() {
+            "lambda_expression" | "class_body" => continue,
+            "assignment_expression"
+                if n.child_by_field_name("operator")
+                    .is_some_and(|o| text(o, src) == "=") =>
+            {
+                let field = n
+                    .child_by_field_name("left")
+                    .and_then(|left| match left.kind() {
+                        "identifier" if !params.contains(&text(left, src)) => Some(text(left, src)),
+                        "field_access"
+                            if left
+                                .child_by_field_name("object")
+                                .is_some_and(|o| o.kind() == "this") =>
+                        {
+                            left.child_by_field_name("field").map(|f| text(f, src))
+                        }
+                        _ => None,
+                    });
+                if let (Some(field), Some(right)) = (field, n.child_by_field_name("right")) {
+                    let at = (class.to_string(), field.to_string());
+                    out.entry(at).or_default().push(value(right, src, 0));
+                }
+            }
+            _ => {}
+        }
+        pending.extend(named(n));
+    }
 }
 
 fn modifiers(node: Node<'_>) -> Vec<&str> {

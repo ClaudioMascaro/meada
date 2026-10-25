@@ -60,6 +60,39 @@ fn java_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
     );
 }
 
+#[test]
+fn java_consumers_follow_an_edited_constant_of_another_file_like_a_cold_index() {
+    let edit = |repo: &Path| {
+        let path = repo.join("maven/api/src/main/java/example/web/Api.java");
+        let before = fs::read_to_string(&path).unwrap();
+        fs::write(&path, before.replace("\"/api\"", "\"/v2\"")).unwrap();
+    };
+    let repo = fixture_repo("fresh_java_consumers", "conformance-java", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_java_consumers_cold",
+            "conformance-java",
+            ORIGIN,
+            edit
+        )
+    );
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    let consumed = |site: &str| {
+        (json["consumers"].as_array().unwrap().iter())
+            .find(|c| c["site"].as_str().unwrap().ends_with(site))
+            .map(|c| c["contract"].clone())
+    };
+    let list = "example.clients.Rest.list()::rest.getForObject#0";
+    assert_eq!(consumed(list), Some("http::GET::/v2/orders".into()));
+}
+
 /// Edits a file whose exports others import, adds a file whose definition turns an inferred
 /// call in an unrelated file into an ambiguous one, deletes a file, and drops the tsconfig
 /// path alias.

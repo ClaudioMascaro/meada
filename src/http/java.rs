@@ -6,7 +6,11 @@
 //! `Code::outside` says an import from Spring binds its name (a class or an enum of the
 //! repository with the same name hides it), and a path folds `static final` constants and `+`
 //! through `Code::value`. `@RequestMapping` without `method` serves every method (`ANY`).
-//! `server.servlet.context-path` is not applied.
+//! `server.servlet.context-path` is not applied. The consumers are `clients.rs`'s.
+
+mod clients;
+
+pub(super) use clients::consumers;
 
 use super::{ANY, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
@@ -27,7 +31,7 @@ const SHORTCUTS: &[(&str, &str)] = &[
     ("PatchMapping", "PATCH"),
     ("DeleteMapping", "DELETE"),
 ];
-/// The members of Spring's `RequestMethod`.
+/// The members of Spring's `RequestMethod`, which its `HttpMethod` has too.
 const REQUEST_METHODS: &[&str] = &[
     "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE",
 ];
@@ -130,7 +134,7 @@ fn jax_rs_annotation(spelled: &str) -> bool {
 
 /// JAX-RS providers: a method of a class with `@Path` carrying a method annotation serves the
 /// class path joined to its own `@Path`. A method with only `@Path` is a sub-resource locator,
-/// and `@ApplicationPath` is not applied. Names count as Spring's do, through `known`.
+/// and `@ApplicationPath` is not applied, and an interface is a client, not a resource. Names count as Spring's do, through `known`.
 fn jax_rs<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
     for (&path, facts) in code.files() {
         if !path.ends_with(".java") {
@@ -164,6 +168,10 @@ fn jax_rs<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
                 let given = code.call(path, entry?.0)?;
                 paths(code, path, given)
             };
+            // An interface with `@Path` is a client (MicroProfile, Quarkus), not a server.
+            if facts.interfaces.contains(&call.scope) {
+                continue;
+            }
             let Some(prefixes) = read(path_of(&call.scope)) else {
                 continue;
             };
@@ -204,9 +212,15 @@ fn known<'a>(
         true => vec![outside.spelled],
         false => outside.candidates,
     };
-    let mut hits = spellings.into_iter().filter(|s| is_known(s));
+    one(&spellings, is_known).map(str::to_string)
+}
+
+/// The one spelling of a name (`Outside`, `Value::External`) that `is_known` accepts: two of
+/// them, or none, is no name the module knows.
+fn one(spellings: &[String], is_known: impl Fn(&str) -> bool) -> Option<&str> {
+    let mut hits = spellings.iter().filter(|s| is_known(s));
     let found = hits.next()?;
-    hits.next().is_none().then_some(found)
+    hits.next().is_none().then_some(found.as_str())
 }
 
 /// Whether `spelled` is a Spring annotation this module reads.
@@ -544,6 +558,14 @@ mod tests {
         assert!(resource("", body).is_empty());
         // A method with only @Path is a sub-resource locator, not a route.
         assert!(resource(JAXRS, "@Path(\"/x\") class C { @Path(\"/y\") void f() {} }").is_empty());
+    }
+
+    #[test]
+    fn a_jax_rs_interface_is_a_client_and_serves_nothing() {
+        let client = "@Path(\"/users\") interface I { @GET void f(); }";
+        assert!(resource(JAXRS, client).is_empty());
+        let nested = "@Path(\"/x\") class C { @GET void g() {} @Path(\"/in\") interface I { @GET void f(); } }";
+        assert_eq!(resource(JAXRS, nested), ["http::GET::/x"]);
     }
 
     #[test]

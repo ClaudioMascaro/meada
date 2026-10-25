@@ -110,6 +110,30 @@ fn java() {
             "maven/api/src/main/java/example/Mains.java::example.Mains.Decorated.main(String[])",
             "maven/api/src/main/java/example/Mains.java::example.Mains.Qualified",
             "maven/api/src/main/java/example/Mains.java::example.Mains.Qualified.main(java.lang.String[])",
+            "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest",
+            "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.Rest(RestTemplate)",
+            "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.list()",
+            "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.one(String)",
+            "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.create()",
+            "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.flag(int)",
+            "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.single()",
+            "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.send(HttpMethod,String)",
+            "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.remove(String)",
+            "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.drop()",
+            "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.lookup()",
+            "maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive",
+            "maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.get()",
+            "maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.flag()",
+            "maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk",
+            "maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.list()",
+            "maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()",
+            "maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()",
+            "maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok",
+            "maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.list()",
+            "maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.remove()",
+            "maven/api/src/main/java/example/clients/OwnEnum.java::example.clients.OwnEnum",
+            "maven/api/src/main/java/example/clients/OwnEnum.java::example.clients.OwnEnum.HttpMethod",
+            "maven/api/src/main/java/example/clients/OwnEnum.java::example.clients.OwnEnum.get()",
             "maven/api/src/main/java/example/web/Api.java::example.web.Api",
             "maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController",
             "maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.list()",
@@ -157,6 +181,8 @@ fn java() {
             "maven/api/src/main/java/example/web/jaxrs/Items.java::example.web.jaxrs.Items.probe()",
             "maven/api/src/main/java/example/web/jaxrs/Items.java::example.web.jaxrs.Items.options()",
             "maven/api/src/main/java/example/web/jaxrs/Items.java::example.web.jaxrs.Items.locator()",
+            "maven/api/src/main/java/example/web/jaxrs/Remote.java::example.web.jaxrs.Remote",
+            "maven/api/src/main/java/example/web/jaxrs/Remote.java::example.web.jaxrs.Remote.fetch()",
             "maven/api/src/main/java/example/web/jaxrs/Jakarta.java::example.web.jaxrs.Jakarta",
             "maven/api/src/main/java/example/web/jaxrs/Jakarta.java::example.web.jaxrs.Jakarta.get()",
             "maven/api/src/main/java/example/web/jaxrs/Jakarta.java::example.web.jaxrs.Jakarta.create()",
@@ -326,6 +352,18 @@ const JAVA_CALLS: &[ExpectedCall] = &[
         ],
     ),
 ];
+
+#[test]
+fn java_context_shows_an_unresolved_consumer() {
+    let repo = fixture_repo("java_unresolved_consumer", "conformance-java", Some(ORIGIN));
+    assert_golden(
+        "conformance-java.context-unresolved.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .context("example.clients.Rest.lookup()", None)
+            .unwrap(),
+    );
+}
 
 #[test]
 fn java_context_lists_callers_through_receivers_and_name_matches() {

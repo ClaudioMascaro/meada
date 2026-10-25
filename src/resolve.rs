@@ -12,8 +12,8 @@ use std::cell::{OnceCell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Modules,
-    Param, Part, Reaches, Star, Step, Taker, Ty, Value,
+    Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
+    LanguagePack, Modules, Param, Part, Reaches, Star, Step, Taker, Ty, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -725,10 +725,14 @@ impl<'a> Resolver<'a> {
         }
         let (scope, callee) = (call.scope.as_str(), call.callee.as_str());
         let seen = &mut self.seen(path, scope);
+        // The result of the call this one is made on, read once: the name match below reads it
+        // too, and reading it twice per call would double the work at every call of a chain.
+        let mut on = None;
         let binding = match (call.on, call.constructs, call.by_path) {
-            (Some(on), false, _) => {
+            (Some(inner), false, _) => {
                 let members = callee.split_once('.').map_or("", |(_, m)| m);
-                let result = self.result_of(path, on, work);
+                let result = self.result_of(path, inner, work);
+                on = Some(result.clone());
                 self.walk(result, members, seen, work, Reading::Value)
             }
             (_, true, _) => self.resolve_as(path, scope, callee, seen, work, Reading::Type),
@@ -783,7 +787,7 @@ impl<'a> Resolver<'a> {
             | Binding::Param(..)
             | Binding::Local(..)
             | Binding::Hidden
-            | Binding::Unknown => self.matched(path, call, work),
+            | Binding::Unknown => self.matched(path, call, on, work),
         }
     }
 
@@ -795,7 +799,13 @@ impl<'a> Resolver<'a> {
     /// (`super.f()`) the family does not answer resolves to nothing. Any other receiver keeps the
     /// repository's candidates, and several of them take the one declared in the family of the
     /// class around the call, other than the calling method itself.
-    fn matched(&self, path: &'a str, call: &'a Call, work: &mut Work<'a>) -> Resolution<'a> {
+    fn matched(
+        &self,
+        path: &'a str,
+        call: &'a Call,
+        on: Option<Binding<'a>>,
+        work: &mut Work<'a>,
+    ) -> Resolution<'a> {
         let (scope, callee) = (call.scope.as_str(), call.callee.as_str());
         if call.arity.is_none() {
             return self.infer(path, callee, call.by_path, None, false);
@@ -811,9 +821,10 @@ impl<'a> Resolver<'a> {
             None => Binding::Unknown,
             Some(head) => {
                 let seen = &mut self.seen(path, scope);
-                let receiver = match call.on {
-                    Some(on) => self.result_of(path, on, work),
-                    None => self.resolve_as(path, scope, head, seen, work, Reading::Value),
+                let receiver = match (on, call.on) {
+                    (Some(known), _) => known,
+                    (None, Some(inner)) => self.result_of(path, inner, work),
+                    (None, None) => self.resolve_as(path, scope, head, seen, work, Reading::Value),
                 };
                 self.instance(receiver, work)
             }
@@ -2691,6 +2702,11 @@ pub enum Expand<'a> {
         held: (&'a str, &'a str),
         at: (&'a str, usize),
     },
+    /// The call at an index of a file, read as one `Value::Call`: the calls of the builder chain
+    /// it is made on (its receivers) and every argument along it are folded, and a name an import
+    /// from outside binds is a `Value::External` spelled where it is written, so an enum member
+    /// passed through a wrapper keeps the evidence of the caller's imports.
+    Chain(&'a str, usize),
 }
 
 /// What `Code::expand` finds at one site.
@@ -2710,6 +2726,8 @@ struct Written<'a> {
     args: &'a [Value],
     kwargs: &'a Keywords,
     at: (&'a str, usize),
+    /// The call read whole, its chain folded (`Expand::Chain`).
+    chain: Option<&'a Call>,
 }
 
 /// What folding values and tracing where they come from may cost in one file, charged to the
@@ -2736,12 +2754,13 @@ const EVAL_DEPTH: usize = 256;
 // thousands of wrappers from overflowing the stack.
 const WRAPPER_DEPTH: usize = 64;
 
-/// Folding one value: the constants being folded (one met again folds to nothing), and how
-/// deep it is.
+/// Folding one value: the constants being folded (one met again folds to nothing), how deep it
+/// is, and whether calls are folded too, an outside name kept (`Expand::Chain`).
 #[derive(Default)]
 struct Fold<'a> {
     held: Vec<(&'a str, &'a str)>,
     nested: usize,
+    chain: bool,
 }
 
 /// How many calls a builder chain is read through, down to what starts it.
@@ -3380,6 +3399,13 @@ impl<'a> Code<'a> {
             {
                 on_demand()
             }
+            // A head no import names, which only the file's outside names bind (Java's bare
+            // `WebClient` under `import a.*;`): the on-demand imports may bring it.
+            (Binding::External(source, Imported::Namespace), _)
+                if source == head && r.by_local[path].of(head).is_empty() =>
+            {
+                on_demand()
+            }
             (Binding::External(..), _) => Vec::new(),
             (Binding::Unknown, false) => match on_demand() {
                 found if found.is_empty() => return None,
@@ -3413,15 +3439,32 @@ impl<'a> Code<'a> {
         let r = self.resolver;
         let (seen, work) = (&mut r.seen(path, scope), &mut Work::default());
         let found = r.resolve_as(path, scope, written, seen, work, Reading::Path);
-        let Binding::External(package, _) = found else {
+        let Binding::External(package, imported) = found else {
             return None;
         };
         let name = written.rsplit('.').next()?;
+        let head = written.split('.').next().unwrap_or(written);
+        let (spelled, candidates) = match (imported, written.contains('.')) {
+            // A single-type import (Java's `import a.B;`) is of the type itself.
+            (Imported::Qualified, false) => (package.to_string(), Vec::new()),
+            // A head only the file's outside names bind: what the on-demand imports may bring,
+            // as `Code::outside` reads it.
+            (Imported::Namespace, _)
+                if r.unordered_globs && package == head && r.by_local[path].of(head).is_empty() =>
+            {
+                let found = r.on_demand(path, head).into_iter();
+                (
+                    written.to_string(),
+                    found.map(|s| format!("{s}.{written}")).collect(),
+                )
+            }
+            _ => (format!("{package}.{name}"), Vec::new()),
+        };
         Some(Outside {
             imported: Some((package, name.to_string())),
-            spelled: format!("{package}.{name}"),
+            spelled,
             direct: true,
-            candidates: Vec::new(),
+            candidates,
         })
     }
 
@@ -3910,7 +3953,8 @@ impl<'a> Code<'a> {
     /// `value`, written in `path` within `scope`, with its constants folded. Parameters are
     /// unknown.
     pub fn value(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Value {
-        unbind(self.eval(path, scope, value, &[], 0, &mut Fold::default(), &mut None))
+        let folded = self.eval(path, scope, value, &[], 0, &mut Fold::default(), &mut None);
+        unbind(folded, false)
     }
 
     /// The constant `name` refers to from `scope` in `path`: its file and qualified name, and
@@ -4126,6 +4170,21 @@ impl<'a> Code<'a> {
                     args: &call.args,
                     kwargs: &call.kwargs,
                     at: (path, index),
+                    chain: None,
+                };
+                self.walk(&written, &mut Vec::new(), read, &mut out);
+            }
+            Expand::Chain(path, index) => {
+                let Some(call) = self.call(path, index) else {
+                    return out;
+                };
+                let written = Written {
+                    path,
+                    scope: &call.scope,
+                    args: &call.args,
+                    kwargs: &call.kwargs,
+                    at: (path, index),
+                    chain: Some(call),
                 };
                 self.walk(&written, &mut Vec::new(), read, &mut out);
             }
@@ -4142,6 +4201,7 @@ impl<'a> Code<'a> {
                     args,
                     kwargs: &[],
                     at,
+                    chain: None,
                 };
                 self.walk(&written, &mut Vec::new(), read, &mut out);
             }
@@ -4168,16 +4228,30 @@ impl<'a> Code<'a> {
             return;
         }
         let mut wants = None;
-        let values: Vec<Value> = args
-            .iter()
-            .map(|a| self.eval(path, scope, a, frames, 0, &mut Fold::default(), &mut wants))
-            .collect();
-        let kwargs: Vec<(String, Value)> = (kwargs.iter())
-            .map(|(k, v)| {
-                let v = self.eval(path, scope, v, frames, 0, &mut Fold::default(), &mut wants);
-                (k.clone(), v)
-            })
-            .collect();
+        let chain = written.chain.is_some();
+        let mut eval = |v: &'a Value| {
+            let fold = &mut Fold {
+                chain,
+                ..Fold::default()
+            };
+            self.eval(path, scope, v, frames, 0, fold, &mut wants)
+        };
+        let (values, kwargs): (Vec<Value>, Vec<(String, Value)>) = match written.chain {
+            Some(call) => {
+                let receiver = call.receiver.as_ref().map(|r| Box::new(eval(r)));
+                let invocation = Invocation {
+                    callee: call.callee.clone(),
+                    receiver,
+                    args: call.args.iter().map(&mut eval).collect(),
+                    range: call.range.clone(),
+                };
+                (vec![Value::Call(invocation)], Vec::new())
+            }
+            None => (
+                args.iter().map(&mut eval).collect(),
+                (kwargs.iter()).map(|(k, v)| (k.clone(), eval(v))).collect(),
+            ),
+        };
         if let Some(found) = read(&values, &kwargs) {
             out.push(Expanded {
                 site: (site, at),
@@ -4202,9 +4276,10 @@ impl<'a> Code<'a> {
             .collect();
         // A wrapper `WRAPPER_DEPTH` calls up is read where it stands too.
         if callers.is_empty() || frames.len() >= WRAPPER_DEPTH {
-            let values: Vec<Value> = values.into_iter().map(unbind).collect();
-            let kwargs: Vec<(String, Value)> =
-                kwargs.into_iter().map(|(k, v)| (k, unbind(v))).collect();
+            let values: Vec<Value> = values.into_iter().map(|v| unbind(v, chain)).collect();
+            let kwargs: Vec<(String, Value)> = (kwargs.into_iter())
+                .map(|(k, v)| (k, unbind(v, chain)))
+                .collect();
             out.extend(read(&values, &kwargs).map(|found| Expanded {
                 site: (site, at),
                 frames: frames.clone(),
@@ -4283,6 +4358,16 @@ impl<'a> Code<'a> {
                     .map(|v| self.eval(path, scope, v, frames, depth, fold, wants))
                     .collect(),
             ),
+            Value::Call(call) if fold.chain => {
+                let mut eval = |v| self.eval(path, scope, v, frames, depth, fold, wants);
+                let receiver = call.receiver.as_deref().map(|r| Box::new(eval(r)));
+                Value::Call(Invocation {
+                    callee: call.callee.clone(),
+                    receiver,
+                    args: call.args.iter().map(eval).collect(),
+                    range: call.range.clone(),
+                })
+            }
             Value::Ref(name) => self.name(path, scope, name, frames, depth, fold, wants),
             other => other.clone(),
         };
@@ -4389,13 +4474,22 @@ impl<'a> Code<'a> {
                     Value::Ref(name.to_string())
                 }
             },
+            Binding::External(..) | Binding::Unknown if fold.chain => {
+                match self.outside(path, scope, name, false) {
+                    Some(o) if !o.candidates.is_empty() => Value::External(o.candidates),
+                    Some(o) if o.direct => Value::External(vec![o.spelled]),
+                    _ => Value::Unknown,
+                }
+            }
             _ => Value::Unknown,
         }
     }
 }
 
-/// `value` with every parameter left in it unknown.
-fn unbind(value: Value) -> Value {
+/// `value` with every parameter left in it unknown; with `chain`, inside its calls too, which
+/// only `Expand::Chain` folds (elsewhere a call's arguments are as written).
+fn unbind(value: Value, chain: bool) -> Value {
+    let unbind = |v| unbind(v, chain);
     match value {
         Value::Ref(_) => Value::Unknown,
         Value::Str(parts) => Value::Str(
@@ -4415,6 +4509,11 @@ fn unbind(value: Value) -> Value {
         ),
         Value::List(items) => Value::List(items.into_iter().map(unbind).collect()),
         Value::New(callee, args) => Value::New(callee, args.into_iter().map(unbind).collect()),
+        Value::Call(call) if chain => Value::Call(Invocation {
+            receiver: call.receiver.map(|r| Box::new(unbind(*r))),
+            args: call.args.into_iter().map(unbind).collect(),
+            ..call
+        }),
         other => other,
     }
 }
@@ -4423,6 +4522,98 @@ fn unbind(value: Value) -> Value {
 mod tests {
     use super::*;
     use crate::lang::python::Python;
+
+    /// What each site of the `go()` call of `a/W.java` reads, whole (`Expand::Chain`) or by its
+    /// arguments (`Expand::Call`): the spellings of the outside name and the text of the path
+    /// the chain is built with, or `None` for a value that is no such name or text.
+    fn chained(caller: &str, whole: bool) -> Vec<(String, Option<Vec<String>>, Option<String>)> {
+        use crate::lang::java::Java;
+        let w = "package a;\nimport org.lib.Mode;\nclass W {\n\
+                 void wrap(Object m, String p) { Lib.start().with(m, \"/\" + p).go(); }\n\
+                 void calls() { wrap(Mode.FAST, \"x\"); }\n}\n";
+        let sources = [("a/W.java", w), ("a/X.java", caller)];
+        let parsed: Vec<(&str, Facts)> = (sources.iter())
+            .map(|(p, src)| (*p, Java.parse(p, src.as_bytes()).unwrap()))
+            .collect();
+        let files: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let layout = Java.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
+        let code = Code::new(&resolver, &files, &Java);
+        let n = (files["a/W.java"].calls.iter())
+            .position(|c| c.callee.ends_with(".go"))
+            .unwrap();
+        let read = |values: &[Value], _: &Keywords| {
+            let args = match values {
+                [Value::Call(go)] => match go.receiver.as_deref() {
+                    Some(Value::Call(with)) => with.args.clone(),
+                    _ => return Some((None, None)),
+                },
+                _ => return Some((None, None)),
+            };
+            if args.iter().any(|a| matches!(a, Value::Ref(_))) {
+                return None;
+            }
+            let mode = match &args[0] {
+                Value::External(spellings) => Some(spellings.clone()),
+                _ => None,
+            };
+            let path = match &args[1] {
+                Value::Str(parts) => crate::lang::literal(parts),
+                _ => None,
+            };
+            Some((mode, path))
+        };
+        let from = match whole {
+            true => Expand::Chain("a/W.java", n),
+            false => Expand::Call("a/W.java", n),
+        };
+        let mut found: Vec<_> = (code.expand(from, &read).into_iter())
+            .map(|e| (e.site.0.to_string(), e.found.0, e.found.1))
+            .collect();
+        found.sort();
+        found
+    }
+
+    #[test]
+    fn a_chain_of_calls_past_the_receiver_depth_resolves_each_call_once() {
+        use crate::lang::java::Java;
+        // `Outside.start().m().m()..`: each call is made on the one before, whose result no
+        // definition answers. Every call reads the result of the one it is made on once, so the
+        // chain costs its length, not two to the power of it.
+        let calls = ".m()".repeat(RECEIVER_DEPTH + 16);
+        let src = format!(
+            "package a;\nimport b.Outside;\nclass C {{ void f() {{ Outside.start(){calls}; }} }}\n"
+        );
+        let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("a/C.java", &facts)]);
+        let layout = Java.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
+        let chained = facts.calls.iter().filter(|c| c.on.is_some()).count();
+        assert!(chained > RECEIVER_DEPTH, "{chained} calls on calls");
+        for call in &facts.calls {
+            assert!(!matches!(
+                resolver.call("a/C.java", call),
+                Resolution::Exact(_)
+            ));
+        }
+    }
+
+    #[test]
+    fn a_chain_read_whole_folds_its_calls_and_spells_an_outside_name_where_it_is_written() {
+        // The caller of the other file hides `Mode` with a type of its own.
+        let hidden = "package a;\nclass X { enum Mode { FAST }\n\
+                      void go(W w) { w.wrap(Mode.FAST, \"y\"); } }\n";
+        let fast = Some(vec!["org.lib.Mode.FAST".to_string()]);
+        assert_eq!(
+            chained(hidden, true),
+            [
+                ("a/W.java".into(), fast, Some("/x".into())),
+                ("a/X.java".into(), None, Some("/y".into())),
+            ]
+        );
+        // Read by its arguments, the call has none of its chain's, and climbs no wrapper.
+        assert_eq!(chained(hidden, false), [("a/W.java".into(), None, None)]);
+    }
 
     #[test]
     fn an_origin_followed_through_methods_past_the_limit_gives_nothing() {

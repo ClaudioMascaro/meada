@@ -42,6 +42,26 @@
       "hash": "81fdcf704e3c82a4e6cecc3761dc7b02677db43c19b2cf9a3ac54a2da1341ae3"
     },
     {
+      "path": "maven/api/src/main/java/example/clients/Jdk.java",
+      "hash": "84f66ed40638f115653e9593533e60b6d87d754f0bc9d0616bde5e8c53f41a61"
+    },
+    {
+      "path": "maven/api/src/main/java/example/clients/Ok.java",
+      "hash": "63c651b1687b10a38ab74739187abdbb2f133bf6a6ef9d24ed6225f82b5a5a4d"
+    },
+    {
+      "path": "maven/api/src/main/java/example/clients/OwnEnum.java",
+      "hash": "bf99779ccb51a8c509fa4ab19f56784479eee2e6cab3d5543a17c24efc40812d"
+    },
+    {
+      "path": "maven/api/src/main/java/example/clients/Reactive.java",
+      "hash": "877db54406c5079f5a283d146fadfa1685e3fc2236de5263c94fa4e849b3cb88"
+    },
+    {
+      "path": "maven/api/src/main/java/example/clients/Rest.java",
+      "hash": "6ae86852c50673e7053e4e813b26080adfda50d1f12507f1f809b8fe56751ab2"
+    },
+    {
       "path": "maven/api/src/main/java/example/stars/Wave.java",
       "hash": "dfa9b17bf44a8c0344cc3beea02314f809e37e6502bcc3f826d1a24099dd302c"
     },
@@ -80,6 +100,10 @@
     {
       "path": "maven/api/src/main/java/example/web/jaxrs/Jakarta.java",
       "hash": "e61e6ae6bc98597af63cd136d9073f4a96df996d7d4f1d8597c3a1a9c18c1ee3"
+    },
+    {
+      "path": "maven/api/src/main/java/example/web/jaxrs/Remote.java",
+      "hash": "d7b6aca9b323d4ea5f90b84b3926cff2409427c73aafa80b2b3fbc122088c820"
     },
     {
       "path": "maven/api/src/main/java/example/web/jaxrs/shadow/GET.java",
@@ -732,6 +756,198 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 82,
+        "end": 568
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 292,
+        "end": 419
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.list()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 170,
+        "end": 286
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 425,
+        "end": 566
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Ok.java",
+        "start": 51,
+        "end": 332
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.list()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Ok.java",
+        "start": 73,
+        "end": 192
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.remove()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Ok.java",
+        "start": 198,
+        "end": 330
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/OwnEnum.java::example.clients.OwnEnum",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/OwnEnum.java",
+        "start": 162,
+        "end": 378
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/OwnEnum.java::example.clients.OwnEnum.HttpMethod",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/OwnEnum.java",
+        "start": 189,
+        "end": 212
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/OwnEnum.java::example.clients.OwnEnum.get()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/OwnEnum.java",
+        "start": 277,
+        "end": 376
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reactive.java",
+        "start": 138,
+        "end": 554
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.flag()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reactive.java",
+        "start": 453,
+        "end": 552
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.get()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reactive.java",
+        "start": 366,
+        "end": 447
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 147,
+        "end": 1340
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.Rest(RestTemplate)",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 209,
+        "end": 273
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.create()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 490,
+        "end": 587
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.drop()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 1121,
+        "end": 1168
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.flag(int)",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 593,
+        "end": 718
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.list()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 279,
+        "end": 367
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.lookup()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 1226,
+        "end": 1338
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.one(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 373,
+        "end": 484
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.remove(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 1042,
+        "end": 1115
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.send(HttpMethod,String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 917,
+        "end": 1036
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.single()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 724,
+        "end": 836
+      }
+    },
+    {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/stars/Wave.java::example.stars.Wave",
       "span": {
         "path": "maven/api/src/main/java/example/stars/Wave.java",
@@ -1113,6 +1329,22 @@
         "path": "maven/api/src/main/java/example/web/jaxrs/Jakarta.java",
         "start": 133,
         "end": 196
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/jaxrs/Remote.java::example.web.jaxrs.Remote",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/jaxrs/Remote.java",
+        "start": 165,
+        "end": 238
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/jaxrs/Remote.java::example.web.jaxrs.Remote.fetch()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/jaxrs/Remote.java",
+        "start": 212,
+        "end": 236
       }
     },
     {
@@ -1861,6 +2093,479 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()::(method_invocation).POST#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 337,
+        "end": 404
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()::(method_invocation).build#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 337,
+        "end": 412
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()::HttpRequest.newBuilder#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 337,
+        "end": 393
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()::URI.create#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 360,
+        "end": 392
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.list()::(method_invocation).build#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.list()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 213,
+        "end": 279
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.list()::(method_invocation).uri#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.list()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 213,
+        "end": 271
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.list()::HttpRequest.newBuilder#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.list()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 213,
+        "end": 237
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.list()::URI.create#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.list()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 242,
+        "end": 270
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()::(method_invocation).build#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 471,
+        "end": 559
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()::(method_invocation).method#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 471,
+        "end": 515
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()::(method_invocation).uri#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 471,
+        "end": 551
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()::HttpRequest.newBuilder#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 471,
+        "end": 495
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()::URI.create#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Jdk.java",
+        "start": 520,
+        "end": 550
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.list()::(expression).url#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.list()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Ok.java",
+        "start": 112,
+        "end": 177
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.list()::(method_invocation).build#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.list()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Ok.java",
+        "start": 112,
+        "end": 185
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.list()::Request.Builder#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.list()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Ok.java",
+        "start": 112,
+        "end": 133
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.remove()::(expression).url#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.remove()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Ok.java",
+        "start": 239,
+        "end": 306
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.remove()::(method_invocation).build#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.remove()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Ok.java",
+        "start": 239,
+        "end": 323
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.remove()::(method_invocation).delete#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.remove()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Ok.java",
+        "start": 239,
+        "end": 315
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.remove()::Request.Builder#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.remove()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Ok.java",
+        "start": 239,
+        "end": 260
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/OwnEnum.java::example.clients.OwnEnum.get()::rest.exchange#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/OwnEnum.java::example.clients.OwnEnum.get()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/OwnEnum.java",
+        "start": 305,
+        "end": 369
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/OwnEnum.java::example.clients.OwnEnum::RestTemplate#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/OwnEnum.java::example.clients.OwnEnum",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/OwnEnum.java",
+        "start": 252,
+        "end": 270
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.flag()::(method_invocation).retrieve#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.flag()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reactive.java",
+        "start": 482,
+        "end": 545
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.flag()::(method_invocation).uri#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.flag()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reactive.java",
+        "start": 482,
+        "end": 534
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.flag()::BUILT.method#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.flag()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reactive.java",
+        "start": 482,
+        "end": 512
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.get()::(method_invocation).retrieve#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.get()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reactive.java",
+        "start": 394,
+        "end": 440
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.get()::(method_invocation).uri#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.get()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reactive.java",
+        "start": 394,
+        "end": 429
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.get()::ORDERS.get#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.get()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reactive.java",
+        "start": 394,
+        "end": 406
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive::(method_invocation).baseUrl#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reactive.java",
+        "start": 296,
+        "end": 351
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive::(method_invocation).build#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reactive.java",
+        "start": 296,
+        "end": 359
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive::WebClient.builder#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reactive.java",
+        "start": 296,
+        "end": 315
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive::WebClient.create#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reactive.java",
+        "start": 198,
+        "end": 247
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.create()::rest.postForObject#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.create()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 521,
+        "end": 580
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.drop()::remove#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.drop()",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.remove(String)",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 1150,
+        "end": 1161
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.flag(int)::String.format#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.flag(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 648,
+        "end": 690
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.flag(int)::rest.patchForObject#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.flag(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 628,
+        "end": 711
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.list()::rest.getForObject#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.list()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 317,
+        "end": 360
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.lookup()::System.getProperty#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.lookup()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 1284,
+        "end": 1316
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.lookup()::rest.getForObject#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.lookup()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 1266,
+        "end": 1331
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.one(String)::rest.getForObject#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.one(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 419,
+        "end": 477
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.remove(String)::send#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.remove(String)",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.send(HttpMethod,String)",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 1075,
+        "end": 1108
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.send(HttpMethod,String)::rest.exchange#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.send(HttpMethod,String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 969,
+        "end": 1029
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.single()::rest.exchange#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.single()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Rest.java",
+        "start": 755,
+        "end": 829
+      }
+    },
+    {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()::doubled#0",
       "caller": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.single()",
       "target": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.doubled()",
@@ -2444,6 +3149,28 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/jaxrs/Remote.java::example.web.jaxrs.Remote::GET#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/jaxrs/Remote.java::example.web.jaxrs.Remote",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/jaxrs/Remote.java",
+        "start": 212,
+        "end": 216
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/jaxrs/Remote.java::example.web.jaxrs::Path#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/jaxrs/Remote.java::example.web.jaxrs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/jaxrs/Remote.java",
+        "start": 165,
+        "end": 181
+      }
+    },
+    {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/jaxrs/shadow/Hidden.java::example.web.jaxrs.shadow.Hidden::GET#0",
       "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/jaxrs/shadow/Hidden.java::example.web.jaxrs.shadow.Hidden",
       "target": "example.com/acme/conformance::maven/api/src/main/java/example/web/jaxrs/shadow/GET.java::example.web.jaxrs.shadow.GET",
@@ -2740,7 +3467,83 @@
       "site": "example.com/acme/conformance::maven/pom.xml"
     }
   ],
-  "consumers": [],
+  "consumers": [
+    {
+      "contract": "http::POST::/api/orders/new",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()::(method_invocation).build#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.list()::(method_invocation).build#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::PUT::/api/orders/1",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()::(method_invocation).build#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.list()::(method_invocation).build#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::DELETE::/api/orders/1",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.remove()::(method_invocation).build#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": null,
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/OwnEnum.java::example.clients.OwnEnum.get()::rest.exchange#0",
+      "via": null
+    },
+    {
+      "contract": "http::PATCH::/orders/1/flag",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.flag()::(method_invocation).uri#0",
+      "via": "host:built.example.com"
+    },
+    {
+      "contract": "http::GET::/api/orders/{}",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.get()::(method_invocation).uri#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::POST::/api/orders/new",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.create()::rest.postForObject#0",
+      "via": null
+    },
+    {
+      "contract": "http::DELETE::/api/orders/7",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.drop()::remove#0",
+      "via": null
+    },
+    {
+      "contract": "http::PATCH::/api/orders/{}/flag",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.flag(int)::rest.patchForObject#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.list()::rest.getForObject#0",
+      "via": null
+    },
+    {
+      "contract": null,
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.lookup()::rest.getForObject#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/api/orders/{}",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.one(String)::rest.getForObject#0",
+      "via": null
+    },
+    {
+      "contract": "http::POST::/api/orders/single",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.single()::rest.exchange#0",
+      "via": null
+    }
+  ],
   "packages": [
     {
       "name": "example:api",
@@ -2822,6 +3625,14 @@
       ]
     },
     {
+      "name": "maven/api/src/main/java/example/clients",
+      "members": [
+        "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.drop()",
+        "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.remove(String)",
+        "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.send(HttpMethod,String)"
+      ]
+    },
+    {
       "name": "maven/api/src/main/java/example/web/jaxrs/shadow",
       "members": [
         "example.com/acme/conformance::maven/api/src/main/java/example/web/jaxrs/shadow/GET.java::example.web.jaxrs.shadow.GET",
@@ -2837,7 +3648,43 @@
       ]
     }
   ],
-  "links": [],
+  "links": [
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.create()::rest.postForObject#0",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.create()",
+      "contract": "http::POST::/api/orders/new",
+      "level": "inferred",
+      "reason": "host unresolved; the only repository serving it is example.com/acme/conformance"
+    },
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.flag(int)::rest.patchForObject#0",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.flag()",
+      "contract": "http::PATCH::/api/orders/{}/flag",
+      "level": "inferred",
+      "reason": "host unresolved; the only repository serving it is example.com/acme/conformance"
+    },
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.list()::rest.getForObject#0",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.list()",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "host unresolved; the only repository serving it is example.com/acme/conformance"
+    },
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.one(String)::rest.getForObject#0",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.get(String)",
+      "contract": "http::GET::/api/orders/{}",
+      "level": "inferred",
+      "reason": "host unresolved; the only repository serving it is example.com/acme/conformance"
+    },
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.single()::rest.exchange#0",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.single()",
+      "contract": "http::POST::/api/orders/single",
+      "level": "inferred",
+      "reason": "host unresolved; the only repository serving it is example.com/acme/conformance"
+    }
+  ],
   "processes": [
     {
       "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/Mains.java::example.Mains.Decorated.main(String[])",
@@ -3499,6 +4346,372 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()",
+      "kind": "export",
+      "label": "example.clients.Jdk.create()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.create()::(method_invocation).build#0",
+          "mark": "no-provider",
+          "contract": "http::POST::/api/orders/new"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.list()",
+      "kind": "export",
+      "label": "example.clients.Jdk.list()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.list()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.list()::(method_invocation).build#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/api/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()",
+      "kind": "export",
+      "label": "example.clients.Jdk.replace()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk.replace()::(method_invocation).build#0",
+          "mark": "no-provider",
+          "contract": "http::PUT::/api/orders/1"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.list()",
+      "kind": "export",
+      "label": "example.clients.Ok.list()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.list()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.list()::(method_invocation).build#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/api/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.remove()",
+      "kind": "export",
+      "label": "example.clients.Ok.remove()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.remove()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Ok.java::example.clients.Ok.remove()::(method_invocation).build#0",
+          "mark": "no-provider",
+          "contract": "http::DELETE::/api/orders/1"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/OwnEnum.java::example.clients.OwnEnum.get()",
+      "kind": "export",
+      "label": "example.clients.OwnEnum.get()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/OwnEnum.java::example.clients.OwnEnum.get()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/OwnEnum.java::example.clients.OwnEnum.get()::rest.exchange#0",
+          "mark": "unresolved"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.flag()",
+      "kind": "export",
+      "label": "example.clients.Reactive.flag()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.flag()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.flag()::(method_invocation).uri#0",
+          "mark": "no-provider",
+          "contract": "http::PATCH::/orders/1/flag"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.get()",
+      "kind": "export",
+      "label": "example.clients.Reactive.get()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.get()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.get()::(method_invocation).uri#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/api/orders/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.Rest(RestTemplate)",
+      "kind": "export",
+      "label": "example.clients.Rest.Rest(RestTemplate)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.Rest(RestTemplate)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.create()",
+      "kind": "export",
+      "label": "example.clients.Rest.create()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.create()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.create()",
+          "reason": "host unresolved; the only repository serving it is example.com/acme/conformance"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.drop()",
+      "kind": "export",
+      "label": "example.clients.Rest.drop()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.drop()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.remove(String)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.send(HttpMethod,String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.drop()::remove#0",
+          "mark": "no-provider",
+          "contract": "http::DELETE::/api/orders/7"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.flag(int)",
+      "kind": "export",
+      "label": "example.clients.Rest.flag(int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.flag(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.flag()",
+          "reason": "host unresolved; the only repository serving it is example.com/acme/conformance"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.list()",
+      "kind": "export",
+      "label": "example.clients.Rest.list()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.list()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.list()",
+          "reason": "host unresolved; the only repository serving it is example.com/acme/conformance"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.lookup()",
+      "kind": "export",
+      "label": "example.clients.Rest.lookup()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.lookup()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.lookup()::rest.getForObject#0",
+          "mark": "unresolved"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.one(String)",
+      "kind": "export",
+      "label": "example.clients.Rest.one(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.one(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.get(String)",
+          "reason": "host unresolved; the only repository serving it is example.com/acme/conformance"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.single()",
+      "kind": "export",
+      "label": "example.clients.Rest.single()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.single()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/OrderController.java::example.web.OrderController.single()",
+          "reason": "host unresolved; the only repository serving it is example.com/acme/conformance"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/util/Tools.java::example.util.Tools.valueOf(int)",
       "kind": "export",
       "label": "example.util.Tools.valueOf(int)",
@@ -3943,6 +5156,20 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/jaxrs/Jakarta.java::example.web.jaxrs.Jakarta.get()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/jaxrs/Remote.java::example.web.jaxrs.Remote.fetch()",
+      "kind": "export",
+      "label": "example.web.jaxrs.Remote.fetch()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/jaxrs/Remote.java::example.web.jaxrs.Remote.fetch()"
         }
       ]
     },

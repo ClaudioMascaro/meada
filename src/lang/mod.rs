@@ -293,6 +293,9 @@ pub struct Facts {
     /// lower-case methods of an exported type).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden: Vec<String>,
+    /// The interfaces of the file (Java's `interface`), by qualified name.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub interfaces: Vec<String>,
     /// Whether the file is left out of the build for the target: a Rust file that opens with an
     /// inner `#![cfg(..)]` that is false (as if no `mod` reached it), a Go file whose build
     /// constraints exclude it.
@@ -776,6 +779,11 @@ pub enum Value {
     /// An anonymous function written in place, by the qualified name of its `Kind::Inline`
     /// definition.
     Function(String),
+    /// A name an import from outside the repository binds (`HttpMethod.GET`), as each import
+    /// that may bind it spells it where it is written: one spelling when an import binds it, the
+    /// candidates of the on-demand imports otherwise (`resolve::Outside`). Only a chain read by
+    /// `resolve::Expand::Chain` holds one; no pack writes it.
+    External(Vec<String>),
     /// Anything else.
     Unknown,
 }
