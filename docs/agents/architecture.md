@@ -1701,17 +1701,21 @@ one for the area a change touches.
   path array is dropped: the others still serve. Interface-declared mappings, composed annotations
   and `server.servlet.context-path` are not read.
 - `http/java/clients.rs` (spec #26, #88): a RestTemplate or a WebClient counts by the type the
-  source writes for the receiver through a single-type import (`Follow::Declarations`), or, for a
-  WebClient, by the `WebClient.create` or `WebClient.builder()` chain it traces to
-  (`Follow::Values`, through `static final` fields and chains written in place); a client held
-  in an instance field or a local is read by its type alone, so its base is unknown and the
-  consumer links by path. A builder (`HttpRequest.newBuilder()`, `new Request.Builder()`) is
-  read only as one chain ending in `build()`; one held in a variable between steps is no
-  consumer. A static call on a class an on-demand import brings (`WebClient.create` under
-  `import ...client.*`) is no client: the pack reads such a receiver as an outside name of its
-  own, with no candidates. `String.format` reads `%s`, `%d` and `%%`; any other conversion
-  leaves the URL unread. A `HttpMethod.X` names a method only when one spelling (`Outside`) is
-  Spring's.
+  source writes for the receiver (`Follow::Declarations`), or, for a WebClient, by the
+  `WebClient.create` or `WebClient.builder()` chain it traces to (`Follow::Values`); a name
+  imported on demand counts through its one candidate in the kind's table (`Outside::candidates`,
+  now also for a head only the file's outside names bind). A WebClient's base is read off the
+  folded chain (`Expand::Chain`), through constants, `final` fields and a wrapper parameter's
+  arguments; a client held in a local has an unknown base, so the consumer links by path. The
+  Java pack keeps a `final` instance field's one value (its initializer, or the single `this.f =
+  v` or `f = v` of all its constructors; two give none) as a `Const` of its class, outside
+  `statics`; a constructor parameter in it is read in the class scope, unknown. A builder
+  (`HttpRequest.newBuilder()`, `new Request.Builder()`) is read only as one chain ending in
+  `build()`; one held in a variable between steps is no consumer, and a chain folded short of
+  its start names no method. `String.format` puts each `%s` or `%d` argument in place (a
+  parameter keeps the wrapper climbing, anything else is a hole) and reads `%%`; any other
+  conversion leaves the URL unread. A `HttpMethod.X` names a method only when one spelling
+  (`Outside`) is Spring's.
 - `http/go.rs` (spec #25): a route is read only with a literal path and a literal prefix; a
   group prefix or a pattern Meada cannot read serves nothing. `net/http` reads `{name}`,
   `{name...}` and `{$}` alone: a `:name` segment is a literal no contract can spell, so its route

@@ -4,24 +4,28 @@
 //! of a WebClient request (`get()`, `method(HttpMethod.X)`) made on a name written as a
 //! `WebClient` or made by `WebClient.create` or `WebClient.builder()`; and the `build()` of a
 //! builder chain that starts at `HttpRequest.newBuilder()` or `new Request.Builder()`, each name
-//! read through `Code::outside`. A WebClient's base is that of the `create(base)` or
-//! `builder().baseUrl(base)` the name traces back to (`Follow::Values`), unknown for a client
-//! only its type tells.
+//! read through `Code::outside` (an on-demand import's one candidate included).
 //!
 //! The call is read whole (`Expand::Chain`), so its builder chain and arguments fold where a
 //! wrapper's callers pass them, and an enum member (`HttpMethod.GET`) arrives as a
 //! `Value::External` spelled by the imports of the file that writes it: a type of the repository
-//! or another package's by that name is no Spring method. The URL folds `+`, constants,
-//! `URI.create(..)` and `String.format` (each `%s` or `%d` a hole); the root's `fetch` reads it.
-// ponytail: a client or a builder held in a local or an instance field is read by its written
-// type alone (a WebClient's base unknown, a builder not at all); `static final` ones and chains
-// written in place are read through.
+//! or another package's by that name is no Spring method. A WebClient's base is read off the
+//! client the folded chain is made on (`WebClient.create(base)`, `builder().baseUrl(base)`,
+//! through constants and `final` fields), so a client a wrapper takes as a parameter has the base
+//! each caller passes; one not read has an unknown base. The URL folds `+`, constants,
+//! `URI.create(..)` and `String.format`; the root's `fetch` reads it.
+// ponytail: a client or a builder held in a local is read by its written type alone (a
+// WebClient's base unknown, a builder not at all); constants, `final` fields and chains written
+// in place are read through.
 
 use super::super::{based, consumer, fetch};
 use super::{REQUEST_METHODS, one};
 use crate::contract::Found;
-use crate::lang::{Invocation, Part, Value};
-use crate::resolve::{Code, Expand, Expanded, Follow, Form, Of, method as member, passes_nothing};
+use crate::lang::{Call, Invocation, Part, Value};
+use crate::resolve::{
+    Code, Expand, Expanded, FLUENT_CHAIN, Follow, Form, Of, Outside, method as member,
+    passes_nothing,
+};
 
 const REST_TEMPLATE: &str = "org.springframework.web.client.RestTemplate";
 /// The methods of a RestTemplate that send one method; `exchange` names it.
@@ -50,6 +54,7 @@ const NEW_BUILDER: &str = "java.net.http.HttpRequest.newBuilder";
 /// The methods of an `HttpRequest.Builder` that set one method; `method` names it.
 const JDK_METHODS: &[(&str, &str)] = &[
     ("GET", "GET"),
+    ("HEAD", "HEAD"),
     ("POST", "POST"),
     ("PUT", "PUT"),
     ("DELETE", "DELETE"),
@@ -69,8 +74,8 @@ const OK_METHODS: &[(&str, &str)] = &[
 enum Client {
     /// A RestTemplate method sending this method; `None` for `exchange`.
     Rest(Option<&'static str>),
-    /// A WebClient request, with the base URL of the client (`None` without one).
-    Web(Option<Vec<Part>>),
+    /// A WebClient request; the base is read off the client its folded chain is made on.
+    Web,
     /// The builder chain of an `HttpRequest` or an OkHttp `Request`: where it starts (the URL
     /// `newBuilder(uri)` may give) and the methods that set the method.
     Builder {
@@ -87,8 +92,8 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
         if !path.ends_with(".java") {
             continue;
         }
-        for (n, stored) in facts.calls.iter().enumerate() {
-            let Some(client) = client(code, path, n, member(&stored.callee)) else {
+        for n in 0..facts.calls.len() {
+            let Some(client) = client(code, path, &facts.calls, n) else {
                 continue;
             };
             let read = |values: &[Value], _: &[(String, Value)]| {
@@ -111,30 +116,45 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
     found
 }
 
-/// The client the call at `index` of `path`, whose callee names `member`, sends on.
-fn client<'a>(code: &Code<'a>, path: &'a str, index: usize, member: &str) -> Option<Client> {
+/// The client the call at `index` of `path` (among the file's `calls` as the index keeps
+/// them) sends on. What the kept facts rule out is ruled out before the call's values are read:
+/// `Code::call` parses the file again on a refresh.
+fn client<'a>(code: &Code<'a>, path: &'a str, calls: &'a [Call], index: usize) -> Option<Client> {
+    let stored = &calls[index];
+    let member = member(&stored.callee);
     let rest = REST_METHODS.iter().find(|(m, _)| *m == member);
     if rest.is_some() || member == "exchange" {
-        let call = code.call(path, index)?;
-        let Some(Value::Ref(name)) = code.receiver(path, index) else {
-            return None;
-        };
-        let typed = typed(code, path, &call.scope, name)?;
-        return (typed == REST_TEMPLATE).then(|| Client::Rest(rest.map(|(_, m)| *m)));
+        let (receiver, _) = stored.callee.rsplit_once('.')?;
+        let typed = typed(code, path, &stored.scope, receiver);
+        one(&typed, |t| t == REST_TEMPLATE)?;
+        return Some(Client::Rest(rest.map(|(_, m)| *m)));
     }
     match member {
         "uri" => {
-            let call = code.call(path, index)?;
-            let Some(Value::Call(request)) = code.receiver(path, index) else {
-                return None;
-            };
-            let starts = self::member(&request.callee);
+            let starts = self::member(&calls.get(stored.on?)?.callee);
             if starts != "method" && !WEB_METHODS.iter().any(|(m, _)| *m == starts) {
                 return None;
             }
-            web_base(code, path, &call.scope, request.receiver.as_deref()?).map(Client::Web)
+            let Some(Value::Call(request)) = code.receiver(path, index) else {
+                return None;
+            };
+            let client = request.receiver.as_deref()?;
+            web_client(code, path, &stored.scope, client).then_some(Client::Web)
         }
         "build" => {
+            // The chain's start as the kept facts tell: `newBuilder`, or a method of a `new`.
+            let mut start = stored;
+            for _ in 0..FLUENT_CHAIN {
+                match start.on.and_then(|on| calls.get(on)) {
+                    Some(next) => start = next,
+                    None => break,
+                }
+            }
+            if self::member(&start.callee) != "newBuilder"
+                && !start.callee.starts_with("(expression).")
+            {
+                return None;
+            }
             let chain = code.chain(path, index)?;
             let start = *chain.last()?;
             let call = code.call(path, start)?;
@@ -172,16 +192,23 @@ fn sends(client: &Client, call: &Invocation) -> (Value, Value) {
             };
             (url(call.args.first()), method)
         }
-        Client::Web(base) => {
-            let method = match call.receiver.as_deref() {
-                Some(Value::Call(request)) => match member(&request.callee) {
-                    "method" => spring_method(request.args.first()),
-                    m => (WEB_METHODS.iter().find(|(w, _)| *w == m))
-                        .map_or(Value::Unknown, |(_, m)| text(m)),
-                },
-                _ => Value::Unknown,
+        Client::Web => {
+            let Some(Value::Call(request)) = call.receiver.as_deref() else {
+                return (Value::Unknown, Value::Unknown);
             };
-            (based(base.as_deref(), &url(call.args.first())), method)
+            let method = match member(&request.callee) {
+                "method" => spring_method(request.args.first()),
+                m => (WEB_METHODS.iter().find(|(w, _)| *w == m))
+                    .map_or(Value::Unknown, |(_, m)| text(m)),
+            };
+            match request.receiver.as_deref() {
+                // A client a wrapper's caller passes: its base is read at each caller.
+                Some(Value::Ref(name)) => (Value::Ref(name.clone()), method),
+                client => (
+                    based(base(client).as_deref(), &url(call.args.first())),
+                    method,
+                ),
+            }
         }
         Client::Builder {
             start,
@@ -190,6 +217,7 @@ fn sends(client: &Client, call: &Invocation) -> (Value, Value) {
         } => {
             // Outermost first: the last call that sets a part is the one that holds.
             let (mut url, mut method) = (None, None);
+            let mut reached = false;
             let mut at = Some(call);
             while let Some(step) = at {
                 let name = member(&step.callee);
@@ -205,11 +233,56 @@ fn sends(client: &Client, call: &Invocation) -> (Value, Value) {
                 }
                 at = match step.receiver.as_deref() {
                     Some(Value::Call(next)) if name != *start => Some(next),
-                    _ => None,
+                    Some(Value::New(..)) => {
+                        reached = true;
+                        None
+                    }
+                    _ => {
+                        reached = name == *start;
+                        None
+                    }
                 };
             }
-            (url.unwrap_or(Value::Unknown), method.unwrap_or(text("GET")))
+            // `GET` when the whole chain was read and names none; a chain folded short of its
+            // start (past a depth or a budget) may name one further down.
+            let absent = match reached {
+                true => text("GET"),
+                false => Value::Unknown,
+            };
+            (url.unwrap_or(Value::Unknown), method.unwrap_or(absent))
         }
+    }
+}
+
+/// The base URL of a folded WebClient: what `WebClient.create(base)` gives, or the outermost
+/// `baseUrl(base)` of a `WebClient.builder()` chain ending in `build()`; `None` without one,
+/// unknown for a client made any other way or not read.
+fn base(client: Option<&Value>) -> Option<Vec<Part>> {
+    let hole = Some(vec![Part::Hole]);
+    let Some(Value::Call(top)) = client else {
+        return hole;
+    };
+    let mut steps = vec![top];
+    while let Some(Value::Call(next)) = steps[steps.len() - 1].receiver.as_deref() {
+        steps.push(next);
+    }
+    let start = steps[steps.len() - 1];
+    let made = matches!(start.receiver.as_deref(),
+        Some(Value::External(s)) if one(s, |s| s == WEB_CLIENT).is_some());
+    let given = |call: &Invocation| match call.args.first() {
+        None | Some(Value::Undefined) => None,
+        Some(Value::Str(parts)) => Some(parts.clone()),
+        // A wrapper's parameter: read at each caller.
+        Some(Value::Ref(name)) => Some(vec![Part::Ref(name.clone())]),
+        Some(_) => Some(vec![Part::Hole]),
+    };
+    match member(&start.callee) {
+        "create" if made && steps.len() == 1 => given(start),
+        "builder" if made && member(&top.callee) == "build" => {
+            let set = steps.iter().find(|c| member(&c.callee) == "baseUrl");
+            set.and_then(|c| given(c))
+        }
+        _ => hole,
     }
 }
 
@@ -226,21 +299,22 @@ fn url(value: Option<&Value>) -> Value {
     if of("java.net.URI") && member(&call.callee) == "create" {
         return url(call.args.first());
     }
-    // `java.lang` needs no import: a bare `String` is its own unless something hides it.
-    if (of("String") || of("java.lang.String")) && member(&call.callee) == "format" {
-        return format(call.args.first());
+    if of("java.lang.String") && member(&call.callee) == "format" {
+        return format(&call.args);
     }
     Value::Unknown
 }
 
-/// `String.format` with the format `value`: each `%s` or `%d` a hole, `%%` a `%`. Unknown for
-/// any other conversion, and for a format that is no string.
-fn format(value: Option<&Value>) -> Value {
-    let parts = match value {
+/// `String.format` with these arguments, the format first: each `%s` or `%d` the next
+/// argument (a string's parts, a parameter as it is, anything else a hole), `%%` a `%`.
+/// Unknown for any other conversion, and for a format that is no string.
+fn format(args: &[Value]) -> Value {
+    let parts = match args.first() {
         Some(Value::Str(parts)) => parts,
         Some(Value::Ref(name)) => return Value::Ref(name.clone()),
         _ => return Value::Unknown,
     };
+    let mut given = args.iter().skip(1);
     let mut out = Vec::new();
     for part in parts {
         let Part::Text(text) = part else {
@@ -258,7 +332,11 @@ fn format(value: Option<&Value>) -> Value {
                 Some('%') => literal.push('%'),
                 Some('s' | 'd') => {
                     out.push(Part::Text(std::mem::take(&mut literal)));
-                    out.push(Part::Hole);
+                    match given.next() {
+                        Some(Value::Str(parts)) => out.extend(parts.iter().cloned()),
+                        Some(Value::Ref(name)) => out.push(Part::Ref(name.clone())),
+                        _ => out.push(Part::Hole),
+                    }
                 }
                 _ => return Value::Unknown,
             }
@@ -286,97 +364,67 @@ fn spring_method(value: Option<&Value>) -> Value {
     }
 }
 
-/// How the imports of `path` may spell `name`, written in `scope`: the import that binds it,
-/// or the on-demand imports that may.
-fn spellings<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a str) -> Vec<String> {
-    match code.outside(path, scope, name, false) {
+/// The spellings of an `Outside`: the candidates of the on-demand imports when only they
+/// may bind it, else the import's.
+fn spelled(outside: Option<Outside>) -> Vec<String> {
+    match outside {
         Some(o) if !o.candidates.is_empty() => o.candidates,
         Some(o) if o.direct => vec![o.spelled],
         _ => Vec::new(),
     }
 }
 
-/// The outside type the source writes for `name` (a field, a parameter, a local).
-fn typed<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a str) -> Option<String> {
-    let found = code.origins(path, scope, Of::Name(name), Follow::Declarations);
-    let origin = found.into_iter().next()?;
-    let typed = origin.form == Form::Type && origin.routes.iter().all(|r| r.steps.is_empty());
-    typed.then_some(origin.outside?.spelled)
+/// How the imports of `path` may spell `name`, written in `scope` (`spelled`).
+fn spellings<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a str) -> Vec<String> {
+    spelled(code.outside(path, scope, name, false))
 }
 
-/// The base URL of the WebClient `client` (a name, or a call made in place), `None` when it
-/// is no WebClient: `Some(None)` without a base, an unknown one when only its type tells or
-/// the clients it may be differ.
-fn web_base<'a>(
-    code: &Code<'a>,
-    path: &'a str,
-    scope: &'a str,
-    client: &'a Value,
-) -> Option<Option<Vec<Part>>> {
-    let hole = || Some(vec![Part::Hole]);
-    let (made, typed) = match client {
+/// How the imports may spell the outside type the source writes for `name` (a field, a
+/// parameter, a local): none when it writes no such type.
+fn typed<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a str) -> Vec<String> {
+    let found = code.origins(path, scope, Of::Name(name), Follow::Declarations);
+    match found.into_iter().next() {
+        Some(o) if o.form == Form::Type && o.routes.iter().all(|r| r.steps.is_empty()) => {
+            spelled(o.outside)
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// Whether `client` (a name, or a call made in place) is a WebClient: written as one, or made
+/// by a `WebClient.create` or `WebClient.builder()` it traces back to.
+fn web_client<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, client: &'a Value) -> bool {
+    match client {
         Value::Ref(name) => {
+            if one(&typed(code, path, scope, name), |t| t == WEB_CLIENT).is_some() {
+                return true;
+            }
             let follow = Follow::Values {
                 passes: passes_nothing,
             };
             let origins = code.origins(path, scope, Of::Name(name), follow);
-            let made: Vec<_> = (origins.iter().filter_map(|o| o.call))
-                .map(|(at, i)| made(code, at, i))
-                .collect();
-            let typed = typed(code, path, scope, name).is_some_and(|t| t == WEB_CLIENT);
-            (made, typed)
+            (origins.iter().filter_map(|o| o.call)).any(|(at, i)| makes(code, at, i))
         }
-        Value::Call(inner) => (
-            vec![made(code, path, code.call_index(path, &inner.range)?)],
-            false,
-        ),
-        _ => return None,
-    };
-    if !typed && made.iter().all(Option::is_none) {
-        return None;
-    }
-    // A call that is no constructor the source shows gives a client whose base is not known.
-    let mut bases: Vec<Option<Vec<Part>>> = Vec::new();
-    for base in made.into_iter().map(|m| m.unwrap_or_else(hole)) {
-        if !bases.contains(&base) {
-            bases.push(base);
-        }
-    }
-    match bases.len() {
-        1 => bases.pop(),
-        _ => Some(hole()),
+        Value::Call(inner) => code
+            .call_index(path, &inner.range)
+            .is_some_and(|i| makes(code, path, i)),
+        _ => false,
     }
 }
 
-/// The base URL of the WebClient the call at `index` of `path` makes, `None` when it makes
-/// none: `WebClient.create(base)`, or a `WebClient.builder()` chain built with its last
-/// `baseUrl(base)`; `Some(None)` without a base.
-fn made<'a>(code: &Code<'a>, path: &'a str, index: usize) -> Option<Option<Vec<Part>>> {
-    let chain = code.chain(path, index)?;
-    let calls: Vec<_> = chain
-        .iter()
-        .map(|&i| code.call(path, i))
-        .collect::<Option<_>>()?;
-    let start = calls.last()?;
-    let names = spellings(code, path, &start.scope, &start.callee);
-    let base = |call: &'a crate::lang::Call| match call.args.first() {
-        None => None,
-        Some(url) => match code.value(path, &call.scope, url) {
-            Value::Str(parts) => Some(parts),
-            Value::Undefined => None,
-            _ => Some(vec![Part::Hole]),
-        },
+/// Whether the call at `index` of `path` makes a WebClient: `WebClient.create(..)`, or a
+/// `WebClient.builder()` chain ending in `build()`.
+fn makes<'a>(code: &Code<'a>, path: &'a str, index: usize) -> bool {
+    let Some(chain) = code.chain(path, index) else {
+        return false;
     };
-    let created = format!("{WEB_CLIENT}.create");
-    let builder = format!("{WEB_CLIENT}.builder");
-    if one(&names, |s| s == created).is_some() && calls.len() == 1 {
-        return Some(base(start));
-    }
-    if one(&names, |s| s == builder).is_some() && member(&calls[0].callee) == "build" {
-        let set = calls.iter().find(|c| member(&c.callee) == "baseUrl");
-        return Some(set.and_then(|c| base(c)));
-    }
-    None
+    let calls: Option<Vec<_>> = chain.iter().map(|&i| code.call(path, i)).collect();
+    let Some((top, start)) = calls.as_ref().and_then(|c| Some((c.first()?, c.last()?))) else {
+        return false;
+    };
+    let names = spellings(code, path, &start.scope, &start.callee);
+    let is = |what: &str| one(&names, |s| s == format!("{WEB_CLIENT}.{what}")).is_some();
+    (is("create") && chain.len() == 1) || (is("builder") && member(&top.callee) == "build")
 }
 
 #[cfg(test)]
@@ -508,7 +556,7 @@ mod tests {
         assert_eq!(exchange(&other, "", "HttpMethod.GET"), unknown);
         assert_eq!(exchange(IMPORTS, "", "HttpMethod.SPELL"), unknown);
         assert_eq!(exchange(IMPORTS, "", "null"), unknown);
-        // Two on-demand imports that may both bring it: none is certain.
+        // Another on-demand import whose package is not Spring's leaves Spring's the one candidate.
         let both = format!("{wild}import org.acme.*;\n");
         assert_eq!(
             exchange(&both, "", "HttpMethod.POST"),
@@ -527,16 +575,18 @@ mod tests {
             "{REST}static final String USERS = Api.BASE + \"/users\";\n\
              void f(int id) {{\n\
              rest.getForObject(USERS + \"/{{id}}\", String.class, id);\n\
-             rest.getForObject(String.format(\"/f/%s/%d/x%%\", USERS, id), String.class);\n\
+             rest.getForObject(String.format(\"%s/f/%d/x%%\", USERS, id), String.class);\n\
+             rest.getForObject(String.format(\"/g/%s\", 7), String.class);\n\
              rest.getForObject(URI.create(USERS + \"/me\"), String.class);\n\
              rest.getForObject(\"https://Users.example.com/u\", String.class);\n}}"
         );
         assert_eq!(
             sent_with(&imports, &body, &others),
             [
+                to("http::GET::/api/users/f/{}/x%"),
                 to("http::GET::/api/users/me"),
                 to("http::GET::/api/users/{}"),
-                to("http::GET::/f/{}/{}/x%"),
+                to("http::GET::/g/{}"),
                 (
                     Some("http::GET::/u".into()),
                     Some("host:users.example.com".into()),
@@ -590,13 +640,86 @@ mod tests {
     }
 
     #[test]
-    fn a_web_client_an_on_demand_import_brings_is_no_client() {
-        // ponytail: the pack reads a class an on-demand import brings as an outside name of its
-        // own, so neither its type nor its static calls are the library's.
-        let wild = "import org.springframework.web.reactive.function.client.*;\n";
+    fn a_client_an_on_demand_import_brings_is_the_librarys_unless_another_may_be() {
+        let wild = "import org.springframework.web.reactive.function.client.*;\n\
+             import org.springframework.web.client.*;\nimport java.util.*;\n";
         let body = "static final WebClient W = WebClient.create(\"http://w.example.com\");\n\
-             void f() { W.get().uri(\"/w\").retrieve(); }";
-        assert!(sent_with(wild, body, &[]).is_empty());
+             RestTemplate rest;\n\
+             void f() { W.get().uri(\"/w\").retrieve(); rest.delete(\"/r\"); }";
+        let host = Some("host:w.example.com".to_string());
+        assert_eq!(
+            sent_with(wild, body, &[]),
+            [
+                to("http::DELETE::/r"),
+                (Some("http::GET::/w".into()), host.clone(), None)
+            ]
+        );
+        // A wildcard of the repository that brings its own `RestTemplate` may be the one.
+        let others = [(
+            "b/RestTemplate.java",
+            "package b; public class RestTemplate {}",
+        )];
+        let both = format!("{wild}import b.*;\n");
+        assert_eq!(
+            sent_with(&both, body, &others),
+            [(Some("http::GET::/w".into()), host, None)]
+        );
+    }
+
+    #[test]
+    fn a_web_client_parameter_takes_the_base_each_caller_passes() {
+        let body = "static final WebClient ORDERS = WebClient.create(\"http://orders.example.com\");\n\
+             WebClient other;\n\
+             void call(WebClient c, String p) { c.get().uri(p).retrieve(); }\n\
+             void a() { call(ORDERS, \"/x\"); call(other, \"/y\"); }";
+        assert_eq!(
+            sent(body),
+            [
+                (
+                    Some("http::GET::/x".into()),
+                    Some("host:orders.example.com".into()),
+                    None
+                ),
+                to("http::GET::/y"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_final_web_client_field_takes_the_base_of_its_one_value() {
+        // An initializer, one constructor assignment, two of them, and a constructor parameter.
+        let body = "private final WebClient f = WebClient.create(\"http://f.example.com\");\n\
+             private final WebClient g;\n\
+             private final WebClient h;\n\
+             private final WebClient p;\n\
+             C(String url) {\n\
+               this.g = WebClient.builder().baseUrl(\"http://g.example.com\").build();\n\
+               h = WebClient.create(\"http://h1.example.com\");\n\
+               this.p = WebClient.create(url);\n\
+             }\n\
+             C(int n) { this.h = WebClient.create(\"http://h2.example.com\"); }\n\
+             void run() {\n\
+               f.get().uri(\"/f\").retrieve();\n\
+               this.g.get().uri(\"/g\").retrieve();\n\
+               h.get().uri(\"/h\").retrieve();\n\
+               p.get().uri(\"/p\").retrieve();\n\
+             }";
+        let via = |c: &str, v: &str| (Some(c.to_string()), Some(format!("host:{v}")), None);
+        assert_eq!(
+            sent(body),
+            [
+                via("http::GET::/f", "f.example.com"),
+                via("http::GET::/g", "g.example.com"),
+                to("http::GET::/h"),
+                to("http::GET::/p"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_parameter_that_hides_a_rest_template_field_sends_nothing() {
+        let body = format!("{REST}void f(Object rest) {{ rest.delete(\"/x\"); }}");
+        assert!(sent(&body).is_empty());
     }
 
     #[test]
@@ -607,18 +730,30 @@ mod tests {
              HttpRequest.newBuilder().PUT(null).uri(URI.create(\"/c\")).header(\"k\", \"v\").build();\n\
              HttpRequest.newBuilder(URI.create(\"/d\")).DELETE().build();\n\
              HttpRequest.newBuilder().method(\"PATCH\", null).uri(URI.create(\"/e\")).build();\n\
-             HttpRequest.newBuilder().GET().uri(URI.create(\"/x\")).uri(URI.create(\"/f\")).build();\n}";
+             HttpRequest.newBuilder().GET().uri(URI.create(\"/x\")).uri(URI.create(\"/f\")).build();\n\
+             HttpRequest.newBuilder(URI.create(\"/g\")).HEAD().build();\n}";
         assert_eq!(
             contracts(body),
             [
                 "http::DELETE::/d",
                 "http::GET::/a",
                 "http::GET::/f",
+                "http::HEAD::/g",
                 "http::PATCH::/e",
                 "http::POST::/b",
                 "http::PUT::/c",
             ]
         );
+    }
+
+    #[test]
+    fn a_chain_folded_short_of_its_start_names_no_method() {
+        // Past the pack's value depth the chain's start is unknown: no `GET` by default.
+        let headers = ".header(\"k\", \"v\")".repeat(80);
+        let body = format!(
+            "void f() {{ HttpRequest.newBuilder(){headers}.uri(URI.create(\"/a\")).build(); }}"
+        );
+        assert_eq!(sent(&body), [open(None)]);
     }
 
     #[test]

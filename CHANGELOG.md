@@ -41,14 +41,18 @@ All notable changes to Meada are recorded here. The format follows
   latter through the new `Outside::candidates`, which every Java kind can use); a shadowing
   repository type, a competing import and `server.servlet.context-path` give no route.
 - Java HTTP consumers (spec #26, #88): RestTemplate methods, WebClient requests (base from
-  `WebClient.create` or `builder().baseUrl`), `HttpRequest.newBuilder()` and OkHttp
-  `Request.Builder` chains, `GET` when a chain names no method. URLs fold `+`, constants,
-  `URI.create`, `String.format` and `{id}` templates; wrappers are read at each call site
+  `WebClient.create` or `builder().baseUrl`, through constants, `final` fields and each caller
+  of a wrapper), `HttpRequest.newBuilder()` and OkHttp `Request.Builder` chains, `GET` when a
+  whole chain names no method. Clients count through single-type imports and the one candidate
+  of on-demand ones. URLs fold `+`, constants, `URI.create`, `String.format` (each `%s` or `%d`
+  its argument) and `{id}` templates; wrappers are read at each call site
   through any number of levels, and an unreadable URL is an unresolved consumer. A new
   `Expand::Chain` reads a call whole, its builder chain and arguments folded at the callers,
   and carries an outside name such as `HttpMethod.GET` as a `Value::External` spelled by the
   writing file's imports, so a shadowing type is no method. The written type of a field typed
-  by a single-type import is now spelled as that import names it.
+  by a single-type import is now spelled as that import names it, and the Java pack keeps a
+  `final` field's one value (its initializer or a single constructor assignment) as a constant
+  of its class.
 
 - A multilingual documentation site (issue #320), with the README reference migrated to
   Portuguese, English and Spanish guides, React Flow maps and roadmap, accessible static and

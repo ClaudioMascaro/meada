@@ -725,10 +725,14 @@ impl<'a> Resolver<'a> {
         }
         let (scope, callee) = (call.scope.as_str(), call.callee.as_str());
         let seen = &mut self.seen(path, scope);
+        // The result of the call this one is made on, read once: the name match below reads it
+        // too, and reading it twice per call would double the work at every call of a chain.
+        let mut on = None;
         let binding = match (call.on, call.constructs, call.by_path) {
-            (Some(on), false, _) => {
+            (Some(inner), false, _) => {
                 let members = callee.split_once('.').map_or("", |(_, m)| m);
-                let result = self.result_of(path, on, work);
+                let result = self.result_of(path, inner, work);
+                on = Some(result.clone());
                 self.walk(result, members, seen, work, Reading::Value)
             }
             (_, true, _) => self.resolve_as(path, scope, callee, seen, work, Reading::Type),
@@ -783,7 +787,7 @@ impl<'a> Resolver<'a> {
             | Binding::Param(..)
             | Binding::Local(..)
             | Binding::Hidden
-            | Binding::Unknown => self.matched(path, call, work),
+            | Binding::Unknown => self.matched(path, call, on, work),
         }
     }
 
@@ -795,7 +799,13 @@ impl<'a> Resolver<'a> {
     /// (`super.f()`) the family does not answer resolves to nothing. Any other receiver keeps the
     /// repository's candidates, and several of them take the one declared in the family of the
     /// class around the call, other than the calling method itself.
-    fn matched(&self, path: &'a str, call: &'a Call, work: &mut Work<'a>) -> Resolution<'a> {
+    fn matched(
+        &self,
+        path: &'a str,
+        call: &'a Call,
+        on: Option<Binding<'a>>,
+        work: &mut Work<'a>,
+    ) -> Resolution<'a> {
         let (scope, callee) = (call.scope.as_str(), call.callee.as_str());
         if call.arity.is_none() {
             return self.infer(path, callee, call.by_path, None, false);
@@ -811,9 +821,10 @@ impl<'a> Resolver<'a> {
             None => Binding::Unknown,
             Some(head) => {
                 let seen = &mut self.seen(path, scope);
-                let receiver = match call.on {
-                    Some(on) => self.result_of(path, on, work),
-                    None => self.resolve_as(path, scope, head, seen, work, Reading::Value),
+                let receiver = match (on, call.on) {
+                    (Some(known), _) => known,
+                    (None, Some(inner)) => self.result_of(path, inner, work),
+                    (None, None) => self.resolve_as(path, scope, head, seen, work, Reading::Value),
                 };
                 self.instance(receiver, work)
             }
@@ -3388,6 +3399,13 @@ impl<'a> Code<'a> {
             {
                 on_demand()
             }
+            // A head no import names, which only the file's outside names bind (Java's bare
+            // `WebClient` under `import a.*;`): the on-demand imports may bring it.
+            (Binding::External(source, Imported::Namespace), _)
+                if source == head && r.by_local[path].of(head).is_empty() =>
+            {
+                on_demand()
+            }
             (Binding::External(..), _) => Vec::new(),
             (Binding::Unknown, false) => match on_demand() {
                 found if found.is_empty() => return None,
@@ -3425,16 +3443,28 @@ impl<'a> Code<'a> {
             return None;
         };
         let name = written.rsplit('.').next()?;
-        // A single-type import (Java's `import a.B;`) is of the type itself.
-        let spelled = match (imported, written.contains('.')) {
-            (Imported::Qualified, false) => package.to_string(),
-            _ => format!("{package}.{name}"),
+        let head = written.split('.').next().unwrap_or(written);
+        let (spelled, candidates) = match (imported, written.contains('.')) {
+            // A single-type import (Java's `import a.B;`) is of the type itself.
+            (Imported::Qualified, false) => (package.to_string(), Vec::new()),
+            // A head only the file's outside names bind: what the on-demand imports may bring,
+            // as `Code::outside` reads it.
+            (Imported::Namespace, _)
+                if r.unordered_globs && package == head && r.by_local[path].of(head).is_empty() =>
+            {
+                let found = r.on_demand(path, head).into_iter();
+                (
+                    written.to_string(),
+                    found.map(|s| format!("{s}.{written}")).collect(),
+                )
+            }
+            _ => (format!("{package}.{name}"), Vec::new()),
         };
         Some(Outside {
             imported: Some((package, name.to_string())),
             spelled,
             direct: true,
-            candidates: Vec::new(),
+            candidates,
         })
     }
 
@@ -4542,6 +4572,30 @@ mod tests {
             .collect();
         found.sort();
         found
+    }
+
+    #[test]
+    fn a_chain_of_calls_past_the_receiver_depth_resolves_each_call_once() {
+        use crate::lang::java::Java;
+        // `Outside.start().m().m()..`: each call is made on the one before, whose result no
+        // definition answers. Every call reads the result of the one it is made on once, so the
+        // chain costs its length, not two to the power of it.
+        let calls = ".m()".repeat(RECEIVER_DEPTH + 16);
+        let src = format!(
+            "package a;\nimport b.Outside;\nclass C {{ void f() {{ Outside.start(){calls}; }} }}\n"
+        );
+        let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("a/C.java", &facts)]);
+        let layout = Java.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
+        let chained = facts.calls.iter().filter(|c| c.on.is_some()).count();
+        assert!(chained > RECEIVER_DEPTH, "{chained} calls on calls");
+        for call in &facts.calls {
+            assert!(!matches!(
+                resolver.call("a/C.java", call),
+                Resolution::Exact(_)
+            ));
+        }
     }
 
     #[test]
