@@ -1726,7 +1726,11 @@ impl<'a> Resolver<'a> {
                 None => {}
             }
         }
-        None
+        // A Kotlin companion's own fields come after the family's, as its methods do; a base
+        // of the companion's that is not known hides nothing of the names outside.
+        let companion = self.companion(Target { path, name: class }, &mut Work::default())?;
+        (self.inherited_field(companion.path, companion.name, name))
+            .filter(|found| !matches!(found, Binding::Unknown))
     }
 
     /// What a bare method name written in the body of class `class` of `path` names

@@ -1510,6 +1510,10 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             })
         }
         "number_literal" => Value::Scalar(text(node, src).parse().ok()),
+        // `["/a", "/b"]`, an annotation's array.
+        "collection_literal" => {
+            Value::List(named(node).map(|n| value(n, src, depth + 1)).collect())
+        }
         "parenthesized_expression" => named(node)
             .next()
             .map_or(Value::Unknown, |n| value(n, src, depth + 1)),

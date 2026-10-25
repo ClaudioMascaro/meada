@@ -13,6 +13,14 @@ pub fn java_files<'a>(code: &Code<'a>) -> impl Iterator<Item = (&'a str, &'a Fac
         .map(|(&path, &facts)| (path, facts))
 }
 
+/// The Java and Kotlin files of `code`, with their facts: what the readers of annotations that
+/// both languages write the same way read (Spring MVC).
+pub fn jvm_files<'a>(code: &Code<'a>) -> impl Iterator<Item = (&'a str, &'a Facts)> + use<'a> {
+    (code.files().iter())
+        .filter(|(path, _)| [".java", ".kt", ".kts"].iter().any(|e| path.ends_with(e)))
+        .map(|(&path, &facts)| (path, facts))
+}
+
 /// Whether `target`, what an annotation of `facts` decorates, is a method of the file: a
 /// method's annotation, not a class's or a field's.
 pub fn is_method(facts: &Facts, target: &str) -> bool {

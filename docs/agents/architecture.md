@@ -1000,8 +1000,8 @@ one for the area a change touches.
   (`spring::CONFIG_FILES`), which the Java pack returns as its `config_files`. `jvm/names.rs`
   holds the name questions the JVM kinds share: `one` (exactly one spelling in the kind's
   table), `known` (a name an import binds), `spellings` and `typed` (the outside type the source
-  writes for a name), and the Java readers' shared filters `java_files` and `is_method` (an
-  annotation on a method of the file).
+  writes for a name), and the Java readers' shared filters `java_files`, `jvm_files` (Java and
+  Kotlin files) and `is_method` (an annotation on a method of the file).
 - New **Go router** (spec #25; net/http, gin, echo, chi and gorilla): a row of `ROUTERS` in
   `http/go.rs` (the package, the functions that make a router, the methods that make a group
   (a `Form`: `Group(prefix)`, chi's `Group(fn)` and `Route(prefix, fn)`, gorilla's
@@ -1312,8 +1312,8 @@ one for the area a change touches.
   one `Code` built from that pack's `layout` and flags take both packs' files, and calls between
   the two languages resolve by fully qualified name. The joining pack's own flags and `layout` are
   not read, and its files reach the contract kinds through that pack's `Code` (the Java kinds read
-  `.java` files alone until a Kotlin form names its own). This keeps one resolver per repository
-  and pack group, with no new invariant (ADR 0002). Java's `layout` therefore also maps a Kotlin
+  `.java` files alone, but the Spring MVC providers, which read Kotlin too). This keeps one
+  resolver per repository and pack group, with no new invariant (ADR 0002). Java's `layout` therefore also maps a Kotlin
   file's top-level overload families and constants by fully qualified name, and a Kotlin class
   joins its own name's overload family with its primary constructor's parameters, so calling the
   class constructs it. A companion object is written as its class's last base: `Resolver::lineage`
@@ -1874,6 +1874,11 @@ one for the area a change touches.
   (`{id:a/b}`) serves nothing. An unreadable element beside readable ones of a `method` or a
   path array is dropped: the others still serve. Interface-declared mappings, composed annotations
   and `server.servlet.context-path` are not read.
+  Kotlin (spec #27, #97): the Spring reader reads Kotlin files too, through `jvm_files` (`.java`,
+  `.kt`, `.kts`, in the shared `Code`), with the same annotations and rules: the Kotlin pack
+  writes `["/a", "/b"]` as a `Value::List` and `method = [RequestMethod.X]` as a keyword list, and
+  a bare constant of a class's companion folds (`Resolver::inherited_field` reads the companion
+  after the family, unless its own bases are unknown). JAX-RS and the clients keep `java_files`.
   JAX-RS (#87, `jax_rs` in the same file): a method with a verb annotation (`GET` ... `OPTIONS`)
   of a class with `@Path`, from `javax.ws.rs` or `jakarta.ws.rs`, joined to the method's own
   `@Path`; both packages through the same `known`, so `import javax.ws.rs.*` beside

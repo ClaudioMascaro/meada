@@ -7,6 +7,7 @@
 //! repository with the same name hides it), and a path folds `static final` constants and `+`
 //! through `Code::value`. `@RequestMapping` without `method` serves every method (`ANY`).
 //! `server.servlet.context-path` is not applied.
+//! Kotlin controllers (#97) are read the same way: the Kotlin pack gives the same facts.
 //! The consumers are `clients.rs`'s and `declarative.rs`'s.
 
 mod clients;
@@ -15,7 +16,7 @@ mod declarative;
 use super::{ANY, METHODS, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
-use crate::jvm::names::{is_method, java_files, known, one, typed};
+use crate::jvm::names::{is_method, java_files, jvm_files, known, one, typed};
 use crate::lang::{Call, Value};
 use crate::resolve::{Code, Follow, Of, passes_nothing};
 
@@ -51,7 +52,7 @@ pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
 /// Spring MVC providers: see the module.
 pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
     let mut found = Vec::new();
-    for (path, facts) in java_files(code) {
+    for (path, facts) in jvm_files(code) {
         // What Spring annotation a call is, by its name outside the repository.
         let spring = |call: &'a Call| -> Option<String> {
             known(code, path, &call.scope, &call.callee, annotation)
@@ -524,6 +525,97 @@ mod tests {
             "@RequestMapping(value = {\"/a\", Api.NOT_A_CONSTANT}, method = {RequestMethod.GET, Missing.X}) void f() {}",
         );
         assert_eq!(found, ["http::GET::/a"]);
+    }
+
+    const KOTLIN_IMPORTS: &str = "import org.springframework.web.bind.annotation.GetMapping\n\
+        import org.springframework.web.bind.annotation.RequestMapping\n\
+        import org.springframework.web.bind.annotation.RequestMethod\n\
+        import org.springframework.web.bind.annotation.RestController\n";
+
+    /// The contracts of the Spring providers of Kotlin controllers: `body` after `imports` in
+    /// `a/C.kt`, with other files of the repository (`(path, source)`), which Java's resolver
+    /// reads with the Java ones.
+    fn served_kotlin(imports: &str, body: &str, others: &[(&str, &str)]) -> Vec<String> {
+        use crate::lang::kotlin::Kotlin;
+        let src = format!("package a\n{imports}\n{body}\n");
+        let mut parsed = vec![("a/C.kt", Kotlin.parse("a/C.kt", src.as_bytes()).unwrap())];
+        for (path, source) in others {
+            let facts = match path.ends_with(".kt") {
+                true => Kotlin.parse(path, source.as_bytes()),
+                false => Java.parse(path, source.as_bytes()),
+            };
+            parsed.push((path, facts.unwrap()));
+        }
+        let files: BTreeMap<&str, &_> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let layout = Java.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
+        let code = Code::new(&resolver, &files, &Java);
+        let mut found: Vec<String> = (providers(&code).into_iter())
+            .filter_map(|f| f.contract)
+            .collect();
+        found.sort();
+        found
+    }
+
+    #[test]
+    fn a_kotlin_controller_reads_arrays_methods_and_every_method() {
+        let body = "@RestController @RequestMapping([\"/a\", \"/b\"]) class C {\n\
+            @GetMapping(\"/x/{id}\") fun f() {}\n\
+            @RequestMapping(path = [\"/y\"], method = [RequestMethod.GET, RequestMethod.HEAD]) fun g() {}\n\
+            @RequestMapping(\"/z\") fun h() {}\n}";
+        assert_eq!(
+            served_kotlin(KOTLIN_IMPORTS, body, &[]),
+            [
+                "http::ANY::/a/z",
+                "http::ANY::/b/z",
+                "http::GET::/a/x/{}",
+                "http::GET::/a/y",
+                "http::GET::/b/x/{}",
+                "http::GET::/b/y",
+                "http::HEAD::/a/y",
+                "http::HEAD::/b/y",
+            ]
+        );
+    }
+
+    #[test]
+    fn kotlin_paths_fold_constants_of_the_class_its_companion_and_other_files() {
+        let others = [
+            (
+                "a/Api.kt",
+                "package a\nconst val BASE = \"/api\"\nobject Api { const val ITEM = \"/{id}\" }",
+            ),
+            (
+                "a/Paths.java",
+                "package a; class Paths { static final String JAVA = \"/java\"; }",
+            ),
+        ];
+        let body = "@RestController @RequestMapping(BASE + \"/v1\") class C {\n\
+            companion object {\n const val FLAG = \"/flag\"\n }\n\
+            @GetMapping(Api.ITEM + FLAG) fun f() {}\n\
+            @GetMapping(path = [Paths.JAVA, \"/\" + \"lit\"]) fun g() {}\n}";
+        assert_eq!(
+            served_kotlin(KOTLIN_IMPORTS, body, &others),
+            [
+                "http::GET::/api/v1/java",
+                "http::GET::/api/v1/lit",
+                "http::GET::/api/v1/{}/flag",
+            ]
+        );
+    }
+
+    #[test]
+    fn a_kotlin_name_of_the_repository_hides_springs() {
+        let own = [(
+            "a/GetMapping.kt",
+            "package a\nannotation class GetMapping(val value: String)",
+        )];
+        let imports = KOTLIN_IMPORTS.replace(
+            "import org.springframework.web.bind.annotation.GetMapping\n",
+            "",
+        );
+        let body = "@RestController class C { @GetMapping(\"/x\") fun f() {} }";
+        assert!(served_kotlin(&imports, body, &own).is_empty());
     }
 
     const JAXRS: &str = "import javax.ws.rs.GET;\nimport javax.ws.rs.Path;\n";
