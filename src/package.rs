@@ -37,7 +37,7 @@ use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
 use crate::lang::{Call, MAX_BYTES, python};
 use crate::literals::Literals;
 use crate::render::{Files, label, rank, section};
-use crate::resolve::{Code, Exported};
+use crate::resolve::{Ancestry, Code, Exported};
 use crate::shape::{self, Shape, Want};
 use crate::workspace::Repository;
 
@@ -215,6 +215,22 @@ trait Ecosystem {
             out.push((entry, resolved));
         }
         out
+    }
+
+    /// Whether a provider of an artifact the file `from.1` of the repository `from.0` depends on
+    /// declares `specifier` itself, whatever the import's chain names there: of the calls one
+    /// site makes through several candidates (`imports`, Java's on-demand imports), the one a
+    /// provider declares enters only when it is alone (`import`). An ecosystem whose `imports`
+    /// gives one at most per call never asks.
+    fn declares<'e>(
+        &self,
+        _exports: &'e [Export],
+        _providers: &Providers,
+        _at: &dyn Fn(usize) -> &'e Provided<'e>,
+        _from: (usize, &str),
+        _specifier: &str,
+    ) -> bool {
+        true
     }
 
     /// Whether shapes cross its packages (`surface`).
@@ -755,6 +771,8 @@ struct Provided<'e> {
     /// The public classes and methods of the Java files. Built the first time a Java import asks
     /// (`Maven::resolutions`), once for all.
     classes: OnceCell<maven::Classes<'e>>,
+    /// The families of the public classes (`Ancestry`), for `Classes`.
+    ancestries: &'e [Ancestry],
 }
 
 /// What an import of a package resolved to in one provider: what named the entry, the import's
@@ -786,6 +804,7 @@ impl<'e> Provided<'e> {
             owned: Default::default(),
             go_dirs: OnceCell::new(),
             classes: OnceCell::new(),
+            ancestries: &export.ancestries,
         }
     }
 
@@ -1017,7 +1036,9 @@ impl Providers {
 /// package at its site, the range of the entry in `Consumer::method` and where it resolves in
 /// `Consumer::hops` (`Packages::link` derives its links), and adds an `imports` row per
 /// provider; a Python import several depended-on packages expose is a consumer of each. Any
-/// other, an import of a package outside the workspace included, adds nothing.
+/// other, an import of a package outside the workspace included, adds nothing. Of the
+/// candidates one site goes through (`Ecosystem::imports`), none enters when several name a
+/// class some provider declares (`Ecosystem::declares`), as `Outside::candidates` says.
 fn import(exports: &mut [Export], providers: &Providers) {
     // Built for a provider the first time an import reaches it.
     let provided: Vec<OnceCell<Provided>> = exports.iter().map(|_| OnceCell::new()).collect();
@@ -1025,7 +1046,15 @@ fn import(exports: &mut [Export], providers: &Providers) {
     for (n, export) in exports.iter().enumerate() {
         let mut consumers = Vec::new();
         let mut imports = Vec::new();
-        for call in &export.import_calls {
+        let sites = export.import_calls.chunk_by(|a, b| a.site == b.site);
+        let declared = |call: &ImportCall| {
+            let from = (n, call.path.as_str());
+            declares(exports, providers, &provided, from, &call.specifier)
+        };
+        let calls = sites
+            .filter(|calls| calls.len() < 2 || calls.iter().filter(|c| declared(c)).count() < 2)
+            .flatten();
+        for call in calls {
             let (from, chain) = ((n, call.path.as_str()), call.chain.as_str());
             let symbol = |at: &Provided, id: &str| at.symbol(id);
             let Some(ecosystem) = of_source(&call.path) else {
@@ -1198,6 +1227,22 @@ fn resolutions<'e>(
     ecosystem.resolutions(exports, providers, &at, from, (specifier, chain), &known)
 }
 
+/// Whether a provider of an artifact the file `from.1` of the repository `from.0` depends on
+/// declares `specifier`, by the rules of the file's ecosystem (`Ecosystem::declares`).
+fn declares<'e>(
+    exports: &'e [Export],
+    providers: &Providers,
+    provided: &'e [OnceCell<Provided<'e>>],
+    from: (usize, &str),
+    specifier: &str,
+) -> bool {
+    let Some(ecosystem) = of_source(from.1) else {
+        return false;
+    };
+    let at = |m: usize| provided[m].get_or_init(|| Provided::new(&exports[m]));
+    ecosystem.declares(exports, providers, &at, from, specifier)
+}
+
 /// The files of a repository an import of one of its packages can reach (issue #175), so the
 /// ones whose exported constants and types keep a shape: for each named manifest, the entry
 /// file (`Provided::entry`, as an import resolves it) of the bare name and of each subpath its
@@ -1223,6 +1268,7 @@ fn surface(
         owned: Default::default(),
         go_dirs: OnceCell::new(),
         classes: OnceCell::new(),
+        ancestries: &[],
     };
     let mut queue = Vec::new();
     // Shapes cross through the packages of an ecosystem that says so (`Ecosystem::shapes`).
@@ -2575,6 +2621,7 @@ mod tests {
             dependencies: Vec::new(),
             import_calls: Vec::new(),
             communities: Vec::new(),
+            ancestries: Vec::new(),
             exported: (files.iter())
                 .map(|(p, _)| row(p, Some("S"), Some(p), Some("S")))
                 .collect(),
@@ -2650,6 +2697,7 @@ mod tests {
             owned: Default::default(),
             go_dirs: OnceCell::new(),
             classes: OnceCell::new(),
+            ancestries: &[],
         }
     }
 

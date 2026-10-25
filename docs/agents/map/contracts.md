@@ -424,13 +424,26 @@ modules updates it.
   type the call's head names (`Code::outside`, which also brings the candidates of on-demand
   and static imports; a JDK `java.` class is none), else the type the source writes for its
   receiver (`Code::origins`, `Follow::Declarations`); a constructor is the class's own name.
+  Each on-demand candidate is its own pair (`Outside::spellings`); `import` groups one site's
+  pairs and lets none enter when two name a class some provider declares
+  (`Ecosystem::declares`), as `Outside::candidates` and the HTTP kinds' `one()` read them.
   It reuses the package path: `Packages::extract` stores the `import` row, `import` resolves it
   through `Maven::resolutions`, which looks the class up in the provider's `exports` rows
   under its qualified name (the row whose `name` is its `target`), keeps the files the artifact
   owns (`Provided::owned_source`) that are no test sources (`tested`: under a
   `Summary::test_roots` root and no deeper `main` one), and picks the symbols named so (`Classes`,
-  built once per provider) that fit the argument count. `exact` for one target of one provider,
-  `ambiguous` for several (overloads, or several providers), `How::Package`. The Gradle scanner
+  built once per provider) that fit the argument count. A method is looked up through the
+  class's family, as Java merges overloads: the provider's `families` rows
+  (`Resolver::ancestries`, resolved in the provider) give the ancestors in method resolution
+  order, each signature comes from the first class that declares it (an override hides the
+  base's), and an opaque ancestor or a family not known keeps one target `inferred` (the strict
+  "Opaque outside" rule of #85, issue #353). A constructor is the class's own, never a method
+  named after it (`#method`). `exact` for one target of one provider, `ambiguous` for several
+  (overloads, or several providers declaring the class, whether or not they declare the
+  method), `How::Package`. The Gradle scanner
   keeps the literal `srcDirs` and `srcDir` of `sourceSets.<set>.java` as `Summary::roots`
   (`test_roots` for a set other than `main`); a directory that is computed, has `..`, or sits in
-  `allprojects`, `subprojects` or a conditional is not kept. Inherited methods are not searched.
+  a block that configures other projects (`allprojects`, `subprojects` and their `.each`,
+  `project(':x')`, `configure(..)`) or a conditional is not kept; `named("set")` and
+  `getByName("set")` name the set by their literal. The source directories past `MAX_ROOTS` are
+  dropped before the defaults join, so the test roots are always among the kept ones.

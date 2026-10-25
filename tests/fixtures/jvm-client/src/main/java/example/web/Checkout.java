@@ -21,6 +21,10 @@ public class Checkout {
         return Stamp.now();
     }
 
+    public String later() {
+        return Stamp.later();
+    }
+
     public Order sample() {
         return Fixtures.sample();
     }

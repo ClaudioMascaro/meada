@@ -569,6 +569,124 @@ fn an_import_reaches_the_method_of_the_class_in_the_provider() {
 }
 
 #[test]
+fn on_demand_candidates_and_shadowing_names_never_give_a_wrong_exact() {
+    let [_, _, client, _] = workspace("jvm_imports_on_demand");
+    let json: Value =
+        serde_json::from_str(&Engine::open(&client).unwrap().export().unwrap()).unwrap();
+    // Two on-demand imports whose packages both declare `Ledger`: neither enters, even where
+    // only one of them declares the method.
+    let wild = "example.com/jvm/client::src/main/java/example/batch/Wild.java::";
+    assert!(
+        imports(&json, wild).is_empty(),
+        "{:?}",
+        imports(&json, wild)
+    );
+    // A repository class of the file's package shadows `import example.models.*`; a parameter
+    // and a local named like the imported class hide it.
+    let probes = imports(&json, &format!("{CLIENT}Probes.java::"));
+    assert!(probes.is_empty(), "{probes:?}");
+    // Two providers declare `example.shared.Stamp`, though only one declares `later()`.
+    let later = imports(
+        &json,
+        &format!("{CLIENT}Checkout.java::example.web.Checkout.later()::"),
+    );
+    assert_eq!(
+        later.iter().map(|i| (i.2, i.3, i.5)).collect::<Vec<_>>(),
+        [(
+            "later(0)",
+            "ambiguous",
+            &*format!("{MODELS}shared/Stamp.java::example.shared.Stamp.later()")
+        )]
+    );
+}
+
+#[test]
+fn an_import_merges_the_overloads_of_the_provider_class_family() {
+    let [_, _, client, _] = workspace("jvm_imports_family");
+    let json: Value =
+        serde_json::from_str(&Engine::open(&client).unwrap().export().unwrap()).unwrap();
+    let at = |caller: &str| -> Vec<(String, String, String, String)> {
+        imports(
+            &json,
+            &format!("{CLIENT}Family.java::example.web.Family.{caller}::"),
+        )
+        .into_iter()
+        .map(|(c, _, n, l, _, t)| {
+            let t = t.strip_prefix(&format!("{MODELS}models/")).unwrap_or(t);
+            (c.into(), n.into(), l.into(), t.into())
+        })
+        .collect()
+    };
+    let row = |c: &str, n: &str, l: &str, t: &str| (c.into(), n.into(), l.into(), t.into());
+    // An inherited overload of the count stays beside the class's own.
+    assert_eq!(
+        at("find(Repo)"),
+        [
+            row(
+                "repo.find#0",
+                "find(1)",
+                "ambiguous",
+                "Base.java::example.models.Base.find(long)"
+            ),
+            row(
+                "repo.find#0",
+                "find(1)",
+                "ambiguous",
+                "Repo.java::example.models.Repo.find(String)"
+            ),
+        ]
+    );
+    assert_eq!(
+        at("made()"),
+        [
+            row(
+                "Repo.of#0",
+                "of(1)",
+                "ambiguous",
+                "Base.java::example.models.Base.of(int)"
+            ),
+            row(
+                "Repo.of#0",
+                "of(1)",
+                "ambiguous",
+                "Repo.java::example.models.Repo.of(String)"
+            ),
+        ]
+    );
+    // An override hides the base's signature; a method only the base declares is inherited.
+    assert_eq!(
+        at("named(Repo)"),
+        [row(
+            "repo.name#0",
+            "name(0)",
+            "exact",
+            "Repo.java::example.models.Repo.name()"
+        )]
+    );
+    assert_eq!(
+        at("sized(Repo)"),
+        [row(
+            "repo.size#0",
+            "size(0)",
+            "exact",
+            "Base.java::example.models.Base.size()"
+        )]
+    );
+    // A base outside the provider's repository may declare an overload: no `exact`.
+    assert_eq!(
+        at("coded(Event)"),
+        [row(
+            "event.code#0",
+            "code(0)",
+            "inferred",
+            "Event.java::example.models.Event.code()"
+        )]
+    );
+    // A method named after its class is no constructor.
+    assert!(at("noted()").is_empty(), "{:?}", at("noted()"));
+}
+
+#[test]
 fn a_gradle_source_set_directory_decides_which_classes_a_dependent_reaches() {
     let [_, _, _, worker] = workspace("jvm_source_sets");
     let json: Value =

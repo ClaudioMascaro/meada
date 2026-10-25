@@ -1078,7 +1078,10 @@ one for the area a change touches.
     name its packages); `names_package(specifier)`; `entries(..)` (the dependency entries an
     import of a file may name, each with the subpath inside the package). `imports(..)` (the
     `(specifier, chain)` pairs a call goes through) has a default, `Code::imported`; Maven
-    overrides it (the class and `name(arity)`, from the head's import or the receiver's type).
+    overrides it (the class and `name(arity)`, from the head's import or the receiver's type,
+    one pair per on-demand candidate, `Outside::spellings`). `declares(..)` (whether a provider
+    declares the specifier itself) defaults to `true`: `import` lets none of one site's pairs
+    enter when two are declared, so only an ecosystem with several pairs per call answers it.
   - `fits`: literal package-name equality; Maven matches the literal fragments of a computed
     coordinate. `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
   - `flag`: the range is unchecked (`range unchecked`); npm checks semver.
@@ -1093,7 +1096,9 @@ one for the area a change touches.
     (`How::CrateName`, no candidates, and the library-head check of an entry that does not
     rename its crate); Go looks in the one directory the subpath names (`How::ModulePath`); Maven
     looks the class up by package declaration in the files the artifact owns that are no test
-    sources and picks the method by name and argument count (`How::Package`, `Maven::resolutions`).
+    sources and picks the method by name and argument count among the overloads of the class's
+    family (`How::Package`, `Maven::resolutions`; the provider's `families` rows, an opaque
+    ancestor keeping the target from `exact`).
   - `resolutions`: the single-entry loop (the entries, each provider the entry `reaches`,
     `resolve` in it); PyPI replaces it whole, since its imports name a module and several
     distributions may expose it.
@@ -1419,7 +1424,9 @@ one for the area a change touches.
   literal group, root project name and included project names/directories in `Summary::build`),
   the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
-  the definition, constant, type or file they name), the `entry_points` table (spec #31:
+  the definition, constant, type or file they name), the `families` table (spec #26: each public
+  Java class's ancestors past it, `Resolver::ancestries`, a repository class by file and name and
+  an opaque one as `null`), the `entry_points` table (spec #31:
   each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
   each community's name and member identities (`communities`, spec #31). `Call::args`,
   `Call::kwargs`, `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::return_values`, `Def::type_params`, `Param::default`,

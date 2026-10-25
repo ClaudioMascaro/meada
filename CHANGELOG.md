@@ -44,8 +44,12 @@ All notable changes to Meada are recorded here. The format follows
   class method lists its consumers in other repositories and `trace` follows the hop. Test
   source roots (`src/test/java`, and a Gradle `sourceSets` directory of a set other than `main`)
   are never imported; the Gradle scanner reads literal `srcDirs`, `srcDir` and `srcDirs +=`
-  (Groovy and Kotlin DSL), nothing computed or conditional. The stored manifest summary gains
-  `test_roots`, so existing indexes rebuild.
+  (Groovy and Kotlin DSL), nothing computed or conditional. A method is picked among the
+  overloads of the class's family in the provider, as Java merges them (an inherited `find(long)`
+  stays beside a declared `find(String)`); an ancestor outside the provider's repository keeps
+  the link from `exact` (`inferred`). Two on-demand imports that both bring a class some
+  provider declares give no link. The stored manifest summary gains `test_roots` and the index
+  a `families` table, so existing indexes rebuild.
 - Spring MVC HTTP providers (spec #26, #86): methods of `@RestController` and `@Controller`
   classes with `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping`
   or `@RequestMapping(method = ..)`, under the class `@RequestMapping` prefix, with `static

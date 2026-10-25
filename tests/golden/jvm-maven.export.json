@@ -2,12 +2,32 @@
   "repository": "example.com/jvm/maven",
   "files": [
     {
+      "path": "models/src/main/java/example/models/Base.java",
+      "hash": "b78bd1edb29483e3ac777558e21eeea76bf87dca7fdd6c862a2fa5d8fd899850"
+    },
+    {
+      "path": "models/src/main/java/example/models/Event.java",
+      "hash": "fa5273bd983f503a652e7d9a15304fbd1bc6ca8f1193f909dab72551a3fa0415"
+    },
+    {
+      "path": "models/src/main/java/example/models/Ledger.java",
+      "hash": "7163de3c0a93ea3220c2ea75e18b221148b0706b938c0aac2848c125be8d2891"
+    },
+    {
+      "path": "models/src/main/java/example/models/Note.java",
+      "hash": "8fd7c44c6c9346eb6883ca1dd09e51bda90097684b76d932a0e3997a7e368e80"
+    },
+    {
       "path": "models/src/main/java/example/models/Order.java",
       "hash": "f42bddbe8d8e5604f15f7a9f76990e2b5533f1b8b967ad6e3cfcaeb3de07e152"
     },
     {
+      "path": "models/src/main/java/example/models/Repo.java",
+      "hash": "26e5e68e735a384f72a02645a12d016a1513a50305aa03deee96b2429d38f62d"
+    },
+    {
       "path": "models/src/main/java/example/shared/Stamp.java",
-      "hash": "fdf7e9f27a53b5ece787041e557f5b53d1e93548952c9f4d3468e2a22f6ffd73"
+      "hash": "3c8d97f82addc0007f3814b54d96642b7ef2061bf0f07ee63782a11b93135a68"
     },
     {
       "path": "models/src/test/java/example/models/Fixtures.java",
@@ -15,6 +35,102 @@
     }
   ],
   "symbols": [
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base",
+      "span": {
+        "path": "models/src/main/java/example/models/Base.java",
+        "start": 25,
+        "end": 282
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.find(long)",
+      "span": {
+        "path": "models/src/main/java/example/models/Base.java",
+        "start": 49,
+        "end": 101
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.name()",
+      "span": {
+        "path": "models/src/main/java/example/models/Base.java",
+        "start": 180,
+        "end": 231
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.of(int)",
+      "span": {
+        "path": "models/src/main/java/example/models/Base.java",
+        "start": 107,
+        "end": 174
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.size()",
+      "span": {
+        "path": "models/src/main/java/example/models/Base.java",
+        "start": 237,
+        "end": 280
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Event.java::example.models.Event",
+      "span": {
+        "path": "models/src/main/java/example/models/Event.java",
+        "start": 55,
+        "end": 149
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Event.java::example.models.Event.code()",
+      "span": {
+        "path": "models/src/main/java/example/models/Event.java",
+        "start": 104,
+        "end": 147
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Ledger.java::example.models.Ledger",
+      "span": {
+        "path": "models/src/main/java/example/models/Ledger.java",
+        "start": 25,
+        "end": 170
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Ledger.java::example.models.Ledger.of(int)",
+      "span": {
+        "path": "models/src/main/java/example/models/Ledger.java",
+        "start": 51,
+        "end": 112
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Ledger.java::example.models.Ledger.open()",
+      "span": {
+        "path": "models/src/main/java/example/models/Ledger.java",
+        "start": 118,
+        "end": 168
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Note.java::example.models.Note",
+      "span": {
+        "path": "models/src/main/java/example/models/Note.java",
+        "start": 25,
+        "end": 94
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Note.java::example.models.Note.Note()#method",
+      "span": {
+        "path": "models/src/main/java/example/models/Note.java",
+        "start": 49,
+        "end": 92
+      }
+    },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order",
       "span": {
@@ -88,11 +204,51 @@
       }
     },
     {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo",
+      "span": {
+        "path": "models/src/main/java/example/models/Repo.java",
+        "start": 25,
+        "end": 253
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.find(String)",
+      "span": {
+        "path": "models/src/main/java/example/models/Repo.java",
+        "start": 62,
+        "end": 120
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.name()",
+      "span": {
+        "path": "models/src/main/java/example/models/Repo.java",
+        "start": 200,
+        "end": 251
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.of(String)",
+      "span": {
+        "path": "models/src/main/java/example/models/Repo.java",
+        "start": 126,
+        "end": 194
+      }
+    },
+    {
       "id": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp",
       "span": {
         "path": "models/src/main/java/example/shared/Stamp.java",
         "start": 25,
-        "end": 111
+        "end": 178
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.later()",
+      "span": {
+        "path": "models/src/main/java/example/shared/Stamp.java",
+        "start": 115,
+        "end": 176
       }
     },
     {
@@ -121,6 +277,17 @@
     }
   ],
   "calls": [
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.of(int)::Base#0",
+      "caller": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.of(int)",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base",
+      "level": "exact",
+      "span": {
+        "path": "models/src/main/java/example/models/Base.java",
+        "start": 157,
+        "end": 167
+      }
+    },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)::Order#0",
       "caller": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
@@ -163,6 +330,17 @@
         "path": "models/src/main/java/example/models/Order.java",
         "start": 212,
         "end": 227
+      }
+    },
+    {
+      "id": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.of(String)::Repo#0",
+      "caller": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.of(String)",
+      "target": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo",
+      "level": "exact",
+      "span": {
+        "path": "models/src/main/java/example/models/Repo.java",
+        "start": 177,
+        "end": 187
       }
     },
     {
@@ -219,17 +397,31 @@
     {
       "name": "models/src/main/java/example/models",
       "members": [
+        "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base",
+        "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.of(int)"
+      ]
+    },
+    {
+      "name": "models/src/main/java/example/models#2",
+      "members": [
         "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.Order(int)",
         "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
         "example.com/jvm/maven::models/src/test/java/example/models/Fixtures.java::example.models.Fixtures.sample()"
       ]
     },
     {
-      "name": "models/src/main/java/example/models#2",
+      "name": "models/src/main/java/example/models#3",
       "members": [
         "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.subtotal()",
         "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.tax(int)",
         "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()"
+      ]
+    },
+    {
+      "name": "models/src/main/java/example/models#4",
+      "members": [
+        "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo",
+        "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.of(String)"
       ]
     }
   ],
@@ -260,6 +452,13 @@
       "provider": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.Order(int)",
       "contract": "package::maven::example:models",
       "level": "exact",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.later()::Stamp.later#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.later()",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
       "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
     },
     {
@@ -305,6 +504,55 @@
       "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
     },
     {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.coded(Event)::event.code#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Event.java::example.models.Event.code()",
+      "contract": "package::maven::example:models",
+      "level": "inferred",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)::repo.find#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.find(long)",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)::repo.find#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.find(String)",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()::Repo.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.of(int)",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()::Repo.of#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.of(String)",
+      "contract": "package::maven::example:models",
+      "level": "ambiguous",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.named(Repo)::repo.name#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.name()",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.sized(Repo)::repo.size#0",
+      "provider": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.size()",
+      "contract": "package::maven::example:models",
+      "level": "exact",
+      "reason": "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked; import package"
+    },
+    {
       "consumer": "example.com/jvm/gradle-client::build.gradle::testImplementation::example:models",
       "provider": "example.com/jvm/maven::models/pom.xml",
       "contract": "package::maven::example:models",
@@ -320,6 +568,125 @@
     }
   ],
   "processes": [
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.find(long)",
+      "kind": "export",
+      "label": "example.models.Base.find(long)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.find(long)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.name()",
+      "kind": "export",
+      "label": "example.models.Base.name()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.name()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.of(int)",
+      "kind": "export",
+      "label": "example.models.Base.of(int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.of(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/maven",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.size()",
+      "kind": "export",
+      "label": "example.models.Base.size()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.size()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Event.java::example.models.Event.code()",
+      "kind": "export",
+      "label": "example.models.Event.code()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Event.java::example.models.Event.code()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Ledger.java::example.models.Ledger.of(int)",
+      "kind": "export",
+      "label": "example.models.Ledger.of(int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Ledger.java::example.models.Ledger.of(int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Ledger.java::example.models.Ledger.open()",
+      "kind": "export",
+      "label": "example.models.Ledger.open()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Ledger.java::example.models.Ledger.open()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Note.java::example.models.Note.Note()#method",
+      "kind": "export",
+      "label": "example.models.Note.Note()#method",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Note.java::example.models.Note.Note()#method"
+        }
+      ]
+    },
     {
       "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(String)",
       "kind": "export",
@@ -387,6 +754,69 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.subtotal()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.find(String)",
+      "kind": "export",
+      "label": "example.models.Repo.find(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.find(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.name()",
+      "kind": "export",
+      "label": "example.models.Repo.name()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.name()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.of(String)",
+      "kind": "export",
+      "label": "example.models.Repo.of(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.of(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/jvm/maven",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.later()",
+      "kind": "export",
+      "label": "example.shared.Stamp.later()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/maven",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.later()"
         }
       ]
     },

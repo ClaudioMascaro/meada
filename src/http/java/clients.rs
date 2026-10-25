@@ -375,19 +375,9 @@ fn spring_method(value: Option<&Value>) -> Value {
     }
 }
 
-/// The spellings of an `Outside`: the candidates of the on-demand imports when only they
-/// may bind it, else the import's.
-fn spelled(outside: Option<Outside>) -> Vec<String> {
-    match outside {
-        Some(o) if !o.candidates.is_empty() => o.candidates,
-        Some(o) if o.direct => vec![o.spelled],
-        _ => Vec::new(),
-    }
-}
-
-/// How the imports of `path` may spell `name`, written in `scope` (`spelled`).
+/// How the imports of `path` may spell `name`, written in `scope` (`Outside::spellings`).
 fn spellings<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a str) -> Vec<String> {
-    spelled(code.outside(path, scope, name, false))
+    (code.outside(path, scope, name, false)).map_or_else(Vec::new, Outside::spellings)
 }
 
 /// How the imports may spell the outside type the source writes for `name` (a field, a
@@ -396,7 +386,7 @@ fn typed<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a str) -> V
     let found = code.origins(path, scope, Of::Name(name), Follow::Declarations);
     match found.into_iter().next() {
         Some(o) if o.form == Form::Type && o.routes.iter().all(|r| r.steps.is_empty()) => {
-            spelled(o.outside)
+            o.outside.map_or_else(Vec::new, Outside::spellings)
         }
         _ => Vec::new(),
     }

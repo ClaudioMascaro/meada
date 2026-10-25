@@ -2,6 +2,10 @@
   "repository": "example.com/jvm/gradle",
   "files": [
     {
+      "path": "src/main/java/example/kit/Ledger.java",
+      "hash": "fdba36bcbbe4d56779ceb6f5ae4220ae5657e12432a541231791a09e6b84a6cc"
+    },
+    {
       "path": "src/main/java/example/shared/Stamp.java",
       "hash": "e5d3900bc65cfc3e40905f0a81c9d53ede079d9e5b3521fccf079509c7dbb376"
     },
@@ -15,6 +19,22 @@
     }
   ],
   "symbols": [
+    {
+      "id": "example.com/jvm/gradle::src/main/java/example/kit/Ledger.java::example.kit.Ledger",
+      "span": {
+        "path": "src/main/java/example/kit/Ledger.java",
+        "start": 22,
+        "end": 111
+      }
+    },
+    {
+      "id": "example.com/jvm/gradle::src/main/java/example/kit/Ledger.java::example.kit.Ledger.of(int)",
+      "span": {
+        "path": "src/main/java/example/kit/Ledger.java",
+        "start": 48,
+        "end": 109
+      }
+    },
     {
       "id": "example.com/jvm/gradle::src/main/java/example/shared/Stamp.java::example.shared.Stamp",
       "span": {
@@ -145,6 +165,20 @@
     }
   ],
   "processes": [
+    {
+      "entry_point": "example.com/jvm/gradle::src/main/java/example/kit/Ledger.java::example.kit.Ledger.of(int)",
+      "kind": "export",
+      "label": "example.kit.Ledger.of(int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/jvm/gradle",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/jvm/gradle::src/main/java/example/kit/Ledger.java::example.kit.Ledger.of(int)"
+        }
+      ]
+    },
     {
       "entry_point": "example.com/jvm/gradle::src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()",
       "kind": "export",

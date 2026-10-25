@@ -4,7 +4,8 @@
 //! class (`imports`, a type a single-type or on-demand import brings, written or declared as a
 //! receiver's type) is looked up under the name the provider's `exports` rows give its public
 //! types, in the files of the depended-on artifact that are not test sources (`tested`), and the
-//! method or constructor is picked among that class's symbols by name and argument count. The
+//! method is picked by name and argument count among the overloads of the class's family (the
+//! provider's `families` rows, as Java merges them), a constructor among the class's own. The
 //! chain of such an import is `name(arity)`.
 
 use std::collections::{HashMap, HashSet};
@@ -18,12 +19,18 @@ use crate::jvm;
 use crate::lang::Call;
 use crate::resolve::{Code, Follow, Form, Of, Outside};
 
+/// A class's ancestors past it, as the `families` rows give them (`Ancestry::ancestors`).
+type Ancestors<'e> = &'e [Option<(String, String)>];
+
 /// The public classes and the methods of a Java provider, built the first time an import asks.
 pub struct Classes<'e> {
     /// The files declaring a type, as `(file, qualified name)`, by qualified name.
     types: HashMap<&'e str, Vec<(&'e str, &'e str)>>,
     /// The ids of the methods and constructors, by their id up to the parameter list.
     methods: HashMap<&'e str, Vec<&'e str>>,
+    /// The ancestors of the public classes with a base, by `(file, qualified name)`
+    /// (`Ancestry::ancestors`: `None` for a family not known).
+    families: HashMap<(&'e str, &'e str), Option<Ancestors<'e>>>,
 }
 
 impl<'e> Classes<'e> {
@@ -60,7 +67,14 @@ impl<'e> Classes<'e> {
             }
         }
         methods.values_mut().for_each(|ids| ids.sort());
-        Self { types, methods }
+        let families = (at.ancestries.iter())
+            .map(|a| ((a.path.as_str(), a.class.as_str()), a.ancestors.as_deref()))
+            .collect();
+        Self {
+            types,
+            methods,
+            families,
+        }
     }
 }
 
@@ -78,7 +92,10 @@ fn fits_arity(id: &str, arity: Option<usize>) -> bool {
     let (Some(arity), Some(open)) = (arity, id.find('(')) else {
         return true;
     };
-    let params = id[open + 1..].strip_suffix(')').unwrap_or_default();
+    // Up to the `)`: a method named after its class carries `#method` past it.
+    let params = id[open + 1..]
+        .split_once(')')
+        .map_or("", |(params, _)| params);
     if params.trim().is_empty() {
         return arity == 0;
     }
@@ -116,41 +133,56 @@ fn tested(manifest: &Manifest, file: &str) -> bool {
     root.is_some_and(|root| summary.test_roots.contains(root))
 }
 
-/// The spellings an `Outside` has: what the on-demand imports may bring, else the import's own.
-fn spelled(outside: Option<Outside>) -> Vec<String> {
-    match outside {
-        Some(o) if !o.candidates.is_empty() => o.candidates,
-        Some(o) if o.direct => vec![o.spelled],
-        _ => Vec::new(),
-    }
+/// The files declaring the class `class` that the artifact at `manifest` owns and that are no
+/// test sources, as `(file, qualified name)`.
+fn declaring<'e>(at: &Provided<'e>, manifest: &Manifest, class: &str) -> Vec<(&'e str, &'e str)> {
+    let classes = at.classes.get_or_init(|| Classes::new(at));
+    (classes.types.get(class).into_iter().flatten())
+        .filter(|(file, _)| at.owned_source(manifest, file) && !tested(manifest, file))
+        .copied()
+        .collect()
 }
 
-/// The ids of the methods named `method` that fit `arity` in the class `class` of the artifact at
-/// `manifest`, in the files it owns that are not tests, sorted.
+/// The ids of the methods named `method` that fit `arity` in the class `class` that `file` of
+/// the provider `at` of `repository` declares, sorted, and whether an ancestor of the class is
+/// opaque. Java merges overloads across the family: each signature comes from the first class of
+/// the family that declares it (an override hides the base's), and an opaque ancestor, or a
+/// family not known, may declare a better one (CODING_STANDARDS, "Opaque outside"). A
+/// constructor (`method` is the class's own name) is the class's alone, never a method of that
+/// name (`#method`).
 fn methods(
     at: &Provided,
     repository: &str,
-    manifest: &Manifest,
-    class: &str,
+    (file, class): (&str, &str),
     (method, arity): (&str, Option<usize>),
     known: &dyn Fn(&str) -> bool,
-) -> Vec<String> {
+) -> (Vec<String>, bool) {
     let classes = at.classes.get_or_init(|| Classes::new(at));
-    let mut ids: Vec<String> = (classes.types.get(class).into_iter().flatten())
-        .filter(|(file, _)| at.owned_source(manifest, file) && !tested(manifest, file))
-        .flat_map(|(file, target)| {
-            let key = format!("{repository}::{file}::{target}.{method}");
-            let found = classes.methods.get(key.as_str()).into_iter().flatten();
-            found
-                .filter(|id| fits_arity(id, arity))
-                .map(|id| id.to_string())
-                .collect::<Vec<_>>()
-        })
-        .filter(|id| known(id))
-        .collect();
+    let constructs = class.rsplit('.').next() == Some(method);
+    let (ancestors, mut opaque) = match classes.families.get(&(file, class)) {
+        _ if constructs => (&[][..], false),
+        Some(Some(ancestors)) => (*ancestors, false),
+        Some(None) => (&[][..], true),
+        None => (&[][..], false),
+    };
+    let own = std::iter::once(Some((file, class)));
+    let rest = (ancestors.iter()).map(|a| a.as_ref().map(|(f, c)| (f.as_str(), c.as_str())));
+    let (mut ids, mut signatures) = (Vec::new(), HashSet::new());
+    for ancestor in own.chain(rest) {
+        let Some((file, class)) = ancestor else {
+            opaque = true;
+            continue;
+        };
+        let key = format!("{repository}::{file}::{class}.{method}");
+        for &id in classes.methods.get(key.as_str()).into_iter().flatten() {
+            let fits = !(constructs && id.ends_with("#method")) && fits_arity(id, arity);
+            if fits && known(id) && signatures.insert(&id[key.len()..]) {
+                ids.push(id.to_string());
+            }
+        }
+    }
     ids.sort();
-    ids.dedup();
-    ids
+    (ids, opaque)
 }
 
 pub struct Maven;
@@ -199,11 +231,12 @@ impl Ecosystem for Maven {
             let origins = code.origins(path, &call.scope, Of::Name(receiver), Follow::Declarations);
             let typed = (origins.into_iter().next())
                 .filter(|o| o.form == Form::Type && o.routes.iter().all(|r| r.steps.is_empty()));
-            let classes = spelled(typed.and_then(|o| o.outside));
+            let classes = (typed.and_then(|o| o.outside)).map_or_else(Vec::new, Outside::spellings);
             found.extend(classes.into_iter().map(|c| (c, method.to_string())));
         }
         if found.is_empty() {
-            for name in spelled(code.outside(path, &call.scope, callee, false)) {
+            let outside = code.outside(path, &call.scope, callee, false);
+            for name in outside.map_or_else(Vec::new, Outside::spellings) {
                 // A constructor is named after its class.
                 let split = match call.constructs {
                     true => name.rsplit('.').next().map(|m| (name.as_str(), m)),
@@ -242,9 +275,11 @@ impl Ecosystem for Maven {
     }
 
     /// The class `specifier` is, by its package declaration, in each provider of each artifact
-    /// the file depends on (`entries`), and the method or constructor its chain names there
-    /// (`methods`): `exact` when one provider declares the class, `ambiguous` when several do or
-    /// when overloads of the count are several; `import package` is the reason.
+    /// the file depends on (`entries`, `declaring`), and the method or constructor its chain
+    /// names there (`methods`): `exact` when one provider declares the class and one target
+    /// fits, `ambiguous` when several providers declare the class (whichever declare the
+    /// method) or several targets fit, `inferred` for one target beside an opaque ancestor;
+    /// `import package` is the reason.
     fn resolutions<'e>(
         &self,
         exports: &'e [Export],
@@ -260,21 +295,24 @@ impl Ecosystem for Maven {
             let mut resolved = Vec::new();
             for (m, i) in providers.matching(self, entry) {
                 let (at, manifest) = (at(m), &exports[m].manifests[i]);
-                let known = |id: &str| known(at, id);
-                let targets = methods(
-                    at,
-                    &exports[m].repository,
-                    manifest,
-                    specifier,
-                    wanted,
-                    &known,
-                );
-                if targets.is_empty() {
+                let declared = declaring(at, manifest, specifier);
+                if declared.is_empty() {
                     continue;
                 }
                 reached.insert((m, i));
-                let level = match targets.len() {
-                    1 => Level::Exact,
+                let known = |id: &str| known(at, id);
+                let (mut targets, mut opaque) = (Vec::new(), false);
+                for class in declared {
+                    let (ids, beside) = methods(at, &exports[m].repository, class, wanted, &known);
+                    targets.extend(ids);
+                    opaque |= beside;
+                }
+                targets.sort();
+                targets.dedup();
+                let level = match (targets.len(), opaque) {
+                    (0, _) => continue,
+                    (1, false) => Level::Exact,
+                    (1, true) => Level::Inferred,
                     _ => Level::Ambiguous,
                 };
                 let r = Resolved {
@@ -296,6 +334,22 @@ impl Ecosystem for Maven {
             }
         }
         out
+    }
+    /// Whether a provider of an artifact the file depends on declares the class `specifier`
+    /// (`declaring`), whatever method it declares.
+    fn declares<'e>(
+        &self,
+        exports: &'e [Export],
+        providers: &Providers,
+        at: &dyn Fn(usize) -> &'e Provided<'e>,
+        from: (usize, &str),
+        specifier: &str,
+    ) -> bool {
+        (self
+            .entries(exports, providers, from, specifier)
+            .into_iter())
+        .flat_map(|(entry, _)| providers.matching(self, entry))
+        .any(|(m, i)| !declaring(at(m), &exports[m].manifests[i], specifier).is_empty())
     }
     fn inherit(&self, manifests: &mut [Manifest]) {
         let settings: Vec<_> = manifests
@@ -376,6 +430,8 @@ mod tests {
         assert!(fits("m(String,Object...)", 1) && fits("m(String,Object...)", 5));
         assert!(!fits("m(String,Object...)", 0));
         assert!(fits_arity("r::a/B.java::p.B.m(int)", None));
+        // A method named after its class carries a mark past its parameters.
+        assert!(fits("B(int)#method", 1) && !fits("B(int)#method", 0));
     }
 
     fn manifest(path: &str, roots: &[&str], tests: &[&str]) -> Manifest {
