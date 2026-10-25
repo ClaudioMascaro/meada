@@ -347,6 +347,13 @@ pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {
     KINDS.iter().copied().find(|k| k.prefix() == prefix)
 }
 
+/// Whether a consumer at a definition calls the provider it links to, by the rule of its kind
+/// (`ContractKind::calls_from_definition`). An unresolved consumer has no contract and is read
+/// as a route's, the only kind that leaves its contract out.
+pub fn calls_from_definition(contract: Option<&str>) -> bool {
+    contract.is_none_or(|c| kind_of(c).is_some_and(|k| k.calls_from_definition()))
+}
+
 /// Whether `contract` is an unresolved side, by the rule of its kind.
 pub fn unresolved(contract: &str) -> bool {
     kind_of(contract).is_some_and(|k| k.unresolved(contract))

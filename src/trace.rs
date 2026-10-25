@@ -314,14 +314,6 @@ impl<'a> Graph<'a> {
     }
 }
 
-/// Whether the consumer calls the provider it links to from the definition it sits at, where
-/// the kind says so; an unresolved one is read as a route's, the only kind that leaves its
-/// contract out.
-fn calls_on(consumer: &Consumer) -> bool {
-    let kind = consumer.contract.as_deref().and_then(contract::kind_of);
-    consumer.contract.is_none() || kind.is_some_and(|k| k.calls_from_definition())
-}
-
 /// Whether the consumer of `link` calls its provider, so the provider is not a writer that goes
 /// on to a reader.
 fn calls_on_link(link: &Link) -> bool {
@@ -523,7 +515,8 @@ impl<'a> Walk<'_, 'a> {
     ) {
         let graph = self.graph;
         let consumers = graph.consumers.get(site);
-        for consumer in (consumers.into_iter().flatten()).filter(|c| !at_definition || calls_on(c))
+        for consumer in (consumers.into_iter().flatten())
+            .filter(|c| !at_definition || contract::calls_from_definition(c.contract.as_deref()))
         {
             let out = graph.out.get(site).into_iter().flatten();
             let links: Vec<&Link> = match &consumer.contract {
@@ -791,7 +784,8 @@ impl<'a> Graph<'a> {
         edges: &mut Vec<Edge<'a>>,
     ) {
         let consumers = self.consumers.get(site);
-        for consumer in (consumers.into_iter().flatten()).filter(|c| !at_definition || calls_on(c))
+        for consumer in (consumers.into_iter().flatten())
+            .filter(|c| !at_definition || contract::calls_from_definition(c.contract.as_deref()))
         {
             let out = self.out.get(site).into_iter().flatten();
             let links: Vec<&Link> = match &consumer.contract {

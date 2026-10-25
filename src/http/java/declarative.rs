@@ -35,7 +35,7 @@ use crate::resolve::{Expand, Follow, Of, method as member, passes_nothing};
 use std::cell::OnceCell;
 use std::collections::BTreeMap;
 
-use super::super::{FEIGN_VIA, based, consumer_at, fetches, join};
+use super::super::{ANY, FEIGN_VIA, based, consumer_at, fetches, join};
 
 const FEIGN: &str = "org.springframework.cloud.openfeign.FeignClient";
 
@@ -121,7 +121,11 @@ fn feign_clients<'a>(
             let methods = match shortcut {
                 Some((_, verb)) => vec![verb.to_string()],
                 None => match request_methods(code, path, given) {
-                    Some(methods) => methods,
+                    // Feign sends GET when the mapping names no method (`SpringMvcContract`).
+                    Some(methods) => methods
+                        .into_iter()
+                        .map(|m| if m == ANY { "GET".into() } else { m })
+                        .collect(),
                     None => continue,
                 },
             };
@@ -181,7 +185,7 @@ impl Base {
             None => None,
             // An empty `url` is none.
             Some(Some(parts)) if literal(&parts).is_some_and(|u| u.is_empty()) => None,
-            Some(Some(parts)) => Some(resolved(parts, configs.of(file))),
+            Some(Some(parts)) => Some(schemed(resolved(parts, configs.of(file)))),
             Some(None) => Some(vec![Part::Hole]),
         };
         let prefix = match client.keyword("path").map(text) {
@@ -203,6 +207,18 @@ impl Base {
     fn named(&self) -> Option<String> {
         self.name.as_ref().map(|n| format!("{FEIGN_VIA}{n}"))
     }
+}
+
+/// `url` with `http://` in front when it starts with text that names no scheme, as Spring Cloud
+/// reads a `url` of `localhost:8080`.
+fn schemed(mut url: Vec<Part>) -> Vec<Part> {
+    if let Some(Part::Text(first)) = url.first_mut()
+        && !first.is_empty()
+        && !first.contains("://")
+    {
+        first.insert_str(0, "http://");
+    }
+    url
 }
 
 /// `parts` with the placeholders of its text resolved against `config`.
@@ -336,7 +352,11 @@ fn retrofit_clients<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
             for (route, base) in
                 (endpoint.routes.iter()).flat_map(|r| bases.iter().map(move |b| (r, b)))
             {
-                let url = retrofit_url(*base, route);
+                // An empty route is Retrofit's dynamic `@Url`: the URL is the argument's.
+                let url = match route.is_empty() {
+                    true => Value::Unknown,
+                    false => retrofit_url(*base, route),
+                };
                 let Some(reads) = fetches(&[url, text(endpoint.verb)]) else {
                     continue;
                 };
@@ -426,22 +446,25 @@ fn retrofit_url(base: Option<&[Part]>, route: &str) -> Value {
     let Some(base) = base else {
         return text(&join("", route));
     };
-    let rooted = match (route.starts_with('/'), base.split_first()) {
-        (true, Some((Part::Text(first), _))) => match first.split_once("://") {
-            // Cut at the end of the host; a host split across parts is left as it is.
-            Some((scheme, rest)) if rest.contains('/') => {
-                let host = rest.split('/').next().unwrap_or_default();
-                vec![Part::Text(format!("{scheme}://{host}"))]
-            }
-            _ => base.to_vec(),
-        },
+    // The text the base starts with, whole: `HOST + "/v1/"` arrives as two parts.
+    let lead: String = (base.iter())
+        .map_while(|p| match p {
+            Part::Text(t) => Some(t.as_str()),
+            _ => None,
+        })
+        .collect();
+    let host = (route.starts_with('/'))
+        .then(|| lead.split_once("://"))
+        .flatten();
+    let rooted = match host {
+        // Cut at the end of the host; a host that runs into a non-text part is left as it is.
+        Some((scheme, rest)) if rest.contains('/') => {
+            let host = rest.split('/').next().unwrap_or_default();
+            vec![Part::Text(format!("{scheme}://{host}"))]
+        }
         _ => base.to_vec(),
     };
-    let route = match route.is_empty() {
-        true => Value::Str(Vec::new()),
-        false => text(route),
-    };
-    based(Some(&rooted), &route)
+    based(Some(&rooted), &text(route))
 }
 
 #[cfg(test)]
@@ -570,6 +593,21 @@ mod tests {
     }
 
     #[test]
+    fn a_url_without_a_scheme_gets_http_like_spring_cloud_does() {
+        let at = |url: &str| {
+            sent(
+                FEIGN,
+                &client(&format!("name = \"orders\", url = \"{url}\""), GET),
+            )
+        };
+        let want = [to(LIST, "http::GET::/orders", "host:orders.example.com")];
+        assert_eq!(at("orders.example.com"), want);
+        assert_eq!(at("http://orders.example.com"), want);
+        let port = [to(LIST, "http::GET::/orders", "host:localhost:8080")];
+        assert_eq!(at("localhost:8080/"), port);
+    }
+
+    #[test]
     fn a_client_without_url_has_an_unresolved_host_and_names_itself() {
         let named = |args: &str| sent(FEIGN, &client(args, GET));
         let want = [to(LIST, "http::GET::/orders", "feign:orders")];
@@ -613,7 +651,8 @@ mod tests {
             [
                 ("a.Orders.f()".to_string(), "http::PUT::/a".to_string()),
                 ("a.Orders.f()".to_string(), "http::PUT::/b".to_string()),
-                ("a.Orders.g()".to_string(), "http::ANY::/c".to_string()),
+                // Feign sends GET when the mapping names no method (`SpringMvcContract`).
+                ("a.Orders.g()".to_string(), "http::GET::/c".to_string()),
             ]
         );
     }
@@ -639,7 +678,10 @@ mod tests {
             "api/src/main/java/a/FeignClient.java",
             "package a; class FeignClient {}",
         )];
-        assert!(sent_in("", &marked, &local, &[]).is_empty());
+        let on_demand = "import org.springframework.cloud.openfeign.*;\n\
+            import org.springframework.web.bind.annotation.*;\n";
+        assert!(sent_in(on_demand, &marked, &local, &[]).is_empty());
+        assert_eq!(sent(on_demand, &marked).len(), 1);
         let local = [(
             "api/src/main/java/a/GetMapping.java",
             "package a; class GetMapping {}",
@@ -753,19 +795,39 @@ mod tests {
     #[test]
     fn a_path_from_the_root_replaces_the_base_path_and_a_relative_one_follows_it() {
         let body = "interface Api { @GET(\"/health\") Object a(); @GET(\"list\") Object b(); \
-            @GET(\"\") Object c(); } \
+            @GET(\"\") Object c(); @GET Object d(); } \
             class Factory { static Api api() { return new Retrofit.Builder()\
             .baseUrl(\"https://h.example.com/api/\").build().create(Api.class); } }";
+        let found = sent(RETROFIT, body);
+        let contracts: Vec<_> = found.iter().map(|s| s.1.as_deref()).collect();
+        // An empty route (or none) is a dynamic `@Url`: no path on the base.
+        assert_eq!(
+            contracts,
+            [
+                Some("http::GET::/health"),
+                Some("http::GET::/api/list"),
+                None,
+                None,
+            ]
+        );
+    }
+
+    #[test]
+    fn a_path_from_the_root_replaces_the_path_of_a_concatenated_base() {
+        let body = "interface Api { @GET(\"/health\") Object a(); @GET(\"list\") Object b(); } \
+            class Factory { static final String HOST = \"https://h.example.com\"; \
+            static Api api() { return new Retrofit.Builder()\
+            .baseUrl(HOST + \"/v1/\").build().create(Api.class); } }";
         let found: Vec<_> = sent(RETROFIT, body)
             .into_iter()
-            .filter_map(|s| s.1)
+            .map(|s| (s.1.unwrap(), s.2.unwrap()))
             .collect();
+        let host = "host:h.example.com";
         assert_eq!(
             found,
             [
-                "http::GET::/health",
-                "http::GET::/api/list",
-                "http::GET::/api"
+                ("http::GET::/health".to_string(), host.to_string()),
+                ("http::GET::/v1/list".to_string(), host.to_string()),
             ]
         );
     }
