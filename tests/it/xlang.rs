@@ -448,3 +448,41 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_java_file() {
 
     assert_golden("xlang-java.trace-uncommitted.txt", &answer);
 }
+
+/// The default's host two repositories serve (a mirror of the web app beside it): the one
+/// reading that applies links ambiguous, and it is one open item, the variable's reading gone.
+#[test]
+fn a_default_whose_host_two_repositories_serve_is_one_open_item() {
+    let (web, api) = xlang_java("xlang_java_ambiguous_default");
+    let mirror = web.parent().unwrap().join("xlang-java-mirror");
+    let _ = fs::remove_dir_all(&mirror);
+    fs::create_dir_all(mirror.join("app/api/audit")).unwrap();
+    fs::write(
+        mirror.join("meada.toml"),
+        "[serve]\nhosts = [\"web.example.com\"]\n",
+    )
+    .unwrap();
+    let route = "app/api/audit/route.ts";
+    fs::copy(web.join(route), mirror.join(route)).unwrap();
+    common::git(&mirror, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    let origin = "https://example.com/xlang-java/mirror.git";
+    common::git(&mirror, &["remote", "add", "origin", origin]);
+    common::git(&mirror, &["add", "-A"]);
+    common::git(&mirror, &["commit", "-q", "-m", "fixture"]);
+    let toml = api.join("meada.toml");
+    let peer = "\n[[peer]]\nrepo = \"example.com/xlang-java/mirror\"\n";
+    fs::write(&toml, fs::read_to_string(&toml).unwrap() + peer).unwrap();
+
+    let items = Engine::open(&api).unwrap().open_items().unwrap();
+
+    let audit: Vec<_> = (items.iter())
+        .filter(|i| i.path.ends_with("AuditClient.java"))
+        .collect();
+    assert_eq!(
+        audit.len(),
+        1,
+        "{:?}",
+        items.iter().map(|i| &i.id).collect::<Vec<_>>()
+    );
+    assert_eq!(audit[0].candidates.len(), 2);
+}

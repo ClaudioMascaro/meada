@@ -2896,6 +2896,9 @@ pub struct Code<'a> {
     /// The marker constants of the literals that set each field (`field_values`), by field name
     /// (`*` for a literal by position), built the first time a field is read.
     literals: OnceCell<HashMap<&'a str, BTreeSet<(&'a str, &'a str)>>>,
+    /// The last segment of every callee of the repository (`save` of `repo.save`, `C` of
+    /// `(opaque).C`), built the first time a parameter is injected (`Code::may_be_called`).
+    callees: OnceCell<HashSet<&'a str>>,
     pack: &'static dyn LanguagePack,
 }
 
@@ -3036,6 +3039,7 @@ impl<'a> Code<'a> {
             folded: RefCell::new(HashMap::new()),
             by_name: full.keys().map(|&path| (path, OnceCell::new())).collect(),
             literals: OnceCell::new(),
+            callees: OnceCell::new(),
             pack,
         }
     }
@@ -4370,6 +4374,22 @@ impl<'a> Code<'a> {
         }
     }
 
+    /// Whether a call of the repository may reach `function`, at any level: an exact caller, or
+    /// any call whose callee ends in its name (the class's for a constructor), a name match, a
+    /// call on an opaque receiver and `this(..)` or `super(..)` included.
+    fn may_be_called(&self, function: Target<'a>) -> bool {
+        if (self.resolver.callers.get(&function)).is_some_and(|c| !c.is_empty()) {
+            return true;
+        }
+        let callees = self.callees.get_or_init(|| {
+            (self.resolver.files.values().flat_map(|f| &f.calls))
+                .map(|c| c.callee.rsplit('.').next().unwrap_or(&c.callee))
+                .collect()
+        });
+        let own = function.name[crate::parent(function.name).len()..].trim_start_matches('.');
+        callees.contains(own.split('(').next().unwrap_or(own))
+    }
+
     /// What `inject` reads off the first annotation of `path` (its full facts) that `marks`
     /// the binding and that it reads.
     fn injected(
@@ -4558,8 +4578,7 @@ impl<'a> Code<'a> {
                 frame => {
                     // No frame binds it: what an annotation injects, when no exact call can
                     // pass it.
-                    let called =
-                        (self.resolver.callers.get(&function)).is_some_and(|c| !c.is_empty());
+                    let called = self.may_be_called(function);
                     let marks = |on: &Marked| matches!(on, Marked::Param(f, at) if f == function.name && *at == n);
                     if let (false, None, Some(inject)) = (called, field, fold.inject)
                         && let Some(value) = self.injected(function.path, marks, inject)

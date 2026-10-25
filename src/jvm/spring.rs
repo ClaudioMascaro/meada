@@ -1,10 +1,11 @@
 //! Spring Boot configuration (spec #26), shared by the JVM packs' contract kinds: the base
-//! `application.properties` and `application.yml` of a module's `src/main/resources`, read for
+//! `application.properties` and `application.yml` (or `.yaml`) of a module's `src/main/resources`, read for
 //! the sources of that module (`<module>/src/main/...`), and the placeholders a value holds.
-//! `.properties` files are read line by line for literal assignments; YAML through the hardened
-//! reader of the provider documents, its nested keys joined with dots. Where a module has both,
-//! `.properties` wins, as in Spring. Profiles (`application-<profile>` files, a document that
-//! activates on one) and relaxed binding are not read. Nothing read here is kept in the index:
+//! `.properties` files are read line by line for literal assignments; YAML (`.yml`, `.yaml`)
+//! through the hardened reader of the provider documents, its nested keys joined with dots.
+//! Where a module has several, `.properties` wins, then `.yml`, as in Spring. Profiles
+//! (`application-<profile>` files, a document that activates on one, the sections after a
+//! `.properties` file's `#---`) and relaxed binding are not read. Nothing read here is kept in the index:
 //! the bytes come from the pack's config files on every refresh, and a value lives only while
 //! the contracts are extracted.
 //!
@@ -46,10 +47,15 @@ pub struct Configs {
 
 impl Configs {
     /// The configurations among `files` (repository path and bytes): those at
-    /// `<module>/src/main/resources/application.properties` or `.../application.yml`.
+    /// `<module>/src/main/resources/application.properties`, `.../application.yml` or
+    /// `.../application.yaml`, in Spring's order of precedence (`.properties`, then `.yml`).
+    /// A file past `lang::MAX_BYTES`, which the index reads cut, is not read.
     pub fn read(files: &[(&str, &[u8])]) -> Self {
-        let (mut yml, mut properties) = (BTreeMap::new(), BTreeMap::new());
+        let mut by_rank: [BTreeMap<&str, Properties>; 3] = Default::default();
         for &(path, src) in files {
+            if src.len() > crate::lang::MAX_BYTES {
+                continue;
+            }
             let Some((module, name)) = path.rsplit_once(RESOURCES) else {
                 continue;
             };
@@ -59,20 +65,22 @@ impl Configs {
             let Ok(src) = std::str::from_utf8(src) else {
                 continue;
             };
-            match name {
-                "application.yml" => yml.insert(module, read_yaml(src)),
-                "application.properties" => properties.insert(module, read_properties(src)),
-                _ => None,
+            let (rank, read) = match name {
+                "application.yaml" => (0, read_yaml(src)),
+                "application.yml" => (1, read_yaml(src)),
+                "application.properties" => (2, read_properties(src)),
+                _ => continue,
             };
+            by_rank[rank].insert(module, read);
         }
-        for (module, read) in properties {
-            yml.entry(module)
-                .or_insert_with(Properties::new)
-                .extend(read);
+        // The one of higher precedence is laid over the others.
+        let mut modules: BTreeMap<String, Properties> = BTreeMap::new();
+        for files in by_rank {
+            for (module, read) in files {
+                modules.entry(module.to_string()).or_default().extend(read);
+            }
         }
-        Self {
-            modules: yml.into_iter().map(|(m, p)| (m.to_string(), p)).collect(),
-        }
+        Self { modules }
     }
 
     /// The configuration of the module whose sources hold `source` (`<module>/src/main/...`).
@@ -94,19 +102,23 @@ fn module_dir(prefix: &str) -> Option<&str> {
     (prefix.is_empty() || prefix.ends_with('/')).then_some(prefix)
 }
 
-/// The literal assignments of a `.properties` file: `key=value`, `key: value` or `key value`,
-/// one per line, the last of a key winning. A comment (`#`, `!`), a line continued with `\`
-/// and a key or a value with an escape (`\`) are not literal, and are left out.
+/// The literal assignments of a `.properties` file's first document: `key=value`, `key: value`
+/// or `key value`, one per line, the last of a key winning. A comment (`#`, `!`), a line
+/// continued with an odd number of trailing `\` and the lines it continues onto, and a key or a
+/// value with an escape (`\`) are not literal, and are left out. A `#---` or `!---` line starts
+/// another document (a profile's, in Spring Boot), which is not read.
 fn read_properties(src: &str) -> Properties {
     let mut out = Properties::new();
     let mut continued = false;
     for line in src.lines() {
         let line = line.trim_start();
-        let continues = line.ends_with('\\');
-        if std::mem::replace(&mut continued, continues) || continues {
-            continue;
+        let comment = !continued && line.starts_with(['#', '!']);
+        if comment && matches!(line.trim_end(), "#---" | "!---") {
+            break;
         }
-        if line.is_empty() || line.starts_with(['#', '!']) || line.contains('\\') {
+        let trailing = line.len() - line.trim_end_matches('\\').len();
+        let was = std::mem::replace(&mut continued, !comment && trailing % 2 == 1);
+        if was || continued || comment || line.is_empty() || line.contains('\\') {
             continue;
         }
         let at = line
@@ -343,7 +355,13 @@ mod tests {
                    escaped=a\\:b\n\
                    long=first \\\n  second\n\
                    after=kept\n\
-                   api.url=http://last.example.com\n";
+                   # a comment ends in \\\n\
+                   evenly=a\\\\\n\
+                   next=kept\n\
+                   api.url=http://last.example.com\n\
+                   #---\n\
+                   spring.config.activate.on-profile=dev\n\
+                   api.url=http://dev.example.com\n";
         assert_eq!(
             read_properties(src),
             props(&[
@@ -351,6 +369,7 @@ mod tests {
                 ("api.url", "http://last.example.com"),
                 ("empty", ""),
                 ("indented", "x"),
+                ("next", "kept"),
                 ("spaced", "http://spaced.example.com"),
                 ("web.url", "https://web.example.com/v1"),
             ])
@@ -379,6 +398,10 @@ mod tests {
     fn each_module_reads_its_own_base_files_and_properties_win() {
         let files: &[(&str, &[u8])] = &[
             (
+                "api/src/main/resources/application.yaml",
+                b"a: yaml\nb: yaml\nc: yaml\n",
+            ),
+            (
                 "api/src/main/resources/application.yml",
                 b"a: yml\nb: yml\n",
             ),
@@ -396,13 +419,21 @@ mod tests {
         ];
         let configs = Configs::read(files);
         let api = configs.of("api/src/main/java/a/B.java").unwrap();
-        assert_eq!(api, &props(&[("a", "properties"), ("b", "yml")]));
+        assert_eq!(
+            api,
+            &props(&[("a", "properties"), ("b", "yml"), ("c", "yaml")])
+        );
         let root = configs.of("src/main/java/a/B.java").unwrap();
         assert_eq!(root, &props(&[("a", "root")]));
         // Test sources, and sources outside a module's `src/main`, take none.
         assert!(configs.of("api/src/test/java/a/B.java").is_none());
         assert!(configs.of("other/src/main/java/a/B.java").is_none());
         assert!(configs.of("lib/a/B.java").is_none());
+        // A file past the size the index reads whole is not read.
+        let big = format!("a=cut{}", "x".repeat(crate::lang::MAX_BYTES));
+        let path = "src/main/resources/application.properties";
+        let files: &[(&str, &[u8])] = &[(path, big.as_bytes())];
+        assert!(Configs::read(files).of("src/main/java/a/B.java").is_none());
     }
 
     #[test]

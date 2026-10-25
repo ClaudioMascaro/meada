@@ -490,11 +490,6 @@
       "via": "host:web.example.com"
     },
     {
-      "contract": "http::POST::/audit",
-      "site": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api.AuditClient.record()::rest.postForObject#0",
-      "via": "env:AUDIT_URL|host:web.example.com"
-    },
-    {
       "contract": "http::GET::/api/prices/{}",
       "site": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)::prices.priceOf#0",
       "via": "env:WEB_URL"
@@ -502,12 +497,7 @@
     {
       "contract": "http::GET::/api/promotions",
       "site": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient.current()::rest.getForObject#0",
-      "via": "env:PROMO_URL|host:promotions.internal"
-    },
-    {
-      "contract": "http::GET::/v2/api/promotions",
-      "site": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient.current()::rest.getForObject#0",
-      "via": "host:promotions.internal"
+      "via": "env:PROMO_URL"
     },
     {
       "contract": "http::GET::/api/reports",

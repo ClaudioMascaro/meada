@@ -532,5 +532,7 @@ stay with the enclosing definition. Generic annotation calls carry `decorates`, 
 values and named arguments for the contract kinds to read. The annotations of a field or a
 parameter, which no definition carries, are `Facts::annotated` (transient: the binding they
 mark and the annotation as a call), and every name a file assigns (`f = v`, `x.f = v`) is a
-marker constant `.f` (stored, like Go's), which `Code::field_written` reads (#89). A `final`
-field a constructor assigns keeps that constructor as `Const::scope`.
+marker constant `.f` (stored, like Go's), which `Code::field_written` reads (#89). A `static`
+field's annotations are not recorded. A `final` field a constructor assigns keeps that
+constructor as `Const::scope`. `this(..)` and `super(..)` are constructor calls
+(`Call::constructs`) of the class's own name and of its `extends` type.

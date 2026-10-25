@@ -9,10 +9,8 @@ example.com/xlang-java/web src/sync.ts:3 syncOrders
     →[exact: host api.example.com is served by example.com/xlang-java/api] example.com/xlang-java/api src/main/java/com/example/api/OrderController.java:34 com.example.api.OrderController.reserve()
       example.com/xlang-java/api src/main/java/com/example/api/AuditClient.java:14 com.example.api.AuditClient.record()
         →[exact: host web.example.com is served by example.com/xlang-java/web] example.com/xlang-java/web app/api/audit/route.ts:1 POST
-        example.com/xlang-java/api src/main/java/com/example/api/AuditClient.java:15 consumes http::POST::/audit, no provider
       example.com/xlang-java/api src/main/java/com/example/api/PromotionClient.java:14 com.example.api.PromotionClient.current()
         →[inferred: base URL from PROMO_URL, a base_url_env of peer example.com/xlang-java/web] example.com/xlang-java/web app/api/promotions/route.ts:1 GET
-        example.com/xlang-java/api src/main/java/com/example/api/PromotionClient.java:15 consumes http::GET::/v2/api/promotions, no provider
       example.com/xlang-java/api src/main/java/com/example/api/ReportClient.java:10 com.example.api.ReportClient.send()
         →[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-java/web] example.com/xlang-java/web app/api/reports/route.ts:1 GET
-chain: inferred · 7 hops · 2 repos · 564 tokens
+chain: inferred · 7 hops · 2 repos · 497 tokens

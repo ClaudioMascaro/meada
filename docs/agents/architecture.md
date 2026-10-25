@@ -981,8 +981,11 @@ one for the area a change touches.
   from the full facts so a file the index kept is parsed again through `Code::misses`). The
   shared side asks it for a field no file assigns (`Code::field_written`, the `.f` marker
   constants the Java pack writes for every `f = v` and `x.f = v`) and for a parameter no frame
-  binds of a function no exact call reaches; a function some exact call reaches climbs to its
-  callers as before, so the injected value never stands in for what a caller passes. A
+  binds of a function no call of the repository may reach (`Code::may_be_called`: an exact
+  caller, or any callee ending in its name, so a name match, a call on an opaque receiver, a
+  `new` inside an anonymous class and `this(..)` or `super(..)`, which the Java pack emits as
+  constructor calls, all count); a function some exact call reaches climbs to its callers as
+  before, so the injected value never stands in for what a caller passes. A
   constructor's parameter a `final` field holds (`Const::scope`, the constructor the value is
   written in) is no wrapper's parameter: it is injected or unknown, never climbed. The values
   an injector gives are transient like the arguments they stand for, so the index stays free of
@@ -1744,17 +1747,22 @@ one for the area a change touches.
   (`Outside`) is Spring's.
   Bases from configuration (#89): the reader expands with `jvm::spring::inject`, so a field or a
   constructor parameter with Spring's `@Value("${key}")` (bound by an import, as for the
-  annotations of #86) holds `key` from the `application.properties` or `application.yml` of its
-  module's `src/main/resources` (`<module>/src/main/...`, properties winning over YAML); a field
-  some file assigns, and one a parameter, a local or a same-name binding hides, hold nothing.
-  A placeholder no key fills is the variable it names (`Part::Env`), and `${X:default}` keeps
-  both (`Part::EnvOr`): `http::fetches` reads such a URL through `X` and, when the default
-  names a host, through that host too, the variable's `via` then `env:X|host:<host>`, which
-  `Http::link` drops when a provider of the workspace serves the host. Both readings stay at
-  the call site, the one that does not apply showing as linking nothing. The Java pack reads
-  `System.getenv("X")` (or `java.lang.System.getenv`) as `Part::Env`, unless the file imports
-  or may declare another `System` (`binds_system`, a word after `class` in a comment counts).
-  Profiles, relaxed binding, YAML lists and a SpEL `#{...}` value are not read.
+  annotations of #86) holds `key` from the `application.properties`, `application.yml` or
+  `application.yaml` of its module's `src/main/resources` (`<module>/src/main/...`, in that
+  order of precedence; a file past `lang::MAX_BYTES` is not read, nor a `.properties` past
+  its first `#---`); a `static` field, a field some file assigns, and one a parameter, a local
+  or a same-name binding hides, hold nothing. A placeholder no key fills is the variable it
+  names (`Part::Env`), and `${X:default}` keeps both (`Part::EnvOr`): `http::fetches` reads
+  such a URL through `X` and, when the default names a host, through that host too, the twins
+  marked in their `via` (`env:X|host:<host>` and `host:<host>|default`). `Http::workspace_step`
+  (`keep_applicable`), after every `declare` filled `Provider::hosts`, keeps the one that
+  applies, its mark dropped: the default's when a provider of the workspace serves its host,
+  else the variable's. Links, `context`, `trace` and the open items see one consumer per call.
+  The Java pack reads `System.getenv("X")` (or `java.lang.System.getenv`) as `Part::Env`,
+  unless the file imports or may declare another `System` (`binds_system`, a word after
+  `class` in a comment counts; `import java.lang.System;` does not). Profiles, relaxed binding,
+  YAML lists and a SpEL `#{...}` value are not read. The configurations are read once per
+  extraction, the first time an annotation is injected.
 - `http/go.rs` (spec #25): a route is read only with a literal path and a literal prefix; a
   group prefix or a pattern Meada cannot read serves nothing. `net/http` reads `{name}`,
   `{name...}` and `{$}` alone: a `:name` segment is a literal no contract can spell, so its route

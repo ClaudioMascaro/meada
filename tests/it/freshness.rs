@@ -1068,8 +1068,10 @@ fn a_refreshed_java_cross_language_pair_exports_what_a_cold_pair_does() {
     assert_ne!(refreshed[1], before[1]);
     // The default left the configuration, the literal with its file, and the new module's
     // configuration gives its client a host.
-    assert!(before[1].contains("env:AUDIT_URL|host:web.example.com"));
-    assert!(!refreshed[1].contains("env:AUDIT_URL|host:"));
+    assert!(before[1].contains("\"contract\": \"http::POST::/api/audit\""));
+    assert!(!before[1].contains("env:AUDIT_URL"));
+    assert!(refreshed[1].contains("\"via\": \"env:AUDIT_URL\""));
+    assert!(!refreshed[1].contains("\"contract\": \"http::POST::/api/audit\""));
     assert!(refreshed[1].contains("\"env:stock.url\""));
     assert!(refreshed[1].contains("tools/src/main/java/com/example/tools/ToolClient.java"));
     assert!(!refreshed[1].contains("ReportClient.java"));

@@ -92,9 +92,11 @@ enum Client {
 
 /// Java HTTP consumers: see the module.
 pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
-    let configs = Configs::read(indexed.configs);
+    // Read the first time an annotation is injected: a repository without one parses none.
+    let configs = std::cell::OnceCell::new();
     let inject = |code: &Code<'a>, path: &'a str, annotation: &'a Call| {
-        spring::inject(&configs, code, path, annotation)
+        let configs = configs.get_or_init(|| Configs::read(indexed.configs));
+        spring::inject(configs, code, path, annotation)
     };
     let mut found = Vec::new();
     for (&path, facts) in code.files() {
@@ -895,7 +897,7 @@ mod tests {
             injected(&body, CONFIGURED, &[]),
             [
                 via("http::GET::/a", "host:lit.example.com"),
-                via("http::GET::/api/c", "host:web.example.com"),
+                via("http::GET::/api/c", "host:web.example.com|default"),
                 via("http::GET::/c", "env:AUDIT_URL|host:web.example.com"),
                 via("http::GET::/d", "env:RAW_URL"),
                 via("http::GET::/e", "host:inline.example.com"),
@@ -910,14 +912,17 @@ mod tests {
             "{REST}@Value(\"${{lit.url}}\") private String lit;\n\
              @Value(\"${{lit.url}}\") private String moved;\n\
              @Value(\"${{lit.url}}\") private String named;\n\
+             @Value(\"${{lit.url}}\") private static String shared;\n\
              String named() {{ return null; }}\n\
              void reset() {{ moved = \"http://other.example.com\"; }}\n\
              void param(String lit) {{ rest.getForObject(lit + \"/p\", String.class); }}\n\
              void local() {{ String lit = x(); rest.getForObject(lit + \"/l\", String.class); }}\n\
              void f() {{\n\
              rest.getForObject(moved + \"/m\", String.class);\n\
-             rest.getForObject(named + \"/n\", String.class);\n}}"
+             rest.getForObject(named + \"/n\", String.class);\n\
+             rest.getForObject(shared + \"/s\", String.class);\n}}"
         );
+        // Spring injects no `static` field.
         assert_eq!(
             injected(&body, CONFIGURED, &[]),
             [
@@ -925,6 +930,7 @@ mod tests {
                 to("http::GET::/m"),
                 via("http::GET::/n", "host:lit.example.com"),
                 to("http::GET::/p"),
+                to("http::GET::/s"),
             ]
         );
         // Another `Value` annotation, and a module without the key's configuration.
@@ -1022,6 +1028,51 @@ mod tests {
         let imports = format!("{IMPORTS}import org.acme.System;\n");
         assert_eq!(sent_with(&imports, &body, &[]), hidden);
         assert_eq!(sent(&format!("{body}\nstatic class System {{}}")), hidden);
+        // Importing `java.lang.System` itself hides nothing.
+        let imports = format!("{IMPORTS}import java.lang.System;\n");
+        assert_eq!(sent_with(&imports, &body, &[]), sent(&body));
+    }
+
+    #[test]
+    fn a_constructor_any_call_may_reach_takes_no_injected_value() {
+        let client = |name: &str, more: &str| {
+            format!(
+                "package a;\n{IMPORTS}{SPRING}\nclass {name} {{\n\
+                 private final WebClient web;\n\
+                 {name}(@Value(\"${{lit.url}}\") String url) {{ this.web = WebClient.create(url); }}\n\
+                 {more}\n\
+                 void f() {{ web.get().uri(\"/{name}\").retrieve(); }}\n}}\n"
+            )
+        };
+        // `this(..)`, `super(..)` and a `new` inside an anonymous class pass their own URL.
+        let delegated = client(
+            "Delegated",
+            "Delegated() { this(\"http://localhost:8080\"); }",
+        );
+        let base = client("Base", "");
+        let anonymous = client("Anonymous", "");
+        let others = [
+            ("api/src/main/java/a/Delegated.java", delegated.as_str()),
+            ("api/src/main/java/a/Base.java", base.as_str()),
+            (
+                "api/src/main/java/a/Sub.java",
+                "package a;\nclass Sub extends Base { Sub() { super(\"http://other.example.com\"); } }\n",
+            ),
+            ("api/src/main/java/a/Anonymous.java", anonymous.as_str()),
+            (
+                "api/src/main/java/a/Maker.java",
+                "package a;\nclass Maker { Object m() { return new Object() {\n\
+                 Object o = new Anonymous(\"http://x.example.com\"); }; } }\n",
+            ),
+        ];
+        assert_eq!(
+            injected("", CONFIGURED, &others),
+            [
+                to("http::GET::/Anonymous"),
+                to("http::GET::/Base"),
+                to("http::GET::/Delegated"),
+            ]
+        );
     }
 
     #[test]

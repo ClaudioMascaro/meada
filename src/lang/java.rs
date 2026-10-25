@@ -78,7 +78,11 @@ impl LanguagePack for Java {
 
     /// Spring's base configuration, which the kinds read (`jvm::spring`) and imports do not.
     fn config_files(&self) -> &'static [&'static str] {
-        &["**/application.properties", "**/application.yml"]
+        &[
+            "**/application.properties",
+            "**/application.yml",
+            "**/application.yaml",
+        ]
     }
 
     fn modules(
@@ -444,6 +448,23 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     facts.calls.push(at);
                 }
             }
+            // `this(..)` calls a constructor of the class, `super(..)` one of its superclass.
+            "explicit_constructor_invocation" if definitions => {
+                let class = crate::parent(scope.as_str());
+                let callee = match node.child_by_field_name("constructor").map(|c| c.kind()) {
+                    Some("this") => class.rsplit('.').next().map(str::to_string),
+                    Some("super") => superclass(node, src),
+                    _ => None,
+                };
+                if let Some(callee) = callee {
+                    let mut at = call(&scope, callee, node.byte_range());
+                    at.by_path = true;
+                    at.constructs = true;
+                    at.args = arguments(node, src, 0);
+                    at.arity = Some(at.args.len());
+                    facts.calls.push(at);
+                }
+            }
             "local_variable_declaration" | "enhanced_for_statement" | "resource" if definitions => {
                 // A declared type, or the class a `var` takes from `new T(..)` or a call.
                 let declared = node.child_by_field_name("type");
@@ -587,7 +608,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         _ => Class::Unknown,
                     };
                     fields.insert(text(name, src).to_string());
-                    if definitions {
+                    // Spring injects no `static` field.
+                    if definitions && !modifiers(node).contains(&"static") {
                         for annotation in annotations(node, src, &scope) {
                             let on = Marked::Field(scope.as_ref().clone(), text(name, src).into());
                             facts.annotated.push(Annotated { on, annotation });
@@ -973,6 +995,23 @@ fn bases(node: Node, src: &[u8], generics: &[String]) -> Vec<String> {
         .collect()
 }
 
+/// The superclass the class around `node` writes in `extends`, as a type name; `None` without
+/// one (`java.lang.Object`'s constructor is outside).
+fn superclass(node: Node, src: &[u8]) -> Option<String> {
+    let mut at = node.parent();
+    while let Some(n) = at {
+        if matches!(
+            n.kind(),
+            "class_declaration" | "enum_declaration" | "record_declaration"
+        ) {
+            let ty = named(n.child_by_field_name("superclass")?).next()?;
+            return Some(type_name(ty, src));
+        }
+        at = n.parent();
+    }
+    None
+}
+
 fn type_name(node: Node, src: &[u8]) -> String {
     let ty = type_spelling(node, src);
     ty.split('<').next().unwrap_or(&ty).trim().to_string()
@@ -1071,7 +1110,8 @@ fn binds_system(root: Node, src: &[u8]) -> bool {
         .filter(|n| n.kind() == "import_declaration")
         .any(|n| {
             let import = text(n, src).trim_end_matches(';').trim_end();
-            import.ends_with(".System")
+            let named = import.trim_start_matches("import").trim_start();
+            import.ends_with(".System") && named != "java.lang.System"
         });
     imported || declares_system(src)
 }
