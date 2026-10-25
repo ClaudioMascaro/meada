@@ -1427,6 +1427,29 @@ fn kotlin() {
             "src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByParameter(Map<String,String>)",
             "src/main/kotlin/example/clients/Probes.kt::example.clients.otherLibrary()",
             "src/main/kotlin/example/clients/Probes.kt::example.clients.typed(HttpClient)",
+            "src/main/kotlin/example/clients/Star.kt::example.clients.star()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.untyped()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.closing()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.closingNamed()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.two()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.shadows()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.variable()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.send(HttpMethod,String)",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.sends()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.sendFrom(HttpMethod,String)",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.sendsFrom()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.sendFixed(HttpMethod)",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.callsFixed()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.named()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.blockNamed()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.thisPut()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.blockValue(HttpRequestBuilder.()->Unit)",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.conditional(Boolean)",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.nested()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.parsed()",
+            "src/main/kotlin/example/clients/Legacy.kt::example.clients.old()",
+            "src/main/kotlin/example/clients/Probes.kt::example.clients.Cache",
+            "src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByOtherLocal()",
             "src/main/kotlin/example/clients/Wrappers.kt::example.clients.fetch(HttpClient,String)",
             "src/main/kotlin/example/clients/Wrappers.kt::example.clients.order(String)",
             "src/main/kotlin/example/clients/Wrappers.kt::example.clients.ping(String)",
@@ -2370,6 +2393,15 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
     let probe = |function: &str, call: &str| {
         format!("src/main/kotlin/example/clients/Probes.kt::example.clients.{function}::{call}")
     };
+    let file = |name: &str, function: &str, call: &str| {
+        format!("src/main/kotlin/example/clients/{name}.kt::example.clients.{function}::{call}")
+    };
+    let (star, local, shadow, legacy) = (
+        "host:star.example.com",
+        "host:local.example.com",
+        "host:shadow.example.com",
+        "host:legacy.example.com",
+    );
     let expected = triples(&[
         // Every verb, and `request` with the method its block sets.
         ("http::GET::/orders", orders, &at("verbs()", "orders.get#0")),
@@ -2479,6 +2511,114 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
             "http::GET::/users/{}",
             orders,
             &wrapper("user(Int)", "orders.get#0"),
+        ),
+        // `HttpClient` and the request functions imported by `*`.
+        (
+            "http::GET::/one",
+            star,
+            &file("Star", "star()", "starred.get#0"),
+        ),
+        // A client a local holds with no type written, made by a call the walk finds, also as
+        // the receiver of `use`; each of two locals keeps its own configuration, and a local
+        // hides the client of the same name.
+        (
+            "http::GET::/untyped",
+            local,
+            &file("Local", "untyped()", "client.get#0"),
+        ),
+        (
+            "http::GET::/use",
+            local,
+            &file("Local", "closing()", "it.get#0"),
+        ),
+        (
+            "http::GET::/named/inner",
+            local,
+            &file("Local", "closingNamed()", "client.get#0"),
+        ),
+        (
+            "http::GET::/plain",
+            local,
+            &file("Local", "two()", "plain.get#0"),
+        ),
+        (
+            "http::GET::/api/items",
+            local,
+            &file("Local", "two()", "based.get#0"),
+        ),
+        (
+            "http::GET::/v9/x",
+            shadow,
+            &file("Local", "shadows()", "billing.get#0"),
+        ),
+        // The method of a wrapper is substituted at each call site, whether the URL depends on
+        // the wrapper's parameters or not.
+        (
+            "http::DELETE::/users/1",
+            orders,
+            &file("Methods", "sends()", "send#0"),
+        ),
+        (
+            "http::POST::/users",
+            orders,
+            &file("Methods", "sends()", "send#1"),
+        ),
+        (
+            "http::PUT::/m1",
+            orders,
+            &file("Methods", "sendsFrom()", "sendFrom#0"),
+        ),
+        (
+            "http::PATCH::/api/m",
+            billing,
+            &file("Methods", "callsFixed()", "sendFixed#0"),
+        ),
+        // The block is the lambda argument wherever it is; `this.method` is the property.
+        (
+            "http::POST::/named",
+            orders,
+            &file("Methods", "named()", "orders.request#0"),
+        ),
+        (
+            "http::PUT::/block-named",
+            orders,
+            &file("Methods", "blockNamed()", "orders.request#0"),
+        ),
+        (
+            "http::PUT::/this",
+            orders,
+            &file("Methods", "thisPut()", "orders.request#0"),
+        ),
+        // A method Meada cannot read is unknown, never `GET`.
+        (
+            "unresolved",
+            orders,
+            &file(
+                "Methods",
+                "blockValue(HttpRequestBuilder.()->Unit)",
+                "orders.request#0",
+            ),
+        ),
+        (
+            "unresolved",
+            orders,
+            &file("Methods", "conditional(Boolean)", "orders.request#0"),
+        ),
+        (
+            "unresolved",
+            orders,
+            &file("Methods", "nested()", "orders.request#0"),
+        ),
+        (
+            "unresolved",
+            orders,
+            &file("Methods", "parsed()", "orders.request#0"),
+        ),
+        // Ktor 1's `defaultRequest`.
+        (
+            "http::GET::/v1/ping",
+            legacy,
+            &file("Legacy", "old()", "legacy.get#0"),
         ),
     ]);
     assert_eq!(

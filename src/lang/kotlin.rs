@@ -10,8 +10,8 @@ use tree_sitter::{Node, Parser};
 use tree_sitter_language::LanguageFn;
 
 use super::{
-    Assigned, Binds, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Invocation,
-    Kind, LanguagePack, Modules, Param, Part, Receiver, Value, children, named, text,
+    Binds, Bound, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Invocation, Kind,
+    LanguagePack, Modules, Param, Part, Receiver, Value, children, named, text,
 };
 use crate::{Result, qualify};
 
@@ -170,11 +170,13 @@ enum Held {
 }
 
 /// A lambda passed to `apply`, `run` or `with` (`receiver`: its `this` is the receiver), or to
-/// `let` or `also` (its parameter is); `run { }` alone is a block with neither.
+/// `let`, `also` or `use` (its parameter is); `run { }` alone is a block with neither. `on` is
+/// the receiver as a value.
 struct Tracked {
     receiver: bool,
     parameter: bool,
     held: Held,
+    on: Value,
 }
 
 /// What a tracked lambda's scope `at` takes from a name declared elsewhere in the file: the
@@ -532,6 +534,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     receiver,
                     parameter,
                     held,
+                    on,
                 }) = given
                 {
                     // The lambda is a scope of its own, a definition that folds into the
@@ -560,6 +563,14 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                         let written = ty.map_or(Class::Unknown, |t| {
                             class_of(t, src, &generics, &mut outside)
                         });
+                        if written == Class::Unknown {
+                            facts.bound.push(Bound {
+                                scope: at.clone(),
+                                within: within.clone(),
+                                name: name.clone(),
+                                value: on,
+                            });
+                        }
                         match held {
                             _ if written != Class::Unknown => locals.push(Receiver {
                                 scope: at,
@@ -603,7 +614,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     }
                 }
             }
-            "assignment" => assigned(&mut facts, node, src, &scope),
+            "assignment" => assigned(&mut facts.calls, node, src),
             "call_expression" => {
                 if let Some((lambda, found)) = tracked_call(node, src) {
                     tracked.insert(lambda.id(), found);
@@ -640,6 +651,18 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 }
                 _ => Class::Unknown,
             };
+            // A `val`: a `var` may hold another value by the time it is used.
+            let property = node
+                .parent()
+                .filter(|p| children(*p).any(|c| c.kind() == "val"));
+            if let (Class::Named(_), Some(initial)) = (&class, property.and_then(initial)) {
+                facts.bound.push(Bound {
+                    scope: scope.to_string(),
+                    within: scope.to_string(),
+                    name: text(name, src).to_string(),
+                    value: value(initial, src, 0),
+                });
+            }
             if class == Class::Unknown {
                 facts.locals.push(qualify(&scope, text(name, src)));
             } else {
@@ -1094,18 +1117,16 @@ fn declared(
     if named(var).nth(1).is_some() {
         return written(var, generics, outside, src);
     }
-    let mut after = false;
-    for child in children(property) {
-        if child.kind() == "=" {
-            after = true;
-        } else if after && child.is_named() {
-            return match held(child, src, 0) {
-                Held::Class(class) => class,
-                _ => Class::Unknown,
-            };
-        }
+    match initial(property).map(|child| held(child, src, 0)) {
+        Some(Held::Class(class)) => class,
+        _ => Class::Unknown,
     }
-    Class::Unknown
+}
+
+/// The expression the property declaration `node` is initialized with.
+fn initial(node: Node) -> Option<Node> {
+    let mut children = children(node).skip_while(|c| c.kind() != "=");
+    children.find(|c| c.is_named())
 }
 
 /// What an expression holds, as far as the syntax says: the class a constructor call `T(..)`
@@ -1164,7 +1185,7 @@ fn tracked_call<'t>(node: Node<'t>, src: &[u8]) -> Option<(Node<'t>, Tracked)> {
     let function = function?;
     let lambda = args.last().filter(|a| a.kind() == "annotated_lambda")?;
     let lambda = named(*lambda).find(|n| n.kind() == "lambda_literal")?;
-    let (receiver, parameter, held) = match function.kind() {
+    let (receiver, parameter, held, receiving) = match function.kind() {
         "navigation_expression"
             if args.len() == 1 && children(function).all(|c| c.kind() != "::") =>
         {
@@ -1172,8 +1193,8 @@ fn tracked_call<'t>(node: Node<'t>, src: &[u8]) -> Option<(Node<'t>, Tracked)> {
             let name = named(function).last().map(|n| text(n, src))?;
             let held = held(on, src, 0);
             match name {
-                "apply" | "run" => (true, false, held),
-                "let" | "also" => (false, true, held),
+                "apply" | "run" => (true, false, held, Value::Unknown),
+                "let" | "also" | "use" => (false, true, held, value(on, src, 0)),
                 _ => return None,
             }
         }
@@ -1181,11 +1202,11 @@ fn tracked_call<'t>(node: Node<'t>, src: &[u8]) -> Option<(Node<'t>, Tracked)> {
             ("with", [arg, _]) if arg.kind() == "value_argument" => {
                 let mut parts = named(*arg);
                 match (parts.next(), parts.next()) {
-                    (Some(on), None) => (true, false, held(on, src, 0)),
+                    (Some(on), None) => (true, false, held(on, src, 0), Value::Unknown),
                     _ => return None,
                 }
             }
-            ("run", [_]) => (false, false, Held::Unknown),
+            ("run", [_]) => (false, false, Held::Unknown, Value::Unknown),
             _ => return None,
         },
         _ => return None,
@@ -1199,6 +1220,7 @@ fn tracked_call<'t>(node: Node<'t>, src: &[u8]) -> Option<(Node<'t>, Tracked)> {
             receiver,
             parameter,
             held,
+            on: receiving,
         },
     ))
 }
@@ -1545,27 +1567,66 @@ fn template(parts: &mut Vec<Part>, text: &str) {
     append(parts, vec![Part::Text(rest.into())]);
 }
 
-/// Records `name = value` written as a statement of the lambda `scope` (`Facts::assigned`).
-fn assigned(facts: &mut Facts, node: Node, src: &[u8], scope: &str) {
-    let last = &scope[crate::parent(scope).len()..];
-    let operator = node.child_by_field_name("operator");
-    if !last.trim_start_matches('.').starts_with('@')
-        || operator.is_none_or(|o| text(o, src) != "=")
-    {
-        return;
-    }
-    let (Some(left), Some(right)) = (
+/// The key a Ktor request block's `method = value` or `this.method = value` is recorded under
+/// in `Call::kwargs` of the call whose lambda holds it (the Ktor client reads it). It is no
+/// Kotlin name, so it matches no parameter.
+const METHOD: &str = "method=";
+
+/// Records `method = value` and `this.method = value`, written in a lambda that is a call's
+/// argument, as the `METHOD` keyword of that call: the setting of a property of the lambda's
+/// receiver, which no call or constant records. The value is kept where the statement is the
+/// lambda's own; where it may not run (an `if`, a `try`, a loop) or sets the outer receiver
+/// from a lambda inside, the call it reaches is told `Unknown`, as it is when a second statement
+/// sets it again.
+fn assigned(calls: &mut [Call], node: Node, src: &[u8]) {
+    let (Some(left), Some(right), Some(operator)) = (
         node.child_by_field_name("left"),
         node.child_by_field_name("right"),
+        node.child_by_field_name("operator"),
     ) else {
         return;
     };
-    if left.kind() == "identifier" {
-        facts.assigned.push(Assigned {
-            scope: scope.to_string(),
-            name: text(left, src).to_string(),
-            value: value(right, src, 0),
-        });
+    let set = match left.kind() {
+        "identifier" => text(left, src) == "method",
+        "navigation_expression" => {
+            let mut parts = named(left);
+            let this = parts.next().is_some_and(|n| n.kind() == "this_expression");
+            this && parts.next().is_some_and(|n| text(n, src) == "method") && parts.next().is_none()
+        }
+        _ => false,
+    };
+    if !set || text(operator, src) != "=" {
+        return;
+    }
+    let (mut at, mut own) = (node, true);
+    while let Some(parent) = at.parent() {
+        match parent.kind() {
+            "lambda_literal" if argument(parent) => {
+                let owner = std::iter::successors(parent.parent(), |n| n.parent())
+                    .find(|n| n.kind() == "call_expression");
+                let Some(owner) = owner else { return };
+                let given = match own {
+                    true => value(right, src, 0),
+                    false => Value::Unknown,
+                };
+                let range = owner.byte_range();
+                let Some(call) = calls.iter_mut().rev().find(|c| c.range == range) else {
+                    return;
+                };
+                match call.kwargs.iter_mut().find(|(k, _)| k == METHOD) {
+                    Some((_, set)) => *set = Value::Unknown,
+                    None => call.kwargs.push((METHOD.into(), given)),
+                }
+                own = false;
+            }
+            "lambda_literal"
+            | "anonymous_function"
+            | "function_declaration"
+            | "class_body"
+            | "object_literal" => return,
+            _ => own = false,
+        }
+        at = parent;
     }
 }
 

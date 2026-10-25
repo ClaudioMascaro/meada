@@ -1940,17 +1940,32 @@ qualification budget does (ADR 0017).
 - `http/kotlin/client.rs` (spec #27, #99): Ktor client calls (`get`, `post`, `put`, `patch`,
   `delete`, `head`, `options` and `request` of `io.ktor.client.request`, counted by the import
   `Code::outside` says binds the verb) on a receiver that is an `io.ktor.client.HttpClient`: one
-  `Code::origins` (`Follow::Values`) traces to a call to it, or one whose written type is it
+  `Code::origins` (`Follow::Values`) traces to a call to it (counted by the import of its
+  callee as `jvm::names::spellings` reads it, so `import io.ktor.client.*` counts), a local the
+  pack recorded (`Facts::bound`: a `val x = Callee(..)` with no written type, and the parameter
+  of a `let`, `also` or `use` lambda, whose value is the receiver; `Clients::local` takes the
+  nearest binding of the name and none when another binding of it shares its scope, so a
+  parameter, a loop variable, a `var`, a local named like a property of the file or one declared
+  twice hides it) followed through `origins` again, or one whose written type is it
   (`jvm::names::typed`); a map, another library's client and a name a local hides are none. The
-  URL (first argument, or `urlString`) goes through `Code::expand` (`Expand::Call`), as the Go
-  clients do, so a wrapper is read at each call site of the function that determines the URL,
-  through any number of levels, with cycle detection; a call with no URL argument
-  (`get { url { .. } }`) is an unresolved consumer. The base of a client made by a call is the
-  `url(..)` of the `defaultRequest { }` in the configuration lambda of that call, folded in its
-  scope: a hole when it is set more than once or not by a string, none for a client known by
-  its type alone. `request` sends the method its block assigns (`method = HttpMethod.X`, from
-  `Facts::assigned`, the `name = value` statements of the lambdas that are arguments, read from
-  the full facts by `Code::assigned`; `GET` when it assigns none, unknown for any other form).
+  call is read whole (`Expand::Chain`, which also gives the reader the call's keyword arguments),
+  so an enum member a wrapper passes keeps the evidence of the caller's imports. The URL (first
+  argument, or `urlString`) goes through `Code::expand`, as the Go clients do, so a wrapper is
+  read at each call site of the function that determines the URL or the method, through any
+  number of levels, with cycle detection; a call with no URL argument (`get { url { .. } }`) is
+  an unresolved consumer. The base of a client made by a call is the `url(..)` of the
+  `defaultRequest { }` in the configuration lambda of that call (Ktor 2 and 3
+  `io.ktor.client.plugins.defaultRequest`, Ktor 1 `io.ktor.client.features.defaultRequest`),
+  folded in its scope: a hole when it is set more than once or not by a string, none for a client
+  known by its type alone. `request` sends the method its block assigns: the pack records
+  `method = v` and `this.method = v` written as a statement of a lambda argument as the
+  `method=` key of that call's `Call::kwargs` (a key no Kotlin name matches; `given` in
+  `http/kotlin.rs` ignores keys ending in `=`), `Unknown` where the statement may not run (inside
+  an `if`, `when`, `try` or loop) and, for the call that owns each lambda around a nested
+  assignment (`headers { method = X }`), because the inner lambda may not run, and when the block
+  assigns it twice. `GET` when it assigns none and the call is given no other argument, a `Ref`
+  while it depends on a parameter of a wrapper, unknown for anything else (a block passed as a
+  value, `HttpMethod.parse(..)`, a method that is no `HttpMethod` member of Ktor).
   The Kotlin pack folds a string literal's templates into parts (`$name`, `${name}` as names,
   any other `${expr}` as a hole); the grammar reads `$name` as text, so the pack finds the name
   in the text. A literal with an escape (`\$`) is still unknown.
@@ -2486,12 +2501,15 @@ qualification budget does (ADR 0017).
   string template that does not fold are not read. A Ktor verb inside a lambda (`get`, `put`) is a call the
   resolver reads as a name match, as any call there is, so it may match a repository method of
   the same name: that method then has a caller and loses its export door.
-- `http/kotlin/client.rs` (spec #27, #99): a method a wrapper takes as a parameter and a `request`
-  block assigns (`method = m`) is not substituted, since the assignment is no argument of the
-  call: the consumer's method is unknown. `url { path(..) }`, `url(..)` and `takeFrom` inside a
+- `http/kotlin/client.rs` (spec #27, #99): `url { path(..) }`, `url(..)` and `takeFrom` inside a
   request block, `HttpRequestBuilder` values, `submitForm`, the `prepare*` forms, an aliased
   import (`import .. as k`) and a client the call reaches through `with(client) { get(..) }`
-  are not read. A `defaultRequest` base given by a parameter of a client factory is a hole.
+  are not read. A `defaultRequest` base given by a parameter of a client factory is a hole. A
+  local client is followed only when its `val` is written with the constructor call (or a
+  `let`, `also` or `use` receiver): `val b = a` and a `var` are not, and a local named like a
+  property of its file is typed unknown by the pack, so it is not either. A nested lambda's
+  `method = X` makes the outer request's method unknown even when the inner lambda always runs
+  (`headers { }`).
 - Rust values (`lang/rust/values.rs`, `lang/rust/builders.rs`, spec #30 #131): `BUILDER_BUDGET`
   (2^20 syntax nodes per file, over every `let mut`, block by block in the order the blocks
   open), `BUILDER_DEPTH` (64 builders read within

@@ -9,6 +9,7 @@ object Paths {
     const val ITEMS = "/items"
     val STOCK = ITEMS + "/stock"
 
-    // Reassigned somewhere: Meada cannot say which value a request sees.
+    // A `var`: Meada never folds one, reassigned or not, as it cannot tell which value a
+    // request sees.
     var drifting = "/drifting"
 }

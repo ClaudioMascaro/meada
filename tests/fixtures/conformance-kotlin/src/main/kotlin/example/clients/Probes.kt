@@ -21,3 +21,11 @@ fun otherLibrary() {
     val http = java.net.http.HttpClient.newHttpClient()
     http.get("https://orders.example.com/other")
 }
+
+class Cache
+
+// A local holding something else hides the client of the same name too.
+fun hiddenByOtherLocal() {
+    val orders = Cache()
+    orders.get("https://orders.example.com/cache")
+}

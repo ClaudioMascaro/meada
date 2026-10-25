@@ -62,11 +62,8 @@ fn given(call: &Call) -> Option<(Option<&Value>, Option<&Value>, &str)> {
         return None;
     };
     let named = |key: &str| call.kwargs.iter().find(|(k, _)| k == key).map(|(_, v)| v);
-    if call
-        .kwargs
-        .iter()
-        .any(|(k, _)| k != "path" && k != "method")
-    {
+    // A key ending in `=` is an assignment in the lambda (`Call::kwargs`), no argument.
+    if (call.kwargs.iter()).any(|(k, _)| k != "path" && k != "method" && !k.ends_with('=')) {
         return None;
     }
     let mut rest = rest.map_or(&[][..], |(_, rest)| rest).iter();
@@ -118,6 +115,17 @@ fn method<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, value: &'a Value) 
     let (head, member) = name.rsplit_once('.')?;
     one(&spellings(code, path, scope, head), |s| s == HTTP_METHOD)?;
     let method = member.to_uppercase();
+    METHODS.contains(&method.as_str()).then_some(method)
+}
+
+/// The method `HttpMethod.X` names, upper-case, when one of the `spelled` names of an outside
+/// value (`Value::External`) is Ktor's.
+fn external(spelled: &[String]) -> Option<String> {
+    let known = |s: &str| {
+        s.strip_prefix(HTTP_METHOD)
+            .is_some_and(|m| m.starts_with('.'))
+    };
+    let method = one(spelled, known)?[HTTP_METHOD.len() + 1..].to_uppercase();
     METHODS.contains(&method.as_str()).then_some(method)
 }
 

@@ -12,9 +12,8 @@ use std::cell::{OnceCell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Annotated, Assigned, Binds, Call, Class, Const, Def, Export, Facts, Import, Imported,
-    Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker, Ty,
-    Value,
+    Annotated, Binds, Bound, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation,
+    Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker, Ty, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -3129,7 +3128,8 @@ pub enum Expand<'a> {
     /// The call at an index of a file, read as one `Value::Call`: the calls of the builder chain
     /// it is made on (its receivers) and every argument along it are folded, and a name an import
     /// from outside binds is a `Value::External` spelled where it is written, so an enum member
-    /// passed through a wrapper keeps the evidence of the caller's imports.
+    /// passed through a wrapper keeps the evidence of the caller's imports. The call's keyword
+    /// arguments are folded the same way and given to the reader.
     Chain(&'a str, usize),
 }
 
@@ -3740,10 +3740,9 @@ impl<'a> Code<'a> {
         self.call(path, index)?.receiver.as_ref()
     }
 
-    /// The `name = value` statements written in lambdas that are call arguments in `path`
-    /// (`Facts::assigned`).
-    pub fn assigned(&self, path: &'a str) -> &'a [Assigned] {
-        self.full(path).map_or(&[], |f| f.assigned.as_slice())
+    /// The values the locals of `path` were given (`Facts::bound`).
+    pub fn bound(&self, path: &'a str) -> &'a [Bound] {
+        self.full(path).map_or(&[], |f| f.bound.as_slice())
     }
 
     /// The values the call at `index` of `path` may return, when a function of the repository
@@ -4777,7 +4776,8 @@ impl<'a> Code<'a> {
                     args: call.args.iter().map(&mut eval).collect(),
                     range: call.range.clone(),
                 };
-                (vec![Value::Call(invocation)], Vec::new())
+                let kwargs = (call.kwargs.iter()).map(|(k, v)| (k.clone(), eval(v)));
+                (vec![Value::Call(invocation)], kwargs.collect())
             }
             None => (
                 args.iter().map(&mut eval).collect(),
