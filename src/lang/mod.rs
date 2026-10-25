@@ -125,6 +125,13 @@ pub trait LanguagePack {
         &[]
     }
 
+    /// Whether a member call of the pack's files may reach an extension function
+    /// (`Facts::extensions`) in scope of its file where no member answers it (Kotlin): those its
+    /// explicit imports bring, then those of its package, then those of its star imports.
+    fn extension_functions(&self) -> bool {
+        false
+    }
+
     /// Whether a method call that no function of the repository answers may hand back the
     /// value it was called on, as a builder does (`Router::new().route(..)` in Rust):
     /// `Code::origins` then follows the call's `receiver`, to a constructor whose outside name
@@ -297,6 +304,12 @@ pub struct Facts {
     /// the shared side looks a member of the type up in each block too.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub impls: Vec<Impl>,
+    /// The blocks of a type's extension functions (Kotlin's `fun String.shout()`), one per
+    /// receiver type and scope written in: their definitions (`scope.<name>`) are no members of
+    /// the type. A call of the pack (`LanguagePack::extension_functions`) on a receiver no
+    /// member answers reaches those its file has in scope.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub extensions: Vec<Impl>,
     /// Names a path of the file begins with that nothing in it binds: the crates outside the
     /// file (Rust's extern prelude). They resolve after every import and glob: to another crate
     /// of the repository by its name, else to something outside it.

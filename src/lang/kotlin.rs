@@ -66,6 +66,10 @@ impl LanguagePack for Kotlin {
         parse(src, path.ends_with(".kts"))
     }
 
+    fn extension_functions(&self) -> bool {
+        true
+    }
+
     fn config_files(&self) -> &'static [&'static str] {
         &[]
     }
@@ -111,6 +115,9 @@ struct Visit<'t> {
     implicit: Implicit,
     /// The type parameters in scope, which name no class.
     generics: Rc<Vec<String>>,
+    /// Inside the lambda of a `let` or `also` whose parameter is `it`, which a lambda that
+    /// declares no parameter hides in its own scope.
+    typed_it: bool,
     depth: usize,
 }
 
@@ -189,6 +196,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         opaque: false,
         implicit: Implicit::Enclosing,
         generics: Rc::new(Vec::new()),
+        typed_it: false,
         depth: 0,
     }];
     let mut budget = QUALIFICATION_BYTES;
@@ -210,6 +218,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         opaque,
         implicit,
         generics,
+        typed_it,
         depth,
     }) = stack.pop()
     {
@@ -224,6 +233,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         let (mut inner, mut inner_place, mut inner_access, mut inner_opaque, mut nested) =
             (scope.clone(), place, access, opaque, depth);
         let (mut inner_implicit, mut inner_generics) = (implicit, generics.clone());
+        let mut inner_typed_it = typed_it;
         let mut skip_parameters = false;
         let defining = !opaque && depth < DEFINITION_DEPTH && place != Place::Init;
         match node.kind() {
@@ -490,6 +500,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     }
                     if parameter && let Some((name, ty)) = lambda_parameter(node, src) {
                         skip_parameters = true;
+                        inner_typed_it |= name == "it";
                         let written = ty.map_or(Class::Unknown, |t| {
                             class_of(t, src, &generics, &mut outside)
                         });
@@ -515,11 +526,22 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     }
                 } else {
                     inner_implicit = Implicit::Unknown;
-                    // `it` is a lambda's one parameter when it declares none.
+                    // `it` is a lambda's one parameter when it declares none. Where a `let`
+                    // around it binds a typed `it`, the lambda is a scope of its own, so its
+                    // `it` hides that one only inside it.
                     if node.kind() == "lambda_literal"
                         && named(node).all(|n| n.kind() != "lambda_parameters")
                     {
-                        facts.locals.push(qualify(&scope, "it"));
+                        if typed_it && depth < DEFINITION_DEPTH {
+                            inner = Rc::new(qualify(&scope, &format!("@{}", node.start_byte())));
+                            let range = node.byte_range();
+                            facts
+                                .defs
+                                .push(definition(&inner, Kind::Inline, range, Vec::new()));
+                            nested += 1;
+                            inner_typed_it = false;
+                        }
+                        facts.locals.push(qualify(&inner, "it"));
                     }
                 }
             }
@@ -594,6 +616,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 opaque: inner_opaque,
                 implicit: inner_implicit,
                 generics: inner_generics.clone(),
+                typed_it: inner_typed_it,
                 depth: nested,
             });
         }
@@ -1040,8 +1063,12 @@ fn held(node: Node, src: &[u8], depth: usize) -> Held {
                     {
                         return held(on, src, depth + 1);
                     }
+                    // `X.f(..)` calls a function of `X` (`Json.encodeToString(x)`): only a
+                    // capitalized name, as Kotlin writes a class's, is read as a constructor
+                    // (`a.b.Box()`, `Outer.Inner()`).
                     let path = callee(function, src);
-                    if path.contains('(') {
+                    let class = last.is_some_and(|l| l.starts_with(char::is_uppercase));
+                    if path.contains('(') || !class {
                         Held::Unknown
                     } else {
                         Held::Class(Class::Named(path))
@@ -1117,8 +1144,10 @@ fn lambda_parameter<'t>(lambda: Node<'t>, src: &[u8]) -> Option<(String, Option<
     }
 }
 
-/// An extension function or property adds a member to its receiver's type: a block of that
-/// type, whose definitions are named under the receiver's name where the extension is written.
+/// An extension function or property extends its receiver's type: a block of that type
+/// (`Facts::extensions`), whose definitions are named under the receiver's name where the
+/// extension is written. A type parameter's (`fun <T> T.logged()`) is spelled in parentheses,
+/// which name no type.
 fn extension(
     facts: &mut Facts,
     seen: &mut BTreeSet<(String, String)>,
@@ -1128,14 +1157,16 @@ fn extension(
     generics: &[String],
 ) {
     let head = on.split('.').next().unwrap_or(on);
-    if generics.iter().any(|g| g == head) {
-        return;
-    }
-    outside.insert(head.to_string());
+    let ty = if generics.iter().any(|g| g == head) {
+        format!("({on})")
+    } else {
+        outside.insert(head.to_string());
+        on.to_string()
+    };
     if seen.insert((scope.to_string(), on.to_string())) {
-        facts.impls.push(Impl {
+        facts.extensions.push(Impl {
             scope: qualify(scope, on),
-            ty: on.to_string(),
+            ty,
             of: None,
             within: scope.to_string(),
         });

@@ -1499,6 +1499,30 @@ fn kotlin() {
             "src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.describe(Boolean)",
             "src/main/kotlin/example/ext/Extensions.kt::example.ext.Store.tag()",
             "src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.tag()",
+            "src/main/kotlin/example/Receivers.kt::example.scoped(String)",
+            "src/main/kotlin/example/Receivers.kt::example.Outside.spawn()",
+            "src/main/kotlin/example/Receivers.kt::example.Outside.items()",
+            "src/main/kotlin/example/Receivers.kt::example.Outside.orders()",
+            "src/main/kotlin/example/Receivers.kt::example.Map.Entry.entryLabel()",
+            "src/main/kotlin/example/Receivers.kt::example.opaque(Outside,Map<String,Int>)",
+            "src/main/kotlin/example/Receivers.kt::example.Any.toJson()",
+            "src/main/kotlin/example/Receivers.kt::example.T.logged()",
+            "src/main/kotlin/example/Receivers.kt::example.CharSequence.blankish()",
+            "src/main/kotlin/example/Receivers.kt::example.general(Cache,String)",
+            "src/main/kotlin/example/Receivers.kt::example.Outside.pretty()",
+            "src/main/kotlin/example/Receivers.kt::example.String.pretty()",
+            "src/main/kotlin/example/Receivers.kt::example.called()",
+            "src/main/kotlin/example/Receivers.kt::example.nestedIt(Cache,List<Disk>)",
+            "src/main/kotlin/example/Receivers.kt::example.localFirst(Cache)",
+            "src/main/kotlin/example/Receivers.kt::example.localFirst(Cache).size()",
+            "src/main/kotlin/example/Receivers.kt::example.unknownReceiver()",
+            "src/main/kotlin/example/other/Others.kt::example.other.Cache.describe()",
+            "src/main/kotlin/example/other/Others.kt::example.other.String.reversed()",
+            "src/main/java/example/legacy/Port.java::example.legacy.Port",
+            "src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)",
+            "src/main/java/example/legacy/Port.java::example.legacy.Port.use(Port,String)",
+            "src/main/kotlin/example/legacy/PortExt.kt::example.legacy.Port.ext(String)",
+            "src/main/kotlin/example/legacy/PortExt.kt::example.legacy.String.length()",
         ],
         &["src/main/kotlin/example/Main.kt::example.main(Array<String>)"],
         &[
@@ -1934,12 +1958,12 @@ fn kotlin() {
             ),
             (
                 "src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)::text.loud#0",
-                EXACT,
+                INFERRED,
                 &["src/main/kotlin/example/Receivers.kt::example.String.loud()"],
             ),
             (
                 "src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)::text.shout#0",
-                EXACT,
+                INFERRED,
                 &["src/main/kotlin/example/Shapes.kt::example.String.shout()"],
             ),
             (
@@ -2020,6 +2044,99 @@ fn kotlin() {
             ),
             (
                 "src/main/kotlin/example/Receivers.kt::example.outsiders(Outside,Mixed,List<Int>)::mixed.size#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.scoped(String)::text.reversed#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.Outside.orders()::items#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Outside.items()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.Outside.orders()::this.items#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Outside.items()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.opaque(Outside,Map<String,Int>)::foreign.items#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Outside.items()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.opaque(Outside,Map<String,Int>)::Outside.spawn#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.opaque(Outside,Map<String,Int>)::entries.entryLabel#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Map.Entry.entryLabel()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.general(Cache,String)::cache.toJson#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Any.toJson()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.general(Cache,String)::text.toJson#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Any.toJson()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.general(Cache,String)::text.logged#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.T.logged()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.general(Cache,String)::text.blankish#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.CharSequence.blankish()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.called()::shown.pretty#0",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/Receivers.kt::example.Outside.pretty()",
+                    "src/main/kotlin/example/Receivers.kt::example.String.pretty()",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.called()::held.wipe#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.wipe()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.nestedIt(Cache,List<Disk>)::it.size#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.size(Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.nestedIt(Cache,List<Disk>)::it.flush#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Disk.flush()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.localFirst(Cache)::size#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.localFirst(Cache).size()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.unknownReceiver()::(call_expression).loud#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.String.loud()"],
+            ),
+            (
+                "src/main/java/example/legacy/Port.java::example.legacy.Port.use(Port,String)::port.ext#0",
+                EXACT,
+                &["src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)"],
+            ),
+            (
+                "src/main/java/example/legacy/Port.java::example.legacy.Port.use(Port,String)::s.length#0",
                 None,
                 &[],
             ),
@@ -2118,6 +2235,33 @@ fn kotlin_hostile_scope_function_nesting_remains_bounded() {
         .collect();
     // The innermost call is past the depth where lambdas are scopes: a name match.
     assert!(size.iter().any(|c| c["level"] == "inferred"), "{size:?}");
+}
+
+/// Thousands of `apply` lambdas on one class index in time linear in their number: a lambda's
+/// scope adds no members to its receiver's class, so no lookup of the class reads them all.
+#[test]
+fn kotlin_scope_functions_on_one_class_stay_linear_in_width() {
+    const WIDTH: usize = 4000;
+    let repo = fixture_repo("kotlin_scopes_width", "conformance-kotlin", Some(ORIGIN));
+    let mut wide = String::from("package wide\nclass Foo { fun size() = 0 }\n");
+    for i in 0..WIDTH {
+        wide.push_str(&format!(
+            "fun f{i}(foo: Foo) {{ foo.apply {{ size() }} }}\n"
+        ));
+    }
+    std::fs::write(repo.join("Wide.kt"), wide).unwrap();
+    let started = std::time::Instant::now();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let took = started.elapsed();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let exact = (json["calls"].as_array().unwrap().iter())
+        .filter(|c| c["span"]["path"] == "Wide.kt" && c["level"] == "exact")
+        .filter(|c| c["target"] == format!("{REPO}::Wide.kt::wide.Foo.size()"))
+        .count();
+    assert_eq!(exact, WIDTH);
+    // Quadratic work took 70 s here in debug; linear work, a few.
+    eprintln!("kotlin scope functions, {WIDTH} wide: {took:?}");
+    assert!(took < std::time::Duration::from_secs(30), "{took:?}");
 }
 
 #[test]

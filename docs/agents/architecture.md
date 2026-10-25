@@ -1331,17 +1331,25 @@ one for the area a change touches.
   type (`Class::Type`) or initialized with a constructor call `T(..)` (`Class::Named`), where
   the one binding of its name says so; `Facts::externs` lists the type heads written in the
   file, so a type nothing binds is outside the repository (Opaque outside). An extension
-  function or property is a `Facts::impls` block of its receiver's type, named as the function
-  is (`pkg.Receiver.f()`): `Resolver::overloaded` reads the blocks of each ancestor of the
-  receiver's family after its members, a signature a member or a nearer ancestor gave hiding
-  it and two blocks that declare one staying several. A block whose type is outside the
-  repository (`fun String.shout()`) is in `Resolver::foreign` by the type's name, which
-  `foreign_member` reaches from a receiver typed by that outside name. A lambda passed to
-  `apply`, `run` or `with` is a `Kind::Inline` definition of its own (`@<offset>`, folded into
-  the one around it) and an `Impl` block of the receiver's type: `this` and a bare call there
-  read that type's family first (`lexical_as` through `blocks`) and the names around it after,
-  or stay a name match when the block's type is no class of the repository (`unread`). The
-  lambda of `let` or `also` is such a scope too, with its parameter (`it`) typed and no block.
+  function or property is a `Facts::extensions` block of its receiver's type, named as the
+  function is (`pkg.Receiver.f()`): it tells what `this` is in the extension's body, and its
+  functions are no members of the type, so Java calls never reach them. A Kotlin call no member
+  answers (`LanguagePack::extension_functions`) reads `Resolver::extended`: the extensions of its
+  name in scope of the file, first to last a scope around the call, an explicit import, the
+  file's package, a star import (`visible`), narrowed by argument count. On a receiver of a class
+  of the repository whose family is all known, the first scope that holds one of a class of the
+  family gives the one of the nearest class, `exact`. An extension of a type from outside the
+  repository or of a type parameter may apply to any receiver (`Any`, `T`, `CharSequence`), and
+  an outside receiver's own members are unknown, so those are name matches over the extensions in
+  scope that may apply; a call on a type's name (`Outside.create()`) reaches no extension. A
+  lambda passed to `apply`, `run` or `with` is a `Kind::Inline` definition of its own
+  (`@<offset>`, folded into the one around it) and an `Impl` block of the receiver's type that
+  declares no member (`impls` leaves it out, so a class's lookups never read one per lambda):
+  `this` and a bare call there read a local function around the block first, then that type's
+  family (`lexical_as` through `blocks`), then the names around it, or stay a name match when
+  the block's type is no class of the repository (`unread`). The lambda of `let` or `also` is
+  such a scope too, with its parameter (`it`) typed and no block; a lambda in it that declares no
+  parameter is a scope of its own, whose `it` hides the typed one only inside it.
   `LanguagePack::is_code` drops from the walk the files of a pack's
   extensions that are no code (Kotlin's `build.gradle.kts` and `settings.gradle.kts`, which the
   package ecosystems read as manifests). A pack that
@@ -1656,9 +1664,13 @@ one for the area a change touches.
   other. A function's result type is not read (`Def::result` is empty), so `make().m()` and a
   local initialized with `make()` are name matches. A typealias is no class of the repository:
   a receiver typed by one is outside it, and resolves to nothing. A name bound twice in one
-  scope with different types, or named like a property, holds an unknown type. An extension is
-  matched by the receiver type's name from any package, imported or not (no scope check), and
-  one of an outside type by that name's last segment. A companion is
+  scope with different types, or named like a property, holds an unknown type. A call `X.f(..)`
+  is read as a constructor only when `f` is capitalized, as Kotlin names classes. An import alias
+  of an extension (`import a.slug as s`) brings nothing in scope for it. An extension written in its
+  class's own file is named as a member would be (`pkg.Foo.x()`), so a call reaches it as a
+  member, a Java call too (the naming of #95). A bare call a top-level function of its name answers is
+  exact to that function, though Kotlin prefers an extension of the implicit receiver. A
+  companion is
   its class's last base, so `Type.m()` reads the class's own instance member first when both
   declare `m` with one signature. A star import of a class (`import a.C.*`) reads every export of
   the class's file. A fully qualified function call (`example.helper()`) is a name match. A class

@@ -119,3 +119,74 @@ fun outsiders(foreign: Outside, mixed: Mixed, list: List<Int>) {
     mixed.size()
     list.wipe()
 }
+
+// Extensions in scope as Kotlin sees them: the same package, explicit imports, star imports.
+// One of a package the file does not import is out of scope (`kotlin.text.reversed` is called).
+fun scoped(text: String) {
+    text.reversed()
+}
+
+// A receiver of a type from outside the repository keeps its members unknown (Opaque outside):
+// its extensions are name matches, and a call on the type's name reaches none of them.
+fun Outside.spawn(): Int = 0
+
+fun Outside.items() {}
+
+fun Outside.orders() {
+    items()
+    this.items()
+}
+
+fun Map.Entry<String, Int>.entryLabel(): String = key
+
+fun opaque(foreign: Outside, entries: Map<String, Int>) {
+    foreign.items()
+    Outside.spawn()
+    entries.entryLabel()
+}
+
+// Extensions of `Any`, of a type parameter and of an outside supertype may apply to any
+// receiver: name matches.
+fun Any.toJson(): String = ""
+
+fun <T> T.logged(): T = this
+
+fun CharSequence.blankish(): Boolean = true
+
+fun general(cache: Cache, text: String) {
+    cache.toJson()
+    text.toJson()
+    text.logged()
+    text.blankish()
+}
+
+// `X.f(..)` is a call, not a constructor: what it returns is unknown.
+fun Outside.pretty(): String = ""
+
+fun String.pretty(): String = this
+
+fun called() {
+    val shown = Outside.render(1)
+    shown.pretty()
+    val held = Outside.render(2)
+    held.wipe()
+}
+
+// An untracked lambda's `it` is its own; the `let` around it keeps its typed one.
+fun nestedIt(cache: Cache, disks: List<Disk>) {
+    cache.let {
+        it.size(1)
+        disks.forEach { it.flush() }
+    }
+}
+
+// A local function comes before the members of a scope function's receiver.
+fun localFirst(cache: Cache) {
+    fun size(): Int = 1
+    cache.apply { size() }
+}
+
+// An unknown receiver and one extension of the name: a name match.
+fun unknownReceiver() {
+    build().loud()
+}
