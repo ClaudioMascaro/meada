@@ -556,21 +556,22 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     }
                 } else {
                     inner_implicit = Implicit::Unknown;
-                    // `it` is a lambda's one parameter when it declares none. Where a `let`
-                    // around it binds a typed `it`, the lambda is a scope of its own, so its
-                    // `it` hides that one only inside it.
-                    if node.kind() == "lambda_literal"
-                        && named(node).all(|n| n.kind() != "lambda_parameters")
-                    {
-                        if typed_it && depth < DEFINITION_DEPTH {
-                            inner = Rc::new(qualify(&scope, &format!("@{}", node.start_byte())));
-                            let range = node.byte_range();
-                            facts
-                                .defs
-                                .push(definition(&inner, Kind::Inline, range, Vec::new()));
-                            nested += 1;
-                            inner_typed_it = false;
-                        }
+                    // A lambda written as an argument is a scope of its own (`Value::Function`
+                    // names it there), as is one in a `let` around it that binds a typed `it`:
+                    // `it`, a lambda's one parameter when it declares none, hides that one only
+                    // inside it.
+                    let lambda = node.kind() == "lambda_literal";
+                    let it = lambda && named(node).all(|n| n.kind() != "lambda_parameters");
+                    if (argument(node) || it && typed_it) && depth < DEFINITION_DEPTH {
+                        inner = Rc::new(qualify(&scope, &format!("@{}", node.start_byte())));
+                        let range = node.byte_range();
+                        facts
+                            .defs
+                            .push(definition(&inner, Kind::Inline, range, Vec::new()));
+                        nested += 1;
+                        inner_typed_it &= !it;
+                    }
+                    if it {
                         facts.locals.push(qualify(&inner, "it"));
                     }
                 }
@@ -579,7 +580,8 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 if let Some((lambda, found)) = tracked_call(node, src) {
                     tracked.insert(lambda.id(), found);
                 }
-                if let Some(at) = call(node, src, &scope, implicit) {
+                let lambdas = depth < DEFINITION_DEPTH;
+                if let Some(at) = call(node, src, &scope, implicit, lambdas) {
                     facts.calls.push(at);
                 }
             }
@@ -1370,8 +1372,9 @@ fn parts<'t>(node: Node<'t>) -> (Option<Node<'t>>, Vec<Node<'t>>) {
     (first, own)
 }
 
-/// The call `node` is, written in `scope`.
-fn call(node: Node, src: &[u8], scope: &str, implicit: Implicit) -> Option<Call> {
+/// The call `node` is, written in `scope`; with `lambdas`, a lambda argument is the
+/// `Kind::Inline` definition the walk gives it.
+fn call(node: Node, src: &[u8], scope: &str, implicit: Implicit, lambdas: bool) -> Option<Call> {
     let (function, args) = parts(node);
     let function = function?;
     let mut callee = callee(function, src);
@@ -1409,32 +1412,52 @@ fn call(node: Node, src: &[u8], scope: &str, implicit: Implicit) -> Option<Call>
         arg_types: Vec::new(),
         uses: Vec::new(),
     };
-    (at.args, at.kwargs) = arguments(&args, src, 0);
+    (at.args, at.kwargs) = arguments(&args, src, 0, lambdas.then_some(scope));
     if function.kind() == "navigation_expression" {
         at.receiver = named(function).next().map(|n| value(n, src, 0));
     }
     Some(at)
 }
 
-/// The arguments as written: positional ones, then named ones (`key = value`).
-fn arguments(nodes: &[Node], src: &[u8], depth: usize) -> (Vec<Value>, Vec<(String, Value)>) {
+/// The arguments as written: positional ones, then named ones (`key = value`). A lambda is the
+/// `Kind::Inline` definition it is under `scope`, when given, and `Unknown` otherwise.
+fn arguments(
+    nodes: &[Node],
+    src: &[u8],
+    depth: usize,
+    scope: Option<&str>,
+) -> (Vec<Value>, Vec<(String, Value)>) {
     let (mut args, mut kwargs) = (Vec::new(), Vec::new());
+    let read = |v: Node| match (v.kind(), scope) {
+        ("lambda_literal", Some(scope)) => {
+            Value::Function(qualify(scope, &format!("@{}", v.start_byte())))
+        }
+        _ => value(v, src, depth + 1),
+    };
     for &node in nodes {
         if node.kind() == "annotated_lambda" {
-            args.push(Value::Unknown);
+            let lambda = named(node).find(|n| n.kind() == "lambda_literal");
+            args.push(lambda.map_or(Value::Unknown, read));
             continue;
         }
         let parts: Vec<Node> = named(node).collect();
         let named_argument = children(node).any(|c| c.kind() == "=");
         match parts[..] {
             [key, v] if named_argument && key.kind() == "identifier" => {
-                kwargs.push((text(key, src).to_string(), value(v, src, depth + 1)));
+                kwargs.push((text(key, src).to_string(), read(v)));
             }
-            [.., v] => args.push(value(v, src, depth + 1)),
+            [.., v] => args.push(read(v)),
             [] => args.push(Value::Unknown),
         }
     }
     (args, kwargs)
+}
+
+/// Whether `node` is a lambda written as an argument of a call, trailing or in parentheses.
+fn argument(node: Node) -> bool {
+    node.kind() == "lambda_literal"
+        && (node.parent())
+            .is_some_and(|p| matches!(p.kind(), "annotated_lambda" | "value_argument"))
 }
 
 /// The annotations written on the declaration `node`, each a call decorating `inner`.
@@ -1462,7 +1485,7 @@ fn annotate(facts: &mut Facts, node: Node, src: &[u8], scope: &str, inner: &str)
         let Some(name) = ty.and_then(|t| type_name(t, src)) else {
             continue;
         };
-        let (positional, keywords) = arguments(&args, src, 0);
+        let (positional, keywords) = arguments(&args, src, 0, None);
         facts.calls.push(Call {
             scope: scope.to_string(),
             callee: name,
@@ -1545,7 +1568,7 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                     .then(|| named(function).next())
                     .flatten()
                     .map(|n| Box::new(value(n, src, depth + 1))),
-                args: arguments(&args, src, depth + 1).0,
+                args: arguments(&args, src, depth + 1, None).0,
                 range: node.byte_range(),
             })
         }

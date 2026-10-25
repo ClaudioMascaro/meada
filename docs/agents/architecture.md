@@ -764,7 +764,8 @@ one for the area a change touches.
   language adapter and the TS/JS, Python, Rust, Go, Java and Kotlin packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`: `Code::origins`, the one origin question, with three evidence policies
   (`Values`, `Constants` for the TypeScript forms, `Declarations` for Go's typed clients and
-  forms), `Code::outside` for what an import from outside binds a name to, and `Code::expand`
+  forms), `Code::outside` for what an import from outside binds a name to, `Code::extensions`
+  for the extension functions a Kotlin call has in scope, and `Code::expand`
   for wrappers, `Expand::Chain` reading a call whole). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs` and its `channel/` submodules
@@ -779,7 +780,8 @@ one for the area a change touches.
   `http/go/clients.rs`, net/http, gin, echo, chi and gorilla/mux providers and their consumers
   with resty; `http/java.rs` and `http/java/clients.rs`, Spring MVC providers and the
   RestTemplate, WebClient, `java.net.http` and OkHttp consumers, whose bases come from the
-  Spring configuration `jvm/spring.rs` reads for the JVM packs' kinds), resource and channel
+  Spring configuration `jvm/spring.rs` reads for the JVM packs' kinds; `http/kotlin.rs`, Ktor
+  providers), resource and channel
   kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
   contracts (specs #22, #24, #30, #25 and #26), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
@@ -1354,7 +1356,10 @@ one for the area a change touches.
   family (`lexical_as` through `blocks`), then the names around it, or stay a name match when
   the block's type is no class of the repository (`unread`). The lambda of `let` or `also` is
   such a scope too, with its parameter (`it`) typed and no block; a lambda in it that declares no
-  parameter is a scope of its own, whose `it` hides the typed one only inside it.
+  parameter is a scope of its own, whose `it` hides the typed one only inside it. Any other
+  lambda written as an argument (trailing or in parentheses) is a `Kind::Inline` scope with no
+  block, as the TypeScript and Rust packs write their closures: the call's argument is its
+  `Value::Function`, so a kind can name it (a Ktor route handler), and it folds otherwise.
   `LanguagePack::is_code` drops from the walk the files of a pack's
   extensions that are no code (Kotlin's `build.gradle.kts` and `settings.gradle.kts`, which the
   package ecosystems read as manifests). A pack that
@@ -1903,6 +1908,24 @@ qualification budget does (ADR 0017).
   (#354), since its annotations are read in the class scope, where an inherited member type
   could shadow the import. A fully qualified annotation without an import (`@javax.ws.rs.GET`)
   and annotations an implementation inherits from an interface are not read.
+- `http/kotlin.rs` (spec #27, #98): Ktor routes, through the same `Mounts` and `prefixes` as
+  the other routers, whose nodes are definitions (file, qualified name): the lambda of each
+  `routing { }` call (a root), the lambda of each `route(prefix) { }` call (mounted under its
+  prefix on the routing scope around the call) and each extension function on Ktor's `Route` or
+  `Routing` (mounted with no segment on each routing scope that calls it through the implicit
+  receiver, so one called under two prefixes serves under both; one nothing calls is served
+  nowhere). The routing scope of a call is the nearest such node around it through lambdas
+  (`Kind::Inline` scopes), stopping at a route's handler. `get`, `post`, `put`, `patch`, `delete`,
+  `head` and `options` with a path or none (the block's path), and `route(path, HttpMethod.X)`,
+  register a route whose handler is the trailing lambda (`handler_site`). The extension called
+  is the nearest one in scope (`Code::extensions`, Kotlin's lookup order: around the call, an
+  explicit import, the package, a star import) whose receiver is Ktor's `Route` or `Routing`:
+  the routing block tells the implicit receiver, which the resolver's own answer for the call
+  (a name match inside a lambda) does not know. A Ktor name counts only when `Code::outside`
+  says an import from `io.ktor.server.routing` (or Ktor 1's `io.ktor.routing`) binds it, and
+  `HttpMethod` from `io.ktor.http`; a name a star import of `io.ktor.server.resources` may bind
+  too is no route, so type-safe routing is not read. Ktor parameters (`{id}`, `{id?}`, `{...}`)
+  fold as actix-web's (`actix_path`).
 - `http/java/clients.rs` (spec #26, #88): a RestTemplate or a WebClient counts by the type the
   source writes for the receiver (`Follow::Declarations`), or, for a WebClient, by the
   `WebClient.create` or `WebClient.builder()` chain it traces to (`Follow::Values`); a name
@@ -2407,7 +2430,7 @@ qualification budget does (ADR 0017).
   `cfg.service(a).route(..)`) is read to that many calls down to what starts it (`Code::chain`),
   and a call past it has no origin, so its route is no provider (the walk is memoized per call,
   linear in the chain). `PREFIX_DEPTH` (64) and `PREFIX_WORK` (4096):
-  `prefixes`, for every kind that mounts (Express, FastAPI, Flask, axum, actix-web, Rocket), reads a router
+  `prefixes`, for every kind that mounts (Express, FastAPI, Flask, axum, actix-web, Rocket, Ktor), reads a router
   nested deeper than the first, or through more mounts than the second, as served nowhere
   rather than under part of its prefixes. A name bound again in its scope (`let mut`,
   shadowing) or assigned again holds no known value, and the routers its `let` holds
@@ -2419,6 +2442,15 @@ qualification budget does (ADR 0017).
   router Meada cannot read. A router handed to a call that is neither a mount nor a wrapper
   of one in its arguments (a router put in a struct, a closure capture) is not told from one
   nothing mounts.
+- `http/kotlin.rs` (spec #27, #98): a lambda past the Kotlin pack's `DEFINITION_DEPTH` is no
+  scope, so what a scope holding a `route` call with no lambda read registers (a route, a
+  routing extension call) is served nowhere, never under part of its prefix. The implicit
+  receiver of a routing block is taken as Ktor's `Route`, kept through any lambda inside the
+  block (`authenticate { }`) but a handler's: a member of `Route` named like an extension of the
+  repository, and an extension of a supertype (`Any`, a type parameter) nearer in scope, are not
+  weighed. Routes nested in `route(path, HttpMethod.X) { }` (its lambda is the handler),
+  `method(HttpMethod.X) { }`, `install(Routing)`, a path passed by name and a path with a string
+  template are not read.
 - Rust values (`lang/rust/values.rs`, `lang/rust/builders.rs`, spec #30 #131): `BUILDER_BUDGET`
   (2^20 syntax nodes per file, over every `let mut`, block by block in the order the blocks
   open), `BUILDER_DEPTH` (64 builders read within

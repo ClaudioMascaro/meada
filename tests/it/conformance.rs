@@ -1551,6 +1551,27 @@ fn kotlin() {
             "src/main/kotlin/example/OneLine.kt::example.Twins",
             "src/main/kotlin/example/OneLine.kt::example.Twins.left()",
             "src/main/kotlin/example/OneLine.kt::example.Twins.right()",
+            // Ktor routes (#98): each inline handler is named for its route.
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /health",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/v1",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().POST /api/v1/items/{}",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().HEAD /api/ping",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes()",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes().DELETE /api/admin/cache",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.prefix()",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.orphan()",
+            "src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()",
+            "src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders",
+            "src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().PATCH /api/admin/orders/{}",
+            "src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.listing()",
+            "src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.fake()",
+            "src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.options(String,()->Unit)",
+            "src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.routing(()->Unit)",
+            "src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Application.typed()",
+            "src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Route.orderRoutes()",
+            "src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Typed",
         ],
         &["src/main/kotlin/example/Main.kt::example.main(Array<String>)"],
         &[
@@ -2210,6 +2231,60 @@ fn kotlin_annotated_class_with_a_one_line_companion_provides_its_mapping() {
     assert_eq!(actual, expected);
 }
 
+/// Ktor routes take the prefix of every enclosing `route` block, through the routing extension
+/// functions called in one (once per prefix), and each is served by its inline handler. Names
+/// like Ktor's without its import, type-safe routing, an unread prefix, an extension function
+/// no routing scope calls and one out of scope serve nothing.
+#[test]
+fn kotlin_ktor_routes_take_every_enclosing_prefix() {
+    let (json, actual) = providers(
+        "kotlin_ktor",
+        "conformance-kotlin",
+        "src/main/kotlin/example/ktor/",
+    );
+    let server = "src/main/kotlin/example/ktor/Server.kt::example.ktor";
+    let module = format!("{server}.Application.module()");
+    let admin = format!("{server}.Route.adminRoutes()");
+    let orders = "src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()";
+    let site = |scope: &str, name: &str| format!("{scope}.{name}");
+    let expected: Vec<(String, String)> = pairs(&[
+        ("http::GET::/health", &site(&module, "GET /health")),
+        ("http::GET::/api/v1", &site(&module, "GET /api/v1")),
+        (
+            "http::POST::/api/v1/items/{}",
+            &site(&module, "POST /api/v1/items/{}"),
+        ),
+        ("http::HEAD::/api/ping", &site(&module, "HEAD /api/ping")),
+        (
+            "http::DELETE::/api/admin/cache",
+            &site(&admin, "DELETE /api/admin/cache"),
+        ),
+        (
+            "http::GET::/api/admin/orders",
+            &site(orders, "GET /api/admin/orders"),
+        ),
+        (
+            "http::GET::/api/v1/orders",
+            &site(orders, "GET /api/admin/orders"),
+        ),
+        (
+            "http::PATCH::/api/admin/orders/{}",
+            &site(orders, "PATCH /api/admin/orders/{}"),
+        ),
+        (
+            "http::PATCH::/api/v1/orders/{}",
+            &site(orders, "PATCH /api/admin/orders/{}"),
+        ),
+    ]);
+    assert_eq!(actual, expected);
+    // A call in a handler belongs to the handler.
+    let calls = json["calls"].as_array().unwrap();
+    let call = |id: &str| calls.iter().find(|c| c["id"] == format!("{REPO}::{id}"));
+    let audit = format!("{module}.POST /api/v1/items/{{}}::(anonymous).audit#0");
+    let found = call(&audit).unwrap_or_else(|| panic!("no call {audit}"));
+    assert_eq!(found["target"], format!("{REPO}::{server}.audit()"));
+}
+
 /// Search finds an extension function by name.
 #[test]
 fn kotlin_search_finds_an_extension_function() {
@@ -2305,6 +2380,39 @@ fn kotlin_scope_functions_on_one_class_stay_linear_in_width() {
     assert_eq!(exact, WIDTH);
     // Quadratic work took 70 s here in debug; linear work, a few.
     eprintln!("kotlin scope functions, {WIDTH} wide: {took:?}");
+    assert!(took < std::time::Duration::from_secs(30), "{took:?}");
+}
+
+/// Ktor `route` blocks nest as deep as prefixes are read. Past the depth where lambdas are
+/// scopes, a route and a routing extension function are served nowhere, never under part of
+/// their prefix, and many calls deep in the blocks index in bounded time.
+#[test]
+fn kotlin_ktor_deep_route_nesting_remains_bounded() {
+    let repo = fixture_repo("kotlin_ktor_depth", "conformance-kotlin", Some(ORIGIN));
+    let head = "package deep\nimport example.ktor.adminRoutes\n\
+                import io.ktor.server.application.Application\nimport io.ktor.server.routing.*\n";
+    let nested = |name: &str, segment: &str, depth: usize, inner: &str| {
+        let mut src = format!("{head}fun Application.{name}() {{\nrouting {{\n");
+        src.push_str(&format!("route(\"/{segment}\") {{\n").repeat(depth));
+        src.push_str(inner);
+        src.push_str(&"}\n".repeat(depth + 2));
+        src
+    };
+    let deep = nested("deep", "a", 40, "get(\"/x\") { }\n");
+    std::fs::write(repo.join("Deep.kt"), deep).unwrap();
+    let past = nested("past", "b", 300, "get(\"/y\") { }\nadminRoutes()\n");
+    std::fs::write(repo.join("Past.kt"), past).unwrap();
+    let started = std::time::Instant::now();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let took = started.elapsed();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let routes: Vec<&str> = (json["providers"].as_array().unwrap().iter())
+        .map(|p| p["contract"].as_str().unwrap())
+        .filter(|c| c.contains("/a/") || c.contains("/b/") || c.contains("/cache"))
+        .collect();
+    let a = format!("http::GET::{}/x", "/a".repeat(40));
+    assert_eq!(routes, ["http::DELETE::/api/admin/cache", a.as_str()]);
+    eprintln!("kotlin ktor routes, 300 deep: {took:?}");
     assert!(took < std::time::Duration::from_secs(30), "{took:?}");
 }
 

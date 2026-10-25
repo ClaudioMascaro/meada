@@ -4552,6 +4552,29 @@ impl<'a> Code<'a> {
         }
     }
 
+    /// The extension functions named `name` that a call of it with `arity` arguments, written in
+    /// `scope` of `path`, has in scope, whatever type they extend, sorted: each with where Kotlin
+    /// finds it, the nearest first (`Resolver::visible`). A kind that knows the implicit receiver
+    /// keeps the nearest of those that extend it.
+    pub fn extensions(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &str,
+        arity: Option<usize>,
+    ) -> Vec<(u8, Target<'a>)> {
+        let r = self.resolver;
+        let fits =
+            |t: &Target<'a>| arity.is_none_or(|n| r.arities.get(t).is_none_or(|a| a.fits(n)));
+        let mut found: Vec<(u8, Target<'a>)> = (r.extensions.get(name).into_iter().flatten())
+            .filter(|e| fits(&e.target))
+            .filter_map(|e| Some((r.visible(path, scope, name, e)?, e.target)))
+            .collect();
+        found.sort();
+        found.dedup();
+        found
+    }
+
     /// The method `method` of the class that `name` (a type, or a name whose class the source
     /// writes), written in `scope` of `path`, is an instance of: looked up through its family and
     /// the other files of its package.

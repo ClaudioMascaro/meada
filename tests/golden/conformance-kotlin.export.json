@@ -54,6 +54,22 @@
       "hash": "d699e6d11262d8ddf57d989928a2fda03a01ef58e3ec2bf3820992cfa8390b88"
     },
     {
+      "path": "src/main/kotlin/example/ktor/Server.kt",
+      "hash": "5d86703741ae07581db0c1bb43bce6daac19bc10a7e99504ae78f587c503e73e"
+    },
+    {
+      "path": "src/main/kotlin/example/ktor/fake/Fake.kt",
+      "hash": "2a1e83088e9a167e123aee9d93839cfe59ff0651bf17ead29dc26faa4e6e81cd"
+    },
+    {
+      "path": "src/main/kotlin/example/ktor/fake/Typed.kt",
+      "hash": "e16644b6965266dae0d18fc9894c84724967210b9fb4fa1916d2b5daef081b7d"
+    },
+    {
+      "path": "src/main/kotlin/example/ktor/orders/OrderRoutes.kt",
+      "hash": "f0aa2c6d332cd715deb2d0a0868fbf325c39cca5f4bfd56edeb398fdf415b511"
+    },
+    {
       "path": "src/main/kotlin/example/legacy/PortExt.kt",
       "hash": "0c818d32b9290b616de0198f5536b71f6d2ef4ce04987394706ff0502b0f8f24"
     },
@@ -1165,6 +1181,166 @@
         "path": "src/main/kotlin/example/ext/Extensions.kt",
         "start": 239,
         "end": 272
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 392,
+        "end": 1148
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/v1",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 571,
+        "end": 633
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /health",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 456,
+        "end": 502
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().HEAD /api/ping",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 910,
+        "end": 1009
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().POST /api/v1/items/{}",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 670,
+        "end": 717
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 1272,
+        "end": 1344
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes().DELETE /api/admin/cache",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 1319,
+        "end": 1342
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.orphan()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 1225,
+        "end": 1270
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 1346,
+        "end": 1360
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.prefix()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 1150,
+        "end": 1177
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.fake()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/fake/Fake.kt",
+        "start": 186,
+        "end": 249
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.options(String,()->Unit)",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/fake/Fake.kt",
+        "start": 130,
+        "end": 184
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.routing(()->Unit)",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/fake/Fake.kt",
+        "start": 88,
+        "end": 128
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Application.typed()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/fake/Typed.kt",
+        "start": 212,
+        "end": 322
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Route.orderRoutes()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/fake/Typed.kt",
+        "start": 415,
+        "end": 464
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Typed",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/fake/Typed.kt",
+        "start": 146,
+        "end": 157
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/orders/OrderRoutes.kt",
+        "start": 330,
+        "end": 519
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/orders/OrderRoutes.kt",
+        "start": 391,
+        "end": 442
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().PATCH /api/admin/orders/{}",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/orders/OrderRoutes.kt",
+        "start": 467,
+        "end": 511
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.listing()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/orders/OrderRoutes.kt",
+        "start": 521,
+        "end": 553
       }
     },
     {
@@ -3423,6 +3599,409 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/v1::call.respondText#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/v1",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 593,
+        "end": 615
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /health::call.respondText#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /health",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 470,
+        "end": 492
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().HEAD /api/ping::(anonymous).handle#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().HEAD /api/ping",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 928,
+        "end": 995
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().HEAD /api/ping::call.respondText#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().HEAD /api/ping",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 957,
+        "end": 977
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().POST /api/v1/items/{}::(anonymous).audit#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().POST /api/v1/items/{}",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 692,
+        "end": 699
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).adminRoutes#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 838,
+        "end": 851
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 441,
+        "end": 502
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).get#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.get(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Mixed.get(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Store.get(String)"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 567,
+        "end": 633
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).get#2",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 1112,
+        "end": 1130
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).orderRoutes#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Route.orderRoutes()",
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 734,
+        "end": 747
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).orderRoutes#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Route.orderRoutes()",
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 808,
+        "end": 821
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).post#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 650,
+        "end": 717
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).prefix#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.prefix()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 1088,
+        "end": 1096
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).route#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 511,
+        "end": 1019
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).route#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 539,
+        "end": 761
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).route#2",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 774,
+        "end": 865
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).route#3",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 878,
+        "end": 1009
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).route#4",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 1082,
+        "end": 1140
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::routing#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.routing(()->Unit)",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 423,
+        "end": 1146
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes().DELETE /api/admin/cache::(anonymous).audit#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes().DELETE /api/admin/cache",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 1329,
+        "end": 1336
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes()::delete#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 1302,
+        "end": 1342
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.orphan()::get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.orphan()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Server.kt",
+        "start": 1250,
+        "end": 1268
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.fake()::(anonymous).options#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.fake()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.options(String,()->Unit)",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/fake/Fake.kt",
+        "start": 221,
+        "end": 241
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.fake()::routing#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.fake()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.routing(()->Unit)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/fake/Fake.kt",
+        "start": 203,
+        "end": 247
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.options(String,()->Unit)::block#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.options(String,()->Unit)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/fake/Fake.kt",
+        "start": 177,
+        "end": 184
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.routing(()->Unit)::block#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.routing(()->Unit)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/fake/Fake.kt",
+        "start": 121,
+        "end": 128
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Application.typed()::(anonymous).route#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Application.typed()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/fake/Typed.kt",
+        "start": 260,
+        "end": 314
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Application.typed()::routing#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Application.typed()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.routing(()->Unit)",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/fake/Typed.kt",
+        "start": 242,
+        "end": 320
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Route.orderRoutes()::get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Route.orderRoutes()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/fake/Typed.kt",
+        "start": 445,
+        "end": 462
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders::(anonymous).listing#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.listing()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/orders/OrderRoutes.kt",
+        "start": 422,
+        "end": 431
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders::call.respondText#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/orders/OrderRoutes.kt",
+        "start": 405,
+        "end": 432
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().PATCH /api/admin/orders/{}::call.respondText#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().PATCH /api/admin/orders/{}",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/orders/OrderRoutes.kt",
+        "start": 481,
+        "end": 501
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()::(anonymous).get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.get(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Mixed.get(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Store.get(String)"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/ktor/orders/OrderRoutes.kt",
+        "start": 387,
+        "end": 442
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()::(anonymous).patch#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/orders/OrderRoutes.kt",
+        "start": 451,
+        "end": 511
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()::route#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/orders/OrderRoutes.kt",
+        "start": 360,
+        "end": 517
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.shared()::closed#0",
       "caller": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.shared()",
       "target": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.closed()",
@@ -3770,12 +4349,20 @@
       "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.any()"
     },
     {
+      "contract": "http::DELETE::/api/admin/cache",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes().DELETE /api/admin/cache"
+    },
+    {
       "contract": "http::DELETE::/api/orders/{}",
       "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.remove()"
     },
     {
       "contract": "http::DELETE::/star/all",
       "site": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.removeAll()"
+    },
+    {
+      "contract": "http::GET::/api/admin/orders",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders"
     },
     {
       "contract": "http::GET::/api/orders",
@@ -3788,6 +4375,18 @@
     {
       "contract": "http::GET::/api/orders/{}",
       "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.fetch(String)"
+    },
+    {
+      "contract": "http::GET::/api/v1",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/v1"
+    },
+    {
+      "contract": "http::GET::/api/v1/orders",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders"
+    },
+    {
+      "contract": "http::GET::/health",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /health"
     },
     {
       "contract": "http::GET::/health/live",
@@ -3822,8 +4421,20 @@
       "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.several()"
     },
     {
+      "contract": "http::HEAD::/api/ping",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().HEAD /api/ping"
+    },
+    {
+      "contract": "http::PATCH::/api/admin/orders/{}",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().PATCH /api/admin/orders/{}"
+    },
+    {
       "contract": "http::PATCH::/api/orders/{}/flag",
       "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.flag()"
+    },
+    {
+      "contract": "http::PATCH::/api/v1/orders/{}",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().PATCH /api/admin/orders/{}"
     },
     {
       "contract": "http::POST::/api/orders/create",
@@ -3836,6 +4447,10 @@
     {
       "contract": "http::POST::/api/orders/single",
       "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.single()"
+    },
+    {
+      "contract": "http::POST::/api/v1/items/{}",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().POST /api/v1/items/{}"
     },
     {
       "contract": "http::POST::/p/c",
@@ -4041,6 +4656,33 @@
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.CharSequence.blankish()",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.T.logged()",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.general(Cache,String)"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/example/ktor",
+      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().POST /api/v1/items/{}",
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes().DELETE /api/admin/cache",
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/example/ktor/fake",
+      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes()",
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.prefix()",
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.fake()",
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.options(String,()->Unit)",
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.routing(()->Unit)",
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Application.typed()"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/example/ktor/orders",
+      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders",
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.listing()"
       ]
     },
     {
@@ -5645,6 +6287,295 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/main/kotlin/example/calls/Imports.kt::example.calls.unknown()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+      "kind": "export",
+      "label": "example.ktor.Application.module()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.routing(()->Unit)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).get#1",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.get(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Mixed.get(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Store.get(String)"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).orderRoutes#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Route.orderRoutes()",
+            "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()::(anonymous).orderRoutes#1",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Route.orderRoutes()",
+            "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.prefix()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/v1::http::GET::/api/v1",
+      "kind": "route",
+      "label": "GET /api/v1",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/v1"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /health::http::GET::/health",
+      "kind": "route",
+      "label": "GET /health",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /health"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().HEAD /api/ping::http::HEAD::/api/ping",
+      "kind": "route",
+      "label": "HEAD /api/ping",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().HEAD /api/ping"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().POST /api/v1/items/{}::http::POST::/api/v1/items/{}",
+      "kind": "route",
+      "label": "POST /api/v1/items/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().POST /api/v1/items/{}"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes().DELETE /api/admin/cache::http::DELETE::/api/admin/cache",
+      "kind": "route",
+      "label": "DELETE /api/admin/cache",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes().DELETE /api/admin/cache"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.orphan()",
+      "kind": "export",
+      "label": "example.ktor.Route.orphan()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.orphan()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.fake()",
+      "kind": "export",
+      "label": "example.ktor.fake.fake()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.fake()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.routing(()->Unit)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.options(String,()->Unit)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Application.typed()",
+      "kind": "export",
+      "label": "example.ktor.fake.typed.Application.typed()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Application.typed()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.routing(()->Unit)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders::http::GET::/api/admin/orders",
+      "kind": "route",
+      "label": "GET /api/admin/orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.listing()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders::http::GET::/api/v1/orders",
+      "kind": "route",
+      "label": "GET /api/v1/orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.listing()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().PATCH /api/admin/orders/{}::http::PATCH::/api/admin/orders/{}",
+      "kind": "route",
+      "label": "PATCH /api/admin/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().PATCH /api/admin/orders/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().PATCH /api/admin/orders/{}::http::PATCH::/api/v1/orders/{}",
+      "kind": "route",
+      "label": "PATCH /api/v1/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().PATCH /api/admin/orders/{}"
         }
       ]
     },
