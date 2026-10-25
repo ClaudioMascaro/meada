@@ -1,11 +1,13 @@
-//! Literal JVM build readers shared by language packs and the Maven package ecosystem, and the
-//! Spring configuration reader the JVM packs' contract kinds share (`spring`).
+//! Literal JVM build readers shared by language packs and the Maven package ecosystem, and what
+//! the JVM packs' contract kinds share: the Spring configuration reader (`spring`) and the
+//! questions they ask of a name a library outside the repository may bind (`names`).
 //! They read only the supplied bytes, never a build tool or another file.
 
 use serde::{Deserialize, Serialize};
 
 pub mod gradle;
 pub mod maven;
+pub mod names;
 pub mod spring;
 
 /// Cross-file Gradle metadata retained in a manifest summary, never the build source text.

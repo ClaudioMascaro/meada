@@ -22,14 +22,14 @@
 // in place are read through.
 
 use super::super::{based, consumer, fetches};
-use super::{REQUEST_METHODS, one};
+use super::REQUEST_METHODS;
 use crate::contract::Found;
 use crate::index::Indexed;
+use crate::jvm::names::{one, spellings, typed};
 use crate::jvm::spring::{self, Configs};
 use crate::lang::{Call, Invocation, Part, Value};
 use crate::resolve::{
-    Code, Expand, Expanded, FLUENT_CHAIN, Follow, Form, Of, Outside, method as member,
-    passes_nothing,
+    Code, Expand, Expanded, FLUENT_CHAIN, Follow, Of, method as member, passes_nothing,
 };
 
 const REST_TEMPLATE: &str = "org.springframework.web.client.RestTemplate";
@@ -372,33 +372,6 @@ fn spring_method(value: Option<&Value>) -> Value {
         },
         Some(Value::Ref(name)) => Value::Ref(name.clone()),
         _ => Value::Unknown,
-    }
-}
-
-/// How the imports of `path` may spell `name`, written in `scope` (`Outside::spellings`).
-pub(super) fn spellings<'a>(
-    code: &Code<'a>,
-    path: &'a str,
-    scope: &'a str,
-    name: &'a str,
-) -> Vec<String> {
-    (code.outside(path, scope, name, false)).map_or_else(Vec::new, Outside::spellings)
-}
-
-/// How the imports may spell the outside type the source writes for `name` (a field, a
-/// parameter, a local): none when it writes no such type.
-pub(super) fn typed<'a>(
-    code: &Code<'a>,
-    path: &'a str,
-    scope: &'a str,
-    name: &'a str,
-) -> Vec<String> {
-    let found = code.origins(path, scope, Of::Name(name), Follow::Declarations);
-    match found.into_iter().next() {
-        Some(o) if o.form == Form::Type && o.routes.iter().all(|r| r.steps.is_empty()) => {
-            o.outside.map_or_else(Vec::new, Outside::spellings)
-        }
-        _ => Vec::new(),
     }
 }
 

@@ -15,6 +15,7 @@ mod declarative;
 use super::{ANY, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
+use crate::jvm::names::known;
 use crate::lang::{Call, Kind, Value};
 use crate::resolve::Code;
 
@@ -203,32 +204,6 @@ fn jax_rs<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
             }
         }
     }
-}
-
-/// The name `name`, written in `scope` of `file`, as a Spring name `is_known` accepts: bound by
-/// an import (single-type or static) from outside, or the one candidate of the on-demand imports
-/// in the table. Two candidates in the table, or none, is no name of Spring's.
-fn known<'a>(
-    code: &Code<'a>,
-    file: &'a str,
-    scope: &'a str,
-    name: &'a str,
-    is_known: impl Fn(&str) -> bool,
-) -> Option<String> {
-    let outside = code.outside(file, scope, name, false)?;
-    let spellings = match outside.candidates.is_empty() {
-        true => vec![outside.spelled],
-        false => outside.candidates,
-    };
-    one(&spellings, is_known).map(str::to_string)
-}
-
-/// The one spelling of a name (`Outside`, `Value::External`) that `is_known` accepts: two of
-/// them, or none, is no name the module knows.
-fn one(spellings: &[String], is_known: impl Fn(&str) -> bool) -> Option<&str> {
-    let mut hits = spellings.iter().filter(|s| is_known(s));
-    let found = hits.next()?;
-    hits.next().is_none().then_some(found.as_str())
 }
 
 /// Whether `spelled` is a Spring annotation this module reads.
@@ -459,6 +434,12 @@ mod tests {
         // and a static on-demand import of an outside class: any of them may be the name.
         let same = [("a/GetMapping.java", "package a; class GetMapping {}")];
         assert_eq!(served_with(WILD, ROUTE, &same), POST);
+        // An annotation type of the package hides it too.
+        let annotation = [(
+            "a/GetMapping.java",
+            "package a; @interface GetMapping { String[] value(); }",
+        )];
+        assert_eq!(served_with(WILD, ROUTE, &annotation), POST);
         let single = format!("{WILD}import org.acme.GetMapping;\n");
         assert_eq!(served(&single, ROUTE), POST);
         let other = [("b/GetMapping.java", "package b; public class GetMapping {}")];

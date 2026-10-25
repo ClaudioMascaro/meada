@@ -794,7 +794,10 @@ pub enum Value {
     /// (spec #23): the name of the schema.
     Schema(String),
     /// The result of `new` on the normalized callee, such as `Kafka` for `new Kafka(...)`, with
-    /// the arguments.
+    /// the arguments. A value written with its type and its fields is one too, the fields as
+    /// one `Object`: a Go composite literal, and a Java annotation written as an element value
+    /// (`@Queue("orders")`, its unnamed element as `value`), which only an annotation's
+    /// arguments hold and the index never keeps.
     New(String, Vec<Value>),
     /// An array, list or tuple literal's items.
     List(Vec<Value>),

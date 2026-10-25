@@ -30,6 +30,10 @@
       "hash": "4455f21194764169c5e5fe0c8dc6bb4024ddbc6d76ce4fa47030e343a0d60f14"
     },
     {
+      "path": "src/events.ts",
+      "hash": "aa885823926b01bb9f51e97ceb75e6a4ab04aabd9f6e0841faeb4f53358b1b5a"
+    },
+    {
       "path": "src/orders.ts",
       "hash": "7e3a8c701891319bf6227916a09aa12b5886d937d7086e69863b67b971e73f79"
     },
@@ -93,6 +97,14 @@
         "path": "app/api/stock/route.ts",
         "start": 7,
         "end": 69
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::src/events.ts::announceShipment",
+      "span": {
+        "path": "src/events.ts",
+        "start": 208,
+        "end": 334
       }
     },
     {
@@ -199,6 +211,39 @@
       }
     },
     {
+      "id": "example.com/xlang-java/web::src/events.ts::Kafka#0",
+      "caller": "example.com/xlang-java/web::src/events.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.ts",
+        "start": 48,
+        "end": 103
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::src/events.ts::announceShipment::producer.send#0",
+      "caller": "example.com/xlang-java/web::src/events.ts::announceShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.ts",
+        "start": 262,
+        "end": 331
+      }
+    },
+    {
+      "id": "example.com/xlang-java/web::src/events.ts::kafka.producer#0",
+      "caller": "example.com/xlang-java/web::src/events.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.ts",
+        "start": 122,
+        "end": 138
+      }
+    },
+    {
       "id": "example.com/xlang-java/web::src/orders.ts::orderStatus::fetch#0",
       "caller": "example.com/xlang-java/web::src/orders.ts::orderStatus",
       "target": null,
@@ -244,6 +289,10 @@
     }
   ],
   "providers": [
+    {
+      "contract": "channel::kafka::orders.shipped",
+      "site": "example.com/xlang-java/web::src/events.ts::announceShipment::producer.send#0"
+    },
     {
       "contract": "http::GET::/api/catalog",
       "site": "example.com/xlang-java/web::app/api/catalog/route.ts::GET",
@@ -407,6 +456,13 @@
       "contract": "http::GET::/api/reports",
       "level": "inferred",
       "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-java/web"
+    },
+    {
+      "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener.onShipment(String)",
+      "provider": "example.com/xlang-java/web::src/events.ts::announceShipment::producer.send#0",
+      "contract": "channel::kafka::orders.shipped",
+      "level": "exact",
+      "reason": "channel::kafka::orders.shipped"
     },
     {
       "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()::(method_invocation).uri#0",

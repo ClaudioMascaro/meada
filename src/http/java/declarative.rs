@@ -22,12 +22,10 @@
 // ponytail: `name` is the literal one (`value`, or the first argument); a placeholder in it is
 // kept as written.
 
-use super::clients::{spellings, typed};
-use super::{
-    MAPPING, SHORTCUTS, VERBS, WEB, balanced, jax_rs_annotation, known, one, paths, request_methods,
-};
+use super::{MAPPING, SHORTCUTS, VERBS, WEB, balanced, jax_rs_annotation, paths, request_methods};
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
+use crate::jvm::names::{known, one, spellings, typed};
 use crate::jvm::spring::{self, Configs};
 use crate::lang::{Call, Facts, Invocation, Kind, Part, Value, literal};
 use crate::resolve::Code;

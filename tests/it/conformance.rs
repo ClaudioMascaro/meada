@@ -212,6 +212,34 @@ fn java() {
             "maven/api/src/main/java/example/web/jaxrs/shadow/Hidden.java::example.web.jaxrs.shadow.Hidden",
             "maven/api/src/main/java/example/web/jaxrs/shadow/Hidden.java::example.web.jaxrs.shadow.Hidden.hidden()",
             "maven/api/src/main/java/example/web/jaxrs/shadow/Hidden.java::example.web.jaxrs.shadow.Hidden.visible()",
+            "maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales",
+            "maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.Sales(KafkaTemplate<String,String>)",
+            "maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.created(String)",
+            "maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.paid(String)",
+            "maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.dynamic(String)",
+            "maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onSale(String)",
+            "maven/api/src/main/java/example/channels/Sales.java::example.channels.Sales.onMissing(String)",
+            "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing",
+            "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.Billing(RabbitTemplate)",
+            "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.invoice(String)",
+            "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.refund(String)",
+            "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()",
+            "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onInvoice(String)",
+            "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)",
+            "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery",
+            "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.Delivery(JmsTemplate,SqsClient,Connection)",
+            "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.notifyCustomer(String)",
+            "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.onNotification(String)",
+            "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)",
+            "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.receive(String)",
+            "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.shipments()",
+            "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.loop(Object)",
+            "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.track(String)",
+            "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.watch(Dispatcher)",
+            "maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams",
+            "maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.Streams(JedisPooled,RedisCommands<String,String>)",
+            "maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.record(String)",
+            "maven/api/src/main/java/example/channels/Streams.java::example.channels.Streams.consume()",
         ],
         &[
             "maven/api/src/main/java/example/Mains.java::example.Mains.Decorated.main(String[])",
@@ -394,6 +422,70 @@ fn java_context_shows_an_unresolved_consumer() {
             .context("example.clients.Rest.lookup()", None)
             .unwrap(),
     );
+}
+
+/// Each Java channel client links its producer to its handler (spec #26, #92): a topic from the
+/// module's Spring configuration, a publish to a named exchange routed by an annotation's and a
+/// configuration's bindings, the default exchange, a NATS wildcard as `inferred`, and a name
+/// that cannot be evaluated left unresolved on both sides.
+#[test]
+fn java_channel_clients_link_their_producers_to_their_handlers() {
+    let repo = fixture_repo("java_channels", "conformance-java", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let short = |site: &str| {
+        let site = site.rsplit("example/channels/").next().unwrap_or(site);
+        site.split_once("::example.channels.")
+            .map_or(site, |(_, s)| s)
+            .to_string()
+    };
+    let links: Vec<String> = (json["links"].as_array().unwrap().iter())
+        .filter(|l| l["contract"].as_str().unwrap().starts_with("channel::"))
+        .map(|l| {
+            let (level, contract) = (
+                l["level"].as_str().unwrap(),
+                l["contract"].as_str().unwrap(),
+            );
+            let (provider, consumer) = (
+                l["provider"].as_str().unwrap(),
+                l["consumer"].as_str().unwrap(),
+            );
+            format!(
+                "{level} {contract} {} -> {}",
+                short(provider),
+                short(consumer)
+            )
+        })
+        .collect();
+    for wanted in [
+        "exact channel::kafka::orders.created Sales.created(String)::kafka.send#0 -> Sales.onSale(String)",
+        "exact channel::kafka::orders.paid Sales.paid(String)::kafka.send#0 -> Sales.onSale(String)",
+        "inferred channel::amqp::invoices Billing.invoice(String)::rabbit.convertAndSend#0 -> Billing.onInvoice(String)",
+        "inferred channel::amqp::audit Billing.invoice(String)::rabbit.convertAndSend#0 -> Billing.onRefund(String)",
+        "exact channel::amqp::refunds Billing.refund(String)::rabbit.convertAndSend#0 -> Billing.onRefund(String)",
+        "exact channel::jms::notifications Delivery.notifyCustomer(String)::jms.convertAndSend#0 -> Delivery.onNotification(String)",
+        "exact channel::sqs::shipments Delivery.ship(String)::sqs.sendMessage#0 -> Delivery.shipments()",
+        "inferred channel::nats::delivery.*.tracked Delivery.track(String)::nats.publish#0 -> Delivery.watch(Dispatcher)",
+        "exact channel::redis::events Streams.record(String)::jedis.xadd#0 -> Streams.consume()",
+        "exact channel::redis::audits Streams.record(String)::lettuce.xadd#0 -> Streams.consume()",
+    ] {
+        assert!(
+            links.contains(&wanted.to_string()),
+            "{wanted} in {links:#?}"
+        );
+    }
+    assert_eq!(links.len(), 10, "{links:#?}");
+    let unresolved = |side: &str| -> Vec<String> {
+        (json[side].as_array().unwrap().iter())
+            .filter(|s| s["contract"] == "channel::kafka")
+            .map(|s| short(s["site"].as_str().unwrap()))
+            .collect()
+    };
+    assert_eq!(
+        unresolved("providers"),
+        ["Sales.dynamic(String)::kafka.send#0"]
+    );
+    assert_eq!(unresolved("consumers"), ["Sales.onMissing(String)"]);
 }
 
 #[test]

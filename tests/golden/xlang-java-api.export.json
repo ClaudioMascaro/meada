@@ -30,6 +30,10 @@
       "hash": "76e84ae1fe9774cf405e3b4d0b71a33ba1e22d8d1668a971a3a0a98707e1dc81"
     },
     {
+      "path": "src/main/java/com/example/api/ShipmentListener.java",
+      "hash": "f99b35d26a7945c4afa6f71c6e0e46721036f190307b54df329362411322a363"
+    },
+    {
       "path": "src/main/java/com/example/api/StockClient.java",
       "hash": "a8c750ec5c85fa8fc3a36a2ee4a9d40b83cdcc4be45e5a14959046ed4a6273cd"
     }
@@ -161,6 +165,30 @@
         "path": "src/main/java/com/example/api/ReportClient.java",
         "start": 235,
         "end": 362
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener",
+      "span": {
+        "path": "src/main/java/com/example/api/ShipmentListener.java",
+        "start": 174,
+        "end": 352
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener.apply(String)",
+      "span": {
+        "path": "src/main/java/com/example/api/ShipmentListener.java",
+        "start": 326,
+        "end": 350
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener.onShipment(String)",
+      "span": {
+        "path": "src/main/java/com/example/api/ShipmentListener.java",
+        "start": 210,
+        "end": 320
       }
     },
     {
@@ -520,6 +548,28 @@
       }
     },
     {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener.onShipment(String)::apply#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener.onShipment(String)",
+      "target": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener.apply(String)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/java/com/example/api/ShipmentListener.java",
+        "start": 304,
+        "end": 313
+      }
+    },
+    {
+      "id": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener::KafkaListener#0",
+      "caller": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/com/example/api/ShipmentListener.java",
+        "start": 210,
+        "end": 255
+      }
+    },
+    {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.StockClient(String)::WebClient.create#0",
       "caller": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.StockClient(String)",
       "target": null,
@@ -621,6 +671,11 @@
       "via": "env:WEB_URL"
     },
     {
+      "contract": "channel::kafka::orders.shipped",
+      "site": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener.onShipment(String)",
+      "via": null
+    },
+    {
       "contract": "http::GET::/api/stock",
       "site": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()::(method_invocation).uri#0",
       "via": "host:web.example.com"
@@ -653,6 +708,13 @@
         "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)",
         "example.com/xlang-java/api::src/main/java/com/example/api/PriceClient.java::com.example.api.PriceClient.priceOf(String)",
         "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()"
+      ]
+    },
+    {
+      "name": "src/main/java/com/example/api#3",
+      "members": [
+        "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener.apply(String)",
+        "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener.onShipment(String)"
       ]
     }
   ],
@@ -698,6 +760,13 @@
       "contract": "http::GET::/api/reports",
       "level": "inferred",
       "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-java/web"
+    },
+    {
+      "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener.onShipment(String)",
+      "provider": "example.com/xlang-java/web::src/events.ts::announceShipment::producer.send#0",
+      "contract": "channel::kafka::orders.shipped",
+      "level": "exact",
+      "reason": "channel::kafka::orders.shipped"
     },
     {
       "consumer": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()::(method_invocation).uri#0",

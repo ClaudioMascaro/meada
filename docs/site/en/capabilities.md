@@ -74,15 +74,18 @@ Resources declared in `meada.toml` also produce contracts. With a `[serve]` tabl
 
 Each producer links to its consumer handlers, including within the same repository.
 
-| Channel | TypeScript / JavaScript | Python | Rust | Go |
-| --- | --- | --- | --- | --- |
-| Kafka | `kafkajs` | `confluent-kafka`, `kafka-python` | `rdkafka` | `segmentio/kafka-go`, `confluent-kafka-go`, `sarama` |
-| RabbitMQ | `amqplib` | `pika` | `lapin` | `amqp091-go` |
-| Amazon SQS | AWS SDK v3, `sqs-consumer` | `boto3` | `aws-sdk-sqs` | `aws-sdk-go-v2` |
-| NATS | `nats` | `nats-py` | `async-nats` | `nats.go` |
-| Redis streams | `ioredis`, `node-redis` | `redis-py` | crate `redis` | `go-redis` |
+| Channel | TypeScript / JavaScript | Python | Rust | Go | Java |
+| --- | --- | --- | --- | --- | --- |
+| Kafka | `kafkajs` | `confluent-kafka`, `kafka-python` | `rdkafka` | `segmentio/kafka-go`, `confluent-kafka-go`, `sarama` | Spring Kafka |
+| RabbitMQ | `amqplib` | `pika` | `lapin` | `amqp091-go` | Spring AMQP |
+| Amazon SQS | AWS SDK v3, `sqs-consumer` | `boto3` | `aws-sdk-sqs` | `aws-sdk-go-v2` | AWS SDK v2 |
+| NATS | `nats` | `nats-py` | `async-nats` | `nats.go` | jnats |
+| Redis streams | `ioredis`, `node-redis` | `redis-py` | crate `redis` | `go-redis` | Jedis, Lettuce |
+| JMS | | | | | Spring JMS |
 
 BullMQ jobs are supported too. In RabbitMQ, a `publish` to an exchange reaches queues through their bindings. NATS supports `*` and `>` wildcards. Broker clusters are not modeled: same-named topics in different clusters can link as though they belonged to one cluster.
+
+In Java, a client counts by the type the code writes for it (`KafkaTemplate`, `RabbitTemplate`, `JmsTemplate`, `SqsClient` or `SqsAsyncClient`, jnats `Connection` or `Dispatcher`, `Jedis`, `JedisPooled`, `UnifiedJedis`, `JedisCluster` and Lettuce's `RedisCommands`, `RedisAsyncCommands` and `RedisReactiveCommands`), and a listener annotation by its Spring import; a repository type with the same name (a class, an interface or an `@interface` annotation) hides it. Producers are `KafkaTemplate.send(topic, ...)`, `RabbitTemplate.convertAndSend(exchange, routingKey, ...)` (with two arguments, or with a `MessagePostProcessor`, it publishes to the default exchange and reaches the queue its key names, or to the configuration's `spring.rabbitmq.template.exchange`), `JmsTemplate.send` and `convertAndSend` with the destination, `sendMessage` with the request's `queueUrl` (the queue is the URL's last segment), `publish(subject, ...)` and `xadd(key, ...)`. Consumers are `@KafkaListener(topics = ...)`, also through `topicPartitions`, `@RabbitListener(queues = ...)`, `queuesToDeclare` and `bindings = @QueueBinding(...)`, whose keys become bindings (on a `direct` `@Exchange`, the default, or a `fanout` one, only keys with no wildcard; on a `headers` one, none), `@JmsListener(destination = ...)`, `receiveMessage`, `subscribe(subject)` and the streams of `xreadGroup` (Jedis, from a `Map.of`) and `xreadgroup` (Lettuce, from `StreamOffset`). `BindingBuilder.bind(new Queue(..)).to(new TopicExchange(..)).with(key)` binds a queue too. An annotation's handler is the annotated method; a polling client's is the method holding the call that names the topic or the queue, even when the receive loop runs in another. Names are evaluated like URLs: constants, `final` fields, a wrapper's arguments, a field with `@Value("${key}")` and the `${key}` placeholders of annotations, read from the module's Spring configuration. A name that does not evaluate (an environment variable, SpEL, an overload the arguments do not tell apart) is an unresolved side.
 
 ## npm packages
 

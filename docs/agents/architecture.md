@@ -763,7 +763,7 @@ one for the area a change touches.
   for wrappers, `Expand::Chain` reading a call whole). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs` and its `channel/` submodules
-  (`channel/message.rs`: the message types and broker helpers; `channel/{ts,python,rust,go}.rs`:
+  (`channel/message.rs`: the message types and broker helpers; `channel/{ts,python,rust,go,java}.rs`:
   the message libraries of each language): the
   `ContractKind` trait and the HTTP kind (`http.rs`: the contract and path rules, the mount
   machinery and the shared consumer readers; one submodule per language: `http/ts.rs` and
@@ -969,7 +969,9 @@ one for the area a change touches.
   `routes![..]` the Rust pack reads as a list of the handlers' paths).
   `Code::returned` and `Code::constant` give a kind the values a call may return and a
   constant holds, for what it must not leave unmounted.
-  `Expand::Chain` is `Code::expand` for a request built by a chain (`http/java/clients.rs`):
+  `Expand::Chain` is `Code::expand` for a request built by a chain (`http/java/clients.rs`; in
+  `channel/java.rs` an SQS request, the stream maps of a Redis group read and a
+  `BindingBuilder` chain):
   the reader gets the call as one `Value::Call`, its receivers and every argument along the
   chain folded with the wrapper's callers bound, and a name an import from outside binds as a
   `Value::External`, spelled (`Outside`, candidates included) in the file that writes it. An
@@ -990,7 +992,11 @@ one for the area a change touches.
   constructor's parameter a `final` field holds (`Const::scope`, the constructor the value is
   written in) is no wrapper's parameter: it is injected or unknown, never climbed. The values
   an injector gives are transient like the arguments they stand for, so the index stays free of
-  them. `jvm/spring.rs` is the one injector (Spring's `@Value`), shared by the JVM packs.
+  them. `jvm/spring.rs` is the one injector (Spring's `@Value`), shared by the JVM packs;
+  `spring::resolved` resolves the placeholders of any other annotation text Spring resolves (a
+  listener's topic or queue). `jvm/names.rs` holds the name questions the JVM kinds share:
+  `one` (exactly one spelling in the kind's table), `known` (a name an import binds),
+  `spellings` and `typed` (the outside type the source writes for a name).
 - New **Go router** (spec #25; net/http, gin, echo, chi and gorilla): a row of `ROUTERS` in
   `http/go.rs` (the package, the functions that make a router, the methods that make a group
   (a `Form`: `Group(prefix)`, chi's `Group(fn)` and `Route(prefix, fn)`, gorilla's
@@ -1061,6 +1067,39 @@ one for the area a change touches.
   `Code::constant` of the writer's name, and a `Topic` field written anywhere in the repository
   (`Code::field_written`, the markers of #79) leaves it unresolved; a writer a function made, or one with no topic, is read from each message. The
   `xlang-go-*` fixtures carry a TypeScript producer to the Go consumer group.
+- **Java channels** (spec #26, #92): `channel/java.rs` lists each client by the outside types
+  the source may write for its receiver (`CLIENTS`: `KafkaTemplate`, `RabbitTemplate`,
+  `JmsTemplate`, the SQS clients, jnats `Connection` and `Dispatcher`, the Jedis clients and
+  Lettuce's `RedisCommands`), read through `jvm::names::typed` and `one`, and the listener
+  annotations (`@KafkaListener`, `@RabbitListener`, `@JmsListener`) through `jvm::names::known`
+  on a method's `Call::decorates`. Names fold through `Code::expand_with` with
+  `jvm::spring::inject` (`Expand::Chain` for an SQS request, a Redis group read and a
+  `BindingBuilder` chain); an annotation's values fold through `Code::value` and its placeholders
+  resolve through `jvm::spring::resolved`. An annotated listener's handler is the method
+  (`Handler::Def`); every other client takes `consume`'s default, the method holding the call
+  that names the topic or queue (the Java pack keeps a lambda's calls in the method that writes
+  it, so a jnats callback is that method too). The overload of `RabbitTemplate.convertAndSend`
+  and `JmsTemplate.convertAndSend` is told by the type of the argument a `MessagePostProcessor`
+  would take (`of`, through `jvm::names::declared`): a name the source types as one, or a `new`
+  of one, picks the routing-key form, and so does a `CorrelationData` there
+  (`(routingKey, message, correlation)`) unless a `MessagePostProcessor` before it makes it
+  `(message, postProcessor, correlation)`; an argument whose type the source does not tell (a
+  lambda, a call, a name with no written type, anything the pack cannot read) leaves the
+  producer unresolved, and a literal or a name of another written type is the message. The two-argument AMQP form publishes to the
+  template's exchange: `spring.rabbitmq.template.exchange` of the module's configuration, else
+  the default exchange, a producer of the queue the key names. An `@Exchange` is `direct`
+  unless its `type` (a string, or a member of `ExchangeTypes` bound by an import) says
+  otherwise: a direct or fanout exchange keeps only the keys with no wildcard word, a headers or
+  custom one none, a topic one, or one whose type is not read, every key; a `DirectExchange` in
+  `BindingBuilder` keeps only a key with no wildcard. The listener annotation is asked first
+  (`jvm::names::known`), and only then whether it is on a method (a set of the file's methods,
+  built once), so a file of many `@Override` methods is read in linear time. The Java pack reads an
+  annotation written as an element value as `Value::New(name, [Object(elements)])`, its unnamed
+  element as `value` (the shape of a Go composite literal; `Code::eval` folds it), only inside
+  an annotation's arguments, which the index never keeps; `channel/java.rs` reads a nested
+  `@QueueBinding`, `@Queue`, `@Exchange` or `@TopicPartition` by its element's key, since Java
+  types an element by the annotation that declares it. `jms` is a broker kind of its own (also
+  AsyncAPI's `jms` protocol), which the Kotlin pack reuses.
 - New **package ecosystem** (spec #22 user story 26, spec #225; track B packs): implement the
   `Ecosystem` trait of `package.rs` in a module of its own under `package/` (`npm`, `pypi`,
   `cargo`, `go`, `maven` today) and add it to `ECOSYSTEMS`; the package kind, the index writer
@@ -1135,9 +1174,9 @@ one for the area a change touches.
   as paths, never opening one, so a symlink changes nothing. A change to what is stored
   re-blesses `tests/golden/schema.txt`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the
-  channel kind's module for that language (TS/JS: `channel/ts.rs`; Python: `channel/python.rs`; Rust: `channel/rust.rs`; Go: `channel/go.rs`), never in the pack, matching a call's
+  channel kind's module for that language (TS/JS: `channel/ts.rs`; Python: `channel/python.rs`; Rust: `channel/rust.rs`; Go: `channel/go.rs`; Java: `channel/java.rs`), never in the pack, matching a call's
   method and the `Code::origins` of its receiver, asked with the policy its language needs (TS/JS:
-  `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Python and Rust:
+  `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Java: the written type, `jvm::names::typed`; Python and Rust:
   `Values`, the constructors named by the file's imports), reading the name through `Code::expand` (a reader that
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
   and giving the handler. A wildcard match (`inferred`, reason `<producer contract> wildcard
@@ -1716,12 +1755,29 @@ one for the area a change touches.
   is found when its third argument is a literal or a name that holds one; any other leaves the
   consumer on the function that calls `Consume`. A queue name is the last segment of the SQS
   queue URL.
+- `channel/java.rs` (spec #26, #92): a client counts only by the type the source writes for its
+  receiver: one a call returns in place (`connection.sync().xadd(..)`), an interface the table
+  does not list (`KafkaOperations`, `AmqpTemplate`, `RedisStreamCommands`) and a `var` with no
+  readable type make no side. A listener annotation on a class (`@KafkaHandler`,
+  `@RabbitHandler` methods), a composed annotation, `@KafkaListeners`, `topicPattern` and an
+  `id`-only listener read no name (one unresolved consumer when the annotation is on a method).
+  A placeholder that resolves to a comma-separated list stays one name. A `RabbitTemplate`
+  whose exchange or routing key the code sets (`setExchange`, `setRoutingKey`) is not read:
+  only the module's `spring.rabbitmq.template.exchange` replaces the default exchange; the
+  one-argument forms and a JMS default destination are unresolved. `BindingBuilder` is read
+  only as `bind(q).to(e).with(key)` with the queue and the exchange written as a `new Queue`,
+  `new TopicExchange` or `new DirectExchange` (through constants and `final` fields); a `@Bean`
+  method's parameter, `QueueBuilder`, `ExchangeBuilder` and a fanout `to(..)` bind nothing, and
+  neither does a `@QueueBinding` without a key. An SQS request built in a lambda
+  (`sendMessage(b -> b.queueUrl(..))`) or held in a local, and Redis streams held in a map
+  variable, are unresolved.
 - `http/java.rs` (spec #26, #86): a Spring MVC route is read from `Call::decorates` on a method
   of a `@RestController` or `@Controller` class, under the class's `@RequestMapping` prefix
   (nested classes do not inherit the outer prefix). An annotation or `RequestMethod.X` counts
   only when `Code::outside` says an import from Spring binds its name: single-type, static, or
   the one on-demand candidate in the kind's table (`Outside::candidates`: `...bind.annotation.*`
-  alone or beside `java.util.*`). A type of the repository with the same name (a nested,
+  alone or beside `java.util.*`). A type of the repository with the same name (a class, an
+  interface or an annotation type, which the Java pack indexes as an interface; a nested,
   same-package or repository-wildcard `GetMapping` or `RequestMethod`), a single-type import of
   another package and two candidates in the table yield no route; the kind reads the enum
   member off the written `Value::Ref`, with no table in the pack. A path folds constants and
