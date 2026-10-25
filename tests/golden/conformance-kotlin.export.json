@@ -86,6 +86,14 @@
       "hash": "913553777de15c7c37f84db37df67915454138d4949f4794df39024c06f8eed0"
     },
     {
+      "path": "src/main/kotlin/example/declarative/Archive.kt",
+      "hash": "8a65d4a94dbbc7184780192982269aa35ba7caaba833f69944c2dec13a50112b"
+    },
+    {
+      "path": "src/main/kotlin/example/declarative/Elsewhere.kt",
+      "hash": "00cba9ccc0ab00de3528b82bdbb9b85564b8a654e32f3dff1bda0d40742d1d40"
+    },
+    {
       "path": "src/main/kotlin/example/declarative/Ledger.kt",
       "hash": "6f0a74f37332f20fbe8fdf2f791019cbd1b9f7ea7f64057456460bdcdac4c684"
     },
@@ -94,12 +102,20 @@
       "hash": "2663683e51821ab4515143bd1c03621a1595f7b7b31c8a854b9e635b5705422a"
     },
     {
+      "path": "src/main/kotlin/example/declarative/Reified.kt",
+      "hash": "9f1d91f93a03419314a0e4efd11cd0e4527a9fcf6d207940adf1e845e3ae0abf"
+    },
+    {
       "path": "src/main/kotlin/example/declarative/Remotes.kt",
       "hash": "1768f8c62c1b16f78b317ed46f5bb04111f9e390c7c8b4cc75aee907dab1f919"
     },
     {
       "path": "src/main/kotlin/example/ext/Extensions.kt",
       "hash": "d699e6d11262d8ddf57d989928a2fda03a01ef58e3ec2bf3820992cfa8390b88"
+    },
+    {
+      "path": "src/main/kotlin/example/jvm/Hidden.kt",
+      "hash": "1f98cd88809b1a3c030711e7fe2c99eb81df809e52e11e7484689b86a0bc15a8"
     },
     {
       "path": "src/main/kotlin/example/jvm/Injected.kt",
@@ -115,7 +131,7 @@
     },
     {
       "path": "src/main/kotlin/example/jvm/Reactive.kt",
-      "hash": "f12e1d02e26d5cff2042d2b4f007ae2f11945b5c19f2e99901a1f0ac932abab2"
+      "hash": "e1aac31628298a42f57c2bd0332931d0565b3f36fe3a86a1a386b7f3df90bb9e"
     },
     {
       "path": "src/main/kotlin/example/jvm/Rest.kt",
@@ -1612,6 +1628,78 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive",
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Archive.kt",
+        "start": 137,
+        "end": 234
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive.find(String)",
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Archive.kt",
+        "start": 161,
+        "end": 232
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal",
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Archive.kt",
+        "start": 288,
+        "end": 388
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal.drop(String)",
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Archive.kt",
+        "start": 312,
+        "end": 386
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes",
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Archive.kt",
+        "start": 480,
+        "end": 546
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes.save()",
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Archive.kt",
+        "start": 502,
+        "end": 544
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere",
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Elsewhere.kt",
+        "start": 222,
+        "end": 385
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere.notes()",
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Elsewhere.kt",
+        "start": 338,
+        "end": 383
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Retrofit.create()",
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Elsewhere.kt",
+        "start": 145,
+        "end": 220
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger",
       "span": {
         "path": "src/main/kotlin/example/declarative/Ledger.kt",
@@ -1649,6 +1737,30 @@
         "path": "src/main/kotlin/example/declarative/Orphan.kt",
         "start": 147,
         "end": 190
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified",
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Reified.kt",
+        "start": 142,
+        "end": 557
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.archive()",
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Reified.kt",
+        "start": 258,
+        "end": 309
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.journal()",
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Reified.kt",
+        "start": 389,
+        "end": 555
       }
     },
     {
@@ -1764,6 +1876,78 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 265,
+        "end": 1486
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.caught()",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 1079,
+        "end": 1311
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.client()",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 726,
+        "end": 812
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.lambda(List<Any>)",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 601,
+        "end": 720
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.local()",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 392,
+        "end": 497
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.loop(List<Any>)",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 912,
+        "end": 1073
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 1375,
+        "end": 1484
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.parameter(Any)",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 503,
+        "end": 595
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.anything()",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 139,
+        "end": 166
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Injected.kt::example.jvm.Injected",
       "span": {
         "path": "src/main/kotlin/example/jvm/Injected.kt",
@@ -1855,24 +2039,24 @@
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other",
       "span": {
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
-        "start": 1120,
-        "end": 1189
+        "start": 1473,
+        "end": 1542
       }
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.get()",
       "span": {
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
-        "start": 1138,
-        "end": 1154
+        "start": 1491,
+        "end": 1507
       }
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
       "span": {
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
-        "start": 1159,
-        "end": 1187
+        "start": 1512,
+        "end": 1540
       }
     },
     {
@@ -1880,7 +2064,15 @@
       "span": {
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
         "start": 384,
-        "end": 1118
+        "end": 1471
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Reactive.kt",
+        "start": 1045,
+        "end": 1216
       }
     },
     {
@@ -1903,16 +2095,16 @@
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.local()",
       "span": {
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
-        "start": 890,
-        "end": 1034
+        "start": 895,
+        "end": 1039
       }
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.other(Other)",
       "span": {
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
-        "start": 1040,
-        "end": 1116
+        "start": 1393,
+        "end": 1469
       }
     },
     {
@@ -1921,6 +2113,14 @@
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
         "start": 693,
         "end": 789
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Reactive.kt",
+        "start": 1222,
+        "end": 1387
       }
     },
     {
@@ -5825,6 +6025,106 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive::GET#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Archive.kt",
+        "start": 161,
+        "end": 181
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal::DELETE#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Archive.kt",
+        "start": 312,
+        "end": 335
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes::PUT#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Archive.kt",
+        "start": 502,
+        "end": 515
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere.notes()::retrofit.create#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere.notes()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Box.Factory.create()",
+        "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Retrofit.create()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.create()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.create()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.create()",
+        "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Elsewhere.kt",
+        "start": 359,
+        "end": 383
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere::(call_expression).baseUrl#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Elsewhere.kt",
+        "start": 268,
+        "end": 324
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere::(call_expression).build#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.build()"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Elsewhere.kt",
+        "start": 268,
+        "end": 332
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere::Retrofit.Builder#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Elsewhere.kt",
+        "start": 268,
+        "end": 286
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Retrofit.create()::IllegalStateException#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Retrofit.create()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Elsewhere.kt",
+        "start": 197,
+        "end": 220
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger::GET#0",
       "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger",
       "target": null,
@@ -5855,6 +6155,110 @@
         "path": "src/main/kotlin/example/declarative/Orphan.kt",
         "start": 147,
         "end": 162
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.archive()::retrofit.create#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.archive()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Box.Factory.create()",
+        "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Retrofit.create()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.create()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.create()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.create()",
+        "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Reified.kt",
+        "start": 283,
+        "end": 309
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.journal()::(call_expression).baseUrl#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.journal()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Reified.kt",
+        "start": 434,
+        "end": 492
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.journal()::(call_expression).build#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.journal()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.build()"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Reified.kt",
+        "start": 434,
+        "end": 500
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.journal()::Retrofit.Builder#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.journal()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Reified.kt",
+        "start": 434,
+        "end": 452
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.journal()::local.create#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.journal()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Reified.kt",
+        "start": 516,
+        "end": 549
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified::(call_expression).baseUrl#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Reified.kt",
+        "start": 186,
+        "end": 244
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified::(call_expression).build#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.build()"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Reified.kt",
+        "start": 186,
+        "end": 252
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified::Retrofit.Builder#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Reified.kt",
+        "start": 186,
+        "end": 204
       }
     },
     {
@@ -6080,6 +6484,256 @@
         "path": "src/main/kotlin/example/declarative/Remotes.kt",
         "start": 525,
         "end": 543
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.caught()::RestTemplate#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.caught()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 1113,
+        "end": 1127
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.caught()::rest.delete#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.caught()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake.delete(String)",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 1154,
+        "end": 1199
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.caught()::rest.delete#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.caught()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake.delete(String)",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 1248,
+        "end": 1295
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.client()::(call_expression).uri#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.client()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 778,
+        "end": 806
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.client()::anything#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.client()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.anything()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 759,
+        "end": 769
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.client()::web.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.client()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan.get()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.get()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.get()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.get()"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 778,
+        "end": 787
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.lambda(List<Any>)::items.forEach#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.lambda(List<Any>)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 640,
+        "end": 714
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.lambda(List<Any>)::rest.delete#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.lambda(List<Any>)",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake.delete(String)",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 664,
+        "end": 712
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.local()::anything#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.local()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.anything()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 425,
+        "end": 435
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.local()::rest.delete#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.local()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake.delete(String)",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 444,
+        "end": 491
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.loop(List<Any>)::(call_expression).uri#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.loop(List<Any>)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 1038,
+        "end": 1067
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.loop(List<Any>)::WebClient.create#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.loop(List<Any>)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 959,
+        "end": 1010
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.loop(List<Any>)::web.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.loop(List<Any>)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan.get()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.get()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.get()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.get()"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 1038,
+        "end": 1047
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()::(call_expression).uri#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 1450,
+        "end": 1478
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()::rest.delete#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 1395,
+        "end": 1441
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()::web.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan.get()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.get()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.get()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.get()"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 1450,
+        "end": 1459
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.parameter(Any)::rest.delete#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.parameter(Any)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 538,
+        "end": 589
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden::RestTemplate#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 303,
+        "end": 317
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden::WebClient.create#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 340,
+        "end": 386
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.anything()::Any#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.anything()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Hidden.kt",
+        "start": 161,
+        "end": 166
       }
     },
     {
@@ -6456,6 +7110,80 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()::(call_expression).baseUrl#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Reactive.kt",
+        "start": 1085,
+        "end": 1147
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()::(call_expression).build#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.build()"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Reactive.kt",
+        "start": 1085,
+        "end": 1155
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()::(call_expression).retrieve#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Reactive.kt",
+        "start": 1164,
+        "end": 1210
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()::(call_expression).uri#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Reactive.kt",
+        "start": 1164,
+        "end": 1199
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()::WebClient.builder#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Reactive.kt",
+        "start": 1085,
+        "end": 1104
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()::client.put#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Reactive.kt",
+        "start": 1164,
+        "end": 1176
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.flag()::(call_expression).retrieve#0",
       "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.flag()",
       "target": null,
@@ -6538,8 +7266,8 @@
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
-        "start": 979,
-        "end": 1028
+        "start": 984,
+        "end": 1033
       }
     },
     {
@@ -6553,8 +7281,8 @@
       ],
       "span": {
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
-        "start": 979,
-        "end": 1017
+        "start": 984,
+        "end": 1022
       }
     },
     {
@@ -6564,8 +7292,8 @@
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
-        "start": 925,
-        "end": 970
+        "start": 930,
+        "end": 975
       }
     },
     {
@@ -6575,8 +7303,8 @@
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
-        "start": 979,
-        "end": 994
+        "start": 984,
+        "end": 999
       }
     },
     {
@@ -6590,8 +7318,8 @@
       ],
       "span": {
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
-        "start": 1075,
-        "end": 1110
+        "start": 1428,
+        "end": 1463
       }
     },
     {
@@ -6601,8 +7329,8 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
-        "start": 1075,
-        "end": 1087
+        "start": 1428,
+        "end": 1440
       }
     },
     {
@@ -6640,6 +7368,54 @@
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
         "start": 715,
         "end": 730
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()::(call_expression).retrieve#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Reactive.kt",
+        "start": 1333,
+        "end": 1381
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()::(call_expression).uri#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Reactive.kt",
+        "start": 1333,
+        "end": 1370
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()::WebClient.create#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Reactive.kt",
+        "start": 1273,
+        "end": 1324
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()::client.patch#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Reactive.kt",
+        "start": 1333,
+        "end": 1347
       }
     },
     {
@@ -8571,6 +9347,21 @@
       "via": "host:orders.example.com"
     },
     {
+      "contract": "http::GET::/archive/{}",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive.find(String)",
+      "via": "host:archive.example.com"
+    },
+    {
+      "contract": "http::DELETE::/journal/{}",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal.drop(String)",
+      "via": "host:journal.example.com"
+    },
+    {
+      "contract": "http::PUT::/notes",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes.save()",
+      "via": null
+    },
+    {
       "contract": "http::GET::/entries/{}",
       "site": "example.com/acme/conformance::src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.entry(String)",
       "via": "env:LEDGER_URL"
@@ -8616,6 +9407,16 @@
       "via": null
     },
     {
+      "contract": "http::GET::/hidden/own",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()::(call_expression).uri#0",
+      "via": "host:hidden.example.com"
+    },
+    {
+      "contract": "http::DELETE::/rest",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()::rest.delete#0",
+      "via": "host:hidden.example.com"
+    },
+    {
       "contract": "http::GET::/a",
       "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Injected.kt::example.jvm.Injected.send()::rest.getForObject#0",
       "via": "host:literal.example.com"
@@ -8656,6 +9457,11 @@
       "via": "host:orders.example.com"
     },
     {
+      "contract": "http::PUT::/reactive/built",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()::(call_expression).uri#0",
+      "via": "host:built-local.example.com"
+    },
+    {
       "contract": "http::PATCH::/reactive/1/flag",
       "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.flag()::(call_expression).uri#0",
       "via": "host:built.example.com"
@@ -8666,9 +9472,19 @@
       "via": "host:orders.example.com"
     },
     {
+      "contract": "http::DELETE::/reactive/local",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.local()::(call_expression).uri#0",
+      "via": "host:local.example.com"
+    },
+    {
       "contract": "http::POST::/reactive",
       "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typed()::(call_expression).uri#0",
       "via": "host:typed.example.com"
+    },
+    {
+      "contract": "http::PATCH::/reactive/typed",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()::(call_expression).uri#0",
+      "via": "host:typed-local.example.com"
     },
     {
       "contract": "http::GET::/rest/local",
@@ -8979,19 +9795,31 @@
     {
       "name": "src/main/kotlin/example/jvm",
       "members": [
-        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.get()",
-        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.other(Other)"
-      ]
-    },
-    {
-      "name": "src/main/kotlin/example/jvm#2",
-      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.caught()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.client()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.lambda(List<Any>)",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.local()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.anything()",
         "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake.delete(String)",
         "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake.probe(Fake,Map<String,String>)"
       ]
     },
     {
+      "name": "src/main/kotlin/example/jvm#2",
+      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.get()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.other(Other)"
+      ]
+    },
+    {
       "name": "src/main/kotlin/example/jvm#3",
+      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()",
+        "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/example/jvm#4",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.drop()",
         "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.remove(String)",
@@ -11630,6 +12458,161 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive.find(String)",
+      "kind": "export",
+      "label": "example.declarative.Archive.find(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive.find(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive.find(String)",
+          "mark": "no-provider",
+          "contract": "http::GET::/archive/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal.drop(String)",
+      "kind": "export",
+      "label": "example.declarative.Journal.drop(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal.drop(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal.drop(String)",
+          "mark": "no-provider",
+          "contract": "http::DELETE::/journal/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes.save()",
+      "kind": "export",
+      "label": "example.declarative.Notes.save()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes.save()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes.save()",
+          "mark": "no-provider",
+          "contract": "http::PUT::/notes"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere.notes()",
+      "kind": "export",
+      "label": "example.declarative.Elsewhere.notes()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere.notes()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere.notes()::retrofit.create#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Box.Factory.create()",
+            "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Retrofit.create()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.create()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.create()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.create()",
+            "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.archive()",
+      "kind": "export",
+      "label": "example.declarative.Reified.archive()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.archive()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.archive()::retrofit.create#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Box.Factory.create()",
+            "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Retrofit.create()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.create()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.create()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.create()",
+            "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.journal()",
+      "kind": "export",
+      "label": "example.declarative.Reified.journal()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.journal()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.journal()::(call_expression).build#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.build()"
+          ]
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Books.open(String)",
       "kind": "export",
       "label": "example.declarative.Books.open(String)",
@@ -11836,6 +12819,235 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.caught()",
+      "kind": "export",
+      "label": "example.jvm.Hidden.caught()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.caught()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake.delete(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.client()",
+      "kind": "export",
+      "label": "example.jvm.Hidden.client()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.client()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.anything()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.client()::(call_expression).uri#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.client()::web.get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan.get()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.get()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.get()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.get()"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.lambda(List<Any>)",
+      "kind": "export",
+      "label": "example.jvm.Hidden.lambda(List<Any>)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.lambda(List<Any>)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake.delete(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.local()",
+      "kind": "export",
+      "label": "example.jvm.Hidden.local()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.local()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.anything()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake.delete(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.loop(List<Any>)",
+      "kind": "export",
+      "label": "example.jvm.Hidden.loop(List<Any>)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.loop(List<Any>)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.loop(List<Any>)::(call_expression).uri#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.loop(List<Any>)::web.get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan.get()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.get()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.get()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.get()"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()",
+      "kind": "export",
+      "label": "example.jvm.Hidden.own()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()::rest.delete#0",
+          "mark": "no-provider",
+          "contract": "http::DELETE::/rest"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()::(call_expression).uri#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()::(call_expression).uri#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/hidden/own"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()::web.get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan.get()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.get()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.get()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.get()"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.parameter(Any)",
+      "kind": "export",
+      "label": "example.jvm.Hidden.parameter(Any)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.parameter(Any)"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Injected.kt::example.jvm.Injected.send()",
       "kind": "export",
       "label": "example.jvm.Injected.send()",
@@ -11864,53 +13076,6 @@
           "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Injected.kt::example.jvm.Injected.send()::rest.getForObject#1",
           "mark": "no-provider",
           "contract": "http::GET::/c"
-        }
-      ]
-    },
-    {
-      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.create()",
-      "kind": "export",
-      "label": "example.jvm.Jdk.create()",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/acme/conformance",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.create()"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/conformance",
-          "level": "ambiguous",
-          "via": "call",
-          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.create()::(call_expression).build#0",
-          "mark": "ambiguous",
-          "candidates": [
-            "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
-            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.build()"
-          ]
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/conformance",
-          "level": null,
-          "via": "call",
-          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.create()::(call_expression).build#0",
-          "mark": "no-provider",
-          "contract": "http::POST::/jdk/new"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/conformance",
-          "level": "ambiguous",
-          "via": "call",
-          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.create()::(call_expression).uri#0",
-          "mark": "ambiguous",
-          "candidates": [
-            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
-            "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
-          ]
         }
       ]
     },
@@ -11946,41 +13111,6 @@
           "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.list()::(call_expression).build#0",
           "mark": "no-provider",
           "contract": "http::GET::/jdk"
-        }
-      ]
-    },
-    {
-      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.create()",
-      "kind": "export",
-      "label": "example.jvm.Ok.create()",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/acme/conformance",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.create()"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/conformance",
-          "level": "ambiguous",
-          "via": "call",
-          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.create()::(call_expression).build#0",
-          "mark": "ambiguous",
-          "candidates": [
-            "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
-            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.build()"
-          ]
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/conformance",
-          "level": null,
-          "via": "call",
-          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.create()::(call_expression).build#0",
-          "mark": "no-provider",
-          "contract": "http::POST::/ok/orders"
         }
       ]
     },
@@ -12116,6 +13246,60 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()",
+      "kind": "export",
+      "label": "example.jvm.Reactive.builtLocal()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()::(call_expression).build#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.build()"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()::(call_expression).uri#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()::(call_expression).uri#0",
+          "mark": "no-provider",
+          "contract": "http::PUT::/reactive/built"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.flag()",
       "kind": "export",
       "label": "example.jvm.Reactive.flag()",
@@ -12173,6 +13357,15 @@
             "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
             "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
           ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.local()::(call_expression).uri#0",
+          "mark": "no-provider",
+          "contract": "http::DELETE::/reactive/local"
         }
       ]
     },
@@ -12241,6 +13434,41 @@
           "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typed()::(call_expression).uri#0",
           "mark": "no-provider",
           "contract": "http::POST::/reactive"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()",
+      "kind": "export",
+      "label": "example.jvm.Reactive.typedLocal()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()::(call_expression).uri#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()::(call_expression).uri#0",
+          "mark": "no-provider",
+          "contract": "http::PATCH::/reactive/typed"
         }
       ]
     },
@@ -12340,38 +13568,6 @@
           "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.change(String)::rest.patchForObject#0",
           "mark": "no-provider",
           "contract": "http::PATCH::/rest/{}/flag"
-        }
-      ]
-    },
-    {
-      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.create()",
-      "kind": "export",
-      "label": "example.jvm.Rest.create()",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/acme/conformance",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.create()"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/conformance",
-          "level": null,
-          "via": "call",
-          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.create()::rest.postForObject#0",
-          "mark": "no-provider",
-          "contract": "http::POST::/rest/new"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/conformance",
-          "level": null,
-          "via": "call",
-          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.create()::rest.postForEntity#0",
-          "mark": "no-provider",
-          "contract": "http::POST::/rest/created"
         }
       ]
     },

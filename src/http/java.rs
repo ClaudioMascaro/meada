@@ -18,7 +18,7 @@ use crate::contract::{Found, Site};
 use crate::index::Indexed;
 use crate::jvm::names::{is_method, java_files, jvm_files, known, local, one, typed};
 use crate::lang::{Bound, Call, Value};
-use crate::resolve::{Code, Follow, Of, passes_nothing};
+use crate::resolve::{Code, Expand, Follow, Inject, Of, passes_nothing};
 
 const WEB: &str = "org.springframework.web.bind.annotation.";
 const CONTROLLERS: &[&str] = &[
@@ -271,6 +271,37 @@ fn reach<'a>(
             .call_index(path, &inner.range)
             .is_some_and(|i| makes(code, path, i)),
         _ => false,
+    }
+}
+
+/// What the local `client` (a name the source writes no type for) holds, folded where it is made:
+/// the chain `WebClient.create(..)` or `Retrofit.Builder()...build()` it is bound to, whose base
+/// a reader joins. `None` for anything but a name bound to exactly one call (Kotlin's
+/// `Facts::bound`, so never in Java) and for a call a wrapper's callers fold to several values.
+fn folded_local<'a>(
+    code: &Code<'a>,
+    (path, scope): (&'a str, &'a str),
+    client: &'a Value,
+    inject: Option<&Inject<'a, '_>>,
+) -> Option<Value> {
+    let (mut scope, mut client) = (scope, client);
+    for _ in 0..LOCAL_DEPTH {
+        let Value::Ref(name) = client else { break };
+        let Bound { within, value, .. } = local(code, path, scope, name)?;
+        (scope, client) = (within, value);
+    }
+    let Value::Call(made) = client else {
+        return None;
+    };
+    let at = code.call_index(path, &made.range)?;
+    let read = |values: &[Value], _: &[(String, Value)]| match values {
+        [call @ Value::Call(_)] => Some(call.clone()),
+        _ => None,
+    };
+    let mut folded = code.expand_with(Expand::Chain(path, at), inject, &read);
+    match folded.len() {
+        1 => folded.pop().map(|f| f.found),
+        _ => None,
     }
 }
 

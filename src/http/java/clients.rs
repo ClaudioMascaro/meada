@@ -22,7 +22,7 @@
 // in place are read through.
 
 use super::super::{based, consumer, fetches};
-use super::{made, member_of};
+use super::{folded_local, made, member_of};
 use crate::contract::Found;
 use crate::index::Indexed;
 use crate::jvm::names::{jvm_files, one, spellings, typed};
@@ -102,11 +102,19 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
             let Some(client) = client(code, path, &facts.calls, n) else {
                 continue;
             };
+            // A client held by a local with no written type: its value, where it is made.
+            let held = match (&client, code.receiver(path, n)) {
+                (Client::Web, Some(Value::Call(request))) => (request.receiver.as_deref())
+                    .and_then(|c| {
+                        folded_local(code, (path, &facts.calls[n].scope), c, Some(&inject))
+                    }),
+                _ => None,
+            };
             let read = |values: &[Value], _: &[(String, Value)]| {
                 let [Value::Call(call)] = values else {
                     return None;
                 };
-                let (url, method) = sends(&client, call);
+                let (url, method) = sends(&client, call, held.as_ref());
                 fetches(&[url, method])
             };
             for Expanded {
@@ -214,7 +222,7 @@ fn client<'a>(code: &Code<'a>, path: &'a str, calls: &'a [Call], index: usize) -
 }
 
 /// The URL and the method of `call`, read whole by `Expand::Chain`, on `client`.
-fn sends(client: &Client, call: &Invocation) -> (Value, Value) {
+fn sends(client: &Client, call: &Invocation, held: Option<&Value>) -> (Value, Value) {
     let text = |m: &str| Value::Str(vec![Part::Text(m.to_string())]);
     match client {
         Client::Rest(method) => {
@@ -237,7 +245,7 @@ fn sends(client: &Client, call: &Invocation) -> (Value, Value) {
                 // A client a wrapper's caller passes: its base is read at each caller.
                 Some(Value::Ref(name)) => (Value::Ref(name.clone()), method),
                 client => (
-                    based(base(client).as_deref(), &url(call.args.first())),
+                    based(base(held.or(client)).as_deref(), &url(call.args.first())),
                     method,
                 ),
             }

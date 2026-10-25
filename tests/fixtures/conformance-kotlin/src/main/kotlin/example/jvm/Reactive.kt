@@ -21,10 +21,20 @@ class Reactive(private val injected: WebClient) {
         injected.post().uri("https://typed.example.com/reactive").retrieve()
     }
 
-    // A local made by a factory call is not read, as in Java: the pack binds no value for it.
+    // A local the source writes no type for holds the call that made it: its base is the client's.
     fun local() {
         val client = WebClient.create("https://local.example.com")
         client.delete().uri("/reactive/local").retrieve()
+    }
+
+    fun builtLocal() {
+        val client = WebClient.builder().baseUrl("https://built-local.example.com").build()
+        client.put().uri("/reactive/built").retrieve()
+    }
+
+    fun typedLocal() {
+        val client: WebClient = WebClient.create("https://typed-local.example.com")
+        client.patch().uri("/reactive/typed").retrieve()
     }
 
     fun other(client: Other) {

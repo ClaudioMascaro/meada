@@ -93,7 +93,11 @@ pub fn local<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &str) -> 
         let held = bound.next();
         let qualified = qualify(s, name);
         let others = bound.next().is_some()
-            || facts.locals.binary_search(&qualified).is_ok()
+            // A `val` of unknown class has its own entry in `locals`: the pack drops its bound
+            // when another binding shares the name. A typed one has a receiver, and no entry.
+            || (facts.locals.binary_search(&qualified).is_ok()
+                && (held.is_none()
+                    || facts.receivers.iter().any(|r| r.scope == s && r.name == name)))
             || (facts.consts.iter()).any(|c| c.name == qualified)
             || (facts.defs.iter()).any(|d| d.name == s && d.params.iter().any(|p| p.name == name))
             || (facts.receivers.iter())
