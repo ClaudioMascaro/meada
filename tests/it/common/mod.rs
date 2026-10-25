@@ -107,6 +107,23 @@ pub fn xlang_go(case: &str) -> (PathBuf, PathBuf) {
     )
 }
 
+/// The web app (TypeScript) and the api service (Java, Spring) of spec #26, in a workspace of
+/// their own under `case`: web first, then api.
+pub fn xlang_java(case: &str) -> (PathBuf, PathBuf) {
+    (
+        fixture_repo(
+            case,
+            "xlang-java-web",
+            Some("https://example.com/xlang-java/web.git"),
+        ),
+        fixture_repo(
+            case,
+            "xlang-java-api",
+            Some("git@example.com:xlang-java/api.git"),
+        ),
+    )
+}
+
 /// The chain with two loose ends added to the catalog's `meada.toml`: a bucket only the
 /// catalog declares, and a write of `orders` through a symbol it does not have. Returns the
 /// gateway, whose workspace holds all four repositories.

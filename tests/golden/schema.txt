@@ -1273,7 +1273,7 @@ sample.java
       "kind": "Class",
       "range": {
         "start": 89,
-        "end": 453
+        "end": 489
       },
       "params": [],
       "bases": [
@@ -1336,6 +1336,15 @@ sample.java
         "end": 451
       },
       "params": []
+    },
+    {
+      "name": "example.Store.reset()",
+      "kind": "Method",
+      "range": {
+        "start": 456,
+        "end": 487
+      },
+      "params": []
     }
   ],
   "overloads": {
@@ -1345,6 +1354,9 @@ sample.java
     ],
     "example.Store.hidden": [
       "example.Store.hidden()"
+    ],
+    "example.Store.reset": [
+      "example.Store.reset()"
     ]
   },
   "constructors": {
@@ -1474,6 +1486,9 @@ sample.java
   "consts": [
     {
       "name": "example.Store.PREFIX"
+    },
+    {
+      "name": ".client"
     }
   ],
   "receivers": [
@@ -1527,7 +1542,8 @@ sample.java
     "var"
   ],
   "hidden": [
-    "example.Store.hidden()"
+    "example.Store.hidden()",
+    "example.Store.reset()"
   ],
   "package": "example"
 }

@@ -499,6 +499,10 @@ block or a field's lambda. The pack sets `base_receiver` (`super`), `unordered_b
 per signature across the C3 family (`Resolver::overloaded`, strict about opaque bases), bare
 calls through `Reading::Method` (`Resolver::inherited`), bare fields through
 `Resolver::inherited_field`, and name matches through the owning family (`Resolver::matched`).
+Fields and methods are separate namespaces where class members are in scope: a name read, not
+called (`Reading::Read`: the head of `repo.save()`, a member read on the way in
+`this.repo.save()`, and every value `Code` folds or traces), sees the field `repo`, never a
+method `repo()`, while a call (`repo()`, `this.repo()`) sees the method (#89).
 
 ## Java source facts (#84)
 
@@ -527,4 +531,10 @@ set, so its first file does not hide another file's public types. Qualified impo
 shared exports, preserving duplicate fully qualified types as ambiguous candidates. `meada-core::parent` ignores dots
 inside signatures when finding the enclosing scope. Calls in lambdas and anonymous classes
 stay with the enclosing definition. Generic annotation calls carry `decorates`, positional
-values and named arguments for the contract kinds to read.
+values and named arguments for the contract kinds to read. The annotations of a field or a
+parameter, which no definition carries, are `Facts::annotated` (transient: the binding they
+mark and the annotation as a call), and every name a file assigns (`f = v`, `x.f = v`) is a
+marker constant `.f` (stored, like Go's), which `Code::field_written` reads (#89). A `static`
+field's annotations are not recorded. A `final` field a constructor assigns keeps that
+constructor as `Const::scope`. `this(..)` and `super(..)` are constructor calls
+(`Call::constructs`) of the class's own name and of its `extends` type.

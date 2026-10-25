@@ -564,6 +564,9 @@ pub struct Indexed<'a> {
     pub exported: &'a [Exported],
     /// The files of every pack, as kept.
     pub files: &'a [&'a str],
+    /// The config files every pack lists (`LanguagePack::config_files`), as read on this
+    /// refresh: path and bytes, which no kind keeps.
+    pub configs: &'a [(&'a str, &'a [u8])],
 }
 
 /// Brings the index up to date with the files a language pack handles under `root`: tracked
@@ -757,11 +760,15 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
     let files: Vec<&str> = all.keys().copied().collect();
     let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
+    let pack_configs: Vec<(&str, &[u8])> = (configs.values().flatten())
+        .map(|(path, src)| (*path, src.as_slice()))
+        .collect();
     let indexed = Indexed {
         manifests: &manifests,
         tsconfigs: &tsconfigs,
         exported: &exported,
         files: &files,
+        configs: &pack_configs,
     };
 
     // Contracts, from every file. Values are not kept in the index, so the files whose

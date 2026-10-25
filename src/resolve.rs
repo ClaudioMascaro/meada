@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
     Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
-    LanguagePack, Modules, Param, Part, Reaches, Star, Step, Taker, Ty, Value,
+    LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker, Ty, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -204,6 +204,10 @@ enum Reading {
     /// that at each class body around it names the methods of the class's family
     /// (`Resolver::inherited`).
     Method,
+    /// A name read, not called: `Value` but that, where class members are in scope (Java), a
+    /// method does not bind it, since fields and methods are separate namespaces (`repo` in
+    /// `repo.save()` is the field `repo`, never a method `repo()`).
+    Read,
 }
 
 impl Reading {
@@ -215,7 +219,10 @@ impl Reading {
     }
 
     fn value(self) -> bool {
-        matches!(self, Reading::Value | Reading::Path | Reading::Method)
+        matches!(
+            self,
+            Reading::Value | Reading::Path | Reading::Method | Reading::Read
+        )
     }
 }
 
@@ -1029,6 +1036,12 @@ impl<'a> Resolver<'a> {
         self.resolve_as(path, scope, callee, seen, work, Reading::Value)
     }
 
+    /// `binding` of a name read, not called (`Reading::Read`).
+    fn read(&self, path: &'a str, scope: &'a str, name: &'a str) -> Binding<'a> {
+        let (seen, work) = (&mut self.seen(path, scope), &mut Work::default());
+        self.resolve_as(path, scope, name, seen, work, Reading::Read)
+    }
+
     /// `binding` of a path (Rust's `store::Store::new`, `Call::by_path`): its head names a
     /// module or a type, which a local or a parameter of the same name does not hide.
     fn path_binding(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Binding<'a> {
@@ -1068,11 +1081,18 @@ impl<'a> Resolver<'a> {
         }
         let lexical = |seen: &mut Seen<'a>| {
             let (head, members) = callee.split_once('.').unwrap_or((callee, ""));
+            // The head of a member chain is read, not called.
+            let head_reading = match reading {
+                Reading::Value | Reading::Any if !members.is_empty() && self.members_in_scope => {
+                    Reading::Read
+                }
+                reading => reading,
+            };
             let binding = match head {
                 _ if Some(head) == self.receiver => self.class(path, scope),
                 _ if Some(head) == self.base_receiver => Binding::Unknown,
                 _ if head.starts_with('(') => Binding::Unknown,
-                _ => self.lexical_as(path, scope, head, seen, reading),
+                _ => self.lexical_as(path, scope, head, seen, head_reading),
             };
             (binding, members)
         };
@@ -1111,10 +1131,14 @@ impl<'a> Resolver<'a> {
     ) -> Binding<'a> {
         let members: Vec<&str> = members.split('.').filter(|m| !m.is_empty()).collect();
         for (n, member) in members.iter().enumerate() {
-            let value = reading.value() && n + 1 == members.len();
+            let last = n + 1 == members.len();
+            let value = reading.value() && last;
+            // A member read on the way, or read last, is no method where fields and methods
+            // are separate namespaces (`Reading::Read`).
+            let read = self.members_in_scope && (!last || reading == Reading::Read);
             binding = match self.instance(binding, work) {
                 Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => {
-                    self.member(t, member, work)
+                    self.member(t, member, read, work)
                 }
                 Binding::Def(t) => match self.def(t.path, &format!("{}.{member}", t.name)) {
                     Binding::Unknown if self.defs[t.path][t.name].kind == Kind::Module => {
@@ -1128,7 +1152,7 @@ impl<'a> Resolver<'a> {
                 {
                     alternatives(
                         all.into_iter()
-                            .map(|t| self.member(t, member, work))
+                            .map(|t| self.member(t, member, read, work))
                             .collect(),
                     )
                     .unwrap_or(Binding::Unknown)
@@ -1319,13 +1343,19 @@ impl<'a> Resolver<'a> {
 
     /// `member` of `class`: the first class of its family that defines it, or binds it as an
     /// attribute; for an overload family, each signature from the first class that declares
-    /// it (`overloaded`). A base whose members are not known, met first, leaves it unknown,
-    /// and so does a family C3 rejects.
-    fn member(&self, class: Target<'a>, member: &'a str, work: &mut Work<'a>) -> Binding<'a> {
+    /// it (`overloaded`), unless the member is `read` (a field, never a method). A base whose
+    /// members are not known, met first, leaves it unknown, and so does a family C3 rejects.
+    fn member(
+        &self,
+        class: Target<'a>,
+        member: &'a str,
+        read: bool,
+        work: &mut Work<'a>,
+    ) -> Binding<'a> {
         let Some(family) = self.family(class, work) else {
             return Binding::Unknown;
         };
-        if let Some(found) = self.overloaded(&family, member) {
+        if !read && let Some(found) = self.overloaded(&family, member) {
             return found;
         }
         for ancestor in family {
@@ -1336,11 +1366,15 @@ impl<'a> Resolver<'a> {
                 return found;
             }
             let qualified = format!("{}.{member}", c.name);
-            let found = self.def(c.path, &qualified);
+            let found = match self.defs[c.path].get_key_value(qualified.as_str()) {
+                Some((name, _)) if read => Binding::Def(Target { path: c.path, name }),
+                _ if read => Binding::Unknown,
+                _ => self.def(c.path, &qualified),
+            };
             if !matches!(found, Binding::Unknown) {
                 return found;
             }
-            if let Some(found) = self.sibling_method(c, &qualified) {
+            if let Some(found) = self.sibling_method(c, &qualified).filter(|_| !read) {
                 return found;
             }
             if let Some(constant) = self.consts[c.path].get(qualified.as_str()) {
@@ -1815,11 +1849,12 @@ impl<'a> Resolver<'a> {
             }
             if let Some((name, def)) = defs.get_key_value(candidate.as_str())
                 && def.kind != Kind::Method
-                && !(def.kind == Kind::Module && reading == Reading::Value)
+                && !(def.kind == Kind::Module && matches!(reading, Reading::Value | Reading::Read))
             {
                 return Binding::Def(Target { path, name });
             }
-            if let Some(overloads) = self.overloads[path].get(candidate.as_str()) {
+            let read = reading == Reading::Read && self.members_in_scope;
+            if !read && let Some(overloads) = self.overloads[path].get(candidate.as_str()) {
                 return match overloads[..] {
                     [one] => Binding::Def(one),
                     _ => Binding::Several(overloads.clone()),
@@ -2050,7 +2085,7 @@ impl<'a> Resolver<'a> {
                 }
             }
             Binding::Def(t) if self.is_class(t) => {
-                let found = self.member(t, name, work);
+                let found = self.member(t, name, false, work);
                 match found {
                     Binding::Def(t) if self.statics.contains(&t) => Binding::Def(t),
                     Binding::Several(all) => one(all
@@ -2720,7 +2755,7 @@ pub struct Expanded<'a, R> {
 }
 
 /// Arguments as written in `path` within `scope`, read on behalf of the call `at`.
-struct Written<'a> {
+struct Written<'a, 'i> {
     path: &'a str,
     scope: &'a str,
     args: &'a [Value],
@@ -2728,6 +2763,8 @@ struct Written<'a> {
     at: (&'a str, usize),
     /// The call read whole, its chain folded (`Expand::Chain`).
     chain: Option<&'a Call>,
+    /// What the kind reads off annotated fields and parameters (`Code::expand_with`).
+    inject: Option<&'i Inject<'a, 'i>>,
 }
 
 /// What folding values and tracing where they come from may cost in one file, charged to the
@@ -2755,13 +2792,23 @@ const EVAL_DEPTH: usize = 256;
 const WRAPPER_DEPTH: usize = 64;
 
 /// Folding one value: the constants being folded (one met again folds to nothing), how deep it
-/// is, and whether calls are folded too, an outside name kept (`Expand::Chain`).
+/// is, whether calls are folded too, an outside name kept (`Expand::Chain`), what the kind
+/// reads off the annotations of a field or a parameter (`Code::expand_with`), and how many of
+/// the constants being folded hold a value written in a function (`Const::scope`), whose
+/// parameters no wrapper frame binds.
 #[derive(Default)]
-struct Fold<'a> {
+struct Fold<'a, 'i> {
     held: Vec<(&'a str, &'a str)>,
     nested: usize,
     chain: bool,
+    inject: Option<&'i Inject<'a, 'i>>,
+    foreign: usize,
 }
+
+/// What a contract kind reads off one annotation written on a field or a parameter
+/// (`Facts::annotated`), given the file and the annotation: the value it injects there, or
+/// `None` when it is no annotation the kind reads.
+pub type Inject<'a, 'i> = dyn Fn(&Code<'a>, &'a str, &'a Call) -> Option<Value> + 'i;
 
 /// How many calls a builder chain is read through, down to what starts it.
 // ponytail: a chain of more builder calls than this is not read to its start; its calls past
@@ -2849,6 +2896,9 @@ pub struct Code<'a> {
     /// The marker constants of the literals that set each field (`field_values`), by field name
     /// (`*` for a literal by position), built the first time a field is read.
     literals: OnceCell<HashMap<&'a str, BTreeSet<(&'a str, &'a str)>>>,
+    /// The last segment of every callee of the repository (`save` of `repo.save`, `C` of
+    /// `(opaque).C`), built the first time a parameter is injected (`Code::may_be_called`).
+    callees: OnceCell<HashSet<&'a str>>,
     pack: &'static dyn LanguagePack,
 }
 
@@ -2989,6 +3039,7 @@ impl<'a> Code<'a> {
             folded: RefCell::new(HashMap::new()),
             by_name: full.keys().map(|&path| (path, OnceCell::new())).collect(),
             literals: OnceCell::new(),
+            callees: OnceCell::new(),
             pack,
         }
     }
@@ -3066,7 +3117,7 @@ impl<'a> Code<'a> {
                 let Some((form, outside, steps)) = self.declared(path, scope, name, 0) else {
                     return Vec::new();
                 };
-                let held = match self.resolver.binding(path, scope, name) {
+                let held = match self.resolver.read(path, scope, name) {
                     Binding::Const(at, constant) => Some((at, constant)),
                     _ => None,
                 };
@@ -3483,7 +3534,7 @@ impl<'a> Code<'a> {
             return None;
         }
         let r = self.resolver;
-        let binding = r.binding(path, scope, name);
+        let binding = r.read(path, scope, name);
         let (at, within, held) = r.holder(&binding)?;
         match r.receivers[at].get(&(within, held))? {
             Class::Type(written) => {
@@ -3519,7 +3570,7 @@ impl<'a> Code<'a> {
     /// The struct field the name `name` (`c.rc`), written in `scope` of `path`, is: the file and
     /// the type that declare it, and the field.
     pub fn field(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<Field<'a>> {
-        let Binding::Local(at, ty, field) = self.resolver.binding(path, scope, name) else {
+        let Binding::Local(at, ty, field) = self.resolver.read(path, scope, name) else {
             return None;
         };
         let class = self.resolver.defs.get(at)?.get(ty)?;
@@ -3822,7 +3873,7 @@ impl<'a> Code<'a> {
     }
 
     fn flow_name(&self, path: &'a str, scope: &'a str, name: &'a str, trail: &mut Trail<'a>) {
-        let binding = self.resolver.binding(path, scope, name);
+        let binding = self.resolver.read(path, scope, name);
         // An attribute assigned a call once in its class (`self.client = Client()`) is a
         // constant of the class.
         let binding = match binding {
@@ -3979,7 +4030,10 @@ impl<'a> Code<'a> {
     fn held(&self, path: &'a str, constant: &'a str) -> Option<(&'a Value, &'a str)> {
         let consts = self.consts(path, constant);
         let held = consts.iter().find(|c| !matches!(c.value, Value::Type(_)))?;
-        Some((&held.value, scope_of(constant)))
+        Some((
+            &held.value,
+            held.scope.as_deref().unwrap_or(scope_of(constant)),
+        ))
     }
 
     /// The `interface` or `type` declaration `name` refers to from `scope` in `path` (spec #23),
@@ -4113,7 +4167,7 @@ impl<'a> Code<'a> {
         let found = r.resolve_as(path, scope, name, seen, work, Reading::Value);
         match r.instance(found, work) {
             Binding::Def(t) | Binding::Instance(t) if r.is_class(t) => {
-                match r.member(t, method, work) {
+                match r.member(t, method, false, work) {
                     Binding::Def(t) => Some(t),
                     _ => None,
                 }
@@ -4157,6 +4211,24 @@ impl<'a> Code<'a> {
         from: Expand<'a>,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
     ) -> Vec<Expanded<'a, R>> {
+        self.expand_with(from, None, read)
+    }
+
+    /// `expand`, with what `inject` reads off the annotations of a field or a parameter
+    /// (`Facts::annotated`) as the value it holds where the source gives it none: a field that
+    /// no file of the repository assigns (`Code::field_written`), and a parameter no wrapper
+    /// frame binds, of a function no exact call reaches. A parameter of a function some exact
+    /// call reaches takes the argument each caller passes, as in `expand`: an injected value
+    /// never stands in for the callers' (a constructor called in the source, with a value or
+    /// an unknown one). A constructor's parameter that a field holds (`Const::scope`) is no
+    /// wrapper's: it is what is injected, or unknown. The injected value is transient, like the
+    /// arguments it stands for.
+    pub fn expand_with<R>(
+        &self,
+        from: Expand<'a>,
+        inject: Option<&Inject<'a, '_>>,
+        read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
+    ) -> Vec<Expanded<'a, R>> {
         let mut out = Vec::new();
         match from {
             Expand::Call(path, index) => {
@@ -4171,6 +4243,7 @@ impl<'a> Code<'a> {
                     kwargs: &call.kwargs,
                     at: (path, index),
                     chain: None,
+                    inject,
                 };
                 self.walk(&written, &mut Vec::new(), read, &mut out);
             }
@@ -4185,6 +4258,7 @@ impl<'a> Code<'a> {
                     kwargs: &call.kwargs,
                     at: (path, index),
                     chain: Some(call),
+                    inject,
                 };
                 self.walk(&written, &mut Vec::new(), read, &mut out);
             }
@@ -4202,6 +4276,7 @@ impl<'a> Code<'a> {
                     kwargs: &[],
                     at,
                     chain: None,
+                    inject,
                 };
                 self.walk(&written, &mut Vec::new(), read, &mut out);
             }
@@ -4211,7 +4286,7 @@ impl<'a> Code<'a> {
 
     fn walk<R>(
         &self,
-        written: &Written<'a>,
+        written: &Written<'a, '_>,
         frames: &mut Vec<Frame<'a>>,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
         out: &mut Vec<Expanded<'a, R>>,
@@ -4232,6 +4307,7 @@ impl<'a> Code<'a> {
         let mut eval = |v: &'a Value| {
             let fold = &mut Fold {
                 chain,
+                inject: written.inject,
                 ..Fold::default()
             };
             self.eval(path, scope, v, frames, 0, fold, &mut wants)
@@ -4298,6 +4374,36 @@ impl<'a> Code<'a> {
         }
     }
 
+    /// Whether a call of the repository may reach `function`, at any level: an exact caller, or
+    /// any call whose callee ends in its name (the class's for a constructor), a name match, a
+    /// call on an opaque receiver and `this(..)` or `super(..)` included.
+    fn may_be_called(&self, function: Target<'a>) -> bool {
+        if (self.resolver.callers.get(&function)).is_some_and(|c| !c.is_empty()) {
+            return true;
+        }
+        let callees = self.callees.get_or_init(|| {
+            (self.resolver.files.values().flat_map(|f| &f.calls))
+                .map(|c| c.callee.rsplit('.').next().unwrap_or(&c.callee))
+                .collect()
+        });
+        let own = function.name[crate::parent(function.name).len()..].trim_start_matches('.');
+        callees.contains(own.split('(').next().unwrap_or(own))
+    }
+
+    /// What `inject` reads off the first annotation of `path` (its full facts) that `marks`
+    /// the binding and that it reads.
+    fn injected(
+        &self,
+        path: &'a str,
+        marks: impl Fn(&Marked) -> bool,
+        inject: &Inject<'a, '_>,
+    ) -> Option<Value> {
+        let annotated = &self.full(path)?.annotated;
+        (annotated.iter())
+            .filter(|a| marks(&a.on))
+            .find_map(|a| inject(self, path, &a.annotation))
+    }
+
     /// `value` with its names folded. `frames[depth..]` bind the parameters of the function
     /// enclosing `scope` and of its callers, innermost first; a parameter no frame binds stays
     /// a `Ref`, and its function is recorded in `wants`. Past `EVAL_DEPTH` or the file's
@@ -4310,7 +4416,7 @@ impl<'a> Code<'a> {
         value: &'a Value,
         frames: &[Frame<'a>],
         depth: usize,
-        fold: &mut Fold<'a>,
+        fold: &mut Fold<'a, '_>,
         wants: &mut Option<Target<'a>>,
     ) -> Value {
         if fold.nested >= EVAL_DEPTH || !self.charge(path, 1) {
@@ -4383,10 +4489,10 @@ impl<'a> Code<'a> {
         name: &'a str,
         frames: &[Frame<'a>],
         depth: usize,
-        fold: &mut Fold<'a>,
+        fold: &mut Fold<'a, '_>,
         wants: &mut Option<Target<'a>>,
     ) -> Value {
-        match self.resolver.binding(path, scope, name) {
+        match self.resolver.read(path, scope, name) {
             Binding::Const(at, constant) => {
                 // `const a = b; const b = a;` folds to nothing.
                 if fold.held.contains(&(at, constant)) || self.resolver.redeclared(at, constant) {
@@ -4395,8 +4501,11 @@ impl<'a> Code<'a> {
                 let Some((value, within)) = self.held(at, constant) else {
                     return Value::Unknown;
                 };
+                let foreign = usize::from(within != scope_of(constant));
                 fold.held.push((at, constant));
+                fold.foreign += foreign;
                 let folded = self.eval(at, within, value, frames, depth, fold, wants);
+                fold.foreign -= foreign;
                 fold.held.pop();
                 folded
             }
@@ -4466,13 +4575,34 @@ impl<'a> Code<'a> {
                         (None, None) => Value::Undefined,
                     }
                 }
-                // ponytail: a parameter of an outer function, captured by a closure, is
-                // unknown; bind it when closures that escape their function matter.
-                Some(_) => Value::Unknown,
-                None => {
+                frame => {
+                    // No frame binds it: what an annotation injects, when no exact call can
+                    // pass it.
+                    let called = self.may_be_called(function);
+                    let marks = |on: &Marked| matches!(on, Marked::Param(f, at) if f == function.name && *at == n);
+                    if let (false, None, Some(inject)) = (called, field, fold.inject)
+                        && let Some(value) = self.injected(function.path, marks, inject)
+                    {
+                        return value;
+                    }
+                    // ponytail: a parameter of an outer function, captured by a closure, is
+                    // unknown; bind it when closures that escape their function matter. So is
+                    // a constructor's parameter a field holds: it is no wrapper's.
+                    if frame.is_some() || fold.foreign > 0 {
+                        return Value::Unknown;
+                    }
                     wants.get_or_insert(function);
                     Value::Ref(name.to_string())
                 }
+            },
+            // A field no file assigns holds what an annotation on it injects.
+            Binding::Local(at, class, field) => match fold.inject {
+                Some(inject) if !self.field_written(field) => {
+                    let marks =
+                        |on: &Marked| matches!(on, Marked::Field(c, f) if c == class && f == field);
+                    self.injected(at, marks, inject).unwrap_or(Value::Unknown)
+                }
+                _ => Value::Unknown,
             },
             Binding::External(..) | Binding::Unknown if fold.chain => {
                 match self.outside(path, scope, name, false) {
@@ -5217,6 +5347,7 @@ mod tests {
             name: name.into(),
             value: Value::Unknown,
             ty: None,
+            scope: None,
         };
         // The constants looked up come after those nothing looks up, so that each lookup walks
         // them.
@@ -7543,6 +7674,25 @@ mod tests {
             calls["p.Outer.Far.m() repo.save"],
             "ambiguous p.Other.save() p.Repo.save()"
         );
+    }
+
+    #[test]
+    fn a_field_and_a_method_of_one_name_keep_their_own_namespaces() {
+        let calls = java_calls(
+            "package p;
+             class Repo { void save() {} }
+             class Other { void save() {} }
+             class Svc {
+                 Repo repo;
+                 Other repo() { return null; }
+                 void run() { repo.save(); this.repo.save(); repo(); this.repo(); }
+             }",
+        );
+        // A receiver read sees the field, a call the method.
+        assert_eq!(calls["p.Svc.run() repo.save"], "exact p.Repo.save()");
+        assert_eq!(calls["p.Svc.run() this.repo.save"], "exact p.Repo.save()");
+        assert_eq!(calls["p.Svc.run() repo"], "exact p.Svc.repo()");
+        assert_eq!(calls["p.Svc.run() this.repo"], "exact p.Svc.repo()");
     }
 
     #[test]

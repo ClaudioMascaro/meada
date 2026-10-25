@@ -37,7 +37,9 @@ pub trait LanguagePack {
     }
 
     /// Repository-relative files that configure how imports name files, such as
-    /// `tsconfig.json`. The shared side reads those present and hands them to `layout`. A name starting with `**/` names every file of that name the walk finds, at
+    /// `tsconfig.json`, or what the pack's contract kinds read (Java's Spring
+    /// `application.properties`, through `Indexed::configs`). The shared side reads those
+    /// present, hands them to `layout` and refreshes the contracts when one changes. A name starting with `**/` names every file of that name the walk finds, at
     /// any depth, in path order (`**/Cargo.toml`: a Cargo workspace's members).
     fn config_files(&self) -> &'static [&'static str];
 
@@ -305,9 +307,30 @@ pub struct Facts {
     /// (`Layout::shared`).
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub package: String,
+    /// The annotations written on fields and parameters (Java's `@Value("${key}") String base`),
+    /// which no definition carries: contract kinds read what they inject (`Code::expand_with`).
+    /// Not kept in the index (see `Call::args`).
+    #[serde(skip)]
+    pub annotated: Vec<Annotated>,
     /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,
+}
+
+/// An annotation written on a field or a parameter: the binding it marks and the annotation as
+/// a call (`callee` its name, `args` and `kwargs` its arguments, `scope` the class around it).
+pub struct Annotated {
+    pub on: Marked,
+    pub annotation: Call,
+}
+
+/// What an annotation marks (`Annotated`).
+#[derive(Clone, PartialEq, Eq)]
+pub enum Marked {
+    /// The field of this name of the class (`Def::name`).
+    Field(String, String),
+    /// The parameter at this position of the function or the constructor (`Def::name`).
+    Param(String, usize),
 }
 
 /// A block whose definitions are members of a type: those named `scope.<member>`. An inherent
@@ -589,6 +612,11 @@ pub struct Const {
     /// Not kept in the index, like `value`.
     #[serde(skip)]
     pub ty: Option<Ty>,
+    /// The scope `value` is written in when it is not the constant's own (`scope_of(name)`):
+    /// a Java `final` field one constructor assigns holds a value written in that constructor.
+    /// Not kept in the index, like `value`.
+    #[serde(skip)]
+    pub scope: Option<String>,
 }
 
 fn unknown() -> Value {
@@ -839,7 +867,7 @@ pub fn literal(parts: &[Part]) -> Option<String> {
         .collect()
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Part {
     Text(String),
     /// A name inside a string, folded like `Value::Ref`.
@@ -847,6 +875,10 @@ pub enum Part {
     /// A read of one environment variable, such as `process.env.X`, through `||`/`??`
     /// fallbacks and string method calls. Its value is never known.
     Env(String),
+    /// A read of one environment variable with the default the source writes for it when the
+    /// variable is unset (Spring's `${X:http://api.example.com}`): the variable and the default's
+    /// parts. Its value is never known, as `Env`'s.
+    EnvOr(String, Vec<Part>),
     /// Any other expression inside a string.
     Hole,
 }

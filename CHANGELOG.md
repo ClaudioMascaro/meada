@@ -8,6 +8,8 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Java field and a method of the same name keep separate namespaces: `repo.save()` and
+  `this.repo.save()` read the field `repo`, `repo()` calls the method.
 - Console manifest groups and validation errors respect the viewer's grant; PKCE redirects
   retain issuer query parameters while replacing generated OAuth keys.
 - Fence recovery shares the fleet reader's Valkey clock and complete heartbeat validation,
@@ -70,6 +72,16 @@ All notable changes to Meada are recorded here. The format follows
   by a single-type import is now spelled as that import names it, and the Java pack keeps a
   `final` field's one value (its initializer or a single constructor assignment) as a constant
   of its class.
+- Java base URLs from Spring configuration (spec #26, #89): a field or a constructor parameter
+  with `@Value("${key}")` holds `key` from the `application.properties`, `application.yml` or
+  `application.yaml` of its module's `src/main/resources` (a shared `jvm::spring` reader the
+  Kotlin pack can call). A literal URL links by host; a `${VAR}` placeholder, and `System.getenv("VAR")`, map
+  through `base_url_env`; with `${VAR:default}`, the default links by host when a peer serves
+  it, otherwise `VAR` maps as before. Meada reads no environment value, and profiles and
+  relaxed binding are not read. A constructor parameter takes Spring's value only when no call
+  in the source creates the class (`this(..)` and `super(..)`, now constructor calls,
+  included). A cross-language chain fixture (TypeScript and Java) is
+  golden for its exports and `trace` both ways.
 
 - A multilingual documentation site (issue #320), with the README reference migrated to
   Portuguese, English and Spanish guides, React Flow maps and roadmap, accessible static and

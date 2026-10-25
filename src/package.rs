@@ -1999,6 +1999,7 @@ mod tests {
                 tsconfigs: &[],
                 exported: &exported,
                 files: &names,
+                configs: &[],
             };
             let found = Packages.extract(&code, &indexed);
             let mut rows: Vec<_> = (found.iter())

@@ -7,7 +7,7 @@ use crate::common;
 
 use std::fs;
 
-use common::{assert_golden, without_processes, xlang, xlang_go, xlang_rust};
+use common::{assert_golden, without_processes, xlang, xlang_go, xlang_java, xlang_rust};
 use meada::engine::{Direction, Engine, Start};
 
 #[test]
@@ -372,4 +372,117 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_go_file() {
         .unwrap();
 
     assert_golden("xlang-go.trace-uncommitted.txt", &answer);
+}
+
+/// The same chain with a Java service (spec #26): the web app (TypeScript, Next.js) reaches the
+/// api (Spring MVC) through `API_URL` and through the api's declared host; the api reaches the
+/// web app with RestTemplate, WebClient and `java.net.http` through bases its Spring
+/// configuration gives `@Value` fields and a constructor parameter (a placeholder, a literal
+/// URL, a placeholder with a default a peer serves and one no peer serves) and through
+/// `System.getenv`.
+#[test]
+fn java_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_host() {
+    let (web, api) = xlang_java("xlang_java_export");
+
+    for (repo, name) in [(web, "web"), (api, "api")] {
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        assert_golden(
+            &format!("xlang-java-{name}.export.json"),
+            &without_processes(&export),
+        );
+    }
+}
+
+#[test]
+fn two_exports_of_the_java_cross_language_fixture_are_byte_identical() {
+    let export = |case| {
+        let (web, api) = xlang_java(case);
+        [web, api].map(|r| Engine::open(&r).unwrap().export().unwrap())
+    };
+
+    assert_eq!(export("xlang_java_twice_a"), export("xlang_java_twice_b"));
+}
+
+#[test]
+fn trace_down_crosses_into_java_and_back_to_typescript() {
+    let (web, _) = xlang_java("xlang_java_down");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("syncOrders"), Direction::Down, None)
+        .unwrap();
+
+    assert_golden("xlang-java.trace-down.txt", &answer);
+}
+
+#[test]
+fn trace_up_crosses_into_java_and_back_to_typescript() {
+    let (web, _) = xlang_java("xlang_java_up");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(
+            Start::From("http::GET::/api/prices/{}"),
+            Direction::Up,
+            None,
+        )
+        .unwrap();
+
+    assert_golden("xlang-java.trace-up.txt", &answer);
+}
+
+#[test]
+fn trace_from_uncommitted_changes_starts_at_an_edited_java_file() {
+    let (_, api) = xlang_java("xlang_java_uncommitted");
+    let controller = api.join("src/main/java/com/example/api/OrderController.java");
+    let edited = fs::read_to_string(&controller).unwrap().replace(
+        "status(@PathVariable String id)",
+        "status(@PathVariable String id, int at)",
+    );
+    fs::write(&controller, edited).unwrap();
+
+    let answer = Engine::open(&api)
+        .unwrap()
+        .trace(Start::Uncommitted, Direction::Up, None)
+        .unwrap();
+
+    assert_golden("xlang-java.trace-uncommitted.txt", &answer);
+}
+
+/// The default's host two repositories serve (a mirror of the web app beside it): the one
+/// reading that applies links ambiguous, and it is one open item, the variable's reading gone.
+#[test]
+fn a_default_whose_host_two_repositories_serve_is_one_open_item() {
+    let (web, api) = xlang_java("xlang_java_ambiguous_default");
+    let mirror = web.parent().unwrap().join("xlang-java-mirror");
+    let _ = fs::remove_dir_all(&mirror);
+    fs::create_dir_all(mirror.join("app/api/audit")).unwrap();
+    fs::write(
+        mirror.join("meada.toml"),
+        "[serve]\nhosts = [\"web.example.com\"]\n",
+    )
+    .unwrap();
+    let route = "app/api/audit/route.ts";
+    fs::copy(web.join(route), mirror.join(route)).unwrap();
+    common::git(&mirror, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    let origin = "https://example.com/xlang-java/mirror.git";
+    common::git(&mirror, &["remote", "add", "origin", origin]);
+    common::git(&mirror, &["add", "-A"]);
+    common::git(&mirror, &["commit", "-q", "-m", "fixture"]);
+    let toml = api.join("meada.toml");
+    let peer = "\n[[peer]]\nrepo = \"example.com/xlang-java/mirror\"\n";
+    fs::write(&toml, fs::read_to_string(&toml).unwrap() + peer).unwrap();
+
+    let items = Engine::open(&api).unwrap().open_items().unwrap();
+
+    let audit: Vec<_> = (items.iter())
+        .filter(|i| i.path.ends_with("AuditClient.java"))
+        .collect();
+    assert_eq!(
+        audit.len(),
+        1,
+        "{:?}",
+        items.iter().map(|i| &i.id).collect::<Vec<_>>()
+    );
+    assert_eq!(audit[0].candidates.len(), 2);
 }
