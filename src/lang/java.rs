@@ -93,8 +93,12 @@ impl LanguagePack for Java {
     fn layout(&self, _configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Result<Layout> {
         let mut packages: BTreeMap<String, Vec<String>> = BTreeMap::new();
         let mut types: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        // What a Kotlin file declares at its top level: functions (by overload family) and
+        // constants, which an import names by fully qualified name too.
+        let mut tops: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for (&path, facts) in files {
-            if facts.unbuilt {
+            // A Kotlin script's declarations are its own: no package or import reaches them.
+            if facts.unbuilt || path.ends_with(".kts") {
                 continue;
             }
             packages
@@ -107,10 +111,25 @@ impl LanguagePack for Java {
                     .or_default()
                     .push(path.to_string());
             }
+            let names = (facts.overloads.keys())
+                .chain(facts.consts.iter().map(|c| &c.name))
+                .filter(|n| !n.starts_with('.') && crate::parent(n) == facts.package);
+            for name in names {
+                let found = tops.entry(name.clone()).or_default();
+                if found.last().map(String::as_str) != Some(path) {
+                    found.push(path.to_string());
+                }
+            }
         }
-        let modules: BTreeMap<String, Vec<String>> = packages
-            .iter()
-            .map(|(name, paths)| (name.clone(), paths.clone()))
+        // A package keeps its files against a top-level declaration of its name (`fun util()`
+        // beside package `util`), whose import then binds nothing; a type wins over both, as
+        // before (Java forbids a type and a package of one name).
+        let modules: BTreeMap<String, Vec<String>> = (tops.into_iter())
+            .chain(
+                packages
+                    .iter()
+                    .map(|(name, paths)| (name.clone(), paths.clone())),
+            )
             .chain(types)
             .collect();
         Ok(Layout {

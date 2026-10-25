@@ -12,6 +12,7 @@ use crate::Result;
 
 pub mod go;
 pub mod java;
+pub mod kotlin;
 pub mod python;
 pub mod rust;
 pub mod ts;
@@ -19,6 +20,20 @@ pub mod ts;
 pub trait LanguagePack {
     /// The file extensions the pack parses, without the dot.
     fn extensions(&self) -> &'static [&'static str];
+
+    /// Whether a file with one of the pack's extensions is code the pack parses: Kotlin's Gradle
+    /// build scripts (`build.gradle.kts`, `settings.gradle.kts`) are manifests, which the
+    /// package ecosystems read instead.
+    fn is_code(&self, _path: &str) -> bool {
+        true
+    }
+
+    /// The pack whose resolution takes this pack's files too, when it is another one: Kotlin's
+    /// files resolve with Java's, in one `Resolver` and one `Code` under that pack's `layout`
+    /// and flags, so calls between them resolve by fully qualified name (`resolver_of`).
+    fn resolves_with(&self) -> Option<&'static dyn LanguagePack> {
+        None
+    }
 
     /// What one file defines, imports, exports and calls. `path` is repository-relative.
     fn parse(&self, path: &str, src: &[u8]) -> Result<Facts>;
@@ -190,6 +205,7 @@ const PACKS: &[&dyn LanguagePack] = &[
     &rust::Rust,
     &go::Go,
     &java::Java,
+    &kotlin::Kotlin,
 ];
 
 /// The index of the pack that parses `path`, if any.
@@ -198,6 +214,15 @@ pub fn pack_for(path: &str) -> Option<usize> {
     PACKS
         .iter()
         .position(|p| p.extensions().contains(&extension))
+        .filter(|&pack| PACKS[pack].is_code(path))
+}
+
+/// The index of the pack whose `Resolver` takes the files of the pack `index`: its own, or the
+/// one it resolves with (`LanguagePack::resolves_with`). Extensions name one pack each.
+pub fn resolver_of(index: usize) -> usize {
+    (PACKS[index].resolves_with())
+        .and_then(|with| (PACKS.iter()).position(|p| p.extensions() == with.extensions()))
+        .unwrap_or(index)
 }
 
 pub fn pack(index: usize) -> &'static dyn LanguagePack {
@@ -584,8 +609,11 @@ pub enum Binds {
     Any,
     /// Only a keyword argument: a Python parameter after `*` or `*args`.
     Keyword,
-    /// No single argument: Python's `*args` and `**kwargs`.
+    /// No single argument: Python's `*args` and `**kwargs`, Kotlin's `vararg`.
     Rest,
+    /// A positional or a keyword argument that a call may leave out: a Kotlin parameter with a
+    /// default value. The argument counts an overload takes (`Resolver::narrow`) allow for it.
+    Optional,
     /// The receiver of a method (`self`): a call on an instance binds it, so its positional
     /// arguments start at the next parameter; a call on the class passes it first.
     Instance,

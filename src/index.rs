@@ -720,13 +720,15 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .chain(kept.iter().map(|(path, facts)| (path.as_str(), facts)))
         .collect();
 
-    // Calls resolve among the files of their own pack, those the pack builds.
+    // Calls resolve among the files of their own pack, those the pack builds, and of the packs
+    // that resolve with it (`lang::resolver_of`): groups are keyed by that pack.
     let mut groups: BTreeMap<usize, BTreeMap<&str, &Facts>> = BTreeMap::new();
     for (&path, &facts) in &parsed {
-        groups.entry(packs[path]).or_default().insert(path, facts);
+        let group = lang::resolver_of(packs[path]);
+        groups.entry(group).or_default().insert(path, facts);
     }
     let found_configs = |pack: usize| -> Vec<(&str, &[u8])> {
-        (configs[&pack].iter())
+        (configs.get(&pack).into_iter().flatten())
             .map(|(n, c)| (*n, c.as_slice()))
             .collect()
     };
@@ -820,7 +822,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         order.reverse();
     }
     for (&path, &facts) in order {
-        let rows = resolve_file(identity, path, facts, &resolvers[&packs[path]], &names);
+        let resolver = &resolvers[&lang::resolver_of(packs[path])];
+        let rows = resolve_file(identity, path, facts, resolver, &names);
         symbols.extend(rows.symbols.iter().map(|(id, ..)| id.clone()));
         for call in &rows.calls {
             // A self-call is no caller: recursion keeps an exported function a door.

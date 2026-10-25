@@ -756,7 +756,7 @@ one for the area a change touches.
   one, never a missing or empty file; `refresh` stays one transaction in place. An operator
   renames an index in (built elsewhere) only while no `meada index` writes that index, one
   writer per index: a refresh's live `index.db-journal` would be taken for the new file's. `lang/`: the
-  language adapter and the TS/JS, Python, Rust, Go and Java packs. `resolve.rs`: calls to definitions (`Resolver`), values
+  language adapter and the TS/JS, Python, Rust, Go, Java and Kotlin packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`: `Code::origins`, the one origin question, with three evidence policies
   (`Values`, `Constants` for the TypeScript forms, `Declarations` for Go's typed clients and
   forms), `Code::outside` for what an import from outside binds a name to, and `Code::expand`
@@ -1305,7 +1305,31 @@ one for the area a change touches.
   its family), `Facts::receivers` (the class each binding gives a name), `Facts::star` (what a
   star import takes), `stars_bind` (whether a star import rebinds names in statement order, as
   Python's does, or only re-exports, as an ES `export *` does) and `Param::binds` (which
-  argument binds each parameter). A pack that
+  argument binds each parameter; `Binds::Optional`, a Kotlin parameter with a default value, and
+  `Binds::Rest` widen the argument counts an overload takes, `Arity` in `Resolver::narrow`). A pack
+  whose files resolve with another pack's says so through `LanguagePack::resolves_with` (Kotlin
+  with Java): `refresh` keys its resolution groups by `lang::resolver_of`, so one `Resolver` and
+  one `Code` built from that pack's `layout` and flags take both packs' files, and calls between
+  the two languages resolve by fully qualified name. The joining pack's own flags and `layout` are
+  not read, and its files reach the contract kinds through that pack's `Code` (the Java kinds read
+  `.java` files alone until a Kotlin form names its own). This keeps one resolver per repository
+  and pack group, with no new invariant (ADR 0002). Java's `layout` therefore also maps a Kotlin
+  file's top-level overload families and constants by fully qualified name, and a Kotlin class
+  joins its own name's overload family with its primary constructor's parameters, so calling the
+  class constructs it. A companion object is written as its class's last base: `Resolver::lineage`
+  keeps a class's own nested class out of its family, so the companion's bases lend nothing to
+  instances, and `Resolver::companion` reads it after the family, for a bare call in the class
+  (`inherited`) and a member of the class (`member`, so `Type.create()`); `Resolver::member` finds
+  a class nested in a class while that class's family is still being linearized, which resolving
+  such a base needs. A bare Kotlin call is `Call::by_path`, as Java's, so it reads the class family
+  first, unless a local, parameter, property or constant of its name in a scope around it holds
+  what it invokes (`bare_calls`). Java's `layout` gives a package's files before a Kotlin
+  top-level declaration of the same fully qualified name, and leaves `.kts` scripts out of every
+  package, since a script's declarations are its own (the Kotlin pack exports none of them). A
+  Kotlin `object` has an `INSTANCE` property of its own type, which Java calls go through.
+  `LanguagePack::is_code` drops from the walk the files of a pack's
+  extensions that are no code (Kotlin's `build.gradle.kts` and `settings.gradle.kts`, which the
+  package ecosystems read as manifests). A pack that
   writes none of them (TypeScript writes no bases or receivers) gets name matches where those
   would have resolved. A language whose files are not all built, or whose imports name files by
   a tree spread over several files (Rust's crates and `mod` declarations), says so through
@@ -1319,7 +1343,7 @@ one for the area a change touches.
   and `Layout::programs` (both below), and `Layout::reaches` (default: none, every file), the
   files a name match may reach from a caller (`Resolver::reaching`, called by `refresh`):
   Rust's are its crate's and those of the repository's libraries it depends on. A language whose
-  files share one scope (a Go package: the files of one directory that declare one package; Java packages; Kotlin and C# packages next) says which through `Layout::shared`, groups of files that
+  files share one scope (a Go package: the files of one directory that declare one package; Java and Kotlin packages, which share the Java layout; C# packages next) says which through `Layout::shared`, groups of files that
   `Resolver::with_shared` takes: a name a file and its imports leave unbound is looked up
   among the top-level definitions and constants of the others in its group, private ones
   included (`Resolver::sibling`, at the end of `lexical_as`), and an import that names any
@@ -1603,6 +1627,26 @@ one for the area a change touches.
   exceeds this budget contributes no facts or package layout, so an incomplete overload
   family cannot produce an exact link; other files still index. The Java hostile-depth and
   long-prefix engine fixtures exceed these limits.
+
+- `lang/kotlin.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
+  `QUALIFICATION_BYTES` (4 MiB) bound the Kotlin pack as they bound the Java pack's, with the same
+  outcome past each; the Kotlin hostile-depth and long-prefix engine fixtures exceed them. Beyond
+  the limits, what the pack leaves out (spec #27, #95): a bare or `this` call inside a lambda, an
+  object literal or an enum entry's body may reach an implicit receiver no syntax names, so it is
+  read as a name match (`(anonymous).f`), never `exact`; scope functions are #96. A companion is
+  its class's last base, so `Type.m()` reads the class's own instance member first when both
+  declare `m` with one signature. A star import of a class (`import a.C.*`) reads every export of
+  the class's file. A fully qualified function call (`example.helper()`) is a name match. A class
+  with a secondary constructor is not in its name's overload family, so calling it resolves to
+  nothing. A single import of a top-level declaration named like a package of the repository
+  (`import app.config` beside package `app.config`) binds nothing, since the package keeps the
+  name. A property of function type that a base class declares, invoked by bare name, is read as
+  a method call. A companion's outside base leaves the companion's members unknown, so
+  `Type.create()` then resolves to nothing (Opaque outside, strict, as Java's #353). Kotlin files
+  resolve with Java's flags, so `java.lang.Object`'s members are the implicit members of a Kotlin
+  class too: a bare `notify()` in a class is unknown. A star import of a Java package from Kotlin sees its
+  package-private classes. The Spring configuration files are read for the Java pack only
+  (`config_files` is empty) until a Kotlin form needs them.
 
 - `snapshot/pull.rs`: a generation's bundles hold at most `GENERATION_BYTES_MAX` (256 GiB)
   together, as the document records their sizes (checked before any download) and as the

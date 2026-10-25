@@ -293,7 +293,8 @@ pub struct Resolver<'a> {
     defs: HashMap<&'a str, HashMap<&'a str, &'a Def>>,
     overloads: HashMap<&'a str, HashMap<&'a str, Vec<Target<'a>>>>,
     constructors: HashMap<&'a str, HashMap<&'a str, Vec<Target<'a>>>>,
-    arities: HashMap<Target<'a>, usize>,
+    /// The argument counts each overload takes, fewest to most (`Arity`).
+    arities: HashMap<Target<'a>, Arity>,
     statics: HashSet<Target<'a>>,
     members_in_scope: bool,
     unordered_globs: bool,
@@ -366,6 +367,33 @@ pub struct Resolver<'a> {
     groups: Vec<Group<'a>>,
 }
 
+/// Whether `inner` is a class nested directly in the class `outer`.
+fn nested_in(inner: Target, outer: Target) -> bool {
+    inner.path == outer.path && crate::parent(inner.name) == outer.name
+}
+
+/// The argument counts a function takes: one per parameter, fewer for the ones a call may leave
+/// out (`Binds::Optional`), and any number more for a `Binds::Rest` one (Kotlin's `vararg`).
+#[derive(Clone, Copy)]
+struct Arity {
+    least: usize,
+    most: Option<usize>,
+}
+
+impl Arity {
+    fn of(params: &[Param]) -> Self {
+        let required = |p: &&Param| !matches!(p.binds, Binds::Optional | Binds::Rest);
+        Arity {
+            least: params.iter().filter(required).count(),
+            most: (!params.iter().any(|p| p.binds == Binds::Rest)).then_some(params.len()),
+        }
+    }
+
+    fn fits(self, arity: usize) -> bool {
+        self.least <= arity && self.most.is_none_or(|most| arity <= most)
+    }
+}
+
 /// Files that share one top-level scope (`Layout::shared`), sorted, and the files whose top
 /// level binds each name: a definition that is no method, or a constant.
 struct Group<'a> {
@@ -427,7 +455,7 @@ impl<'a> Resolver<'a> {
                                 .filter_map(|name| {
                                     let (&name, def) = defs[path].get_key_value(name.as_str())?;
                                     let target = Target { path, name };
-                                    arities.insert(target, def.params.len());
+                                    arities.insert(target, Arity::of(&def.params));
                                     Some(target)
                                 })
                                 .collect();
@@ -939,7 +967,7 @@ impl<'a> Resolver<'a> {
 
     fn narrow(&self, binding: Binding<'a>, arity: Option<usize>) -> Binding<'a> {
         let Some(arity) = arity else { return binding };
-        let fits = |t: &Target<'a>| self.arities.get(t).is_none_or(|n| *n == arity);
+        let fits = |t: &Target<'a>| self.arities.get(t).is_none_or(|n| n.fits(arity));
         match binding {
             Binding::Def(t) if !fits(&t) => Binding::Unknown,
             Binding::Several(all) => match all.into_iter().filter(fits).collect::<Vec<_>>()[..] {
@@ -1353,7 +1381,16 @@ impl<'a> Resolver<'a> {
         work: &mut Work<'a>,
     ) -> Binding<'a> {
         let Some(family) = self.family(class, work) else {
-            return Binding::Unknown;
+            // A class nested in the class is its own, whatever its bases: found while the family
+            // is being linearized too (a Kotlin companion, written as a base of its class).
+            let qualified = format!("{}.{member}", class.name);
+            return match self.defs[class.path].get_key_value(qualified.as_str()) {
+                Some((name, def)) if def.kind == Kind::Class => Binding::Def(Target {
+                    path: class.path,
+                    name,
+                }),
+                _ => Binding::Unknown,
+            };
         };
         if !read && let Some(found) = self.overloaded(&family, member) {
             return found;
@@ -1384,7 +1421,10 @@ impl<'a> Resolver<'a> {
                 return Binding::Local(c.path, c.name, member);
             }
         }
-        Binding::Unknown
+        match self.companion(class, work) {
+            Some(companion) => self.member(companion, member, read, work),
+            None => Binding::Unknown,
+        }
     }
 
     /// The overloads of `member` a family declares (`Facts::overloads`), as `member` reads a
@@ -1487,8 +1527,33 @@ impl<'a> Resolver<'a> {
             {
                 Some(Binding::Unknown)
             }
+            None => {
+                let class = Target { path, name: class };
+                let companion = self.companion(class, &mut Work::default())?;
+                self.inherited(companion.path, companion.name, name)
+            }
             found => found,
         }
+    }
+
+    /// The class nested in `class` that `class` writes as a base: a Kotlin companion object,
+    /// whose members a call on the class's name and a bare call in it reach after the class's
+    /// own family. No other language can write one (a class extending its own nested class is a
+    /// cycle in Java), so the written bases are checked by name before any is resolved.
+    fn companion(&self, class: Target<'a>, work: &mut Work<'a>) -> Option<Target<'a>> {
+        let defs = &self.defs[class.path];
+        let nested = |b: &String| {
+            b.rsplit_once('.').is_some_and(|(_, last)| {
+                defs.contains_key(format!("{}.{last}", class.name).as_str())
+            })
+        };
+        if !defs[class.name].bases.iter().any(nested) {
+            return None;
+        }
+        (self.bases(class, work).into_iter()).find_map(|b| match b {
+            Ancestor::Class(b) if nested_in(b, class) => Some(b),
+            _ => None,
+        })
     }
 
     /// The method `qualified` (`Type.method`) of `class` that another file of its package
@@ -1567,11 +1632,14 @@ impl<'a> Resolver<'a> {
             return Err(Cut);
         }
         work.busy.push(key);
-        let bases = self.bases(class, work);
+        let mut bases = self.bases(class, work);
         if work.cut {
             work.busy.pop();
             return Err(Cut);
         }
+        // A class nested in the class and written as its base (a Kotlin companion object) is
+        // no ancestor of its instances: `Resolver::companion` reads it after the family.
+        bases.retain(|b| !matches!(b, Ancestor::Class(b) if nested_in(*b, class)));
         let mut lists = Vec::new();
         for base in &bases {
             lists.push(match base {
@@ -1698,7 +1766,7 @@ impl<'a> Resolver<'a> {
             found.retain(|t| reaches(path, t.path));
         }
         if let Some(arity) = arity {
-            found.retain(|t| self.arities.get(t).is_none_or(|n| *n == arity));
+            found.retain(|t| self.arities.get(t).is_none_or(|n| n.fits(arity)));
         }
         found
     }
@@ -3742,7 +3810,7 @@ impl<'a> Code<'a> {
         match param.binds {
             Binds::Rest => None,
             Binds::Keyword => call.keyword(&param.name),
-            Binds::Any | Binds::Instance | Binds::Class => (position)
+            Binds::Any | Binds::Optional | Binds::Instance | Binds::Class => (position)
                 .and_then(|at| call.args.get(at))
                 .or_else(|| call.keyword(&param.name)),
         }
