@@ -31,4 +31,20 @@ fun Application.configured() {
     }
 }
 
+// `set(` with a lambda on the same line, with and without a space before the parenthesis.
+fun Application.keyed() {
+    val key = "k"
+    set("k") { audit() }
+}
+
+fun Application.spaced() {
+    val key = "k"
+    set ("k") { audit() }
+}
+
+fun Application.spacedPair() {
+    val key = "k"
+    set ("k", key)
+}
+
 fun afterLocals() {}

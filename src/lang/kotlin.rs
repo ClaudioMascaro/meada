@@ -1731,4 +1731,39 @@ fun after() {}
             ]
         );
     }
+
+    #[test]
+    fn a_setter_parameter_is_any_name() {
+        // The scanner patch reads `set(` as a setter only before a name: non-ASCII letters,
+        // `_` and backticked names are names, and a space before the parenthesis is allowed.
+        let src = "package a
+class A {
+    var p: Int = 0
+        get() = field
+        set(значение) { field = значение }
+    var q: Int = 0
+        get() = field
+        set(ñ) { field = ñ }
+    var r: Int = 0
+        get() = field
+        set(_v) { field = _v }
+    var s: Int = 0
+        get() = field
+        set(`odd name`) { field = `odd name` }
+    var t: Int = 0
+        get() = field
+        set (v) { field = v }
+    fun z() {}
+}
+";
+        let facts = parse(src.as_bytes(), false).unwrap();
+        let mut names: Vec<&str> = facts.defs.iter().map(|d| d.name.as_str()).collect();
+        names.sort_unstable();
+        assert_eq!(
+            names,
+            [
+                "a.A", "a.A.p", "a.A.q", "a.A.r", "a.A.s", "a.A.t", "a.A.z()"
+            ]
+        );
+    }
 }

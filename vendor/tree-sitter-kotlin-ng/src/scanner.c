@@ -61,6 +61,33 @@ static bool scan_words(TSLexer *lexer, const char words[MAX_WORDS][MAX_WORD_SIZE
     return false;
 }
 
+// With the lookahead on the `(` after a `set` that may be a setter: true when it is a call on a
+// new statement. A setter's parameter is a name, possibly annotated (`set(v) {`, `set(@A v) {`);
+// `set("k") {` and `set("k", v)` are calls.
+static bool set_paren_is_call(TSLexer *lexer) {
+    skip(lexer);
+    while (iswspace(lexer->lookahead)) {
+        skip(lexer);
+    }
+    if (!(iswalpha(lexer->lookahead) || lexer->lookahead > 127 || lexer->lookahead == '_' ||
+          lexer->lookahead == '`' || lexer->lookahead == '@')) {
+        return true;
+    }
+    // skip until the closing parenthesis
+    while (lexer->lookahead != ')' && !lexer->eof(lexer)) {
+        skip(lexer);
+    }
+    skip(lexer);
+
+    while (iswspace(lexer->lookahead)) {
+        if (lexer->lookahead == '\n') {
+            return true;
+        }
+        skip(lexer);
+    }
+    return false;
+}
+
 void *tree_sitter_kotlin_external_scanner_create() { return NULL; }
 
 void tree_sitter_kotlin_external_scanner_destroy(void *payload) {}
@@ -338,28 +365,7 @@ bool tree_sitter_kotlin_external_scanner_scan(void *payload, TSLexer *lexer, con
                 else if (index == 4 && (!valid_symbols[SET] || lexer->lookahead == '[' || lexer->lookahead == '(' ||
                                         lexer->lookahead == '.')) {
                     if (lexer->lookahead == '(' && valid_symbols[SET]) {
-                        // A setter's parameter is a name, possibly annotated: `set("k") {` is a call.
-                        skip(lexer);
-                        while (iswspace(lexer->lookahead)) {
-                            skip(lexer);
-                        }
-                        if (!(iswalpha(lexer->lookahead) || lexer->lookahead == '_' || lexer->lookahead == '`' ||
-                              lexer->lookahead == '@')) {
-                            return true;
-                        }
-                        // skip until the closing parenthesis
-                        while (lexer->lookahead != ')' && !lexer->eof(lexer)) {
-                            skip(lexer);
-                        }
-                        skip(lexer);
-
-                        while (iswspace(lexer->lookahead)) {
-                            if (lexer->lookahead == '\n') {
-                                return true;
-                            }
-                            skip(lexer);
-                        }
-                        return false;
+                        return set_paren_is_call(lexer);
                     }
                     return true;
                 }
@@ -368,7 +374,10 @@ bool tree_sitter_kotlin_external_scanner_scan(void *payload, TSLexer *lexer, con
                     while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
                         skip(lexer);
                     }
-                    return !(lexer->lookahead == '(' || lexer->lookahead == '\n' || lexer->lookahead == '\r' ||
+                    if (lexer->lookahead == '(') {
+                        return set_paren_is_call(lexer);
+                    }
+                    return !(lexer->lookahead == '\n' || lexer->lookahead == '\r' ||
                              lexer->lookahead == ';' || lexer->lookahead == '}' || lexer->lookahead == '/' ||
                              lexer->eof(lexer));
                 }
