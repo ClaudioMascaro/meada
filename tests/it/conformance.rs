@@ -1572,6 +1572,17 @@ fn kotlin() {
             "src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Application.typed()",
             "src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Route.orderRoutes()",
             "src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Typed",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/named",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/kw",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Application.hidden(Route.()->Unit)",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Application.local()",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.catalog()",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.users()",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Application.cycle()",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Routing.top()",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Routing.top().GET /top",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.again()",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.again().GET /cyc/loop",
         ],
         &["src/main/kotlin/example/Main.kt::example.main(Array<String>)"],
         &[
@@ -2234,7 +2245,9 @@ fn kotlin_annotated_class_with_a_one_line_companion_provides_its_mapping() {
 /// Ktor routes take the prefix of every enclosing `route` block, through the routing extension
 /// functions called in one (once per prefix), and each is served by its inline handler. Names
 /// like Ktor's without its import, type-safe routing, an unread prefix, an extension function
-/// no routing scope calls and one out of scope serve nothing.
+/// no routing scope calls, one out of scope and one a parameter or a local function hides
+/// serve nothing; a path passed by name is read, a `Routing` receiver mounts and a cycle adds
+/// no prefix.
 #[test]
 fn kotlin_ktor_routes_take_every_enclosing_prefix() {
     let (json, actual) = providers(
@@ -2245,6 +2258,7 @@ fn kotlin_ktor_routes_take_every_enclosing_prefix() {
     let server = "src/main/kotlin/example/ktor/Server.kt::example.ktor";
     let module = format!("{server}.Application.module()");
     let admin = format!("{server}.Route.adminRoutes()");
+    let hidden = "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden".to_string();
     let orders = "src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()";
     let site = |scope: &str, name: &str| format!("{scope}.{name}");
     let expected: Vec<(String, String)> = pairs(&[
@@ -2255,6 +2269,13 @@ fn kotlin_ktor_routes_take_every_enclosing_prefix() {
             &site(&module, "POST /api/v1/items/{}"),
         ),
         ("http::HEAD::/api/ping", &site(&module, "HEAD /api/ping")),
+        ("http::GET::/api/named", &site(&module, "GET /api/named")),
+        ("http::GET::/api/kw", &site(&module, "GET /api/kw")),
+        ("http::GET::/top", &site(&hidden, "Routing.top().GET /top")),
+        (
+            "http::GET::/cyc/loop",
+            &site(&hidden, "Route.again().GET /cyc/loop"),
+        ),
         (
             "http::DELETE::/api/admin/cache",
             &site(&admin, "DELETE /api/admin/cache"),
@@ -2381,6 +2402,46 @@ fn kotlin_scope_functions_on_one_class_stay_linear_in_width() {
     // Quadratic work took 70 s here in debug; linear work, a few.
     eprintln!("kotlin scope functions, {WIDTH} wide: {took:?}");
     assert!(took < std::time::Duration::from_secs(30), "{took:?}");
+}
+
+/// A large file of nested lambdas (a Compose-like UI) is indexed: a lambda's scope costs the
+/// qualification budget where it is stored, not at every syntax node.
+#[test]
+fn kotlin_large_nested_lambda_file_stays_within_the_qualification_budget() {
+    let repo = fixture_repo("kotlin_compose", "conformance-kotlin", Some(ORIGIN));
+    // The review's generator (20 sections, 6 levels, about 1,100 lines): the base indexed it.
+    let (sections, depth) = (20, 6);
+    let mut ui = String::from(
+        "package com.example.feature.home.ui.screens.details\n\n\
+         import androidx.compose.runtime.Composable\n\n",
+    );
+    for f in 0..sections {
+        ui.push_str(&format!(
+            "@Composable\nfun DetailsSection{f}(viewModel: DetailsViewModel, \
+             onNavigate: (String) -> Unit, modifier: Modifier) {{\n"
+        ));
+        let column = "Column(modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp)\
+                      .fillMaxWidth()) {\n";
+        ui.push_str(&column.repeat(depth));
+        for i in 0..20 {
+            ui.push_str(&format!(
+                "Text(text = stringResource(R.string.title_{i}), style = \
+                 MaterialTheme.typography.titleLarge, maxLines = 2, modifier = \
+                 Modifier.padding(top = 4.dp))\n\
+                 Button(onClick = {{ viewModel.onEvent(DetailsEvent.Clicked({i})); \
+                 onNavigate(\"route/{i}\") }}) {{ Text(\"go {i}\") }}\n"
+            ));
+        }
+        ui.push_str(&"}\n".repeat(depth + 1));
+    }
+    std::fs::write(repo.join("Ui.kt"), ui).unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let found = (json["symbols"].as_array().unwrap().iter())
+        .filter(|s| s["id"].as_str().unwrap().contains("Ui.kt::"))
+        .filter(|s| s["id"].as_str().unwrap().contains(".DetailsSection"))
+        .count();
+    assert_eq!(found, sections);
 }
 
 /// Ktor `route` blocks nest as deep as prefixes are read. Past the depth where lambdas are

@@ -1359,7 +1359,9 @@ one for the area a change touches.
   parameter is a scope of its own, whose `it` hides the typed one only inside it. Any other
   lambda written as an argument (trailing or in parentheses) is a `Kind::Inline` scope with no
   block, as the TypeScript and Rust packs write their closures: the call's argument is its
-  `Value::Function`, so a kind can name it (a Ktor route handler), and it folds otherwise.
+  `Value::Function`, so a kind can name it (a Ktor route handler), and it folds otherwise. A
+  function declared where it is no definition (in a lambda, an object literal or an initializer)
+  is such a scope too, so its body is not the code around it.
   `LanguagePack::is_code` drops from the walk the files of a pack's
   extensions that are no code (Kotlin's `build.gradle.kts` and `settings.gradle.kts`, which the
   package ecosystems read as manifests). A pack that
@@ -1663,7 +1665,12 @@ one for the area a change touches.
 
 - `lang/kotlin.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the Kotlin pack as they bound the Java pack's, with the same
-  outcome past each; the Kotlin hostile-depth and long-prefix engine fixtures exceed them. Beyond
+  outcome past each; the Kotlin hostile-depth and long-prefix engine fixtures exceed them. The
+  budget charges each syntax node the qualified name up to its last named definition, and the
+  `.@<offset>` segments of the lambdas and local functions after it only at a node that stores
+  the name (a call, a definition, a binding), so nested lambdas cost what the facts keep: a file
+  of deeply nested lambdas (a Compose UI, a Ktor routing file) reaches the budget at about 92%
+  of the size it did before lambdas were scopes. Beyond
   the limits, what the pack leaves out (spec #27, #95, #96): a bare or `this` call inside a lambda
   other than the five scope functions', an object literal or an enum entry's body may reach an
   implicit receiver no syntax names, so it is read as a name match (`(anonymous).f`), never
@@ -1915,11 +1922,15 @@ qualification budget does (ADR 0017).
   `Routing` (mounted with no segment on each routing scope that calls it through the implicit
   receiver, so one called under two prefixes serves under both; one nothing calls is served
   nowhere). The routing scope of a call is the nearest such node around it through lambdas
-  (`Kind::Inline` scopes), stopping at a route's handler. `get`, `post`, `put`, `patch`, `delete`,
+  passed as arguments (`Kind::Inline` scopes inside a call of the scope around them, by the
+  calls' and definitions' ranges), stopping at a route's handler and at a local function's
+  body. `get`, `post`, `put`, `patch`, `delete`,
   `head` and `options` with a path or none (the block's path), and `route(path, HttpMethod.X)`,
-  register a route whose handler is the trailing lambda (`handler_site`). The extension called
+  register a route whose handler is the trailing lambda (`handler_site`); the path and the method
+  are read positionally or by name (`path =`, `method =`). The extension called
   is the nearest one in scope (`Code::extensions`, Kotlin's lookup order: around the call, an
-  explicit import, the package, a star import) whose receiver is Ktor's `Route` or `Routing`:
+  explicit import, the package, a star import, after the locals and parameters that hide the
+  name) whose receiver is Ktor's `Route`, or `Routing` in a scope whose receiver is one:
   the routing block tells the implicit receiver, which the resolver's own answer for the call
   (a name match inside a lambda) does not know. A Ktor name counts only when `Code::outside`
   says an import from `io.ktor.server.routing` (or Ktor 1's `io.ktor.routing`) binds it, and
@@ -2442,15 +2453,22 @@ qualification budget does (ADR 0017).
   router Meada cannot read. A router handed to a call that is neither a mount nor a wrapper
   of one in its arguments (a router put in a struct, a closure capture) is not told from one
   nothing mounts.
-- `http/kotlin.rs` (spec #27, #98): a lambda past the Kotlin pack's `DEFINITION_DEPTH` is no
-  scope, so what a scope holding a `route` call with no lambda read registers (a route, a
-  routing extension call) is served nowhere, never under part of its prefix. The implicit
-  receiver of a routing block is taken as Ktor's `Route`, kept through any lambda inside the
-  block (`authenticate { }`) but a handler's: a member of `Route` named like an extension of the
-  repository, and an extension of a supertype (`Any`, a type parameter) nearer in scope, are not
-  weighed. Routes nested in `route(path, HttpMethod.X) { }` (its lambda is the handler),
-  `method(HttpMethod.X) { }`, `install(Routing)`, a path passed by name and a path with a string
-  template are not read.
+- `http/kotlin.rs` (spec #27, #98): a scope holding a `route` call whose lambda is not read (one
+  nested past the Kotlin pack's `DEFINITION_DEPTH`, or a block passed as a function reference,
+  `route(path, Route::orders)`) registers nothing: its routes and routing extension calls, the
+  block's siblings included, are served nowhere, never under part of a prefix. The implicit
+  receiver of a routing block is taken as Ktor's `Route` (`Routing` in `routing { }`), kept
+  through any lambda argument inside the block (`authenticate { }`) but a handler's or a local
+  function's: a member of `Route` named like an extension of the repository, and an extension of
+  a supertype (`Any`, a type parameter) nearer in scope, are not weighed, and an extension on
+  `Routing` called in a `route` block (which Kotlin runs on the `Routing` around it) mounts
+  nothing. A local or a parameter of the name hides an extension (`Code::extensions`), and a
+  local function of the name mounts nothing. Routes nested in `route(path, HttpMethod.X) { }`
+  (its lambda is the handler), `method(HttpMethod.X) { }`, `install(Routing)`, a lambda passed
+  by name (`body = { }`), any named argument other than `path` and `method`, and a path with a
+  string template are not read. A Ktor verb inside a lambda (`get`, `put`) is a call the
+  resolver reads as a name match, as any call there is, so it may match a repository method of
+  the same name: that method then has a caller and loses its export door.
 - Rust values (`lang/rust/values.rs`, `lang/rust/builders.rs`, spec #30 #131): `BUILDER_BUDGET`
   (2^20 syntax nodes per file, over every `let mut`, block by block in the order the blocks
   open), `BUILDER_DEPTH` (64 builders read within

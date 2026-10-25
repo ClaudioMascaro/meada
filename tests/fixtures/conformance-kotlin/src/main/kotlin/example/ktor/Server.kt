@@ -30,6 +30,11 @@ fun Application.module() {
                 orderRoutes()
                 adminRoutes()
             }
+            // A path passed by name.
+            get(path = "/named") { }
+            route(path = "/kw") {
+                get { }
+            }
             route("/ping", HttpMethod.Head) {
                 handle {
                     call.respondText("")

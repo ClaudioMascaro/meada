@@ -141,6 +141,9 @@ struct Visit<'t> {
     /// declares no parameter hides in its own scope.
     typed_it: bool,
     depth: usize,
+    /// How long the scope's qualified name is up to its last named definition: the lambdas and
+    /// local functions after it (`.@<offset>`) are charged to the budget where they are stored.
+    named_len: usize,
 }
 
 /// Whom a bare call or a call on `this` reaches in a piece of code.
@@ -220,6 +223,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         generics: Rc::new(Vec::new()),
         typed_it: false,
         depth: 0,
+        named_len: facts.package.len(),
     }];
     let mut budget = QUALIFICATION_BYTES;
     // Type names written in the file, which nothing binds when they are not the repository's.
@@ -242,9 +246,15 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         generics,
         typed_it,
         depth,
+        named_len,
     }) = stack.pop()
     {
-        let Some(left) = budget.checked_sub(scope.len()) else {
+        let charge = if stores(node.kind()) {
+            scope.len()
+        } else {
+            named_len
+        };
+        let Some(left) = budget.checked_sub(charge) else {
             // A partial overload family could turn an ambiguous call into a false exact one.
             return Ok(Facts {
                 unbuilt: true,
@@ -265,6 +275,8 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         let (mut inner_implicit, mut inner_generics) = (implicit, generics.clone());
         let mut inner_typed_it = typed_it;
         let mut skip_parameters = false;
+        // A lambda or a local function: a scope that keeps the named length of its own.
+        let mut inline = false;
         let defining = !opaque && depth < DEFINITION_DEPTH && place != Place::Init;
         match node.kind() {
             "class_declaration" | "object_declaration" | "companion_object" if defining => {
@@ -384,6 +396,19 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     facts.hidden.push(inner.as_ref().clone());
                 }
                 annotate(&mut facts, node, src, &scope, &inner);
+            }
+            // A function declared where it is no definition (in a lambda, an object literal, an
+            // initializer) is a scope of its own, as a lambda is: its body is not the code
+            // around it.
+            "function_declaration" if depth < DEFINITION_DEPTH => {
+                inner = Rc::new(qualify(&scope, &format!("@{}", node.start_byte())));
+                let range = node.byte_range();
+                facts
+                    .defs
+                    .push(definition(&inner, Kind::Inline, range, Vec::new()));
+                nested += 1;
+                inline = true;
+                inner_place = Place::Code;
             }
             "property_declaration" if matches!(place, Place::Top | Place::Class) && defining => {
                 let names: Vec<Node> = (named(node))
@@ -517,6 +542,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                         .defs
                         .push(definition(&inner, Kind::Inline, range, Vec::new()));
                     nested += 1;
+                    inline = true;
                     let (at, within) = (inner.as_ref().clone(), scope.as_ref().clone());
                     if receiver {
                         inner_implicit = Implicit::Receiver;
@@ -569,6 +595,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                             .defs
                             .push(definition(&inner, Kind::Inline, range, Vec::new()));
                         nested += 1;
+                        inline = true;
                         inner_typed_it &= !it;
                     }
                     if it {
@@ -619,6 +646,10 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 locals.push(Receiver { scope, name, class });
             }
         }
+        let inner_named = match inline || Rc::ptr_eq(&inner, &scope) {
+            true => named_len,
+            false => inner.len(),
+        };
         let mut pushed: Vec<Node> = named(node).collect();
         // A property's own names are no locals of the code its initializer or getter is.
         if node.kind() == "property_declaration" && matches!(place, Place::Top | Place::Class) {
@@ -650,6 +681,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 generics: inner_generics.clone(),
                 typed_it: inner_typed_it,
                 depth: nested,
+                named_len: inner_named,
             });
         }
     }
@@ -1451,6 +1483,29 @@ fn arguments(
         }
     }
     (args, kwargs)
+}
+
+/// Whether a node of `kind` stores its scope's qualified name in the facts: a call, a definition
+/// or a binding. The rest of the nodes are charged the named part of the name alone.
+fn stores(kind: &str) -> bool {
+    matches!(
+        kind,
+        "call_expression"
+            | "annotation"
+            | "lambda_literal"
+            | "anonymous_function"
+            | "object_literal"
+            | "function_declaration"
+            | "class_declaration"
+            | "object_declaration"
+            | "companion_object"
+            | "property_declaration"
+            | "variable_declaration"
+            | "parameter"
+            | "class_parameter"
+            | "catch_block"
+            | "enum_entry"
+    )
 }
 
 /// Whether `node` is a lambda written as an argument of a call, trailing or in parentheses.
