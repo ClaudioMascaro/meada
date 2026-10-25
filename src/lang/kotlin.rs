@@ -1674,4 +1674,96 @@ mod tests {
         );
         assert!(!facts.unwrap().unbuilt);
     }
+
+    #[test]
+    fn accessors_stay_accessors_beside_the_scanner_patch() {
+        // The forms the local scanner patch (ADR 0017) must keep reading as accessors: a
+        // property with a getter is a definition, and the declarations after it survive.
+        let src = b"package a
+class A {
+    val a: Int
+        get() = 1
+    val b: Int
+        get(): Int = 2
+    val c: Int
+        get() { return 3 }
+    var d: Int = 0
+        private set
+    var e: Int = 0
+        get
+        set(value) { field = value }
+    val f: Int
+        @JvmName(\"ff\") get() = 4
+    val g: Int
+        get ( ) = 5
+    var h = 0
+        internal get
+    val i: Int
+        get /* c */ () = 6
+    var j = 1
+        set(v) = Unit
+        get() = 2
+    fun z() {}
+}
+val top: Int
+    get() = 7
+fun after() {}
+";
+        let facts = parse(src, false).unwrap();
+        let mut names: Vec<&str> = facts.defs.iter().map(|d| d.name.as_str()).collect();
+        names.sort_unstable();
+        assert_eq!(
+            names,
+            [
+                "a.A",
+                "a.A.a",
+                "a.A.b",
+                "a.A.c",
+                "a.A.e",
+                "a.A.f",
+                "a.A.g",
+                "a.A.h",
+                "a.A.i",
+                "a.A.j",
+                "a.A.z()",
+                "a.after()",
+                "a.top"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_setter_parameter_is_any_name() {
+        // The scanner patch reads `set(` as a setter only before a name: non-ASCII letters,
+        // `_` and backticked names are names, and a space before the parenthesis is allowed.
+        let src = "package a
+class A {
+    var p: Int = 0
+        get() = field
+        set(значение) { field = значение }
+    var q: Int = 0
+        get() = field
+        set(ñ) { field = ñ }
+    var r: Int = 0
+        get() = field
+        set(_v) { field = _v }
+    var s: Int = 0
+        get() = field
+        set(`odd name`) { field = `odd name` }
+    var t: Int = 0
+        get() = field
+        set (v) { field = v }
+    fun z() {}
+}
+";
+        let facts = parse(src.as_bytes(), false).unwrap();
+        let mut names: Vec<&str> = facts.defs.iter().map(|d| d.name.as_str()).collect();
+        names.sort_unstable();
+        assert_eq!(
+            names,
+            [
+                "a.A", "a.A.p", "a.A.q", "a.A.r", "a.A.s", "a.A.t", "a.A.z()"
+            ]
+        );
+    }
 }
