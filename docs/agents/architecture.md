@@ -90,6 +90,11 @@ exporting `init`, `validate`, `workspaceVersionId`, `workspaceDiff`, `entriesTex
 `parseExport`. CI's `core` job builds it
 with wasm-pack and checks both trees.
 
+Every tree-sitter grammar is a crate except Kotlin's: `vendor/tree-sitter-kotlin-ng/` holds
+`tree-sitter-kotlin-ng` 1.1.0 with upstream PRs #21 and #13 (`PROVENANCE.md`), which the root's
+`build.rs` compiles and `lang/kotlin.rs` binds (ADR 0017). No other Kotlin grammar may enter the
+dependency tree: they all export `tree_sitter_kotlin`.
+
 - `meada-core/src/manifest.rs`: a workspace manifest's `[[repository]]` (`EntryFile`,
   `EntryPeer`) and the `[serve]` and `[[resource]]` shapes `meada.toml` shares (`Serve`,
   `Resource`, `Role`, `declared`, `gateway_path`); `parse` and `error_at`, the errors naming
@@ -1683,7 +1688,9 @@ one for the area a change touches.
   resolve with Java's flags, so `java.lang.Object`'s members are the implicit members of a Kotlin
   class too: a bare `notify()` in a class is unknown. A star import of a Java package from Kotlin sees its
   package-private classes. The Spring configuration files are read for the Java pack only
-  (`config_files` is empty) until a Kotlin form needs them.
+  (`config_files` is empty) until a Kotlin form needs them. A declaration the grammar reads as an
+infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out, as the
+qualification budget does (ADR 0017).
 
 - `snapshot/pull.rs`: a generation's bundles hold at most `GENERATION_BYTES_MAX` (256 GiB)
   together, as the document records their sizes (checked before any download) and as the

@@ -26,6 +26,10 @@
       "hash": "277db288e33ec85c8e0a50a647f8fc6600aaa932f696daaa931a69dea660446a"
     },
     {
+      "path": "src/main/kotlin/example/OneLine.kt",
+      "hash": "bd93993b5907c48da20f3d51e83d6a7a7bdb70cd37618f1e049d587794f68ffd"
+    },
+    {
       "path": "src/main/kotlin/example/Receivers.kt",
       "hash": "c4d95242291559c7e27e37065504d372c27b530ebcb1fbaf9ffe1ed4d606dcf9"
     },
@@ -68,6 +72,10 @@
     {
       "path": "src/main/kotlin/example/web/Api.kt",
       "hash": "05126f2f92420b758b2ba8a2c0388582934935827a5e989cbb628e65006683b9"
+    },
+    {
+      "path": "src/main/kotlin/example/web/HealthController.kt",
+      "hash": "0f24c523d8fc58a2168ed7b27a12ef46b04cc71aee3ebc5a1e4122ab062ac22a"
     },
     {
       "path": "src/main/kotlin/example/web/OrderController.kt",
@@ -365,6 +373,30 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 1020,
         "end": 1039
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/OneLine.kt::example.Twins",
+      "span": {
+        "path": "src/main/kotlin/example/OneLine.kt",
+        "start": 82,
+        "end": 128
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/OneLine.kt::example.Twins.left()",
+      "span": {
+        "path": "src/main/kotlin/example/OneLine.kt",
+        "start": 96,
+        "end": 110
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/OneLine.kt::example.Twins.right()",
+      "span": {
+        "path": "src/main/kotlin/example/OneLine.kt",
+        "start": 111,
+        "end": 126
       }
     },
     {
@@ -1269,6 +1301,30 @@
         "path": "src/main/kotlin/example/web/Api.kt",
         "start": 55,
         "end": 98
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController",
+      "span": {
+        "path": "src/main/kotlin/example/web/HealthController.kt",
+        "start": 354,
+        "end": 532
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.Companion",
+      "span": {
+        "path": "src/main/kotlin/example/web/HealthController.kt",
+        "start": 426,
+        "end": 472
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.live()",
+      "span": {
+        "path": "src/main/kotlin/example/web/HealthController.kt",
+        "start": 478,
+        "end": 530
       }
     },
     {
@@ -3411,6 +3467,39 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController::GetMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/HealthController.kt",
+        "start": 478,
+        "end": 498
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web::RequestMapping#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/HealthController.kt",
+        "start": 370,
+        "end": 396
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web::RestController#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/web/HealthController.kt",
+        "start": 354,
+        "end": 369
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::DeleteMapping#0",
       "caller": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController",
       "target": null,
@@ -3699,6 +3788,10 @@
     {
       "contract": "http::GET::/api/orders/{}",
       "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.fetch(String)"
+    },
+    {
+      "contract": "http::GET::/health/live",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.live()"
     },
     {
       "contract": "http::GET::/p/a",
@@ -4168,6 +4261,34 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.util()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/OneLine.kt::example.Twins.left()",
+      "kind": "export",
+      "label": "example.Twins.left()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/OneLine.kt::example.Twins.left()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/OneLine.kt::example.Twins.right()",
+      "kind": "export",
+      "label": "example.Twins.right()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/OneLine.kt::example.Twins.right()"
         }
       ]
     },
@@ -5629,6 +5750,20 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::src/main/kotlin/example/util/Tools.kt::example.util.Tools.doubled()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.live()::http::GET::/health/live",
+      "kind": "route",
+      "label": "GET /health/live",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.live()"
         }
       ]
     },

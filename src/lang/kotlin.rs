@@ -7,6 +7,7 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use tree_sitter::{Node, Parser};
+use tree_sitter_language::LanguageFn;
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Invocation, Kind,
@@ -28,6 +29,18 @@ const PATH_DEPTH: usize = 256;
 // ponytail: a long package prefix must not multiply across a broad file without a budget.
 const QUALIFICATION_BYTES: usize = 4 * 1024 * 1024;
 
+/// The hard keywords that open a declaration. The grammar reads one as a name only when it
+/// misparses a declaration as an infix call (`misparsed`).
+const DECLARATION_KEYWORDS: &[&str] = &[
+    "class",
+    "fun",
+    "interface",
+    "object",
+    "typealias",
+    "val",
+    "var",
+];
+
 /// The packages every Kotlin file on the JVM imports on demand without writing it.
 const DEFAULT_IMPORTS: &[&str] = &[
     "java.lang",
@@ -41,6 +54,15 @@ const DEFAULT_IMPORTS: &[&str] = &[
     "kotlin.sequences",
     "kotlin.text",
 ];
+
+unsafe extern "C" {
+    /// The vendored grammar's constructor, which `build.rs` compiles (ADR 0017).
+    fn tree_sitter_kotlin() -> *const ();
+}
+
+/// The Kotlin grammar, the way the grammar crates expose theirs.
+// SAFETY: the function is the tree-sitter CLI's generated constructor of a static language.
+const LANGUAGE: LanguageFn = unsafe { LanguageFn::from_raw(tree_sitter_kotlin) };
 
 pub struct Kotlin;
 
@@ -164,7 +186,7 @@ struct Later {
 /// One file's facts; a `script`'s declarations are its own, exported to no other file.
 fn parse(src: &[u8], script: bool) -> Result<Facts> {
     let mut parser = Parser::new();
-    parser.set_language(&tree_sitter_kotlin_ng::LANGUAGE.into())?;
+    parser.set_language(&LANGUAGE.into())?;
     let tree = parser
         .parse(src, None)
         .ok_or("tree-sitter returned no tree")?;
@@ -230,6 +252,14 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
             });
         };
         budget = left;
+        if misparsed(node, src) {
+            // The declaration is lost with no ERROR node: the file is left out as a whole, like
+            // one over budget, rather than indexed without it.
+            return Ok(Facts {
+                unbuilt: true,
+                ..Facts::default()
+            });
+        }
         let (mut inner, mut inner_place, mut inner_access, mut inner_opaque, mut nested) =
             (scope.clone(), place, access, opaque, depth);
         let (mut inner_implicit, mut inner_generics) = (implicit, generics.clone());
@@ -913,6 +943,16 @@ fn parameters(
     (params, types, classes)
 }
 
+/// Whether `node` is a declaration the grammar read as an infix call: a hard keyword as one of
+/// its operands (grammar 1.1.0 read `@A @B("x") class C { .. }` with `class` as an operand
+/// and `C` as the infix function).
+/// Valid code never names anything `class` or `fun`, and a backticked name keeps its backticks.
+fn misparsed(node: Node, src: &[u8]) -> bool {
+    node.kind() == "infix_expression"
+        && named(node)
+            .any(|n| n.kind() == "identifier" && DECLARATION_KEYWORDS.contains(&text(n, src)))
+}
+
 /// A type's tokens as written, without annotations or comments, a space only between words.
 fn spelling(node: Node, src: &[u8]) -> String {
     let mut spelled = String::new();
@@ -1536,5 +1576,24 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             Value::Str(parts)
         }
         _ => Value::Unknown,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_declaration_read_as_an_infix_call_leaves_the_file_out() {
+        // What the grammar makes of a declaration it misparses: a hard keyword as an operand
+        // of an infix call, with no ERROR node (`val a = b class C` is one such tree).
+        let facts = parse(b"package a\nfun f() {}\nval a = b class C\n", false).unwrap();
+        assert!(facts.unbuilt && facts.defs.is_empty());
+        // Soft keywords are names, and a backticked keyword is one too.
+        let facts = parse(
+            b"package a\nval p = value to open\nval q = x `class` y\n",
+            false,
+        );
+        assert!(!facts.unwrap().unbuilt);
     }
 }
