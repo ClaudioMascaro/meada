@@ -91,9 +91,9 @@ exporting `init`, `validate`, `workspaceVersionId`, `workspaceDiff`, `entriesTex
 with wasm-pack and checks both trees.
 
 Every tree-sitter grammar is a crate except Kotlin's: `vendor/tree-sitter-kotlin-ng/` holds
-`tree-sitter-kotlin-ng` 1.1.0 with upstream PRs #21 and #13 (`PROVENANCE.md`), which the root's
-`build.rs` compiles and `lang/kotlin.rs` binds (ADR 0017). No other Kotlin grammar may enter the
-dependency tree: they all export `tree_sitter_kotlin`.
+`tree-sitter-kotlin-ng` 1.1.0 with upstream PRs #21 and #13 and a local scanner patch
+(`PROVENANCE.md`), which the root's `build.rs` compiles and `lang/kotlin.rs` binds (ADR 0017). No
+other Kotlin grammar may enter the dependency tree: they all export `tree_sitter_kotlin`.
 
 - `meada-core/src/manifest.rs`: a workspace manifest's `[[repository]]` (`EntryFile`,
   `EntryPeer`) and the `[serve]` and `[[resource]]` shapes `meada.toml` shares (`Serve`,

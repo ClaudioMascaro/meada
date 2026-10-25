@@ -74,6 +74,10 @@
       "hash": "d699e6d11262d8ddf57d989928a2fda03a01ef58e3ec2bf3820992cfa8390b88"
     },
     {
+      "path": "src/main/kotlin/example/ktor/Locals.kt",
+      "hash": "295b70b538866b427505b21892142b5650c7d6ff57de300e66fd093513b4b9b8"
+    },
+    {
       "path": "src/main/kotlin/example/ktor/Server.kt",
       "hash": "0edb436a80c2d10b71d1b051f83595a1df99063e2dc8e03a9f674a0143389ff5"
     },
@@ -1397,6 +1401,78 @@
         "path": "src/main/kotlin/example/ext/Extensions.kt",
         "start": 239,
         "end": 272
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.configured()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 609,
+        "end": 691
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.keyed()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 784,
+        "end": 854
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 273,
+        "end": 490
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 451,
+        "end": 482
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /local",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 368,
+        "end": 399
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spaced()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 856,
+        "end": 928
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spacedPair()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 930,
+        "end": 999
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.stored()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 492,
+        "end": 556
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.afterLocals()",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 1001,
+        "end": 1021
       }
     },
     {
@@ -4485,6 +4561,176 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.configured()::(anonymous).audit#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.configured()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 676,
+        "end": 683
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.configured()::set#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.configured()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 662,
+        "end": 689
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.keyed()::(anonymous).audit#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.keyed()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 843,
+        "end": 850
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.keyed()::set#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.keyed()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 832,
+        "end": 852
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /::(anonymous).audit#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 465,
+        "end": 472
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /local::(anonymous).audit#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /local",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 382,
+        "end": 389
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()::(anonymous).Service#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 336,
+        "end": 345
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()::(anonymous).get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 354,
+        "end": 399
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()::(anonymous).get#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.get(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Mixed.get(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Store.get(String)"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 447,
+        "end": 482
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()::(anonymous).lazy#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 422,
+        "end": 438
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()::routing#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.routing(()->Unit)",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 304,
+        "end": 488
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spaced()::(anonymous).audit#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spaced()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 917,
+        "end": 924
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spaced()::set#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spaced()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 905,
+        "end": 926
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spacedPair()::set#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spacedPair()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 983,
+        "end": 997
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.stored()::set#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.stored()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/ktor/Locals.kt",
+        "start": 541,
+        "end": 554
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/v1::call.respondText#0",
       "caller": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/v1",
       "target": null,
@@ -5483,6 +5729,10 @@
       "site": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.removeAll()"
     },
     {
+      "contract": "http::GET::/",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /"
+    },
+    {
       "contract": "http::GET::/api/admin/orders",
       "site": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders"
     },
@@ -5525,6 +5775,10 @@
     {
       "contract": "http::GET::/health/live",
       "site": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.live()"
+    },
+    {
+      "contract": "http::GET::/local",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /local"
     },
     {
       "contract": "http::GET::/p/a",
@@ -5960,6 +6214,11 @@
     {
       "name": "src/main/kotlin/example/ktor",
       "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.configured()",
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.keyed()",
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /",
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /local",
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spaced()",
         "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().POST /api/v1/items/{}",
         "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes().DELETE /api/admin/cache",
         "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()"
@@ -5968,6 +6227,7 @@
     {
       "name": "src/main/kotlin/example/ktor/hidden",
       "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()",
         "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
         "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes()",
         "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.prefix()",
@@ -8110,6 +8370,187 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.HttpClient.options(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.configured()",
+      "kind": "export",
+      "label": "example.ktor.Application.configured()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.configured()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.keyed()",
+      "kind": "export",
+      "label": "example.ktor.Application.keyed()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.keyed()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()",
+      "kind": "export",
+      "label": "example.ktor.Application.locals()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.routing(()->Unit)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()::(anonymous).get#1",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.get(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Mixed.get(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Store.get(String)"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /::http::GET::/",
+      "kind": "route",
+      "label": "GET /",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /local::http::GET::/local",
+      "kind": "route",
+      "label": "GET /local",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /local"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spaced()",
+      "kind": "export",
+      "label": "example.ktor.Application.spaced()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spaced()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spacedPair()",
+      "kind": "export",
+      "label": "example.ktor.Application.spacedPair()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spacedPair()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.stored()",
+      "kind": "export",
+      "label": "example.ktor.Application.stored()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.stored()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.afterLocals()",
+      "kind": "export",
+      "label": "example.ktor.afterLocals()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.afterLocals()"
         }
       ]
     },
