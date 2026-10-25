@@ -2514,5 +2514,7 @@ one for the area a change touches.
   indexing continues. `jvm/gradle.rs`: `GRADLE_DEPTH` (64) bounds nested blocks; a deeper build
   or settings file reads as an empty summary. The Gradle scanner does not read Groovy slashy
   strings, and reads a triple-quoted string as quoted pairs. It keeps at most `MAX_ROOTS` (64)
-  source directories. JVM coordinate names share
+  source directories. The Groovy and the Kotlin DSL files (`*.gradle`, `*.gradle.kts`) go
+  through this one scanner (spec #27: `tests/it/kotlinpkg.rs`); a `project(":x")` dependency
+  declares no coordinate. JVM coordinate names share
   `package::MAX_NAME` (214 bytes). These readers never run Maven, Gradle or a JDK.

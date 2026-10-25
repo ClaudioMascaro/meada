@@ -1,0 +1,157 @@
+{
+  "repository": "example.com/kotlin/lib",
+  "files": [
+    {
+      "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
+      "hash": "9663043bed568ff1b9b45aa6e30962d8f28684a6ee01a01152fa0a35c048e399"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String)",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
+        "start": 21,
+        "end": 70
+      }
+    }
+  ],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "package::maven::dev.kt.core:core",
+      "site": "example.com/kotlin/lib::core/build.gradle.kts"
+    },
+    {
+      "contract": "package::maven::dev.kt.http:client",
+      "site": "example.com/kotlin/lib::http/client/build.gradle.kts"
+    },
+    {
+      "contract": "package::maven::dev.kt:toolbox",
+      "site": "example.com/kotlin/lib::build.gradle.kts"
+    },
+    {
+      "contract": "package::maven::dev.kt:util",
+      "site": "example.com/kotlin/lib::util/build.gradle.kts"
+    }
+  ],
+  "consumers": [],
+  "packages": [
+    {
+      "name": "dev.kt.core:core",
+      "version": "3.1",
+      "repository": "example.com/kotlin/lib",
+      "directory": "core",
+      "ecosystem": "maven"
+    },
+    {
+      "name": "dev.kt.http:client",
+      "version": "3.1",
+      "repository": "example.com/kotlin/lib",
+      "directory": "http/client",
+      "ecosystem": "maven"
+    },
+    {
+      "name": "dev.kt:toolbox",
+      "version": "3.1",
+      "repository": "example.com/kotlin/lib",
+      "directory": ".",
+      "ecosystem": "maven"
+    },
+    {
+      "name": "dev.kt:util",
+      "version": "3.1",
+      "repository": "example.com/kotlin/lib",
+      "directory": "util",
+      "ecosystem": "maven"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::api::dev.kt.core:core",
+      "provider": "example.com/kotlin/lib::core/build.gradle.kts",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::api::dev.kt:toolbox",
+      "provider": "example.com/kotlin/lib::build.gradle.kts",
+      "contract": "package::maven::dev.kt:toolbox",
+      "level": "exact",
+      "reason": "package::maven::dev.kt:toolbox 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::compileOnly::dev.kt.http:client",
+      "provider": "example.com/kotlin/lib::http/client/build.gradle.kts",
+      "contract": "package::maven::dev.kt.http:client",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.http:client 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::implementation::dev.kt:*",
+      "provider": "example.com/kotlin/lib::build.gradle.kts",
+      "contract": "package::maven::dev.kt:*",
+      "level": "ambiguous",
+      "reason": "2 providers fit; computed coordinate; package::maven::dev.kt:* 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::implementation::dev.kt:*",
+      "provider": "example.com/kotlin/lib::util/build.gradle.kts",
+      "contract": "package::maven::dev.kt:*",
+      "level": "ambiguous",
+      "reason": "2 providers fit; computed coordinate; package::maven::dev.kt:* 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::implementation::dev.kt:toolbox",
+      "provider": "example.com/kotlin/lib::build.gradle.kts",
+      "contract": "package::maven::dev.kt:toolbox",
+      "level": "exact",
+      "reason": "package::maven::dev.kt:toolbox 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::runtimeOnly::dev.kt:util",
+      "provider": "example.com/kotlin/lib::util/build.gradle.kts",
+      "contract": "package::maven::dev.kt:util",
+      "level": "exact",
+      "reason": "package::maven::dev.kt:util none (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::testCompileOnly::dev.kt.core:core",
+      "provider": "example.com/kotlin/lib::core/build.gradle.kts",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::testImplementation::dev.kt:toolbox",
+      "provider": "example.com/kotlin/lib::build.gradle.kts",
+      "contract": "package::maven::dev.kt:toolbox",
+      "level": "exact",
+      "reason": "package::maven::dev.kt:toolbox 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::testRuntimeOnly::dev.kt.http:client",
+      "provider": "example.com/kotlin/lib::http/client/build.gradle.kts",
+      "contract": "package::maven::dev.kt.http:client",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.http:client 3.1 (local 3.1), range unchecked"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String)",
+      "kind": "export",
+      "label": "dev.kt.core.greet(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String)"
+        }
+      ]
+    }
+  ]
+}

@@ -26,6 +26,7 @@ mod hostile;
 mod index;
 mod items;
 mod jvmpkg;
+mod kotlinpkg;
 mod manifest;
 mod mcp;
 mod oidc;
