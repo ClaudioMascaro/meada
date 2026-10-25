@@ -2357,7 +2357,7 @@ impl<'a> Resolver<'a> {
         for &at in self.by_local[path].of(&crate::qualify("", "*")) {
             let Imported::Glob {
                 path: target,
-                inside: false,
+                inside,
                 ..
             } = &imports[at].name
             else {
@@ -2373,6 +2373,10 @@ impl<'a> Resolver<'a> {
                 Binding::External(source, Imported::Namespace | Imported::Qualified) => {
                     Some(source)
                 }
+                // An `inside` glob (the own package's; Kotlin's written ones, which see
+                // `internal` members) gives an outside source only, as the repository's names
+                // are bound before this is asked.
+                _ if *inside => None,
                 other => match self.through_glob(other, false, name, work, seen) {
                     Binding::Unknown => None,
                     _ => return Vec::new(),

@@ -1537,6 +1537,13 @@ fn kotlin() {
             "src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.any()",
             "src/main/kotlin/example/web/PageController.kt::example.web.PageController",
             "src/main/kotlin/example/web/PageController.kt::example.web.PageController.page()",
+            "src/main/kotlin/example/web/StarController.kt::example.web.StarController",
+            "src/main/kotlin/example/web/StarController.kt::example.web.StarController.one()",
+            "src/main/kotlin/example/web/StarController.kt::example.web.StarController.removeAll()",
+            "src/main/kotlin/example/web/VarargController.kt::example.web.VarargController",
+            "src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()",
+            "src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()",
+            "src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()",
         ],
         &["src/main/kotlin/example/Main.kt::example.main(Array<String>)"],
         &[

@@ -252,23 +252,44 @@ fn made<'a>(
 }
 
 /// The paths of a mapping annotation: one of the elements `keys` names (Spring's `value` or
-/// `path`), or the one unnamed argument, a string or an array of them, constants folded; the
-/// root when it gives none. `None` when it gives two, or a value that is no list of strings; a
-/// path that cannot be read yields none.
+/// `path`), or the unnamed arguments (one string or array, or Kotlin's several, which fill the
+/// `value` array), constants folded; the root when it gives none. `None` when it gives two
+/// kinds, or a value that is no list of strings; a path that cannot be read yields none.
 fn paths<'a>(code: &Code<'a>, file: &'a str, call: &'a Call, keys: &[&str]) -> Option<Vec<String>> {
     let given: Vec<&Value> = (call.args.iter())
         .chain(keys.iter().filter_map(|k| call.keyword(k)))
         .collect();
-    let value = match given.as_slice() {
+    let fold = |v: &'a Value| code.value(file, &call.scope, v);
+    let items: Vec<Value> = match given.as_slice() {
         [] => return Some(vec![String::new()]),
-        [one] => code.value(file, &call.scope, one),
+        [one] => match array_of(code, file, &call.scope, one) {
+            Some(elements) => elements.iter().map(fold).collect(),
+            None => match fold(one) {
+                Value::List(items) => items,
+                one => return path_literal(one).map(|p| vec![p]),
+            },
+        },
+        several if call.args.len() == several.len() => several.iter().map(|v| fold(v)).collect(),
         _ => return None,
     };
-    match value {
-        Value::List(items) if items.is_empty() => Some(vec![String::new()]),
-        Value::List(items) => Some(items.into_iter().filter_map(path_literal).collect()),
-        one => path_literal(one).map(|p| vec![p]),
+    match items.is_empty() {
+        true => Some(vec![String::new()]),
+        false => Some(items.into_iter().filter_map(path_literal).collect()),
     }
+}
+
+/// The elements of Kotlin's `arrayOf(..)` written as an annotation's array, when the name is
+/// the standard library's (a function of the repository by that name is none).
+fn array_of<'a>(
+    code: &Code<'a>,
+    file: &'a str,
+    scope: &'a str,
+    v: &'a Value,
+) -> Option<&'a [Value]> {
+    let Value::Call(call) = v else { return None };
+    (call.receiver.is_none() && call.callee == "arrayOf").then_some(())?;
+    known(code, file, scope, &call.callee, |s| s == "kotlin.arrayOf")?;
+    Some(&call.args)
 }
 
 /// The methods `@RequestMapping(method = ..)` names: every method without one, and those of
@@ -283,12 +304,17 @@ fn request_methods<'a>(code: &Code<'a>, file: &'a str, call: &'a Call) -> Option
         let spelled = known(code, file, &call.scope, name, member)?;
         member_of(&spelled, REQUEST_METHOD).map(str::to_string)
     };
-    let methods: Vec<String> = match call.keyword("method") {
-        None => return Some(vec![ANY.into()]),
-        Some(Value::List(items)) => items.iter().filter_map(member).collect(),
-        Some(one) => member(one).into_iter().collect(),
+    let listed: Option<&[Value]> = match call.keyword("method") {
+        Some(Value::List(items)) => Some(items),
+        Some(one) => array_of(code, file, &call.scope, one),
+        None => None,
     };
-    let empty = matches!(call.keyword("method"), Some(Value::List(items)) if items.is_empty());
+    let methods: Vec<String> = match (call.keyword("method"), listed) {
+        (None, _) => return Some(vec![ANY.into()]),
+        (_, Some(items)) => items.iter().filter_map(member).collect(),
+        (Some(one), None) => member(one).into_iter().collect(),
+    };
+    let empty = listed.is_some_and(<[Value]>::is_empty);
     match (methods.is_empty(), empty) {
         (true, true) => Some(vec![ANY.into()]),
         (true, false) => None,
@@ -602,6 +628,57 @@ mod tests {
                 "http::GET::/api/v1/{}/flag",
             ]
         );
+    }
+
+    #[test]
+    fn a_kotlin_star_import_from_spring_binds_its_annotations_and_enum() {
+        let imports = "import org.springframework.web.bind.annotation.*\n";
+        let body = "@RestController class C {\n\
+            @GetMapping(\"/x\") fun f() {}\n\
+            @RequestMapping(\"/y\", method = [RequestMethod.PUT]) fun g() {}\n}";
+        assert_eq!(
+            served_kotlin(imports, body, &[]),
+            ["http::GET::/x", "http::PUT::/y"]
+        );
+        // A type of the package hides the star import's name.
+        let own = [("a/GetMapping.kt", "package a\nannotation class GetMapping")];
+        assert_eq!(served_kotlin(imports, body, &own), ["http::PUT::/y"]);
+    }
+
+    #[test]
+    fn kotlin_several_paths_and_array_of_fill_the_arrays() {
+        let body = "@RestController @RequestMapping(\"/p\", \"/q\") class C {\n\
+            @GetMapping(\"/a\", \"/b\") fun f() {}\n\
+            @PostMapping(value = arrayOf(\"/c\")) fun g() {}\n\
+            @RequestMapping(\"/d\", method = arrayOf(RequestMethod.PUT)) fun h() {}\n\
+            @RequestMapping(\"/e\", method = arrayOf()) fun i() {}\n}";
+        let imports =
+            format!("{KOTLIN_IMPORTS}import org.springframework.web.bind.annotation.PostMapping\n");
+        let found = served_kotlin(&imports, body, &[]);
+        let wanted = |m: &str, route: &str| ["/p", "/q"].map(|p| format!("http::{m}::{p}{route}"));
+        let mut expected: Vec<String> = [
+            ("GET", "/a"),
+            ("GET", "/b"),
+            ("POST", "/c"),
+            ("PUT", "/d"),
+            ("ANY", "/e"),
+        ]
+        .iter()
+        .flat_map(|(m, r)| wanted(m, r))
+        .collect();
+        expected.sort();
+        assert_eq!(found, expected);
+        // Two kinds of argument, or an `arrayOf` of the repository, serve nothing.
+        let mixed = "@RestController class C { @GetMapping(\"/a\", path = [\"/b\"]) fun f() {} }";
+        assert!(served_kotlin(KOTLIN_IMPORTS, mixed, &[]).is_empty());
+        let own = [(
+            "a/Own.kt",
+            "package a\nfun arrayOf(vararg s: String): Array<String> = emptyArray()",
+        )];
+        let hidden = "@RestController class C { @GetMapping(arrayOf(\"/a\")) fun f() {} }";
+        assert!(served_kotlin(KOTLIN_IMPORTS, hidden, &own).is_empty());
+        let plain = "@RestController class C { @GetMapping(arrayOf(\"/a\")) fun f() {} }";
+        assert_eq!(served_kotlin(KOTLIN_IMPORTS, plain, &[]), ["http::GET::/a"]);
     }
 
     #[test]

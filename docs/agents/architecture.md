@@ -1878,7 +1878,14 @@ one for the area a change touches.
   `.kt`, `.kts`, in the shared `Code`), with the same annotations and rules: the Kotlin pack
   writes `["/a", "/b"]` as a `Value::List` and `method = [RequestMethod.X]` as a keyword list, and
   a bare constant of a class's companion folds (`Resolver::inherited_field` reads the companion
-  after the family, unless its own bases are unknown). JAX-RS and the clients keep `java_files`.
+  after the family, unless its own bases are unknown: a ceiling, since a same-named name outside
+  then wins over the companion's inherited member). Several unnamed paths (`@GetMapping("/a",
+  "/b")`) fill the `value` array, and `arrayOf(..)` counts as `[..]` in a path or a `method`
+  when `known` says the name is `kotlin.arrayOf`. The pack writes a star import as an `inside`
+  glob (it sees `internal` members), so `Resolver::on_demand` takes the outside source of an
+  `inside` glob too (never the repository's names), and an outside star import
+  (`...bind.annotation.*`) gives `known` its candidate, as Java's does.
+  JAX-RS and the clients keep `java_files`.
   JAX-RS (#87, `jax_rs` in the same file): a method with a verb annotation (`GET` ... `OPTIONS`)
   of a class with `@Path`, from `javax.ws.rs` or `jakarta.ws.rs`, joined to the method's own
   `@Path`; both packages through the same `known`, so `import javax.ws.rs.*` beside
