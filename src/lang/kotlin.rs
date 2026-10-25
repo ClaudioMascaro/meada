@@ -241,6 +241,8 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     // The names some assignment writes, which no one value stands for (`Code::field_written`).
     let mut writes = BTreeSet::new();
     let mut locals: Vec<Receiver> = Vec::new();
+    // The `val`s of unknown class a `Bound` was recorded for, by qualified name.
+    let mut vals: Vec<String> = Vec::new();
     // The receivers of tracked lambdas, by the lambda's node.
     let mut tracked: HashMap<usize, Tracked> = HashMap::new();
     let mut later: Vec<Later> = Vec::new();
@@ -692,13 +694,18 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
             let property = node
                 .parent()
                 .filter(|p| children(*p).any(|c| c.kind() == "val"));
-            if let (Class::Named(_), Some(initial)) = (&class, property.and_then(initial)) {
+            // The value a client reader follows to its base: a constructor call, a factory call
+            // (`WebClient.create(..)`, `.build()`), written type or none.
+            if let Some(initial) = property.and_then(initial) {
                 facts.bound.push(Bound {
                     scope: scope.to_string(),
                     within: scope.to_string(),
                     name: text(name, src).to_string(),
                     value: value(initial, src, 0),
                 });
+                if class == Class::Unknown {
+                    vals.push(qualify(&scope, text(name, src)));
+                }
             }
             if class == Class::Unknown {
                 facts.locals.push(qualify(&scope, text(name, src)));
@@ -782,6 +789,16 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
             })
             .collect(),
     );
+    // A name another binding of the scope also declares (a loop variable, a `catch` parameter)
+    // holds no one value: the bound of such a `val` is dropped. Two `val`s keep both bounds.
+    let taken = |name: &String| {
+        let (held, declared) = (vals.iter().filter(|v| *v == name).count(), &facts.locals);
+        declared.iter().filter(|l| *l == name).count() > held
+    };
+    let shared: HashSet<String> = vals.iter().filter(|v| taken(v)).cloned().collect();
+    facts
+        .bound
+        .retain(|b| !shared.contains(&qualify(&b.scope, &b.name)));
     facts.locals.sort();
     facts.locals.dedup();
     for names in facts.overloads.values_mut() {
@@ -1513,6 +1530,10 @@ fn call(node: Node, src: &[u8], scope: &str, implicit: Implicit, lambdas: bool) 
         uses: Vec::new(),
     };
     (at.args, at.kwargs) = arguments(&args, src, 0, lambdas.then_some(scope));
+    if let Some(ty) = type_argument(node, src) {
+        at.kwargs
+            .push((TYPE_ARGUMENT.into(), Value::Member(ty, "class".into())));
+    }
     if function.kind() == "navigation_expression" {
         at.receiver = named(function).next().map(|n| value(n, src, 0));
     }
@@ -1839,6 +1860,43 @@ fn callee(node: Node, src: &[u8]) -> String {
     parts.join(".")
 }
 
+/// The key of the type argument a call is given (`create<Api>()`) among its keyword arguments:
+/// the class as the `Member(X, "class")` of the literal `X::class.java`. No name matches it.
+pub const TYPE_ARGUMENT: &str = "<type>=";
+
+/// The class `X` of the one type argument `f<X>(..)` is written with (a path, `a.X`, too).
+fn type_argument(node: Node, src: &[u8]) -> Option<String> {
+    // With a trailing lambda the call wraps the one the arguments belong to.
+    let inner = named(node).next().filter(|f| f.kind() == "call_expression");
+    let arguments = named(inner.unwrap_or(node)).find(|n| n.kind() == "type_arguments")?;
+    let mut projections = named(arguments);
+    let (only, rest) = (projections.next()?, projections.next());
+    let ty = named(only)
+        .find(|n| n.kind() == "user_type")
+        .filter(|_| rest.is_none())?;
+    let path: Vec<&str> = (named(ty).take_while(|n| n.kind() == "identifier"))
+        .map(|n| text(n, src))
+        .collect();
+    (!path.is_empty()).then(|| path.join("."))
+}
+
+/// The class `X` of the class literal `X::class.java` (a path, `a.X`, too).
+fn java_class(node: Node, src: &[u8]) -> Option<String> {
+    let mut outer = named(node);
+    let (literal, java) = (outer.next()?, outer.next()?);
+    if outer.next().is_some()
+        || text(java, src) != "java"
+        || literal.kind() != "navigation_expression"
+    {
+        return None;
+    }
+    let mut inner = named(literal);
+    let (on, class) = (inner.next()?, inner.next()?);
+    let literal_of_class =
+        children(literal).any(|c| c.kind() == "::") && text(class, src) == "class";
+    (inner.next().is_none() && literal_of_class).then(|| callee(on, src))
+}
+
 /// The string methods an environment read passes through, still the variable's value as far as
 /// the host goes.
 const STRING_METHODS: &[&str] = &[
@@ -1986,7 +2044,12 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             }
             Value::Str(parts)
         }
-        "identifier" | "navigation_expression" => Value::Ref(callee(node, src)),
+        // `Api::class.java`, the `Api.class` of Java.
+        "navigation_expression" => match java_class(node, src) {
+            Some(class) => Value::Member(class, "class".into()),
+            None => Value::Ref(callee(node, src)),
+        },
+        "identifier" => Value::Ref(callee(node, src)),
         "this_expression" => Value::Ref("this".into()),
         "call_expression" => {
             let (function, args) = parts(node);
@@ -2162,6 +2225,63 @@ mod tests {
             Value::Str(parts) => Some(parts),
             _ => None,
         }
+    }
+
+    /// A class literal is the member `class` of the class named, as Java's `Api.class` is: the
+    /// `Api::class.java` that Retrofit's `create` takes.
+    #[test]
+    fn a_class_literal_is_the_member_class_of_the_type() {
+        let of = |literal: &str| {
+            let facts = parse(format!("package a\nval x = {literal}\n").as_bytes(), false);
+            facts.unwrap().consts.remove(0).value
+        };
+        for literal in ["Api::class.java", "a.Api::class.java"] {
+            let name = literal.split("::").next().unwrap();
+            let Value::Member(ty, class) = of(literal) else {
+                panic!("{literal} is a class literal");
+            };
+            assert_eq!((ty.as_str(), class.as_str()), (name, "class"), "{literal}");
+        }
+        // A callable reference is no class literal.
+        assert!(!matches!(of("Api::create"), Value::Member(..)));
+    }
+
+    /// The one type argument of a call is its keyword `TYPE_ARGUMENT`, a class literal as
+    /// `create(Api::class.java)` gives it; two of them, or none, give none.
+    #[test]
+    fn a_type_argument_is_the_class_of_a_keyword() {
+        let of = |call: &str| {
+            let src = format!("package a\nfun f() {{ {call} }}\n");
+            let mut calls = parse(src.as_bytes(), false).unwrap().calls;
+            let call = calls.swap_remove(0);
+            (call.keyword(TYPE_ARGUMENT)).map(|v| match v {
+                Value::Member(ty, class) => format!("{ty}.{class}"),
+                _ => "?".into(),
+            })
+        };
+        assert_eq!(of("one.create<Api>()").as_deref(), Some("Api.class"));
+        assert_eq!(of("create<a.Api>()").as_deref(), Some("a.Api.class"));
+        assert_eq!(of("create<List<Api>>()").as_deref(), Some("List.class"));
+        assert_eq!(of("create<A, B>()"), None);
+        assert_eq!(of("create(1)"), None);
+    }
+
+    /// A `val` of unknown class is bound to its initializer, unless a binding of another kind
+    /// (a loop variable, a `catch` parameter) declares the name in the scope.
+    #[test]
+    fn a_local_val_is_bound_when_no_other_binding_shares_its_name() {
+        let bound = |body: &str| {
+            let src = format!("package a\nfun f(xs: List<Any>) {{ {body} }}\n");
+            let facts = parse(src.as_bytes(), false).unwrap();
+            facts.bound.into_iter().map(|b| b.name).collect::<Vec<_>>()
+        };
+        assert_eq!(bound("val a = xs.make()"), ["a"]);
+        assert_eq!(
+            bound("val a = xs.make(); for (a in xs) { use(a) }"),
+            [] as [&str; 0]
+        );
+        // Two `val`s keep both, which `jvm::names::local` reads as a name declared twice.
+        assert_eq!(bound("val a = xs.make(); val a = xs.other()"), ["a", "a"]);
     }
 
     /// `\$` is a `$` that starts no template: Spring's `@Value("\${key}")` is the text `${key}`.

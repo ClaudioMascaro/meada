@@ -22,10 +22,10 @@
 // in place are read through.
 
 use super::super::{based, consumer, fetches};
-use super::{made, member_of};
+use super::{folded_local, made, member_of};
 use crate::contract::Found;
 use crate::index::Indexed;
-use crate::jvm::names::{java_files, one, spellings, typed};
+use crate::jvm::names::{jvm_files, one, spellings, typed};
 use crate::jvm::spring::{self, Configs};
 use crate::lang::{Annotated, Call, Invocation, Part, Value};
 use crate::resolve::{Code, Expand, Expanded, FLUENT_CHAIN, method as member};
@@ -97,16 +97,24 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
         spring::inject(configs, code, path, annotated)
     };
     let mut found = Vec::new();
-    for (path, facts) in java_files(code) {
+    for (path, facts) in jvm_files(code) {
         for n in 0..facts.calls.len() {
             let Some(client) = client(code, path, &facts.calls, n) else {
                 continue;
+            };
+            // A client held by a local with no written type: its value, where it is made.
+            let held = match (&client, code.receiver(path, n)) {
+                (Client::Web, Some(Value::Call(request))) => (request.receiver.as_deref())
+                    .and_then(|c| {
+                        folded_local(code, (path, &facts.calls[n].scope), c, Some(&inject))
+                    }),
+                _ => None,
             };
             let read = |values: &[Value], _: &[(String, Value)]| {
                 let [Value::Call(call)] = values else {
                     return None;
                 };
-                let (url, method) = sends(&client, call);
+                let (url, method) = sends(&client, call, held.as_ref());
                 fetches(&[url, method])
             };
             for Expanded {
@@ -132,18 +140,36 @@ fn client<'a>(code: &Code<'a>, path: &'a str, calls: &'a [Call], index: usize) -
     if rest.is_some() || member == "exchange" {
         let (receiver, _) = stored.callee.rsplit_once('.')?;
         let typed = typed(code, path, &stored.scope, receiver);
-        one(&typed, |t| t == REST_TEMPLATE)?;
+        if one(&typed, |t| t == REST_TEMPLATE).is_none() {
+            // No type written (Kotlin infers it): the `RestTemplate()` call that made it.
+            let receiver = code.receiver(path, index).filter(|_| typed.is_empty())?;
+            made(
+                code,
+                (path, &stored.scope),
+                receiver,
+                REST_TEMPLATE,
+                constructs,
+            )
+            .then_some(())?;
+        }
         return Some(Client::Rest(rest.map(|(_, m)| *m)));
     }
     match member {
         "uri" => {
-            let starts = self::member(&calls.get(stored.on?)?.callee);
-            if starts != "method" && !WEB_METHODS.iter().any(|(m, _)| *m == starts) {
-                return None;
+            // The kept facts tell the call it is made on only when the pack gives `Call::on`.
+            if let Some(on) = stored.on {
+                let starts = self::member(&calls.get(on)?.callee);
+                if starts != "method" && !WEB_METHODS.iter().any(|(m, _)| *m == starts) {
+                    return None;
+                }
             }
             let Some(Value::Call(request)) = code.receiver(path, index) else {
                 return None;
             };
+            let starts = self::member(&request.callee);
+            if starts != "method" && !WEB_METHODS.iter().any(|(m, _)| *m == starts) {
+                return None;
+            }
             let client = request.receiver.as_deref()?;
             web_client(code, path, &stored.scope, client).then_some(Client::Web)
         }
@@ -156,8 +182,10 @@ fn client<'a>(code: &Code<'a>, path: &'a str, calls: &'a [Call], index: usize) -
                     None => break,
                 }
             }
+            // Kotlin's pack gives no `Call::on`: the chain's start is read below.
             if self::member(&start.callee) != "newBuilder"
                 && !start.callee.starts_with("(expression).")
+                && !(stored.on.is_none() && start.callee.starts_with("(call_expression)."))
             {
                 return None;
             }
@@ -180,6 +208,12 @@ fn client<'a>(code: &Code<'a>, path: &'a str, calls: &'a [Call], index: usize) -
                     setter: "url",
                     methods: OK_METHODS,
                 }),
+                // Kotlin calls the constructor: the chain starts at the call itself.
+                _ if started(&call.callee, OK_BUILDER) => Some(Client::Builder {
+                    start: "Builder",
+                    setter: "url",
+                    methods: OK_METHODS,
+                }),
                 _ => None,
             }
         }
@@ -188,7 +222,7 @@ fn client<'a>(code: &Code<'a>, path: &'a str, calls: &'a [Call], index: usize) -
 }
 
 /// The URL and the method of `call`, read whole by `Expand::Chain`, on `client`.
-fn sends(client: &Client, call: &Invocation) -> (Value, Value) {
+fn sends(client: &Client, call: &Invocation, held: Option<&Value>) -> (Value, Value) {
     let text = |m: &str| Value::Str(vec![Part::Text(m.to_string())]);
     match client {
         Client::Rest(method) => {
@@ -211,7 +245,7 @@ fn sends(client: &Client, call: &Invocation) -> (Value, Value) {
                 // A client a wrapper's caller passes: its base is read at each caller.
                 Some(Value::Ref(name)) => (Value::Ref(name.clone()), method),
                 client => (
-                    based(base(client).as_deref(), &url(call.args.first())),
+                    based(base(held.or(client)).as_deref(), &url(call.args.first())),
                     method,
                 ),
             }
@@ -367,6 +401,16 @@ fn spring_method(value: Option<&Value>) -> Value {
         Some(Value::Ref(name)) => Value::Ref(name.clone()),
         _ => Value::Unknown,
     }
+}
+
+/// Whether the call at `index` of `path` is the constructor `RestTemplate(..)`: Kotlin writes no
+/// `new`.
+fn constructs<'a>(code: &Code<'a>, path: &'a str, index: usize) -> bool {
+    let call = &code.files()[path].calls[index];
+    one(&spellings(code, path, &call.scope, &call.callee), |s| {
+        s == REST_TEMPLATE
+    })
+    .is_some()
 }
 
 /// Whether `client` (a name, or a call made in place) is a WebClient: written as one, or made

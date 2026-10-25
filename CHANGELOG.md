@@ -62,6 +62,18 @@ All notable changes to Meada are recorded here. The format follows
   serves links by host. `System.getenv("X")` and `System.getenv()["X"]`, through `?:`
   fallbacks, `!!` and string methods such as `trimEnd` and `removeSuffix`, are the base URL
   variable `X`. A cross-language fixture links TypeScript and Ktor in both directions.
+- Kotlin HTTP consumers (issue #101): `RestTemplate`, `WebClient`, OkHttp and Retrofit are read
+  in Kotlin files with the Java rules, written the Kotlin way: no `new`, a `RestTemplate()` or
+  `Request.Builder()` constructor call, `HttpMethod` and `HttpUrl` imports by `*`, and
+  `Api::class.java` as the Retrofit service. A Retrofit interface with annotated `fun`s links
+  each function to its provider, and a Kotlin base comes from a literal, `@Value` or
+  `System.getenv` with the rules of issue #100. A client held by a property, a constructor
+  property or a local `val` is followed (`val x = RestTemplate()`, `val web =
+  WebClient.create(..)`, `val retrofit = Retrofit.Builder()...build()`), and the base comes from
+  the call that made it. The extension `retrofit.create<Api>()` (with `import retrofit2.create`)
+  creates the interface as `create(Api::class.java)` does. A named argument on a nested builder
+  step and an OkHttp builder held by a local are not read. A cross-language fixture calls the
+  TypeScript provider through a Retrofit interface.
 - Java OpenFeign and Retrofit clients (issue #90): each method of an `@FeignClient(name, url)`
   interface with Spring mapping annotations, or of a Retrofit interface with `retrofit2.http`
   verbs, is an HTTP consumer sited at the interface method, so a caller of the method reaches

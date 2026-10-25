@@ -10,6 +10,10 @@
       "hash": "e8eda934a8be2e6b447d412af40d16e029fd9eacf6b8c3a38c8eee1a36abedf2"
     },
     {
+      "path": "src/main/kotlin/com/example/api/Ledger.kt",
+      "hash": "f361eafc5e6ad6b6564ebdc8bcdd6980ddf97640d9a93916ec15b65235a4b533"
+    },
+    {
       "path": "src/main/kotlin/com/example/api/MirrorClient.kt",
       "hash": "88531871e07ce77592312e37fa7d742a8dd0234c2c2b8d2d022db4ab3cc54481"
     },
@@ -27,7 +31,7 @@
     },
     {
       "path": "src/main/kotlin/com/example/api/Server.kt",
-      "hash": "6b31ae07fb96cbe59680d107c6ed76592a362fadf589933a9aa5fd5e81e88a5b"
+      "hash": "e6316d4072dad452b0e236accfb5577d256c1f094144ef25c131e4a210679757"
     },
     {
       "path": "src/main/kotlin/com/example/api/StockClient.kt",
@@ -65,6 +69,38 @@
         "path": "src/main/kotlin/com/example/api/InventoryClient.kt",
         "start": 363,
         "end": 447
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.LedgerApi",
+      "span": {
+        "path": "src/main/kotlin/com/example/api/Ledger.kt",
+        "start": 258,
+        "end": 363
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.LedgerApi.entry(String)",
+      "span": {
+        "path": "src/main/kotlin/com/example/api/Ledger.kt",
+        "start": 284,
+        "end": 361
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.Ledgers",
+      "span": {
+        "path": "src/main/kotlin/com/example/api/Ledger.kt",
+        "start": 365,
+        "end": 511
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.Ledgers.api()",
+      "span": {
+        "path": "src/main/kotlin/com/example/api/Ledger.kt",
+        "start": 386,
+        "end": 509
       }
     },
     {
@@ -140,27 +176,27 @@
       }
     },
     {
-      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient)",
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi)",
       "span": {
         "path": "src/main/kotlin/com/example/api/Server.kt",
         "start": 371,
-        "end": 1068
+        "end": 1124
       }
     },
     {
-      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}",
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}",
       "span": {
         "path": "src/main/kotlin/com/example/api/Server.kt",
-        "start": 630,
-        "end": 800
+        "start": 653,
+        "end": 856
       }
     },
     {
-      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve",
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve",
       "span": {
         "path": "src/main/kotlin/com/example/api/Server.kt",
-        "start": 830,
-        "end": 1050
+        "start": 886,
+        "end": 1106
       }
     },
     {
@@ -256,6 +292,61 @@
         "path": "src/main/kotlin/com/example/api/InventoryClient.kt",
         "start": 290,
         "end": 305
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.LedgerApi::GET#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.LedgerApi",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/com/example/api/Ledger.kt",
+        "start": 284,
+        "end": 307
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.Ledgers.api()::(call_expression).baseUrl#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.Ledgers.api()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/com/example/api/Ledger.kt",
+        "start": 417,
+        "end": 471
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.Ledgers.api()::(call_expression).build#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.Ledgers.api()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/com/example/api/Ledger.kt",
+        "start": 417,
+        "end": 479
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.Ledgers.api()::(call_expression).create#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.Ledgers.api()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/com/example/api/Ledger.kt",
+        "start": 417,
+        "end": 509
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.Ledgers.api()::Retrofit.Builder#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.Ledgers.api()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/com/example/api/Ledger.kt",
+        "start": 417,
+        "end": 435
       }
     },
     {
@@ -402,135 +493,146 @@
       }
     },
     {
-      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}::call.respondText#0",
-      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}",
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}::call.respondText#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}",
       "target": null,
       "level": null,
       "span": {
         "path": "src/main/kotlin/com/example/api/Server.kt",
-        "start": 766,
-        "end": 786
+        "start": 822,
+        "end": 842
       }
     },
     {
-      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}::prices.priceOf#0",
-      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}",
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}::ledger.entry#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}",
+      "target": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.LedgerApi.entry(String)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/com/example/api/Server.kt",
+        "start": 789,
+        "end": 805
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}::prices.priceOf#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}",
       "target": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/PriceClient.kt::com.example.api.PriceClient.priceOf(String)",
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/com/example/api/Server.kt",
-        "start": 701,
-        "end": 719
+        "start": 724,
+        "end": 742
       }
     },
     {
-      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}::stock.level#0",
-      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}",
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}::stock.level#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}",
       "target": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/StockClient.kt::com.example.api.StockClient.level()",
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/com/example/api/Server.kt",
-        "start": 736,
-        "end": 749
+        "start": 759,
+        "end": 772
       }
     },
     {
-      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve::audit.record#0",
-      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve",
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve::audit.record#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve",
       "target": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/AuditClient.kt::com.example.api.AuditClient.record()",
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/com/example/api/Server.kt",
-        "start": 848,
-        "end": 862
+        "start": 904,
+        "end": 918
       }
     },
     {
-      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve::call.respondText#0",
-      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve",
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve::call.respondText#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve",
       "target": null,
       "level": null,
       "span": {
         "path": "src/main/kotlin/com/example/api/Server.kt",
-        "start": 1008,
-        "end": 1036
+        "start": 1064,
+        "end": 1092
       }
     },
     {
-      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve::inventory.left#0",
-      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve",
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve::inventory.left#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve",
       "target": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/InventoryClient.kt::com.example.api.InventoryClient.left(String)",
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/com/example/api/Server.kt",
-        "start": 947,
-        "end": 991
+        "start": 1003,
+        "end": 1047
       }
     },
     {
-      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve::promotions.current#0",
-      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve",
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve::promotions.current#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve",
       "target": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/PromotionClient.kt::com.example.api.PromotionClient.current()",
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/com/example/api/Server.kt",
-        "start": 879,
-        "end": 899
+        "start": 935,
+        "end": 955
       }
     },
     {
-      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve::reports.send#0",
-      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve",
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve::reports.send#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve",
       "target": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/ReportClient.kt::com.example.api.ReportClient.send()",
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/com/example/api/Server.kt",
-        "start": 916,
-        "end": 930
+        "start": 972,
+        "end": 986
       }
     },
     {
-      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient)::(anonymous).get#0",
-      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient)",
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi)::(anonymous).get#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi)",
       "target": null,
       "level": null,
       "span": {
         "path": "src/main/kotlin/com/example/api/Server.kt",
-        "start": 617,
-        "end": 800
+        "start": 640,
+        "end": 856
       }
     },
     {
-      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient)::(anonymous).post#0",
-      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient)",
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi)::(anonymous).post#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi)",
       "target": null,
       "level": null,
       "span": {
         "path": "src/main/kotlin/com/example/api/Server.kt",
-        "start": 813,
-        "end": 1050
+        "start": 869,
+        "end": 1106
       }
     },
     {
-      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient)::(anonymous).route#0",
-      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient)",
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi)::(anonymous).route#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi)",
       "target": null,
       "level": null,
       "span": {
         "path": "src/main/kotlin/com/example/api/Server.kt",
-        "start": 586,
-        "end": 1060
+        "start": 609,
+        "end": 1116
       }
     },
     {
-      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient)::routing#0",
-      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient)",
+      "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi)::routing#0",
+      "caller": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi)",
       "target": null,
       "level": null,
       "span": {
         "path": "src/main/kotlin/com/example/api/Server.kt",
-        "start": 568,
-        "end": 1066
+        "start": 591,
+        "end": 1122
       }
     },
     {
@@ -570,11 +672,11 @@
   "providers": [
     {
       "contract": "http::GET::/orders/{}",
-      "site": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}"
+      "site": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}"
     },
     {
       "contract": "http::POST::/orders/reserve",
-      "site": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve"
+      "site": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve"
     },
     {
       "contract": "package::maven::com.example:api",
@@ -585,6 +687,11 @@
     {
       "contract": "http::POST::/api/audit",
       "site": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/AuditClient.kt::com.example.api.AuditClient.record()::client.post#0",
+      "via": "host:web.example.com"
+    },
+    {
+      "contract": "http::GET::/api/ledger/{}",
+      "site": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.LedgerApi.entry(String)",
       "via": "host:web.example.com"
     },
     {
@@ -604,12 +711,12 @@
     },
     {
       "contract": "http::GET::/api/prices/{}",
-      "site": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}::prices.priceOf#0",
+      "site": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}::prices.priceOf#0",
       "via": "env:WEB_URL"
     },
     {
       "contract": "http::GET::/api/inventory/{}",
-      "site": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve::inventory.left#0",
+      "site": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve::inventory.left#0",
       "via": "env:WEB_URL"
     },
     {
@@ -635,14 +742,15 @@
         "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/InventoryClient.kt::com.example.api.InventoryClient.left(String)",
         "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/PromotionClient.kt::com.example.api.PromotionClient.current()",
         "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/ReportClient.kt::com.example.api.ReportClient.send()",
-        "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve"
+        "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve"
       ]
     },
     {
       "name": "src/main/kotlin/com/example/api#2",
       "members": [
+        "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.LedgerApi.entry(String)",
         "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/PriceClient.kt::com.example.api.PriceClient.priceOf(String)",
-        "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}",
+        "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}",
         "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/StockClient.kt::com.example.api.StockClient.level()"
       ]
     }
@@ -652,6 +760,13 @@
       "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/AuditClient.kt::com.example.api.AuditClient.record()::client.post#0",
       "provider": "example.com/xlang-kotlin/web::app/api/audit/route.ts::POST",
       "contract": "http::POST::/api/audit",
+      "level": "exact",
+      "reason": "host web.example.com is served by example.com/xlang-kotlin/web"
+    },
+    {
+      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.LedgerApi.entry(String)",
+      "provider": "example.com/xlang-kotlin/web::app/api/ledger/[id]/route.ts::GET",
+      "contract": "http::GET::/api/ledger/{}",
       "level": "exact",
       "reason": "host web.example.com is served by example.com/xlang-kotlin/web"
     },
@@ -670,14 +785,14 @@
       "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-kotlin/web"
     },
     {
-      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}::prices.priceOf#0",
+      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}::prices.priceOf#0",
       "provider": "example.com/xlang-kotlin/web::app/api/prices/[sku]/route.ts::GET",
       "contract": "http::GET::/api/prices/{}",
       "level": "inferred",
       "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-kotlin/web"
     },
     {
-      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve::inventory.left#0",
+      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve::inventory.left#0",
       "provider": "example.com/xlang-kotlin/web::app/api/inventory/[sku]/route.ts::GET",
       "contract": "http::GET::/api/inventory/{}",
       "level": "inferred",
@@ -692,14 +807,14 @@
     },
     {
       "consumer": "example.com/xlang-kotlin/web::src/orders.ts::reserveOrder::fetch#0",
-      "provider": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve",
+      "provider": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve",
       "contract": "http::POST::/orders/reserve",
       "level": "exact",
       "reason": "host api.example.com is served by example.com/xlang-kotlin/api"
     },
     {
       "consumer": "example.com/xlang-kotlin/web::src/sync.ts::syncOrders::orderStatus#0",
-      "provider": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}",
+      "provider": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}",
       "contract": "http::GET::/orders/{}",
       "level": "inferred",
       "reason": "base URL from API_URL, a base_url_env of peer example.com/xlang-kotlin/api"

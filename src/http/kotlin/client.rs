@@ -20,10 +20,9 @@
 use super::{external, implicit};
 use crate::contract::Found;
 use crate::index::Indexed;
-use crate::jvm::names::{one, spellings, typed};
+use crate::jvm::names::{local, one, spellings, typed};
 use crate::jvm::spring::{self, Configs};
-use crate::lang::{Annotated, Bound, Call, Class, Part, Value};
-use crate::qualify;
+use crate::lang::{Annotated, Bound, Call, Part, Value};
 use crate::resolve::{Code, Expand, Expanded, Follow, Of, passes_nothing};
 
 use super::super::{based, consumer, fetches};
@@ -99,7 +98,7 @@ impl<'c, 'a> Clients<'c, 'a> {
                 return Some(vec![Client::Typed]);
             }
             // A local with no written type holds what the pack recorded for it.
-            let Bound { within, value, .. } = self.local(path, scope, name)?;
+            let Bound { within, value, .. } = local(self.code, path, scope, name)?;
             return match depth < LOCAL_DEPTH {
                 true => self.reach(path, within, value, depth + 1),
                 false => None,
@@ -117,40 +116,6 @@ impl<'c, 'a> Clients<'c, 'a> {
         let call = &self.code.files()[path].calls[index];
         let spelled = spellings(self.code, path, &call.scope, &call.callee);
         one(&spelled, |s| s == CLIENT).is_some()
-    }
-
-    /// The value the nearest binding of `name` around `scope` holds, when the pack recorded it
-    /// and no other binding of the name is in the same scope (a name declared twice, a loop
-    /// variable, a parameter, a constant, a property).
-    fn local(&self, path: &'a str, scope: &'a str, name: &str) -> Option<&'a Bound> {
-        let facts = self.code.files()[path];
-        let mut at = Some(scope);
-        while let Some(s) = at {
-            let mut bound =
-                (self.code.bound(path).iter()).filter(|b| b.scope == s && b.name == name);
-            let held = bound.next();
-            let qualified = qualify(s, name);
-            let others = bound.next().is_some()
-                || facts.locals.binary_search(&qualified).is_ok()
-                || (facts.consts.iter()).any(|c| c.name == qualified)
-                || (facts.defs.iter())
-                    .any(|d| d.name == s && d.params.iter().any(|p| p.name == name))
-                || (facts.receivers.iter())
-                    .any(|r| r.scope == s && r.name == name && r.class == Class::Unknown);
-            match (held, others) {
-                (Some(found), false) => return Some(found),
-                (None, false)
-                    if !facts
-                        .receivers
-                        .iter()
-                        .any(|r| r.scope == s && r.name == name) =>
-                {
-                    at = (!s.is_empty()).then(|| crate::parent(s));
-                }
-                _ => return None,
-            }
-        }
-        None
     }
 
     /// The base URL `clients` share, `None` when none is set. A hole when they differ or one is

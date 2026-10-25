@@ -1906,7 +1906,26 @@ qualification budget does (ADR 0017).
   glob (it sees `internal` members), so `Resolver::on_demand` takes the outside source of an
   `inside` glob too (never the repository's names), and an outside star import
   (`...bind.annotation.*`) gives `known` its candidate, as Java's does.
-  JAX-RS and the clients keep `java_files`.
+  JAX-RS and Feign keep `java_files`; the `RestTemplate`, `WebClient`, OkHttp and Retrofit readers
+  take `jvm_files` (spec #27, #101): Kotlin writes the same clients without `new`
+  (`RestTemplate()`, `Request.Builder()`, a `Call::receiver` of `Retrofit` and no `Call::on`),
+  so the `uri` and `build` steps of `clients.rs` match a chain step spelled
+  `(call_expression).name`, `constructs` takes a `RestTemplate(..)` call for the written type, and
+  `made` falls back, after typed and origin lookups, to `jvm::names::local` (Kotlin's
+  `Facts::bound`, shared with the Ktor reader) up to `LOCAL_DEPTH`. The pack binds every local
+  `val` with an initializer, whatever its class (a factory call `WebClient.create(..)` or a
+  `.build()` has none), and drops the bound of one whose name a loop variable or a `catch`
+  parameter also declares in the scope; `local` then does not take the `val`'s own entry in
+  `Facts::locals` for another binding (a typed one still has its receiver). A client held by such a
+  local gets its base from `folded_local` (`http/java.rs`): the call it is bound to, folded by
+  `Expand::Chain` where it is made, replaces the evaluated `Ref` that `sends` (`Client::Web`) and
+  `declarative::base` would read as an unknown base. The Kotlin pack reads `X::class.java` as
+  `Value::Member(X, "class")`, the Java class literal, and gives a call's one type argument
+  (`create<Api>()`) as the same member under the keyword `lang::kotlin::TYPE_ARGUMENT`, which no
+  name matches; `retrofit_clients` takes it for `create` only when `retrofit2.create` is what
+  `known` says the name is. In `declarative.rs`, `builds`/`base` take the Kotlin constructor
+  `Retrofit.Builder` as the chain start, and the bases of a `.kt` file expand with Spring's
+  `@Value` inject (Java Retrofit bases stay as they were).
   JAX-RS (#87, `jax_rs` in the same file): a method with a verb annotation (`GET` ... `OPTIONS`)
   of a class with `@Path`, from `javax.ws.rs` or `jakarta.ws.rs`, joined to the method's own
   `@Path`; both packages through the same `known`, so `import javax.ws.rs.*` beside
@@ -2545,6 +2564,11 @@ qualification budget does (ADR 0017).
   stop injection into the constructor's property; `@Value` on a plain function's parameter is
   injected as if the function were a bean's. A secondary constructor's `@Value` parameters are
   not read, and a `@set:Value` property is taken as injected into its field.
+- Kotlin HTTP consumers (spec #27, #101): a named argument on a nested builder step
+  (`.url(url = ..)`) is dropped by `Invocation`, so the consumer is open, never a wrong link; an
+  OkHttp `Request.Builder` held by a local `val` is not followed (the chain starts at the local's
+  name, as in Java); a local that a wrapper's callers fold to several bases has an unknown one;
+  Java Retrofit bases from `@Value` stay unread; Feign remains Java-only.
 - Rust values (`lang/rust/values.rs`, `lang/rust/builders.rs`, spec #30 #131): `BUILDER_BUDGET`
   (2^20 syntax nodes per file, over every `let mut`, block by block in the order the blocks
   open), `BUILDER_DEPTH` (64 builders read within

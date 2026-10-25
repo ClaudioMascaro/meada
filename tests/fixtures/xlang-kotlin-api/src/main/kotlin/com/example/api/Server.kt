@@ -16,6 +16,7 @@ fun Application.module(
     promotions: PromotionClient,
     reports: ReportClient,
     inventory: InventoryClient,
+    ledger: LedgerApi,
 ) {
     routing {
         route("/orders") {
@@ -23,6 +24,7 @@ fun Application.module(
                 val id = call.parameters["id"] ?: ""
                 prices.priceOf(id)
                 stock.level()
+                ledger.entry(id)
                 call.respondText(id)
             }
             post("/reserve") {
