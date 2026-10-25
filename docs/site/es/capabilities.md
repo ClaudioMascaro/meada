@@ -54,9 +54,11 @@ Meada conecta consumidores y proveedores entre lenguajes, incluso detrás de gat
 | Python | `requests`, `httpx`, `aiohttp` | FastAPI, Flask, Django |
 | Rust | `reqwest`, `ureq` | axum, actix-web, Rocket |
 | Go | `net/http`, resty | `net/http`, gin, echo, chi, gorilla/mux |
-| Java | n/a | Spring MVC |
+| Java | n/a | Spring MVC, JAX-RS |
 
 En Java, un método de una clase `@RestController` o `@Controller` con `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping` o `@RequestMapping(method = RequestMethod.X)` pasa a ser proveedor, bajo el prefijo del `@RequestMapping` de la clase. La ruta pliega constantes `static final` (también de otras clases) y `+`; cada ruta de un array es un proveedor. Un `@RequestMapping` sin `method` atiende todos los métodos (`http::ANY::<ruta>`) y se vincula a consumidores de cualquier método, con "any method" en la razón. `server.servlet.context-path` no se aplica. Las anotaciones y `RequestMethod` valen por un import de Spring, simple, estático o `import ...bind.annotation.*`; una clase del repositorio con el mismo nombre, o un import que también podría traer el nombre, las oculta. En `method` o en un array de rutas, un elemento ilegible se ignora y los demás valen.
+
+En Java, una clase con `@Path` (`javax.ws.rs` o `jakarta.ws.rs`) es un recurso JAX-RS: un método con `@GET`, `@POST`, `@PUT`, `@PATCH`, `@DELETE`, `@HEAD` u `@OPTIONS` pasa a ser proveedor en la ruta de la clase más el `@Path` del método, con constantes plegadas y `{id}` o `{id:regex}` como parámetro. Un método solo con `@Path` (localizador de subrecurso) no es ruta, y `@ApplicationPath` no se aplica. Los nombres valen por import, como en Spring.
 
 En Rust, `base_url_env` puede vincular una URL base leída con `std::env::var`, `env!` o `dotenvy::var`. En Go, cubre `os.Getenv` y `os.LookupEnv`, incluidos valores por defecto con `if v == ""`, `len(v) == 0`, `!ok` o `!ok || v == ""` cuando `ok` viene del mismo `os.LookupEnv`. También sigue `strings.TrimSuffix`, `TrimRight` y `TrimSpace`.
 

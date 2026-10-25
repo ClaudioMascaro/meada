@@ -40,6 +40,11 @@ All notable changes to Meada are recorded here. The format follows
   `RequestMethod` count only through a Spring import (single-type, static or on-demand, the
   latter through the new `Outside::candidates`, which every Java kind can use); a shadowing
   repository type, a competing import and `server.servlet.context-path` give no route.
+- JAX-RS HTTP providers (spec #26, #87): methods with `@GET`, `@POST`, `@PUT`, `@PATCH`,
+  `@DELETE`, `@HEAD` or `@OPTIONS` in a class with `@Path`, under `javax.ws.rs` or
+  `jakarta.ws.rs`, at the class path joined to the method `@Path` with constants folded and
+  `{id:regex}` as a parameter. Names count only through an import, as for Spring; a method with
+  only `@Path` and `@ApplicationPath` give no route.
 
 - A multilingual documentation site (issue #320), with the README reference migrated to
   Portuguese, English and Spanish guides, React Flow maps and roadmap, accessible static and

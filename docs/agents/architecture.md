@@ -1691,6 +1691,11 @@ one for the area a change touches.
   (`{id:a/b}`) serves nothing. An unreadable element beside readable ones of a `method` or a
   path array is dropped: the others still serve. Interface-declared mappings, composed annotations
   and `server.servlet.context-path` are not read.
+  JAX-RS (#87, `jax_rs` in the same file): a method with a verb annotation (`GET` ... `OPTIONS`)
+  of a class with `@Path`, from `javax.ws.rs` or `jakarta.ws.rs`, joined to the method's own
+  `@Path`; both packages through the same `known`, so `import javax.ws.rs.*` beside
+  `jakarta.ws.rs.*` is two candidates and serves nothing. A `@Path`-only method and
+  `@ApplicationPath` are not routes.
 - `http/go.rs` (spec #25): a route is read only with a literal path and a literal prefix; a
   group prefix or a pattern Meada cannot read serves nothing. `net/http` reads `{name}`,
   `{name...}` and `{$}` alone: a `:name` segment is a literal no contract can spell, so its route
