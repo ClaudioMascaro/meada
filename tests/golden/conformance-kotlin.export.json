@@ -15,7 +15,7 @@
     },
     {
       "path": "src/main/kotlin/example/Main.kt",
-      "hash": "a97005cc64bb1b52fa598f128c41c30537c2ce01d948f9ccb1f197348dcae73c"
+      "hash": "ab6d474f8f6a4f9b773779763f968b9ccc9df154202c5cf7aa2bbd53c569bcd2"
     },
     {
       "path": "src/main/kotlin/example/Members.kt",
@@ -72,6 +72,22 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Launcher",
+      "span": {
+        "path": "src/main/kotlin/example/Main.kt",
+        "start": 198,
+        "end": 235
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Launcher.main()",
+      "span": {
+        "path": "src/main/kotlin/example/Main.kt",
+        "start": 220,
+        "end": 233
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Runner",
       "span": {
         "path": "src/main/kotlin/example/Main.kt",
@@ -85,6 +101,14 @@
         "path": "src/main/kotlin/example/Main.kt",
         "start": 181,
         "end": 194
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.String.main()",
+      "span": {
+        "path": "src/main/kotlin/example/Main.kt",
+        "start": 292,
+        "end": 312
       }
     },
     {
@@ -857,8 +881,13 @@
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.main(Array<String>)::(call_expression).main#0",
       "caller": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.main(Array<String>)",
-      "target": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Runner.main()",
-      "level": "inferred",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Launcher.main()",
+        "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Runner.main()",
+        "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.String.main()"
+      ],
       "span": {
         "path": "src/main/kotlin/example/Main.kt",
         "start": 93,
@@ -1845,7 +1874,6 @@
       "name": "src/main/kotlin/example#3",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Runner",
-        "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Runner.main()",
         "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.main(Array<String>)"
       ]
     },
@@ -1931,9 +1959,15 @@
         {
           "depth": 1,
           "repository": "example.com/acme/conformance",
-          "level": "inferred",
+          "level": "ambiguous",
           "via": "call",
-          "node": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Runner.main()"
+          "node": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.main(Array<String>)::(call_expression).main#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Launcher.main()",
+            "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Runner.main()",
+            "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.String.main()"
+          ]
         },
         {
           "depth": 1,

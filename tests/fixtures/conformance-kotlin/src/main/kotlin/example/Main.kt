@@ -9,3 +9,10 @@ fun main(args: Array<String>) {
 class Runner {
     fun main() {}
 }
+
+object Launcher {
+    fun main() {}
+}
+
+// An extension named `main` is no entry point either.
+fun String.main() {}
