@@ -1,0 +1,3 @@
+# A literal URL, matched by host against the peers' [serve] hosts.
+stock:
+  url: https://web.example.com

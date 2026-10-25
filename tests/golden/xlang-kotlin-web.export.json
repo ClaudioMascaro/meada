@@ -1,0 +1,388 @@
+{
+  "repository": "example.com/xlang-kotlin/web",
+  "files": [
+    {
+      "path": "app/api/audit/route.ts",
+      "hash": "646000f05a54a28b0fb8c1e897114cc25c059a12b6198b4cdb34ece09d6830d4"
+    },
+    {
+      "path": "app/api/inventory/[sku]/route.ts",
+      "hash": "42b6b93fec6956c15d6fef8c405fb62f7f7a654ba9fc8673cd66ad6fef3f21c8"
+    },
+    {
+      "path": "app/api/prices/[sku]/route.ts",
+      "hash": "864cec176aff35f6914c56db5d229d7318eeb37dc5b6e5c84930d8d1ee37ed67"
+    },
+    {
+      "path": "app/api/promotions/route.ts",
+      "hash": "e4dcd4a1eac15dcb79254b7175ad12eebdfcb0889c88de5852ab456e118e0b08"
+    },
+    {
+      "path": "app/api/reports/route.ts",
+      "hash": "e4dcd4a1eac15dcb79254b7175ad12eebdfcb0889c88de5852ab456e118e0b08"
+    },
+    {
+      "path": "app/api/stock/route.ts",
+      "hash": "4455f21194764169c5e5fe0c8dc6bb4024ddbc6d76ce4fa47030e343a0d60f14"
+    },
+    {
+      "path": "src/orders.ts",
+      "hash": "7e3a8c701891319bf6227916a09aa12b5886d937d7086e69863b67b971e73f79"
+    },
+    {
+      "path": "src/sync.ts",
+      "hash": "fe6ce37d2379c6fa9ebd6bb0a41fee2d5d1798cd6a51d834dcdd2d5c9648ba59"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/xlang-kotlin/web::app/api/audit/route.ts::POST",
+      "span": {
+        "path": "app/api/audit/route.ts",
+        "start": 7,
+        "end": 78
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::app/api/inventory/[sku]/route.ts::GET",
+      "span": {
+        "path": "app/api/inventory/[sku]/route.ts",
+        "start": 7,
+        "end": 68
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::app/api/prices/[sku]/route.ts::GET",
+      "span": {
+        "path": "app/api/prices/[sku]/route.ts",
+        "start": 7,
+        "end": 145
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::app/api/promotions/route.ts::GET",
+      "span": {
+        "path": "app/api/promotions/route.ts",
+        "start": 7,
+        "end": 59
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::app/api/reports/route.ts::GET",
+      "span": {
+        "path": "app/api/reports/route.ts",
+        "start": 7,
+        "end": 59
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::app/api/stock/route.ts::GET",
+      "span": {
+        "path": "app/api/stock/route.ts",
+        "start": 7,
+        "end": 69
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::src/orders.ts::orderStatus",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 75,
+        "end": 150
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::src/orders.ts::reserveOrder",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 195,
+        "end": 300
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::src/sync.ts::syncOrders",
+      "span": {
+        "path": "src/sync.ts",
+        "start": 62,
+        "end": 153
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/xlang-kotlin/web::app/api/audit/route.ts::POST::Response#0",
+      "caller": "example.com/xlang-kotlin/web::app/api/audit/route.ts::POST",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/audit/route.ts",
+        "start": 40,
+        "end": 75
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::app/api/inventory/[sku]/route.ts::GET::Response.json#0",
+      "caller": "example.com/xlang-kotlin/web::app/api/inventory/[sku]/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/inventory/[sku]/route.ts",
+        "start": 39,
+        "end": 65
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::app/api/prices/[sku]/route.ts::GET::Response.json#0",
+      "caller": "example.com/xlang-kotlin/web::app/api/prices/[sku]/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/prices/[sku]/route.ts",
+        "start": 97,
+        "end": 142
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::app/api/promotions/route.ts::GET::Response.json#0",
+      "caller": "example.com/xlang-kotlin/web::app/api/promotions/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/promotions/route.ts",
+        "start": 39,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::app/api/reports/route.ts::GET::Response.json#0",
+      "caller": "example.com/xlang-kotlin/web::app/api/reports/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/reports/route.ts",
+        "start": 39,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::app/api/stock/route.ts::GET::Response.json#0",
+      "caller": "example.com/xlang-kotlin/web::app/api/stock/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/stock/route.ts",
+        "start": 39,
+        "end": 66
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::src/orders.ts::orderStatus::fetch#0",
+      "caller": "example.com/xlang-kotlin/web::src/orders.ts::orderStatus",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/orders.ts",
+        "start": 119,
+        "end": 147
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::src/orders.ts::reserveOrder::fetch#0",
+      "caller": "example.com/xlang-kotlin/web::src/orders.ts::reserveOrder",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/orders.ts",
+        "start": 230,
+        "end": 297
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::src/sync.ts::syncOrders::orderStatus#0",
+      "caller": "example.com/xlang-kotlin/web::src/sync.ts::syncOrders",
+      "target": "example.com/xlang-kotlin/web::src/orders.ts::orderStatus",
+      "level": "exact",
+      "span": {
+        "path": "src/sync.ts",
+        "start": 110,
+        "end": 125
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::src/sync.ts::syncOrders::reserveOrder#0",
+      "caller": "example.com/xlang-kotlin/web::src/sync.ts::syncOrders",
+      "target": "example.com/xlang-kotlin/web::src/orders.ts::reserveOrder",
+      "level": "exact",
+      "span": {
+        "path": "src/sync.ts",
+        "start": 136,
+        "end": 150
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "http::GET::/api/inventory/{}",
+      "site": "example.com/xlang-kotlin/web::app/api/inventory/[sku]/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/inventory/[sku]/route.ts"
+        },
+        "fields": [
+          "left"
+        ],
+        "scalars": [
+          "left"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/prices/{}",
+      "site": "example.com/xlang-kotlin/web::app/api/prices/[sku]/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/prices/[sku]/route.ts"
+        },
+        "fields": [
+          "price",
+          "sku"
+        ],
+        "open": [
+          "sku"
+        ],
+        "scalars": [
+          "price"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/promotions",
+      "site": "example.com/xlang-kotlin/web::app/api/promotions/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/promotions/route.ts"
+        },
+        "fields": [
+          "[]"
+        ],
+        "open": [
+          "[]"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/reports",
+      "site": "example.com/xlang-kotlin/web::app/api/reports/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/reports/route.ts"
+        },
+        "fields": [
+          "[]"
+        ],
+        "open": [
+          "[]"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/stock",
+      "site": "example.com/xlang-kotlin/web::app/api/stock/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/stock/route.ts"
+        },
+        "fields": [
+          "level"
+        ],
+        "scalars": [
+          "level"
+        ]
+      }
+    },
+    {
+      "contract": "http::POST::/api/audit",
+      "site": "example.com/xlang-kotlin/web::app/api/audit/route.ts::POST"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "http::POST::/orders/reserve",
+      "site": "example.com/xlang-kotlin/web::src/orders.ts::reserveOrder::fetch#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/orders/{}",
+      "site": "example.com/xlang-kotlin/web::src/sync.ts::syncOrders::orderStatus#0",
+      "via": "env:API_URL"
+    }
+  ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/xlang-kotlin/web::src/orders.ts::orderStatus",
+        "example.com/xlang-kotlin/web::src/orders.ts::reserveOrder",
+        "example.com/xlang-kotlin/web::src/sync.ts::syncOrders"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/AuditClient.kt::com.example.api.AuditClient.record()::client.post#0",
+      "provider": "example.com/xlang-kotlin/web::app/api/audit/route.ts::POST",
+      "contract": "http::POST::/api/audit",
+      "level": "exact",
+      "reason": "host web.example.com is served by example.com/xlang-kotlin/web"
+    },
+    {
+      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/PromotionClient.kt::com.example.api.PromotionClient.current()::client.get#0",
+      "provider": "example.com/xlang-kotlin/web::app/api/promotions/route.ts::GET",
+      "contract": "http::GET::/api/promotions",
+      "level": "inferred",
+      "reason": "base URL from PROMO_URL, a base_url_env of peer example.com/xlang-kotlin/web"
+    },
+    {
+      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/ReportClient.kt::com.example.api.ReportClient.send()::client.get#0",
+      "provider": "example.com/xlang-kotlin/web::app/api/reports/route.ts::GET",
+      "contract": "http::GET::/api/reports",
+      "level": "inferred",
+      "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-kotlin/web"
+    },
+    {
+      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}::prices.priceOf#0",
+      "provider": "example.com/xlang-kotlin/web::app/api/prices/[sku]/route.ts::GET",
+      "contract": "http::GET::/api/prices/{}",
+      "level": "inferred",
+      "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-kotlin/web"
+    },
+    {
+      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve::inventory.left#0",
+      "provider": "example.com/xlang-kotlin/web::app/api/inventory/[sku]/route.ts::GET",
+      "contract": "http::GET::/api/inventory/{}",
+      "level": "inferred",
+      "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-kotlin/web"
+    },
+    {
+      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/StockClient.kt::com.example.api.StockClient.level()::client.get#0",
+      "provider": "example.com/xlang-kotlin/web::app/api/stock/route.ts::GET",
+      "contract": "http::GET::/api/stock",
+      "level": "exact",
+      "reason": "host web.example.com is served by example.com/xlang-kotlin/web"
+    },
+    {
+      "consumer": "example.com/xlang-kotlin/web::src/orders.ts::reserveOrder::fetch#0",
+      "provider": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve",
+      "contract": "http::POST::/orders/reserve",
+      "level": "exact",
+      "reason": "host api.example.com is served by example.com/xlang-kotlin/api"
+    },
+    {
+      "consumer": "example.com/xlang-kotlin/web::src/sync.ts::syncOrders::orderStatus#0",
+      "provider": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}",
+      "contract": "http::GET::/orders/{}",
+      "level": "inferred",
+      "reason": "base URL from API_URL, a base_url_env of peer example.com/xlang-kotlin/api"
+    }
+  ]
+}

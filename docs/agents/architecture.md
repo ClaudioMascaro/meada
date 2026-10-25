@@ -1699,8 +1699,10 @@ one for the area a change touches.
   `Type.create()` then resolves to nothing (Opaque outside, strict, as Java's #353). Kotlin files
   resolve with Java's flags, so `java.lang.Object`'s members are the implicit members of a Kotlin
   class too: a bare `notify()` in a class is unknown. A star import of a Java package from Kotlin sees its
-  package-private classes. The Spring configuration files are read for the Java pack only
-  (`config_files` is empty) until a Kotlin form needs them. A declaration the grammar reads as an
+  package-private classes. The Kotlin pack lists the same Spring configuration files as the Java
+  pack (`jvm::spring::CONFIG_FILES`, spec #27, #100), so a Kotlin-only repository gets them
+  through `Indexed::configs` (a mixed one lists each twice, which `Configs::read` takes as once).
+  A declaration the grammar reads as an
 infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out, as the
 qualification budget does (ADR 0017).
 
@@ -1968,7 +1970,21 @@ qualification budget does (ADR 0017).
   value, `HttpMethod.parse(..)`, a method that is no `HttpMethod` member of Ktor).
   The Kotlin pack folds a string literal's templates into parts (`$name`, `${name}` as names,
   any other `${expr}` as a hole); the grammar reads `$name` as text, so the pack finds the name
-  in the text. A literal with an escape (`\$`) is still unknown.
+  in the text. A literal with an escape other than `\$` is unknown; `\$` is a `$` that starts no
+  template, so Spring's `@Value("\${key}")` is the text `${key}` (#100).
+  Base URLs (spec #27, #100): the client reader expands with `Code::expand_with` and
+  `jvm::spring::inject` (as `http/java/clients.rs`, `Configs` read the first time an annotation
+  is injected). The Kotlin pack records `Facts::annotated` for a property (a field of its class,
+  `static` at the top level or in an object or a companion, where Spring injects nothing), a
+  constructor parameter (`Marked::Param` of the class, and the `Marked::Field` of the property
+  a `val` or `var` declares, whose `Const` is dropped when annotated, as a `lateinit var` has
+  none, so the annotation is what it holds) and a function's parameter. It reads
+  `System.getenv("X")`, `java.lang.System.getenv("X")` and `System.getenv()["X"]` as `Part::Env`
+  (`lang/kotlin.rs::env`), through `!!`, parentheses, `?:` fallbacks (a hole when the fallback
+  reads a second variable) and the string methods of `STRING_METHODS` (`trimEnd`,
+  `removeSuffix`, ...), unless the file binds `System` to another type (`SYSTEM_BOUND`, as
+  Java's); the variable maps through `base_url_env` as in the trunk. A function-local `val` is
+  no constant in the Kotlin pack, so the read must stand in a property or the URL expression.
 - `http/java/clients.rs` (spec #26, #88): a RestTemplate or a WebClient counts by the type the
   source writes for the receiver (`Follow::Declarations`), or, for a WebClient, by the
   `WebClient.create` or `WebClient.builder()` chain it traces to (`Follow::Values`); a name
