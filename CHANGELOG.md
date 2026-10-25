@@ -424,9 +424,11 @@ All notable changes to Meada are recorded here. The format follows
   pull holds the whole retained list (at most `keep` plus `KEPT_MAX` entries, refused past it),
   so a pin on a kept generation answers until it is dropped; `pointer set` accepts any retained
   generation.
-- npm installer (spec #32): cargo-dist builds and publishes an npm package named `meada` with each
-  release, at the crate's version, so `npx meada mcp` launches the MCP server and `npx meada
-  <command>` runs any command; the release configuration is planned as a dry run on pull requests.
+- npm installer (spec #32): cargo-dist builds an npm package named `meada` with each release, at
+  the crate's version, so `npx meada mcp` launches the MCP server and `npx meada <command>` runs
+  any command; the release configuration is planned as a dry run on pull requests. The release
+  workflow only stages the package (`npm stage publish`); it reaches npm when a maintainer
+  approves the staged version with 2FA.
 - Go language pack (spec #25): `.go` files with no Go toolchain. Functions, methods named
   `Type.Method` (pointer and value receivers alike), structs, interfaces and other named types,
   and interface methods (`Interface.Method`); a function literal is no definition, its calls
