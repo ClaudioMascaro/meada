@@ -244,15 +244,16 @@ fn an_import_reaches_the_declaration_in_the_provider_sources() {
             row(
                 "Money.of#0",
                 "dev.kt.core.Money",
-                "of(1)",
+                "Companion.of(1)",
                 "exact",
                 money(".Companion.of(Int)")
             ),
+            // An extension crosses by the import of its name, never as a member of the class.
             row(
                 "doubled.format#0",
-                "dev.kt.core.Money",
-                "format(0)",
-                "exact",
+                "dev.kt.core",
+                ".format(0)@dev.kt.core.Money",
+                "inferred",
                 money(".format()")
             ),
             row(
@@ -310,7 +311,7 @@ fn an_import_reaches_the_declaration_in_the_provider_sources() {
         [row(
             "Cash.of#0",
             "dev.kt.core.Money",
-            "of(1)",
+            "Companion.of(1)",
             "exact",
             money(".Companion.of(Int)")
         )]
@@ -321,7 +322,7 @@ fn an_import_reaches_the_declaration_in_the_provider_sources() {
             row(
                 "Money.of#0",
                 "dev.kt.core.Money",
-                "of(1)",
+                "Companion.of(1)",
                 "exact",
                 money(".Companion.of(Int)")
             ),
@@ -362,6 +363,148 @@ fn an_import_reaches_the_declaration_in_the_provider_sources() {
     assert!(imports(&json, &probes).is_empty(), "{json}");
 }
 
+fn rows(json: &Value, caller: &str) -> Vec<(String, String, String, String)> {
+    (calls(json, "Ext.kt", caller).into_iter())
+        .map(|(c, s, n, l, t)| (c, format!("{s} {n} {l}"), t, String::new()))
+        .collect()
+}
+
+#[test]
+fn a_call_that_may_leave_arguments_out_reaches_every_overload_it_could() {
+    let json = app_export("kotlin_imports_defaults");
+    let core = |sig: &str| format!("{CORE}Core.kt::dev.kt.core.{sig}");
+    let row = |call: &str, spec: &str, level: &str, target: String| {
+        (
+            call.into(),
+            format!("dev.kt.core {spec} {level}"),
+            target,
+            String::new(),
+        )
+    };
+    // `pick(x, y = 0)` takes the call that leaves `y` out, and so does `pick(text)`.
+    assert_eq!(
+        rows(&json, "defaults()"),
+        [
+            row("pick#0", "pick(1)", "ambiguous", core("pick(Int,Int)")),
+            row("pick#0", "pick(1)", "ambiguous", core("pick(String)")),
+        ]
+    );
+    assert_eq!(
+        rows(&json, "every()"),
+        [row("pick#0", "pick(2)", "exact", core("pick(Int,Int)"))]
+    );
+    // A vararg takes any number of arguments.
+    assert_eq!(
+        rows(&json, "varargs()"),
+        [row(
+            "many#0",
+            "many(2)",
+            "exact",
+            core("many(vararg String)")
+        )]
+    );
+}
+
+#[test]
+fn an_extension_crosses_by_the_import_of_its_name_and_a_member_wins() {
+    let json = app_export("kotlin_imports_extensions");
+    let ext = |call: &str, receiver: &str, level: &str, target: &str| {
+        (
+            call.to_string(),
+            format!(
+                "dev.kt.core .{call_name}(0)@{receiver} {level}",
+                call_name = call.split(['.', '#']).nth(1).unwrap()
+            ),
+            format!("{CORE}{target}"),
+            String::new(),
+        )
+    };
+    // Typed receivers, in a file of neither class: a class of the provider, and an outside type.
+    assert_eq!(
+        rows(&json, "labelled(Money)"),
+        [ext(
+            "money.label#0",
+            "dev.kt.core.Money",
+            "inferred",
+            "MoneyExt.kt::dev.kt.core.Money.label()"
+        )]
+    );
+    assert_eq!(
+        rows(&json, "drawn(Thing)"),
+        [ext(
+            "thing.render#0",
+            "outside.absent.Thing",
+            "inferred",
+            "MoneyExt.kt::dev.kt.core.Thing.render()"
+        )]
+    );
+    // The member of the receiver's type, not the extension of the same name.
+    assert_eq!(
+        rows(&json, "counted(Money)"),
+        [(
+            "money.total#0".to_string(),
+            "dev.kt.core.Money total(0) exact".to_string(),
+            format!("{CORE}Money.kt::dev.kt.core.Money.total()"),
+            String::new()
+        )]
+    );
+    // The explicit import beats the star import of the same name.
+    assert_eq!(
+        rows(&json, "shouted(String)"),
+        [(
+            "text.shout#0".to_string(),
+            "dev.kt.core .shout(0) inferred".to_string(),
+            format!("{CORE}Core.kt::dev.kt.core.String.shout()"),
+            String::new()
+        )]
+    );
+    // The app's own extension of the same class and name, with the provider's never imported.
+    let own = format!("{APP}own/Own.kt::");
+    assert!(imports(&json, &own).is_empty(), "{json}");
+}
+
+#[test]
+fn a_call_on_the_class_name_is_the_companion_s_and_one_on_an_instance_the_member_s() {
+    let json = app_export("kotlin_imports_companion");
+    let boxed = |member: &str| format!("{CORE}Box.kt::dev.kt.core.Box{member}");
+    assert_eq!(
+        calls(&json, "Ext.kt", "viaClass()"),
+        [(
+            "Box.of#0".into(),
+            "dev.kt.core.Box".into(),
+            "Companion.of(1)".into(),
+            "exact".into(),
+            boxed(".Companion.of(Int)")
+        )]
+    );
+    assert_eq!(
+        calls(&json, "Ext.kt", "viaInstance(Box)"),
+        [(
+            "box.of#0".into(),
+            "dev.kt.core.Box".into(),
+            "of(1)".into(),
+            "exact".into(),
+            boxed(".of(Int)")
+        )]
+    );
+}
+
+#[test]
+fn a_name_the_code_hides_or_a_class_from_outside_reaches_no_provider() {
+    let json = app_export("kotlin_imports_probes");
+    // Hidden names: a local function, a parameter, a local value and a member of the enclosing
+    // class, each named like the imported function; the one call that reaches it is the control.
+    let hidden = imports(&json, &format!("{APP}probes/Hidden.kt::"));
+    assert_eq!(hidden.len(), 1, "{hidden:?}");
+    assert_eq!(hidden[0].0, "dev.shop.probes.real()::greet#0");
+    // Opaque outside: a class from a library named like the package's, imported by name over the
+    // package's star import, has members unknown to the workspace.
+    assert!(
+        imports(&json, &format!("{APP}probes/Opaque.kt::")).is_empty(),
+        "{json}"
+    );
+}
+
 #[test]
 fn several_providers_declaring_the_package_and_declaration_make_the_import_ambiguous() {
     let json = app_export("kotlin_imports_ambiguous");
@@ -382,13 +525,13 @@ fn several_providers_declaring_the_package_and_declaration_make_the_import_ambig
             row(
                 "Stamp.now#0",
                 "dev.kt.shared.Stamp",
-                "now(0)",
+                "Companion.now(0)",
                 "kit::src/main/java/dev/kt/shared/Stamp.java::dev.kt.shared.Stamp.now()"
             ),
             row(
                 "Stamp.now#0",
                 "dev.kt.shared.Stamp",
-                "now(0)",
+                "Companion.now(0)",
                 "lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()"
             ),
             row(

@@ -1,6 +1,6 @@
 example.com/kotlin/lib core/src/main/kotlin/dev/kt/core/Core.kt:3-3 dev.kt.core.greet(String)
-community: core/src/main/kotlin/dev/kt/core#2
-processes: 4 (4 export; 2 repositories): dev.shop.bulk() (example.com/kotlin/app), dev.shop.hello() (example.com/kotlin/app), dev.shop.pay(Int) (example.com/kotlin/app), dev.kt.core.Money.format() (example.com/kotlin/lib)
+community: core/src/main/kotlin/dev/kt/core#3
+processes: 5 (5 export; 2 repositories): dev.shop.bulk() (example.com/kotlin/app), dev.shop.hello() (example.com/kotlin/app), dev.shop.pay(Int) (example.com/kotlin/app), dev.shop.probes.real() (example.com/kotlin/app), dev.kt.core.Money.format() (example.com/kotlin/lib)
 fun greet(name: String): String = "hello " + name
 callers:
 example.com/kotlin/lib core/src/main/kotlin/dev/kt/core/Core.kt:5 dev.kt.core.greet(String,Int) [inferred: one method named greet]
@@ -9,3 +9,4 @@ callees: none
 consumers:
 example.com/kotlin/app src/main/kotlin/dev/shop/Bulk.kt:5 dev.shop.bulk() [range unchecked]
 example.com/kotlin/app src/main/kotlin/dev/shop/Shop.kt:23 dev.shop.hello() [range unchecked]
+example.com/kotlin/app src/main/kotlin/dev/shop/probes/Hidden.kt:24 dev.shop.probes.real() [range unchecked]

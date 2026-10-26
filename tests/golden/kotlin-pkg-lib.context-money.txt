@@ -20,9 +20,10 @@ example.com/kotlin/lib core/src/test/kotlin/shared/dev/kt/core/Extras.kt:3 dev.k
 callees: none
 consumers:
 example.com/kotlin/app src/main/kotlin/dev/shop/Bulk.kt:5 dev.shop.bulk() [range unchecked]
+example.com/kotlin/app src/main/kotlin/dev/shop/Ext.kt:28 dev.shop.counted(Money) [range unchecked]
 example.com/kotlin/app src/main/kotlin/dev/shop/Shop.kt:18 dev.shop.pay(Int) [range unchecked]
 example.com/kotlin/app src/main/kotlin/dev/shop/Shop.kt:19 dev.shop.pay(Int) [range unchecked]
 example.com/kotlin/app src/main/kotlin/dev/shop/Shop.kt:19 dev.shop.pay(Int) [range unchecked]
-example.com/kotlin/app src/main/kotlin/dev/shop/Shop.kt:20 dev.shop.pay(Int) [range unchecked]
+example.com/kotlin/app src/main/kotlin/dev/shop/Shop.kt:20 dev.shop.pay(Int) [inferred, range unchecked]
 example.com/kotlin/app src/main/kotlin/dev/shop/Shop.kt:20 dev.shop.pay(Int) [range unchecked]
 example.com/kotlin/app src/main/kotlin/dev/shop/Shop.kt:28 dev.shop.aliased() [range unchecked]

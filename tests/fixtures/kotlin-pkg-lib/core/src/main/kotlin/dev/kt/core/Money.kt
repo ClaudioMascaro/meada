@@ -11,3 +11,5 @@ class Money(val cents: Int) {
 }
 
 fun Money.format(): String = greet("$" + total())
+
+fun Money.stamp(): String = "lib"

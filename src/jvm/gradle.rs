@@ -338,6 +338,18 @@ fn included(args: &[Token]) -> Vec<&str> {
 fn dotted(tokens: &[Token]) -> Option<(String, &[Token])> {
     let head = tokens.first()?.word()?;
     match &tokens[1..] {
+        // `sourceSets.getByName("test").kotlin`: the set is the literal in the call.
+        [
+            Token::Mark('('),
+            Token::String(set, false),
+            Token::Mark(')'),
+            Token::Word(tail),
+            rest @ ..,
+        ] if tail.starts_with('.') && super::literal(set) => {
+            let (before, last) = head.rsplit_once('.')?;
+            matches!(last, "named" | "getByName").then_some(())?;
+            Some((format!("{before}.{set}{tail}"), rest))
+        }
         [
             Token::Mark('['),
             Token::String(set, false),
@@ -363,13 +375,22 @@ fn source_dirs(tokens: &[Token], blocks: &[String]) -> Option<(bool, Vec<String>
         .flat_map(|s| s.split('.'))
         .collect();
     let at = path.iter().position(|s| *s == "sourceSets")?;
-    let [set, "java" | "kotlin", "srcDirs" | "srcDir"] = path[at + 1..] else {
+    let [set, lang @ ("java" | "kotlin"), "srcDirs" | "srcDir"] = path[at + 1..] else {
         return None;
     };
     // `named(set)` or `getByName(set)` with no literal name (`block_head`) is no known set.
     if matches!(set, "named" | "getByName") {
         return None;
     }
+    // A Java directory of a set other than `main` is a test one. A Kotlin set is told by its
+    // name (Gradle's `test`, the multiplatform `*Main` and `*Test`); any other is not read, as
+    // its files may be production code (`Summary::roots`).
+    let main = match (lang, set) {
+        (_, "main") => true,
+        ("kotlin", set) if set.ends_with("Main") => true,
+        ("kotlin", set) if set != "test" && !set.ends_with("Test") => return None,
+        _ => false,
+    };
     let mut rest = rest;
     if let [Token::Mark('+'), tail @ ..] = rest {
         rest = tail;
@@ -394,7 +415,7 @@ fn source_dirs(tokens: &[Token], blocks: &[String]) -> Option<(bool, Vec<String>
             _ => None,
         })
         .collect();
-    Some((set == "main", dirs))
+    Some((main, dirs))
 }
 
 /// The name a block's head line gives it: its first word, with a `named(..)` or `getByName(..)`
@@ -772,12 +793,45 @@ mod tests {
                 &["src/a"],
                 &["src/t"],
             ),
+            // A set looked up by a literal name, then its directories.
+            (
+                "sourceSets.getByName(\"test\").kotlin.srcDir(\"src/t\")",
+                &[],
+                &["src/t"],
+            ),
         ] {
             let (all, tests) = roots(src);
             let expected: Vec<_> = main.iter().chain(test).copied().collect();
             assert_eq!(all, with(&expected), "{src}");
             assert_eq!(tests, test_roots(test), "{src}");
         }
+    }
+
+    #[test]
+    fn a_kotlin_directory_is_main_or_test_by_the_name_of_its_set() {
+        let tested = |set: &str| {
+            let (all, tests) = roots(&format!(
+                "sourceSets {{ {set} {{ kotlin.srcDir(\"src/x\") }} }}"
+            ));
+            (
+                all.iter().any(|r| r == "src/x"),
+                tests.iter().any(|t| t == "src/x"),
+            )
+        };
+        // Multiplatform: `*Main` is production, `*Test` is test code.
+        for main in ["main", "commonMain", "jvmMain"] {
+            assert_eq!(tested(main), (true, false), "{main}");
+        }
+        for test in ["test", "commonTest", "jvmTest", "integrationTest"] {
+            assert_eq!(tested(test), (true, true), "{test}");
+        }
+        // Any other set is read as nothing: its files resolve by their package.
+        for other in ["integration", "val jvmMain by getting", "benchmarks"] {
+            assert_eq!(tested(other), (false, false), "{other}");
+        }
+        // A Java directory of a set other than `main` stays a test root.
+        let (_, tests) = roots("sourceSets.integration.java.srcDirs = ['src/i']");
+        assert!(tests.iter().any(|t| t == "src/i"));
     }
 
     #[test]

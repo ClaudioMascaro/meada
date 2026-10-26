@@ -1159,13 +1159,22 @@ one for the area a change touches.
     as written and with its package, which is what makes a declaration top-level and public): a
     function by name and argument count (`ambiguous` when several fit), a class by its capital,
     as the class itself (its constructor), an extension function (`.name(arity)`) as a name
-    match, `inferred`, since a member of a receiver's type that is not read would win. A class
-    also answers for the members of its unnamed `Companion`. `member_of`: none; Maven's
+    match, `inferred`, which crosses only through the import of its name: the chain carries the
+    receiver's type (`.name(arity)@Class`) when the source writes one, and a member of that class
+    the provider declares hides the extension. A declaration `Classes::published` shows as an
+    extension of its class (`Class.method`) is never one of its members (`methods`). A chain
+    `Companion.name(arity)` is a call on the class's name: the companion's member first, the
+    class's own after; a plain chain is the instance's, in the reverse order. A function with a
+    default parameter or a vararg has a `flexible` row (`resolve::Flexible`, the least and most
+    argument counts), which `Classes::fits` reads before counting the parameters in the id.
+    `member_of`: none; Maven's
     constructors and methods of a class (a companion's too), so `context` on a public class
     lists, once per call, the calls that reach its members (`reached`, at the best level of the
     call's links into the class). `JVM` source roots (`jvm::ROOTS`, `jvm::TEST_ROOTS`) are
     `src/{main,test}/{java,kotlin}`, and the Gradle scanner reads the `java` and the `kotlin`
-    directory sets, `sourceSets["main"]` and `named("main")` heads included.
+    directory sets, `sourceSets["main"]`, `named("main")` and `getByName("test")` heads
+    included. A Java set other than `main` is a test set; a Kotlin one is told by its name
+    (`main` and `*Main` production, `test` and `*Test` test, any other not read).
   - `resolutions`: the single-entry loop (the entries, each provider the entry `reaches`,
     `resolve` in it); PyPI replaces it whole, since its imports name a module and several
     distributions may expose it.

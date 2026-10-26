@@ -37,7 +37,7 @@ use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
 use crate::lang::{Call, MAX_BYTES, python};
 use crate::literals::Literals;
 use crate::render::{Files, label, rank, section};
-use crate::resolve::{Ancestry, Code, Exported};
+use crate::resolve::{Ancestry, Code, Exported, Flexible};
 use crate::shape::{self, Shape, Want};
 use crate::workspace::Repository;
 
@@ -781,6 +781,8 @@ struct Provided<'e> {
     classes: OnceCell<maven::Classes<'e>>,
     /// The families of the public classes (`Ancestry`), for `Classes`.
     ancestries: &'e [Ancestry],
+    /// The functions that take more than one count of arguments (`Flexible`), for `Classes`.
+    flexible: &'e [Flexible],
 }
 
 /// What an import of a package resolved to in one provider: what named the entry, the import's
@@ -813,6 +815,7 @@ impl<'e> Provided<'e> {
             go_dirs: OnceCell::new(),
             classes: OnceCell::new(),
             ancestries: &export.ancestries,
+            flexible: &export.flexible,
         }
     }
 
@@ -1284,6 +1287,7 @@ fn surface(
         go_dirs: OnceCell::new(),
         classes: OnceCell::new(),
         ancestries: &[],
+        flexible: &[],
     };
     let mut queue = Vec::new();
     // Shapes cross through the packages of an ecosystem that says so (`Ecosystem::shapes`).
@@ -2648,6 +2652,7 @@ mod tests {
             import_calls: Vec::new(),
             communities: Vec::new(),
             ancestries: Vec::new(),
+            flexible: Vec::new(),
             exported: (files.iter())
                 .map(|(p, _)| row(p, Some("S"), Some(p), Some("S")))
                 .collect(),
@@ -2724,6 +2729,7 @@ mod tests {
             go_dirs: OnceCell::new(),
             classes: OnceCell::new(),
             ancestries: &[],
+            flexible: &[],
         }
     }
 

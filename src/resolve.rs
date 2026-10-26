@@ -2845,6 +2845,23 @@ impl<'a> Resolver<'a> {
         rows
     }
 
+    /// The functions that take more than one count of arguments: a default parameter, or a
+    /// vararg (`Arity`). A function with a fixed count has no row. For an import of the
+    /// repository as a package to tell which calls its overloads take. Sorted.
+    pub fn flexible(&self) -> Vec<Flexible> {
+        let mut rows: Vec<_> = (self.arities.iter())
+            .filter(|(_, a)| a.most != Some(a.least))
+            .map(|(t, a)| Flexible {
+                path: t.path.to_string(),
+                name: t.name.to_string(),
+                least: a.least,
+                most: a.most,
+            })
+            .collect();
+        rows.sort_by(|a, b| (&a.path, &a.name).cmp(&(&b.path, &b.name)));
+        rows
+    }
+
     /// What each file exports, for an import of the repository as a package (spec #22), as
     /// `export` reads it: for each name a file exports, the definition, the module-level
     /// constant or type (issue #175) or the whole file it names, or nothing when that is outside
@@ -3104,6 +3121,18 @@ pub struct Ancestry {
     /// name)`, one outside it or not resolved (opaque) as `None`. `None` for a family C3 rejects
     /// or that is cut, whose members are not known.
     pub ancestors: Option<Vec<Option<(String, String)>>>,
+}
+
+/// A function that takes more than one count of arguments (`Resolver::flexible`): from `least`
+/// to `most`, any number more when that is `None`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Flexible {
+    /// The file declaring it.
+    pub path: String,
+    /// Its qualified name, with its parameter types.
+    pub name: String,
+    pub least: usize,
+    pub most: Option<usize>,
 }
 
 /// A call whose arguments bind the parameters of `def`, the function it reaches.
