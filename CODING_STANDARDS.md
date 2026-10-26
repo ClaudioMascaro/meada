@@ -10,7 +10,8 @@ A link, provider or consumer Meada cannot place with certainty stays out of the 
 user story 22). A wrong `exact` link and a provider at a wrong path are the worst failures: an
 agent believes them and acts on them. A missing one is an open item that a person or `meada
 decide` closes. A rule that cannot tell yields nothing, or a name match at `inferred` or
-`ambiguous`; a guess never becomes `exact`, a provider or a consumer.
+`ambiguous`; a guess never becomes `exact`, a provider or a consumer. In an export golden, read
+each changed level, target, provider and consumer with `cargo run --example golden_diff`.
 
 ## Probes
 
