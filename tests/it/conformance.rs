@@ -3856,21 +3856,17 @@ fn csharp() {
             EXACT,
             vec![orders("Order.Lines.cs", "Order.Create()")],
         ),
+        // A type Acme.Core also declares under its name is Acme.Api's own from Acme.Api: the
+        // compiler prefers the project's type to a reference's.
         (
             run("OrderDto#0"),
-            AMBIGUOUS,
-            vec![
-                api("Contracts.cs", "Acme.Contracts.OrderDto"),
-                core("Contracts/Copies.cs", "Acme.Contracts.OrderDto"),
-            ],
+            EXACT,
+            vec![api("Contracts.cs", "Acme.Contracts.OrderDto")],
         ),
         (
             run("Shell#0"),
-            AMBIGUOUS,
-            vec![
-                api("Contracts.cs", "Acme.Hosting.Shell"),
-                core("Contracts/Copies.cs", "Acme.Hosting.Shell"),
-            ],
+            EXACT,
+            vec![api("Contracts.cs", "Acme.Hosting.Shell")],
         ),
         // Opaque outside: a base from outside the repository, written on the type or on another
         // of its parts, may declare the name, so what the file binds is a name match at most.

@@ -478,6 +478,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     if modifiers.contains(&"static") {
                         facts.statics.push(inner.as_ref().clone());
                         // A `static Main` method starts a program, whatever its signature.
+                        // ponytail: the compiler takes `Main` returning `void`, `int` or a `Task`
+                        // of them, with no parameter or a `string[]`, and ignores one beside
+                        // top-level statements (CS7022); a signature it rejects (CS0028) still
+                        // counts here.
                         if !constructor && name == "Main" {
                             facts.programs.push(inner.as_ref().clone());
                         }
@@ -1055,10 +1059,15 @@ fn parse(src: &[u8]) -> Result<Facts> {
         let mut child_scope = (inner.clone(), inner_namespace.clone());
         let mut visits = Vec::new();
         // The top-level statements of a file are the body of a synthetic `Main`, a program.
-        let top = (named(node).filter(|c| c.kind() == "global_statement"))
-            .map(|c| c.byte_range())
-            .reduce(|a, b| a.start.min(b.start)..a.end.max(b.end))
-            .filter(|_| node.kind() == "compilation_unit" && definitions);
+        // ponytail: a file that also declares a type `Main` in the global namespace gets none,
+        // since the two would share the name; its top-level statements are no program.
+        let top = match node.kind() == "compilation_unit" && definitions {
+            true => (named(node).filter(|c| c.kind() == "global_statement"))
+                .map(|c| c.byte_range())
+                .reduce(|a, b| a.start.min(b.start)..a.end.max(b.end))
+                .filter(|_| !declares_main(node, src)),
+            false => None,
+        };
         if let Some(range) = &top {
             facts.defs.push(Def {
                 name: MAIN.to_string(),
@@ -1315,6 +1324,17 @@ fn parse(src: &[u8]) -> Result<Facts> {
         names.sort();
     }
     Ok(facts)
+}
+
+/// Whether the compilation unit `root` declares a type named `Main` in the global namespace:
+/// before any file-scoped namespace, whose declarations are its siblings.
+fn declares_main(root: Node, src: &[u8]) -> bool {
+    (named(root).take_while(|c| c.kind() != "file_scoped_namespace_declaration")).any(|c| {
+        c.kind().ends_with("_declaration")
+            && c.kind() != "namespace_declaration"
+            && c.child_by_field_name("name")
+                .is_some_and(|n| text(n, src) == MAIN)
+    })
 }
 
 /// Whether a lambda written as an argument in `scope` is a `Kind::Inline` definition: inside
@@ -2185,6 +2205,50 @@ mod tests {
         );
         assert_eq!(then, &["TrimEnd", "ToLower"]);
         assert_eq!(empty, "string.Empty");
+    }
+
+    /// Top-level statements are a synthetic `Main`, a program, unless the file declares a type
+    /// `Main` in the global namespace, which would share its name.
+    #[test]
+    fn top_level_statements_are_a_main_unless_a_type_main_shares_the_name() {
+        let mains = |source: &str| {
+            let facts = CSharp.parse("Program.cs", source.as_bytes()).unwrap();
+            let defs = (facts.defs.iter()).filter(|d| d.name == MAIN).count();
+            (defs, facts.programs)
+        };
+        let top = "Run();\nvoid Run() { }\n";
+        assert_eq!(mains(top), (1, vec![MAIN.to_string()]));
+        assert_eq!(mains(&format!("{top}class Main {{ }}\n")), (1, vec![]));
+        assert_eq!(
+            mains(&format!("{top}namespace N {{ class Main {{ }} }}\n")),
+            (1, vec![MAIN.to_string()])
+        );
+    }
+
+    /// A lambda is a `Kind::Inline` scope of its own, in top-level statements as in a method:
+    /// its parameters are locals of that scope, never of the code around it.
+    #[test]
+    fn a_lambda_s_parameters_are_locals_of_its_inline_scope() {
+        let source = "app.MapGet(\"/a\", (Order o) => o.Total());\n\
+                      class C { void M() { H.On(x => x.Go()); } }\n";
+        let facts = CSharp.parse("Program.cs", source.as_bytes()).unwrap();
+        let inline: Vec<&str> = (facts.defs.iter())
+            .filter(|d| d.kind == Kind::Inline)
+            .map(|d| d.name.as_str())
+            .collect();
+        let [top, method] = inline[..] else {
+            panic!("{inline:?}")
+        };
+        assert!(top.starts_with("Main.@"), "{top}");
+        assert!(method.starts_with("C.M().@"), "{method}");
+        let scope = |name: &str| {
+            (facts.receivers.iter())
+                .filter(|r| r.name == name)
+                .map(|r| r.scope.as_str())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(scope("o"), [top]);
+        assert_eq!(scope("x"), [method]);
     }
 
     /// The reads of one node share one allocation of their scope, however long it is.

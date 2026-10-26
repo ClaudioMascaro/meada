@@ -3643,12 +3643,8 @@
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::OrderDto#0",
       "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
-      "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Contracts.OrderDto",
-        "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Contracts.OrderDto"
-      ],
+      "target": "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Contracts.OrderDto",
+      "level": "exact",
       "span": {
         "path": "src/Acme.Api/Checkout.cs",
         "start": 714,
@@ -3669,12 +3665,8 @@
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::Shell#0",
       "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
-      "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Hosting.Shell",
-        "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Hosting.Shell"
-      ],
+      "target": "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Hosting.Shell",
+      "level": "exact",
       "span": {
         "path": "src/Acme.Api/Checkout.cs",
         "start": 742,
@@ -7565,8 +7557,6 @@
       "name": "src/Acme.Api",
       "members": [
         "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board.Show()",
-        "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout",
-        "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
         "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home.Index()",
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.FieldShadow.Run()",
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.ReadonlyShadow.Run()",
@@ -7579,10 +7569,6 @@
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parse(object)",
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Pattern(object)",
         "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Batch.Run()",
-        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Default()",
-        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService()",
-        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService(string)",
-        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing.Lower(string)",
         "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
       ]
     },
@@ -7666,16 +7652,22 @@
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account",
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Deposit(int)",
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Deposit(int,string)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Thaw()",
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Archive(IEnumerable<Account>)",
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Summarize(Account)",
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Auditor",
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IAuditor.Review()",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Ledger.Post(T)",
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings",
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Accrue()",
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Sweep()",
         "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes",
         "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Field()",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Generic(T)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)",
         "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller",
         "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Current()",
         "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Open()",
@@ -7684,17 +7676,6 @@
     },
     {
       "name": "src/Acme.Core/Billing#2",
-      "members": [
-        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
-        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Ledger.Post(T)",
-        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Field()",
-        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Generic(T)",
-        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)",
-        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)"
-      ]
-    },
-    {
-      "name": "src/Acme.Core/Billing#3",
       "members": [
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IReviewer.Escalate()",
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.ServiceExtensions.AddOrders(IServices)",
@@ -7705,6 +7686,28 @@
     {
       "name": "src/Acme.Core/Orders",
       "members": [
+        "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout",
+        "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+        "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Contracts.OrderDto",
+        "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Hosting.Shell",
+        "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order",
+        "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Audit()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Default()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService(string)",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string)",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int).Check",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Validate(string)",
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing.Lower(string)",
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string)",
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string,int)"
+      ]
+    },
+    {
+      "name": "src/Acme.Core/Orders#2",
+      "members": [
         "example.com/acme/conformance::src/Acme.Core/Orders/Carrier.Fees.cs::Acme.Core.Orders.Carrier.Bill()",
         "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()",
         "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Ship()",
@@ -7712,24 +7715,10 @@
       ]
     },
     {
-      "name": "src/Acme.Core/Orders#2",
+      "name": "src/Acme.Core/Orders#3",
       "members": [
         "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Courier()",
         "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Carrier(string)"
-      ]
-    },
-    {
-      "name": "src/Acme.Core/Orders#3",
-      "members": [
-        "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order",
-        "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()",
-        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Audit()",
-        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string)",
-        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
-        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int).Check",
-        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Validate(string)",
-        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string)",
-        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string,int)"
       ]
     },
     {
@@ -8920,26 +8909,16 @@
         {
           "depth": 1,
           "repository": "example.com/acme/conformance",
-          "level": "ambiguous",
+          "level": "exact",
           "via": "call",
-          "node": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::OrderDto#0",
-          "mark": "ambiguous",
-          "candidates": [
-            "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Contracts.OrderDto",
-            "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Contracts.OrderDto"
-          ]
+          "node": "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Contracts.OrderDto"
         },
         {
           "depth": 1,
           "repository": "example.com/acme/conformance",
-          "level": "ambiguous",
+          "level": "exact",
           "via": "call",
-          "node": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::Shell#0",
-          "mark": "ambiguous",
-          "candidates": [
-            "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Hosting.Shell",
-            "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Hosting.Shell"
-          ]
+          "node": "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Hosting.Shell"
         }
       ]
     },
