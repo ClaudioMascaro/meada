@@ -26,6 +26,10 @@
       "hash": "caa22233891428dc67d60aba259886e4972d64fe21203ee76954b7fbb4a9f0d4"
     },
     {
+      "path": "src/Acme.Api/Controllers.cs",
+      "hash": "3feee918afea38c1201c9837e890a8dbdedaf1b096d27affdcc92d0e07b58e24"
+    },
+    {
       "path": "src/Acme.Api/Inside.cs",
       "hash": "4b7695397e7411a5d9bc3f03f986d456e83d3e9aadff2f3a0423c395acbe3a92"
     },
@@ -205,6 +209,150 @@
         "path": "src/Acme.Api/Contracts.cs",
         "start": 130,
         "end": 153
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.ApiBase",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 1487,
+        "end": 1542
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 216,
+        "end": 1123
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Allowed()",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 693,
+        "end": 736
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Anything()",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 1002,
+        "end": 1056
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Create()",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 414,
+        "end": 453
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Get(int)",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 355,
+        "end": 408
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Health()",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 807,
+        "end": 856
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Helper()",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 1097,
+        "end": 1121
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.List()",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 313,
+        "end": 349
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Probe()",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 649,
+        "end": 687
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Remove(int?)",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 586,
+        "end": 643
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Replace(int)",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 459,
+        "end": 512
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Status(int?)",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 862,
+        "end": 929
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Touch(int)",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 518,
+        "end": 580
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.PingController",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 1220,
+        "end": 1313
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.PingController.Pong()",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 1267,
+        "end": 1311
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.UsersController",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 1393,
+        "end": 1485
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.UsersController.List()",
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 1438,
+        "end": 1483
       }
     },
     {
@@ -983,6 +1131,182 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpDelete#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 587,
+        "end": 606
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpGet#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 314,
+        "end": 321
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpGet#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 356,
+        "end": 375
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpGet#2",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 808,
+        "end": 826
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpGet#3",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 863,
+        "end": 890
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpHead#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 650,
+        "end": 658
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpOptions#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 694,
+        "end": 705
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpPatch#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 519,
+        "end": 545
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpPost#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 415,
+        "end": 423
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpPut#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 460,
+        "end": 475
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::Route#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 1003,
+        "end": 1024
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.PingController::HttpGet#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.PingController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 1268,
+        "end": 1283
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.UsersController::HttpGet#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.UsersController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 1439,
+        "end": 1455
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api::ApiController#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 217,
+        "end": 230
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api::Route#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 233,
+        "end": 258
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api::Route#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Controllers.cs",
+        "start": 1488,
+        "end": 1499
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()::Second.Make#0",
       "caller": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()",
       "target": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second.Make()",
@@ -1438,7 +1762,56 @@
       }
     }
   ],
-  "providers": [],
+  "providers": [
+    {
+      "contract": "http::ANY::/api/Orders/any/Anything",
+      "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Anything()"
+    },
+    {
+      "contract": "http::DELETE::/api/Orders/{}",
+      "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Remove(int?)"
+    },
+    {
+      "contract": "http::GET::/api/Orders",
+      "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.List()"
+    },
+    {
+      "contract": "http::GET::/api/Orders/{}",
+      "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Get(int)"
+    },
+    {
+      "contract": "http::GET::/health",
+      "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Health()"
+    },
+    {
+      "contract": "http::GET::/ping",
+      "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.PingController.Pong()"
+    },
+    {
+      "contract": "http::GET::/status/{}",
+      "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Status(int?)"
+    },
+    {
+      "contract": "http::HEAD::/api/Orders",
+      "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Probe()"
+    },
+    {
+      "contract": "http::OPTIONS::/api/Orders",
+      "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Allowed()"
+    },
+    {
+      "contract": "http::PATCH::/api/Orders/{}/Touch",
+      "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Touch(int)"
+    },
+    {
+      "contract": "http::POST::/api/Orders",
+      "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Create()"
+    },
+    {
+      "contract": "http::PUT::/api/Orders/{}",
+      "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Replace(int)"
+    }
+  ],
   "consumers": [],
   "communities": [
     {
@@ -1706,6 +2079,202 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/Acme.Api/Cli.cs::Acme.Api.Cli.Main(string[])"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Allowed()::http::OPTIONS::/api/Orders",
+      "kind": "route",
+      "label": "OPTIONS /api/Orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Allowed()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Anything()::http::ANY::/api/Orders/any/Anything",
+      "kind": "route",
+      "label": "ANY /api/Orders/any/Anything",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Anything()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Create()::http::POST::/api/Orders",
+      "kind": "route",
+      "label": "POST /api/Orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Create()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Get(int)::http::GET::/api/Orders/{}",
+      "kind": "route",
+      "label": "GET /api/Orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Get(int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Health()::http::GET::/health",
+      "kind": "route",
+      "label": "GET /health",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Health()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Helper()",
+      "kind": "export",
+      "label": "Acme.Api.OrdersController.Helper()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Helper()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.List()::http::GET::/api/Orders",
+      "kind": "route",
+      "label": "GET /api/Orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.List()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Probe()::http::HEAD::/api/Orders",
+      "kind": "route",
+      "label": "HEAD /api/Orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Probe()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Remove(int?)::http::DELETE::/api/Orders/{}",
+      "kind": "route",
+      "label": "DELETE /api/Orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Remove(int?)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Replace(int)::http::PUT::/api/Orders/{}",
+      "kind": "route",
+      "label": "PUT /api/Orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Replace(int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Status(int?)::http::GET::/status/{}",
+      "kind": "route",
+      "label": "GET /status/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Status(int?)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Touch(int)::http::PATCH::/api/Orders/{}/Touch",
+      "kind": "route",
+      "label": "PATCH /api/Orders/{}/Touch",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Touch(int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.PingController.Pong()::http::GET::/ping",
+      "kind": "route",
+      "label": "GET /ping",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.PingController.Pong()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.UsersController.List()",
+      "kind": "export",
+      "label": "Acme.Api.UsersController.List()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.UsersController.List()"
         }
       ]
     },

@@ -13,7 +13,7 @@
 mod clients;
 mod declarative;
 
-use super::{ANY, METHODS, contract, join, path_literal, provider};
+use super::{ANY, METHODS, balanced, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
 use crate::jvm::names::{
@@ -359,25 +359,6 @@ fn request_methods<'a>(code: &Code<'a>, file: &'a str, call: &'a Call) -> Option
         (true, false) => None,
         _ => Some(methods),
     }
-}
-
-/// Whether every `{` of `path` closes within its segment, as `{id:[0-9]{3}}` does: a pattern
-/// with a `/` inside braces is not read.
-fn balanced(path: &str) -> bool {
-    path.split('/').all(|segment| {
-        let mut depth = 0usize;
-        for c in segment.chars() {
-            match c {
-                '{' => depth += 1,
-                '}' => match depth.checked_sub(1) {
-                    Some(d) => depth = d,
-                    None => return false,
-                },
-                _ => {}
-            }
-        }
-        depth == 0
-    })
 }
 
 #[cfg(test)]

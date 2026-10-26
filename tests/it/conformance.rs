@@ -3349,6 +3349,24 @@ fn csharp() {
         api("Opaque.cs", "Acme.Api.Board"),
         api("Board.Show.cs", "Acme.Api.Board"),
         api("Board.Show.cs", "Acme.Api.Board.Show()"),
+        api("Controllers.cs", "Acme.Api.OrdersController"),
+        api("Controllers.cs", "Acme.Api.OrdersController.List()"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Get(int)"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Create()"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Replace(int)"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Touch(int)"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Remove(int?)"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Probe()"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Allowed()"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Health()"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Status(int?)"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Anything()"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Helper()"),
+        api("Controllers.cs", "Acme.Api.PingController"),
+        api("Controllers.cs", "Acme.Api.PingController.Pong()"),
+        api("Controllers.cs", "Acme.Api.UsersController"),
+        api("Controllers.cs", "Acme.Api.UsersController.List()"),
+        api("Controllers.cs", "Acme.Api.ApiBase"),
         api("Namespaces.cs", "Acme.Api.Outside"),
         api("Namespaces.cs", "Acme.Api.Outside.Run()"),
         api("Inside.cs", "Acme.Api.Inside"),
@@ -3634,6 +3652,50 @@ fn csharp() {
         ],
         &calls,
     );
+}
+
+/// ASP.NET Core controllers are providers (spec #28, #109): `[controller]` and `[action]` are
+/// replaced, `{id:int}` and `{id?}` are parameters, a rooted template replaces the class prefix,
+/// a method `[Route]` without a method attribute serves every method, and a controller of a
+/// repository base class is not read.
+#[test]
+fn csharp_controllers_are_providers_with_their_full_paths() {
+    let (_, actual) = providers(
+        "csharp_controllers",
+        "conformance-csharp",
+        "src/Acme.Api/Controllers.cs",
+    );
+    let at = |method: &str| format!("src/Acme.Api/Controllers.cs::Acme.Api.{method}");
+    let routes = [
+        ("GET", "/api/Orders", "OrdersController.List()"),
+        ("GET", "/api/Orders/{}", "OrdersController.Get(int)"),
+        ("POST", "/api/Orders", "OrdersController.Create()"),
+        ("PUT", "/api/Orders/{}", "OrdersController.Replace(int)"),
+        (
+            "PATCH",
+            "/api/Orders/{}/Touch",
+            "OrdersController.Touch(int)",
+        ),
+        ("DELETE", "/api/Orders/{}", "OrdersController.Remove(int?)"),
+        ("HEAD", "/api/Orders", "OrdersController.Probe()"),
+        ("OPTIONS", "/api/Orders", "OrdersController.Allowed()"),
+        ("GET", "/health", "OrdersController.Health()"),
+        ("GET", "/status/{}", "OrdersController.Status(int?)"),
+        (
+            "ANY",
+            "/api/Orders/any/Anything",
+            "OrdersController.Anything()",
+        ),
+        ("GET", "/ping", "PingController.Pong()"),
+    ];
+    let contracts: Vec<(String, String)> = (routes.iter())
+        .map(|(m, path, method)| (format!("http::{m}::{path}"), at(method)))
+        .collect();
+    let expected: Vec<(&str, &str)> = contracts
+        .iter()
+        .map(|(c, s)| (c.as_str(), s.as_str()))
+        .collect();
+    assert_eq!(actual, pairs(&expected));
 }
 
 /// Public and protected members of public types are export doors when uncalled; private and
