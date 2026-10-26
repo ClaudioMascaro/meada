@@ -1,0 +1,8 @@
+# The web app (TypeScript, Next.js) reaches the api service (C#, ASP.NET Core) through a base URL
+# variable and through the api's declared host. The C# repository uses these same keys.
+[serve]
+hosts = ["web.example.com"]
+
+[[peer]]
+repo = "example.com/xlang-csharp/api"
+base_url_env = ["API_URL"]

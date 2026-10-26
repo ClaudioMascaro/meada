@@ -990,6 +990,17 @@ pub enum Part {
     /// variable is unset (Spring's `${X:http://api.example.com}`): the variable and the default's
     /// parts. Its value is never known, as `Env`'s.
     EnvOr(String, Vec<Part>),
+    /// A call or a subscript with one string literal, read inside a string without the pack
+    /// knowing what it reads (C#'s `Environment.GetEnvironmentVariable("X")` and
+    /// `configuration["A:B"]`): `callee` as written (a subscript's is its receiver and `[]`),
+    /// `key` the literal and `scope` where it is written (shared by the reads of one node), so the
+    /// kind that knows the library decides what it is (`Env`, `EnvOr` or `Hole`). Only the C#
+    /// pack writes it.
+    Read {
+        scope: std::sync::Arc<str>,
+        callee: String,
+        key: String,
+    },
     /// Any other expression inside a string.
     Hole,
 }

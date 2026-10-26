@@ -44,11 +44,11 @@ const VERBS: &[(&str, &str)] = &[
 ];
 const MAP_METHODS: &str = "MapMethods";
 const MAP_GROUP: &str = "MapGroup";
-const APP: &str = "Microsoft.AspNetCore.Builder.WebApplication.";
+pub(super) const APP: &str = "Microsoft.AspNetCore.Builder.WebApplication.";
 /// What makes an application: `WebApplication.Create(..)`.
 const CREATE: &str = "Create";
 /// What makes a builder whose `Build()` is an application.
-const BUILDERS: &[&str] = &["CreateBuilder", "CreateSlimBuilder", "CreateEmptyBuilder"];
+pub(super) const BUILDERS: &[&str] = &["CreateBuilder", "CreateSlimBuilder", "CreateEmptyBuilder"];
 const HTTP_METHODS: &str = "Microsoft.AspNetCore.Http.HttpMethods.";
 /// The conventions a group is configured with, each returning the group it is called on
 /// (`app.MapGroup("/api").RequireAuthorization()`).

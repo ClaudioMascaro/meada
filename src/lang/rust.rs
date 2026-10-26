@@ -1906,7 +1906,7 @@ mod tests {
                     Part::Text(t) => t.clone(),
                     Part::Ref(r) => format!("<{r}>"),
                     Part::Env(e) => format!("env:{e}"),
-                    Part::EnvOr(..) | Part::Hole => "{}".into(),
+                    Part::EnvOr(..) | Part::Read { .. } | Part::Hole => "{}".into(),
                 })
                 .collect::<String>(),
             Value::Ref(name) => format!("@{name}"),

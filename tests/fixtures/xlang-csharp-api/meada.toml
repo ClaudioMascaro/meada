@@ -1,0 +1,10 @@
+# The api service (C#, ASP.NET Core) reaches the web app (TypeScript, Next.js) through base URL
+# variables and through the web app's declared host, with the keys the TypeScript repository
+# uses. The bases come from the environment and from `appsettings.json`: a configuration key
+# maps to the variable `Section__Key`.
+[serve]
+hosts = ["api.example.com"]
+
+[[peer]]
+repo = "example.com/xlang-csharp/web"
+base_url_env = ["WEB_URL", "Prices__BaseUrl", "Promo__Url"]

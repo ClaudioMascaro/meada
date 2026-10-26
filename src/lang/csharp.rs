@@ -5,6 +5,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use tree_sitter::{Node, Parser};
 
@@ -86,7 +87,7 @@ impl LanguagePack for CSharp {
 
     /// Every project file: an SDK-style one is a project (`join`).
     fn config_files(&self) -> &'static [&'static str] {
-        &["**/*.csproj"]
+        &["**/*.csproj", "**/appsettings.json"]
     }
 
     fn modules(
@@ -356,6 +357,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
             });
         };
         qualification_bytes = remaining;
+        SCOPE.with_borrow_mut(|s| *s = (scope.clone(), None));
         let (mut inner, mut inner_namespace) = (scope.clone(), namespace.clone());
         let (mut in_interface, mut public, mut nested) = (interface, visible, depth);
         let defining = definitions && depth < DEFINITION_DEPTH;
@@ -1488,6 +1490,63 @@ fn arguments(list: Option<Node>, src: &[u8], depth: usize) -> (Vec<Value>, Vec<(
     (args, kwargs)
 }
 
+thread_local! {
+    /// The scope of the node `parse` is reading, and its shared copy once a read asks for it:
+    /// the reads of one node share one allocation of it (`Part::Read`).
+    static SCOPE: std::cell::RefCell<(Rc<String>, Option<Arc<str>>)> =
+        std::cell::RefCell::new((Rc::new(String::new()), None));
+}
+
+/// The methods of a string that trim it: on a read, they leave it the read.
+const TRIMS: &[&str] = &["Trim", "TrimEnd", "TrimStart"];
+
+/// The members whose call with one string literal is a read of the environment the kind decides
+/// on (`Environment.GetEnvironmentVariable("X")`): any other call with a literal
+/// (`MapGroup("/api")`, `CreateClient("x")`) stays a call.
+const READS: &[&str] = &["GetEnvironmentVariable"];
+
+/// `callee` and `key` as a read in the scope `parse` is reading.
+fn read(callee: String, key: String) -> Part {
+    let scope = SCOPE.with_borrow_mut(|(scope, shared)| {
+        (shared.get_or_insert_with(|| Arc::from(scope.as_str()))).clone()
+    });
+    Part::Read { scope, callee, key }
+}
+
+/// The read a value is: a subscript or a call already written as one.
+fn read_of(value: &Value) -> Option<Part> {
+    match value {
+        Value::Str(parts) => match &parts[..] {
+            [read @ Part::Read { .. }] => Some(read.clone()),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// The operands of a chain of `??` from `node`, left to right, or `None` when the chain is
+/// longer than `VALUE_DEPTH`.
+fn coalesced<'t>(node: Node<'t>, src: &[u8]) -> Option<Vec<Node<'t>>> {
+    let is_coalesce = |n: Node| {
+        n.kind() == "binary_expression"
+            && (n.child_by_field_name("operator")).is_some_and(|o| text(o, src) == "??")
+    };
+    let mut operands = Vec::new();
+    let mut current = node;
+    loop {
+        operands.extend(current.child_by_field_name("left"));
+        let right = current.child_by_field_name("right")?;
+        match is_coalesce(right) {
+            true if operands.len() < VALUE_DEPTH => current = right,
+            true => return None,
+            false => {
+                operands.push(right);
+                return Some(operands);
+            }
+        }
+    }
+}
+
 /// An expression as written, as far as this pack folds one: string literals (plain, verbatim,
 /// raw and interpolated), `+` between strings, names, calls and constructions; the rest is
 /// unknown. A construction's object initializer (`new T { A = 1 }`) is its last argument, an
@@ -1548,6 +1607,45 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 false => Value::Str(parts),
             }
         }
+        // `a ?? b ?? c` keeps a read on its left, unless a fallback is a read too: exactly one.
+        "binary_expression"
+            if node
+                .child_by_field_name("operator")
+                .is_some_and(|n| text(n, src) == "??") =>
+        {
+            let Some(operands) = coalesced(node, src) else {
+                return Value::Unknown;
+            };
+            let mut reads = operands
+                .into_iter()
+                .map(|n| read_of(&value(n, src, depth + 1)));
+            match (reads.next().flatten(), reads.flatten().count()) {
+                (Some(left), 0) => Value::Str(vec![left]),
+                (Some(_), _) => Value::Str(vec![Part::Hole]),
+                _ => Value::Unknown,
+            }
+        }
+        // `x!` is `x`.
+        "postfix_unary_expression" if children(node).any(|c| c.kind() == "!") => named(node)
+            .next()
+            .map_or(Value::Unknown, |n| value(n, src, depth + 1)),
+        // `receiver["key"]`: a read, as far as the receiver is a name.
+        "element_access_expression" => {
+            let receiver = (node.child_by_field_name("expression")).map(|n| callee(n, src));
+            let keys = (node.child_by_field_name("subscript"))
+                .map(|list| arguments(Some(list), src, depth).0);
+            match (receiver, keys.as_deref()) {
+                (Some(receiver), Some([Value::Str(key)])) if !receiver.contains('(') => {
+                    match &key[..] {
+                        [Part::Text(key)] => {
+                            Value::Str(vec![read(format!("{receiver}[]"), key.clone())])
+                        }
+                        _ => Value::Unknown,
+                    }
+                }
+                _ => Value::Unknown,
+            }
+        }
         "identifier" | "member_access_expression" | "qualified_name" => {
             Value::Ref(callee(node, src))
         }
@@ -1557,10 +1655,26 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             let object = function
                 .filter(|f| f.kind() == "member_access_expression")
                 .and_then(|f| f.child_by_field_name("expression"));
+            let receiver = object.map(|n| value(n, src, depth + 1));
+            let member = function.and_then(|f| f.child_by_field_name("name"));
+            // A trimmed read is still the read.
+            let trimmed = member.is_some_and(|n| TRIMS.contains(&text(n, src)));
+            if let Some(read) = receiver.as_ref().filter(|_| trimmed).and_then(read_of) {
+                return Value::Str(vec![read]);
+            }
+            let callee = function.map_or_else(String::new, |f| callee(f, src));
+            let args = arguments(node.child_by_field_name("arguments"), src, depth).0;
+            if let ([Value::Str(key)], Some(member)) = (&args[..], member)
+                && let [Part::Text(key)] = &key[..]
+                && READS.contains(&text(member, src))
+                && !callee.contains('(')
+            {
+                return Value::Str(vec![read(callee, key.clone())]);
+            }
             Value::Call(Invocation {
-                callee: function.map_or_else(String::new, |f| callee(f, src)),
-                receiver: object.map(|n| Box::new(value(n, src, depth + 1))),
-                args: arguments(node.child_by_field_name("arguments"), src, depth).0,
+                callee,
+                receiver: receiver.map(Box::new),
+                args,
                 range: node.byte_range(),
             })
         }
@@ -1742,6 +1856,86 @@ mod tests {
         let took = start.elapsed();
         assert_eq!(facts.calls.len(), 4096);
         assert!(took.as_secs() < 10, "{took:?}");
+    }
+
+    /// The arguments of the calls of `callee` in `source`, as the strings they fold to.
+    fn strings(source: &str, callee: &str) -> Vec<Vec<Part>> {
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        (facts.calls.iter().filter(|c| c.callee == callee))
+            .flat_map(|c| &c.args)
+            .filter_map(|a| match a {
+                Value::Str(p) => Some(p.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// A read under a long `Trim` chain or a long `??` chain stays linear: past `VALUE_DEPTH` it
+    /// is an unknown part, never a read.
+    #[test]
+    fn a_long_trim_or_fallback_chain_around_a_read_is_read_in_linear_time() {
+        let get = "Environment.GetEnvironmentVariable(\"X\")";
+        let trims = format!("{get}{}", ".Trim()".repeat(4096));
+        let falls = format!("{get}{}", " ?? \"d\"".repeat(4096));
+        let source = format!(
+            "class C {{ void M() {{ H.Get({trims} + \"/a\"); H.Get(({falls}) + \"/b\"); }} }}"
+        );
+        let start = std::time::Instant::now();
+        let found = strings(&source, "H.Get");
+        assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
+        assert_eq!(found[0], [Part::Hole, Part::Text("/a".into())]);
+        assert_eq!(found[1], [Part::Hole, Part::Text("/b".into())]);
+        // Within the depth, the chain is one read.
+        let short = format!(
+            "class C {{ void M() {{ H.Get({get}{} + \"/c\"); }} }}",
+            ".Trim()".repeat(20)
+        );
+        let [parts] = &strings(&short, "H.Get")[..] else {
+            panic!()
+        };
+        assert!(matches!(parts[0], Part::Read { .. }), "{parts:?}");
+    }
+
+    /// Reads of three operands count across the chain, and only the calls of the reading members
+    /// with one literal are reads.
+    #[test]
+    fn only_a_chain_with_one_read_and_a_reading_member_make_a_read() {
+        let get = |k| format!("Environment.GetEnvironmentVariable(\"{k}\")");
+        let is_read = |url: String| {
+            let source = format!("class C {{ void M() {{ H.Get({url}); }} }}");
+            matches!(&strings(&source, "H.Get")[..], [p] if matches!(p[..], [Part::Read { .. }]))
+        };
+        assert!(is_read(format!("{} ?? \"d\" ?? \"e\"", get("X"))));
+        assert!(is_read(format!("({} ?? \"d\") ?? \"e\"", get("X"))));
+        assert!(!is_read(format!("{} ?? \"d\" ?? {}", get("X"), get("Y"))));
+        assert!(!is_read(format!("{} ?? {} ?? \"d\"", get("X"), get("Y"))));
+        assert!(!is_read(format!("({} ?? \"d\") ?? {}", get("X"), get("Y"))));
+        // A call with a literal of another member stays a call, as `MapGroup("/api")` does.
+        assert!(!is_read("Other.Get(\"X\")".into()));
+    }
+
+    /// The reads of one node share one allocation of their scope, however long it is.
+    #[test]
+    fn the_reads_of_one_node_share_their_scope() {
+        let holes = "{c[\"k\"]}".repeat(100);
+        let source = format!(
+            "namespace {}; class C {{ void M(IConfiguration c) {{ H.Get($\"{holes}\"); }} }}",
+            "N".repeat(2_000)
+        );
+        let found = strings(&source, "H.Get");
+        let [parts] = &found[..] else {
+            panic!("{}", found.len())
+        };
+        let scopes: Vec<_> = parts
+            .iter()
+            .filter_map(|p| match p {
+                Part::Read { scope, .. } => Some(scope),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(scopes.len(), 100);
+        assert!(scopes.iter().all(|s| Arc::ptr_eq(s, scopes[0])));
+        assert!(scopes[0].len() > 2_000);
     }
 
     #[test]

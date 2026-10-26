@@ -1,0 +1,12 @@
+example.com/xlang-csharp/web src/sync.ts:3 syncOrders
+  example.com/xlang-csharp/web src/orders.ts:4 orderStatus
+  →[inferred: base URL from API_URL, a base_url_env of peer example.com/xlang-csharp/api] example.com/xlang-csharp/api Controllers/OrdersController.cs:22 Api.Controllers.OrdersController.Status(string)
+    example.com/xlang-csharp/api Clients/PriceClient.cs:14 Api.Clients.PriceClient.PriceOf(string)
+    →[inferred: base URL from Prices__BaseUrl, a base_url_env of peer example.com/xlang-csharp/web] example.com/xlang-csharp/web app/api/prices/[sku]/route.ts:1 GET
+  example.com/xlang-csharp/web src/orders.ts:9 reserveOrder
+    →[exact: host api.example.com is served by example.com/xlang-csharp/api] example.com/xlang-csharp/api Controllers/OrdersController.cs:29 Api.Controllers.OrdersController.Reserve()
+      example.com/xlang-csharp/api Clients/StockClient.cs:8 Api.Clients.StockClient.Level()
+        →[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-csharp/web] example.com/xlang-csharp/web app/api/stock/route.ts:1 GET
+      example.com/xlang-csharp/api Clients/AuditClient.cs:14 Api.Clients.AuditClient.Record()
+        →[exact: host web.example.com is served by example.com/xlang-csharp/web] example.com/xlang-csharp/web app/api/audit/route.ts:1 POST
+chain: inferred · 5 hops · 2 repos · 341 tokens
