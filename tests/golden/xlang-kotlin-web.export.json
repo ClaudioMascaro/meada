@@ -10,6 +10,10 @@
       "hash": "42b6b93fec6956c15d6fef8c405fb62f7f7a654ba9fc8673cd66ad6fef3f21c8"
     },
     {
+      "path": "app/api/ledger/[id]/route.ts",
+      "hash": "8709e7b70744e94e7896336f97908557db9836a7c23c7ca4128323e5cb3ed748"
+    },
+    {
       "path": "app/api/prices/[sku]/route.ts",
       "hash": "864cec176aff35f6914c56db5d229d7318eeb37dc5b6e5c84930d8d1ee37ed67"
     },
@@ -49,6 +53,14 @@
         "path": "app/api/inventory/[sku]/route.ts",
         "start": 7,
         "end": 68
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::app/api/ledger/[id]/route.ts::GET",
+      "span": {
+        "path": "app/api/ledger/[id]/route.ts",
+        "start": 7,
+        "end": 144
       }
     },
     {
@@ -129,6 +141,17 @@
         "path": "app/api/inventory/[sku]/route.ts",
         "start": 39,
         "end": 65
+      }
+    },
+    {
+      "id": "example.com/xlang-kotlin/web::app/api/ledger/[id]/route.ts::GET::Response.json#0",
+      "caller": "example.com/xlang-kotlin/web::app/api/ledger/[id]/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/ledger/[id]/route.ts",
+        "start": 96,
+        "end": 141
       }
     },
     {
@@ -237,6 +260,24 @@
       }
     },
     {
+      "contract": "http::GET::/api/ledger/{}",
+      "site": "example.com/xlang-kotlin/web::app/api/ledger/[id]/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/ledger/[id]/route.ts"
+        },
+        "fields": [
+          "entries",
+          "entries[]",
+          "id"
+        ],
+        "open": [
+          "entries[]",
+          "id"
+        ]
+      }
+    },
+    {
       "contract": "http::GET::/api/prices/{}",
       "site": "example.com/xlang-kotlin/web::app/api/prices/[sku]/route.ts::GET",
       "shape": {
@@ -336,6 +377,13 @@
       "reason": "host web.example.com is served by example.com/xlang-kotlin/web"
     },
     {
+      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.LedgerApi.entry(String)",
+      "provider": "example.com/xlang-kotlin/web::app/api/ledger/[id]/route.ts::GET",
+      "contract": "http::GET::/api/ledger/{}",
+      "level": "exact",
+      "reason": "host web.example.com is served by example.com/xlang-kotlin/web"
+    },
+    {
       "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/PromotionClient.kt::com.example.api.PromotionClient.current()::client.get#0",
       "provider": "example.com/xlang-kotlin/web::app/api/promotions/route.ts::GET",
       "contract": "http::GET::/api/promotions",
@@ -350,14 +398,14 @@
       "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-kotlin/web"
     },
     {
-      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}::prices.priceOf#0",
+      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}::prices.priceOf#0",
       "provider": "example.com/xlang-kotlin/web::app/api/prices/[sku]/route.ts::GET",
       "contract": "http::GET::/api/prices/{}",
       "level": "inferred",
       "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-kotlin/web"
     },
     {
-      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve::inventory.left#0",
+      "consumer": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve::inventory.left#0",
       "provider": "example.com/xlang-kotlin/web::app/api/inventory/[sku]/route.ts::GET",
       "contract": "http::GET::/api/inventory/{}",
       "level": "inferred",
@@ -372,14 +420,14 @@
     },
     {
       "consumer": "example.com/xlang-kotlin/web::src/orders.ts::reserveOrder::fetch#0",
-      "provider": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).POST /orders/reserve",
+      "provider": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).POST /orders/reserve",
       "contract": "http::POST::/orders/reserve",
       "level": "exact",
       "reason": "host api.example.com is served by example.com/xlang-kotlin/api"
     },
     {
       "consumer": "example.com/xlang-kotlin/web::src/sync.ts::syncOrders::orderStatus#0",
-      "provider": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient).GET /orders/{}",
+      "provider": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Server.kt::com.example.api.Application.module(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,LedgerApi).GET /orders/{}",
       "contract": "http::GET::/orders/{}",
       "level": "inferred",
       "reason": "base URL from API_URL, a base_url_env of peer example.com/xlang-kotlin/api"

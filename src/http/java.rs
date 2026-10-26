@@ -16,9 +16,9 @@ mod declarative;
 use super::{ANY, METHODS, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
-use crate::jvm::names::{is_method, java_files, jvm_files, known, one, typed};
-use crate::lang::{Call, Value};
-use crate::resolve::{Code, Follow, Of, passes_nothing};
+use crate::jvm::names::{is_method, java_files, jvm_files, known, local, one, typed};
+use crate::lang::{Bound, Call, Value};
+use crate::resolve::{Code, Expand, Follow, Inject, Of, passes_nothing};
 
 const WEB: &str = "org.springframework.web.bind.annotation.";
 const CONTROLLERS: &[&str] = &[
@@ -233,6 +233,20 @@ fn made<'a>(
     ty: &str,
     makes: impl Fn(&Code<'a>, &'a str, usize) -> bool,
 ) -> bool {
+    reach(code, (path, scope), client, ty, &makes, 0)
+}
+
+/// How many locals `made` is followed through (`val a = b`, `val b = Client()`).
+const LOCAL_DEPTH: usize = 8;
+
+fn reach<'a>(
+    code: &Code<'a>,
+    (path, scope): (&'a str, &'a str),
+    client: &'a Value,
+    ty: &str,
+    makes: &impl Fn(&Code<'a>, &'a str, usize) -> bool,
+    depth: usize,
+) -> bool {
     match client {
         Value::Ref(name) => {
             if one(&typed(code, path, scope, name), |t| t == ty).is_some() {
@@ -242,12 +256,52 @@ fn made<'a>(
                 passes: passes_nothing,
             };
             let origins = code.origins(path, scope, Of::Name(name), follow);
-            (origins.iter().filter_map(|o| o.call)).any(|(at, i)| makes(code, at, i))
+            if (origins.iter().filter_map(|o| o.call)).any(|(at, i)| makes(code, at, i)) {
+                return true;
+            }
+            // A local the source writes no type of holds what the pack recorded for it (Kotlin).
+            match local(code, path, scope, name) {
+                Some(Bound { within, value, .. }) if depth < LOCAL_DEPTH => {
+                    reach(code, (path, within), value, ty, makes, depth + 1)
+                }
+                _ => false,
+            }
         }
         Value::Call(inner) => code
             .call_index(path, &inner.range)
             .is_some_and(|i| makes(code, path, i)),
         _ => false,
+    }
+}
+
+/// What the local `client` (a name the source writes no type for) holds, folded where it is made:
+/// the chain `WebClient.create(..)` or `Retrofit.Builder()...build()` it is bound to, whose base
+/// a reader joins. `None` for anything but a name bound to exactly one call (Kotlin's
+/// `Facts::bound`, so never in Java) and for a call a wrapper's callers fold to several values.
+fn folded_local<'a>(
+    code: &Code<'a>,
+    (path, scope): (&'a str, &'a str),
+    client: &'a Value,
+    inject: Option<&Inject<'a, '_>>,
+) -> Option<Value> {
+    let (mut scope, mut client) = (scope, client);
+    for _ in 0..LOCAL_DEPTH {
+        let Value::Ref(name) = client else { break };
+        let Bound { within, value, .. } = local(code, path, scope, name)?;
+        (scope, client) = (within, value);
+    }
+    let Value::Call(made) = client else {
+        return None;
+    };
+    let at = code.call_index(path, &made.range)?;
+    let read = |values: &[Value], _: &[(String, Value)]| match values {
+        [call @ Value::Call(_)] => Some(call.clone()),
+        _ => None,
+    };
+    let mut folded = code.expand_with(Expand::Chain(path, at), inject, &read);
+    match folded.len() {
+        1 => folded.pop().map(|f| f.found),
+        _ => None,
     }
 }
 
