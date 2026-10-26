@@ -144,6 +144,15 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether the members of a class may be extended from outside it (C#'s `this` parameter),
+    /// where the pack does not read the extensions (`extension_functions`): a method whose first
+    /// parameter is `Binds::Instance` takes its receiver there. A call on a typed receiver that
+    /// no member answers, one of a class of the repository without an opaque base or one of a
+    /// type outside it, is a name match among those methods; otherwise it resolves to nothing.
+    fn extension_methods(&self) -> bool {
+        false
+    }
+
     /// Whether a method call that no function of the repository answers may hand back the
     /// value it was called on, as a builder does (`Router::new().route(..)` in Rust):
     /// `Code::origins` then follows the call's `receiver`, to a constructor whose outside name

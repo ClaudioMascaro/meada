@@ -26,6 +26,10 @@
       "hash": "caa22233891428dc67d60aba259886e4972d64fe21203ee76954b7fbb4a9f0d4"
     },
     {
+      "path": "src/Acme.Api/Desk.cs",
+      "hash": "24438156cf53a9f26e7371c7d15782121f99471eb2ae8f889acdf678a813f9fa"
+    },
+    {
       "path": "src/Acme.Api/Inside.cs",
       "hash": "4b7695397e7411a5d9bc3f03f986d456e83d3e9aadff2f3a0423c395acbe3a92"
     },
@@ -40,6 +44,18 @@
     {
       "path": "src/Acme.Api/Shadows.cs",
       "hash": "067c703f754ef2c75f3fab0a6b4bf0a48694203be6be42471cf31926e04270c4"
+    },
+    {
+      "path": "src/Acme.Core/Billing/Accounts.cs",
+      "hash": "30fa1ad440a504fe0003069df86a2003c0c8892f4b77c4eeed67ad0383f8cea7"
+    },
+    {
+      "path": "src/Acme.Core/Billing/Probes.cs",
+      "hash": "a89494b348daf4e43ea1b573c60d4c141894abd145ddd333f89f3cd332f236cf"
+    },
+    {
+      "path": "src/Acme.Core/Billing/Teller.cs",
+      "hash": "e3805aa4387cc44ab52ec48d231cdb0cf9b04182610cb16ab01c907e14c6c1f1"
     },
     {
       "path": "src/Acme.Core/Contracts/Copies.cs",
@@ -208,6 +224,46 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Booth",
+      "span": {
+        "path": "src/Acme.Api/Desk.cs",
+        "start": 335,
+        "end": 417
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Booth.Open()",
+      "span": {
+        "path": "src/Acme.Api/Desk.cs",
+        "start": 375,
+        "end": 415
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Desk",
+      "span": {
+        "path": "src/Acme.Api/Desk.cs",
+        "start": 132,
+        "end": 333
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Desk.Desk(Teller)",
+      "span": {
+        "path": "src/Acme.Api/Desk.cs",
+        "start": 193,
+        "end": 245
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Desk.Serve(Account)",
+      "span": {
+        "path": "src/Acme.Api/Desk.cs",
+        "start": 251,
+        "end": 331
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside",
       "span": {
         "path": "src/Acme.Api/Inside.cs",
@@ -349,6 +405,358 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 607,
         "end": 687
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 242,
+        "end": 497
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Close(int)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 364,
+        "end": 395
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Close(string)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 401,
+        "end": 437
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Deposit(int)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 269,
+        "end": 304
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Deposit(int,string)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 310,
+        "end": 358
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 443,
+        "end": 467
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Thaw()",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 473,
+        "end": 495
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 718,
+        "end": 946
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Archive(IEnumerable<Account>)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 878,
+        "end": 944
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Audit(Account)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 822,
+        "end": 872
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Summarize(Account)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 762,
+        "end": 816
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Auditor",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 176,
+        "end": 240
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Auditor.Review()",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 214,
+        "end": 238
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IAuditor",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 30,
+        "end": 78
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IAuditor.Review()",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 62,
+        "end": 76
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IReviewer",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 80,
+        "end": 142
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IReviewer.Escalate()",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 124,
+        "end": 140
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IServices",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 144,
+        "end": 174
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Ledger",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 948,
+        "end": 1081
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Ledger.Post(T)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 1034,
+        "end": 1079
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 499,
+        "end": 716
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Accrue()",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 536,
+        "end": 560
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Sweep()",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 644,
+        "end": 714
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.SavingsExtensions",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 1083,
+        "end": 1179
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.SavingsExtensions.Audit(Savings)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 1127,
+        "end": 1177
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.ServiceExtensions",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 1265,
+        "end": 1458
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.ServiceExtensions.AddOrders(IServices)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 1309,
+        "end": 1366
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.ServiceExtensions.AddOrders(IServices,Action<Account>)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 1372,
+        "end": 1456
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Batch",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1872,
+        "end": 1963
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Batch.Run()",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1921,
+        "end": 1961
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Pane",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 92,
+        "end": 197
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Pane.Touch()",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 125,
+        "end": 195
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 199,
+        "end": 1797
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 651,
+        "end": 803
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Field()",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1188,
+        "end": 1226
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Generic(T)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 809,
+        "end": 860
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 948,
+        "end": 1182
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1388,
+        "end": 1795
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 336,
+        "end": 554
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 30,
+        "end": 1708
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Current()",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 311,
+        "end": 353
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Open()",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 259,
+        "end": 305
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 359,
+        "end": 1706
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Teller(IAuditor)",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 194,
+        "end": 253
       }
     },
     {
@@ -983,6 +1391,39 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Booth.Open()::teller.Current#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Booth.Open()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Current()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Desk.cs",
+        "start": 396,
+        "end": 412
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Desk.Serve(Account)::Auditor#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Desk.Serve(Account)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Auditor",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Desk.cs",
+        "start": 308,
+        "end": 321
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Desk.Serve(Account)::teller.Run#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Desk.Serve(Account)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Desk.cs",
+        "start": 288,
+        "end": 328
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()::Second.Make#0",
       "caller": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()",
       "target": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second.Make()",
@@ -1123,6 +1564,645 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 665,
         "end": 682
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Ledger.Post(T)::entry.Freeze#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Ledger.Post(T)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 1062,
+        "end": 1076
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Sweep()::Freeze#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Sweep()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 678,
+        "end": 686
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Sweep()::this.Thaw#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Sweep()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Thaw()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Accounts.cs",
+        "start": 696,
+        "end": 707
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Batch.Run()::Format.Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Batch.Run()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1941,
+        "end": 1958
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Pane.Touch()::Freeze#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Pane.Touch()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 159,
+        "end": 167
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Pane.Touch()::this.Thaw#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Pane.Touch()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 177,
+        "end": 188
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)::item.Freeze#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 729,
+        "end": 742
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)::item.Thaw#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Thaw()",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 783,
+        "end": 794
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Field()::slot.Freeze#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Field()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1210,
+        "end": 1223
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Generic(T)::value.Freeze#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Generic(T)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 843,
+        "end": 857
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)::list.ForEach#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1065,
+        "end": 1100
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)::slot.Freeze#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1042,
+        "end": 1055
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)::slot.Freeze#1",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1086,
+        "end": 1099
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)::slot.Freeze#2",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1137,
+        "end": 1150
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)::slot.Freeze#3",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1162,
+        "end": 1175
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)::ServiceExtensions.AddOrders#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.ServiceExtensions.AddOrders(IServices)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1698,
+        "end": 1735
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)::ServiceExtensions.AddOrders#1",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.ServiceExtensions.AddOrders(IServices,Action<Account>)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1745,
+        "end": 1788
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)::Teller.Accrue#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1521,
+        "end": 1536
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)::given.Audit#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Audit(Account)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.SavingsExtensions.Audit(Savings)"
+      ],
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1546,
+        "end": 1559
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)::items.Count#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1498,
+        "end": 1511
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)::reviewer.Escalate#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IReviewer.Escalate()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1596,
+        "end": 1615
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)::reviewer.Review#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IAuditor.Review()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1569,
+        "end": 1586
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)::services.AddOrders#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.ServiceExtensions.AddOrders(IServices)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1625,
+        "end": 1645
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)::services.AddOrders#1",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.ServiceExtensions.AddOrders(IServices,Action<Account>)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1655,
+        "end": 1688
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)::full.Thaw#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Thaw()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 513,
+        "end": 524
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)::ledger.Post#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Ledger.Post(T)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 461,
+        "end": 479
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)::maybe.Freeze#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 489,
+        "end": 503
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)::pane.Freeze#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 534,
+        "end": 547
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Current()::Account#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Current()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 339,
+        "end": 352
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Open()::Savings#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Open()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 291,
+        "end": 304
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::(invocation_expression).Freeze#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 1107,
+        "end": 1125
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::(invocation_expression).Sweep#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Sweep()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 1083,
+        "end": 1097
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::Account#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 781,
+        "end": 794
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::Current#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Current()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 1107,
+        "end": 1116
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::Mystery#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 1612,
+        "end": 1621
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::Open#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Open()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 1042,
+        "end": 1048
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::Open#1",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Open()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 1083,
+        "end": 1089
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::Primary.Accrue#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Accrue()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 554,
+        "end": 570
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::Savings#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 842,
+        "end": 855
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::auditor.Review#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IAuditor.Review()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 1251,
+        "end": 1268
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::explicitly.Thaw#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Thaw()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 804,
+        "end": 821
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::given.Accrue#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 1480,
+        "end": 1494
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::given.Close#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Close(int)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Close(string)"
+      ],
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 640,
+        "end": 654
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::given.Deposit#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Deposit(int)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 580,
+        "end": 596
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::given.Deposit#1",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Deposit(int,string)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 606,
+        "end": 630
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::given.Summarize#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Summarize(Account)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 1361,
+        "end": 1378
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::made.Accrue#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Accrue()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 865,
+        "end": 878
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::made.Freeze#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 888,
+        "end": 901
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::opened.Accrue#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Accrue()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 1058,
+        "end": 1073
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::queue.Archive#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Archive(IEnumerable<Account>)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 1388,
+        "end": 1403
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::reviewer.Review#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IAuditor.Review()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 1224,
+        "end": 1241
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::targeted.Thaw#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Thaw()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 945,
+        "end": 960
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::unknown.Missing#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 1682,
+        "end": 1699
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::unknown.Review#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Auditor.Review()",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IAuditor.Review()"
+      ],
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 1656,
+        "end": 1672
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::unknown.Sweep#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Sweep()",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 1631,
+        "end": 1646
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::vault.Freeze#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 530,
+        "end": 544
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller::Savings#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 174,
+        "end": 187
       }
     },
     {
@@ -1462,6 +2542,7 @@
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parameter(object)",
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parse(object)",
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Pattern(object)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Batch.Run()",
         "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
       ]
     },
@@ -1473,14 +2554,66 @@
       ]
     },
     {
+      "name": "src/Acme.Core/Billing",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Booth.Open()",
+        "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Desk.Serve(Account)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Deposit(int)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Deposit(int,string)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Thaw()",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Archive(IEnumerable<Account>)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Summarize(Account)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Auditor",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IAuditor.Review()",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Accrue()",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Sweep()",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Current()",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Open()",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)"
+      ]
+    },
+    {
+      "name": "src/Acme.Core/Billing#2",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Ledger.Post(T)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Field()",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Generic(T)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)"
+      ]
+    },
+    {
+      "name": "src/Acme.Core/Billing#3",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IReviewer.Escalate()",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.ServiceExtensions.AddOrders(IServices)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.ServiceExtensions.AddOrders(IServices,Action<Account>)",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)"
+      ]
+    },
+    {
       "name": "src/Acme.Core/Orders",
       "members": [
         "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout",
         "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order",
+        "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Audit()",
         "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Default()",
         "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService()",
         "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService(string)",
-        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing.Lower(string)"
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string)",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int).Check",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Validate(string)",
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing.Lower(string)",
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string)",
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string,int)"
       ]
     },
     {
@@ -1502,26 +2635,12 @@
     {
       "name": "src/Acme.Core/Orders#4",
       "members": [
-        "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order",
-        "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()",
-        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Audit()",
-        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string)",
-        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
-        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int).Check",
-        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Validate(string)",
-        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string)",
-        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string,int)"
-      ]
-    },
-    {
-      "name": "src/Acme.Core/Orders#5",
-      "members": [
         "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Sum()",
         "example.com/acme/conformance::src/Acme.Core/Orders/Order.cs::Acme.Core.Orders.Order.Total()"
       ]
     },
     {
-      "name": "src/Acme.Core/Orders#6",
+      "name": "src/Acme.Core/Orders#5",
       "members": [
         "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Add()",
         "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Count()"
@@ -1706,6 +2825,223 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/Acme.Api/Cli.cs::Acme.Api.Cli.Main(string[])"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Booth.Open()",
+      "kind": "export",
+      "label": "Acme.Api.Booth.Open()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Booth.Open()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Current()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Desk.Desk(Teller)",
+      "kind": "export",
+      "label": "Acme.Api.Desk.Desk(Teller)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Desk.Desk(Teller)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Desk.Serve(Account)",
+      "kind": "export",
+      "label": "Acme.Api.Desk.Serve(Account)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Desk.Serve(Account)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Accrue()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Deposit(int)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Deposit(int,string)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::given.Close#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Close(int)",
+            "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Close(string)"
+          ]
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Thaw()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Open()"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings",
+          "mark": "seen"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Sweep()"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+          "mark": "seen"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Thaw()",
+          "mark": "seen"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Current()"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account",
+          "mark": "seen"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IAuditor.Review()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Summarize(Account)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Archive(IEnumerable<Account>)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::unknown.Review#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Auditor.Review()",
+            "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IAuditor.Review()"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Auditor"
         }
       ]
     },
@@ -1937,6 +3273,243 @@
           "level": "inferred",
           "via": "call",
           "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Batch.Run()",
+      "kind": "export",
+      "label": "Acme.Core.Billing.Batch.Run()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Batch.Run()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Pane.Touch()",
+      "kind": "export",
+      "label": "Acme.Core.Billing.Pane.Touch()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Pane.Touch()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)",
+      "kind": "export",
+      "label": "Acme.Core.Billing.Probes.Blocks(bool)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Thaw()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Field()",
+      "kind": "export",
+      "label": "Acme.Core.Billing.Probes.Field()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Field()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Generic(T)",
+      "kind": "export",
+      "label": "Acme.Core.Billing.Probes.Generic(T)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Generic(T)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)",
+      "kind": "export",
+      "label": "Acme.Core.Billing.Probes.Hides(List<Savings>,object)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)",
+      "kind": "export",
+      "label": "Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)::given.Audit#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Audit(Account)",
+            "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.SavingsExtensions.Audit(Savings)"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IAuditor.Review()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IReviewer.Escalate()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.ServiceExtensions.AddOrders(IServices)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.ServiceExtensions.AddOrders(IServices,Action<Account>)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)",
+      "kind": "export",
+      "label": "Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Ledger.Post(T)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
+          "mark": "seen"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Thaw()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Teller(IAuditor)",
+      "kind": "export",
+      "label": "Acme.Core.Billing.Teller.Teller(IAuditor)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Teller(IAuditor)"
         }
       ]
     },
