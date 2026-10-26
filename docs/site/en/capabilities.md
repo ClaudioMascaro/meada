@@ -1,6 +1,6 @@
 # Capabilities and limits
 
-Meada 0.1 indexes TypeScript, JavaScript, Python, Rust, Go, Java and Kotlin. It finds calls in code and connects repositories through HTTP, packages and messaging channels. Each link reports its confidence level.
+Meada 0.1 indexes TypeScript, JavaScript, Python, Rust, Go, Java, Kotlin and C#. It finds calls in code and connects repositories through HTTP, packages and messaging channels. Each link reports its confidence level.
 
 Server mode includes the [console](console.md), [snapshots](snapshots.md), [retention](generations.md) and [managed workspace](workspaces.md) through optional modules. The console has an editor, diff, playground and graph. [Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/) and [Helm](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/) provide deployment examples.
 
@@ -14,6 +14,7 @@ Server mode includes the [console](console.md), [snapshots](snapshots.md), [rete
 | Go | `.go` included by the package's build rules |
 | Java | `.java`, resolved by their `package` declarations |
 | Kotlin | `.kt` and `.kts` (but `build.gradle.kts` and `settings.gradle.kts`), resolved by their `package` declarations |
+| C# | `.cs`, grouped into projects by SDK-style `.csproj` files and resolved by their `namespace` declarations |
 
 ### Rust
 
@@ -52,6 +53,14 @@ Meada reads classes (including `data`, `sealed`, `enum` and `annotation` classes
 Single, aliased (`as`) and `*` imports resolve through package declarations, and the file's own package is visible without an import. Bare, `this`, object (`Registry.find()`) and companion (`Point.origin()`) calls are `exact` when argument count leaves one function, counting parameters with default values and `vararg`; overloads with the same argument count stay `ambiguous`. Calling a class's name constructs it. Inside a lambda, a bare or `this` call may belong to an implicit receiver, and resolves by name only. Kotlin and Java in one repository call each other by fully qualified name. Names outside the repository stay external.
 
 Declarations that are neither `private` nor `internal` form the exported surface; an `internal` one is visible across the repository, and a top-level `private` one in its own file only. Indexing needs no Kotlin compiler, JDK or Gradle.
+
+### C#
+
+Each SDK-style `.csproj` (one with an `Sdk`) is a project and holds the `.cs` files of its directory, inside a `.sln` or not; `.sln` files change nothing, and an old-style `.csproj`, with no `Sdk`, is no project. Meada reads classes, records, structs and interfaces, nested ones (`Outer.Inner`) and `partial` ones included (each part in its own file, with every part's members), methods and constructors with their written parameter types (`Acme.Orders.OrderService.Place(string,int)`) and local functions (`Method.Local`). Block and file-scoped namespaces give the full names. A lambda's calls belong to the symbol around it, and an attribute is a call on what it decorates.
+
+`using`, `using static`, aliases (`using X = A.B`) and `global using` resolve through the namespaces of every project; a `global using`, the `.csproj`'s `<Using>` items and enabled implicit usings (`ImplicitUsings`) apply to every file of the project, and to it alone. Bare, `this`, `base`, static (`Type.Method()`) and `using static` calls are `exact` when argument count leaves one method, counting `params` and parameters with default values; overloads with the same argument count stay `ambiguous`. Types outside the repository stay external. Calls on a receiver of a written type do not resolve through that type yet.
+
+Public types and their public or protected members form the exported surface. Indexing needs no .NET SDK or MSBuild and runs no repository code.
 
 ## HTTP and contract documents
 

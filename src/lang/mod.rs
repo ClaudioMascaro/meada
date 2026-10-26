@@ -10,6 +10,7 @@ use tree_sitter::Node;
 
 use crate::Result;
 
+pub mod csharp;
 pub mod go;
 pub mod java;
 pub mod kotlin;
@@ -55,8 +56,16 @@ pub trait LanguagePack {
     /// `tsconfig.json`, or what the pack's contract kinds read (Java's Spring
     /// `application.properties`, through `Indexed::configs`). The shared side reads those
     /// present, hands them to `layout` and refreshes the contracts when one changes. A name starting with `**/` names every file of that name the walk finds, at
-    /// any depth, in path order (`**/Cargo.toml`: a Cargo workspace's members).
+    /// any depth, in path order (`**/Cargo.toml`: a Cargo workspace's members), and `**/*`
+    /// every file whose name ends with the rest (`**/*.csproj`).
     fn config_files(&self) -> &'static [&'static str];
+
+    /// What the pack's files give one another before they resolve, from the config files as
+    /// `layout` gets them and the facts of every file of the pack, as parsed: C#'s `global using`
+    /// directives and a project file's usings bind in every file of their project. The index
+    /// keeps the facts as parsed and joins them again on every refresh, before `layout`, so a
+    /// file another one's change affects resolves anew without being parsed again.
+    fn join(&self, _configs: &[(&str, &[u8])], _files: &mut BTreeMap<&str, &mut Facts>) {}
 
     /// How imports name files in one repository, built from its config files as
     /// `(path, contents)`, in `config_files` order, and from the facts of the pack's files: a
@@ -151,6 +160,13 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether classes of one qualified name in several files are the parts of one type (C#'s
+    /// `partial`): a member lookup reads every part, and a constructor call of the type takes
+    /// the first part, by path, when no constructor answers.
+    fn partial_types(&self) -> bool {
+        false
+    }
+
     /// Names every file of the language may call without binding them, which contract kinds
     /// read, such as `fetch`.
     fn globals(&self) -> &'static [&'static str] {
@@ -213,7 +229,17 @@ const PACKS: &[&dyn LanguagePack] = &[
     &go::Go,
     &java::Java,
     &kotlin::Kotlin,
+    &csharp::CSharp,
 ];
+
+/// Whether a file named `file` is one a `**/` name of `config_files` names (`pattern`, past
+/// the `**/`): that name, or for `*.ext` any name ending so.
+pub fn names_config(pattern: &str, file: &str) -> bool {
+    match pattern.strip_prefix('*') {
+        Some(ending) => file.len() > ending.len() && file.ends_with(ending),
+        None => file == pattern,
+    }
+}
 
 /// The index of the pack that parses `path`, if any.
 pub fn pack_for(path: &str) -> Option<usize> {
@@ -355,6 +381,11 @@ pub struct Facts {
     /// the index (see `Call::args`).
     #[serde(skip)]
     pub bound: Vec<Bound>,
+    /// What the file gives every file of its project, in the pack's spelling, which
+    /// `LanguagePack::join` applies to each: C#'s `global using` directives (`A.B`, `static
+    /// A.B`, `X = A.B`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub project: Vec<String>,
     /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,

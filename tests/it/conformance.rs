@@ -3258,6 +3258,409 @@ fn conform(fixture: &str, symbols: &[&str], programs: &[&str], calls: &[Expected
     assert_golden(&format!("{fixture}.export.json"), &export);
 }
 
+const CORE: &str = "src/Acme.Core";
+const API: &str = "src/Acme.Api";
+
+#[test]
+fn csharp() {
+    let core = |file: &str, name: &str| format!("{CORE}/{file}::{name}");
+    let api = |file: &str, name: &str| format!("{API}/{file}::{name}");
+    let format = |name: &str| core("Text/Format.cs", &format!("Acme.Core.Text.{name}"));
+    let orders = |file: &str, name: &str| {
+        core(
+            &format!("Orders/{file}"),
+            &format!("Acme.Core.Orders.{name}"),
+        )
+    };
+    let service = |name: &str| orders("OrderService.cs", &format!("OrderService{name}"));
+    let store = |name: &str| core("Store/Repository.cs", &format!("Acme.Core.Store.{name}"));
+    let shadows = |name: &str| api("Shadows.cs", &format!("Acme.Api.{name}"));
+    let symbols = [
+        format("Format"),
+        format("Format.Upper(string)"),
+        format("Format.Pad(string)"),
+        format("Format.Pad(string,int)"),
+        format("Format.Hidden()"),
+        format("Casing"),
+        format("Casing.Lower(string)"),
+        format("Money"),
+        format("Point"),
+        format("Point.Point(int)"),
+        format("Point.Twice()"),
+        format("Point.Double(int)"),
+        format("IClock"),
+        format("IClock.Now()"),
+        store("Repository"),
+        store("Repository.Save(T)"),
+        store("Repository.Save(List<T>,int)"),
+        store("Repository.SaveAll(T[])"),
+        store("Repository.Flush()"),
+        service(""),
+        service(".OrderService()"),
+        service(".OrderService(string)"),
+        service(".Place(string,int)"),
+        service(".Place(string,int).Check"),
+        service(".Place(string)"),
+        service(".Audit()"),
+        service(".Validate(string)"),
+        service(".Notify(string)"),
+        service(".Notify(int)"),
+        service(".Default()"),
+        service(".Line"),
+        service(".Line.Add()"),
+        service(".Line.Count()"),
+        orders("Order.cs", "Order"),
+        orders("Order.cs", "Order.Total()"),
+        orders("Order.Lines.cs", "Order"),
+        orders("Order.Lines.cs", "Order.Sum()"),
+        orders("Order.Lines.cs", "Order.Create()"),
+        orders("Shipping.cs", "Carrier"),
+        orders("Shipping.cs", "Carrier.Carrier(string)"),
+        orders("Shipping.cs", "Carrier.Ship()"),
+        orders("Shipping.cs", "Carrier.Track()"),
+        orders("Shipping.cs", "Carrier.Rate()"),
+        orders("Shipping.cs", "Carrier.Purge()"),
+        orders("Shipping.cs", "Courier"),
+        orders("Shipping.cs", "Courier.Courier()"),
+        orders("Shipping.cs", "Courier.Ship()"),
+        api("Checkout.cs", "Acme.Api.Checkout"),
+        api("Checkout.cs", "Acme.Api.Checkout.Run()"),
+        shadows("Shadows"),
+        shadows("Shadows.Parameter(object)"),
+        shadows("Shadows.Local()"),
+        shadows("Shadows.Lambda()"),
+        shadows("Shadows.Loop(object[])"),
+        shadows("Shadows.Caught()"),
+        shadows("Shadows.Out()"),
+        shadows("Shadows.Pattern(object)"),
+        shadows("Shadows.Parse(object)"),
+        shadows("FieldShadow"),
+        shadows("FieldShadow.Run()"),
+        "legacy/Old.cs::Legacy.Old".to_string(),
+        "legacy/Old.cs::Legacy.Old.Run()".to_string(),
+    ];
+    let place = |callee: &str| format!("{}::{callee}", service(".Place(string,int)"));
+    let run = |callee: &str| {
+        format!(
+            "{}::{callee}",
+            api("Checkout.cs", "Acme.Api.Checkout.Run()")
+        )
+    };
+    let upper = format("Format.Upper(string)");
+    let lower = format("Casing.Lower(string)");
+    let mut calls: Vec<(String, Option<&str>, Vec<String>)> = vec![
+        // Unqualified calls, `this.`, local functions and lambdas in the type.
+        (
+            place("Check#0"),
+            EXACT,
+            vec![service(".Place(string,int).Check")],
+        ),
+        (
+            place("Validate#0"),
+            EXACT,
+            vec![service(".Validate(string)")],
+        ),
+        (place("this.Audit#0"), EXACT, vec![service(".Audit()")]),
+        (place("Audit#0"), EXACT, vec![service(".Audit()")]),
+        (place("Place#0"), EXACT, vec![service(".Place(string)")]),
+        (
+            place("Notify#0"),
+            AMBIGUOUS,
+            vec![service(".Notify(int)"), service(".Notify(string)")],
+        ),
+        // The project's global usings: a namespace, a static class and an alias.
+        (place("Lower#0"), EXACT, vec![lower.clone()]),
+        (place("Fmt.Upper#0"), EXACT, vec![upper.clone()]),
+        (
+            place("Format.Pad#0"),
+            EXACT,
+            vec![format("Format.Pad(string,int)")],
+        ),
+        (
+            place("Format.Pad#1"),
+            EXACT,
+            vec![format("Format.Pad(string)")],
+        ),
+        // A partial type: each part is its own definition, its members are all one type's, and
+        // constructing it with no constructor names its first part.
+        (
+            place("Order.Create#0"),
+            EXACT,
+            vec![orders("Order.Lines.cs", "Order.Create()")],
+        ),
+        (
+            place("Order#0"),
+            EXACT,
+            vec![orders("Order.Lines.cs", "Order")],
+        ),
+        (
+            format!("{}::Order#0", orders("Order.Lines.cs", "Order.Create()")),
+            EXACT,
+            vec![orders("Order.Lines.cs", "Order")],
+        ),
+        (
+            format!("{}::Sum#0", orders("Order.cs", "Order.Total()")),
+            EXACT,
+            vec![orders("Order.Lines.cs", "Order.Sum()")],
+        ),
+        // Constructors, `: this(..)` and `: base(..)`; written bases and `base.`.
+        (
+            format!("{}::OrderService#0", service(".OrderService()")),
+            EXACT,
+            vec![service(".OrderService(string)")],
+        ),
+        (
+            format!("{}::OrderService#0", service(".Default()")),
+            EXACT,
+            vec![service(".OrderService()")],
+        ),
+        (
+            format!("{}::Count#0", service(".Line.Add()")),
+            EXACT,
+            vec![service(".Line.Count()")],
+        ),
+        (
+            format!("{}::Carrier#0", orders("Shipping.cs", "Courier.Courier()")),
+            EXACT,
+            vec![orders("Shipping.cs", "Carrier.Carrier(string)")],
+        ),
+        (
+            format!("{}::base.Ship#0", orders("Shipping.cs", "Courier.Ship()")),
+            EXACT,
+            vec![orders("Shipping.cs", "Carrier.Ship()")],
+        ),
+        (
+            format!("{}::Track#0", orders("Shipping.cs", "Courier.Ship()")),
+            EXACT,
+            vec![orders("Shipping.cs", "Carrier.Track()")],
+        ),
+        (
+            format!("{}::Double#0", format("Point.Twice()")),
+            EXACT,
+            vec![format("Point.Double(int)")],
+        ),
+        // An attribute is a call on what it decorates, written in the scope around it.
+        (
+            format!("{CORE}/Orders/Shipping.cs::Acme.Core.Orders::Serializable#0"),
+            None,
+            vec![],
+        ),
+        (
+            format!("{}::Obsolete#0", orders("Shipping.cs", "Carrier")),
+            None,
+            vec![],
+        ),
+        // Overloads narrowed by argument count, `params` taking any.
+        (
+            format!("{}::Save#0", store("Repository.SaveAll(T[])")),
+            EXACT,
+            vec![store("Repository.Save(T)")],
+        ),
+        (
+            format!("{}::SaveAll#0", store("Repository.Flush()")),
+            EXACT,
+            vec![store("Repository.SaveAll(T[])")],
+        ),
+        (
+            format!("{}::SaveAll#1", store("Repository.Flush()")),
+            EXACT,
+            vec![store("Repository.SaveAll(T[])")],
+        ),
+        // Another project: `using`, `using static`, aliases, a fully qualified name and the
+        // project file's `<Using>`.
+        (
+            format!(
+                "{}::OrderService#0",
+                api("Checkout.cs", "Acme.Api.Checkout")
+            ),
+            EXACT,
+            vec![service(".OrderService(string)")],
+        ),
+        (run("Upper#0"), EXACT, vec![upper.clone()]),
+        (run("Text.Format.Upper#0"), EXACT, vec![upper.clone()]),
+        (run("Svc.Default#0"), EXACT, vec![service(".Default()")]),
+        (
+            run("Acme.Core.Text.Casing.Lower#0"),
+            EXACT,
+            vec![lower.clone()],
+        ),
+        (
+            run("OrderService.Default#0"),
+            EXACT,
+            vec![service(".Default()")],
+        ),
+        // Acme.Core's global usings stop at its project: a bare call no family declares and a
+        // type name nothing binds resolve to nothing.
+        (run("Lower#0"), None, vec![]),
+        (run("Fmt.Upper#0"), None, vec![]),
+        // A project file that is not SDK-style adds nothing.
+        (
+            "legacy/Old.cs::Legacy.Old.Run()::Upper#0".to_string(),
+            None,
+            vec![],
+        ),
+    ];
+    // Every binding form hides the type `Format` in its scope.
+    for scope in [
+        "Shadows.Parameter(object)",
+        "Shadows.Local()",
+        "Shadows.Lambda()",
+        "Shadows.Loop(object[])",
+        "Shadows.Caught()",
+        "Shadows.Out()",
+        "Shadows.Pattern(object)",
+        "FieldShadow.Run()",
+    ] {
+        let id = format!("{}::Format.Upper#0", shadows(scope));
+        calls.push((id, INFERRED, vec![upper.clone()]));
+    }
+    let symbols: Vec<&str> = symbols.iter().map(String::as_str).collect();
+    let targets: Vec<Vec<&str>> = (calls.iter())
+        .map(|(_, _, t)| t.iter().map(String::as_str).collect())
+        .collect();
+    let calls: Vec<ExpectedCall> = (calls.iter().zip(&targets))
+        .map(|((id, level, _), targets)| (id.as_str(), *level, targets.as_slice()))
+        .collect();
+    conform("conformance-csharp", &symbols, &[], &calls);
+}
+
+/// Public and protected members of public types are export doors when uncalled; private and
+/// internal ones, and those of a type that is not public, are not.
+#[test]
+fn csharp_public_and_protected_members_are_export_doors() {
+    let repo = fixture_repo("csharp_doors", "conformance-csharp", Some(ORIGIN));
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let doors: Vec<&str> = (json["processes"].as_array().unwrap().iter())
+        .filter(|p| p["kind"] == "export")
+        .map(|p| p["entry_point"].as_str().unwrap())
+        .collect();
+    for door in [
+        "Acme.Core.Orders.Carrier.Rate()",
+        "Acme.Core.Orders.OrderService.Line.Add()",
+        "Acme.Core.Text.IClock.Now()",
+    ] {
+        assert!(doors.iter().any(|d| d.ends_with(door)), "{door}");
+    }
+    for hidden in [
+        "Acme.Core.Orders.Carrier.Purge()",
+        "Acme.Core.Text.Format.Hidden()",
+        "Legacy.Old.Run()",
+    ] {
+        assert!(!doors.iter().any(|d| d.ends_with(hidden)), "{hidden}");
+    }
+}
+
+#[test]
+fn csharp_search_finds_a_type_and_context_lists_callers_and_callees() {
+    let repo = fixture_repo("csharp_queries", "conformance-csharp", Some(ORIGIN));
+    let engine = Engine::open(&repo).unwrap();
+    assert_golden(
+        "conformance-csharp.search-orderservice.txt",
+        &engine.search("OrderService", Some("symbol"), None).unwrap(),
+    );
+    assert_golden(
+        "conformance-csharp.context-default.txt",
+        &engine
+            .context("Acme.Core.Orders.OrderService.Default()", None)
+            .unwrap(),
+    );
+}
+
+#[test]
+fn csharp_hostile_definition_and_member_depths_remain_bounded() {
+    let repo = fixture_repo("csharp_depths", "conformance-csharp", Some(ORIGIN));
+    let mut deep = String::from("namespace Hostile; public class Deep { void Ping() {}");
+    for n in 0..132 {
+        deep.push_str(&format!("public class Inner{n} {{"));
+    }
+    deep.push_str("void Ping() {} void Leaf() { Ping(); this.Ping(); Missing(); }");
+    deep.push_str(&"}".repeat(133));
+    std::fs::write(repo.join("Deep.cs"), deep).unwrap();
+    let expression = format!("{}\"value\"{}", "(".repeat(1024), ")".repeat(1024));
+    let member = format!("root{}.Send()", ".Part".repeat(300));
+    let values = format!(
+        "namespace Hostile; public class Values {{ public void Run() {{ Take({expression}); {member}; }} }}"
+    );
+    std::fs::write(repo.join("Values.cs"), values).unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let definitions = (json["symbols"].as_array().unwrap().iter())
+        .filter(|s| s["span"]["path"] == "Deep.cs")
+        .count();
+    assert_eq!(definitions, 129);
+    assert!(
+        (json["calls"].as_array().unwrap().iter())
+            .filter(|c| c["span"]["path"] == "Deep.cs")
+            .all(|c| c["level"] != "exact")
+    );
+    assert!(
+        (json["calls"].as_array().unwrap().iter())
+            .any(|c| c["span"]["path"] == "Values.cs" && c["target"].is_null())
+    );
+}
+
+#[test]
+fn csharp_qualification_expansion_discards_the_whole_file_and_keeps_other_files() {
+    let repo = fixture_repo(
+        "csharp_qualification_budget",
+        "conformance-csharp",
+        Some(ORIGIN),
+    );
+    let namespace = format!("N{}", "a".repeat(4096));
+    let mut source = format!(
+        "namespace {namespace};\npublic class Expanded {{\npublic static void Overloaded(string value) {{}}\n"
+    );
+    for n in 0..600 {
+        source.push_str(&format!("public void Method{n}() {{}}\n"));
+    }
+    source.push_str("public static void Overloaded(int value) {}\n}\n");
+    std::fs::write(repo.join("Expanded.cs"), source).unwrap();
+    let caller = format!(
+        "using {namespace};\nnamespace Budget;\npublic class Caller {{ public void Run() {{ Expanded.Overloaded(\"value\"); }} }}\n"
+    );
+    std::fs::write(repo.join("Budget.cs"), caller).unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let symbols = json["symbols"].as_array().unwrap();
+    assert!(symbols.iter().all(|s| s["span"]["path"] != "Expanded.cs"));
+    assert!((symbols.iter()).any(|s| s["id"].as_str().unwrap().ends_with("Budget.Caller.Run()")));
+    let called = (json["calls"].as_array().unwrap().iter())
+        .find(|c| {
+            c["caller"]
+                .as_str()
+                .unwrap()
+                .ends_with("Budget.Caller.Run()")
+        })
+        .unwrap();
+    assert!(called["target"].is_null());
+    assert!(called["level"].is_null());
+}
+
+/// A type written in more files than `TYPE_PARTS` is no one type: constructing it is ambiguous.
+#[test]
+fn csharp_a_type_in_too_many_parts_is_several_classes() {
+    let repo = fixture_repo("csharp_type_parts", "conformance-csharp", Some(ORIGIN));
+    for n in 0..65 {
+        let part = format!("namespace Parts;\npublic partial class Wide {{ void M{n}() {{}} }}\n");
+        std::fs::write(repo.join(format!("Wide{n:02}.cs")), part).unwrap();
+    }
+    let caller = "namespace Parts;\npublic class Maker { Wide Make() => new Wide(); }\n";
+    std::fs::write(repo.join("Maker.cs"), caller).unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let made = (json["calls"].as_array().unwrap().iter())
+        .find(|c| {
+            c["id"]
+                .as_str()
+                .unwrap()
+                .ends_with("Parts.Maker.Make()::Wide#0")
+        })
+        .unwrap();
+    assert_eq!(made["level"], "ambiguous");
+    assert_eq!(made["candidates"].as_array().unwrap().len(), 65);
+}
+
 #[test]
 fn typescript_and_javascript() {
     conform(

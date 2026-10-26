@@ -7,7 +7,7 @@ use roxmltree::{Document, Node, ParsingOptions};
 // ponytail: a POM is shallow; deeper elements make the file no POM.
 const XML_DEPTH: usize = 64;
 // ponytail: bounds the in-memory tree independently of the manifest's byte limit.
-const XML_NODES: u32 = 65_536;
+pub(crate) const XML_NODES: u32 = 65_536;
 // ponytail: a POM declares two or three namespaces; each nested declaration copies the
 // enclosing ones in roxmltree.
 const XML_NAMESPACES: usize = 16;
@@ -41,8 +41,8 @@ fn field(node: Node<'_, '_>, name: &str) -> Option<String> {
 /// Whether the POM stays within the limits roxmltree's cost depends on, read in one linear pass
 /// before parsing: namespace declarations, attributes per tag and element depth. Comments,
 /// CDATA, processing instructions and declarations are skipped; an unterminated one, or an
-/// unterminated tag, is no POM.
-fn within_limits(text: &str) -> bool {
+/// unterminated tag, is no POM. The .NET project files reader shares it.
+pub(crate) fn within_limits(text: &str) -> bool {
     if text.matches("xmlns").count() > XML_NAMESPACES {
         return false;
     }

@@ -287,6 +287,13 @@ type Family<'a> = Option<Vec<Ancestor<'a>>>;
 // thousands from overflowing the stack and from keeping families quadratic in its length.
 const FAMILY_DEPTH: usize = 128;
 
+/// The most files one type may be written in (`LanguagePack::partial_types`). Classes of one
+/// name in more files are each its own class, so a lookup reads its own file alone and a
+/// name that binds them all is `ambiguous`.
+// ponytail: real partial types have a handful of parts; the limit keeps a crafted type in
+// thousands of files from making every member lookup of it read them all.
+const TYPE_PARTS: usize = 64;
+
 /// A linearization given up because the bases nest deeper than `FAMILY_DEPTH` below the
 /// families being resolved, or a receiver or a family reached through a member was cut
 /// (`Work::cut`): no family is kept on the way up, since the cut depends on where the walk
@@ -385,6 +392,10 @@ pub struct Resolver<'a> {
     /// place in `groups`.
     shared: HashMap<&'a str, usize>,
     groups: Vec<Group<'a>>,
+    /// The files of each class several files define, sorted, when the pack's types may be
+    /// written in parts (`LanguagePack::partial_types`): one type, whose members are all of
+    /// theirs.
+    parts: HashMap<&'a str, Vec<&'a str>>,
 }
 
 /// Whether `inner` is a class nested directly in the class `outer`.
@@ -547,6 +558,18 @@ impl<'a> Resolver<'a> {
                 tops,
                 methods,
                 exporting,
+            });
+        }
+        let mut parts: HashMap<&str, Vec<&str>> = HashMap::new();
+        if language.partial_types() {
+            for (&path, facts) in files {
+                for def in facts.defs.iter().filter(|d| d.kind == Kind::Class) {
+                    parts.entry(def.name.as_str()).or_default().push(path);
+                }
+            }
+            parts.retain(|_, paths| {
+                paths.dedup();
+                (2..=TYPE_PARTS).contains(&paths.len())
             });
         }
         let written = (files.values())
@@ -716,6 +739,7 @@ impl<'a> Resolver<'a> {
             later,
             shared: sharing,
             groups,
+            parts,
         };
         let mut work = Work::default();
         for (path, facts) in files {
@@ -902,7 +926,9 @@ impl<'a> Resolver<'a> {
                 match classes[..] {
                     [] => return Resolution::Unresolved,
                     [one] => Binding::Def(one),
-                    _ => Binding::Several(classes),
+                    _ => self
+                        .one_type(&classes)
+                        .map_or(Binding::Several(classes), Binding::Def),
                 }
             }
             found => found,
@@ -917,9 +943,14 @@ impl<'a> Resolver<'a> {
                 } else {
                     (&self.overloads, Binding::Unknown)
                 };
-                families[t.path]
-                    .get(t.name)
-                    .map_or(absent, |all| Binding::Several(all.clone()))
+                let all: Vec<Target> = (self.parts(t).into_iter())
+                    .flat_map(|part| families[part.path].get(part.name).into_iter().flatten())
+                    .copied()
+                    .collect();
+                match all.is_empty() {
+                    true => absent,
+                    false => Binding::Several(all),
+                }
             }
             found => found,
         };
@@ -1667,8 +1698,8 @@ impl<'a> Resolver<'a> {
         if !read && let Some(found) = self.overloaded(&family, member) {
             return found;
         }
-        for ancestor in family {
-            let Ancestor::Class(c) = ancestor else {
+        for ancestor in self.with_parts(&family).iter() {
+            let Ancestor::Class(c) = *ancestor else {
                 return Binding::Unknown;
             };
             if let Some(found) = self.block_member(c, member) {
@@ -1716,7 +1747,7 @@ impl<'a> Resolver<'a> {
     /// the class): it is reached through `Resolver::extensions` alone, after the members.
     fn overloaded(&self, family: &[Ancestor<'a>], member: &str) -> Option<Binding<'a>> {
         let (mut found, mut signatures, mut opaque) = (Vec::new(), HashSet::new(), false);
-        for ancestor in family {
+        for ancestor in self.with_parts(family).iter() {
             let Ancestor::Class(c) = *ancestor else {
                 opaque = true;
                 continue;
@@ -1776,7 +1807,7 @@ impl<'a> Resolver<'a> {
         let Some(family) = self.families.get(&Target { path, name: class })? else {
             return Some(Binding::Unknown);
         };
-        for ancestor in family {
+        for ancestor in self.with_parts(family).iter() {
             let Ancestor::Class(c) = *ancestor else {
                 return Some(Binding::Unknown);
             };
@@ -1858,6 +1889,39 @@ impl<'a> Resolver<'a> {
         let (&name, files) = group.methods.get_key_value(qualified)?;
         let path = *files.iter().find(|f| **f != class.path)?;
         Some(Binding::Def(Target { path, name }))
+    }
+
+    /// `class` and the other parts of its type (`parts`), its own file first.
+    fn parts(&self, class: Target<'a>) -> Vec<Target<'a>> {
+        let others = self.parts.get(class.name).into_iter().flatten();
+        let others = others
+            .filter(|&&path| path != class.path)
+            .map(|&path| Target {
+                path,
+                name: class.name,
+            });
+        std::iter::once(class).chain(others).collect()
+    }
+
+    /// `family` with the other parts of each class after it (`parts`).
+    fn with_parts<'f>(&self, family: &'f [Ancestor<'a>]) -> std::borrow::Cow<'f, [Ancestor<'a>]> {
+        if self.parts.is_empty() {
+            return std::borrow::Cow::Borrowed(family);
+        }
+        let parts = family.iter().flat_map(|ancestor| match ancestor {
+            Ancestor::Class(c) => self.parts(*c).into_iter().map(Ancestor::Class).collect(),
+            opaque => vec![opaque.clone()],
+        });
+        std::borrow::Cow::Owned(parts.collect())
+    }
+
+    /// One class for `all` when they are the parts of one type (`parts`): the first part.
+    fn one_type(&self, all: &[Target<'a>]) -> Option<Target<'a>> {
+        let first = *all.iter().min()?;
+        let paths = self.parts.get(first.name)?;
+        all.iter()
+            .all(|t| t.name == first.name && paths.contains(&t.path))
+            .then_some(first)
     }
 
     /// `member` of `class` in its blocks (`Facts::impls`): the inherent blocks' first, else the

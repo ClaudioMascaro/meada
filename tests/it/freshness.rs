@@ -15,6 +15,70 @@ use meada::engine::Engine;
 const ORIGIN: Option<&str> = Some("https://example.com/acme/conformance.git");
 const WEB: Option<&str> = Some("https://example.com/acme/web.git");
 
+/// The level of the call `id` ends with in the export `json`.
+fn level<'j>(json: &'j serde_json::Value, id: &str) -> &'j serde_json::Value {
+    let calls = json["calls"].as_array().unwrap();
+    let call = calls
+        .iter()
+        .find(|c| c["id"].as_str().unwrap().ends_with(id));
+    &call.unwrap_or_else(|| panic!("no call {id}"))["level"]
+}
+
+/// Edits a global using file, adds and deletes `.cs` files, rewrites one project file and
+/// adds another: files that did not change on disk resolve anew.
+#[test]
+fn csharp_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
+    let edit = |repo: &Path| {
+        let globals = repo.join("src/Acme.Core/GlobalUsings.cs");
+        let before = fs::read_to_string(&globals).unwrap();
+        fs::write(
+            &globals,
+            before.replace("global using Fmt = ", "global using Other = "),
+        )
+        .unwrap();
+        fs::write(
+            repo.join("src/Acme.Core/Orders/Extra.cs"),
+            "namespace Acme.Core.Orders;\n\npublic class Extra\n{\n    public void Run() { Format.Upper(\"e\"); }\n}\n",
+        )
+        .unwrap();
+        fs::remove_file(repo.join("src/Acme.Core/Orders/Order.Lines.cs")).unwrap();
+        let api = repo.join("src/Acme.Api/Acme.Api.csproj");
+        let before = fs::read_to_string(&api).unwrap();
+        fs::write(
+            &api,
+            before.replace("<Using Include=\"Acme.Core.Orders\" />", ""),
+        )
+        .unwrap();
+        fs::write(
+            repo.join("legacy/Modern.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <ItemGroup>\n    \
+             <Using Include=\"Acme.Core.Text.Format\" Static=\"true\" />\n  </ItemGroup>\n</Project>\n",
+        )
+        .unwrap();
+    };
+    let repo = fixture_repo("fresh_csharp", "conformance-csharp", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_csharp_cold", "conformance-csharp", ORIGIN, edit)
+    );
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    // The alias is gone from every file of Acme.Core, the project file's `<Using>` from
+    // Acme.Api, and the new SDK-style project file adds a `using static`.
+    assert!(level(&json, "OrderService.Place(string,int)::Fmt.Upper#0").is_null());
+    assert!(level(&json, "Checkout.Run()::OrderService.Default#0").is_null());
+    assert_eq!(level(&json, "Legacy.Old.Run()::Upper#0"), "exact");
+    assert_eq!(
+        level(&json, "Acme.Core.Orders.Extra.Run()::Format.Upper#0"),
+        "exact"
+    );
+}
+
 #[test]
 fn kotlin_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
     let edit = |repo: &Path| {
