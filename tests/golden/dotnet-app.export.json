@@ -1,0 +1,463 @@
+{
+  "repository": "example.com/dotnet/app",
+  "files": [
+    {
+      "path": "src/Jobs/Report.cs",
+      "hash": "dfea675055e0bcf50c0d0112580b4bd72e249777f0864facaecbbc6f2d9e3a4c"
+    },
+    {
+      "path": "src/Shared/Stamp.cs",
+      "hash": "fc963ed5b1ecf93ca399c31fd4851de8882224539bec2bc9b309dc2ed9e4f916"
+    },
+    {
+      "path": "src/Web/Checkout.cs",
+      "hash": "f98d490999e89f55f976fef248b0970982305b4c40e9d06e66a71b95b7c33c84"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report",
+      "span": {
+        "path": "src/Jobs/Report.cs",
+        "start": 110,
+        "end": 264
+      }
+    },
+    {
+      "id": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Line(int)",
+      "span": {
+        "path": "src/Jobs/Report.cs",
+        "start": 136,
+        "end": 207
+      }
+    },
+    {
+      "id": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Short(int)",
+      "span": {
+        "path": "src/Jobs/Report.cs",
+        "start": 213,
+        "end": 262
+      }
+    },
+    {
+      "id": "example.com/dotnet/app::src/Shared/Stamp.cs::Example.Shared.Stamp",
+      "span": {
+        "path": "src/Shared/Stamp.cs",
+        "start": 27,
+        "end": 97
+      }
+    },
+    {
+      "id": "example.com/dotnet/app::src/Shared/Stamp.cs::Example.Shared.Stamp.Now()",
+      "span": {
+        "path": "src/Shared/Stamp.cs",
+        "start": 59,
+        "end": 95
+      }
+    },
+    {
+      "id": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout",
+      "span": {
+        "path": "src/Web/Checkout.cs",
+        "start": 56,
+        "end": 242
+      }
+    },
+    {
+      "id": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Create()",
+      "span": {
+        "path": "src/Web/Checkout.cs",
+        "start": 202,
+        "end": 240
+      }
+    },
+    {
+      "id": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)",
+      "span": {
+        "path": "src/Web/Checkout.cs",
+        "start": 84,
+        "end": 196
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Line(int)::Currency.Cents#0",
+      "caller": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Line(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Jobs/Report.cs",
+        "start": 184,
+        "end": 206
+      }
+    },
+    {
+      "id": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Line(int)::Stamp.Now#0",
+      "caller": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Line(int)",
+      "target": "example.com/dotnet/app::src/Shared/Stamp.cs::Example.Shared.Stamp.Now()",
+      "level": "inferred",
+      "span": {
+        "path": "src/Jobs/Report.cs",
+        "start": 170,
+        "end": 181
+      }
+    },
+    {
+      "id": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Short(int)::Cents#0",
+      "caller": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Short(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Jobs/Report.cs",
+        "start": 248,
+        "end": 261
+      }
+    },
+    {
+      "id": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Create()::Order#0",
+      "caller": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Create()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Web/Checkout.cs",
+        "start": 227,
+        "end": 239
+      }
+    },
+    {
+      "id": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)::Order.Of#0",
+      "caller": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Web/Checkout.cs",
+        "start": 141,
+        "end": 159
+      }
+    },
+    {
+      "id": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)::order.Total#0",
+      "caller": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Web/Checkout.cs",
+        "start": 176,
+        "end": 189
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::nuget::Jobs",
+      "site": "example.com/dotnet/app::src/Jobs/Jobs.csproj"
+    },
+    {
+      "contract": "package::nuget::Shared",
+      "site": "example.com/dotnet/app::src/Shared/Shared.csproj"
+    },
+    {
+      "contract": "package::nuget::Web",
+      "site": "example.com/dotnet/app::src/Web/Web.csproj"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "package::nuget::Example.Money",
+      "site": "example.com/dotnet/app::src/Jobs/Jobs.csproj::ProjectReference::Example.Money",
+      "via": "path ../dotnet-lib/src/Money/Money.csproj"
+    },
+    {
+      "contract": "package::nuget::Example.Money",
+      "site": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Line(int)::Currency.Cents#0",
+      "via": "path ../dotnet-lib/src/Money/Money.csproj"
+    },
+    {
+      "contract": "package::nuget::Example.Money",
+      "site": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Short(int)::Cents#0",
+      "via": "path ../dotnet-lib/src/Money/Money.csproj"
+    },
+    {
+      "contract": "package::nuget::Example.Kit",
+      "site": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Create()::Order#0",
+      "via": null
+    },
+    {
+      "contract": "package::nuget::Example.Kit",
+      "site": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)::Order.Of#0",
+      "via": null
+    },
+    {
+      "contract": "package::nuget::Example.Kit",
+      "site": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)::order.Total#0",
+      "via": null
+    },
+    {
+      "contract": "package::nuget::Example.Kit",
+      "site": "example.com/dotnet/app::src/Web/Web.csproj::PackageReference::Example.Kit",
+      "via": null
+    }
+  ],
+  "packages": [
+    {
+      "name": "Jobs",
+      "repository": "example.com/dotnet/app",
+      "directory": "src/Jobs",
+      "ecosystem": "nuget"
+    },
+    {
+      "name": "Shared",
+      "repository": "example.com/dotnet/app",
+      "directory": "src/Shared",
+      "ecosystem": "nuget"
+    },
+    {
+      "name": "Web",
+      "repository": "example.com/dotnet/app",
+      "directory": "src/Web",
+      "ecosystem": "nuget"
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "src/Jobs/Jobs.csproj",
+      "field": "ProjectReference",
+      "name": "Example.Money"
+    },
+    {
+      "manifest": "src/Web/Web.csproj",
+      "field": "PackageReference",
+      "name": "Example.Kit",
+      "range": "[1.0,2.0)"
+    }
+  ],
+  "imports": [
+    {
+      "site": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Line(int)::Currency.Cents#0",
+      "specifier": "Example.Money.Currency",
+      "name": "Cents(1)",
+      "level": "exact",
+      "how": "namespace",
+      "target": "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)"
+    },
+    {
+      "site": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Short(int)::Cents#0",
+      "specifier": "Example.Money.Currency",
+      "name": "Cents(1)",
+      "level": "exact",
+      "how": "namespace",
+      "target": "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)"
+    },
+    {
+      "site": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Create()::Order#0",
+      "specifier": "Example.Kit.Pricing.Order",
+      "name": "Order(1)",
+      "level": "exact",
+      "how": "namespace",
+      "target": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Order(int)"
+    },
+    {
+      "site": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)::Order.Of#0",
+      "specifier": "Example.Kit.Pricing.Order",
+      "name": "Of(1)",
+      "level": "exact",
+      "how": "namespace",
+      "target": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Of(int)"
+    },
+    {
+      "site": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)::order.Total#0",
+      "specifier": "Example.Kit.Pricing.Order",
+      "name": "Total(0)",
+      "level": "exact",
+      "how": "namespace",
+      "target": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Total()"
+    }
+  ],
+  "communities": [
+    {
+      "name": "src/Jobs",
+      "members": [
+        "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Line(int)",
+        "example.com/dotnet/app::src/Shared/Stamp.cs::Example.Shared.Stamp.Now()"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/dotnet/app::src/Jobs/Jobs.csproj::ProjectReference::Example.Money",
+      "provider": "example.com/dotnet/lib::src/Money/Money.csproj",
+      "contract": "package::nuget::Example.Money",
+      "level": "exact",
+      "reason": "package::nuget::Example.Money none (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Line(int)::Currency.Cents#0",
+      "provider": "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)",
+      "contract": "package::nuget::Example.Money",
+      "level": "exact",
+      "reason": "package::nuget::Example.Money none (local none), range unchecked; import namespace"
+    },
+    {
+      "consumer": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Short(int)::Cents#0",
+      "provider": "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)",
+      "contract": "package::nuget::Example.Money",
+      "level": "exact",
+      "reason": "package::nuget::Example.Money none (local none), range unchecked; import namespace"
+    },
+    {
+      "consumer": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Create()::Order#0",
+      "provider": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Order(int)",
+      "contract": "package::nuget::Example.Kit",
+      "level": "exact",
+      "reason": "package::nuget::Example.Kit [1.0,2.0) (local 1.2.0), range unchecked; import namespace"
+    },
+    {
+      "consumer": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)::Order.Of#0",
+      "provider": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Of(int)",
+      "contract": "package::nuget::Example.Kit",
+      "level": "exact",
+      "reason": "package::nuget::Example.Kit [1.0,2.0) (local 1.2.0), range unchecked; import namespace"
+    },
+    {
+      "consumer": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)::order.Total#0",
+      "provider": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Total()",
+      "contract": "package::nuget::Example.Kit",
+      "level": "exact",
+      "reason": "package::nuget::Example.Kit [1.0,2.0) (local 1.2.0), range unchecked; import namespace"
+    },
+    {
+      "consumer": "example.com/dotnet/app::src/Web/Web.csproj::PackageReference::Example.Kit",
+      "provider": "example.com/dotnet/lib::src/Kit/Kit.csproj",
+      "contract": "package::nuget::Example.Kit",
+      "level": "exact",
+      "reason": "package::nuget::Example.Kit [1.0,2.0) (local 1.2.0), range unchecked"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Line(int)",
+      "kind": "export",
+      "label": "Example.App.Jobs.Report.Line(int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/dotnet/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Line(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/dotnet/app",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/dotnet/app::src/Shared/Stamp.cs::Example.Shared.Stamp.Now()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/dotnet/lib",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)",
+          "reason": "package::nuget::Example.Money none (local none), range unchecked; import namespace"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Short(int)",
+      "kind": "export",
+      "label": "Example.App.Jobs.Report.Short(int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/dotnet/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Short(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/dotnet/lib",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)",
+          "reason": "package::nuget::Example.Money none (local none), range unchecked; import namespace"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Create()",
+      "kind": "export",
+      "label": "Example.App.Web.Checkout.Create()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/dotnet/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Create()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/dotnet/lib",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Order(int)",
+          "reason": "package::nuget::Example.Kit [1.0,2.0) (local 1.2.0), range unchecked; import namespace"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)",
+      "kind": "export",
+      "label": "Example.App.Web.Checkout.Pay(int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/dotnet/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/dotnet/lib",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Of(int)",
+          "reason": "package::nuget::Example.Kit [1.0,2.0) (local 1.2.0), range unchecked; import namespace"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/dotnet/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Order(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/dotnet/lib",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Total()",
+          "reason": "package::nuget::Example.Kit [1.0,2.0) (local 1.2.0), range unchecked; import namespace"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/dotnet/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Tax(int)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/dotnet/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Subtotal()"
+        }
+      ]
+    }
+  ]
+}

@@ -49,3 +49,7 @@ Os contratos de pacotes JVM são descobertos nos manifests: `pom.xml`, `settings
 Em Java e Kotlin com Spring, a URL base pode vir de `@Value("${chave}")` (em Kotlin, `@Value("\${chave}")`, com o `$` escapado), lida do `application.properties`, do `application.yml` ou do `application.yaml` em `src/main/resources` de cada módulo, sem chave nova em `meada.toml`. Uma URL literal liga pelo host em `[serve] hosts`; um placeholder `${VAR}` (com ou sem `:padrão`) usa as mesmas chaves `base_url_env` de `[[peer]]`. Um padrão cujo host algum par serve liga por esse host.
 
 Em C#, a URL base pode vir de `Environment.GetEnvironmentVariable("X")` ou de `configuration["Secao:Chave"]`, lida do `appsettings.json` do projeto (só o arquivo base), sem chave nova no `meada.toml`. Uma chave é a variável `Secao__Chave` nos `base_url_env` do `[[peer]]`; uma URL literal que o arquivo guarda para ela liga por host em `[serve] hosts` quando algum peer serve esse host.
+
+## Pacotes NuGet
+
+Os contratos de pacotes NuGet são descobertos nos `.csproj` com SDK. Não precisam de chave extra no `meada.toml`: um `PackageReference` liga ao provedor pelo id, e um `ProjectReference` pelo caminho do arquivo do projeto, que alcança um projeto de outro repositório pelas raízes dos repositórios do workspace (declare-o em `[[peer]]`). Valores de propriedade como `$(Version)` ficam sem avaliar.

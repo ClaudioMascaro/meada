@@ -1,0 +1,289 @@
+{
+  "repository": "example.com/dotnet/lib",
+  "files": [
+    {
+      "path": "src/Kit/Pricing/Order.cs",
+      "hash": "eacc0eb162420930074a7a94a6aa945140db086f422decef132545833e626535"
+    },
+    {
+      "path": "src/Money/Currency.cs",
+      "hash": "2b7ceb6c1e2308d26bdeb8272868f68ba963fcc02bed421fbeee1fc6bf6093ff"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Audit",
+      "span": {
+        "path": "src/Kit/Pricing/Order.cs",
+        "start": 384,
+        "end": 441
+      }
+    },
+    {
+      "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Audit.Run()",
+      "span": {
+        "path": "src/Kit/Pricing/Order.cs",
+        "start": 411,
+        "end": 439
+      }
+    },
+    {
+      "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order",
+      "span": {
+        "path": "src/Kit/Pricing/Order.cs",
+        "start": 32,
+        "end": 382
+      }
+    },
+    {
+      "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Of(int)",
+      "span": {
+        "path": "src/Kit/Pricing/Order.cs",
+        "start": 171,
+        "end": 231
+      }
+    },
+    {
+      "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Order(int)",
+      "span": {
+        "path": "src/Kit/Pricing/Order.cs",
+        "start": 93,
+        "end": 165
+      }
+    },
+    {
+      "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Subtotal()",
+      "span": {
+        "path": "src/Kit/Pricing/Order.cs",
+        "start": 281,
+        "end": 322
+      }
+    },
+    {
+      "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Tax(int)",
+      "span": {
+        "path": "src/Kit/Pricing/Order.cs",
+        "start": 328,
+        "end": 380
+      }
+    },
+    {
+      "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Total()",
+      "span": {
+        "path": "src/Kit/Pricing/Order.cs",
+        "start": 237,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency",
+      "span": {
+        "path": "src/Money/Currency.cs",
+        "start": 26,
+        "end": 143
+      }
+    },
+    {
+      "id": "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)",
+      "span": {
+        "path": "src/Money/Currency.cs",
+        "start": 61,
+        "end": 141
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Of(int)::Order#0",
+      "caller": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Of(int)",
+      "target": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Order(int)",
+      "level": "exact",
+      "span": {
+        "path": "src/Kit/Pricing/Order.cs",
+        "start": 211,
+        "end": 230
+      }
+    },
+    {
+      "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Total()::Subtotal#0",
+      "caller": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Total()",
+      "target": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Subtotal()",
+      "level": "exact",
+      "span": {
+        "path": "src/Kit/Pricing/Order.cs",
+        "start": 263,
+        "end": 273
+      }
+    },
+    {
+      "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Total()::Tax#0",
+      "caller": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Total()",
+      "target": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Tax(int)",
+      "level": "exact",
+      "span": {
+        "path": "src/Kit/Pricing/Order.cs",
+        "start": 259,
+        "end": 274
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::nuget::Example.Kit",
+      "site": "example.com/dotnet/lib::src/Kit/Kit.csproj"
+    },
+    {
+      "contract": "package::nuget::Example.Money",
+      "site": "example.com/dotnet/lib::src/Money/Money.csproj"
+    }
+  ],
+  "consumers": [],
+  "packages": [
+    {
+      "name": "Example.Kit",
+      "version": "1.2.0",
+      "repository": "example.com/dotnet/lib",
+      "directory": "src/Kit",
+      "ecosystem": "nuget"
+    },
+    {
+      "name": "Example.Money",
+      "repository": "example.com/dotnet/lib",
+      "directory": "src/Money",
+      "ecosystem": "nuget"
+    }
+  ],
+  "communities": [
+    {
+      "name": "src/Kit/Pricing",
+      "members": [
+        "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Of(int)",
+        "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Order(int)"
+      ]
+    },
+    {
+      "name": "src/Kit/Pricing#2",
+      "members": [
+        "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Subtotal()",
+        "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Tax(int)",
+        "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Total()"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/dotnet/app::src/Jobs/Jobs.csproj::ProjectReference::Example.Money",
+      "provider": "example.com/dotnet/lib::src/Money/Money.csproj",
+      "contract": "package::nuget::Example.Money",
+      "level": "exact",
+      "reason": "package::nuget::Example.Money none (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Line(int)::Currency.Cents#0",
+      "provider": "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)",
+      "contract": "package::nuget::Example.Money",
+      "level": "exact",
+      "reason": "package::nuget::Example.Money none (local none), range unchecked; import namespace"
+    },
+    {
+      "consumer": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Short(int)::Cents#0",
+      "provider": "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)",
+      "contract": "package::nuget::Example.Money",
+      "level": "exact",
+      "reason": "package::nuget::Example.Money none (local none), range unchecked; import namespace"
+    },
+    {
+      "consumer": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Create()::Order#0",
+      "provider": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Order(int)",
+      "contract": "package::nuget::Example.Kit",
+      "level": "exact",
+      "reason": "package::nuget::Example.Kit [1.0,2.0) (local 1.2.0), range unchecked; import namespace"
+    },
+    {
+      "consumer": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)::Order.Of#0",
+      "provider": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Of(int)",
+      "contract": "package::nuget::Example.Kit",
+      "level": "exact",
+      "reason": "package::nuget::Example.Kit [1.0,2.0) (local 1.2.0), range unchecked; import namespace"
+    },
+    {
+      "consumer": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)::order.Total#0",
+      "provider": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Total()",
+      "contract": "package::nuget::Example.Kit",
+      "level": "exact",
+      "reason": "package::nuget::Example.Kit [1.0,2.0) (local 1.2.0), range unchecked; import namespace"
+    },
+    {
+      "consumer": "example.com/dotnet/app::src/Web/Web.csproj::PackageReference::Example.Kit",
+      "provider": "example.com/dotnet/lib::src/Kit/Kit.csproj",
+      "contract": "package::nuget::Example.Kit",
+      "level": "exact",
+      "reason": "package::nuget::Example.Kit [1.0,2.0) (local 1.2.0), range unchecked"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Of(int)",
+      "kind": "export",
+      "label": "Example.Kit.Pricing.Order.Of(int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/dotnet/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Of(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/dotnet/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Order(int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Total()",
+      "kind": "export",
+      "label": "Example.Kit.Pricing.Order.Total()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/dotnet/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Total()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/dotnet/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Tax(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/dotnet/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Subtotal()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)",
+      "kind": "export",
+      "label": "Example.Money.Currency.Cents(int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/dotnet/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)"
+        }
+      ]
+    }
+  ]
+}

@@ -47,3 +47,7 @@ JVM package contracts are discovered from manifests: `pom.xml`, `settings.gradle
 In Java and Kotlin with Spring, the base URL may come from `@Value("${key}")` (in Kotlin, `@Value("\${key}")`, the `$` escaped), read from the `application.properties`, `application.yml` or `application.yaml` in each module's `src/main/resources`, with no new `meada.toml` key. A literal URL links by host in `[serve] hosts`; a `${VAR}` placeholder (with or without `:default`) uses the same `[[peer]]` `base_url_env` keys. A default whose host some peer serves links by that host.
 
 In C#, the base URL may come from `Environment.GetEnvironmentVariable("X")` or from `configuration["Section:Key"]`, read from the project's `appsettings.json` (the base file only), with no new `meada.toml` key. A key is the variable `Section__Key` in `[[peer]]` `base_url_env`; a literal URL the file holds for it links by host in `[serve] hosts` when some peer serves that host.
+
+## NuGet packages
+
+NuGet package contracts are discovered from the SDK-style `.csproj` files. They need no additional `meada.toml` key: a `PackageReference` links to a provider by its id, and a `ProjectReference` by the path of its project file, which reaches a project of another repository by the roots of the workspace repositories (declare it in `[[peer]]`). Property values such as `$(Version)` stay unevaluated.

@@ -3958,6 +3958,10 @@ fn web_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
 #[test]
 fn csharp_minimal_apis_are_providers_with_their_full_paths() {
     let (_, actual) = providers("csharp_minimal", "conformance-csharp", WEB);
+    // The project files beside the routes provide packages, not routes.
+    let actual: Vec<_> = (actual.into_iter())
+        .filter(|(contract, _)| contract.starts_with("http::"))
+        .collect();
     let handler = |name: &str| web("Handlers.cs", &format!("Handlers.{name}"));
     let orders = |name: &str| web("OrderRoutes.cs", name);
     let all = orders("OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders");

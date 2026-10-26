@@ -785,8 +785,8 @@ one for the area a change touches.
   controller providers, `http/csharp/minimal.rs`, minimal API providers,
   `http/csharp/clients.rs`, HttpClient and typed client consumers, and `http/csharp/refit.rs`,
   Refit consumers), resource and channel
-  kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
-  contracts (specs #22, #24, #30, #25 and #26), the shared steps and one module per ecosystem behind
+  kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go, Maven and NuGet packages as
+  contracts (specs #22, #24, #30, #25, #26 and #28), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `literals.rs`, `zod.rs` (and `meada-core`'s `shape.rs`): OpenAPI and AsyncAPI
@@ -835,7 +835,8 @@ one for the area a change touches.
 - Package: `package::npm::<name>`, `package::pypi::<name>` (the PEP 503 normalized name) or
   `package::cargo::<name>` (the `[package] name`; a dependent's site names the key it writes, so
   a renamed crate has its own site) or `package::go::<module path>` (the `module` of a `go.mod`), or
-  `package::maven::<group>:<artifact>` (a Maven or Gradle artifact),
+  `package::maven::<group>:<artifact>` (a Maven or Gradle artifact) or `package::nuget::<id>` (an
+  SDK-style `.csproj`: its `PackageId`, else `AssemblyName`, else file name),
   provided at `<repository>::<manifest path>` (such as `example.com/pkg/shared::package.json` or
   `example.com/pkg/pylib::pyproject.toml`) and consumed at `<repository>::<manifest
   path>::<field>::<name>` (PyPI fields: `project.dependencies`, `tool.poetry.dependencies`, and
@@ -1027,9 +1028,10 @@ one for the area a change touches.
   files), `kotlin` and `array_of`.
 - `dotnet/` holds what the .NET pack and ecosystems share (spec #28), as `jvm/` does for the
   JVM: `dotnet/msbuild.rs` reads an SDK-style project file (`msbuild::read`: whether it is a
-  project, and its `Using`s, the SDK's implicit usings among them), which the C# pack's `join`
-  reads and the NuGet ecosystem (#116) is to read manifests with; a second reader of project
-  files is a finding. `xml.rs` holds the bounds every XML build file reader shares
+  project and, if so, its `Using`s (the SDK's implicit usings among them), its `PackageId`,
+  `AssemblyName` and version, and its `PackageReference` and `ProjectReference` items), which the
+  C# pack's `join` and the NuGet ecosystem (#116) both read; a second reader of project files is
+  a finding. `xml.rs` holds the bounds every XML build file reader shares
   (`within_limits`, `XML_NODES`), owned by neither ecosystem: `jvm/maven.rs` and
   `dotnet/msbuild.rs` both check them before roxmltree parses.
 - New **Go router** (spec #25; net/http, gin, echo, chi and gorilla): a row of `ROUTERS` in
@@ -1170,7 +1172,7 @@ one for the area a change touches.
   `xlang-kotlin` one a TypeScript producer reaching a Kotlin `@KafkaListener`.
 - New **package ecosystem** (spec #22 user story 26, spec #225; track B packs): implement the
   `Ecosystem` trait of `package.rs` in a module of its own under `package/` (`npm`, `pypi`,
-  `cargo`, `go`, `maven` today) and add it to `ECOSYSTEMS`; the package kind, the index writer
+  `cargo`, `go`, `maven`, `nuget` today) and add it to `ECOSYSTEMS`; the package kind, the index writer
   and the packs learn no name. An arm for one ecosystem added to the shared code is a finding. It plugs
   in another manifest format (`Cargo.toml`, `go.mod`) without a new kind of contract: the
   contract `package::<name>::<package>` (`Ecosystem::prefix`, derived from `name`) still routes
@@ -1193,13 +1195,21 @@ one for the area a change touches.
     its name imports; `kotlin.` and `java.` packages are none). `declares(..)` (whether a
     provider declares what the `(specifier, chain)` names, whatever its signature) defaults to
     `true`: `import` lets none of one site's pairs enter when two are declared, so only an
-    ecosystem with several pairs per call answers it.
+    ecosystem with several pairs per call answers it. `settle(..)` (default: nothing) runs at the
+    start of the workspace step, over every repository's manifests, for an ecosystem whose
+    entries name a provider by location: NuGet gives a `ProjectReference` entry the id of the
+    project at its path (a project file's name need not be its id), and a `PackageReference` the
+    spelling of the one provider whose id differs by case only, before `consume` reads them,
+    each by one folded-location map (linear in the manifests).
   - `fits`: literal package-name equality; Maven matches the literal fragments of a computed
     coordinate. `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
   - `flag`: the range is unchecked (`range unchecked`); npm checks semver.
   - `reaches`: every provider; npm's `workspace:` keeps the dependent's own repository, Cargo
     and Go share `sourced`, in the seam (a `path` by the folded location, a `git` by the
-    remote's identity).
+    remote's identity); NuGet's `ProjectReference` (a `path <project file>` source) uses it too
+    and only for a project of another repository, so a reference inside one repository adds no
+    package link (the pack resolves it), while a `PackageReference` reaches every provider of
+    the id.
   - `owns`: every manifest of the ecosystem bounds the files under it; PyPI only a
     `pyproject.toml`, Cargo only a manifest with a `[package]`.
   - `ways` and `resolve`: Node's rule (`exports`, else `types`, `module` and `main`, else the
@@ -1227,7 +1237,24 @@ one for the area a change touches.
     class's own after; a plain chain is the instance's, in the reverse order. A function with a
     default parameter or a vararg has a `flexible` row (`resolve::Flexible`, the least and most
     argument counts), which `Classes::fits` reads before counting the parameters in the id.
-    `member_of`: none; Maven's
+    NuGet shares Maven's `imports`, `resolutions` and `declares` (free functions in
+    `package/maven.rs`, taking the ecosystem and the `How` to report: `How::Namespace`,
+    `; import namespace`): C# exports its types as Java does, under the qualified name, so the
+    class lookup, the family walk and the argument-count pick are the same code; `declaring`
+    counts a file only for the ecosystem whose `sources()` has its extension; `entries` is the
+    references of the nearest SDK-style `.csproj` above the file (`owner`, `Summary::project`,
+    as the pack's `join`); the three provider loops keep the providers an entry's `reaches`
+    lets through, as the default `resolutions` does, so a `ProjectReference` pins its project;
+    the shared code names no ecosystem: each passes its platform prefixes (`java.`, `kotlin.`
+    for Maven, `System.` for NuGet) to `imports`, and the class tables take every ecosystem's
+    source extensions.
+    Ceilings: a `ProjectReference` path written in another case than the file system's does not
+    match (ids match case-insensitively, paths do not), extension methods and a name written
+    fully qualified with no `using` are not followed, a receiver typed by a `var` whose value is
+    a call through a package (`var o = Order.Of(1); o.Total()`) is not followed (the return
+    type lives in the provider's index; Java has the same gap), and two projects in one
+    directory share it (the first by path owns the files).
+    `member_of`: none; Maven's and NuGet's
     constructors and methods of a class (a companion's too), so `context` on a public class
     lists, once per call, the calls that reach its members (`reached`, at the best level of the
     call's links into the class). `JVM` source roots (`jvm::ROOTS`, `jvm::TEST_ROOTS`) are

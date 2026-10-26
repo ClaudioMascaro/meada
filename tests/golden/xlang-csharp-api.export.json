@@ -560,6 +560,10 @@
     {
       "contract": "http::POST::/orders/reserve",
       "site": "example.com/xlang-csharp/api::Controllers/OrdersController.cs::Api.Controllers.OrdersController.Reserve()"
+    },
+    {
+      "contract": "package::nuget::Api",
+      "site": "example.com/xlang-csharp/api::Api.csproj"
     }
   ],
   "consumers": [
@@ -597,6 +601,14 @@
       "contract": "http::GET::/api/promotions",
       "site": "example.com/xlang-csharp/api::Program.cs::Main::promotions.GetStringAsync#0",
       "via": "env:Promo__Url"
+    }
+  ],
+  "packages": [
+    {
+      "name": "Api",
+      "repository": "example.com/xlang-csharp/api",
+      "directory": ".",
+      "ecosystem": "nuget"
     }
   ],
   "communities": [
