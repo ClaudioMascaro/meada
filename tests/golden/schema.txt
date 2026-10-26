@@ -27,6 +27,7 @@ CREATE TABLE manifests (
 );
 CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
 CREATE TABLE families (path TEXT NOT NULL, class TEXT NOT NULL, ancestors TEXT);
+CREATE TABLE flexible (path TEXT NOT NULL, name TEXT NOT NULL, least INTEGER NOT NULL, most INTEGER);
 CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL, site TEXT NOT NULL);
 CREATE TABLE communities (name TEXT NOT NULL, member TEXT NOT NULL);
 
@@ -2184,10 +2185,13 @@ sample.pom.xml
   ],
   "roots": [
     "src/main/java",
-    "src/test/java"
+    "src/main/kotlin",
+    "src/test/java",
+    "src/test/kotlin"
   ],
   "test_roots": [
-    "src/test/java"
+    "src/test/java",
+    "src/test/kotlin"
   ]
 }
 
@@ -2212,10 +2216,13 @@ sample.build.gradle.kts
   ],
   "roots": [
     "src/main/java",
-    "src/test/java"
+    "src/main/kotlin",
+    "src/test/java",
+    "src/test/kotlin"
   ],
   "test_roots": [
-    "src/test/java"
+    "src/test/java",
+    "src/test/kotlin"
   ]
 }
 

@@ -54,6 +54,22 @@ All notable changes to Meada are recorded here. The format follows
   unresolved consumer, never a `GET` guessed. The client may be imported by `*` or held by an
   untyped local `val` (`HttpClient(CIO).use { it.get(..) }` too). `url { path(..) }` builders are
   not read.
+- Kotlin imports into provider sources (issue #106): an import of a class, a top-level function
+  or an extension function from a workspace artifact the repository depends on reaches the
+  declaration in the provider by its `package` declaration, so `context` on a public declaration
+  lists its consumers in other repositories and `trace` follows the hop. `exact` when one
+  provider declares the package and declaration, `ambiguous` when several do or overloads of the
+  argument count remain; the reason ends `; import package`. A class name called constructs the
+  class, a call on a class's name reaches its companion before its members (an instance's call,
+  the member first), and an extension function crosses only through the import of its name,
+  `inferred`, on a receiver typed or not, never as a member of the class it extends: a member of
+  the receiver's type with the name wins. A call that may leave a default argument out or fills a
+  `vararg` reaches every overload it could, so the index stores the functions with a variable
+  argument count (the `flexible` table, a new stored format). The source roots gain
+  `src/main/kotlin` and `src/test/kotlin`, and the Gradle scanner reads the `kotlin` directory
+  set, `sourceSets["main"]` and `getByName("test")` alongside the `java` forms: a Kotlin set is
+  main when named `main` or `*Main`, test when named `test` or `*Test`, and any other is not
+  read. A named companion and `setSrcDirs` are not followed.
 - Kotlin base URLs from Spring configuration and the environment (issue #100): the Ktor client
   reads a base a property or a constructor property gets from Spring's `@Value("\${key}")` (the
   `$` escaped in a Kotlin string) in the `application.properties` or `application.yml` of its

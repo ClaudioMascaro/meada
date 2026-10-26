@@ -186,8 +186,8 @@ pub fn read(src: &[u8]) -> Summary {
         name,
         version,
         dependencies,
-        roots: vec!["src/main/java".into(), "src/test/java".into()],
-        test_roots: vec!["src/test/java".into()],
+        roots: super::ROOTS.map(Into::into).into(),
+        test_roots: super::TEST_ROOTS.map(Into::into).into(),
         ..Summary::default()
     }
 }
@@ -209,8 +209,16 @@ mod tests {
     #[test]
     fn the_source_roots_are_main_and_test_and_the_test_one_is_marked() {
         let summary = read(project("", "").as_bytes());
-        assert_eq!(summary.roots, ["src/main/java", "src/test/java"]);
-        assert_eq!(summary.test_roots, ["src/test/java"]);
+        assert_eq!(
+            summary.roots,
+            [
+                "src/main/java",
+                "src/main/kotlin",
+                "src/test/java",
+                "src/test/kotlin"
+            ]
+        );
+        assert_eq!(summary.test_roots, ["src/test/java", "src/test/kotlin"]);
     }
 
     #[test]

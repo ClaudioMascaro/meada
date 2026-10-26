@@ -333,25 +333,65 @@ fn included(args: &[Token]) -> Vec<&str> {
         .collect()
 }
 
+/// The head of a statement as a dotted path, with an index by a literal name read as a member
+/// (`sourceSets["main"].java.srcDirs` is `sourceSets.main.java.srcDirs`), and what follows it.
+fn dotted(tokens: &[Token]) -> Option<(String, &[Token])> {
+    let head = tokens.first()?.word()?;
+    match &tokens[1..] {
+        // `sourceSets.getByName("test").kotlin`: the set is the literal in the call.
+        [
+            Token::Mark('('),
+            Token::String(set, false),
+            Token::Mark(')'),
+            Token::Word(tail),
+            rest @ ..,
+        ] if tail.starts_with('.') && super::literal(set) => {
+            let (before, last) = head.rsplit_once('.')?;
+            matches!(last, "named" | "getByName").then_some(())?;
+            Some((format!("{before}.{set}{tail}"), rest))
+        }
+        [
+            Token::Mark('['),
+            Token::String(set, false),
+            Token::Mark(']'),
+            Token::Word(tail),
+            rest @ ..,
+        ] if super::literal(set) && tail.starts_with('.') => {
+            Some((format!("{head}.{set}{tail}"), rest))
+        }
+        rest => Some((head.to_string(), rest)),
+    }
+}
+
 /// The literal directories a statement adds to a source set of `sourceSets`, with whether the
 /// set is `main`: `srcDirs = ['a']`, `srcDirs += 'a'`, `srcDir 'a'`, `srcDirs("a", "b")`, inside
-/// `sourceSets { main { java { ... } } }` or written with the dotted path. A directory that is not
-/// a literal relative path (`file(..)`, `..`, a variable) is not read.
+/// `sourceSets { main { java { ... } } }` or written with the dotted path, for the `java` or the
+/// `kotlin` directories alike. A directory that is not a literal relative path (`file(..)`,
+/// `..`, a variable) is not read.
 fn source_dirs(tokens: &[Token], blocks: &[String]) -> Option<(bool, Vec<String>)> {
-    let head = tokens.first()?.word()?;
+    let (head, rest) = dotted(tokens)?;
     let path: Vec<&str> = (blocks.iter().map(String::as_str))
-        .chain([head])
+        .chain([head.as_str()])
         .flat_map(|s| s.split('.'))
         .collect();
     let at = path.iter().position(|s| *s == "sourceSets")?;
-    let [set, "java", "srcDirs" | "srcDir"] = path[at + 1..] else {
+    let [set, lang @ ("java" | "kotlin"), "srcDirs" | "srcDir"] = path[at + 1..] else {
         return None;
     };
     // `named(set)` or `getByName(set)` with no literal name (`block_head`) is no known set.
     if matches!(set, "named" | "getByName") {
         return None;
     }
-    let mut rest = &tokens[1..];
+    // A Java directory of a set other than `main` is a test one. A Kotlin set is told by its
+    // name (Gradle's `test`, the multiplatform `*Main` and `*Test`); any other is not read, as
+    // its files may be production code (`Summary::roots`).
+    let main = match (lang, set) {
+        (_, "main") => true,
+        ("kotlin", set) if set.ends_with("Main") => true,
+        ("kotlin", set) if set != "test" && !set.ends_with("Test") => return None,
+        _ => false,
+    };
+    let mut rest = rest;
     if let [Token::Mark('+'), tail @ ..] = rest {
         rest = tail;
     }
@@ -375,12 +415,15 @@ fn source_dirs(tokens: &[Token], blocks: &[String]) -> Option<(bool, Vec<String>
             _ => None,
         })
         .collect();
-    Some((set == "main", dirs))
+    Some((main, dirs))
 }
 
 /// The name a block's head line gives it: its first word, with a `named(..)` or `getByName(..)`
 /// of a literal set read as that set (`sourceSets.named("main")` is `sourceSets.main`).
 fn block_head(line: &[Token]) -> String {
+    if let Some((head, [])) = dotted(line) {
+        return head;
+    }
     let head = line.iter().find_map(Token::word).unwrap_or("");
     if let [
         Token::Word(_),
@@ -573,8 +616,8 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
         for (main, dir) in sources {
             *dirs.entry(dir).or_insert(true) &= main;
         }
-        let mut roots = vec!["src/main/java".to_string(), "src/test/java".to_string()];
-        let mut tests = vec!["src/test/java".to_string()];
+        let mut roots: Vec<String> = super::ROOTS.map(Into::into).into();
+        let mut tests: Vec<String> = super::TEST_ROOTS.map(Into::into).into();
         for (dir, main) in dirs.into_iter().take(MAX_ROOTS - roots.len()) {
             if !main {
                 tests.push(dir.clone());
@@ -686,7 +729,21 @@ mod tests {
 
     #[test]
     fn a_literal_source_set_directory_adds_a_root_main_or_not() {
-        let defaults = ["src/main/java", "src/test/java"];
+        let defaults = [
+            "src/main/java",
+            "src/main/kotlin",
+            "src/test/java",
+            "src/test/kotlin",
+        ];
+        let test_roots = |extra: &[&str]| -> Vec<String> {
+            let mut all: Vec<String> = ["src/test/java", "src/test/kotlin"]
+                .iter()
+                .chain(extra)
+                .map(|s| s.to_string())
+                .collect();
+            all.sort();
+            all
+        };
         let with = |extra: &[&str]| -> Vec<String> {
             let mut all: Vec<String> = defaults
                 .iter()
@@ -696,7 +753,7 @@ mod tests {
             all.sort();
             all
         };
-        assert_eq!(roots(""), (with(&[]), vec!["src/test/java".to_string()]));
+        assert_eq!(roots(""), (with(&[]), test_roots(&[])));
         // Groovy and Kotlin forms, nested or dotted, replacing or adding.
         for (src, main, test) in [
             (
@@ -714,18 +771,67 @@ mod tests {
                 &["src/a"],
                 &["src/i"],
             ),
+            // The Kotlin source directory set, Groovy and Kotlin DSL.
+            (
+                "sourceSets { main { kotlin { srcDirs = ['src/a'] } } }",
+                &["src/a"],
+                &[],
+            ),
+            (
+                "sourceSets {\n main { kotlin.srcDir(\"src/a\") }\n named(\"test\") { kotlin.srcDirs(\"src/t\", \"src/u\") }\n}",
+                &["src/a"],
+                &["src/t", "src/u"],
+            ),
+            // An indexed set, in the dotted path or as a block's head.
+            (
+                "sourceSets[\"main\"].kotlin.srcDir(\"src/a\")\nsourceSets['it'].java.srcDirs += 'src/i'",
+                &["src/a"],
+                &["src/i"],
+            ),
+            (
+                "kotlin { sourceSets[\"main\"].kotlin.srcDir(\"src/a\") }\nsourceSets {\n getByName(\"test\") { kotlin.srcDir(\"src/t\") }\n}",
+                &["src/a"],
+                &["src/t"],
+            ),
+            // A set looked up by a literal name, then its directories.
+            (
+                "sourceSets.getByName(\"test\").kotlin.srcDir(\"src/t\")",
+                &[],
+                &["src/t"],
+            ),
         ] {
             let (all, tests) = roots(src);
             let expected: Vec<_> = main.iter().chain(test).copied().collect();
             assert_eq!(all, with(&expected), "{src}");
-            let mut want: Vec<_> = ["src/test/java"]
-                .iter()
-                .chain(test)
-                .map(|s| s.to_string())
-                .collect();
-            want.sort();
-            assert_eq!(tests, want, "{src}");
+            assert_eq!(tests, test_roots(test), "{src}");
         }
+    }
+
+    #[test]
+    fn a_kotlin_directory_is_main_or_test_by_the_name_of_its_set() {
+        let tested = |set: &str| {
+            let (all, tests) = roots(&format!(
+                "sourceSets {{ {set} {{ kotlin.srcDir(\"src/x\") }} }}"
+            ));
+            (
+                all.iter().any(|r| r == "src/x"),
+                tests.iter().any(|t| t == "src/x"),
+            )
+        };
+        // Multiplatform: `*Main` is production, `*Test` is test code.
+        for main in ["main", "commonMain", "jvmMain"] {
+            assert_eq!(tested(main), (true, false), "{main}");
+        }
+        for test in ["test", "commonTest", "jvmTest", "integrationTest"] {
+            assert_eq!(tested(test), (true, true), "{test}");
+        }
+        // Any other set is read as nothing: its files resolve by their package.
+        for other in ["integration", "val jvmMain by getting", "benchmarks"] {
+            assert_eq!(tested(other), (false, false), "{other}");
+        }
+        // A Java directory of a set other than `main` stays a test root.
+        let (_, tests) = roots("sourceSets.integration.java.srcDirs = ['src/i']");
+        assert!(tests.iter().any(|t| t == "src/i"));
     }
 
     #[test]
@@ -739,19 +845,26 @@ mod tests {
             "allprojects { sourceSets { main { java { srcDirs = ['src/a'] } } } }",
             "subprojects { sourceSets.main.java.srcDir 'src/a' }",
             "sourceSets { main { resources { srcDirs = ['src/a'] } } }",
-            "sourceSets { main { kotlin { srcDirs = ['src/a'] } } }",
             "project(':app') { sourceSets { main { java { srcDirs = ['src/a'] } } } }",
             "configure(subprojects) { sourceSets.main.java.srcDir 'src/a' }",
             "subprojects.each { sourceSets.main.java.srcDir 'src/a' }",
             "allprojects.forEach { sourceSets.main.java.srcDir 'src/a' }",
             "sourceSets.named(set) { java.srcDir 'src/a' }",
+            "sourceSets[set].kotlin.srcDir(\"src/a\")",
+            "sourceSets[\"main\"].kotlin.srcDir(dir)",
+            "sourceSets { main { kotlin { exclude(\"src/a\") } } }",
             "other { main { java { srcDirs = ['src/a'] } } }",
         ] {
             assert_eq!(
                 roots(src),
                 (
-                    vec!["src/main/java".to_string(), "src/test/java".to_string()],
-                    vec!["src/test/java".to_string()]
+                    vec![
+                        "src/main/java".to_string(),
+                        "src/main/kotlin".to_string(),
+                        "src/test/java".to_string(),
+                        "src/test/kotlin".to_string()
+                    ],
+                    vec!["src/test/java".to_string(), "src/test/kotlin".to_string()]
                 ),
                 "{src}"
             );
@@ -768,7 +881,7 @@ mod tests {
         assert_eq!(roots(&src).0.len(), MAX_ROOTS);
         // The defaults stay, and every test root is a kept root.
         let (all, tests) = roots(&src);
-        assert!(all.iter().any(|r| r == "src/main/java"), "{all:?}");
+        assert!(all.iter().any(|r| r == "src/main/kotlin"), "{all:?}");
         assert!(tests.iter().all(|t| all.contains(t)), "{tests:?}");
         let src = format!(
             "sourceSets {{ main {{ java {{ srcDirs = [{}] }} }}\n test {{ java {{ srcDirs = [{}] }} }} }}",
@@ -785,10 +898,11 @@ mod tests {
         for src in [
             "sourceSets.named('main') { java.srcDir 'src/a' }",
             "sourceSets { getByName(\"main\") { java.srcDir(\"src/a\") } }",
+            "sourceSets[\"main\"].kotlin { srcDir(\"src/a\") }",
         ] {
             let (all, tests) = roots(src);
             assert!(all.iter().any(|r| r == "src/a"), "{src}");
-            assert_eq!(tests, ["src/test/java"], "{src}");
+            assert_eq!(tests, ["src/test/java", "src/test/kotlin"], "{src}");
         }
         let (all, tests) = roots("sourceSets.named('it') { java.srcDir 'src/i' }");
         assert!(all.iter().any(|r| r == "src/i") && tests.iter().any(|t| t == "src/i"));
