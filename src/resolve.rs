@@ -346,6 +346,8 @@ pub struct Resolver<'a> {
     base_receiver: Option<&'static str>,
     /// The pack's `LanguagePack::unordered_bases`.
     unordered_bases: bool,
+    /// The pack's `LanguagePack::extension_methods`.
+    extension_methods: bool,
     /// The pack's `LanguagePack::implicit_members`.
     implicit: &'static [&'static str],
     /// The pack's names bound everywhere (`LanguagePack::globals`).
@@ -409,6 +411,9 @@ fn nested_in(inner: Target, outer: Target) -> bool {
 struct Arity {
     least: usize,
     most: Option<usize>,
+    /// Whether the first parameter is the instance a call made on a receiver supplies (C#'s
+    /// extension `this`): such a call counts one argument fewer than `Ext.F(x)` does.
+    receiver: bool,
 }
 
 impl Arity {
@@ -417,11 +422,19 @@ impl Arity {
         Arity {
             least: params.iter().filter(required).count(),
             most: (!params.iter().any(|p| p.binds == Binds::Rest)).then_some(params.len()),
+            receiver: params.first().is_some_and(|p| p.binds == Binds::Instance),
         }
     }
 
     fn fits(self, arity: usize) -> bool {
         self.least <= arity && self.most.is_none_or(|most| arity <= most)
+    }
+
+    /// `fits` for a call whose form `on_receiver` tells, only when the function takes its
+    /// receiver as a first parameter.
+    fn fits_call(self, arity: usize, on_receiver: &dyn Fn() -> bool) -> bool {
+        let arity = arity + usize::from(self.receiver && on_receiver());
+        self.fits(arity)
     }
 }
 
@@ -715,6 +728,7 @@ impl<'a> Resolver<'a> {
             receiver: language.receiver(),
             base_receiver: language.base_receiver(),
             unordered_bases: language.unordered_bases(),
+            extension_methods: language.extension_methods(),
             implicit: language.implicit_members(),
             globals: language.globals(),
             callers: HashMap::new(),
@@ -954,7 +968,7 @@ impl<'a> Resolver<'a> {
             found => found,
         };
         let known = matches!(binding, Binding::Def(_) | Binding::Several(_));
-        let binding = self.narrow(binding, call.arity);
+        let binding = self.narrow(binding, call.arity, &|| self.on_receiver(path, call));
         // No member fits: an extension function in scope may.
         if matches!(binding, Binding::Unknown | Binding::External(..))
             && let Some(found) = self.extended(path, call, on.clone(), work)
@@ -981,6 +995,21 @@ impl<'a> Resolver<'a> {
         }
     }
 
+    /// Whether `call` is made on a receiver (`x.F()`, `this.F()`), not bare or on a type's name
+    /// (`Ext.F(x)`): the form that decides how many arguments a function that takes its receiver
+    /// as a first parameter (`Arity::receiver`) is given.
+    fn on_receiver(&self, path: &'a str, call: &'a Call) -> bool {
+        let Some((head, _)) = call.callee.rsplit_once('.') else {
+            return false;
+        };
+        if call.on.is_some() || Some(head) == self.receiver || Some(head) == self.base_receiver {
+            return true;
+        }
+        let (seen, work) = (&mut self.seen(path, &call.scope), &mut Work::default());
+        let found = self.resolve_as(path, &call.scope, head, seen, work, Reading::Value);
+        !matches!(found, Binding::Def(t) if self.is_class(t))
+    }
+
     /// The name match of a call that no binding answers (`infer`). A call narrowed by its
     /// argument count (`Call::arity`, a pack whose overloads merge across a class family) reads
     /// the family that owns it: a receiver whose class the source writes, `this` and a bare
@@ -988,7 +1017,12 @@ impl<'a> Resolver<'a> {
     /// base and declares none falls back to what its scope binds, as a name match. A base call
     /// (`super.f()`) the family does not answer resolves to nothing. Any other receiver keeps the
     /// repository's candidates, and several of them take the one declared in the family of the
-    /// class around the call, other than the calling method itself.
+    /// class around the call, other than the calling method itself. In a pack whose members may
+    /// be extended (`LanguagePack::extension_methods`) a receiver the source types is not
+    /// "any other": one of a class of the repository whose family lacks the method, with no
+    /// opaque base, and one whose written type is outside the repository, match the methods that
+    /// take their receiver as a first parameter alone (`Arity::receiver`); with an opaque base
+    /// the member may be the base's, and the call resolves to nothing.
     fn matched(
         &self,
         path: &'a str,
@@ -1005,7 +1039,9 @@ impl<'a> Resolver<'a> {
             return Resolution::Unresolved;
         }
         let bare = head.is_none() && self.members_in_scope;
-        let all = self.candidates(path, callee, call.by_path, call.arity, bare);
+        let on_receiver = || self.on_receiver(path, call);
+        let all = self.candidates(path, callee, call.by_path, call.arity, bare, &on_receiver);
+        let mut written = false;
         let owner = match head {
             None if bare => self.class(path, scope),
             None => Binding::Unknown,
@@ -1016,9 +1052,30 @@ impl<'a> Resolver<'a> {
                     (None, Some(inner)) => self.result_of(path, inner, work),
                     (None, None) => self.resolve_as(path, scope, head, seen, work, Reading::Value),
                 };
+                // The source writes a type for the receiver.
+                written = (self.holder(&receiver)).is_some_and(|(p, s, n)| {
+                    matches!(self.receivers[p].get(&(s, n)), Some(Class::Type(_)))
+                });
                 self.instance(receiver, work)
             }
         };
+        let on_instance = matches!(owner, Binding::Instance(_)) || head == self.receiver;
+        // An extension method may answer a call on a receiver the repository lacks the member
+        // of, or whose written type is outside it; no other method of that name does.
+        let extensions = |all: &[Target<'a>]| -> Vec<Target<'a>> {
+            (all.iter().copied())
+                .filter(|t| {
+                    (self.defs[t.path][t.name].params.first())
+                        .is_some_and(|p| p.binds == Binds::Instance)
+                })
+                .collect()
+        };
+        if self.extension_methods
+            && written
+            && !matches!(owner, Binding::Instance(_) | Binding::Def(_))
+        {
+            return one_of(extensions(&all));
+        }
         let family = match owner {
             Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => {
                 self.family(t, work).map(|f| (f, true))
@@ -1073,11 +1130,17 @@ impl<'a> Resolver<'a> {
                     work,
                     Reading::Path,
                 );
-                match self.narrow(found, call.arity) {
+                match self.narrow(found, call.arity, &|| self.on_receiver(path, call)) {
                     Binding::Def(t) => narrowed(t, all.len().max(1)),
                     Binding::Several(several) => Resolution::Ambiguous(several),
                     _ => Resolution::Unresolved,
                 }
+            }
+            [] if self.extension_methods
+                && on_instance
+                && !family.iter().any(|a| matches!(a, Ancestor::Opaque(_))) =>
+            {
+                one_of(extensions(&all))
             }
             [] => Resolution::Unresolved,
         }
@@ -1120,9 +1183,15 @@ impl<'a> Resolver<'a> {
         found
     }
 
-    fn narrow(&self, binding: Binding<'a>, arity: Option<usize>) -> Binding<'a> {
+    fn narrow(
+        &self,
+        binding: Binding<'a>,
+        arity: Option<usize>,
+        on_receiver: &dyn Fn() -> bool,
+    ) -> Binding<'a> {
         let Some(arity) = arity else { return binding };
-        let fits = |t: &Target<'a>| self.arities.get(t).is_none_or(|n| n.fits(arity));
+        let fits =
+            |t: &Target<'a>| (self.arities.get(t)).is_none_or(|n| n.fits_call(arity, on_receiver));
         match binding {
             Binding::Def(t) if !fits(&t) => Binding::Unknown,
             Binding::Several(all) => match all.into_iter().filter(fits).collect::<Vec<_>>()[..] {
@@ -2101,7 +2170,7 @@ impl<'a> Resolver<'a> {
         arity: Option<usize>,
         bare: bool,
     ) -> Resolution<'a> {
-        one_of(self.candidates(path, callee, by_path, arity, bare))
+        one_of(self.candidates(path, callee, by_path, arity, bare, &|| false))
     }
 
     /// The definitions whose name matches the callee's last name anywhere `path` reaches
@@ -2115,6 +2184,7 @@ impl<'a> Resolver<'a> {
         by_path: bool,
         arity: Option<usize>,
         bare: bool,
+        on_receiver: &dyn Fn() -> bool,
     ) -> Vec<Target<'a>> {
         let (member, last) = match callee.rsplit_once('.') {
             Some((_, last)) => (true, last),
@@ -2130,7 +2200,7 @@ impl<'a> Resolver<'a> {
             found.retain(|t| reaches(path, t.path));
         }
         if let Some(arity) = arity {
-            found.retain(|t| self.arities.get(t).is_none_or(|n| n.fits(arity)));
+            found.retain(|t| (self.arities.get(t)).is_none_or(|n| n.fits_call(arity, on_receiver)));
         }
         // A file whose calls reach no extension function (Java's) matches none by name either.
         if !self.extending.contains(path) {

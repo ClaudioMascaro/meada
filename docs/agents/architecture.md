@@ -1558,6 +1558,35 @@ one for the area a change touches.
   classes declared in that namespace alone (`Binding::of_namespace`), since a C# file's group
   is its first namespace's and it may declare types in another; the C# layout names such a file
   for each other namespace it declares types in, when no file has that namespace as package.
+  C# method calls (spec #28, #108) use the seams Java's do and add none but one flag. The pack
+  writes `Facts::receivers` from the declared type of a field, a property, a parameter
+  (primary constructors' too), a local with an explicit type, a `foreach`, `out` or pattern
+  variable, and a `var` initialized with `new T(..)` (`Class::Type`), or with a call
+  (`Class::Result`); a target-typed `new()` takes the declared type. `Def::result` is a
+  method's or local function's written return type, so `Make().Save()`, `Make()?.Save()` and
+  `var x = Make()` follow it (`Call::on`). A type is read as written, without its type
+  arguments or a nullable mark; a predefined type, an array, a tuple, `var` and a type
+  parameter are no class. A name bound twice in a scope with two classes, or by a local named
+  like a field of the file, is unknown. A class's written bases (`Def::bases`) serve
+  unqualified, `this.` and receiver calls, an interface receiver reaches the interface's
+  member alone, and overloads are narrowed by `Call::arity`, a tie `ambiguous`. The `this`
+  parameter of an extension method is `Binds::Instance`: a call made on a receiver counts one
+  argument fewer than `Ext.F(x)` does (`Arity::receiver`, `Resolver::on_receiver`), so
+  `AddOrders(this S)` and `AddOrders(this S, Action<O>)` tell `s.AddOrders(f)` from
+  `Ext.AddOrders(s)`, and `Code::arg` binds the receiver to that parameter.
+  `LanguagePack::extension_methods` (C# only) lets an extension method answer a call no member
+  does: on a receiver of a class of the repository whose family lacks the method and has no
+  opaque base, or whose written type is outside the repository (`List<T>`), the name match
+  keeps the methods with a `Binds::Instance` first parameter alone (`inferred`, or `ambiguous`
+  with every one that fits). With an opaque base, or on a type's name (`Teller.Missing()`),
+  or a bare call, the call resolves to nothing, and so does a method of the repository that
+  is no extension. A receiver without a written type (`var x = Make()` of unknown result, a
+  lambda parameter, a type parameter) keeps the broad name match. The extensions are not
+  looked up: an extension method called as `x.M()` is never `exact`, one called as `Ext.M(x)`
+  is. Ceilings: no generic type argument is read (`Result` and `Result<T>` are one type), a
+  `var` takes a type from `new` and a call alone (no cast, `await` or conditional), a
+  target-typed `new()` records no constructor call, and a parameter type written `global::A`
+  or `alias::A` is spelled `A` and `alias.A` in a signature.
 - New **config key**: add the field to `Config`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
 - New **MCP tool**: `mcp.rs`, one `Engine` method that builds the tool's result, its result
