@@ -368,7 +368,7 @@ impl Ecosystem for Maven {
         // `(class, method, receiver)`: the receiver is the `@` an extension's chain ends with.
         let mut found: Vec<(String, String, String)> = Vec::new();
         // A call on a class's name (`Money.of(1)`) is its companion's (or its object's).
-        let on_class = path.ends_with(".kt")
+        let on_class = jvm::names::kotlin(path)
             && !call.constructs
             && (callee.rsplit_once('.'))
                 .and_then(|(head, _)| head.rsplit('.').next())
@@ -414,7 +414,7 @@ impl Ecosystem for Maven {
         // names the receiver's type when that is the one the source writes, for a member of the
         // type would hide it.
         if let (true, false, Some((_, name))) = (
-            path.ends_with(".kt") && (found.is_empty() || !typed.is_empty()),
+            jvm::names::kotlin(path) && (found.is_empty() || !typed.is_empty()),
             local,
             callee.rsplit_once('.'),
         ) {

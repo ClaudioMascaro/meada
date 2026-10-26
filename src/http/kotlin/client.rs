@@ -17,10 +17,10 @@
 //! Spring injects with `@Value("\${key}")` into a property or a constructor property is read
 //! from the module's configuration (`jvm::spring::inject`, as the Java clients do).
 
-use super::{external, implicit};
+use super::{VERBS, external, implicit};
 use crate::contract::Found;
 use crate::index::Indexed;
-use crate::jvm::names::{LOCAL_DEPTH, one, spellings, typed};
+use crate::jvm::names::{LOCAL_DEPTH, kotlin, one, spellings, typed};
 use crate::jvm::spring::{self, Configs};
 use crate::lang::kotlin::TYPE_ARGUMENT;
 use crate::lang::{Annotated, Bound, Call, Part, Value};
@@ -37,8 +37,7 @@ const DEFAULT_REQUEST: &[&str] = &[
     "io.ktor.client.plugins.defaultRequest",
     "io.ktor.client.features.defaultRequest",
 ];
-/// The request functions that name their method, and the one that takes it from its block.
-const VERBS: &[&str] = &["get", "post", "put", "patch", "delete", "head", "options"];
+/// The request function that takes its method from its block; the others name it (`VERBS`).
 const REQUEST_FUNCTION: &str = "request";
 /// The key the pack records a request block's `method = value` under in `Call::kwargs` (a
 /// property assigned in a lambda passed to the call is `<name>=`, `kotlin::assigned`).
@@ -213,7 +212,7 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
     let clients = Clients { code };
     let mut found = Vec::new();
     for (&path, facts) in code.files() {
-        if !path.ends_with(".kt") && !path.ends_with(".kts") {
+        if !kotlin(path) {
             continue;
         }
         for (n, stored) in facts.calls.iter().enumerate() {

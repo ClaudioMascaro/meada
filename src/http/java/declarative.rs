@@ -28,7 +28,7 @@ use super::{
 };
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
-use crate::jvm::names::{is_method, java_files, jvm_files, known, one, spellings};
+use crate::jvm::names::{is_method, java_files, jvm_files, known, kotlin, one, spellings};
 use crate::jvm::spring::{self, Configs};
 use crate::lang::kotlin::TYPE_ARGUMENT;
 use crate::lang::{Annotated, Call, Facts, Invocation, Part, Value, literal};
@@ -341,7 +341,7 @@ fn retrofit_clients<'a>(
                     configs.get_or_init(|| Configs::read(indexed.configs, indexed.manifests));
                 spring::inject(configs, code, path, annotated)
             };
-            let inject: Option<&Inject> = path.ends_with(".kt").then_some(&inject);
+            let inject: Option<&Inject> = kotlin(path).then_some(&inject);
             let client = code.receiver(path, n);
             if class != "class" || !client.is_some_and(|c| is_retrofit(code, path, &call.scope, c))
             {
