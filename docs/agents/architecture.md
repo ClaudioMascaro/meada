@@ -782,8 +782,9 @@ one for the area a change touches.
   RestTemplate, WebClient, `java.net.http` and OkHttp consumers, whose bases come from the
   Spring configuration `jvm/spring.rs` reads for the JVM packs' kinds; `http/kotlin.rs`, Ktor
   providers, and `http/kotlin/client.rs`, Ktor client consumers; `http/csharp.rs`, ASP.NET Core
-  controller providers, `http/csharp/minimal.rs`, minimal API providers, and
-  `http/csharp/clients.rs`, HttpClient consumers), resource and channel
+  controller providers, `http/csharp/minimal.rs`, minimal API providers,
+  `http/csharp/clients.rs`, HttpClient and typed client consumers, and `http/csharp/refit.rs`,
+  Refit consumers), resource and channel
   kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
   contracts (specs #22, #24, #30, #25 and #26), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
@@ -997,9 +998,12 @@ one for the area a change touches.
   arguments or makes a `Value::External`: `Expand::Call` and `Code::value` leave them as
   written, so no other reader sees a change.
   `Code::expand_with` is `Code::expand` with an injector (`resolve::Inject`): what a kind reads
-  off an annotation written on a field or a parameter (`Facts::annotated`, transient, read
-  from the full facts so a file the index kept is parsed again through `Code::misses`). The
-  shared side asks it for a field no file assigns (`Code::field_written`, the `.f` marker
+  off an annotation written on a field or a parameter (`Injected::Annotated`, from
+  `Facts::annotated`, transient, read from the full facts so a file the index kept is parsed
+  again through `Code::misses`), and, for a parameter no annotation on it injects into, what it
+  gives the parameter itself (`Injected::Param(function, n)`: a dependency injection container
+  passes a constructor's parameter by its type, with no annotation, as C#'s typed client takes
+  its `HttpClient`). The shared side asks it for a field no file assigns (`Code::field_written`, the `.f` marker
   constants the Java pack writes for every `f = v` and `x.f = v`) and for a parameter no frame
   binds of a function no call of the repository may reach (`Code::may_be_called`: an exact
   caller, or any callee ending in its name, so a name match, a call on an opaque receiver, a
@@ -1009,8 +1013,9 @@ one for the area a change touches.
   constructor's parameter a `final` field holds (`Const::scope`, the constructor the value is
   written in) is no wrapper's parameter: it is injected or unknown, never climbed. The values
   an injector gives are transient like the arguments they stand for, so the index stays free of
-  them. `jvm/spring.rs` is the one injector (Spring's `@Value`, `spring::inject`, which is given
-  the annotation with what it marks), shared by the JVM packs; `spring::resolved` is the one
+  them. `jvm/spring.rs` is the JVM packs' injector (Spring's `@Value`, `spring::inject`, which is
+  given the annotation with what it marks, and nothing for `Injected::Param`), and
+  `http/csharp/clients.rs` C#'s (an `HttpClient` constructor parameter, `Injected::Param` only); `spring::resolved` is the one
   rule for an annotation's text Spring resolves (`@Value`, a Feign `url` or `path`, a listener's
   topic or queue): literal text with its placeholders resolved, an environment read kept, any
   other part unknown. The list of Spring's config files is the reader's too
@@ -2232,10 +2237,36 @@ qualification budget does (ADR 0017).
   the `await` around `a`; `condition` reads through it). Ceilings: a field is followed only
   when it holds a construction or a call (an instance `readonly` string is not folded, only
   `const` and `static readonly`); a name assigned anywhere in the file is unknown in all of
-  it, even in another method; a client set by a typed client's constructor parameter
-  (spec #28, #113), `new Uri(base, relative)` with two arguments, a `HttpRequestMessage` built
-  with an object initializer, a raw string of several lines and `AddHttpClient<T>` bases are
+  it, even in another method; `new Uri(base, relative)` with two arguments, a
+  `HttpRequestMessage` built with an object initializer and a raw string of several lines are
   not read.
+  Typed clients (spec #28, #113): an instance `readonly` field with no initializer that one
+  plain `=` of its class writes, in a constructor (`this.f = v`, or `f = v` with no parameter
+  or local `f` there), is a constant of the class whose value is written in that constructor
+  (`Const::scope`, Java's `final` model), so `_http = http` makes `_http` the constructor's
+  parameter. The pack gives a call's type arguments as written (`Call::uses`, one chain
+  `[Step::Argument(tys)]`, the meaning shape facts give it). The kind expands with an injector
+  for `Injected::Param` only: a parameter of a constructor no call may reach, declared
+  `HttpClient`, is a client whose base is the one `<param>.BaseAddress` the constructor
+  assigns, else the one address every framework `AddHttpClient<T>(c => c.BaseAddress = ..)`
+  of its class sets (`AddHttpClient<I, T>`: the last type argument; the call must reach no
+  function of the repository, `Code::reaches`; the address is the one `<name>.BaseAddress`
+  bound of a receiver of the lambda's scope, folded and its reads decided where the lambda is
+  written). Two registrations with different addresses, one that does not fold, a constructor
+  some call reaches, or a parameter of a method leave the base unknown. The injected value is
+  a construction (`new HttpClient { BaseAddress = new Uri(parts) }`), so the base is read as an
+  initializer's, and an assignment on the field still wins.
+- `http/csharp/refit.rs` (spec #28, #113): a method of an interface (`Facts::interfaces`) with
+  Refit's `[Get]`, `[Post]`, `[Put]`, `[Patch]`, `[Delete]` or `[Head]` (through the usings, or
+  written as `Refit.Get`, read in the scope around the interface so that a method named like the
+  attribute is no type; `Hiding`, shared with the controllers, says a class of the repository
+  named `GetAttribute` hides it) and a path from the root is a consumer at its definition
+  (`Site::Def`), as Retrofit's are. Its bases are the first arguments of each framework
+  `RestService.For<Api>(base)` whose first type argument names the interface, read with
+  `Expand::Call` (a wrapper's callers pass it) and the reads decided in the file of `For`; one
+  consumer per base, and an interface no `For` makes has an unknown base. The route follows the
+  base's own path (Refit appends it). `AddRefitClient` and `For` given an `HttpClient` are not
+  read.
 - `http/csharp/reads.rs` and `dotnet/appsettings.rs` (spec #28, #112): environment and
   configuration reads in a consumer's URL. The pack records what looks like a read without
   deciding what it reads: a subscript with one string literal, and a call of a member in `READS`

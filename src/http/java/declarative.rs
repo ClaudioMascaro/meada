@@ -31,10 +31,10 @@ use crate::index::Indexed;
 use crate::jvm::names::{java_files, jvm_files, kotlin};
 use crate::jvm::spring::{self, Configs};
 use crate::lang::kotlin::TYPE_ARGUMENT;
-use crate::lang::{Annotated, Call, Facts, Invocation, Part, Value, literal};
+use crate::lang::{Call, Facts, Invocation, Part, Value, literal};
 use crate::names::{is_method, known, one, spellings};
 use crate::resolve::Code;
-use crate::resolve::{Expand, Inject, method as member};
+use crate::resolve::{Expand, Inject, Injected, method as member};
 use std::cell::OnceCell;
 use std::collections::BTreeMap;
 
@@ -337,10 +337,10 @@ fn retrofit_clients<'a>(
             };
             // Kotlin's `@Value` bases come from the module's configuration. Java's Retrofit
             // bases stay as they were read before: an injected one is not read.
-            let inject = |code: &Code<'a>, path: &'a str, annotated: &'a Annotated| {
+            let inject = |code: &Code<'a>, path: &'a str, on: Injected<'a>| {
                 let configs =
                     configs.get_or_init(|| Configs::read(indexed.configs, indexed.manifests));
-                spring::inject(configs, code, path, annotated)
+                spring::inject(configs, code, path, on.annotated()?)
             };
             let inject: Option<&Inject> = kotlin(path).then_some(&inject);
             let client = code.receiver(path, n);

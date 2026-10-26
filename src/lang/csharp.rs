@@ -11,7 +11,7 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Binds, Bound, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Join, Kind,
-    LanguagePack, Layout, Modules, Param, Part, Receiver, Value, children, named, text,
+    LanguagePack, Layout, Modules, Param, Part, Receiver, Step, Ty, Value, children, named, text,
 };
 use crate::dotnet::msbuild::{self, Using};
 use crate::{Result, qualify};
@@ -331,6 +331,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // The assignments through a name (`c.BaseAddress = v`, `_c = v`): the scope written in, the
     // path without a leading `this.`, whether it began with one, and the value.
     let mut members: Vec<(String, String, bool, Value)> = Vec::new();
+    // The instance `readonly` fields with no initializer, by class and name, and every write of
+    // a name or of `this.name` in the file: the scope written in, whether through `this.`, and
+    // the value of a plain `=` (none for `+=`, `++`, `out`, `ref` or a tuple).
+    let mut readonly: Vec<(String, String)> = Vec::new();
+    let mut writes: BTreeMap<String, Vec<(String, bool, Option<Value>)>> = BTreeMap::new();
     // Initializer calls of `var` locals (by `Class::Result` place) and chained calls (by place
     // in `facts.calls`), linked to the calls they name once every call is read.
     let mut results: Vec<Range<usize>> = Vec::new();
@@ -575,6 +580,19 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         lambdas(list, &scope, &mut at.args, &mut at.kwargs);
                     }
                     at.arity = Some(at.args.len() + at.kwargs.len());
+                    // `For<Api>(..)`: the type arguments the call is given, as written.
+                    let generic = match function {
+                        Some(f) if f.kind() == "member_access_expression" => {
+                            f.child_by_field_name("name")
+                        }
+                        f => f,
+                    };
+                    if let Some(list) = (generic.filter(|g| g.kind() == "generic_name"))
+                        .and_then(|g| named(g).find(|n| n.kind() == "type_argument_list"))
+                    {
+                        let tys = named(list).map(|t| Ty::Named(type_name(t, src))).collect();
+                        at.uses = vec![vec![Step::Argument(tys)]];
+                    }
                     let object = match function {
                         Some(f) if f.kind() == "member_access_expression" => {
                             f.child_by_field_name("expression")
@@ -680,6 +698,12 @@ fn parse(src: &[u8]) -> Result<Facts> {
                             ty: None,
                             scope: None,
                         });
+                    } else if definitions
+                        && initial.is_none()
+                        && modifiers.contains(&"readonly")
+                        && !modifiers.contains(&"static")
+                    {
+                        readonly.push((scope.as_ref().clone(), text(name, src).to_string()));
                     } else if let Some(v) = initial.filter(|n| definitions && held(n)) {
                         bound.push(Bound {
                             scope: scope.as_ref().clone(),
@@ -702,27 +726,34 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     "tuple_expression" => named(l).flat_map(named).collect(),
                     _ => vec![l],
                 });
+                let plain = node
+                    .child_by_field_name("operator")
+                    .is_some_and(|o| text(o, src) == "=");
+                let one = plain && left.is_some_and(|l| l.kind() != "tuple_expression");
+                let given = right.filter(|_| one).map(|r| value(r, src, 0));
                 for target in targets {
-                    match target.kind() {
-                        "identifier" => {
-                            assigned.insert(text(target, src).to_string());
-                        }
+                    let (name, this) = match target.kind() {
+                        "identifier" => (target, false),
                         // `this.x = v` assigns the field `x`.
                         "member_access_expression"
                             if target
                                 .child_by_field_name("expression")
                                 .is_some_and(|e| text(e, src) == "this") =>
                         {
-                            if let Some(name) = target.child_by_field_name("name") {
-                                assigned.insert(text(name, src).to_string());
+                            match target.child_by_field_name("name") {
+                                Some(name) => (name, true),
+                                None => continue,
                             }
                         }
-                        _ => {}
-                    }
+                        _ => continue,
+                    };
+                    assigned.insert(text(name, src).to_string());
+                    let at = (scope.as_ref().clone(), this, given.clone());
+                    writes
+                        .entry(text(name, src).to_string())
+                        .or_default()
+                        .push(at);
                 }
-                let plain = node
-                    .child_by_field_name("operator")
-                    .is_some_and(|o| text(o, src) == "=");
                 if let (Some(left), Some(right), true, true) = (left, right, plain, definitions)
                     && matches!(left.kind(), "member_access_expression" | "identifier")
                 {
@@ -750,11 +781,21 @@ fn parse(src: &[u8]) -> Result<Facts> {
             {
                 for target in named(node).filter(|t| t.kind() == "identifier") {
                     assigned.insert(text(target, src).to_string());
+                    let at = (scope.as_ref().clone(), false, None);
+                    writes
+                        .entry(text(target, src).to_string())
+                        .or_default()
+                        .push(at);
                 }
             }
             "argument" if children(node).any(|c| matches!(c.kind(), "out" | "ref")) => {
                 for target in named(node).filter(|t| t.kind() == "identifier") {
                     assigned.insert(text(target, src).to_string());
+                    let at = (scope.as_ref().clone(), false, None);
+                    writes
+                        .entry(text(target, src).to_string())
+                        .or_default()
+                        .push(at);
                 }
             }
             "property_declaration" | "event_declaration" => {
@@ -1080,6 +1121,39 @@ fn parse(src: &[u8]) -> Result<Facts> {
         }
     }
     bound.retain(|b| !assigned.contains(&b.name));
+    // An instance `readonly` field written once in the file, by a plain `=` in a constructor of
+    // its class (as `this.f`, or as `f` where no parameter or local of the constructor is `f`),
+    // holds that value, written in the constructor: a constant of the class, as Java's `final`
+    // fields are (`Const::scope`).
+    // ponytail: a part of a `partial` type in another file may assign the field too.
+    let enclosing = |scope: &str| {
+        let mut class = scope;
+        while !classes.contains(class) && !class.is_empty() {
+            class = crate::parent(class);
+        }
+        class.to_string()
+    };
+    for (class, name) in readonly {
+        let ctors = facts.constructors.get(&class);
+        let written: Vec<_> = (writes.get(&name).into_iter().flatten())
+            .filter(|(scope, ..)| enclosing(scope) == class)
+            .collect();
+        if let [(ctor, this, Some(value))] = written.as_slice()
+            && ctors.is_some_and(|c| c.contains(ctor))
+            && (*this
+                || !facts
+                    .receivers
+                    .iter()
+                    .any(|r| r.scope == *ctor && r.name == name))
+        {
+            facts.consts.push(Const {
+                name: qualify(&class, &name),
+                value: value.clone(),
+                ty: None,
+                scope: Some(ctor.clone()),
+            });
+        }
+    }
     facts.bound = bound;
     facts.bound.extend(through);
     facts.externs = outside.into_iter().collect();

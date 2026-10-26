@@ -3466,6 +3466,42 @@ fn csharp() {
         api("Clients.cs", "Acme.Api.Clients.Reads.Run(int)"),
         api("Clients.cs", "Acme.Api.Clients.Repo"),
         api("Clients.cs", "Acme.Api.Clients.Repo.GetAsync(string)"),
+        api("Typed.cs", "Acme.Api.Typed.CatalogClient"),
+        api(
+            "Typed.cs",
+            "Acme.Api.Typed.CatalogClient.CatalogClient(HttpClient)",
+        ),
+        api("Typed.cs", "Acme.Api.Typed.CatalogClient.Products()"),
+        api("Typed.cs", "Acme.Api.Typed.CatalogClient.Product(int)"),
+        api("Typed.cs", "Acme.Api.Typed.StockClient"),
+        api(
+            "Typed.cs",
+            "Acme.Api.Typed.StockClient.StockClient(HttpClient)",
+        ),
+        api("Typed.cs", "Acme.Api.Typed.StockClient.Level()"),
+        api("Typed.cs", "Acme.Api.Typed.TwiceClient"),
+        api(
+            "Typed.cs",
+            "Acme.Api.Typed.TwiceClient.TwiceClient(HttpClient)",
+        ),
+        api("Typed.cs", "Acme.Api.Typed.TwiceClient.Run()"),
+        api("Typed.cs", "Acme.Api.Typed.Registrations"),
+        api(
+            "Typed.cs",
+            "Acme.Api.Typed.Registrations.AddClients(IServiceCollection)",
+        ),
+        api("Remote.cs", "Acme.Api.Remote.IInventoryApi"),
+        api("Remote.cs", "Acme.Api.Remote.IInventoryApi.Item(string)"),
+        api("Remote.cs", "Acme.Api.Remote.IInventoryApi.Add(string)"),
+        api("Remote.cs", "Acme.Api.Remote.IInventoryApi.Delete(string)"),
+        api("Remote.cs", "Acme.Api.Remote.IReportsApi"),
+        api("Remote.cs", "Acme.Api.Remote.IReportsApi.All()"),
+        api("Remote.cs", "Acme.Api.Remote.Inventory"),
+        api("Remote.cs", "Acme.Api.Remote.Inventory.Find(string)"),
+        api(
+            "Remote.cs",
+            "Acme.Api.Remote.Inventory.AddReports(IServiceCollection)",
+        ),
         shadows("Shadows"),
         shadows("Shadows.Parameter(object)"),
         shadows("Shadows.Local()"),
@@ -3714,6 +3750,18 @@ fn csharp() {
             vec!["legacy/Top.cs::Main.Shout".to_string()],
         ),
         (run("Fmt.Upper#0"), None, vec![]),
+        // A caller of a Refit interface's method reaches it through the field's declared type.
+        (
+            api(
+                "Remote.cs",
+                "Acme.Api.Remote.Inventory.Find(string)::_api.Item#0",
+            ),
+            EXACT,
+            vec![api(
+                "Remote.cs",
+                "Acme.Api.Remote.IInventoryApi.Item(string)",
+            )],
+        ),
         // A project file that is not SDK-style adds nothing.
         (
             "legacy/Old.cs::Legacy.Old.Run()::Upper#0".to_string(),
@@ -4191,6 +4239,62 @@ fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
         ),
     ]);
     assert_eq!(consumers(&json, "src/Acme.Api/Clients.cs"), expected);
+}
+
+/// Typed clients and Refit interfaces are consumers (spec #28, #113): a typed client's calls take
+/// the base its registration or its constructor gives the client the container passes, and two
+/// registrations with different bases leave it unknown; each method of a Refit interface is a
+/// consumer with the base `RestService.For` makes it with, and one only `AddRefitClient`
+/// registers has an unknown base.
+#[test]
+fn csharp_typed_clients_and_refit_methods_are_consumers() {
+    let repo = fixture_repo("csharp_typed_consumers", "conformance-csharp", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let typed = |site: &str| format!("src/Acme.Api/Typed.cs::Acme.Api.Typed.{site}");
+    let remote = |site: &str| format!("src/Acme.Api/Remote.cs::Acme.Api.Remote.{site}");
+    let expected = triples(&[
+        (
+            "http::GET::/v1/products",
+            "host:catalog.example.com",
+            &typed("CatalogClient.Products()::_http.GetStringAsync#0"),
+        ),
+        (
+            "http::GET::/products/{}",
+            "host:catalog.example.com",
+            &typed("CatalogClient.Product(int)::this._http.GetStringAsync#0"),
+        ),
+        (
+            "http::GET::/level",
+            "host:stock.example.com",
+            &typed("StockClient.Level()::_http.GetStringAsync#0"),
+        ),
+        (
+            "http::GET::/twice",
+            "",
+            &typed("TwiceClient.Run()::_http.GetStringAsync#0"),
+        ),
+    ]);
+    assert_eq!(consumers(&json, "src/Acme.Api/Typed.cs"), expected);
+    let expected = triples(&[
+        (
+            "http::GET::/api/items/{}",
+            "host:inventory.example.com",
+            &remote("IInventoryApi.Item(string)"),
+        ),
+        (
+            "http::POST::/api/items",
+            "host:inventory.example.com",
+            &remote("IInventoryApi.Add(string)"),
+        ),
+        (
+            "http::DELETE::/api/items/{}",
+            "host:inventory.example.com",
+            &remote("IInventoryApi.Delete(string)"),
+        ),
+        ("http::GET::/reports", "", &remote("IReportsApi.All()")),
+    ]);
+    assert_eq!(consumers(&json, "src/Acme.Api/Remote.cs"), expected);
 }
 
 /// Context lists the consumer an HttpClient call that cannot be evaluated is, unresolved.

@@ -18,17 +18,25 @@
 //! made on the name the call is made on, in the scope that declares the name: a base not read
 //! (two assignments, a name that is assigned or hidden) is unknown, so the path alone is the
 //! contract. A relative URL joins the base as `Uri` does (RFC 3986).
-// ponytail: a field set from a parameter or assigned twice has an unknown base, and so has a
-// client a wrapper takes whose callers build it elsewhere; an instance `readonly` field that is
-// not `const` or `static` is not folded; `AddHttpClient<T>` is #113's.
+//!
+//! A typed client (#113): the `HttpClient` a dependency injection container passes to a
+//! constructor nothing calls (`Injected::Param`) has the one `BaseAddress` the constructor sets on
+//! it, else the one every `AddHttpClient<T>(c => c.BaseAddress = ..)` of its class sets
+//! (`registered`), and a `readonly` field the constructor assigns it holds it (the pack's
+//! `Const::scope`). Two registrations with different bases leave it unknown.
+// ponytail: a field set from a method's parameter or assigned twice has an unknown base, and so
+// has a client a wrapper takes whose callers build it elsewhere; an instance `readonly` field
+// holds only what one constructor assigns it.
 
 use super::super::{based, consumer, fetches};
 use super::reads::Reads;
 use crate::contract::Found;
 use crate::index::Indexed;
-use crate::lang::{Bound, Invocation, Part, Value};
+use crate::lang::{Bound, Invocation, Part, Step, Ty, Value};
 use crate::names::{one, spellings};
-use crate::resolve::{Code, Expand, Expanded, method as member};
+use crate::resolve::{Code, Expand, Expanded, Injected, Target, method as member};
+use std::cell::OnceCell;
+use std::collections::BTreeMap;
 
 const HTTP_CLIENT: &str = "System.Net.Http.HttpClient";
 const REQUEST: &str = "System.Net.Http.HttpRequestMessage";
@@ -59,10 +67,21 @@ const MEMBERS: &[(&str, &str)] = &[
 ];
 /// The member `BaseAddress` of an `HttpClient`.
 const BASE: &str = "BaseAddress";
+/// The framework's registration of a typed client, `services.AddHttpClient<T>(..)`.
+const REGISTER: &str = "AddHttpClient";
 
 /// C# HTTP consumers: see the module.
 pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
     let reads = Reads::new(indexed.configs);
+    // Read the first time a typed client's constructor is met.
+    let typed = OnceCell::new();
+    let inject = |code: &Code<'a>, _: &'a str, on: Injected<'a>| match on {
+        Injected::Param(ctor, n) => {
+            let typed = typed.get_or_init(|| registered(code, &reads));
+            injected(code, &reads, typed, ctor, n)
+        }
+        Injected::Annotated(_) => None,
+    };
     let mut found = Vec::new();
     for (&path, facts) in code.files().iter().filter(|(p, _)| p.ends_with(".cs")) {
         for (n, stored) in facts.calls.iter().enumerate() {
@@ -87,7 +106,7 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
                 site: (site, at),
                 found: reads,
                 ..
-            } in code.expand(Expand::Chain(path, n), &read)
+            } in code.expand_with(Expand::Chain(path, n), Some(&inject), &read)
             {
                 (reads.into_iter()).for_each(|read| found.push(consumer(site, at, read, None)));
             }
@@ -303,15 +322,108 @@ fn base<'a>(
         _ => None,
     };
     match assigned.or(initial) {
-        Some(Value::New(_, args)) if args.len() == 1 => {
-            match reads.value(code, path, args[0].clone()) {
-                Value::Str(parts) => parts,
-                Value::Ref(name) => vec![Part::Ref(name)],
-                _ => vec![Part::Hole],
-            }
-        }
+        Some(set) => address(code, reads, path, set),
+        None => vec![Part::Hole],
+    }
+}
+
+/// The parts of the address a `BaseAddress = new Uri(base)` written in `path` sets, its reads
+/// decided; a hole when it is not read.
+fn address<'a>(code: &Code<'a>, reads: &Reads, path: &'a str, set: &Value) -> Vec<Part> {
+    match set {
+        Value::New(_, args) if args.len() == 1 => match reads.value(code, path, args[0].clone()) {
+            Value::Str(parts) => parts,
+            Value::Ref(name) => vec![Part::Ref(name.clone())],
+            _ => vec![Part::Hole],
+        },
         _ => vec![Part::Hole],
     }
+}
+
+/// The typed clients the repository registers with the framework's `AddHttpClient<T>(..)`
+/// (`AddHttpClient<I, T>`: the last type argument), by the class's qualified name: the address
+/// each registration's configuring lambda sets (`c => c.BaseAddress = new Uri(base)`), read
+/// where it is written. A registration that sets none adds none.
+// ponytail: a lambda's address is folded where it is written: a parameter of the method that
+// registers the client is unknown, and so is a lambda passed by name or `ConfigureHttpClient`.
+fn registered<'a>(code: &Code<'a>, reads: &Reads) -> BTreeMap<&'a str, Vec<Vec<Part>>> {
+    let mut out: BTreeMap<&'a str, Vec<Vec<Part>>> = BTreeMap::new();
+    for (&path, facts) in code.files().iter().filter(|(p, _)| p.ends_with(".cs")) {
+        for (n, stored) in facts.calls.iter().enumerate() {
+            if member(&stored.callee) != REGISTER
+                || stored.decorates.is_some()
+                || code.reaches(path, n).is_some()
+            {
+                continue;
+            }
+            let Some(Step::Argument(tys)) = code.uses(path, n).and_then(|u| u.first()?.first())
+            else {
+                continue;
+            };
+            let Some(Ty::Named(ty)) = tys.last() else {
+                continue;
+            };
+            let Some(class) = code.definition(path, &stored.scope, ty) else {
+                continue;
+            };
+            let entry = out.entry(class.name).or_default();
+            let lambda = match code.call(path, n).and_then(|c| c.args.last()) {
+                Some(Value::Function(lambda)) => lambda.as_str(),
+                _ => continue,
+            };
+            // What the lambda sets on its client parameter, whatever its name.
+            let set: Vec<&Bound> = (facts.receivers.iter())
+                .filter(|r| r.scope == lambda)
+                .flat_map(|r| code.bounds(path, lambda, &format!("{}.{BASE}", r.name)))
+                .collect();
+            let parts = match set.as_slice() {
+                [] => continue,
+                [b] => address(code, reads, path, &code.value(path, &b.within, &b.value)),
+                _ => vec![Part::Hole],
+            };
+            if !entry.contains(&parts) {
+                entry.push(parts);
+            }
+        }
+    }
+    out
+}
+
+/// The client a dependency injection container passes for the parameter `n` of the
+/// constructor `ctor`, when it is an `HttpClient`: one with the address the constructor sets on
+/// the parameter, or else the one address every registration of its class as a typed client
+/// sets (`registered`). `None` when neither gives one.
+fn injected<'a>(
+    code: &Code<'a>,
+    reads: &Reads,
+    registered: &BTreeMap<&'a str, Vec<Vec<Part>>>,
+    ctor: Target<'a>,
+    n: usize,
+) -> Option<Value> {
+    let class = crate::parent(ctor.name);
+    let facts = code.files().get(ctor.path)?;
+    if !(facts.constructors.get(class)).is_some_and(|c| c.iter().any(|c| c == ctor.name)) {
+        return None;
+    }
+    let param = code.param(ctor, n)?;
+    let (at, within, ty) = code.written(ctor.path, ctor.name, &param.name)?;
+    if !is_http_client(code, at, within, ty) {
+        return None;
+    }
+    let own = code.bounds(ctor.path, ctor.name, &format!("{}.{BASE}", param.name));
+    let parts = match (own.as_slice(), registered.get(class).map(Vec::as_slice)) {
+        ([b], _) => address(
+            code,
+            reads,
+            ctor.path,
+            &code.value(ctor.path, &b.within, &b.value),
+        ),
+        ([], Some([one])) => one.clone(),
+        _ => return None,
+    };
+    let address = Value::New("Uri".into(), vec![Value::Str(parts)]);
+    let set = Value::Object(vec![(BASE.into(), address)]);
+    Some(Value::New(HTTP_CLIENT.into(), vec![set]))
 }
 
 /// `url` with `base` in front when `url` is relative to it, as `Uri` joins them (RFC 3986): a
@@ -1286,5 +1398,105 @@ mod tests {
         assert_eq!(sent_in(&body, &[], &configs), twin);
         // A file in no project reads the nearest file above it.
         assert_eq!(sent_in(&body, &[], &[("appsettings.json", SETTINGS)]), twin);
+    }
+
+    /// A typed client `C`: its constructor takes the `HttpClient`, a field holds it.
+    const TYPED: &str = "private readonly HttpClient _http;\n\
+                         public C(HttpClient http) { _http = http; }\n\
+                         public async Task F() { await _http.GetAsync(\"/a\"); await this._http.GetAsync(\"b\"); }";
+
+    /// The consumers of `TYPED`, with `registered` written in a method of another file.
+    fn typed(registered: &str) -> Vec<Sent> {
+        let startup = format!(
+            "{USINGS}using Microsoft.Extensions.DependencyInjection;\nnamespace A;\n\
+             public static class Startup {{\n\
+             public static void Add(IServiceCollection services, IConfiguration config) {{\n{registered}\n}}\n}}\n"
+        );
+        sent_in(
+            TYPED,
+            &[("A/Startup.cs", &startup)],
+            &[("appsettings.json", SETTINGS)],
+        )
+    }
+
+    #[test]
+    fn a_typed_client_takes_the_base_its_registration_gives() {
+        assert_eq!(
+            typed(
+                "services.AddHttpClient<C>(c => c.BaseAddress = new Uri(\"https://typed.example.com/v1/\"));"
+            ),
+            [
+                host("http::GET::/a", "typed.example.com"),
+                host("http::GET::/v1/b", "typed.example.com")
+            ]
+        );
+    }
+
+    #[test]
+    fn a_typed_client_takes_a_base_from_configuration_and_the_last_type_argument() {
+        let read = "services.AddHttpClient<IApi, C>((sp, c) => { c.BaseAddress = new Uri(config[\"Api:Url\"]!); });";
+        assert_eq!(
+            typed(&format!("{read}\nservices.AddHttpClient<C>();")),
+            [
+                twins("http::GET::/a", "Api__Url", "api.example.com").to_vec(),
+                // The variable's own value is unknown: a relative URL follows its root.
+                vec![twins("http::GET::/b", "Api__Url", "api.example.com")[0].clone()],
+                vec![twins("http::GET::/v1/b", "Api__Url", "api.example.com")[1].clone()],
+            ]
+            .concat()
+        );
+    }
+
+    #[test]
+    fn a_typed_client_registered_with_two_bases_or_none_has_an_unknown_base() {
+        let one =
+            "services.AddHttpClient<C>(c => c.BaseAddress = new Uri(\"https://one.example.com\"));";
+        let two =
+            "services.AddHttpClient<C>(c => c.BaseAddress = new Uri(\"https://two.example.com\"));";
+        let unknown = [to("http::GET::/a"), to("http::GET::/b")];
+        assert_eq!(typed(&format!("{one}\n{two}")), unknown);
+        assert_eq!(typed(&format!("{one}\n{one}")).len(), 2);
+        assert_eq!(
+            typed(&format!("{one}\n{one}"))[0].1.as_deref(),
+            Some("host:one.example.com")
+        );
+        // Registered as another class, and a base that does not fold.
+        assert_eq!(
+            typed(
+                "services.AddHttpClient<Startup>(c => c.BaseAddress = new Uri(\"https://other.example.com\"));"
+            ),
+            unknown
+        );
+        assert_eq!(
+            typed("services.AddHttpClient<C>(c => c.BaseAddress = new Uri(Url()));"),
+            unknown
+        );
+    }
+
+    #[test]
+    fn a_base_the_constructor_sets_on_its_parameter_reaches_the_field_that_holds_it() {
+        let body = "private readonly HttpClient _http;\n\
+             public C(HttpClient http) { http.BaseAddress = new Uri(\"https://own.example.com/\"); _http = http; }\n\
+             public async Task F() { await _http.GetAsync(\"/a\"); }";
+        assert_eq!(sent(body), [host("http::GET::/a", "own.example.com")]);
+    }
+
+    #[test]
+    fn a_client_of_a_method_or_of_a_called_constructor_is_not_injected() {
+        let startup = format!(
+            "{USINGS}using Microsoft.Extensions.DependencyInjection;\nnamespace A;\n\
+             public static class Startup {{\n\
+             public static void Add(IServiceCollection services) {{\n\
+             services.AddHttpClient<C>(c => c.BaseAddress = new Uri(\"https://typed.example.com\"));\n}}\n\
+             public static C Make() => new C(new HttpClient());\n}}\n"
+        );
+        let body = "private readonly HttpClient _http;\n\
+             public C(HttpClient http) { _http = http; }\n\
+             public async Task F() { await _http.GetAsync(\"/a\"); }\n\
+             public async Task G(HttpClient h) { await h.GetAsync(\"/g\"); }";
+        assert_eq!(
+            sent_with(body, &[("A/Startup.cs", &startup)]),
+            [to("http::GET::/a"), to("http::GET::/g")]
+        );
     }
 }
