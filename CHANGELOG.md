@@ -28,6 +28,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- NuGet packages (spec #28): each SDK-style `.csproj` provides `package::nuget::<id>` (its
+  `PackageId`, else `AssemblyName`, else file name). A `PackageReference` naming a workspace
+  package and a `ProjectReference` to a project of another repository link to it at `exact`
+  (`range unchecked`); a `using` of a namespace of a project the file depends on reaches its
+  types, so `context` on a public type lists the calls in other repositories and `trace` crosses
+  the hop, with `; import namespace` in the reason. The exported import's `how` can now be
+  `namespace`.
 - C# source indexing (issue #107): `.cs` files, grouped into projects by SDK-style `.csproj`
   files (an old-style one, with no `Sdk`, is none; `.sln` files change nothing), yield
   namespace-qualified classes, records, structs and interfaces, nested and `partial` ones

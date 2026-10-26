@@ -1,7 +1,7 @@
 //! Packages (spec #22): every manifest of a workspace repository with a valid name provides
 //! `package::<ecosystem>::<name>` (`package.json`: `npm`; `pyproject.toml`: `pypi`, spec #24;
 //! `Cargo.toml`: `cargo`, spec #30; `go.mod`: `go`, spec #25; `pom.xml` and the Gradle build and
-//! settings files: `maven`, spec #26),
+//! settings files: `maven`, spec #26; `*.csproj`: `nuget`, spec #28),
 //! and every dependency entry that names a package of the workspace, in the same ecosystem,
 //! consumes it. `refresh` reads each manifest into a `Summary`, derived from its bytes
 //! alone and stored in the index; `Packages::declare` turns the named ones into providers and
@@ -12,7 +12,7 @@
 //! This file holds what the ecosystems share: the `Ecosystem` trait with its defaults (Node's
 //! rule for the ways in, the candidates and the provider view), the list `ECOSYSTEMS`, the
 //! summary types and the workspace steps. Each ecosystem's own rules live in its module under
-//! `package/` (`npm`, `pypi`, `cargo`, `go`, `maven`).
+//! `package/` (`npm`, `pypi`, `cargo`, `go`, `maven`, `nuget`).
 //!
 //! Imports cross too: `extract` stores every call through a binding imported from a bare
 //! specifier, and `import`, a workspace step after `consume`, resolves those whose package the
@@ -45,12 +45,14 @@ mod cargo;
 mod go;
 mod maven;
 mod npm;
+mod nuget;
 mod pypi;
 
 use cargo::Cargo;
 use go::Go;
 use maven::Maven;
 use npm::{Npm, exported};
+use nuget::Nuget;
 use pypi::Pypi;
 
 pub struct Packages;
@@ -254,10 +256,14 @@ trait Ecosystem {
 
     /// Fills what a member manifest of `manifests` inherits from a parent one: nothing.
     fn inherit(&self, _manifests: &mut [Manifest]) {}
+
+    /// Names the dependency entries that point at a provider by its location with the name that
+    /// provider gives its package, once every repository's manifests are known: nothing.
+    fn settle(&self, _exports: &mut [Export]) {}
 }
 
 /// Every ecosystem, in the order `of` and `of_contract` search and `inherit` runs.
-const ECOSYSTEMS: &[&dyn Ecosystem] = &[&Npm, &Pypi, &Cargo, &Go, &Maven];
+const ECOSYSTEMS: &[&dyn Ecosystem] = &[&Npm, &Pypi, &Cargo, &Go, &Maven, &Nuget];
 
 /// The ecosystem of the manifest at `path`, by its file name (`Ecosystem::is_manifest`); `None`
 /// for any other file.
@@ -1671,6 +1677,7 @@ impl ContractKind for Packages {
     /// level; an entry point of another kind stays one), and the shapes imported from a
     /// package (issue #175).
     fn workspace_step(&self, exports: &mut [Export]) {
+        ECOSYSTEMS.iter().for_each(|e| e.settle(exports));
         let providers = Providers::new(exports);
         consume(exports, &providers);
         import(exports, &providers);
@@ -2334,7 +2341,7 @@ mod tests {
     #[test]
     fn the_list_names_each_ecosystem_once_in_its_order() {
         let names: Vec<_> = ECOSYSTEMS.iter().map(|e| e.name()).collect();
-        assert_eq!(names, ["npm", "pypi", "cargo", "go", "maven"]);
+        assert_eq!(names, ["npm", "pypi", "cargo", "go", "maven", "nuget"]);
         let prefixes: Vec<_> = ECOSYSTEMS.iter().map(|e| e.prefix()).collect();
         assert_eq!(
             prefixes,
@@ -2343,7 +2350,8 @@ mod tests {
                 "package::pypi::",
                 "package::cargo::",
                 "package::go::",
-                "package::maven::"
+                "package::maven::",
+                "package::nuget::"
             ]
         );
     }
@@ -2363,6 +2371,7 @@ mod tests {
             "requirements-dev.txt",
             "Cargo.toml",
             "go.mod",
+            "Kit.csproj",
         ] {
             let claims = ECOSYSTEMS.iter().filter(|e| e.is_manifest(manifest));
             assert_eq!(claims.count(), 1, "{manifest}");

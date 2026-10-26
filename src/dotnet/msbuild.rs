@@ -1,6 +1,6 @@
 //! SDK-style MSBuild project files (`.csproj`), read as XML with no MSBuild evaluation:
-//! whether one is a project, and the usings it adds to every file of it, the SDK's implicit
-//! usings among them.
+//! whether one is a project, the usings it adds to every file of it (the SDK's implicit usings
+//! among them), the properties that name its package and the references it declares.
 
 use roxmltree::{Document, Node, ParsingOptions};
 
@@ -14,6 +14,22 @@ pub enum Using {
     Namespace(String),
     Static(String),
     Alias(String, String),
+}
+
+/// What an SDK-style project file says, as written: nothing is evaluated, so a value may hold
+/// `$(Property)` text.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Project {
+    /// The usings it adds to each of its files, in order.
+    pub usings: Vec<Using>,
+    /// The `PackageId` and `AssemblyName` properties, and the `PackageVersion` or else `Version`.
+    pub package_id: Option<String>,
+    pub assembly_name: Option<String>,
+    pub version: Option<String>,
+    /// Its `PackageReference` items, as `(Include, Version)`, in order.
+    pub packages: Vec<(String, Option<String>)>,
+    /// The `Include` of its `ProjectReference` items, in order, as written.
+    pub projects: Vec<String>,
 }
 
 /// The namespaces implicit usings add in every SDK project (the SDK's own list).
@@ -46,13 +62,13 @@ const WORKER: &[&str] = &[
     "Microsoft.Extensions.Logging",
 ];
 
-/// The usings an SDK-style project file adds to each of its files, in order: the implicit
-/// usings it enables, then its `<Using>` items, less those it removes. `None` when the file
-/// is no SDK-style project (no `Sdk` on `Project`, in an `Sdk` element or on an `Import`), or
-/// cannot be read.
+/// What an SDK-style project file says: the usings it adds to each of its files, in order (the
+/// implicit usings it enables, then its `<Using>` items, less those it removes), its package
+/// properties and its references. `None` when the file is no SDK-style project (no `Sdk` on
+/// `Project`, in an `Sdk` element or on an `Import`), or cannot be read.
 // ponytail: properties are read as written, with no `Condition`, import or
-// `Directory.Build.props`; the last `ImplicitUsings` written decides.
-pub fn read(src: &[u8]) -> Option<Vec<Using>> {
+// `Directory.Build.props`; the last one written decides.
+pub fn read(src: &[u8]) -> Option<Project> {
     if src.len() > MAX_BYTES {
         return None;
     }
@@ -82,10 +98,13 @@ pub fn read(src: &[u8]) -> Option<Vec<Using>> {
         .unwrap_or("")
         .trim()
         .to_ascii_lowercase();
-    let implicit = (elements(project, "PropertyGroup").flat_map(|g| elements(g, "ImplicitUsings")))
-        .last()
-        .and_then(|n| n.text())
-        .is_some_and(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "enable" | "true"));
+    let property = |name: &'static str| {
+        let last = (elements(project, "PropertyGroup").flat_map(|g| elements(g, name))).last();
+        let value = last.and_then(|n| n.text()).map(str::trim);
+        value.filter(|v| !v.is_empty()).map(str::to_string)
+    };
+    let implicit = property("ImplicitUsings")
+        .is_some_and(|v| matches!(v.to_ascii_lowercase().as_str(), "enable" | "true"));
     let mut usings: Vec<Using> = Vec::new();
     if implicit {
         // MSBuild reads SDK names in any case.
@@ -125,7 +144,31 @@ pub fn read(src: &[u8]) -> Option<Vec<Using>> {
             !removed.contains(&n.as_str())
         }
     });
-    Some(usings)
+    let items = |name: &'static str| {
+        elements(project, "ItemGroup")
+            .flat_map(move |g| elements(g, name))
+            .filter_map(|n| Some((n, n.attribute("Include")?.trim())))
+            .filter(|(_, include)| !include.is_empty())
+    };
+    let version = |item: Node| {
+        let child = elements(item, "Version").next().and_then(|v| v.text());
+        (item.attribute("Version").or(child))
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .map(str::to_string)
+    };
+    Some(Project {
+        usings,
+        package_id: property("PackageId"),
+        assembly_name: property("AssemblyName"),
+        version: property("PackageVersion").or_else(|| property("Version")),
+        packages: items("PackageReference")
+            .map(|(n, include)| (include.to_string(), version(n)))
+            .collect(),
+        projects: items("ProjectReference")
+            .map(|(_, include)| include.to_string())
+            .collect(),
+    })
 }
 
 /// The child elements of `node` named `name`, in order.
@@ -149,7 +192,7 @@ mod tests {
             </ItemGroup>
           </Project>"#;
         assert_eq!(
-            read(src.as_bytes()).unwrap(),
+            read(src.as_bytes()).unwrap().usings,
             [
                 Using::Namespace("A.B".into()),
                 Using::Alias("F".into(), "D.E".into()),
@@ -159,15 +202,40 @@ mod tests {
     }
 
     #[test]
+    fn package_properties_and_references_are_read_as_written() {
+        let src = r#"<Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <PackageId>First</PackageId><PackageId> Kit </PackageId>
+              <AssemblyName></AssemblyName><Version>1.0</Version><PackageVersion>2.0</PackageVersion>
+            </PropertyGroup>
+            <ItemGroup>
+              <PackageReference Include="A" Version=" 1.* " />
+              <PackageReference Include="B"><Version>[2,3)</Version></PackageReference>
+              <PackageReference Include="C" />
+              <PackageReference Update="D" Version="1" />
+              <ProjectReference Include="..\X\X.csproj" />
+            </ItemGroup>
+          </Project>"#;
+        let project = read(src.as_bytes()).unwrap();
+        assert_eq!(project.package_id.as_deref(), Some("Kit"));
+        assert_eq!(project.assembly_name, None);
+        assert_eq!(project.version.as_deref(), Some("2.0"));
+        let packages = [("A", Some("1.*")), ("B", Some("[2,3)")), ("C", None)];
+        let packages = packages.map(|(n, v)| (n.to_string(), v.map(String::from)));
+        assert_eq!(project.packages, packages);
+        assert_eq!(project.projects, ["..\\X\\X.csproj"]);
+    }
+
+    #[test]
     fn an_sdk_is_named_in_any_case_or_on_an_import() {
         let lower = "<Project Sdk=\"microsoft.net.sdk.WEB\"><PropertyGroup>\
                      <ImplicitUsings>true</ImplicitUsings></PropertyGroup></Project>";
-        let usings = read(lower.as_bytes()).unwrap();
+        let usings = read(lower.as_bytes()).unwrap().usings;
         assert!(usings.contains(&Using::Namespace("Microsoft.AspNetCore.Http".into())));
         let import = "<Project><Import Project=\"Sdk.props\" Sdk=\"Microsoft.NET.Sdk\" />\
                       <ItemGroup><Using Include=\"A\" /></ItemGroup></Project>";
         assert_eq!(
-            read(import.as_bytes()).unwrap(),
+            read(import.as_bytes()).unwrap().usings,
             [Using::Namespace("A".into())]
         );
     }

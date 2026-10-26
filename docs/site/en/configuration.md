@@ -45,3 +45,7 @@ Without a `meada.toml`, the repository declares no peers.
 JVM package contracts are discovered from manifests: `pom.xml`, `settings.gradle`, `settings.gradle.kts`, `build.gradle` and `build.gradle.kts`. They need no additional `meada.toml` key. Declare other repositories in `[[peer]]` as in the examples above. Use literal coordinates for `exact` links; Maven properties and Gradle expressions remain unevaluated, and those that make up the group or artifact produce `ambiguous` candidates.
 
 In Java and Kotlin with Spring, the base URL may come from `@Value("${key}")` (in Kotlin, `@Value("\${key}")`, the `$` escaped), read from the `application.properties`, `application.yml` or `application.yaml` in each module's `src/main/resources`, with no new `meada.toml` key. A literal URL links by host in `[serve] hosts`; a `${VAR}` placeholder (with or without `:default`) uses the same `[[peer]]` `base_url_env` keys. A default whose host some peer serves links by that host.
+
+## NuGet packages
+
+NuGet package contracts are discovered from the SDK-style `.csproj` files. They need no additional `meada.toml` key: a `PackageReference` links to a provider by its id, and a `ProjectReference` by the path of its project file, which reaches a project of another repository by the roots of the workspace repositories (declare it in `[[peer]]`). Property values such as `$(Version)` stay unevaluated.

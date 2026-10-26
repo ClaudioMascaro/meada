@@ -1,0 +1,10 @@
+example.com/dotnet/lib src/Kit/Pricing/Order.cs:14-14 Example.Kit.Pricing.Order.Total()
+community: src/Kit/Pricing#2
+processes: 2 (2 export; 2 repositories): Example.App.Web.Checkout.Pay(int) (example.com/dotnet/app), Example.Kit.Pricing.Order.Total() (example.com/dotnet/lib)
+public int Total() => Tax(Subtotal());
+callers: none
+callees:
+example.com/dotnet/lib src/Kit/Pricing/Order.cs:16 Example.Kit.Pricing.Order.Subtotal()
+example.com/dotnet/lib src/Kit/Pricing/Order.cs:18 Example.Kit.Pricing.Order.Tax(int)
+consumers:
+example.com/dotnet/app src/Web/Checkout.cs:10 Example.App.Web.Checkout.Pay(int) [range unchecked]

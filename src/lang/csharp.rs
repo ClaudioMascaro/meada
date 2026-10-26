@@ -144,7 +144,7 @@ impl LanguagePack for CSharp {
                 let dir = path
                     .rsplit_once('/')
                     .map_or(String::new(), |(d, _)| format!("{d}/"));
-                Some((dir, msbuild::read(src)?))
+                Some((dir, msbuild::read(src)?.usings))
             })
             .collect();
         // Each project's usings, by its directory, or a file's in none by its path. Their order

@@ -2455,6 +2455,24 @@ sample.settings.gradle.kts
   }
 }
 
+sample.csproj
+{
+  "name": "Example.Kit",
+  "version": "1.2.0",
+  "dependencies": [
+    {
+      "field": "PackageReference",
+      "name": "Example.Json",
+      "range": "[1.0,2.0)"
+    },
+    {
+      "field": "ProjectReference",
+      "name": "Core",
+      "via": "path src/Core/Core.csproj"
+    }
+  ]
+}
+
 sample.tsconfig.json
 {
   "out_dir": "./dist",

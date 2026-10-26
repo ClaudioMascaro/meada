@@ -5228,6 +5228,18 @@
     {
       "contract": "http::PUT::/sync",
       "site": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Sync()"
+    },
+    {
+      "contract": "package::nuget::Acme.Api",
+      "site": "example.com/acme/conformance::src/Acme.Api/Acme.Api.csproj"
+    },
+    {
+      "contract": "package::nuget::Acme.Core",
+      "site": "example.com/acme/conformance::src/Acme.Core/Acme.Core.csproj"
+    },
+    {
+      "contract": "package::nuget::Acme.Web",
+      "site": "example.com/acme/conformance::src/Acme.Web/Acme.Web.csproj"
     }
   ],
   "consumers": [
@@ -5455,6 +5467,26 @@
       "contract": "http::GET::/orders/{}",
       "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Wrappers.Run(string)::ForOrder#1",
       "via": "host:wrapped.example.com"
+    }
+  ],
+  "packages": [
+    {
+      "name": "Acme.Api",
+      "repository": "example.com/acme/conformance",
+      "directory": "src/Acme.Api",
+      "ecosystem": "nuget"
+    },
+    {
+      "name": "Acme.Core",
+      "repository": "example.com/acme/conformance",
+      "directory": "src/Acme.Core",
+      "ecosystem": "nuget"
+    },
+    {
+      "name": "Acme.Web",
+      "repository": "example.com/acme/conformance",
+      "directory": "src/Acme.Web",
+      "ecosystem": "nuget"
     }
   ],
   "communities": [

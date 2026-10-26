@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::{
     Ecosystem, Entry, Export, How, Manifest, Provided, Providers, Resolution, Resolved, Summary,
-    bare_directory, holding,
+    bare_directory, holding, of, of_source,
 };
 use crate::contract::Level;
 use crate::jvm;
@@ -48,7 +48,7 @@ pub struct Classes<'e> {
 
 impl<'e> Classes<'e> {
     fn new(at: &Provided<'e>) -> Self {
-        let source = |path: &str| path.ends_with(".java") || path.ends_with(".kt");
+        let source = |path: &str| [".java", ".kt", ".cs"].iter().any(|e| path.ends_with(e));
         let mut types: HashMap<&str, Vec<(&str, &str)>> = HashMap::new();
         for rows in at
             .exported
@@ -97,7 +97,7 @@ impl<'e> Classes<'e> {
         for &id in at
             .symbols
             .iter()
-            .filter(|id| id.contains(".java::") || id.contains(".kt::"))
+            .filter(|id| [".java::", ".kt::", ".cs::"].iter().any(|e| id.contains(e)))
         {
             if let Some(open) = id.find('(') {
                 methods.entry(&id[..open]).or_default().push(id);
@@ -213,11 +213,16 @@ fn tested(manifest: &Manifest, file: &str) -> bool {
 }
 
 /// The files declaring the class `class` that the artifact at `manifest` owns and that are no
-/// test sources, as `(file, qualified name)`.
+/// test sources, as `(file, qualified name)`. A file counts for the ecosystem that imports its
+/// extension only: a C# file under a `pom.xml` is no Maven class.
 fn declaring<'e>(at: &Provided<'e>, manifest: &Manifest, class: &str) -> Vec<(&'e str, &'e str)> {
     let classes = at.classes.get_or_init(|| Classes::new(at));
     (classes.types.get(class).into_iter().flatten())
         .filter(|(file, _)| at.owned_source(manifest, file) && !tested(manifest, file))
+        .filter(|(file, _)| {
+            let ecosystem = |e: Option<&dyn Ecosystem>| e.map(|e| e.name());
+            ecosystem(of_source(file)) == ecosystem(of(&manifest.path))
+        })
         .copied()
         .collect()
 }
@@ -355,89 +360,8 @@ impl Ecosystem for Maven {
     fn names_package(&self, name: &str) -> bool {
         name.split('.').all(jvm::literal)
     }
-    /// The class and the method a call names through an import, as `(class, name(arity))`: a
-    /// type the call's head names (`Order.of(1)`, `new Order(1)`, an on-demand import's), else
-    /// the type the source writes for its receiver (`order.total()`). A JDK class is none. Kotlin
-    /// adds the top-level function or class a bare name imports (`greet(..)`: the package, then
-    /// the name), and for a call on a receiver of no class of the repository the extension
-    /// function its name imports, as `(package, .name(arity))` and, when the type the source
-    /// writes for the receiver is one class, `@` and that class after it. A call on a class's
-    /// name (`Money.of(1)`) says so in its chain (`Companion.of(1)`).
     fn imports<'a>(&self, code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
-        let callee = call.callee.as_str();
-        // `(class, method, receiver)`: the receiver is the `@` an extension's chain ends with.
-        let mut found: Vec<(String, String, String)> = Vec::new();
-        // A call on a class's name (`Money.of(1)`) is its companion's (or its object's).
-        let on_class = jvm::names::kotlin(path)
-            && !call.constructs
-            && (callee.rsplit_once('.'))
-                .and_then(|(head, _)| head.rsplit('.').next())
-                .is_some_and(|head| head.starts_with(char::is_uppercase));
-        let marked = |method: &str| match on_class {
-            true => format!("Companion.{method}"),
-            false => method.to_string(),
-        };
-        // The type the source writes for the receiver comes first: a local named like a package
-        // (`order.total()`) is no type the on-demand imports bring.
-        let (mut local, mut typed) = (false, Vec::new());
-        if let (false, Some((receiver, method))) = (call.constructs, callee.rsplit_once('.')) {
-            let origins = code.origins(path, &call.scope, Of::Name(receiver), Follow::Declarations);
-            let origin = (origins.into_iter().next())
-                .filter(|o| o.form == Form::Type && o.routes.iter().all(|r| r.steps.is_empty()));
-            // A type of the repository: its members and extensions are the repository's.
-            local = origin.as_ref().is_some_and(|o| o.outside.is_none());
-            typed = (origin.and_then(|o| o.outside)).map_or_else(Vec::new, Outside::spellings);
-            found.extend(
-                typed
-                    .iter()
-                    .map(|c| (c.clone(), marked(method), String::new())),
-            );
-        }
-        if found.is_empty() {
-            let outside = code.outside(path, &call.scope, callee, false);
-            for name in outside.map_or_else(Vec::new, Outside::spellings) {
-                // A constructor is named after its class.
-                let split = match call.constructs {
-                    true => name.rsplit('.').next().map(|m| (name.as_str(), m)),
-                    false => name.rsplit_once('.'),
-                };
-                found.extend((split).map(|(c, m)| (c.to_string(), marked(m), String::new())));
-            }
-        }
-        found.retain(|(class, ..)| {
-            class.contains('.')
-                && !class.contains('(')
-                && !class.starts_with("java.")
-                && !class.starts_with("kotlin.")
-        });
-        // An extension function is called on a receiver, and imported by its name alone. It
-        // names the receiver's type when that is the one the source writes, for a member of the
-        // type would hide it.
-        if let (true, false, Some((_, name))) = (
-            jvm::names::kotlin(path) && (found.is_empty() || !typed.is_empty()),
-            local,
-            callee.rsplit_once('.'),
-        ) {
-            let suffix = match &typed[..] {
-                [one] if found.iter().any(|(class, ..)| class == one) => format!("@{one}"),
-                _ => String::new(),
-            };
-            let outside = code.outside(path, &call.scope, name, false);
-            for spelled in outside.map_or_else(Vec::new, Outside::spellings) {
-                found.extend(
-                    (spelled.rsplit_once('.'))
-                        .map(|(p, n)| (p.into(), format!(".{n}"), suffix.clone())),
-                );
-            }
-        }
-        found.sort();
-        found.dedup();
-        (found.into_iter())
-            .map(|(class, method, receiver)| match call.arity {
-                Some(arity) => (class, format!("{method}({arity}){receiver}")),
-                None => (class, format!("{method}{receiver}")),
-            })
-            .collect()
+        imports(code, path, call)
     }
     /// Every artifact the manifests holding the file depend on, nearest first, once each; the
     /// import's class stands for the subpath.
@@ -456,156 +380,34 @@ impl Ecosystem for Maven {
             .collect()
     }
 
-    /// The class `specifier` is, by its package declaration, in each provider of each artifact
-    /// the file depends on (`entries`, `declaring`), and the method or constructor its chain
-    /// names there (`methods`): `exact` when one provider declares the class and one target
-    /// fits, `ambiguous` when several providers declare the class (whichever declare the
-    /// method) or several targets fit, `inferred` for one target beside an opaque ancestor;
-    /// `import package` is the reason.
     fn resolutions<'e>(
         &self,
         exports: &'e [Export],
         providers: &Providers,
         at: &dyn Fn(usize) -> &'e Provided<'e>,
         from: (usize, &str),
-        (specifier, chain): (&str, &str),
+        import: (&str, &str),
         known: &dyn Fn(&Provided<'e>, &str) -> bool,
     ) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
-        let Chain {
-            call: wanted,
-            extension,
-            on_class,
-            receiver,
-        } = self::chain(chain);
-        // A member of the receiver's type hides an extension of the same name (Kotlin picks it).
-        // A type a provider declares, whose family is all known, has no other member.
-        let mut members_known = false;
-        if let Some(class) = receiver {
-            let (mut hidden, mut declared, mut opaque) = (false, false, false);
-            let matching = (self
-                .entries(exports, providers, from, specifier)
-                .into_iter())
-            .flat_map(|(entry, _)| providers.matching(self, entry));
-            for (m, i) in matching {
-                let (at, manifest) = (at(m), &exports[m].manifests[i]);
-                let known = |id: &str| known(at, id);
-                for c in declaring(at, manifest, class) {
-                    let (ids, beside) =
-                        methods(at, &exports[m].repository, c, wanted, false, &known);
-                    (hidden, declared, opaque) =
-                        (hidden || !ids.is_empty(), true, opaque || beside);
-                }
-            }
-            if hidden {
-                return Vec::new();
-            }
-            members_known = declared && !opaque;
-        }
-        let (mut out, mut reached) = (Vec::new(), HashSet::new());
-        for (entry, _) in self.entries(exports, providers, from, specifier) {
-            let mut resolved = Vec::new();
-            for (m, i) in providers.matching(self, entry) {
-                let (at, manifest) = (at(m), &exports[m].manifests[i]);
-                let repository = &exports[m].repository;
-                let known = |id: &str| known(at, id);
-                let (mut targets, mut opaque) = (Vec::new(), false);
-                let declared = match extension {
-                    true => Vec::new(),
-                    false => declaring(at, manifest, specifier),
-                };
-                for class in &declared {
-                    let (ids, beside) = methods(at, repository, *class, wanted, on_class, &known);
-                    targets.extend(ids);
-                    opaque |= beside;
-                }
-                let mut found = !declared.is_empty();
-                // A package holds functions, classes (their constructors) and extensions.
-                if !found {
-                    let classes = at.classes.get_or_init(|| Classes::new(at));
-                    for id in top_level(at, manifest, (specifier, wanted.0), extension) {
-                        if (!id.contains('(') || classes.fits(id, wanted.1)) && known(id) {
-                            targets.push(id.to_string());
-                        }
-                    }
-                    found = !targets.is_empty();
-                }
-                if !found {
-                    continue;
-                }
-                reached.insert((m, i));
-                targets.sort();
-                targets.dedup();
-                // An extension of the receiver's own type, the package's class, is the one Kotlin
-                // picks when the type's members are all known and none is named so.
-                let own = (receiver.filter(|_| members_known))
-                    .map(|class| format!("::{class}.{}(", wanted.0));
-                let exact: Vec<String> = (targets.iter())
-                    .filter(|id| own.as_ref().is_some_and(|own| id.contains(own.as_str())))
-                    .cloned()
-                    .collect();
-                if let [one] = &exact[..] {
-                    targets = vec![one.clone()];
-                }
-                // An extension may be shadowed by a member of a receiver's type that is not
-                // read (Kotlin picks the member).
-                let shadowed = extension && exact.len() != 1;
-                let level = match (targets.len(), opaque || shadowed) {
-                    (0, _) => continue,
-                    (1, false) => Level::Exact,
-                    (1, true) => Level::Inferred,
-                    _ => Level::Ambiguous,
-                };
-                let r = Resolved {
-                    how: How::Package,
-                    level,
-                    targets,
-                };
-                resolved.push((m, manifest, at, r));
-            }
-            if !resolved.is_empty() {
-                out.push((entry, resolved));
-            }
-        }
-        if reached.len() > 1 {
-            for (_, resolved) in &mut out {
-                resolved
-                    .iter_mut()
-                    .for_each(|r| r.3.level = Level::Ambiguous);
-            }
-        }
-        out
+        resolutions(
+            (self, How::Package),
+            exports,
+            providers,
+            at,
+            from,
+            import,
+            known,
+        )
     }
-    /// Whether a provider of an artifact the file depends on declares what the import names: the
-    /// class `specifier` (`declaring`), whatever method it declares, or what the package
-    /// `specifier` holds under the chain's name (`top_level`).
     fn declares<'e>(
         &self,
         exports: &'e [Export],
         providers: &Providers,
         at: &dyn Fn(usize) -> &'e Provided<'e>,
         from: (usize, &str),
-        (specifier, chain): (&str, &str),
+        import: (&str, &str),
     ) -> bool {
-        let Chain {
-            call: (name, _),
-            extension,
-            receiver,
-            ..
-        } = self::chain(chain);
-        // The receiver's type tells which extension applies, and the link is a name match:
-        // none of them rules the others out.
-        if receiver.is_some() {
-            return false;
-        }
-        (self
-            .entries(exports, providers, from, specifier)
-            .into_iter())
-        .flat_map(|(entry, _)| providers.matching(self, entry))
-        .any(|(m, i)| {
-            let (at, manifest) = (at(m), &exports[m].manifests[i]);
-            !extension && !declaring(at, manifest, specifier).is_empty()
-                || !top_level(at, manifest, (specifier, name), extension).is_empty()
-        })
+        declares(self, exports, providers, at, from, import)
     }
     fn inherit(&self, manifests: &mut [Manifest]) {
         let settings: Vec<_> = manifests
@@ -659,6 +461,242 @@ impl Ecosystem for Maven {
                 .and_then(|(g, a)| jvm::coordinate(g, a));
         }
     }
+}
+
+/// The class and the method a call names through an import, as `(class, name(arity))`: a
+/// type the call's head names (`Order.of(1)`, `new Order(1)`, an on-demand import's), else
+/// the type the source writes for its receiver (`order.total()`). A JDK class is none. Kotlin
+/// adds the top-level function or class a bare name imports (`greet(..)`: the package, then
+/// the name), and for a call on a receiver of no class of the repository the extension
+/// function its name imports, as `(package, .name(arity))` and, when the type the source
+/// writes for the receiver is one class, `@` and that class after it. A call on a class's
+/// name (`Money.of(1)`) says so in its chain (`Companion.of(1)`).
+pub(super) fn imports<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
+    let callee = call.callee.as_str();
+    // `(class, method, receiver)`: the receiver is the `@` an extension's chain ends with.
+    let mut found: Vec<(String, String, String)> = Vec::new();
+    // A call on a class's name (`Money.of(1)`) is its companion's (or its object's).
+    let on_class = jvm::names::kotlin(path)
+        && !call.constructs
+        && (callee.rsplit_once('.'))
+            .and_then(|(head, _)| head.rsplit('.').next())
+            .is_some_and(|head| head.starts_with(char::is_uppercase));
+    let marked = |method: &str| match on_class {
+        true => format!("Companion.{method}"),
+        false => method.to_string(),
+    };
+    // The type the source writes for the receiver comes first: a local named like a package
+    // (`order.total()`) is no type the on-demand imports bring.
+    let (mut local, mut typed) = (false, Vec::new());
+    if let (false, Some((receiver, method))) = (call.constructs, callee.rsplit_once('.')) {
+        let origins = code.origins(path, &call.scope, Of::Name(receiver), Follow::Declarations);
+        let origin = (origins.into_iter().next())
+            .filter(|o| o.form == Form::Type && o.routes.iter().all(|r| r.steps.is_empty()));
+        // A type of the repository: its members and extensions are the repository's.
+        local = origin.as_ref().is_some_and(|o| o.outside.is_none());
+        typed = (origin.and_then(|o| o.outside)).map_or_else(Vec::new, Outside::spellings);
+        found.extend(
+            typed
+                .iter()
+                .map(|c| (c.clone(), marked(method), String::new())),
+        );
+    }
+    if found.is_empty() {
+        let outside = code.outside(path, &call.scope, callee, false);
+        for name in outside.map_or_else(Vec::new, Outside::spellings) {
+            // A constructor is named after its class.
+            let split = match call.constructs {
+                true => name.rsplit('.').next().map(|m| (name.as_str(), m)),
+                false => name.rsplit_once('.'),
+            };
+            found.extend((split).map(|(c, m)| (c.to_string(), marked(m), String::new())));
+        }
+    }
+    found.retain(|(class, ..)| {
+        class.contains('.')
+            && !class.contains('(')
+            && !class.starts_with("java.")
+            && !class.starts_with("kotlin.")
+            // ponytail: a workspace type in `System.*` (a polyfill) is not followed.
+            && !(path.ends_with(".cs") && class.starts_with("System."))
+    });
+    // An extension function is called on a receiver, and imported by its name alone. It
+    // names the receiver's type when that is the one the source writes, for a member of the
+    // type would hide it.
+    if let (true, false, Some((_, name))) = (
+        jvm::names::kotlin(path) && (found.is_empty() || !typed.is_empty()),
+        local,
+        callee.rsplit_once('.'),
+    ) {
+        let suffix = match &typed[..] {
+            [one] if found.iter().any(|(class, ..)| class == one) => format!("@{one}"),
+            _ => String::new(),
+        };
+        let outside = code.outside(path, &call.scope, name, false);
+        for spelled in outside.map_or_else(Vec::new, Outside::spellings) {
+            found.extend(
+                (spelled.rsplit_once('.'))
+                    .map(|(p, n)| (p.into(), format!(".{n}"), suffix.clone())),
+            );
+        }
+    }
+    found.sort();
+    found.dedup();
+    (found.into_iter())
+        .map(|(class, method, receiver)| match call.arity {
+            Some(arity) => (class, format!("{method}({arity}){receiver}")),
+            None => (class, format!("{method}{receiver}")),
+        })
+        .collect()
+}
+
+/// The class `specifier` is, by its package declaration, in each provider of each artifact
+/// the file depends on (`entries`, `declaring`), and the method or constructor its chain
+/// names there (`methods`): `exact` when one provider declares the class and one target
+/// fits, `ambiguous` when several providers declare the class (whichever declare the
+/// method) or several targets fit, `inferred` for one target beside an opaque ancestor;
+/// `how` is the import's reason (`import package`).
+///
+/// The dependency's `reaches` decides which providers an entry may name.
+pub(super) fn resolutions<'e>(
+    (eco, how): (&dyn Ecosystem, How),
+    exports: &'e [Export],
+    providers: &Providers,
+    at: &dyn Fn(usize) -> &'e Provided<'e>,
+    from: (usize, &str),
+    (specifier, chain): (&str, &str),
+    known: &dyn Fn(&Provided<'e>, &str) -> bool,
+) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
+    let Chain {
+        call: wanted,
+        extension,
+        on_class,
+        receiver,
+    } = self::chain(chain);
+    // A member of the receiver's type hides an extension of the same name (Kotlin picks it).
+    // A type a provider declares, whose family is all known, has no other member.
+    let mut members_known = false;
+    if let Some(class) = receiver {
+        let (mut hidden, mut declared, mut opaque) = (false, false, false);
+        let matching = (eco.entries(exports, providers, from, specifier).into_iter())
+            .flat_map(|(entry, _)| providers.matching(eco, entry));
+        for (m, i) in matching {
+            let (at, manifest) = (at(m), &exports[m].manifests[i]);
+            let known = |id: &str| known(at, id);
+            for c in declaring(at, manifest, class) {
+                let (ids, beside) = methods(at, &exports[m].repository, c, wanted, false, &known);
+                (hidden, declared, opaque) = (hidden || !ids.is_empty(), true, opaque || beside);
+            }
+        }
+        if hidden {
+            return Vec::new();
+        }
+        members_known = declared && !opaque;
+    }
+    let (mut out, mut reached) = (Vec::new(), HashSet::new());
+    for (entry, _) in eco.entries(exports, providers, from, specifier) {
+        let mut resolved = Vec::new();
+        for (m, i) in providers.matching(eco, entry) {
+            let (at, manifest) = (at(m), &exports[m].manifests[i]);
+            let repository = &exports[m].repository;
+            let known = |id: &str| known(at, id);
+            let (mut targets, mut opaque) = (Vec::new(), false);
+            let declared = match extension {
+                true => Vec::new(),
+                false => declaring(at, manifest, specifier),
+            };
+            for class in &declared {
+                let (ids, beside) = methods(at, repository, *class, wanted, on_class, &known);
+                targets.extend(ids);
+                opaque |= beside;
+            }
+            let mut found = !declared.is_empty();
+            // A package holds functions, classes (their constructors) and extensions.
+            if !found {
+                let classes = at.classes.get_or_init(|| Classes::new(at));
+                for id in top_level(at, manifest, (specifier, wanted.0), extension) {
+                    if (!id.contains('(') || classes.fits(id, wanted.1)) && known(id) {
+                        targets.push(id.to_string());
+                    }
+                }
+                found = !targets.is_empty();
+            }
+            if !found {
+                continue;
+            }
+            reached.insert((m, i));
+            targets.sort();
+            targets.dedup();
+            // An extension of the receiver's own type, the package's class, is the one Kotlin
+            // picks when the type's members are all known and none is named so.
+            let own = (receiver.filter(|_| members_known))
+                .map(|class| format!("::{class}.{}(", wanted.0));
+            let exact: Vec<String> = (targets.iter())
+                .filter(|id| own.as_ref().is_some_and(|own| id.contains(own.as_str())))
+                .cloned()
+                .collect();
+            if let [one] = &exact[..] {
+                targets = vec![one.clone()];
+            }
+            // An extension may be shadowed by a member of a receiver's type that is not
+            // read (Kotlin picks the member).
+            let shadowed = extension && exact.len() != 1;
+            let level = match (targets.len(), opaque || shadowed) {
+                (0, _) => continue,
+                (1, false) => Level::Exact,
+                (1, true) => Level::Inferred,
+                _ => Level::Ambiguous,
+            };
+            let r = Resolved {
+                how,
+                level,
+                targets,
+            };
+            resolved.push((m, manifest, at, r));
+        }
+        if !resolved.is_empty() {
+            out.push((entry, resolved));
+        }
+    }
+    if reached.len() > 1 {
+        for (_, resolved) in &mut out {
+            resolved
+                .iter_mut()
+                .for_each(|r| r.3.level = Level::Ambiguous);
+        }
+    }
+    out
+}
+
+/// Whether a provider of an artifact the file depends on declares what the import names: the
+/// class `specifier` (`declaring`), whatever method it declares, or what the package
+/// `specifier` holds under the chain's name (`top_level`).
+pub(super) fn declares<'e>(
+    eco: &dyn Ecosystem,
+    exports: &'e [Export],
+    providers: &Providers,
+    at: &dyn Fn(usize) -> &'e Provided<'e>,
+    from: (usize, &str),
+    (specifier, chain): (&str, &str),
+) -> bool {
+    let Chain {
+        call: (name, _),
+        extension,
+        receiver,
+        ..
+    } = self::chain(chain);
+    // The receiver's type tells which extension applies, and the link is a name match:
+    // none of them rules the others out.
+    if receiver.is_some() {
+        return false;
+    }
+    (eco.entries(exports, providers, from, specifier).into_iter())
+        .flat_map(|(entry, _)| providers.matching(eco, entry))
+        .any(|(m, i)| {
+            let (at, manifest) = (at(m), &exports[m].manifests[i]);
+            !extension && !declaring(at, manifest, specifier).is_empty()
+                || !top_level(at, manifest, (specifier, name), extension).is_empty()
+        })
 }
 
 #[cfg(test)]
