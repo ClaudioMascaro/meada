@@ -4081,7 +4081,7 @@ impl<'a> Code<'a> {
     }
 
     /// The value the nearest binding of `name` around `scope` of `path` holds (`Facts::bound`,
-    /// which only the Kotlin pack fills), when no other binding of the name is in the same scope
+    /// which the Kotlin and C# packs fill), when no other binding of the name is in the same scope
     /// (a name declared twice, a loop variable, a parameter, a constant, a property). Each scope
     /// is looked up by name (`ByName::bound` and the resolver's maps), so a file of many locals
     /// and calls costs each lookup its depth, never the file's width.
@@ -4102,7 +4102,9 @@ impl<'a> Code<'a> {
                     && (held.is_none() || receiver.is_some()))
                 || r.consts[path].contains(qualified.as_str())
                 || r.defs[path].get(s).is_some_and(|d| d.params.iter().any(|p| p.name == name))
-                || receiver.is_some_and(|c| **c == Class::Unknown);
+                // A receiver of unknown class beside a bound is the local's own (C#'s `var x`);
+                // the pack binds the other bindings of the name too, so two bounds leave none.
+                || (held.is_none() && receiver.is_some_and(|c| **c == Class::Unknown));
             match (held, others) {
                 (Some(found), false) => return Some(found),
                 (None, false) if receiver.is_none() => {
@@ -4112,6 +4114,19 @@ impl<'a> Code<'a> {
             }
         }
         None
+    }
+
+    /// Every bound of `name` in exactly `scope` of `path`, in source order (`Facts::bound`):
+    /// the packs that record a name once per assignment (C#'s `name=`) are read whole here.
+    pub fn bounds(&self, path: &'a str, scope: &'a str, name: &str) -> Vec<&'a Bound> {
+        let Some(by_name) = self.by_name(path) else {
+            return Vec::new();
+        };
+        let key = by_name
+            .bound
+            .iter()
+            .find(|(k, _)| *k.0 == *scope && *k.1 == *name);
+        key.map_or_else(Vec::new, |(_, found)| found.clone())
     }
 
     /// The values the call at `index` of `path` may return, when a function of the repository
@@ -4725,6 +4740,8 @@ impl<'a> Code<'a> {
     /// The type the source writes for the field, property, parameter or local `name`, read in
     /// `scope` of `path`: the file and scope that write it and the type as written, to read
     /// through the imports there (`Code::outside`). `None` when no type is written for the name.
+    /// Unlike `names::typed`, it needs no entry in `Facts::externs` (a pack that keeps outside
+    /// types out of it, so that a call on one stays a name match, as C#'s does).
     pub fn written(
         &self,
         path: &'a str,

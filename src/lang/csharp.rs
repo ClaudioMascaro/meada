@@ -323,9 +323,13 @@ fn parse(src: &[u8]) -> Result<Facts> {
     let mut locals: Vec<Receiver> = Vec::new();
     // The types declared so far: a local whose scope is one sits in an initializer.
     let mut classes = BTreeSet::new();
-    // The member assignments (`c.BaseAddress = v`): the scope written in, the member path
-    // without a leading `this.`, whether it began with one, and the value.
-    let mut assigned: Vec<(String, String, bool, Value)> = Vec::new();
+    // What a name written in a definition is bound to (`Facts::bound`), and the names assigned
+    // anywhere in the file (`=`, `+=`, `++`, `out`, `ref`), which hold no one value.
+    let mut bound: Vec<Bound> = Vec::new();
+    let mut assigned: BTreeSet<String> = BTreeSet::new();
+    // The assignments through a name (`c.BaseAddress = v`, `_c = v`): the scope written in, the
+    // path without a leading `this.`, whether it began with one, and the value.
+    let mut members: Vec<(String, String, bool, Value)> = Vec::new();
     // Initializer calls of `var` locals (by `Class::Result` place) and chained calls (by place
     // in `facts.calls`), linked to the calls they name once every call is read.
     let mut results: Vec<Range<usize>> = Vec::new();
@@ -563,9 +567,14 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     at.by_path = bare;
                     (at.args, at.kwargs) = arguments(node.child_by_field_name("arguments"), src, 0);
                     at.arity = Some(at.args.len() + at.kwargs.len());
-                    let object = function
-                        .filter(|f| f.kind() == "member_access_expression")
-                        .and_then(|f| f.child_by_field_name("expression"));
+                    let object = match function {
+                        Some(f) if f.kind() == "member_access_expression" => {
+                            f.child_by_field_name("expression")
+                        }
+                        // `a?.M()`: the call of `M` on `a`.
+                        Some(f) if f.kind() == "conditional_access_expression" => condition(f),
+                        _ => None,
+                    };
                     at.receiver = object.map(|n| value(n, src, 0));
                     // `Make().Save()`, `Make().x.Save()`, `Make()?.Save()`: the call the chain
                     // is made on.
@@ -664,7 +673,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                             scope: None,
                         });
                     } else if let Some(v) = initial.filter(|n| definitions && held(n)) {
-                        facts.bound.push(Bound {
+                        bound.push(Bound {
                             scope: scope.as_ref().clone(),
                             within: scope.as_ref().clone(),
                             name: text(name, src).to_string(),
@@ -673,27 +682,71 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     }
                 }
             }
-            "assignment_expression" if definitions => {
+            // `new T { A = v }` assigns no name in scope.
+            "assignment_expression"
+                if !node
+                    .parent()
+                    .is_some_and(|p| p.kind() == "initializer_expression") =>
+            {
                 let left = node.child_by_field_name("left");
                 let right = node.child_by_field_name("right");
+                let targets = left.into_iter().flat_map(|l| match l.kind() {
+                    "tuple_expression" => named(l).flat_map(named).collect(),
+                    _ => vec![l],
+                });
+                for target in targets {
+                    match target.kind() {
+                        "identifier" => {
+                            assigned.insert(text(target, src).to_string());
+                        }
+                        // `this.x = v` assigns the field `x`.
+                        "member_access_expression"
+                            if target
+                                .child_by_field_name("expression")
+                                .is_some_and(|e| text(e, src) == "this") =>
+                        {
+                            if let Some(name) = target.child_by_field_name("name") {
+                                assigned.insert(text(name, src).to_string());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
                 let plain = node
                     .child_by_field_name("operator")
                     .is_some_and(|o| text(o, src) == "=");
-                if let (Some(left), Some(right), true) = (left, right, plain)
-                    && left.kind() == "member_access_expression"
+                if let (Some(left), Some(right), true, true) = (left, right, plain, definitions)
+                    && matches!(left.kind(), "member_access_expression" | "identifier")
                 {
                     let path = callee(left, src);
                     let rooted = path.strip_prefix("this.");
-                    // `this.x = v` is a field assignment, not a member written through one.
-                    let member = rooted.unwrap_or(&path).contains('.');
-                    if !path.contains('(') && member {
-                        assigned.push((
+                    // A name assigned from a call or a construction is also recorded as
+                    // `name=`: the kinds tell what it was made from (a factory's client).
+                    let rest = rooted.unwrap_or(&path);
+                    if !path.contains('(') && (rest.contains('.') || held(&right)) {
+                        let name = match rest.contains('.') {
+                            true => rest.to_string(),
+                            false => format!("{rest}="),
+                        };
+                        members.push((
                             scope.as_ref().clone(),
-                            rooted.unwrap_or(&path).to_string(),
+                            name,
                             rooted.is_some(),
                             value(right, src, 0),
                         ));
                     }
+                }
+            }
+            "postfix_unary_expression" | "prefix_unary_expression"
+                if children(node).any(|c| matches!(c.kind(), "++" | "--")) =>
+            {
+                for target in named(node).filter(|t| t.kind() == "identifier") {
+                    assigned.insert(text(target, src).to_string());
+                }
+            }
+            "argument" if children(node).any(|c| matches!(c.kind(), "out" | "ref")) => {
+                for target in named(node).filter(|t| t.kind() == "identifier") {
+                    assigned.insert(text(target, src).to_string());
                 }
             }
             "property_declaration" | "event_declaration" => {
@@ -710,6 +763,16 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         name: text(name, src).to_string(),
                         class,
                     });
+                    // A property initialized with a construction or a call is bound to it.
+                    let initial = node.child_by_field_name("value");
+                    if let Some(v) = initial.filter(|n| definitions && held(n)) {
+                        bound.push(Bound {
+                            scope: scope.as_ref().clone(),
+                            within: scope.as_ref().clone(),
+                            name: text(name, src).to_string(),
+                            value: value(v, src, 0),
+                        });
+                    }
                 }
             }
             // The other bindings hide an outer name in the whole definition around them.
@@ -742,12 +805,12 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         Some(ty) => class_of(ty, src, &generics),
                         None => Class::Unknown,
                     };
-                    if let Some(v) = value.filter(|n| definitions && !initializer && held(n)) {
-                        facts.bound.push(Bound {
+                    if definitions && !initializer {
+                        bound.push(Bound {
                             scope: scope.as_ref().clone(),
                             within: scope.as_ref().clone(),
                             name: text(name, src).to_string(),
-                            value: self::value(v, src, 0),
+                            value: value.map_or(Value::Unknown, |v| self::value(v, src, 0)),
                         });
                     }
                     locals.push(Receiver {
@@ -774,6 +837,13 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     _ => Class::Unknown,
                 };
                 for name in names {
+                    // It holds no one value, and shares the name of a local of the scope.
+                    bind_unknown(
+                        &mut bound,
+                        definitions && !classes.contains(scope.as_str()),
+                        &scope,
+                        text(name, src),
+                    );
                     locals.push(Receiver {
                         scope: scope.as_ref().clone(),
                         name: text(name, src).to_string(),
@@ -789,10 +859,12 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 };
                 match node.child_by_field_name("parameters") {
                     Some(p) if p.kind() == "implicit_parameter" => {
+                        bind_unknown(&mut bound, definitions, &inner, text(p, src));
                         locals.push(unknown(text(p, src)));
                     }
                     list => {
                         for (name, _, _) in parameters_of(list, src) {
+                            bind_unknown(&mut bound, definitions, &inner, &name);
                             locals.push(unknown(&name));
                         }
                     }
@@ -905,14 +977,19 @@ fn parse(src: &[u8]) -> Result<Facts> {
         }
     }
     facts.receivers = receivers;
-    // A member assigned through a field (`_c.BaseAddress = v`, `this.c.BaseAddress = v`) is bound
-    // in the type that declares the field, so any method of it reads the value; through a
-    // local or a parameter, in the method.
+    // A name assigned through a field (`_c.BaseAddress = v`, `this.c.BaseAddress = v`, `_c = v`) is
+    // bound in the type that declares the field, so any method of it reads the value; through a
+    // local or a parameter, in the scope that declares it.
     let bindings: BTreeSet<(&str, &str)> = (facts.receivers.iter())
         .map(|r| (r.scope.as_str(), r.name.as_str()))
         .collect();
-    for (scope, path, this, value) in assigned {
-        let head = path.split('.').next().unwrap_or(&path);
+    let mut through: Vec<Bound> = Vec::new();
+    for (scope, path, this, value) in members {
+        let head = path
+            .split('.')
+            .next()
+            .unwrap_or(&path)
+            .trim_end_matches('=');
         let mut within = scope.as_str();
         let mut declared = None;
         while !this && declared.is_none() {
@@ -925,7 +1002,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
             within = crate::parent(within);
         }
         let at = match (this, declared) {
-            (false, Some(s)) if !classes.contains(s) => scope.clone(),
             (false, Some(s)) => s.to_string(),
             (true, _) => {
                 let mut class = scope.as_str();
@@ -936,13 +1012,23 @@ fn parse(src: &[u8]) -> Result<Facts> {
             }
             (false, None) => scope.clone(),
         };
-        facts.bound.push(Bound {
-            scope: at,
-            within: scope,
-            name: path,
-            value,
-        });
+        // A member written twice holds no one value.
+        match through
+            .iter_mut()
+            .find(|b| b.scope == at && b.name == path && !path.ends_with('='))
+        {
+            Some(twice) => twice.value = Value::Unknown,
+            None => through.push(Bound {
+                scope: at,
+                within: scope,
+                name: path,
+                value,
+            }),
+        }
     }
+    bound.retain(|b| !assigned.contains(&b.name));
+    facts.bound = bound;
+    facts.bound.extend(through);
     facts.externs = outside.into_iter().collect();
     // A using of the namespace takes its types, internal ones too (they are the assembly's),
     // never the names the file's own usings bind.
@@ -960,6 +1046,20 @@ fn parse(src: &[u8]) -> Result<Facts> {
         names.sort();
     }
     Ok(facts)
+}
+
+/// A name bound in `scope` to no value the source gives (a loop variable, a pattern, a lambda
+/// parameter): a bound of its own, so that a local of the scope that shares the name is not
+/// taken for the only one (`Code::local`).
+fn bind_unknown(bound: &mut Vec<Bound>, defining: bool, scope: &str, name: &str) {
+    if defining {
+        bound.push(Bound {
+            scope: scope.to_string(),
+            within: scope.to_string(),
+            name: name.to_string(),
+            value: Value::Unknown,
+        });
+    }
 }
 
 /// Whether a local or a field with this initializer is bound to it (`Facts::bound`): a
@@ -1097,12 +1197,22 @@ fn class_of(ty: Node, src: &[u8], generics: &[String]) -> Class {
     Class::Type(name)
 }
 
+/// What a conditional access `a?.M` reads its member from: `a`, which the grammar wraps in
+/// the `await` around it (`await a?.M()` is `await (a?.M())` in C#).
+fn condition(node: Node) -> Option<Node> {
+    let condition = node.child_by_field_name("condition")?;
+    match condition.kind() {
+        "await_expression" => named(condition).next(),
+        _ => Some(condition),
+    }
+}
+
 /// What a receiver is written on: the expression a member access or a conditional access reads
 /// its member from.
 fn receiver_of(node: Node) -> Option<Node> {
     match node.kind() {
         "member_access_expression" => node.child_by_field_name("expression"),
-        "conditional_access_expression" => node.child_by_field_name("condition"),
+        "conditional_access_expression" => condition(node),
         _ => None,
     }
 }
@@ -1253,7 +1363,7 @@ fn callee(node: Node, src: &[u8]) -> String {
                 match member {
                     Some(member) => {
                         pending.push(member);
-                        pending.extend(n.child_by_field_name("condition"));
+                        pending.extend(condition(n));
                     }
                     // `a?[0]` is no name.
                     None => parts.push("(expression)"),

@@ -3442,6 +3442,30 @@ fn csharp() {
         ),
         api("Clients.cs", "Acme.Api.Clients.Unread.Lookup()"),
         api("Clients.cs", "Acme.Api.Clients.Unread.Run()"),
+        api("Clients.cs", "Acme.Api.Clients.Reassigned"),
+        api(
+            "Clients.cs",
+            "Acme.Api.Clients.Reassigned.Reassigned(HttpClient)",
+        ),
+        api("Clients.cs", "Acme.Api.Clients.Reassigned.Prod()"),
+        api("Clients.cs", "Acme.Api.Clients.Reassigned.Stage()"),
+        api("Clients.cs", "Acme.Api.Clients.Reassigned.Run(bool)"),
+        api(
+            "Clients.cs",
+            "Acme.Api.Clients.Reassigned.Hidden(HttpClient)",
+        ),
+        api("Clients.cs", "Acme.Api.Clients.Reassigned.Use()"),
+        api("Clients.cs", "Acme.Api.Clients.Reassigned.Inner"),
+        api("Clients.cs", "Acme.Api.Clients.Reassigned.Inner.Run()"),
+        api("Clients.cs", "Acme.Api.Clients.Reads"),
+        api(
+            "Clients.cs",
+            "Acme.Api.Clients.Reads.Reads(HttpClient,IHttpClientFactory)",
+        ),
+        api("Clients.cs", "Acme.Api.Clients.Reads.Config()"),
+        api("Clients.cs", "Acme.Api.Clients.Reads.Run(int)"),
+        api("Clients.cs", "Acme.Api.Clients.Repo"),
+        api("Clients.cs", "Acme.Api.Clients.Repo.GetAsync(string)"),
         shadows("Shadows"),
         shadows("Shadows.Parameter(object)"),
         shadows("Shadows.Local()"),
@@ -3801,125 +3825,239 @@ fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
     let at = |function: &str, call: &str| {
         format!("src/Acme.Api/Clients.cs::Acme.Api.Clients.{function}::{call}")
     };
-    let (orders, billing, shared, local) = (
-        "host:orders.example.com",
-        "host:billing.example.com",
-        "host:shared.example.com",
-        "host:local.example.com",
-    );
-    let (verbs, based, folds, wrap) = (
-        "Verbs.Run(int)",
-        "Based.Run()",
-        "Folds.Run(string)",
-        "Wrappers.Run(string)",
-    );
-    let (verbatim, format, wrapped) = (
-        "host:verbatim.example.com",
-        "host:format.example.com",
-        "host:wrapped.example.com",
-    );
+    // Each method with its verb, base address, folded URL, wrapper, and the names that hold no
+    // one value (`Reassigned`), read once through `Reads`.
     let expected = triples(&[
-        // Every method, and `SendAsync` with a request made in place.
-        ("http::GET::/orders", orders, &at(verbs, "http.GetAsync#0")),
-        (
-            "http::POST::/orders",
-            orders,
-            &at(verbs, "http.PostAsync#0"),
-        ),
-        (
-            "http::PUT::/orders/1",
-            orders,
-            &at(verbs, "http.PutAsync#0"),
-        ),
-        (
-            "http::PATCH::/orders/2",
-            orders,
-            &at(verbs, "http.PatchAsync#0"),
-        ),
-        (
-            "http::DELETE::/orders/3",
-            orders,
-            &at(verbs, "http.DeleteAsync#0"),
-        ),
-        (
-            "http::GET::/text",
-            orders,
-            &at(verbs, "http.GetStringAsync#0"),
-        ),
-        (
-            "http::GET::/stream",
-            orders,
-            &at(verbs, "http.GetStreamAsync#0"),
-        ),
-        (
-            "http::GET::/bytes",
-            orders,
-            &at(verbs, "http.GetByteArrayAsync#0"),
-        ),
-        (
-            "http::GET::/json",
-            orders,
-            &at(verbs, "http.GetFromJsonAsync#0"),
-        ),
-        (
-            "http::POST::/json",
-            orders,
-            &at(verbs, "http.PostAsJsonAsync#0"),
-        ),
-        (
-            "http::PUT::/json/1",
-            orders,
-            &at(verbs, "http.PutAsJsonAsync#0"),
-        ),
-        (
-            "http::DELETE::/send",
-            orders,
-            &at(verbs, "http.SendAsync#0"),
-        ),
-        ("http::POST::/uri", orders, &at(verbs, "http.SendAsync#1")),
-        // The base address of the client each call is made on.
+        // Based.Run()
         (
             "http::GET::/api/items",
-            shared,
-            &at(based, "Shared.GetAsync#0"),
+            "host:shared.example.com",
+            &at("Based.Run()", "Shared.GetAsync#0"),
         ),
-        ("http::GET::/root", shared, &at(based, "Shared.GetAsync#1")),
+        (
+            "http::GET::/root",
+            "host:shared.example.com",
+            &at("Based.Run()", "Shared.GetAsync#1"),
+        ),
         (
             "http::GET::/billing",
-            billing,
-            &at(based, "field.GetAsync#0"),
+            "host:billing.example.com",
+            &at("Based.Run()", "field.GetAsync#0"),
         ),
         (
-            "http::GET::/v1/orders/1",
-            local,
-            &at(based, "local.GetStringAsync#0"),
+            "http::GET::/orders/1",
+            "host:local.example.com",
+            &at("Based.Run()", "local.GetStringAsync#0"),
         ),
-        // Strings folded.
+        (
+            "http::GET::/v1/orders/2",
+            "host:slash.example.com",
+            &at("Based.Run()", "slash.GetStringAsync#0"),
+        ),
+        // Folds.Run(string)
         (
             "http::GET::/invoices/{}",
-            billing,
-            &at(folds, "http.GetAsync#0"),
+            "host:billing.example.com",
+            &at("Folds.Run(string)", "http.GetAsync#0"),
         ),
         (
             "http::GET::/api/invoices",
-            billing,
-            &at(folds, "http.GetAsync#1"),
+            "host:billing.example.com",
+            &at("Folds.Run(string)", "http.GetAsync#1"),
         ),
         (
             "http::GET::/items/stock",
-            orders,
-            &at(folds, "http.GetAsync#2"),
+            "host:orders.example.com",
+            &at("Folds.Run(string)", "http.GetAsync#2"),
         ),
-        ("http::GET::/plus/{}", local, &at(folds, "http.GetAsync#3")),
-        ("http::GET::/a", verbatim, &at(folds, "http.GetAsync#4")),
-        ("http::GET::/{}/b", verbatim, &at(folds, "http.GetAsync#5")),
-        ("http::GET::/{}/{}", format, &at(folds, "http.GetAsync#6")),
-        // A wrapper, read at each call site of the wrapper and of the one that calls it.
-        ("http::GET::/orders/7", wrapped, &at(wrap, "ForOrder#0")),
-        ("http::GET::/orders/{}", wrapped, &at(wrap, "ForOrder#1")),
-        ("http::GET::/direct", wrapped, &at(wrap, "Fetch#0")),
-        // A URL that cannot be evaluated; the named client has no consumer.
+        (
+            "http::GET::/plus/{}",
+            "host:local.example.com",
+            &at("Folds.Run(string)", "http.GetAsync#3"),
+        ),
+        (
+            "http::GET::/a",
+            "host:verbatim.example.com",
+            &at("Folds.Run(string)", "http.GetAsync#4"),
+        ),
+        (
+            "http::GET::/{}/b",
+            "host:verbatim.example.com",
+            &at("Folds.Run(string)", "http.GetAsync#5"),
+        ),
+        (
+            "http::GET::/{}/{}",
+            "host:format.example.com",
+            &at("Folds.Run(string)", "http.GetAsync#6"),
+        ),
+        // Reads.Run(int)
+        (
+            "http::GET::/property",
+            "host:property.example.com",
+            &at("Reads.Run(int)", "Client.GetAsync#0"),
+        ),
+        (
+            "http::GET::/u/{}",
+            "host:locals.example.com",
+            &at("Reads.Run(int)", "http.GetAsync#0"),
+        ),
+        (
+            "http::GET::/s",
+            "host:locals.example.com",
+            &at("Reads.Run(int)", "http.GetAsync#1"),
+        ),
+        (
+            "http::GET::/c",
+            "host:locals.example.com",
+            &at("Reads.Run(int)", "http.GetAsync#2"),
+        ),
+        (
+            "http::GET::/n",
+            "host:null.example.com",
+            &at("Reads.Run(int)", "http.GetAsync#3"),
+        ),
+        (
+            "http::PUT::/m",
+            "host:method.example.com",
+            &at("Reads.Run(int)", "http.SendAsync#0"),
+        ),
+        (
+            "http::GET::/q",
+            "host:qualified.example.com",
+            &at("Reads.Run(int)", "qualified.GetAsync#0"),
+        ),
+        (
+            "http::GET::/rooted",
+            "",
+            &at("Reads.Run(int)", "unknown.GetAsync#0"),
+        ),
+        // Reassigned.Inner.Run()
+        (
+            "http::GET::/inner",
+            "",
+            &at("Reassigned.Inner.Run()", "shadow.GetAsync#0"),
+        ),
+        // Reassigned.Run(bool)
+        (
+            "http::GET::/branch",
+            "",
+            &at("Reassigned.Run(bool)", "branch.GetAsync#0"),
+        ),
+        (
+            "http::GET::/client",
+            "",
+            &at("Reassigned.Run(bool)", "c.GetAsync#0"),
+        ),
+        (
+            "unresolved",
+            "",
+            &at("Reassigned.Run(bool)", "http.GetAsync#0"),
+        ),
+        (
+            "unresolved",
+            "",
+            &at("Reassigned.Run(bool)", "http.SendAsync#0"),
+        ),
+        (
+            "http::GET::/swapped",
+            "",
+            &at("Reassigned.Run(bool)", "swapped.GetAsync#0"),
+        ),
+        (
+            "http::GET::/twice",
+            "",
+            &at("Reassigned.Run(bool)", "twice.GetAsync#0"),
+        ),
+        // Reassigned.Use()
+        (
+            "http::GET::/hidden",
+            "host:arg.example.com",
+            &at("Reassigned.Use()", "Hidden#0"),
+        ),
+        // Unread.Run()
         ("unresolved", "", &at("Unread.Run()", "http.GetAsync#0")),
+        // Verbs.Run(int)
+        (
+            "http::DELETE::/orders/3",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.DeleteAsync#0"),
+        ),
+        (
+            "http::GET::/orders",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.GetAsync#0"),
+        ),
+        (
+            "http::GET::/bytes",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.GetByteArrayAsync#0"),
+        ),
+        (
+            "http::GET::/json",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.GetFromJsonAsync#0"),
+        ),
+        (
+            "http::GET::/stream",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.GetStreamAsync#0"),
+        ),
+        (
+            "http::GET::/text",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.GetStringAsync#0"),
+        ),
+        (
+            "http::PATCH::/orders/2",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.PatchAsync#0"),
+        ),
+        (
+            "http::POST::/json",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.PostAsJsonAsync#0"),
+        ),
+        (
+            "http::POST::/orders",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.PostAsync#0"),
+        ),
+        (
+            "http::PUT::/json/1",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.PutAsJsonAsync#0"),
+        ),
+        (
+            "http::PUT::/orders/1",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.PutAsync#0"),
+        ),
+        (
+            "http::DELETE::/send",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.SendAsync#0"),
+        ),
+        (
+            "http::POST::/uri",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.SendAsync#1"),
+        ),
+        // Wrappers.Run(string)
+        (
+            "http::GET::/direct",
+            "host:wrapped.example.com",
+            &at("Wrappers.Run(string)", "Fetch#0"),
+        ),
+        (
+            "http::GET::/orders/7",
+            "host:wrapped.example.com",
+            &at("Wrappers.Run(string)", "ForOrder#0"),
+        ),
+        (
+            "http::GET::/orders/{}",
+            "host:wrapped.example.com",
+            &at("Wrappers.Run(string)", "ForOrder#1"),
+        ),
     ]);
     assert_eq!(consumers(&json, "src/Acme.Api/Clients.cs"), expected);
 }

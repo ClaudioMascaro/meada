@@ -1,25 +1,30 @@
 //! C# HTTP consumers (spec #28, #111): the `HttpClient` methods that send a request. A call
 //! counts only when its receiver is an `HttpClient` by its declared type or by the construction
-//! it traces back to, the type read through the usings (`names::typed`, `Code::outside`), never
-//! by text; a client `IHttpClientFactory.CreateClient(name)` made is a named client, which is
-//! not read.
+//! it is made on, the type read through the usings (`Code::written` gives the type the source
+//! writes, `names::spellings` the names the imports give it), never by text; a client
+//! `IHttpClientFactory.CreateClient(name)` made, held by a local or a field, is a named client,
+//! which is not read.
 //!
 //! The call is read whole (`Expand::Chain`), so a wrapper (a method that takes the path, the
 //! method or the client as a parameter) turns each of its call sites into a consumer with its
 //! arguments substituted, and a `HttpMethod.X` arrives as a `Value::External` spelled by the
-//! imports of the file that writes it. The URL folds string literals, interpolated and verbatim
-//! strings, `+`, `const` and `static readonly` fields (the pack's `Facts::consts`) and
-//! `new Uri(..)`. A client's base is the `BaseAddress` its construction sets in an object
-//! initializer (`new HttpClient { BaseAddress = new Uri(base) }`, in a local, a field or a
-//! `static readonly` field), or the one `BaseAddress = new Uri(base)` assignment made on the
-//! name the call is made on (a local, or a field assigned once in its type): a base not read is
-//! unknown, so the path alone is the contract.
-// ponytail: a client held in a field some method assigns more than once, or passed to a wrapper
-// that was built elsewhere, has an unknown base; `AddHttpClient<T>` is #113's.
+//! imports of the file that writes it. The URL folds string literals, interpolated, verbatim and
+//! raw strings, `+`, `const` and `static readonly` fields (the pack's `Facts::consts`), locals
+//! bound once (`Facts::bound`) and `new Uri(..)`. A name assigned anywhere in its file (`=`,
+//! `+=`, `++`, `out`, `ref`) holds no one value, so a reassigned local, request or client is
+//! unknown. A client's base is the `BaseAddress` its construction sets in an object
+//! initializer (`new HttpClient { BaseAddress = new Uri(base) }`, in a local, a field, a
+//! property or a `static readonly` field), or the one `BaseAddress = new Uri(base)` assignment
+//! made on the name the call is made on, in the scope that declares the name: a base not read
+//! (two assignments, a name that is assigned or hidden) is unknown, so the path alone is the
+//! contract. A relative URL joins the base as `Uri` does (RFC 3986).
+// ponytail: a field set from a parameter or assigned twice has an unknown base, and so has a
+// client a wrapper takes whose callers build it elsewhere; an instance `readonly` field that is
+// not `const` or `static` is not folded; `AddHttpClient<T>` is #113's.
 
 use super::super::{based, consumer, fetches};
 use crate::contract::Found;
-use crate::lang::{Invocation, Part, Value};
+use crate::lang::{Bound, Invocation, Part, Value};
 use crate::names::{one, spellings};
 use crate::resolve::{Code, Expand, Expanded, method as member};
 
@@ -71,7 +76,8 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
                 let [Value::Call(call)] = values else {
                     return None;
                 };
-                let (url, method) = sends(code, (path, &stored.scope), receiver, sent, call);
+                let at = (path, stored.scope.as_str());
+                let (url, method) = sends(code, at, n, receiver, sent, call);
                 fetches(&[url, method])
             };
             for Expanded {
@@ -107,24 +113,61 @@ fn sent(callee: &str) -> Option<Sent> {
 
 /// Whether the call at `index` of `path`, made on `receiver`, is made on an `HttpClient`: the
 /// receiver is written as one (a field, a property, a parameter, a typed local), or was made by
-/// `new HttpClient(..)`; one `CreateClient` made is a named client.
+/// `new HttpClient(..)`; one `CreateClient` made, held by a local or a field, is a named client.
 fn is_client<'a>(code: &Code<'a>, path: &'a str, index: usize, receiver: &'a str) -> bool {
     let scope = code.files()[path].calls[index].scope.as_str();
-    let named = code
-        .local(path, scope, receiver)
-        .is_some_and(|b| matches!(&b.value, Value::Call(c) if member(&c.callee) == "CreateClient"));
-    if named {
+    if named(code, (path, scope), receiver) {
         return false;
     }
     if let Some((at, within, ty)) = code.written(path, scope, receiver) {
-        return one(&spellings(code, at, within, ty), |t| t == HTTP_CLIENT).is_some();
+        return is_http_client(code, at, within, ty);
     }
     // No type written: the construction in place, or a local made by `new HttpClient()`.
-    let made = |ty: &'a str| one(&spellings(code, path, scope, ty), |t| t == HTTP_CLIENT).is_some();
     match code.receiver(path, index) {
-        Some(Value::New(ty, _)) => made(ty),
+        Some(Value::New(ty, _)) => is_http_client(code, path, scope, ty),
         _ => false,
     }
+}
+
+/// Whether `ty`, written in `scope` of `path`, is `System.Net.Http.HttpClient`, in full or
+/// through the usings.
+fn is_http_client<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, ty: &'a str) -> bool {
+    ty == HTTP_CLIENT || one(&spellings(code, path, scope, ty), |t| t == HTTP_CLIENT).is_some()
+}
+
+/// Whether the name `receiver` holds the client `CreateClient(name)` made: a local declared
+/// with it, or a name assigned it (`_n = factory.CreateClient("x")`), at the scope that
+/// declares it.
+fn named<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), receiver: &'a str) -> bool {
+    let name = receiver.strip_prefix("this.").unwrap_or(receiver);
+    let made =
+        |b: &&Bound| matches!(&b.value, Value::Call(c) if member(&c.callee) == "CreateClient");
+    code.local(path, scope, name).iter().any(made)
+        || code
+            .written(path, scope, name)
+            .is_some_and(|(at, within, _)| {
+                at == path
+                    && code
+                        .bounds(path, within, &format!("{name}="))
+                        .iter()
+                        .any(made)
+            })
+}
+
+/// The binding of `name.member` (a member assigned through the name), when the scope that
+/// binds it is the one that declares `name`: a parameter that hides a field, or a nested type's
+/// own field, keeps its own.
+fn written<'a>(
+    code: &Code<'a>,
+    (path, scope): (&'a str, &'a str),
+    name: &'a str,
+    member: &str,
+) -> Option<&'a Bound> {
+    let name = name.strip_prefix("this.").unwrap_or(name);
+    let head = name.split('.').next().unwrap_or(name);
+    let (at, within, _) = code.written(path, scope, head)?;
+    let bound = code.local(path, scope, &format!("{name}.{member}"))?;
+    (at == path && bound.scope == within).then_some(bound)
 }
 
 /// The URL and the method of `call`, read whole by `Expand::Chain`, made on `receiver` (as the
@@ -132,7 +175,8 @@ fn is_client<'a>(code: &Code<'a>, path: &'a str, index: usize, receiver: &'a str
 fn sends<'a>(
     code: &Code<'a>,
     (path, scope): (&'a str, &'a str),
-    receiver: &str,
+    index: usize,
+    receiver: &'a str,
     sent: Sent,
     call: &Invocation,
 ) -> (Value, Value) {
@@ -141,7 +185,16 @@ fn sends<'a>(
         Sent::Verb(verb) => (call.args.first(), text(verb)),
         Sent::Request => match call.args.first() {
             Some(Value::New(ty, args)) if is_request(code, (path, scope), ty) => {
-                (args.get(1), http_method(args.first()))
+                // `request.Method = HttpMethod.X`, set after the construction, wins.
+                let set = match code.call(path, index).and_then(|c| c.args.first()) {
+                    Some(Value::Ref(name)) => written(code, (path, scope), name, "Method"),
+                    _ => None,
+                };
+                let method = match set {
+                    Some(b) => member_set(code, (path, &b.within), &b.value),
+                    None => http_method(args.first()),
+                };
+                (args.get(1), method)
             }
             // A request a wrapper takes: read at each caller.
             Some(Value::Ref(name)) => return (Value::Ref(name.clone()), Value::Ref(name.clone())),
@@ -154,8 +207,7 @@ fn sends<'a>(
         Some(Value::Ref(name)) => (Value::Ref(name.clone()), method),
         client => {
             // The assignment on the name the call is made on wins over the initializer.
-            let name = receiver.strip_prefix("this.").unwrap_or(receiver);
-            let assigned = (code.local(path, scope, &format!("{name}.{BASE}")))
+            let assigned = (written(code, (path, scope), receiver, BASE))
                 .map(|b| code.value(path, &b.within, &b.value));
             (based_on(base(client, assigned.as_ref()), url), method)
         }
@@ -175,6 +227,29 @@ fn http_method(value: Option<&Value>) -> Value {
             None => Value::Unknown,
         },
         Some(Value::Ref(name)) => Value::Ref(name.clone()),
+        _ => Value::Unknown,
+    }
+}
+
+/// The method a `HttpMethod.X` assigned to a request names (`Method = HttpMethod.X`), written as
+/// is in `scope` of `path`: unknown when it is not one of the members or `HttpMethod` is not the
+/// framework's.
+fn member_set<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), value: &'a Value) -> Value {
+    let named = match value {
+        Value::Ref(r) => r.rsplit_once('.'),
+        _ => None,
+    };
+    let method = HTTP_METHOD.trim_end_matches('.');
+    match named {
+        Some((ty, name))
+            if ty == method
+                || one(&spellings(code, path, scope, ty), |s| s == method).is_some() =>
+        {
+            match MEMBERS.iter().find(|(m, _)| *m == name) {
+                Some((_, verb)) => Value::Str(vec![Part::Text(verb.to_string())]),
+                None => Value::Unknown,
+            }
+        }
         _ => Value::Unknown,
     }
 }
@@ -226,38 +301,68 @@ fn base(client: Option<&Value>, assigned: Option<&Value>) -> Vec<Part> {
     }
 }
 
-/// `url` with `base` in front when `url` is relative to it. A path from the root
-/// (`/orders`) replaces the base's own path, as `Uri` does.
+/// `url` with `base` in front when `url` is relative to it, as `Uri` joins them (RFC 3986): a
+/// path from the root (`/orders`) replaces the base's own path, and a relative one replaces the
+/// base's last segment (`https://c/v1` and `orders` give `/orders`, `https://c/v1/` gives
+/// `/v1/orders`).
 fn based_on(mut base: Vec<Part>, url: Value) -> Value {
-    let rooted = matches!(&url, Value::Str(p) if matches!(p.first(), Some(Part::Text(t)) if t.starts_with('/')));
-    if rooted {
-        origin(&mut base);
+    let first = match &url {
+        Value::Str(parts) => match parts.first() {
+            Some(Part::Text(t)) => Some(t.as_str()),
+            _ => None,
+        },
+        _ => None,
+    };
+    match (first, path_start(&base)) {
+        (Some(t), Some((n, at))) if t.starts_with('/') => cut(&mut base, n, at),
+        (Some(t), Some((n, at))) if !t.contains("://") => {
+            // After the last `/` of the base's path.
+            let last = (n..base.len()).rev().find_map(|m| match &base[m] {
+                Part::Text(t) => {
+                    let from = if m == n { at } else { 0 };
+                    t[from..].rfind('/').map(|i| (m, from + i))
+                }
+                _ => None,
+            });
+            if let Some((m, i)) = last {
+                cut(&mut base, m, i + 1);
+            }
+        }
+        _ => {}
     }
     based(Some(&base), &url)
 }
 
-/// `base` cut at the path after its host.
-fn origin(base: &mut Vec<Part>) {
-    let (mut scheme, mut cut) = (false, None);
-    for (n, part) in base.iter_mut().enumerate() {
-        let Part::Text(t) = part else { continue };
-        let from = match scheme {
-            true => 0,
-            false => match t.find("://") {
-                Some(at) => at + 3,
-                None => continue,
-            },
+/// `base` kept up to byte `at` of its part `n`.
+fn cut(base: &mut Vec<Part>, n: usize, at: usize) {
+    if let Part::Text(t) = &mut base[n] {
+        t.truncate(at);
+    }
+    base.truncate(n + 1);
+}
+
+/// The part and byte where the path of `base` begins: the first `/` after the host, which is
+/// what follows a literal `://`, or the first text after a part that is not literal when the
+/// scheme is not (an address read from configuration).
+fn path_start(base: &[Part]) -> Option<(usize, usize)> {
+    let (mut scheme, mut opaque) = (false, false);
+    for (n, part) in base.iter().enumerate() {
+        let Part::Text(t) = part else {
+            opaque = true;
+            continue;
+        };
+        let from = match (scheme, t.find("://")) {
+            (true, _) => 0,
+            (false, Some(at)) => at + 3,
+            (false, None) if opaque => 0,
+            (false, None) => continue,
         };
         scheme = true;
         if let Some(at) = t[from..].find('/') {
-            t.truncate(from + at);
-            cut = Some(n + 1);
-            break;
+            return Some((n, from + at));
         }
     }
-    if let Some(n) = cut {
-        base.truncate(n);
-    }
+    None
 }
 
 #[cfg(test)]
@@ -379,7 +484,7 @@ mod tests {
         let body = "static readonly HttpClient Shared = new HttpClient { BaseAddress = new Uri(\"https://s.example.com/api/\") };\n\
              private readonly HttpClient _field = new HttpClient { BaseAddress = new Uri(\"https://f.example.com\") };\n\
              private readonly HttpClient _set;\n\
-             C() { _set = new HttpClient(); _set.BaseAddress = new Uri(\"https://c.example.com/v1\"); }\n\
+             C() { _set = new HttpClient(); _set.BaseAddress = new Uri(\"https://c.example.com/v1/\"); }\n\
              async void F() {\n\
              await Shared.GetAsync(\"orders\");\n\
              await Shared.GetAsync(\"/root\");\n\
@@ -556,5 +661,238 @@ mod tests {
             .collect();
         found.sort();
         assert_eq!(found, ["http::GET::/alias"]);
+    }
+
+    /// A client with a base, in C# source.
+    fn client(host: &str) -> String {
+        format!("new HttpClient {{ BaseAddress = new Uri(\"https://{host}.example.com\") }}")
+    }
+
+    #[test]
+    fn a_reassigned_request_is_no_constant() {
+        let body = format!(
+            "{CLIENT}async Task F() {{\n\
+             var req = new HttpRequestMessage(HttpMethod.Get, \"https://h.example.com/a\");\n\
+             req = new HttpRequestMessage(HttpMethod.Post, \"https://h.example.com/b\");\n\
+             await _http.SendAsync(req);\n}}"
+        );
+        assert_eq!(contracts(&body), Vec::<String>::new());
+        assert_eq!(sent(&body).len(), 1);
+    }
+
+    #[test]
+    fn a_reassigned_client_has_an_unknown_base() {
+        let body = format!(
+            "async Task F() {{\n\
+             var c = {};\n\
+             c = {};\n\
+             await c.GetAsync(\"/x\");\n}}",
+            client("a"),
+            client("b")
+        );
+        assert_eq!(sent(&body), [to("http::GET::/x")]);
+    }
+
+    #[test]
+    fn a_field_assigned_after_its_initializer_has_an_unknown_base() {
+        let field = format!("private readonly HttpClient _c = {};\n", client("default"));
+        for assign in [
+            "public C(HttpClient c) { _c = c; }",
+            "public C(HttpClient c) { this._c = c; }",
+            "void Swap(HttpClient c) { _c = c; }",
+        ] {
+            let body = format!("{field}{assign}\nasync Task F() {{ await _c.GetAsync(\"/x\"); }}");
+            assert_eq!(sent(&body), [to("http::GET::/x")], "{assign}");
+        }
+    }
+
+    #[test]
+    fn a_local_assigned_by_out_ref_or_compound_is_no_constant() {
+        let body = format!(
+            "{CLIENT}static void Fill(out string s) {{ s = \"/b\"; }}\n\
+             async Task F() {{\n\
+             string u = \"https://h.example.com/a\";\n\
+             Fill(out u);\n\
+             await _http.GetAsync(u);\n\
+             string v = \"https://h.example.com/v\";\n\
+             v += \"/w\";\n\
+             await _http.GetAsync(v);\n}}"
+        );
+        assert_eq!(contracts(&body), Vec::<String>::new());
+        assert_eq!(sent(&body).len(), 2);
+    }
+
+    #[test]
+    fn two_base_address_assignments_are_an_unknown_base() {
+        let field = format!(
+            "private readonly HttpClient _h = {};\n\
+             void Prod() {{ _h.BaseAddress = new Uri(\"https://prod.example.com\"); }}\n\
+             void Stage() {{ _h.BaseAddress = new Uri(\"https://stage.example.com\"); }}\n\
+             async Task F() {{ await _h.GetAsync(\"/x\"); }}",
+            client("default")
+        );
+        assert_eq!(sent(&field), [to("http::GET::/x")]);
+        let local = format!(
+            "async Task F(bool b) {{\n\
+             var c = {};\n\
+             if (b) c.BaseAddress = new Uri(\"https://prod.example.com\");\n\
+             else c.BaseAddress = new Uri(\"https://stage.example.com\");\n\
+             await c.GetAsync(\"/x\");\n}}",
+            client("default")
+        );
+        assert_eq!(sent(&local), [to("http::GET::/x")]);
+    }
+
+    #[test]
+    fn a_base_assigned_through_a_field_is_not_the_base_of_a_parameter_that_hides_it() {
+        let body = "private readonly HttpClient http;\n\
+             public C() { this.http.BaseAddress = new Uri(\"https://field.example.com\"); }\n\
+             async Task F(HttpClient http) { await http.GetAsync(\"/x\"); }\n\
+             void Use() { F(new HttpClient { BaseAddress = new Uri(\"https://arg.example.com\") }); }";
+        assert_eq!(sent(body), [host("http::GET::/x", "arg.example.com")]);
+        let alone = body.replace("void Use() { F(", "void Use() { var _ = (");
+        assert_eq!(sent(&alone), [to("http::GET::/x")]);
+    }
+
+    #[test]
+    fn a_nested_class_with_its_own_field_keeps_its_own_base() {
+        let body = "private readonly HttpClient _http;\n\
+             public C() { _http.BaseAddress = new Uri(\"https://outer.example.com\"); }\n\
+             async Task F() { await _http.GetAsync(\"/x\"); }\n\
+             public class Inner {\n\
+             private readonly HttpClient _http;\n\
+             async Task G() { await _http.GetAsync(\"/y\"); }\n}";
+        assert_eq!(
+            sent(body),
+            [
+                host("http::GET::/x", "outer.example.com"),
+                to("http::GET::/y")
+            ]
+        );
+    }
+
+    #[test]
+    fn a_relative_url_merges_with_the_base_path_as_rfc_3986_does() {
+        let body = "async Task F() {\n\
+             var a = new HttpClient { BaseAddress = new Uri(\"https://c.example.com/v1\") };\n\
+             var b = new HttpClient { BaseAddress = new Uri(\"https://c.example.com/v1/\") };\n\
+             var d = new HttpClient { BaseAddress = new Uri(\"https://c.example.com\") };\n\
+             var e = new HttpClient { BaseAddress = new Uri(\"https://c.example.com/v1/x\") };\n\
+             await a.GetAsync(\"orders\");\n\
+             await b.GetAsync(\"orders\");\n\
+             await d.GetAsync(\"orders\");\n\
+             await e.GetAsync(\"orders\");\n}";
+        let mut paths: Vec<_> = contracts(body);
+        paths.sort();
+        assert_eq!(
+            paths,
+            [
+                "http::GET::/orders",
+                "http::GET::/orders",
+                "http::GET::/v1/orders",
+                "http::GET::/v1/orders"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_base_with_no_literal_scheme_is_cut_at_the_first_path_for_a_rooted_url() {
+        let body = "static string Cfg() => \"x\";\n\
+             async Task F() {\n\
+             var c = new HttpClient { BaseAddress = new Uri(Cfg() + \"/api/\") };\n\
+             await c.GetAsync(\"/x\");\n}";
+        assert_eq!(contracts(body), ["http::GET::/x"]);
+    }
+
+    #[test]
+    fn a_named_client_held_in_a_field_is_not_read() {
+        let body = "private readonly HttpClient _n;\n\
+             public C(IHttpClientFactory f) { _n = f.CreateClient(\"orders\"); }\n\
+             async Task F() { await _n.GetAsync(\"/named\"); }\n\
+             private HttpClient _m;\n\
+             public void Set(IHttpClientFactory f) { this._m = f.CreateClient(); }\n\
+             async Task G() { await _m.GetAsync(\"/named2\"); }";
+        assert_eq!(sent(body), Vec::<Sent>::new());
+    }
+
+    #[test]
+    fn a_fully_qualified_http_client_counts() {
+        let body = "private readonly System.Net.Http.HttpClient _q;\n\
+             async Task F() {\n\
+             await _q.GetAsync(\"https://q.example.com/q\");\n\
+             await new System.Net.Http.HttpClient().GetAsync(\"https://q.example.com/n\");\n}";
+        assert_eq!(
+            sent(body),
+            [
+                host("http::GET::/n", "q.example.com"),
+                host("http::GET::/q", "q.example.com")
+            ]
+        );
+    }
+
+    #[test]
+    fn a_method_set_after_the_request_is_built_is_read() {
+        let body = format!(
+            "{CLIENT}async Task F() {{\n\
+             var req = new HttpRequestMessage(HttpMethod.Get, \"https://r.example.com/p\");\n\
+             req.Method = HttpMethod.Post;\n\
+             await _http.SendAsync(req);\n}}"
+        );
+        assert_eq!(contracts(&body), ["http::POST::/p"]);
+    }
+
+    #[test]
+    fn a_local_url_is_followed_once_and_a_reassigned_one_is_not() {
+        let body = format!(
+            "{CLIENT}async Task F(int id) {{\n\
+             var a = $\"https://l.example.com/a/{{id}}\";\n\
+             string b = \"https://l.example.com/b\";\n\
+             const string k = \"https://l.example.com/k\";\n\
+             await _http.GetAsync(a);\n\
+             await _http.GetAsync(b);\n\
+             await _http.GetAsync(k);\n}}\n\
+             async Task G() {{\n\
+             string u = \"https://l.example.com/u\";\n\
+             u += \"/more\";\n\
+             await _http.GetAsync(u);\n}}"
+        );
+        assert_eq!(
+            sent(&body),
+            [
+                open("GET"),
+                host("http::GET::/a/{}", "l.example.com"),
+                host("http::GET::/b", "l.example.com"),
+                host("http::GET::/k", "l.example.com"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_null_conditional_call_is_a_consumer() {
+        let body = "async Task F() { await _http?.GetAsync(\"https://n.example.com/n\"); }";
+        assert_eq!(contracts(&format!("{CLIENT}{body}")), ["http::GET::/n"]);
+    }
+
+    #[test]
+    fn a_property_initializer_gives_the_base_of_the_client_it_holds() {
+        let body = format!(
+            "public HttpClient Client {{ get; }} = {};\n\
+             async Task F() {{ await Client.GetAsync(\"/p\"); }}",
+            client("prop")
+        );
+        assert_eq!(sent(&body), [host("http::GET::/p", "prop.example.com")]);
+    }
+
+    #[test]
+    fn a_get_async_of_the_repository_beside_the_client_call_is_not_called_by_it() {
+        // The pack's call, not the kind's: the client call must stay a call of the outside type.
+        let body = format!(
+            "{CLIENT}async Task F() {{ await _http.GetAsync(\"https://z.example.com/z\"); }}"
+        );
+        let other = "namespace A;\npublic class Repo { public Task GetAsync(string s) => null; }\n";
+        assert_eq!(
+            sent_with(&body, &[("A/Repo.cs", other)]),
+            [host("http::GET::/z", "z.example.com")]
+        );
     }
 }

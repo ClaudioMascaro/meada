@@ -23,7 +23,7 @@
     },
     {
       "path": "src/Acme.Api/Clients.cs",
-      "hash": "ec513fdbeb0322aa5cb03d97db8e85d385f156a2f2aecd107717e9d7777dd72a"
+      "hash": "b58ad77768171231b4fec9b8ef84b7c38f44594a7abd06d4bf3cb502a12d30a2"
     },
     {
       "path": "src/Acme.Api/Contracts.cs",
@@ -228,7 +228,7 @@
       "span": {
         "path": "src/Acme.Api/Clients.cs",
         "start": 1737,
-        "end": 2351
+        "end": 2611
       }
     },
     {
@@ -236,31 +236,31 @@
       "span": {
         "path": "src/Acme.Api/Clients.cs",
         "start": 2001,
-        "end": 2345
+        "end": 2605
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Folds",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 2437,
-        "end": 3153
+        "start": 2697,
+        "end": 3413
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Folds.Folds(HttpClient)",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 2579,
-        "end": 2630
+        "start": 2839,
+        "end": 2890
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Folds.Run(string)",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 2640,
-        "end": 3147
+        "start": 2900,
+        "end": 3407
       }
     },
     {
@@ -272,35 +272,155 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 7076,
+        "end": 8524
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Config()",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 7547,
+        "end": 7603
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Reads(HttpClient,IHttpClientFactory)",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 7377,
+        "end": 7537
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 7613,
+        "end": 8518
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 4753,
+        "end": 7009
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Hidden(HttpClient)",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 6583,
+        "end": 6664
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Inner",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 6843,
+        "end": 7003
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Inner.Run()",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 6933,
+        "end": 6993
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Prod()",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5311,
+        "end": 5390
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Reassigned(HttpClient)",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5112,
+        "end": 5301
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5491,
+        "end": 6499
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Stage()",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5400,
+        "end": 5481
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Use()",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 6674,
+        "end": 6784
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Repo",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 8614,
+        "end": 8708
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Repo.GetAsync(string)",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 8646,
+        "end": 8702
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 3815,
-        "end": 4437
+        "start": 4075,
+        "end": 4626
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Lookup()",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 4099,
-        "end": 4157
+        "start": 4359,
+        "end": 4417
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Run()",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 4167,
-        "end": 4431
+        "start": 4427,
+        "end": 4620
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Unread(HttpClient,IHttpClientFactory)",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 3945,
-        "end": 4089
+        "start": 4205,
+        "end": 4349
       }
     },
     {
@@ -331,40 +451,40 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Wrappers",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 3226,
-        "end": 3716
+        "start": 3486,
+        "end": 3976
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Wrappers.Fetch(string)",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 3369,
-        "end": 3470
+        "start": 3629,
+        "end": 3730
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Wrappers.ForOrder(string)",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 3480,
-        "end": 3547
+        "start": 3740,
+        "end": 3807
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Wrappers.Run(string)",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 3557,
-        "end": 3710
+        "start": 3817,
+        "end": 3970
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Wrappers.Wrappers(HttpClient)",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 3305,
-        "end": 3359
+        "start": 3565,
+        "end": 3619
       }
     },
     {
@@ -1874,6 +1994,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()::HttpClient#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 2452,
+        "end": 2468
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()::Shared.GetAsync#0",
       "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()",
       "target": null,
@@ -1907,6 +2038,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()::Uri#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 2502,
+        "end": 2542
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()::field.GetAsync#0",
       "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()",
       "target": null,
@@ -1926,6 +2068,17 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 2302,
         "end": 2334
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()::slash.GetStringAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 2562,
+        "end": 2594
       }
     },
     {
@@ -1979,8 +2132,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 2701,
-        "end": 2748
+        "start": 2961,
+        "end": 3008
       }
     },
     {
@@ -1990,8 +2143,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 2768,
-        "end": 2797
+        "start": 3028,
+        "end": 3057
       }
     },
     {
@@ -2001,8 +2154,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 2817,
-        "end": 2855
+        "start": 3077,
+        "end": 3115
       }
     },
     {
@@ -2012,8 +2165,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 2875,
-        "end": 2911
+        "start": 3135,
+        "end": 3171
       }
     },
     {
@@ -2023,8 +2176,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 2931,
-        "end": 2979
+        "start": 3191,
+        "end": 3239
       }
     },
     {
@@ -2034,8 +2187,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 2999,
-        "end": 3053
+        "start": 3259,
+        "end": 3313
       }
     },
     {
@@ -2045,19 +2198,492 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 3073,
-        "end": 3136
+        "start": 3333,
+        "end": 3396
       }
     },
     {
-      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Run()::(invocation_expression).GetAsync#0",
-      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Run()",
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Reads(HttpClient,IHttpClientFactory)::factory.CreateClient#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Reads(HttpClient,IHttpClientFactory)",
       "target": null,
       "level": null,
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 4369,
-        "end": 4420
+        "start": 7496,
+        "end": 7526
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::Client.GetAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 8343,
+        "end": 8371
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::Config#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
+      "target": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Config()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 8439,
+        "end": 8447
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::HttpClient#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 8400,
+        "end": 8460
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::HttpRequestMessage#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 7984,
+        "end": 8054
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::Uri#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 8431,
+        "end": 8458
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::http.GetAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 7858,
+        "end": 7877
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::http.GetAsync#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 7897,
+        "end": 7916
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::http.GetAsync#2",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 7936,
+        "end": 7959
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::http.GetAsync#3",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 8149,
+        "end": 8199
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::http.SendAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 8115,
+        "end": 8134
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::pooled.GetAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 8292,
+        "end": 8323
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::qualified.GetAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 8219,
+        "end": 8272
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::unknown.GetAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 8480,
+        "end": 8507
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads::HttpClient#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 7294,
+        "end": 7366
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads::Uri#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 7325,
+        "end": 7364
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Hidden(HttpClient)::shadow.GetAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Hidden(HttpClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 6635,
+        "end": 6661
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Inner.Run()::shadow.GetAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Inner.Run()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 6965,
+        "end": 6990
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Prod()::Uri#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Prod()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5352,
+        "end": 5387
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Reassigned(HttpClient)::Uri#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Reassigned(HttpClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5254,
+        "end": 5290
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::HttpClient#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5647,
+        "end": 5716
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::HttpClient#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5734,
+        "end": 5804
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::HttpClient#2",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5873,
+        "end": 5944
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::HttpRequestMessage#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 6171,
+        "end": 6238
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::HttpRequestMessage#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 6258,
+        "end": 6326
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::Uri#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5678,
+        "end": 5714
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::Uri#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5765,
+        "end": 5802
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::Uri#2",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5904,
+        "end": 5942
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::Uri#3",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5989,
+        "end": 6024
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::Uri#4",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 6064,
+        "end": 6100
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::branch.GetAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 6120,
+        "end": 6146
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::c.GetAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5824,
+        "end": 5845
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::http.GetAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 6470,
+        "end": 6488
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::http.SendAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 6346,
+        "end": 6365
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::swapped.GetAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5552,
+        "end": 5580
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::twice.GetAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5600,
+        "end": 5624
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Stage()::Uri#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Stage()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 5442,
+        "end": 5478
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Use()::Hidden#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Use()",
+      "target": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Hidden(HttpClient)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 6706,
+        "end": 6781
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Use()::HttpClient#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 6713,
+        "end": 6780
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Use()::Uri#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 6744,
+        "end": 6778
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned::HttpClient#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 4829,
+        "end": 4900
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned::HttpClient#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 4946,
+        "end": 5015
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned::Uri#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 4860,
+        "end": 4898
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned::Uri#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Clients.cs",
+        "start": 4977,
+        "end": 5013
       }
     },
     {
@@ -2067,8 +2693,8 @@
       "level": "exact",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 4233,
-        "end": 4241
+        "start": 4493,
+        "end": 4501
       }
     },
     {
@@ -2078,19 +2704,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 4275,
-        "end": 4305
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Run()::factory.CreateClient#1",
-      "caller": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Run()",
-      "target": null,
-      "level": null,
-      "span": {
-        "path": "src/Acme.Api/Clients.cs",
-        "start": 4369,
-        "end": 4399
+        "start": 4535,
+        "end": 4565
       }
     },
     {
@@ -2100,8 +2715,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 4219,
-        "end": 4242
+        "start": 4479,
+        "end": 4502
       }
     },
     {
@@ -2111,8 +2726,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 4325,
-        "end": 4349
+        "start": 4585,
+        "end": 4609
       }
     },
     {
@@ -2298,8 +2913,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 3412,
-        "end": 3469
+        "start": 3672,
+        "end": 3729
       }
     },
     {
@@ -2309,8 +2924,8 @@
       "level": "exact",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 3524,
-        "end": 3546
+        "start": 3784,
+        "end": 3806
       }
     },
     {
@@ -2320,8 +2935,8 @@
       "level": "exact",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 3683,
-        "end": 3699
+        "start": 3943,
+        "end": 3959
       }
     },
     {
@@ -2331,8 +2946,8 @@
       "level": "exact",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 3618,
-        "end": 3631
+        "start": 3878,
+        "end": 3891
       }
     },
     {
@@ -2342,8 +2957,8 @@
       "level": "exact",
       "span": {
         "path": "src/Acme.Api/Clients.cs",
-        "start": 3651,
-        "end": 3663
+        "start": 3911,
+        "end": 3923
       }
     },
     {
@@ -3949,9 +4564,14 @@
       "via": "host:billing.example.com"
     },
     {
-      "contract": "http::GET::/v1/orders/1",
+      "contract": "http::GET::/orders/1",
       "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()::local.GetStringAsync#0",
       "via": "host:local.example.com"
+    },
+    {
+      "contract": "http::GET::/v1/orders/2",
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()::slash.GetStringAsync#0",
+      "via": "host:slash.example.com"
     },
     {
       "contract": "http::GET::/invoices/{}",
@@ -3987,6 +4607,86 @@
       "contract": "http::GET::/{}/{}",
       "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Folds.Run(string)::http.GetAsync#6",
       "via": "host:format.example.com"
+    },
+    {
+      "contract": "http::GET::/property",
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::Client.GetAsync#0",
+      "via": "host:property.example.com"
+    },
+    {
+      "contract": "http::GET::/u/{}",
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::http.GetAsync#0",
+      "via": "host:locals.example.com"
+    },
+    {
+      "contract": "http::GET::/s",
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::http.GetAsync#1",
+      "via": "host:locals.example.com"
+    },
+    {
+      "contract": "http::GET::/c",
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::http.GetAsync#2",
+      "via": "host:locals.example.com"
+    },
+    {
+      "contract": "http::GET::/n",
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::http.GetAsync#3",
+      "via": "host:null.example.com"
+    },
+    {
+      "contract": "http::PUT::/m",
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::http.SendAsync#0",
+      "via": "host:method.example.com"
+    },
+    {
+      "contract": "http::GET::/q",
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::qualified.GetAsync#0",
+      "via": "host:qualified.example.com"
+    },
+    {
+      "contract": "http::GET::/rooted",
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::unknown.GetAsync#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/inner",
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Inner.Run()::shadow.GetAsync#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/branch",
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::branch.GetAsync#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/client",
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::c.GetAsync#0",
+      "via": null
+    },
+    {
+      "contract": null,
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::http.GetAsync#0",
+      "via": null
+    },
+    {
+      "contract": null,
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::http.SendAsync#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/swapped",
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::swapped.GetAsync#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/twice",
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::twice.GetAsync#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/hidden",
+      "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Use()::Hidden#0",
+      "via": "host:arg.example.com"
     },
     {
       "contract": null,
@@ -4109,12 +4809,26 @@
     {
       "name": "src/Acme.Api#2",
       "members": [
+        "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Config()",
+        "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)"
+      ]
+    },
+    {
+      "name": "src/Acme.Api#3",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Hidden(HttpClient)",
+        "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Use()"
+      ]
+    },
+    {
+      "name": "src/Acme.Api#4",
+      "members": [
         "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Lookup()",
         "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Run()"
       ]
     },
     {
-      "name": "src/Acme.Api#3",
+      "name": "src/Acme.Api#5",
       "members": [
         "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Wrappers.Fetch(string)",
         "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Wrappers.ForOrder(string)",
@@ -4122,13 +4836,13 @@
       ]
     },
     {
-      "name": "src/Acme.Api#4",
+      "name": "src/Acme.Api#6",
       "members": [
         "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.Route"
       ]
     },
     {
-      "name": "src/Acme.Api#5",
+      "name": "src/Acme.Api#7",
       "members": [
         "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()",
         "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second.Make()"
@@ -4449,7 +5163,16 @@
           "via": "call",
           "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()::local.GetStringAsync#0",
           "mark": "no-provider",
-          "contract": "http::GET::/v1/orders/1"
+          "contract": "http::GET::/orders/1"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()::slash.GetStringAsync#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/v1/orders/2"
         }
       ]
     },
@@ -4541,6 +5264,288 @@
           "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Folds.Run(string)::http.GetAsync#6",
           "mark": "no-provider",
           "contract": "http::GET::/{}/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Reads(HttpClient,IHttpClientFactory)",
+      "kind": "export",
+      "label": "Acme.Api.Clients.Reads.Reads(HttpClient,IHttpClientFactory)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Reads(HttpClient,IHttpClientFactory)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
+      "kind": "export",
+      "label": "Acme.Api.Clients.Reads.Run(int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::http.GetAsync#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/u/{}"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::http.GetAsync#1",
+          "mark": "no-provider",
+          "contract": "http::GET::/s"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::http.GetAsync#2",
+          "mark": "no-provider",
+          "contract": "http::GET::/c"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::http.SendAsync#0",
+          "mark": "no-provider",
+          "contract": "http::PUT::/m"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::http.GetAsync#3",
+          "mark": "no-provider",
+          "contract": "http::GET::/n"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::qualified.GetAsync#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/q"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::Client.GetAsync#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/property"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Config()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::unknown.GetAsync#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/rooted"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Inner.Run()",
+      "kind": "export",
+      "label": "Acme.Api.Clients.Reassigned.Inner.Run()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Inner.Run()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Inner.Run()::shadow.GetAsync#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/inner"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Prod()",
+      "kind": "export",
+      "label": "Acme.Api.Clients.Reassigned.Prod()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Prod()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Reassigned(HttpClient)",
+      "kind": "export",
+      "label": "Acme.Api.Clients.Reassigned.Reassigned(HttpClient)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Reassigned(HttpClient)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
+      "kind": "export",
+      "label": "Acme.Api.Clients.Reassigned.Run(bool)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::swapped.GetAsync#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/swapped"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::twice.GetAsync#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/twice"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::c.GetAsync#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/client"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::branch.GetAsync#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/branch"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::http.SendAsync#0",
+          "mark": "unresolved"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::http.GetAsync#0",
+          "mark": "unresolved"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Stage()",
+      "kind": "export",
+      "label": "Acme.Api.Clients.Reassigned.Stage()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Stage()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Use()",
+      "kind": "export",
+      "label": "Acme.Api.Clients.Reassigned.Use()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Use()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Hidden(HttpClient)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Use()::Hidden#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/hidden"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Repo.GetAsync(string)",
+      "kind": "export",
+      "label": "Acme.Api.Clients.Repo.GetAsync(string)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Repo.GetAsync(string)"
         }
       ]
     },

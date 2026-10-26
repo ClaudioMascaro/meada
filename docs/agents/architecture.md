@@ -2153,17 +2153,33 @@ qualification budget does (ADR 0017).
   `new Uri(x)` is `x`. The pack folds string literals, verbatim, raw (one line) and interpolated
   strings (`{{` and `}}` unescaped, a hole with an alignment or format clause is a parameter),
   `+`, and `const` and `static readonly` fields, of other types too (`Facts::consts` and
-  `Facts::statics`, as Java's `static final`). A base is the `BaseAddress = new Uri(x)` of the
-  client's initializer (the pack gives an initializer as the last argument of the creation, a
-  `Value::Object`) or an assignment on the name the call is made on (a `Bound` named
-  `<name>.BaseAddress`, at the class when `<name>` is a field, at the method otherwise); the
-  assignment wins, a relative URL joins it and one starting with `/` keeps its origin. A client
-  with no readable base is a path-only contract. Named clients (`CreateClient(name)`, local or
-  chained) are not consumers. Ceilings: a local `string url = ...` is not followed; an instance
-  `readonly` field is not folded (only `const` and `static readonly`); a type written fully
-  qualified in place is not resolved; a field assigned a client more than once has an unknown
-  base; `new Uri(base, relative)` with two arguments, a `HttpRequestMessage` built with an
-  object initializer and `AddHttpClient<T>` bases (spec #28, #113) are not read.
+  `Facts::statics`, as Java's `static final`). The pack binds every local to its initializer
+  (`Facts::bound`, an `Unknown` bound for a loop variable, a pattern or a lambda parameter, so
+  that a second binding of the name leaves none), and a field or property that holds a
+  construction or a call. A name assigned anywhere in its file (`=`, `+=`, `++`, `out`,
+  `ref`, `this.x = v`) loses its bound: it holds no one value (the rule of the minimal API
+  reader, spec #28, #110), so a reassigned local, request or client is unknown, and
+  `Code::local` follows a local of unknown class when the pack bound it once. A base is the
+  `BaseAddress = new Uri(x)` of the client's initializer (the pack gives an initializer as the
+  last argument of the creation, a `Value::Object`) or an assignment on the name the call is
+  made on (a `Bound` named `<name>.BaseAddress`, in the scope that declares `<name>`, which
+  `clients.rs` checks against `Code::written` so that a parameter that hides a field, or a
+  nested type's own field, keeps its own); two assignments leave an `Unknown` bound, which is
+  an unknown base. The assignment wins over the initializer. A relative URL joins the base as
+  RFC 3986 does (`https://c/v1` and `orders` give `/orders`, `https://c/v1/` gives
+  `/v1/orders`) and one starting with `/` keeps the origin; a base with no literal scheme is
+  cut at the first text after its non-literal parts. `request.Method = HttpMethod.X`, set
+  after the construction, is read the same way (a `Bound` named `<name>.Method`). A client with
+  no readable base is a path-only contract. Named clients (`CreateClient(name)`) held by a
+  local or by a field assigned from it (a `Bound` named `<field>=`, read with `Code::bounds`)
+  are not consumers. `a?.M()` is a call of `M` on `a` (the grammar parses `await a?.M()` with
+  the `await` around `a`; `condition` reads through it). Ceilings: a field is followed only
+  when it holds a construction or a call (an instance `readonly` string is not folded, only
+  `const` and `static readonly`); a name assigned anywhere in the file is unknown in all of
+  it, even in another method; a client set by a typed client's constructor parameter
+  (spec #28, #113), `new Uri(base, relative)` with two arguments, a `HttpRequestMessage` built
+  with an object initializer, a raw string of several lines and `AddHttpClient<T>` bases are
+  not read.
 - `http/kotlin.rs` (spec #27, #98): Ktor routes, through the same `Mounts` and `prefixes` as
   the other routers, whose nodes are definitions (file, qualified name): the lambda of each
   `routing { }` call (a root), the lambda of each `route(prefix) { }` call (mounted under its

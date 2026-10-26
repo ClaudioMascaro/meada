@@ -50,6 +50,10 @@ namespace Acme.Api.Clients
             var local = new HttpClient();
             local.BaseAddress = new Uri("https://local.example.com/v1");
             await local.GetStringAsync("orders/1");
+            // A relative URL replaces the last segment of a base without a trailing slash.
+            var slash = new HttpClient();
+            slash.BaseAddress = new Uri("https://slash.example.com/v1/");
+            await slash.GetStringAsync("orders/2");
         }
     }
 
@@ -111,7 +115,108 @@ namespace Acme.Api.Clients
             await http.GetAsync(Lookup());
             HttpClient named = factory.CreateClient("orders");
             await named.GetAsync("/named");
-            await factory.CreateClient("orders").GetAsync("/chained");
         }
+    }
+
+    // A name assigned again holds no one value: the base or the request is unknown, never the
+    // first one written.
+    public class Reassigned
+    {
+        private readonly HttpClient swapped = new HttpClient { BaseAddress = new Uri("https://default.example.com") };
+        private readonly HttpClient twice = new HttpClient { BaseAddress = new Uri("https://twice.example.com") };
+        private readonly HttpClient shadow;
+        private readonly HttpClient http;
+
+        public Reassigned(HttpClient client)
+        {
+            swapped = client;
+            http = client;
+            this.shadow.BaseAddress = new Uri("https://field.example.com");
+        }
+
+        public void Prod() { twice.BaseAddress = new Uri("https://prod.example.com"); }
+
+        public void Stage() { twice.BaseAddress = new Uri("https://stage.example.com"); }
+
+        public async Task Run(bool flag)
+        {
+            await swapped.GetAsync("/swapped");
+            await twice.GetAsync("/twice");
+
+            var c = new HttpClient { BaseAddress = new Uri("https://first.example.com") };
+            c = new HttpClient { BaseAddress = new Uri("https://second.example.com") };
+            await c.GetAsync("/client");
+
+            var branch = new HttpClient { BaseAddress = new Uri("https://default.example.com") };
+            if (flag) branch.BaseAddress = new Uri("https://prod.example.com");
+            else branch.BaseAddress = new Uri("https://stage.example.com");
+            await branch.GetAsync("/branch");
+
+            var req = new HttpRequestMessage(HttpMethod.Get, "https://req.example.com/a");
+            req = new HttpRequestMessage(HttpMethod.Post, "https://req.example.com/b");
+            await http.SendAsync(req);
+
+            string url = "https://again.example.com/a";
+            url += "/more";
+            await http.GetAsync(url);
+        }
+
+        // A parameter that hides the field keeps the base of its caller.
+        public async Task Hidden(HttpClient shadow) { await shadow.GetAsync("/hidden"); }
+
+        public async Task Use() { await Hidden(new HttpClient { BaseAddress = new Uri("https://arg.example.com") }); }
+
+        // A nested type has a field of its own.
+        public class Inner
+        {
+            private readonly HttpClient shadow;
+
+            public async Task Run() { await shadow.GetAsync("/inner"); }
+        }
+    }
+
+    // What the source reads about a client and its request.
+    public class Reads
+    {
+        private readonly HttpClient http;
+        private readonly System.Net.Http.HttpClient qualified;
+        private readonly HttpClient pooled;
+        public HttpClient Client { get; } = new HttpClient { BaseAddress = new Uri("https://property.example.com") };
+
+        public Reads(HttpClient http, IHttpClientFactory factory)
+        {
+            this.http = http;
+            pooled = factory.CreateClient("orders");
+        }
+
+        private string Config() => "https://config.example.com";
+
+        public async Task Run(int id)
+        {
+            var user = $"https://locals.example.com/u/{id}";
+            string text = "https://locals.example.com/s";
+            const string fixedUrl = "https://locals.example.com/c";
+            await http.GetAsync(user);
+            await http.GetAsync(text);
+            await http.GetAsync(fixedUrl);
+
+            var put = new HttpRequestMessage(HttpMethod.Get, "https://method.example.com/m");
+            put.Method = HttpMethod.Put;
+            await http.SendAsync(put);
+
+            await http?.GetAsync("https://null.example.com/n");
+            await qualified.GetAsync("https://qualified.example.com/q");
+            await pooled.GetAsync("/named-field");
+            await Client.GetAsync("/property");
+
+            var unknown = new HttpClient { BaseAddress = new Uri(Config() + "/api/") };
+            await unknown.GetAsync("/rooted");
+        }
+    }
+
+    // A GetAsync of the repository does not make the client's call one of its own.
+    public class Repo
+    {
+        public Task GetAsync(string path) => Task.CompletedTask;
     }
 }
