@@ -17,11 +17,12 @@
 //! Spring injects with `@Value("\${key}")` into a property or a constructor property is read
 //! from the module's configuration (`jvm::spring::inject`, as the Java clients do).
 
-use super::{external, implicit};
+use super::{VERBS, external, implicit};
 use crate::contract::Found;
 use crate::index::Indexed;
-use crate::jvm::names::{local, one, spellings, typed};
+use crate::jvm::names::{LOCAL_DEPTH, kotlin, one, spellings, typed};
 use crate::jvm::spring::{self, Configs};
+use crate::lang::kotlin::TYPE_ARGUMENT;
 use crate::lang::{Annotated, Bound, Call, Part, Value};
 use crate::resolve::{Code, Expand, Expanded, Follow, Of, passes_nothing};
 
@@ -36,14 +37,11 @@ const DEFAULT_REQUEST: &[&str] = &[
     "io.ktor.client.plugins.defaultRequest",
     "io.ktor.client.features.defaultRequest",
 ];
-/// The request functions that name their method, and the one that takes it from its block.
-const VERBS: &[&str] = &["get", "post", "put", "patch", "delete", "head", "options"];
+/// The request function that takes its method from its block; the others name it (`VERBS`).
 const REQUEST_FUNCTION: &str = "request";
-/// The key the pack records `method = value` under in `Call::kwargs`.
+/// The key the pack records a request block's `method = value` under in `Call::kwargs` (a
+/// property assigned in a lambda passed to the call is `<name>=`, `kotlin::assigned`).
 const METHOD: &str = "method=";
-
-/// How many locals a client is followed through (`c.use { it.get(..) }` on a local `c`).
-const LOCAL_DEPTH: usize = 8;
 
 /// A client, as far as the source tells: the call that makes it, only its type, or one whose
 /// configuration is not known.
@@ -98,7 +96,7 @@ impl<'c, 'a> Clients<'c, 'a> {
                 return Some(vec![Client::Typed]);
             }
             // A local with no written type holds what the pack recorded for it.
-            let Bound { within, value, .. } = local(self.code, path, scope, name)?;
+            let Bound { within, value, .. } = self.code.local(path, scope, name)?;
             return match depth < LOCAL_DEPTH {
                 true => self.reach(path, within, value, depth + 1),
                 false => None,
@@ -214,7 +212,7 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
     let clients = Clients { code };
     let mut found = Vec::new();
     for (&path, facts) in code.files() {
-        if !path.ends_with(".kt") && !path.ends_with(".kts") {
+        if !kotlin(path) {
             continue;
         }
         for (n, stored) in facts.calls.iter().enumerate() {
@@ -254,7 +252,8 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
                 let rest = request.args.iter().skip(usize::from(first.is_some()));
                 let given = rest.into_iter().any(|v| !matches!(v, Value::Function(_)))
                     || (kwargs.iter()).any(|(k, v)| {
-                        k != "urlString" && k != METHOD && !matches!(v, Value::Function(_))
+                        let assigned = k.ends_with('=') && k != TYPE_ARGUMENT;
+                        k != "urlString" && !assigned && !matches!(v, Value::Function(_))
                     });
                 let method = match member {
                     REQUEST_FUNCTION => requested(kwargs, given),
@@ -273,4 +272,81 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
         }
     }
     found
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::LanguagePack;
+    use crate::lang::java::Java;
+    use crate::lang::kotlin::Kotlin;
+    use crate::resolve::Resolver;
+    use std::collections::BTreeMap;
+
+    const KOTLIN: &str = "src/main/kotlin/a/C.kt";
+    const IMPORTS: &str = "import io.ktor.client.HttpClient\nimport io.ktor.client.engine.cio.CIO\n\
+        import io.ktor.client.request.get\n";
+
+    /// The consumers of the Kotlin file `body`, after the Ktor imports, and how long reading
+    /// them took at best of three.
+    fn read(body: &str) -> (usize, std::time::Duration) {
+        let src = format!("package a\n{IMPORTS}{body}");
+        let facts = Kotlin.parse(KOTLIN, src.as_bytes()).unwrap();
+        let files = BTreeMap::from([(KOTLIN, &facts)]);
+        let layout = Java.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
+        let code = Code::new(&resolver, &files, &Java);
+        let indexed = Indexed {
+            manifests: &[],
+            tsconfigs: &[],
+            exported: &[],
+            files: &[],
+            configs: &[],
+        };
+        let runs = (0..3).map(|_| {
+            let at = std::time::Instant::now();
+            (consumers(&code, &indexed).len(), at.elapsed())
+        });
+        runs.min_by_key(|(_, took)| *took).unwrap()
+    }
+
+    /// A client held through `LOCAL_DEPTH` locals is followed; one more is not.
+    #[test]
+    fn a_client_is_followed_through_at_most_local_depth_locals() {
+        let chain = |locals: usize| {
+            let held: String = (1..locals)
+                .map(|i| format!("    val c{i} = c{}\n", i - 1))
+                .collect();
+            let last = locals - 1;
+            format!(
+                "suspend fun f() {{\n    val c0 = HttpClient(CIO)\n{held}    \
+                 c{last}.get(\"https://x.example.com/p\")\n}}\n"
+            )
+        };
+        assert_eq!(read(&chain(LOCAL_DEPTH)).0, 1);
+        assert_eq!(read(&chain(LOCAL_DEPTH + 1)).0, 0);
+    }
+
+    /// A file of many functions, each with a client local and a call, is read in time linear
+    /// in their number: a local is looked up by its scope and name (`Code::local`), never by a
+    /// scan of the file's locals.
+    #[test]
+    fn many_client_locals_are_read_in_linear_time() {
+        let time = |n: usize| {
+            let body: String = (0..n)
+                .map(|i| {
+                    format!(
+                        "suspend fun f{i}() {{ val c{i} = HttpClient(CIO); \
+                         c{i}.get(\"https://x.example.com/p{i}\") }}\n"
+                    )
+                })
+                .collect();
+            let (found, took) = read(&body);
+            assert_eq!(found, n);
+            took
+        };
+        let (small, large) = (time(500), time(2000));
+        // Linear is about 4x; scanning the file's locals per call would be about 16x.
+        assert!(large < small * 9, "{small:?} then {large:?}");
+    }
 }

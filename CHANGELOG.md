@@ -33,7 +33,11 @@ All notable changes to Meada are recorded here. The format follows
   companions (`Class.Companion` when unnamed), top-level and extension functions, properties
   with getters and methods, with written parameter types. Single, aliased and star imports
   resolve through package declarations; bare, `this`, object and companion calls are `exact`
-  when the argument count, counting default values and `vararg`, leaves one function. Kotlin and
+  when the argument count, counting default values and `vararg`, leaves one function. An
+  extension function is never a member of the class it extends, even written in that class's
+  file: a member of the class or of a base wins, and a Java call never reaches it. A call on a
+  class's name reaches its companion's member before an instance member of the same name. A call on
+  `x!!` or `x?.` is a call on `x`, of the type `x` is declared with. Kotlin and
   Java files of one repository call each other by fully qualified name. No Kotlin compiler, JDK
   or Gradle is involved.
 
@@ -62,8 +66,10 @@ All notable changes to Meada are recorded here. The format follows
   argument count remain; the reason ends `; import package`. A class name called constructs the
   class, a call on a class's name reaches its companion before its members (an instance's call,
   the member first), and an extension function crosses only through the import of its name,
-  `inferred`, on a receiver typed or not, never as a member of the class it extends: a member of
-  the receiver's type with the name wins. A call that may leave a default argument out or fills a
+  never as a member of the class it extends: a member of the receiver's type with the name wins,
+  and the link is `exact` when the type the source writes for the receiver is a class of the
+  provider's package whose members are all known and one extension of that class fits,
+  `inferred` on any other receiver. A call that may leave a default argument out or fills a
   `vararg` reaches every overload it could, so the index stores the functions with a variable
   argument count (the `flexible` table, a new stored format). The source roots gain
   `src/main/kotlin` and `src/test/kotlin`, and the Gradle scanner reads the `kotlin` directory
@@ -77,7 +83,8 @@ All notable changes to Meada are recorded here. The format follows
   host, a `${VAR}` placeholder maps through `base_url_env`, and a default whose host a peer
   serves links by host. `System.getenv("X")` and `System.getenv()["X"]`, through `?:`
   fallbacks, `!!` and string methods such as `trimEnd` and `removeSuffix`, are the base URL
-  variable `X`. A cross-language fixture links TypeScript and Ktor in both directions.
+  variable `X`, also through a local `val` of the function (`val base = System.getenv("X") ?:
+  ".."`), which folds where it is written as TypeScript's `const` does. A cross-language fixture links TypeScript and Ktor in both directions.
 - Kotlin HTTP consumers (issue #101): `RestTemplate`, `WebClient`, OkHttp and Retrofit are read
   in Kotlin files with the Java rules, written the Kotlin way: no `new`, a `RestTemplate()` or
   `Request.Builder()` constructor call, `HttpMethod` and `HttpUrl` imports by `*`, and
@@ -101,8 +108,10 @@ All notable changes to Meada are recorded here. The format follows
   trailing-lambda post-processor (`convertAndSend("x") { m -> m }`) is an untold overload, as
   Java's lambda: its producer is unresolved. A message built in the call (`Order("1")`) picks
   the overload as Java's `new` does. In `with`, `run`, `apply` and extension function blocks, a
-  member of the implicit receiver hides the property of the class around, for channel and HTTP
-  clients alike. A call on the receiver itself (an extension function on the client, `apply`,
+  member of the implicit receiver hides the property of the class around and a top-level
+  property, after the parameters and locals of the code around, for channel and HTTP clients,
+  call resolution and folded values alike; a client read in the block of a receiver whose type is
+  outside the repository is unknown. A call on the receiver itself (an extension function on the client, `apply`,
   `with`) is not read. A cross-language fixture produces a topic in TypeScript
   and consumes it in a Kotlin `@KafkaListener`, and `trace` down from the producer reaches the
   handler.

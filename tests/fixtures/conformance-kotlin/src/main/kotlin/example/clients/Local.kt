@@ -40,3 +40,29 @@ suspend fun variable() {
     client = HttpClient(CIO) { defaultRequest { url("https://local.example.com/other") } }
     client.get("/var")
 }
+
+// A client read in the block of a receiver is the receiver's: `Rack.outer` sets no base, though
+// the client of the file does.
+val outer = HttpClient(CIO) { defaultRequest { url("https://outer.example.com/") } }
+
+class Rack {
+    val outer: HttpClient = HttpClient(CIO)
+}
+
+suspend fun implicitClient(rack: Rack) {
+    with(rack) { outer.get("/implicit") }
+}
+
+// A local `val` holds its one value, an environment read through a fallback too; a `var` holds
+// none.
+suspend fun localBase() {
+    val base = System.getenv("LOCAL_URL") ?: "https://fallback.example.com"
+    val client = HttpClient(CIO)
+    client.get("$base/env")
+}
+
+suspend fun varBase() {
+    var root = "https://local.example.com"
+    root = "https://other.example.com"
+    HttpClient(CIO).get("$root/var-base")
+}

@@ -16,7 +16,9 @@ mod declarative;
 use super::{ANY, METHODS, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
-use crate::jvm::names::{array_of, is_method, java_files, jvm_files, known, local, one, typed};
+use crate::jvm::names::{
+    LOCAL_DEPTH, array_of, is_method, java_files, jvm_files, known, one, typed,
+};
 use crate::lang::{Bound, Call, Value};
 use crate::resolve::{Code, Expand, Follow, Inject, Of, passes_nothing};
 
@@ -236,9 +238,6 @@ fn made<'a>(
     reach(code, (path, scope), client, ty, &makes, 0)
 }
 
-/// How many locals `made` is followed through (`val a = b`, `val b = Client()`).
-const LOCAL_DEPTH: usize = 8;
-
 fn reach<'a>(
     code: &Code<'a>,
     (path, scope): (&'a str, &'a str),
@@ -260,7 +259,7 @@ fn reach<'a>(
                 return true;
             }
             // A local the source writes no type of holds what the pack recorded for it (Kotlin).
-            match local(code, path, scope, name) {
+            match code.local(path, scope, name) {
                 Some(Bound { within, value, .. }) if depth < LOCAL_DEPTH => {
                     reach(code, (path, within), value, ty, makes, depth + 1)
                 }
@@ -287,7 +286,7 @@ fn folded_local<'a>(
     let (mut scope, mut client) = (scope, client);
     for _ in 0..LOCAL_DEPTH {
         let Value::Ref(name) = client else { break };
-        let Bound { within, value, .. } = local(code, path, scope, name)?;
+        let Bound { within, value, .. } = code.local(path, scope, name)?;
         (scope, client) = (within, value);
     }
     let Value::Call(made) = client else {

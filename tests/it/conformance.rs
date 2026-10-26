@@ -1471,6 +1471,12 @@ fn kotlin() {
             "src/main/kotlin/example/Members.kt::example.Init",
             "src/main/kotlin/example/Members.kt::example.Level",
             "src/main/kotlin/example/Members.kt::example.Level.label()",
+            "src/main/kotlin/example/Members.kt::example.Twin",
+            "src/main/kotlin/example/Members.kt::example.Twin.m()",
+            "src/main/kotlin/example/Members.kt::example.Twin.own()",
+            "src/main/kotlin/example/Members.kt::example.Twin.Companion",
+            "src/main/kotlin/example/Members.kt::example.Twin.Companion.m()",
+            "src/main/kotlin/example/Members.kt::example.twins(Twin)",
             "src/main/kotlin/example/Main.kt::example.main(Array<String>)",
             "src/main/kotlin/example/Main.kt::example.Runner",
             "src/main/kotlin/example/Main.kt::example.Runner.main()",
@@ -1548,6 +1554,10 @@ fn kotlin() {
             "src/main/kotlin/example/clients/Local.kt::example.clients.two()",
             "src/main/kotlin/example/clients/Local.kt::example.clients.shadows()",
             "src/main/kotlin/example/clients/Local.kt::example.clients.variable()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.Rack",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.implicitClient(Rack)",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.localBase()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.varBase()",
             "src/main/kotlin/example/clients/Methods.kt::example.clients.send(HttpMethod,String)",
             "src/main/kotlin/example/clients/Methods.kt::example.clients.sends()",
             "src/main/kotlin/example/clients/Methods.kt::example.clients.sendFrom(HttpMethod,String)",
@@ -1677,6 +1687,18 @@ fn kotlin() {
             "src/main/kotlin/example/Receivers.kt::example.localFirst(Cache)",
             "src/main/kotlin/example/Receivers.kt::example.localFirst(Cache).size()",
             "src/main/kotlin/example/Receivers.kt::example.unknownReceiver()",
+            "src/main/kotlin/example/Receivers.kt::example.Shelf",
+            "src/main/kotlin/example/Receivers.kt::example.asserted(Cache?)",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.read()",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.reset()",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Meter",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Meter.ext(Int)",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)",
+            "src/main/java/example/legacy/Gauges.java::example.legacy.Gauges",
+            "src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)",
+            "src/main/kotlin/example/Receivers.kt::example.implicitMember(Shelf)",
+            "src/main/kotlin/example/Receivers.kt::example.localBeforeMember(Shelf,Store)",
             "src/main/kotlin/example/other/Others.kt::example.other.Cache.describe()",
             "src/main/kotlin/example/other/Others.kt::example.other.String.reversed()",
             "src/main/java/example/legacy/Port.java::example.legacy.Port",
@@ -2458,6 +2480,60 @@ fn kotlin() {
                 &["src/main/kotlin/example/Receivers.kt::example.String.loud()"],
             ),
             (
+                "src/main/kotlin/example/Receivers.kt::example.asserted(Cache?)::cache.tag#0",
+                EXACT,
+                &["src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.tag()"],
+            ),
+            // A call on the class's name reaches the companion, one on an instance the class.
+            (
+                "src/main/kotlin/example/Members.kt::example.twins(Twin)::Twin.m#0",
+                EXACT,
+                &["src/main/kotlin/example/Members.kt::example.Twin.Companion.m()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.twins(Twin)::twin.m#0",
+                EXACT,
+                &["src/main/kotlin/example/Members.kt::example.Twin.m()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Twin.own()::this.m#0",
+                EXACT,
+                &["src/main/kotlin/example/Members.kt::example.Twin.m()"],
+            ),
+            // An extension in its class's file is no member: Java never reaches it, and a member
+            // of a Java base wins over it.
+            (
+                "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)::gauge.reset#0",
+                EXACT,
+                &["src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.reset()"],
+            ),
+            (
+                "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)::meter.ext#0",
+                EXACT,
+                &["src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)"],
+            ),
+            (
+                "src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)::gauge.reset#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)::meter.ext#0",
+                EXACT,
+                &["src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)"],
+            ),
+            // A name read in a receiver's block is its member; a local around comes first.
+            (
+                "src/main/kotlin/example/Receivers.kt::example.implicitMember(Shelf)::stock.clear#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.clear()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.localBeforeMember(Shelf,Store)::stock.get#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Store.get(String)"],
+            ),
+            (
                 "src/main/java/example/legacy/Port.java::example.legacy.Port.use(Port,String)::port.ext#0",
                 EXACT,
                 &["src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)"],
@@ -2775,6 +2851,23 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
             "http::GET::/v9/x",
             shadow,
             &file("Local", "shadows()", "billing.get#0"),
+        ),
+        // A local `val` folds, an environment read through a fallback too; a `var` does not.
+        (
+            "http::GET::/env",
+            "env:LOCAL_URL",
+            &file("Local", "localBase()", "client.get#0"),
+        ),
+        (
+            "http::GET::/var-base",
+            "",
+            &file("Local", "varBase()", "(call_expression).get#0"),
+        ),
+        // A client read in a receiver's block is the receiver's, with no base.
+        (
+            "http::GET::/implicit",
+            "",
+            &file("Local", "implicitClient(Rack)", "outer.get#0"),
         ),
         // The method of a wrapper is substituted at each call site, whether the URL depends on
         // the wrapper's parameters or not.

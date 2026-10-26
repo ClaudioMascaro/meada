@@ -1,5 +1,5 @@
 example.com/kotlin/app src/main/kotlin/dev/shop/Shop.kt:20 doubled.format
-  →[inferred: package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package] example.com/kotlin/lib core/src/main/kotlin/dev/kt/core/Money.kt:13 dev.kt.core.Money.format()
+  →[exact: package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package] example.com/kotlin/lib core/src/main/kotlin/dev/kt/core/Money.kt:13 dev.kt.core.Money.format()
     example.com/kotlin/lib core/src/main/kotlin/dev/kt/core/Core.kt:3 dev.kt.core.greet(String)
     example.com/kotlin/lib core/src/main/kotlin/dev/kt/core/Money.kt:6 dev.kt.core.Money.total()
-chain: inferred · 1 hops · 2 repos · 128 tokens
+chain: exact · 1 hops · 2 repos · 127 tokens

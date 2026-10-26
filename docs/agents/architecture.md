@@ -781,7 +781,7 @@ one for the area a change touches.
   with resty; `http/java.rs` and `http/java/clients.rs`, Spring MVC providers and the
   RestTemplate, WebClient, `java.net.http` and OkHttp consumers, whose bases come from the
   Spring configuration `jvm/spring.rs` reads for the JVM packs' kinds; `http/kotlin.rs`, Ktor
-  providers), resource and channel
+  providers, and `http/kotlin/client.rs`, Ktor client consumers), resource and channel
   kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
   contracts (specs #22, #24, #30, #25 and #26), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
@@ -1132,11 +1132,15 @@ one for the area a change touches.
   A member of an implicit receiver comes before the names around it, as Kotlin resolves them:
   in the block of a `with`, `run` or `apply`, or in an extension function, `kafka` in
   `kafka.send(..)` is the receiver's property when the receiver is a class of the repository
-  that has one (`Resolver::lexical_as`, `Reading::Member`, through `Facts::impls` and
-  `Facts::extensions`), unknown when the receiver's type is not the repository's, and the
-  property of the class around only when the receiver is a class of the repository without that
-  member. Only the type a name is declared with asks (`Code::declared`): a constant's value and a
-  called name (an imported extension) are read as before. A call on the receiver itself
+  that has one (`Resolver::lexical_as`, through `Facts::impls` and `Facts::extensions`), for
+  every name read: the head of a call, a constant's value, the type a name is declared with
+  (`Code::declared`) and the object the flow of `Follow::Values` follows. A parameter or a local
+  of the code around the block comes first (`Resolver::local_around`), and the property of the
+  class around only when the receiver is a class of the repository without that member. A
+  receiver whose type is not the repository's leaves the name unknown only where the object it
+  holds is asked (`Reading::Member`: `Code::declared` and the flow of `Follow::Values`, which find
+  clients); a constant's value and a call's receiver are read outside the block (a Known
+  ceiling). A call on the receiver itself
   (`kafka.apply { send(..) }`, `with(kafka) { send(..) }`, an extension function of the
   template) is not read: its callee has no receiver name. The `conformance-kotlin` fixture holds
   each channel form and the hidden-name cases (`channels/Receivers.kt`, `jvm/Hidden.kt`), and the
@@ -1187,10 +1191,14 @@ one for the area a change touches.
     as a Kotlin package (`top_level`: the symbols of `Classes::named` that the file exports both
     as written and with its package, which is what makes a declaration top-level and public): a
     function by name and argument count (`ambiguous` when several fit), a class by its capital,
-    as the class itself (its constructor), an extension function (`.name(arity)`) as a name
-    match, `inferred`, which crosses only through the import of its name: the chain carries the
-    receiver's type (`.name(arity)@Class`) when the source writes one, and a member of that class
-    the provider declares hides the extension. A declaration `Classes::published` shows as an
+    as the class itself (its constructor), an extension function (`.name(arity)`), which
+    crosses only through the import of its name: the chain carries the receiver's type
+    (`.name(arity)@Class`) when the source writes one, and a member of that class the provider
+    declares hides the extension. The one extension of that class itself (`package.Class.name`,
+    so the class is of the extension's package) is `exact` when a provider declares the class
+    and its family is all known; any other is a name match, `inferred` (or `ambiguous`). An
+    extension file that imports another class of the name its package declares would make that
+    `exact` wrong, which the provider rows cannot tell (a Known ceiling). A declaration `Classes::published` shows as an
     extension of its class (`Class.method`) is never one of its members (`methods`). A chain
     `Companion.name(arity)` is a call on the class's name: the companion's member first, the
     class's own after; a plain chain is the instance's, in the reverse order. A function with a
@@ -1377,7 +1385,11 @@ one for the area a change touches.
   class constructs it. A companion object is written as its class's last base: `Resolver::lineage`
   keeps a class's own nested class out of its family, so the companion's bases lend nothing to
   instances, and `Resolver::companion` reads it after the family, for a bare call in the class
-  (`inherited`) and a member of the class (`member`, so `Type.create()`); `Resolver::member` finds
+  (`inherited`) and a member of an instance (`member`). A call or a read on the class's name
+  (`Type.create()`, `Type.X`) reads the companion first (`Resolver::walk` through
+  `Resolver::companions`, each class's companion read once after the families), then a nested
+  class or a constant of the class, never an instance member, so `Type.m()` is the companion's
+  when the class declares an `m` too; `this.m()` is a call on an instance. `Resolver::member` finds
   a class nested in a class while that class's family is still being linearized, which resolving
   such a base needs. A bare Kotlin call is `Call::by_path`, as Java's, so it reads the class family
   first, unless a local, parameter, property or constant of its name in a scope around it holds
@@ -1388,10 +1400,15 @@ one for the area a change touches.
   Kotlin writes its receivers as Java does: a property, parameter or local typed by its written
   type (`Class::Type`) or initialized with a constructor call `T(..)` (`Class::Named`), where
   the one binding of its name says so; `Facts::externs` lists the type heads written in the
-  file, so a type nothing binds is outside the repository (Opaque outside). An extension
+  file, so a type nothing binds is outside the repository (Opaque outside). A call on `x!!` or
+  `x?.` is a call on `x` (`kotlin::callee`), of the type `x` is declared with. An extension
   function or property is a `Facts::extensions` block of its receiver's type, named as the
   function is (`pkg.Receiver.f()`): it tells what `this` is in the extension's body, and its
-  functions are no members of the type, so Java calls never reach them. A Kotlin call no member
+  functions are no members of the type, so Java calls never reach them, not even by name
+  (`Resolver::candidates` drops them for a file whose pack has no extension functions). Written in
+  its class's file, an extension is named under the class as a member is, so the member lookup
+  (`Resolver::member`, `overloaded`) skips it by `Resolver::extends`: a member of the class or of
+  a base (a Java one too) comes first, and the extension is reached through `extended` alone. A Kotlin call no member
   answers (`LanguagePack::extension_functions`) reads `Resolver::extended`: the extensions of its
   name in scope of the file, first to last a scope around the call, an explicit import, the
   file's package, a star import (`visible`), narrowed by argument count. On a receiver of a class
@@ -1583,7 +1600,9 @@ one for the area a change touches.
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition, constant, type or file they name), the `families` table (spec #26: each public
   Java class's ancestors past it, `Resolver::ancestries`, a repository class by file and name and
-  an opaque one as `null`), the `entry_points` table (spec #31:
+  an opaque one as `null`), the `flexible` table (spec #27, #106: each function that takes more
+  than one count of arguments, a default parameter or a vararg, by file and qualified name with
+  its parameter types, with the least and the most count, `resolve::Flexible`), the `entry_points` table (spec #31:
   each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
   each community's name and member identities (`communities`, spec #31). `Call::args`,
   `Call::kwargs`, `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::return_values`, `Def::type_params`, `Param::default`,
@@ -1714,6 +1733,10 @@ one for the area a change touches.
   family cannot produce an exact link; other files still index. The Java hostile-depth and
   long-prefix engine fixtures exceed these limits.
 
+- `jvm/names.rs`: `LOCAL_DEPTH` (8) bounds how many locals a JVM client reader (Ktor,
+  `RestTemplate`, `WebClient`, Retrofit) follows a client through (`val b = a`, `val a =
+  HttpClient(..)`); past it the client is not followed and its calls are no consumers.
+
 - `lang/kotlin.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the Kotlin pack as they bound the Java pack's, with the same
   outcome past each; the Kotlin hostile-depth and long-prefix engine fixtures exceed them. The
@@ -1734,14 +1757,13 @@ one for the area a change touches.
   a receiver typed by one is outside it, and resolves to nothing. A name bound twice in one
   scope with different types, or named like a property, holds an unknown type. A call `X.f(..)`
   is read as a constructor only when `f` is capitalized, as Kotlin names classes. An import alias
-  of an extension (`import a.slug as s`) brings nothing in scope for it. An extension written in its
-  class's own file is named as a member would be (`pkg.Foo.x()`), so a call reaches it as a
-  member, a Java call too (the naming of #95). A bare call a top-level function of its name answers is
-  exact to that function, though Kotlin prefers an extension of the implicit receiver. A
-  companion is
-  its class's last base, so `Type.m()` reads the class's own instance member first when both
-  declare `m` with one signature. A star import of a class (`import a.C.*`) reads every export of
-  the class's file. A fully qualified function call (`example.helper()`) is a name match. A class
+  of an extension (`import a.slug as s`) brings nothing in scope for it. A bare call a top-level function of its name answers is
+  exact to that function, though Kotlin prefers an extension of the implicit receiver. A star import of a class (`import a.C.*`) reads every export of
+  the class's file. An imported extension of the provider's class `p.C` is `exact` on a
+  receiver typed `p.C`, though the extension's file may import another `C` over its package's. In the block of a receiver whose type is outside the repository (a Ktor
+  `Application` or `Route` extension function), a constant's value and a call's receiver are
+  the names outside the block, though that type may declare a member of the name; the object a
+  client walk or a declared type asks is unknown there. A fully qualified function call (`example.helper()`) is a name match. A class
   with a secondary constructor is not in its name's overload family, so calling it resolves to
   nothing. A single import of a top-level declaration named like a package of the repository
   (`import app.config` beside package `app.config`) binds nothing, since the package keeps the
@@ -1963,8 +1985,12 @@ qualification budget does (ADR 0017).
   (`RestTemplate()`, `Request.Builder()`, a `Call::receiver` of `Retrofit` and no `Call::on`),
   so the `uri` and `build` steps of `clients.rs` match a chain step spelled
   `(call_expression).name`, `constructs` takes a `RestTemplate(..)` call for the written type, and
-  `made` falls back, after typed and origin lookups, to `jvm::names::local` (Kotlin's
-  `Facts::bound`, shared with the Ktor reader) up to `LOCAL_DEPTH`. The pack binds every local
+  `made` falls back, after typed and origin lookups, to `Code::local` (Kotlin's
+  `Facts::bound`, shared with the Ktor reader and indexed by scope and name in `ByName`, so a
+  lookup costs its scope depth) up to `jvm::names::LOCAL_DEPTH`. The value evaluation reads the
+  same local (`Code::eval`, a `Binding::Hidden` or `Binding::Local` with a bound): a URL or a
+  topic written through a local `val` of a function folds where the `val` is written, an
+  environment read through `?:` included, as TypeScript folds a function's `const`. The pack binds every local
   `val` with an initializer, whatever its class (a factory call `WebClient.create(..)` or a
   `.build()` has none), and drops the bound of one whose name a loop variable or a `catch`
   parameter also declares in the scope; `local` then does not take the `val`'s own entry in
@@ -2030,13 +2056,14 @@ qualification budget does (ADR 0017).
   `defaultRequest { }` in the configuration lambda of that call (Ktor 2 and 3
   `io.ktor.client.plugins.defaultRequest`, Ktor 1 `io.ktor.client.features.defaultRequest`),
   folded in its scope: a hole when it is set more than once or not by a string, none for a client
-  known by its type alone. `request` sends the method its block assigns: the pack records
-  `method = v` and `this.method = v` written as a statement of a lambda argument as the
-  `method=` key of that call's `Call::kwargs` (a key no Kotlin name matches; `given` in
-  `http/kotlin.rs` ignores keys ending in `=`), `Unknown` where the statement may not run (inside
-  an `if`, `when`, `try` or loop) and, for the call that owns each lambda around a nested
-  assignment (`headers { method = X }`), because the inner lambda may not run, and when the block
-  assigns it twice. `GET` when it assigns none and the call is given no other argument, a `Ref`
+  known by its type alone. `request` sends the method its block assigns: the pack records any
+  property assignment `p = v` or `this.p = v` written as a statement of a lambda argument as the
+  `p=` key of that call's `Call::kwargs` (`kotlin::assigned`, a key no Kotlin name matches and the
+  pack names no property; `given` in `http/kotlin.rs` and in `http/kotlin/client.rs` ignores keys
+  ending in `=`), `Unknown` where the statement may not run (inside an `if`, `when`, `try` or
+  loop) and, for the call that owns each lambda around a nested assignment (`headers { method = X
+  }`), because the inner lambda may not run, and when the block assigns it twice. The Ktor
+  client reads the `method=` key (`client.rs`). `GET` when it assigns none and the call is given no other argument, a `Ref`
   while it depends on a parameter of a wrapper, unknown for anything else (a block passed as a
   value, `HttpMethod.parse(..)`, a method that is no `HttpMethod` member of Ktor).
   The Kotlin pack folds a string literal's templates into parts (`$name`, `${name}` as names,

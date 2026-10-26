@@ -248,12 +248,13 @@ fn an_import_reaches_the_declaration_in_the_provider_sources() {
                 "exact",
                 money(".Companion.of(Int)")
             ),
-            // An extension crosses by the import of its name, never as a member of the class.
+            // An extension crosses by the import of its name, never as a member of the class:
+            // `exact` on a receiver of the provider's class, whose members are all known.
             row(
                 "doubled.format#0",
                 "dev.kt.core",
                 ".format(0)@dev.kt.core.Money",
-                "inferred",
+                "exact",
                 money(".format()")
             ),
             row(
@@ -419,13 +420,14 @@ fn an_extension_crosses_by_the_import_of_its_name_and_a_member_wins() {
             String::new(),
         )
     };
-    // Typed receivers, in a file of neither class: a class of the provider, and an outside type.
+    // Typed receivers, in a file of neither class: a class of the provider, whose members are
+    // known (`exact`), and an outside type, whose members may hide the extension.
     assert_eq!(
         rows(&json, "labelled(Money)"),
         [ext(
             "money.label#0",
             "dev.kt.core.Money",
-            "inferred",
+            "exact",
             "MoneyExt.kt::dev.kt.core.Money.label()"
         )]
     );

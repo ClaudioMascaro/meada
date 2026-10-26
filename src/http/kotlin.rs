@@ -23,7 +23,7 @@ use super::rust::actix_path;
 use super::{METHODS, Mounts, contract, handler_site, join, normalize_path, path_literal};
 use super::{prefixes, provider};
 use crate::contract::Found;
-use crate::jvm::names::{one, spellings};
+use crate::jvm::names::{kotlin, one, spellings};
 use crate::lang::{Call, Facts, Kind, Value};
 use crate::resolve::Code;
 
@@ -32,7 +32,8 @@ const ROUTING: &[&str] = &["io.ktor.server.routing.", "io.ktor.routing."];
 /// The package of type-safe routing, whose `get` and others a star import may bind too.
 const RESOURCES: &str = "io.ktor.server.resources.";
 const HTTP_METHOD: &str = "io.ktor.http.HttpMethod";
-/// The functions that register a route of one method, by their lower-case method.
+/// Ktor's functions of one method, by their lower-case method: a server route's, and a client
+/// request's (`kotlin/client.rs`).
 const VERBS: &[&str] = &["get", "post", "put", "patch", "delete", "head", "options"];
 
 /// A definition (file, qualified name): a routing scope, a node of the mounts.
@@ -260,7 +261,7 @@ impl<'c, 'a> Ktor<'c, 'a> {
         // The Ktor calls, with their name, and the other calls through the implicit receiver.
         let (mut ktor_calls, mut others) = (Vec::new(), Vec::new());
         for (&path, facts) in code.files() {
-            if !path.ends_with(".kt") && !path.ends_with(".kts") {
+            if !kotlin(path) {
                 continue;
             }
             for (n, call) in facts.calls.iter().enumerate() {
