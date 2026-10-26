@@ -2106,6 +2106,9 @@ sample.cs
   "package": "Example",
   "project": [
     "Example.Util"
+  ],
+  "partial": [
+    "Example.Store"
   ]
 }
 

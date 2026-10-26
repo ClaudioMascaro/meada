@@ -723,16 +723,23 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             .map(|(n, c)| (*n, c.as_slice()))
             .collect()
     };
-    // What each pack's files give one another (`LanguagePack::join`), on the facts as parsed:
-    // the index keeps those, so a refresh joins them as a cold index does.
-    let mut joining: BTreeMap<usize, BTreeMap<&str, &mut Facts>> = BTreeMap::new();
-    let changed_facts = changed.iter_mut().map(|p| (p.path.as_str(), &mut p.facts));
-    let kept_facts = kept.iter_mut().map(|(path, facts)| (path.as_str(), facts));
-    for (path, facts) in changed_facts.chain(kept_facts) {
-        joining.entry(packs[path]).or_default().insert(path, facts);
+    // What each pack's files give one another (`LanguagePack::join`), from the facts as parsed:
+    // the index keeps those, so a refresh joins them as a cold index does, and joins the files
+    // the contracts parse again for their values the same way.
+    let mut raw: BTreeMap<usize, BTreeMap<&str, &Facts>> = BTreeMap::new();
+    let changed_facts = changed.iter().map(|p| (p.path.as_str(), &p.facts));
+    for (path, facts) in changed_facts.chain(kept.iter().map(|(p, f)| (p.as_str(), f))) {
+        raw.entry(packs[path]).or_default().insert(path, facts);
     }
-    for (pack, mut files) in joining {
-        lang::pack(pack).join(&found_configs(pack), &mut files);
+    let joins: BTreeMap<usize, lang::Join> = (raw.iter())
+        .map(|(&pack, files)| (pack, lang::pack(pack).join(&found_configs(pack), files)))
+        .collect();
+    drop(raw);
+    for p in &mut changed {
+        joins[&packs[p.path.as_str()]](&p.path, &mut p.facts);
+    }
+    for (path, facts) in &mut kept {
+        joins[&packs[path.as_str()]](path, facts);
     }
     let parsed: BTreeMap<&str, &Facts> = changed
         .iter()
@@ -827,7 +834,10 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         for path in misses {
             let src = fs::read(root.join(&path))?;
             let pack = packs[path.as_str()];
-            let facts = lang::pack(pack).parse_with(&path, &src, &settings[&pack](&path))?;
+            let mut facts = lang::pack(pack).parse_with(&path, &src, &settings[&pack](&path))?;
+            if let Some(join) = joins.get(&pack) {
+                join(&path, &mut facts);
+            }
             reparsed.insert(path, facts);
         }
     };

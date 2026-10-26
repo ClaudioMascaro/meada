@@ -392,10 +392,10 @@ pub struct Resolver<'a> {
     /// place in `groups`.
     shared: HashMap<&'a str, usize>,
     groups: Vec<Group<'a>>,
-    /// The files of each class several files define, sorted, when the pack's types may be
-    /// written in parts (`LanguagePack::partial_types`): one type, whose members are all of
-    /// theirs.
-    parts: HashMap<&'a str, Vec<&'a str>>,
+    /// The files of each type declared in parts (`Facts::partial`) in several files of one
+    /// unit (`Facts::unit`), sorted, by unit and name: one type, whose members and bases are
+    /// all of theirs.
+    parts: HashMap<(&'a str, &'a str), Vec<&'a str>>,
 }
 
 /// Whether `inner` is a class nested directly in the class `outer`.
@@ -560,18 +560,17 @@ impl<'a> Resolver<'a> {
                 exporting,
             });
         }
-        let mut parts: HashMap<&str, Vec<&str>> = HashMap::new();
-        if language.partial_types() {
-            for (&path, facts) in files {
-                for def in facts.defs.iter().filter(|d| d.kind == Kind::Class) {
-                    parts.entry(def.name.as_str()).or_default().push(path);
-                }
+        let mut parts: HashMap<(&str, &str), Vec<&str>> = HashMap::new();
+        for (&path, facts) in files {
+            for name in &facts.partial {
+                let key = (facts.unit.as_str(), name.as_str());
+                parts.entry(key).or_default().push(path);
             }
-            parts.retain(|_, paths| {
-                paths.dedup();
-                (2..=TYPE_PARTS).contains(&paths.len())
-            });
         }
+        parts.retain(|_, paths| {
+            paths.dedup();
+            (2..=TYPE_PARTS).contains(&paths.len())
+        });
         let written = (files.values())
             .flat_map(|f| f.consts.iter())
             .filter_map(|c| c.name.strip_prefix('.'))
@@ -1891,9 +1890,15 @@ impl<'a> Resolver<'a> {
         Some(Binding::Def(Target { path, name }))
     }
 
+    /// The files of the type `class` is a part of (`parts`), if it is one.
+    fn parts_of(&self, class: Target<'a>) -> Option<&Vec<&'a str>> {
+        let unit = self.files.get(class.path)?.unit.as_str();
+        self.parts.get(&(unit, class.name))
+    }
+
     /// `class` and the other parts of its type (`parts`), its own file first.
     fn parts(&self, class: Target<'a>) -> Vec<Target<'a>> {
-        let others = self.parts.get(class.name).into_iter().flatten();
+        let others = self.parts_of(class).into_iter().flatten();
         let others = others
             .filter(|&&path| path != class.path)
             .map(|&path| Target {
@@ -1918,7 +1923,7 @@ impl<'a> Resolver<'a> {
     /// One class for `all` when they are the parts of one type (`parts`): the first part.
     fn one_type(&self, all: &[Target<'a>]) -> Option<Target<'a>> {
         let first = *all.iter().min()?;
-        let paths = self.parts.get(first.name)?;
+        let paths = self.parts_of(first)?;
         all.iter()
             .all(|t| t.name == first.name && paths.contains(&t.path))
             .then_some(first)
@@ -2027,24 +2032,24 @@ impl<'a> Resolver<'a> {
     /// What each base `class` writes is, in order, resolved from the scope enclosing it.
     fn bases(&self, class: Target<'a>, work: &mut Work<'a>) -> Vec<Ancestor<'a>> {
         let scope = crate::parent(class.name);
-        let bases = self.defs[class.path][class.name].bases.iter().enumerate();
-        bases
-            .map(|(n, base)| {
-                match self.resolve(
-                    class.path,
-                    scope,
-                    base,
-                    &mut self.seen(class.path, scope),
-                    work,
-                ) {
+        let mut out = Vec::new();
+        // A type written in parts has the bases every part writes, its own first.
+        for class in self.parts(class) {
+            for (n, base) in self.defs[class.path][class.name].bases.iter().enumerate() {
+                let seen = &mut self.seen(class.path, scope);
+                let base = match self.resolve(class.path, scope, base, seen, work) {
                     Binding::Def(t) if self.is_class(t) => Ancestor::Class(t),
                     _ if base.starts_with('(') => {
                         Ancestor::Opaque(format!("{}::{}#{n}", class.path, class.name))
                     }
                     _ => Ancestor::Opaque(self.imported_name(class.path, scope, base)),
+                };
+                if !out.contains(&base) {
+                    out.push(base);
                 }
-            })
-            .collect()
+            }
+        }
+        out
     }
 
     /// `name` as the file's imports spell it: the module and name its head imports, then the
@@ -2556,7 +2561,10 @@ impl<'a> Resolver<'a> {
                 // `internal` members) gives an outside source only, as the repository's names
                 // are bound before this is asked.
                 _ if *inside => None,
-                other => match self.through_glob(other, false, name, work, seen) {
+                other => match self
+                    .through_glob(other, false, name, work, seen)
+                    .of_namespace(self, self.glob_namespace(path, target))
+                {
                     Binding::Unknown => None,
                     _ => return Vec::new(),
                 },
@@ -2570,6 +2578,16 @@ impl<'a> Resolver<'a> {
         sources.sort_unstable();
         sources.dedup();
         sources
+    }
+
+    /// The namespace a glob of `path` whose target is the import `target` takes the names of
+    /// (`wildcard`'s `Imported::Namespace` source), if it is one.
+    fn glob_namespace(&self, path: &'a str, target: &str) -> Option<&'a str> {
+        let imports = &self.files[path].imports;
+        (self.by_local[path].of(target).iter().rev())
+            .map(|&at| &imports[at])
+            .find(|i| matches!(i.name, Imported::Namespace))
+            .map(|i| i.source.as_str())
     }
 
     /// What a glob import whose target is `bound` gives `name` (`globs`).
@@ -2660,6 +2678,7 @@ impl<'a> Resolver<'a> {
             let work = &mut Work::default();
             let bound = self.resolve_as(path, scope, target, seen, work, Reading::Alias);
             let found = self.through_glob(bound, *inside, name, work, seen);
+            let found = found.of_namespace(self, self.glob_namespace(path, target));
             seen.depth -= 1;
             if seen.cut {
                 return Some(Binding::Unknown);
@@ -2836,7 +2855,21 @@ impl<'a> Resolver<'a> {
         let found = at
             .into_iter()
             .filter_map(|at| self.file_exports(files[at], name, seen, value));
-        one(found.collect())
+        // The parts of one type the files export are that type: the asking file's own part, else
+        // the first.
+        match one(found.collect()) {
+            Some(Binding::Several(all)) => Some(match self.one_type(&all) {
+                Some(first) => {
+                    let own = Target {
+                        path,
+                        name: first.name,
+                    };
+                    Binding::Def(if all.contains(&own) { own } else { first })
+                }
+                None => Binding::Several(all),
+            }),
+            found => found,
+        }
     }
 
     /// `exports` of the one file `path`.
@@ -3188,6 +3221,29 @@ fn one_of(found: Vec<Target>) -> Resolution {
         [] => Resolution::Unresolved,
         [one] => Resolution::Inferred(one),
         _ => Resolution::Ambiguous(found),
+    }
+}
+
+impl<'a> Binding<'a> {
+    /// What a glob of `namespace` gives, as `self`: the classes declared in that namespace
+    /// alone. A file's group may hold another namespace's types too (a C# file declaring two).
+    fn of_namespace(self, resolver: &Resolver<'a>, namespace: Option<&str>) -> Binding<'a> {
+        let Some(namespace) = namespace else {
+            return self;
+        };
+        let foreign = |t: &Target| resolver.is_class(*t) && crate::parent(t.name) != namespace;
+        match self {
+            Binding::Def(t) if foreign(&t) => Binding::Unknown,
+            Binding::Several(all) => {
+                let kept: Vec<_> = all.into_iter().filter(|t| !foreign(t)).collect();
+                match kept[..] {
+                    [] => Binding::Unknown,
+                    [one] => Binding::Def(one),
+                    _ => Binding::Several(kept),
+                }
+            }
+            found => found,
+        }
     }
 }
 

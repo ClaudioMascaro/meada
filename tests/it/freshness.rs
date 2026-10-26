@@ -24,57 +24,97 @@ fn level<'j>(json: &'j serde_json::Value, id: &str) -> &'j serde_json::Value {
     &call.unwrap_or_else(|| panic!("no call {id}"))["level"]
 }
 
-/// Edits a global using file, adds and deletes `.cs` files, rewrites one project file and
-/// adds another: files that did not change on disk resolve anew.
-#[test]
-fn csharp_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
-    let edit = |repo: &Path| {
-        let globals = repo.join("src/Acme.Core/GlobalUsings.cs");
-        let before = fs::read_to_string(&globals).unwrap();
-        fs::write(
-            &globals,
-            before.replace("global using Fmt = ", "global using Other = "),
-        )
-        .unwrap();
-        fs::write(
-            repo.join("src/Acme.Core/Orders/Extra.cs"),
-            "namespace Acme.Core.Orders;\n\npublic class Extra\n{\n    public void Run() { Format.Upper(\"e\"); }\n}\n",
-        )
-        .unwrap();
-        fs::remove_file(repo.join("src/Acme.Core/Orders/Order.Lines.cs")).unwrap();
-        let api = repo.join("src/Acme.Api/Acme.Api.csproj");
-        let before = fs::read_to_string(&api).unwrap();
-        fs::write(
-            &api,
-            before.replace("<Using Include=\"Acme.Core.Orders\" />", ""),
-        )
-        .unwrap();
-        fs::write(
-            repo.join("legacy/Modern.csproj"),
-            "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <ItemGroup>\n    \
-             <Using Include=\"Acme.Core.Text.Format\" Static=\"true\" />\n  </ItemGroup>\n</Project>\n",
-        )
-        .unwrap();
-    };
-    let repo = fixture_repo("fresh_csharp", "conformance-csharp", ORIGIN);
+/// Refreshes a copy of the C# fixture after `edit`, checks it equals a cold export of the same
+/// files and differs from the export before, and gives the refreshed export.
+fn csharp_refreshed(case: &str, edit: impl Fn(&Path)) -> serde_json::Value {
+    let repo = fixture_repo(case, "conformance-csharp", ORIGIN);
     age(&repo);
     let engine = Engine::open(&repo).unwrap();
     let before = engine.export().unwrap();
     edit(&repo);
     let refreshed = engine.export().unwrap();
     assert_ne!(before, refreshed);
-    assert_eq!(
-        refreshed,
-        cold_export("fresh_csharp_cold", "conformance-csharp", ORIGIN, edit)
-    );
-    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
-    // The alias is gone from every file of Acme.Core, the project file's `<Using>` from
-    // Acme.Api, and the new SDK-style project file adds a `using static`.
+    let cold = cold_export(&format!("{case}_cold"), "conformance-csharp", ORIGIN, &edit);
+    assert_eq!(refreshed, cold);
+    serde_json::from_str(&refreshed).unwrap()
+}
+
+/// Rewrites a file of the repository with `from` replaced by `to`.
+fn replace(repo: &Path, file: &str, from: &str, to: &str) {
+    let path = repo.join(file);
+    let before = fs::read_to_string(&path).unwrap();
+    assert!(before.contains(from), "{file}: {from}");
+    fs::write(&path, before.replace(from, to)).unwrap();
+}
+
+const GLOBALS: &str = "src/Acme.Core/GlobalUsings.cs";
+const API_PROJECT: &str = "src/Acme.Api/Acme.Api.csproj";
+
+/// Edits a global using file, adds and deletes `.cs` files, deletes one project file and adds
+/// another: files that did not change on disk resolve anew.
+#[test]
+fn csharp_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
+    let json = csharp_refreshed("fresh_csharp", |repo: &Path| {
+        replace(
+            repo,
+            GLOBALS,
+            "global using Fmt = ",
+            "global using Other = ",
+        );
+        fs::write(
+            repo.join("src/Acme.Core/Orders/Extra.cs"),
+            "namespace Acme.Core.Orders;\n\npublic class Extra\n{\n    public void Run() { Format.Upper(\"e\"); }\n}\n",
+        )
+        .unwrap();
+        fs::remove_file(repo.join("src/Acme.Core/Orders/Order.Lines.cs")).unwrap();
+        fs::remove_file(repo.join(API_PROJECT)).unwrap();
+        fs::write(
+            repo.join("legacy/Modern.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <ItemGroup>\n    \
+             <Using Include=\"Acme.Core.Text.Format\" Static=\"true\" />\n  </ItemGroup>\n</Project>\n",
+        )
+        .unwrap();
+    });
+    // The alias is gone from every file of Acme.Core, Acme.Api's project file with its
+    // `<Using>`, and the new SDK-style project file adds a `using static`.
     assert!(level(&json, "OrderService.Place(string,int)::Fmt.Upper#0").is_null());
     assert!(level(&json, "Checkout.Run()::OrderService.Default#0").is_null());
     assert_eq!(level(&json, "Legacy.Old.Run()::Upper#0"), "exact");
     assert_eq!(
         level(&json, "Acme.Core.Orders.Extra.Run()::Format.Upper#0"),
+        "exact"
+    );
+}
+
+/// A project file changes alone: the files of its project resolve anew.
+#[test]
+fn csharp_refreshed_export_after_a_project_file_edit_equals_a_cold_export() {
+    let json = csharp_refreshed("fresh_csharp_project", |repo: &Path| {
+        replace(
+            repo,
+            API_PROJECT,
+            "<Using Include=\"Acme.Core.Orders\" />",
+            "",
+        );
+    });
+    assert!(level(&json, "Checkout.Run()::OrderService.Default#0").is_null());
+    assert_eq!(level(&json, "Checkout.Run()::Svc.Default#0"), "exact");
+}
+
+/// A global using file changes alone: the other files of its project resolve anew.
+#[test]
+fn csharp_refreshed_export_after_a_global_using_edit_equals_a_cold_export() {
+    let json = csharp_refreshed("fresh_csharp_globals", |repo: &Path| {
+        replace(
+            repo,
+            GLOBALS,
+            "global using static Acme.Core.Text.Casing;\n",
+            "",
+        );
+    });
+    assert!(level(&json, "OrderService.Place(string,int)::Lower#0").is_null());
+    assert_eq!(
+        level(&json, "OrderService.Place(string,int)::Fmt.Upper#0"),
         "exact"
     );
 }

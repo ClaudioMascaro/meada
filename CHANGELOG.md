@@ -31,7 +31,8 @@ All notable changes to Meada are recorded here. The format follows
 - C# source indexing (issue #107): `.cs` files, grouped into projects by SDK-style `.csproj`
   files (an old-style one, with no `Sdk`, is none; `.sln` files change nothing), yield
   namespace-qualified classes, records, structs and interfaces, nested and `partial` ones
-  included (each part in its own file, a member lookup reading every part), methods and
+  included (each part in its own file of one project, a member lookup reading every
+  part and its bases), methods and
   constructors with written parameter types, and local functions (`Method.Local`). `using`,
   `using static`, aliases and `global using` resolve through every project's namespaces; a
   `global using`, a project file's `<Using>` items and its enabled implicit usings apply to every

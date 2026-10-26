@@ -96,15 +96,21 @@ modules updates it.
   .js .jsx .mjs .cjs`, reads `tsconfig.json`), `lang/python.rs` (`.py`, reads
   `pyproject.toml`: `.pyi` and notebooks are not read), `lang/rust.rs` (`.rs`, reads every
   `Cargo.toml` through the `**/Cargo.toml` config name, receiver keyword `Self`, see below) and
-  `lang/go.rs` (`.go`, reads every `go.mod` through `**/go.mod`, see below).
-  `refresh` reads a `**/<name>` config at any depth from the walk, in path order, and any
+  `lang/go.rs` (`.go`, reads every `go.mod` through `**/go.mod`, see below), then the Java,
+  Kotlin and `lang/csharp.rs` packs (`.cs`, reads every project file through `**/*.csproj`
+  with `dotnet::msbuild`).
+  `refresh` reads a `**/<name>` config at any depth from the walk, in path order (and a
+  `**/*.ext` one, every file ending so, `lang::names_config`), and any
   config through `read_config` (up to one byte past `lang::MAX_BYTES`, no symbolic link,
-  as a manifest is); it groups the
+  as a manifest is); it joins each pack's files first (`LanguagePack::join`, built from the
+  configs and every file's facts as parsed, applied to each file and to each file the
+  contracts parse again: C#'s project-wide usings and `Facts::unit`), then groups the
   parsed files by pack, asks each pack once for its `layout(configs, parsed files)`, keeps the
   files `Layout::members` names (default: all; a left-out file keeps its `files` row and facts
   with an empty `resolved`, its symbol and call rows are deleted, and the export and `status`
   skip it), and builds each `Resolver` from `Layout::modules`, `Layout::published` and
-  `Layout::reaches`. `parse` sees one file at a time; no pack
+  `Layout::reaches`; the `Resolver` reads a type declared in parts in several files of one unit
+  (`Facts::partial`, `Facts::unit`) as one type (`Resolver::parts`). `parse` sees one file at a time; no pack
   method touches the index. `Facts::locals` holds every name a binding makes besides definitions, `const`s and
   `Def::params` (`let`, `var`, destructuring, `catch`, `for ... of`, a nested, array or rest
   parameter pattern, any parameter of a function that is no definition), qualified by the

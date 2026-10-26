@@ -60,12 +60,15 @@ pub trait LanguagePack {
     /// every file whose name ends with the rest (`**/*.csproj`).
     fn config_files(&self) -> &'static [&'static str];
 
-    /// What the pack's files give one another before they resolve, from the config files as
-    /// `layout` gets them and the facts of every file of the pack, as parsed: C#'s `global using`
-    /// directives and a project file's usings bind in every file of their project. The index
-    /// keeps the facts as parsed and joins them again on every refresh, before `layout`, so a
-    /// file another one's change affects resolves anew without being parsed again.
-    fn join(&self, _configs: &[(&str, &[u8])], _files: &mut BTreeMap<&str, &mut Facts>) {}
+    /// What the pack's files give one another before they resolve (`Join`), built from the
+    /// config files as `layout` gets them and the facts of every file of the pack, as parsed:
+    /// C#'s `global using` directives and a project file's usings bind in every file of their
+    /// project. The index keeps the facts as parsed and joins each file's again on every
+    /// refresh, before `layout`, and those it parses again for their values too, so a file
+    /// another one's change affects resolves anew without being parsed again.
+    fn join(&self, _configs: &[(&str, &[u8])], _files: &BTreeMap<&str, &Facts>) -> Join {
+        Box::new(|_, _| {})
+    }
 
     /// How imports name files in one repository, built from its config files as
     /// `(path, contents)`, in `config_files` order, and from the facts of the pack's files: a
@@ -160,13 +163,6 @@ pub trait LanguagePack {
         false
     }
 
-    /// Whether classes of one qualified name in several files are the parts of one type (C#'s
-    /// `partial`): a member lookup reads every part, and a constructor call of the type takes
-    /// the first part, by path, when no constructor answers.
-    fn partial_types(&self) -> bool {
-        false
-    }
-
     /// Names every file of the language may call without binding them, which contract kinds
     /// read, such as `fetch`.
     fn globals(&self) -> &'static [&'static str] {
@@ -187,6 +183,9 @@ pub trait LanguagePack {
 /// (first argument) may name, most likely first. The shared side takes the first one that
 /// the pack parses.
 pub type Modules = Box<dyn Fn(&str, &str) -> Vec<String>>;
+
+/// What `LanguagePack::join` does to a file's facts (second argument), by its path (first).
+pub type Join = Box<dyn Fn(&str, &mut Facts)>;
 
 /// Whether code in a file (first argument) may call into another (second argument).
 pub type Reaches = Box<dyn Fn(&str, &str) -> bool>;
@@ -386,6 +385,14 @@ pub struct Facts {
     /// A.B`, `X = A.B`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub project: Vec<String>,
+    /// The types the file declares in parts (C#'s `partial`), by qualified name: the classes of
+    /// one such name in the files of one `unit` are one type (`Resolver::parts`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub partial: Vec<String>,
+    /// The compilation the file belongs to, which `LanguagePack::join` sets (C#'s project):
+    /// the parts of a partial type come from one. Not kept in the index: it is joined again.
+    #[serde(skip)]
+    pub unit: String,
     /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,

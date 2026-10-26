@@ -3290,6 +3290,14 @@ fn csharp() {
         format("Point.Double(int)"),
         format("IClock"),
         format("IClock.Now()"),
+        format("SystemClock"),
+        format("SystemClock.Now()"),
+        core("Text/Nested.cs", "Acme.Core.Outer.First"),
+        core("Text/Nested.cs", "Acme.Core.Outer.Inner.Second"),
+        core("Text/Nested.cs", "Acme.Core.Outer.Inner.Second.Make()"),
+        core("Contracts/Copies.cs", "Acme.Contracts.OrderDto"),
+        core("Contracts/Copies.cs", "Acme.Hosting.Shell"),
+        core("Contracts/Copies.cs", "Acme.Hosting.Shell.Stop()"),
         store("Repository"),
         store("Repository.Save(T)"),
         store("Repository.Save(List<T>,int)"),
@@ -3320,11 +3328,25 @@ fn csharp() {
         orders("Shipping.cs", "Carrier.Track()"),
         orders("Shipping.cs", "Carrier.Rate()"),
         orders("Shipping.cs", "Carrier.Purge()"),
-        orders("Shipping.cs", "Courier"),
-        orders("Shipping.cs", "Courier.Courier()"),
-        orders("Shipping.cs", "Courier.Ship()"),
+        orders("Carrier.Fees.cs", "Carrier"),
+        orders("Carrier.Fees.cs", "Carrier.Bill()"),
+        orders("Courier.cs", "Courier"),
+        orders("Courier.cs", "Courier.Courier()"),
+        orders("Courier.cs", "Courier.Ship()"),
         api("Checkout.cs", "Acme.Api.Checkout"),
         api("Checkout.cs", "Acme.Api.Checkout.Run()"),
+        api("Contracts.cs", "Acme.Contracts.OrderDto"),
+        api("Contracts.cs", "Acme.Hosting.Shell"),
+        api("Contracts.cs", "Acme.Hosting.Shell.Start()"),
+        api("Opaque.cs", "Acme.Api.Home"),
+        api("Opaque.cs", "Acme.Api.Home.Index()"),
+        api("Opaque.cs", "Acme.Api.Board"),
+        api("Board.Show.cs", "Acme.Api.Board"),
+        api("Board.Show.cs", "Acme.Api.Board.Show()"),
+        api("Namespaces.cs", "Acme.Api.Outside"),
+        api("Namespaces.cs", "Acme.Api.Outside.Run()"),
+        api("Inside.cs", "Acme.Api.Inside"),
+        api("Inside.cs", "Acme.Api.Inside.Run()"),
         shadows("Shadows"),
         shadows("Shadows.Parameter(object)"),
         shadows("Shadows.Local()"),
@@ -3419,20 +3441,32 @@ fn csharp() {
             EXACT,
             vec![service(".Line.Count()")],
         ),
+        // A base that is a partial type: every part's members are inherited.
         (
-            format!("{}::Carrier#0", orders("Shipping.cs", "Courier.Courier()")),
+            format!("{}::Carrier#0", orders("Courier.cs", "Courier.Courier()")),
             EXACT,
             vec![orders("Shipping.cs", "Carrier.Carrier(string)")],
         ),
         (
-            format!("{}::base.Ship#0", orders("Shipping.cs", "Courier.Ship()")),
+            format!("{}::base.Ship#0", orders("Courier.cs", "Courier.Ship()")),
             EXACT,
             vec![orders("Shipping.cs", "Carrier.Ship()")],
         ),
         (
-            format!("{}::Track#0", orders("Shipping.cs", "Courier.Ship()")),
+            format!("{}::Track#0", orders("Courier.cs", "Courier.Ship()")),
             EXACT,
             vec![orders("Shipping.cs", "Carrier.Track()")],
+        ),
+        (
+            format!("{}::Bill#0", orders("Courier.cs", "Courier.Ship()")),
+            EXACT,
+            vec![orders("Carrier.Fees.cs", "Carrier.Bill()")],
+        ),
+        // An explicit interface implementation's calls are its type's.
+        (
+            format!("{}::Now#0", format("SystemClock")),
+            EXACT,
+            vec![format("SystemClock.Now()")],
         ),
         (
             format!("{}::Double#0", format("Point.Twice()")),
@@ -3488,6 +3522,59 @@ fn csharp() {
             run("OrderService.Default#0"),
             EXACT,
             vec![service(".Default()")],
+        ),
+        (
+            run("Create#0"),
+            EXACT,
+            vec![orders("Order.Lines.cs", "Order.Create()")],
+        ),
+        (
+            run("OrderDto#0"),
+            AMBIGUOUS,
+            vec![
+                api("Contracts.cs", "Acme.Contracts.OrderDto"),
+                core("Contracts/Copies.cs", "Acme.Contracts.OrderDto"),
+            ],
+        ),
+        (
+            run("Shell#0"),
+            AMBIGUOUS,
+            vec![
+                api("Contracts.cs", "Acme.Hosting.Shell"),
+                core("Contracts/Copies.cs", "Acme.Hosting.Shell"),
+            ],
+        ),
+        // Opaque outside: a base from outside the repository, written on the type or on another
+        // of its parts, may declare the name, so what the file binds is a name match at most.
+        (
+            format!("{}::Upper#0", api("Opaque.cs", "Acme.Api.Home.Index()")),
+            INFERRED,
+            vec![upper.clone()],
+        ),
+        (
+            format!("{}::Upper#0", api("Board.Show.cs", "Acme.Api.Board.Show()")),
+            INFERRED,
+            vec![upper.clone()],
+        ),
+        // A type of a second namespace in a file binds under that namespace alone.
+        (
+            format!(
+                "{}::Second.Make#0",
+                api("Namespaces.cs", "Acme.Api.Outside.Run()")
+            ),
+            None,
+            vec![],
+        ),
+        (
+            format!(
+                "{}::Second.Make#0",
+                api("Inside.cs", "Acme.Api.Inside.Run()")
+            ),
+            EXACT,
+            vec![core(
+                "Text/Nested.cs",
+                "Acme.Core.Outer.Inner.Second.Make()",
+            )],
         ),
         // Acme.Core's global usings stop at its project: a bare call no family declares and a
         // type name nothing binds resolve to nothing.
@@ -3637,28 +3724,36 @@ fn csharp_qualification_expansion_discards_the_whole_file_and_keeps_other_files(
     assert!(called["level"].is_null());
 }
 
-/// A type written in more files than `TYPE_PARTS` is no one type: constructing it is ambiguous.
+/// A type written in more files of one project than `TYPE_PARTS` is no one type: constructing
+/// it is ambiguous. Written in fewer, it is one, its first part constructed.
 #[test]
 fn csharp_a_type_in_too_many_parts_is_several_classes() {
-    let repo = fixture_repo("csharp_type_parts", "conformance-csharp", Some(ORIGIN));
-    for n in 0..65 {
-        let part = format!("namespace Parts;\npublic partial class Wide {{ void M{n}() {{}} }}\n");
-        std::fs::write(repo.join(format!("Wide{n:02}.cs")), part).unwrap();
+    for (parts, level, candidates) in [(64, "exact", 0), (65, "ambiguous", 65)] {
+        let case = format!("csharp_type_parts_{parts}");
+        let repo = fixture_repo(&case, "conformance-csharp", Some(ORIGIN));
+        let dir = repo.join("src/Acme.Core/Parts");
+        std::fs::create_dir_all(&dir).unwrap();
+        for n in 0..parts {
+            let part =
+                format!("namespace Parts;\npublic partial class Wide {{ void M{n}() {{}} }}\n");
+            std::fs::write(dir.join(format!("Wide{n:02}.cs")), part).unwrap();
+        }
+        let caller = "namespace Parts;\npublic class Maker { Wide Make() => new Wide(); }\n";
+        std::fs::write(dir.join("Maker.cs"), caller).unwrap();
+        let json: Value =
+            serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+        let made = (json["calls"].as_array().unwrap().iter())
+            .find(|c| {
+                c["id"]
+                    .as_str()
+                    .unwrap()
+                    .ends_with("Parts.Maker.Make()::Wide#0")
+            })
+            .unwrap();
+        assert_eq!(made["level"], level, "{parts}");
+        let found = made["candidates"].as_array().map_or(0, Vec::len);
+        assert_eq!(found, candidates, "{parts}");
     }
-    let caller = "namespace Parts;\npublic class Maker { Wide Make() => new Wide(); }\n";
-    std::fs::write(repo.join("Maker.cs"), caller).unwrap();
-    let json: Value =
-        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
-    let made = (json["calls"].as_array().unwrap().iter())
-        .find(|c| {
-            c["id"]
-                .as_str()
-                .unwrap()
-                .ends_with("Parts.Maker.Make()::Wide#0")
-        })
-        .unwrap();
-    assert_eq!(made["level"], "ambiguous");
-    assert_eq!(made["candidates"].as_array().unwrap().len(), 65);
 }
 
 #[test]

@@ -2,8 +2,6 @@
 //! SDK-style project files say which files form a project, for the usings that apply to all of
 //! them (`join`).
 
-mod project;
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 use std::rc::Rc;
@@ -11,9 +9,10 @@ use std::rc::Rc;
 use tree_sitter::{Node, Parser};
 
 use super::{
-    Binds, Call, Class, Def, Export, Facts, Import, Imported, Invocation, Kind, LanguagePack,
+    Binds, Call, Class, Def, Export, Facts, Import, Imported, Invocation, Join, Kind, LanguagePack,
     Layout, Modules, Param, Part, Receiver, Value, children, named, text,
 };
+use crate::dotnet::msbuild::{self, Using};
 use crate::{Result, qualify};
 
 /// How many named types may enclose a definition. Deeper bodies keep their enclosing symbol.
@@ -32,7 +31,7 @@ const QUALIFICATION_BYTES: usize = 4 * 1024 * 1024;
 /// and its `global using` directives together. A project past it keeps no facts in any file:
 /// a partial set could bind a name one of the missing usings makes ambiguous.
 // ponytail: real projects write tens; this bounds what a crafted file copies into every file.
-const PROJECT_USINGS: usize = 1024;
+const PROJECT_USINGS: usize = 256;
 
 pub struct CSharp;
 
@@ -69,10 +68,6 @@ impl LanguagePack for CSharp {
         true
     }
 
-    fn partial_types(&self) -> bool {
-        true
-    }
-
     fn implicit_members(&self) -> &'static [&'static str] {
         &[
             "Equals",
@@ -99,16 +94,45 @@ impl LanguagePack for CSharp {
     }
 
     /// Namespaces are Java's packages: types resolve by namespace and name across every
-    /// project of the repository, and the files of one namespace share its scope.
+    /// project of the repository, and the files of one namespace share its scope. A namespace
+    /// a file declares besides its first (`Facts::package`) names that file too.
     fn layout(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Result<Layout> {
-        super::java::Java.layout(configs, files)
+        let layout = super::java::Java.layout(configs, files)?;
+        // ponytail: a namespace that is one file's package and another file's second keeps the
+        // package's files alone; the other file's types there bind by full name.
+        let mut others: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for (&path, facts) in files {
+            let classes: BTreeSet<&str> = (facts.defs.iter())
+                .filter(|d| d.kind == Kind::Class)
+                .map(|d| d.name.as_str())
+                .collect();
+            let namespaces: BTreeSet<&str> = (classes.iter())
+                .map(|name| crate::parent(name))
+                .filter(|ns| !classes.contains(ns) && *ns != facts.package)
+                .collect();
+            for ns in namespaces {
+                others
+                    .entry(ns.to_string())
+                    .or_default()
+                    .push(path.to_string());
+            }
+        }
+        let modules = layout.modules;
+        Ok(Layout {
+            modules: Box::new(move |from, name| match modules(from, name) {
+                found if found.is_empty() => others.get(name).cloned().unwrap_or_default(),
+                found => found,
+            }),
+            ..layout
+        })
     }
 
     /// A project's usings bind in each of its files: those its project file adds (`<Using>`,
     /// implicit usings) and the `global using` directives of its files. A file in no SDK-style
     /// project takes its own. An alias names a namespace unless a type of the repository has
-    /// its target's name.
-    fn join(&self, configs: &[(&str, &[u8])], files: &mut BTreeMap<&str, &mut Facts>) {
+    /// its target's name. Each file's `Facts::unit` is its project, whose files alone the parts
+    /// of a partial type come from.
+    fn join(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Join {
         // Each project's directory (`a/b/`, empty at the root) and what its file adds.
         let projects: Vec<(String, Vec<Using>)> = (configs.iter())
             .filter(|(path, _)| path.ends_with(".csproj"))
@@ -116,28 +140,16 @@ impl LanguagePack for CSharp {
                 let dir = path
                     .rsplit_once('/')
                     .map_or(String::new(), |(d, _)| format!("{d}/"));
-                Some((dir, project::read(src)?))
+                Some((dir, msbuild::read(src)?))
             })
             .collect();
-        // ponytail: the nearest project directory owns a file, the first project file of a
-        // directory with two; MSBuild items that include or exclude files are not read.
-        let owner = |path: &str| {
-            (projects.iter().enumerate())
-                .filter(|(_, (dir, _))| path.starts_with(dir.as_str()))
-                .max_by_key(|(n, (dir, _))| (dir.len(), std::cmp::Reverse(*n)))
-                .map(|(n, _)| n)
-        };
-        // Each project's usings, by project (a file in none is its own). Their order says
-        // nothing: the globs combine, and two aliases of one name are no C#.
-        let mut usings: BTreeMap<std::result::Result<usize, &str>, BTreeSet<Using>> =
-            BTreeMap::new();
-        for (&path, facts) in files.iter() {
-            let key = owner(path).ok_or(path);
-            let found = usings.entry(key).or_insert_with(|| match key {
-                Ok(n) => projects[n].1.iter().cloned().collect(),
-                Err(_) => BTreeSet::new(),
-            });
-            for using in facts.project.iter().filter_map(|u| Using::read(u)) {
+        // Each project's usings, by its directory, or a file's in none by its path. Their order
+        // says nothing: the globs combine, and two aliases of one name are no C#.
+        let mut usings: BTreeMap<String, BTreeSet<Using>> = BTreeMap::new();
+        for (&path, facts) in files {
+            let (unit, own) = owner(&projects, path);
+            let found = (usings.entry(unit)).or_insert_with(|| own.iter().cloned().collect());
+            for using in facts.project.iter().filter_map(|u| read_using(u)) {
                 if found.len() > PROJECT_USINGS {
                     break;
                 }
@@ -149,17 +161,25 @@ impl LanguagePack for CSharp {
             .filter(|d| d.kind == Kind::Class)
             .map(|d| d.name.clone())
             .collect();
-        for (&path, facts) in files.iter_mut() {
-            let found = &usings[&owner(path).ok_or(path)];
+        Box::new(move |path, facts| {
+            let (unit, own) = owner(&projects, path);
+            let fallback: BTreeSet<Using>;
+            let found = match usings.get(&unit) {
+                Some(found) => found,
+                None => {
+                    fallback = own.iter().cloned().collect();
+                    &fallback
+                }
+            };
             if found.len() > PROJECT_USINGS {
-                **facts = Facts {
+                *facts = Facts {
                     unbuilt: true,
                     ..Facts::default()
                 };
-                continue;
+                return;
             }
             for using in found {
-                using.apply(facts);
+                apply(using, facts);
             }
             for import in &mut facts.imports {
                 if matches!(import.name, Imported::Namespace)
@@ -169,66 +189,71 @@ impl LanguagePack for CSharp {
                     import.name = Imported::Qualified;
                 }
             }
-        }
+            facts.unit = unit;
+        })
     }
 }
 
-/// A using directive, as `Facts::project` spells it: `A.B`, `static A.B` or `X = A.B`.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-enum Using {
-    Namespace(String),
-    Static(String),
-    Alias(String, String),
+/// The project that owns `path`, by its directory, and what its project file adds; a file in no
+/// project is its own, by its path, adding nothing.
+// ponytail: the nearest project directory owns a file, the first project file of a directory
+// with two; MSBuild items that include or exclude files are not read.
+fn owner<'p>(projects: &'p [(String, Vec<Using>)], path: &str) -> (String, &'p [Using]) {
+    (projects.iter().enumerate())
+        .filter(|(_, (dir, _))| path.starts_with(dir.as_str()))
+        .max_by_key(|(n, (dir, _))| (dir.len(), std::cmp::Reverse(*n)))
+        .map_or((path.to_string(), &[][..]), |(_, (dir, own))| {
+            (dir.clone(), own.as_slice())
+        })
 }
 
-impl Using {
-    fn read(spelled: &str) -> Option<Using> {
-        if let Some(ty) = spelled.strip_prefix("static ") {
-            return Some(Using::Static(ty.to_string()));
-        }
-        match spelled.split_once(" = ") {
-            Some((alias, target)) => Some(Using::Alias(alias.into(), target.into())),
-            None => (!spelled.is_empty()).then(|| Using::Namespace(spelled.to_string())),
-        }
+/// A using directive as `Facts::project` spells it: `A.B`, `static A.B` or `X = A.B`.
+fn read_using(spelled: &str) -> Option<Using> {
+    if let Some(ty) = spelled.strip_prefix("static ") {
+        return Some(Using::Static(ty.to_string()));
     }
-
-    fn spell(&self) -> String {
-        match self {
-            Using::Namespace(ns) => ns.clone(),
-            Using::Static(ty) => format!("static {ty}"),
-            Using::Alias(alias, target) => format!("{alias} = {target}"),
-        }
+    match spelled.split_once(" = ") {
+        Some((alias, target)) => Some(Using::Alias(alias.into(), target.into())),
+        None => (!spelled.is_empty()).then(|| Using::Namespace(spelled.to_string())),
     }
+}
 
-    /// The imports the directive writes in the file: a namespace's types on demand, a type's
-    /// static members and nested types, or an alias, read as a namespace until `join` finds
-    /// a type of its name.
-    fn apply(&self, facts: &mut Facts) {
-        match self {
-            Using::Namespace(ns) => wildcard(ns, false, facts),
-            Using::Static(ty) => {
-                let alias = format!("@static{}", facts.imports.len());
-                facts.imports.push(Import {
-                    local: alias.clone(),
-                    source: ty.clone(),
-                    name: Imported::Qualified,
-                });
-                facts.imports.push(Import {
-                    local: "*".into(),
-                    source: String::new(),
-                    name: Imported::Glob {
-                        path: alias,
-                        inside: false,
-                        public: false,
-                    },
-                });
-            }
-            Using::Alias(alias, target) => facts.imports.push(Import {
+fn spell(using: &Using) -> String {
+    match using {
+        Using::Namespace(ns) => ns.clone(),
+        Using::Static(ty) => format!("static {ty}"),
+        Using::Alias(alias, target) => format!("{alias} = {target}"),
+    }
+}
+
+/// The imports a using directive writes in the file: a namespace's types on demand, a type's
+/// static members and nested types, or an alias, read as a namespace until `join` finds a type
+/// of its name.
+fn apply(using: &Using, facts: &mut Facts) {
+    match using {
+        Using::Namespace(ns) => wildcard(ns, false, facts),
+        Using::Static(ty) => {
+            let alias = format!("@static{}", facts.imports.len());
+            facts.imports.push(Import {
                 local: alias.clone(),
-                source: target.clone(),
-                name: Imported::Namespace,
-            }),
+                source: ty.clone(),
+                name: Imported::Qualified,
+            });
+            facts.imports.push(Import {
+                local: "*".into(),
+                source: String::new(),
+                name: Imported::Glob {
+                    path: alias,
+                    inside: false,
+                    public: false,
+                },
+            });
         }
+        Using::Alias(alias, target) => facts.imports.push(Import {
+            local: alias.clone(),
+            source: target.clone(),
+            name: Imported::Namespace,
+        }),
     }
 }
 
@@ -321,7 +346,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
         // A static constructor is the type's initializer, no constructor a call names: its
         // calls are the type's.
         let initializer = node.kind() == "constructor_declaration" && modifiers.contains(&"static");
-        if let Some(kind) = kind.filter(|_| defining && !initializer) {
+        // An explicit interface implementation (`long IClock.Now()`) is reached through the
+        // interface alone: no symbol of its own, its calls the type's.
+        let explicit = named(node).any(|n| n.kind() == "explicit_interface_specifier");
+        if let Some(kind) = kind.filter(|_| defining && !initializer && !explicit) {
             let Some(name) = node.child_by_field_name("name") else {
                 continue;
             };
@@ -412,6 +440,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
                             facts.private.push(alias.to_string());
                         }
                     }
+                    if modifiers.contains(&"partial") {
+                        facts.partial.push(inner.as_ref().clone());
+                    }
                     in_interface = node.kind() == "interface_declaration";
                     if in_interface {
                         facts.interfaces.push(inner.as_ref().clone());
@@ -466,7 +497,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
             "using_directive" => {
                 if let Some(using) = using(node, src) {
                     match children(node).any(|c| c.kind() == "global") {
-                        true => facts.project.push(using.spell()),
+                        true => facts.project.push(spell(&using)),
                         false => usings.push(using),
                     }
                 }
@@ -626,7 +657,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         wildcard(ns, true, &mut facts);
     }
     for using in usings {
-        using.apply(&mut facts);
+        apply(&using, &mut facts);
     }
     let mut at = BTreeMap::new();
     for receiver in std::mem::take(&mut facts.receivers) {
@@ -999,9 +1030,11 @@ mod tests {
             })
             .collect();
         let configs: Vec<(&str, &[u8])> = configs.iter().map(|(p, s)| (*p, s.as_bytes())).collect();
-        let mut files: BTreeMap<&str, &mut Facts> =
-            parsed.iter_mut().map(|(p, f)| (p.as_str(), f)).collect();
-        CSharp.join(&configs, &mut files);
+        let raw: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (p.as_str(), f)).collect();
+        let join = CSharp.join(&configs, &raw);
+        for (path, facts) in &mut parsed {
+            join(path, facts);
+        }
         parsed
     }
 

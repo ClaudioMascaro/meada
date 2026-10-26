@@ -33,4 +33,12 @@ namespace Acme.Core.Text
     {
         long Now();
     }
+
+    public class SystemClock : IClock
+    {
+        public long Now() => 0;
+
+        // An explicit implementation is no symbol of its own: its calls are the type's.
+        long IClock.Now() => Now();
+    }
 }

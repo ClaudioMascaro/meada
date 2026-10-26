@@ -1,7 +1,7 @@
 namespace Acme.Core.Orders;
 
 [Serializable]
-public abstract class Carrier
+public abstract partial class Carrier
 {
     protected Carrier(string name) { }
 
@@ -13,15 +13,4 @@ public abstract class Carrier
     protected void Rate() { }
 
     private void Purge() { }
-}
-
-public sealed class Courier : Carrier
-{
-    public Courier() : base("courier") { }
-
-    public override void Ship()
-    {
-        base.Ship();
-        Track();
-    }
 }

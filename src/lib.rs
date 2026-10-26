@@ -10,6 +10,7 @@ mod decider;
 mod decisions;
 mod declared;
 mod document;
+mod dotnet;
 mod drift_view;
 pub mod engine;
 mod entry;
@@ -42,6 +43,7 @@ pub mod ui;
 #[cfg(feature = "valkey")]
 mod valkey;
 mod workspace;
+mod xml;
 mod zod;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;

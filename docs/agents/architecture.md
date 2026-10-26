@@ -1009,6 +1009,13 @@ one for the area a change touches.
   table), `known` (a name an import binds), `spellings` and `typed` (the outside type the source
   writes for a name), and the Java readers' shared filters `java_files`, `jvm_files` (Java and
   Kotlin files) and `is_method` (an annotation on a method of the file).
+- `dotnet/` holds what the .NET pack and ecosystems share (spec #28), as `jvm/` does for the
+  JVM: `dotnet/msbuild.rs` reads an SDK-style project file (`msbuild::read`: whether it is a
+  project, and its `Using`s, the SDK's implicit usings among them), which the C# pack's `join`
+  reads and the NuGet ecosystem (#116) is to read manifests with; a second reader of project
+  files is a finding. `xml.rs` holds the bounds every XML build file reader shares
+  (`within_limits`, `XML_NODES`), owned by neither ecosystem: `jvm/maven.rs` and
+  `dotnet/msbuild.rs` both check them before roxmltree parses.
 - New **Go router** (spec #25; net/http, gin, echo, chi and gorilla): a row of `ROUTERS` in
   `http/go.rs` (the package, the functions that make a router, the methods that make a group
   (a `Form`: `Group(prefix)`, chi's `Group(fn)` and `Route(prefix, fn)`, gorilla's
@@ -1532,17 +1539,24 @@ one for the area a change touches.
   A pack whose files bind names another file writes (C#'s `global using` directives, and the
   `<Using>` items and implicit usings of a project file, which apply to every file of the
   project) gives `LanguagePack::join`: on every refresh, before `layout`, the index hands it the
-  pack's config files and the facts of all its files as parsed, which it may change in memory
-  (the C# pack appends each project's usings to the `imports` of each of its files, from
-  `Facts::project` and `lang/csharp/project.rs`, and reads an alias as a type's when a class of
-  the repository has its target's name). The index keeps the facts as parsed and joins them
-  again each time, so a file whose own text did not change resolves as a cold index resolves
-  it; `resolved` then rewrites its rows. A pack whose types may be written in parts across
-  files (`LanguagePack::partial_types`, C#'s `partial`) has `Resolver::parts`: classes of one
-  qualified name in several files are one type, so a member lookup (`member`, `overloaded`,
-  `inherited_field`) reads every part after each class of a family (`with_parts`), several
-  parts of one type a name binds construct its first part by path (`one_type`), and a
-  constructor call takes the constructors of every part.
+  pack's config files and the facts of all its files as parsed, and it gives back a `Join`, what
+  to do to one file's facts, which the index applies to each file and to each file the
+  contracts parse again for their values (the C# pack appends each project's usings to the
+  `imports` of each of its files, from `Facts::project` and `dotnet::msbuild`, reads an alias as
+  a type's when a class of the repository has its target's name, and sets `Facts::unit` to the
+  project). The index keeps the facts as parsed and joins them again each time, so a file whose
+  own text did not change resolves as a cold index resolves it; `resolved` then rewrites its
+  rows. A type a pack declares in parts (`Facts::partial`, C#'s `partial`) in several files of
+  one `Facts::unit` is one type (`Resolver::parts`): a member lookup (`member`, `overloaded`,
+  `inherited_field`) reads every part after each class of a family (`with_parts`), the family
+  linearizes the bases every part writes (`bases`), a name the parts' files export binds the
+  asking file's own part, else the first by path (`exports`), several parts a name binds
+  construct the first (`one_type`), and a constructor call takes the constructors of every part.
+  Classes of one name that are not parts of one type stay several, `ambiguous`. A glob of a
+  namespace (`wildcard`'s `Imported::Namespace` source, `Resolver::glob_namespace`) takes the
+  classes declared in that namespace alone (`Binding::of_namespace`), since a C# file's group
+  is its first namespace's and it may declare types in another; the C# layout names such a file
+  for each other namespace it declares types in, when no file has that namespace as package.
 - New **config key**: add the field to `Config`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
 - New **MCP tool**: `mcp.rs`, one `Engine` method that builds the tool's result, its result
@@ -1796,22 +1810,24 @@ one for the area a change touches.
 infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out, as the
 qualification budget does (ADR 0017).
 
-- `resolve.rs`: `TYPE_PARTS` (64) bounds the files one partial type is read across
+- `resolve.rs`: `TYPE_PARTS` (64) bounds the files of one unit one partial type is read across
   (`Resolver::parts`); classes of one name in more files are each a class of its own, so a
   member lookup reads its own file and a name binding them all is `ambiguous`. A C#
-  conformance test writes one type in more files.
+  conformance test writes one type in 64 files and in 65.
 
 - `lang/csharp.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the C# pack as they bound the Java pack's, with the same
   outcome past each (a call inside a definition nested too deep is `(opaque).`, resolving to
-  nothing); `PROJECT_USINGS` (1,024) bounds the distinct usings `join` adds to every file of a
+  nothing); `PROJECT_USINGS` (256) bounds the distinct usings `join` adds to every file of a
   project, past which the project's files keep no facts, since a partial set could make a
   name exact that a missing using leaves ambiguous. The C# hostile-depth, long-prefix and
   pack unit tests exceed them. Beyond the limits, what the pack leaves out (spec #28, #107):
-  a `using` inside a namespace block binds in the whole file, and a file's types take its
-  first namespace's group (`Facts::package`); the global namespace's types are seen only from
-  the global namespace. A project file is SDK-style when its `Project` has an `Sdk` attribute
-  or an `Sdk` element; its properties are read as written, with no `Condition`, import or
+  a `using` inside a namespace block binds in the whole file, and a file joins its first
+  namespace's group (`Facts::package`): a type it declares in another namespace binds there
+  through the file (`Binding::of_namespace`) only when no file has that namespace as package,
+  and by full name otherwise; the global namespace's types are seen only from the global
+  namespace. A project file is SDK-style when its `Project` has an `Sdk` attribute, an `Sdk`
+  element or an `Import` with an `Sdk` (any case); its properties are read as written, with no `Condition`, import or
   `Directory.Build.props`, and the nearest project directory owns a file (MSBuild items that
   include or remove files are not read; two project files in one directory take the first).
   Implicit usings add the SDK's own list for `Microsoft.NET.Sdk`, plus `.Web`'s and
@@ -1824,8 +1840,8 @@ qualification budget does (ADR 0017).
   parameter's `ref`, `out` and `in` are not part of a written signature, so `M(int)` and
   `M(ref int)` share one id; a static constructor, a primary constructor, an operator, an
   indexer, a property accessor and an explicit interface implementation define no symbol
-  (their calls are the type's). A partial type's bases are those each part writes, read for
-  that part. Interpolated, raw and concatenated strings are unknown values.
+  (their calls are the type's). The parts of a partial type come from one project. Interpolated,
+  raw and concatenated strings are unknown values.
 
 - `snapshot/pull.rs`: a generation's bundles hold at most `GENERATION_BYTES_MAX` (256 GiB)
   together, as the document records their sizes (checked before any download) and as the
@@ -2789,13 +2805,13 @@ qualification budget does (ADR 0017).
   budget and nesting limit; a `.properties` file is bounded by `lang::MAX_BYTES` like every pack
   config. A same-package `System` type in another file is not seen by the Java pack's
   `getenv`.
-- `jvm/maven.rs` (spec #26): `XML_DEPTH` (64 nested elements), `XML_NAMESPACES` (16 `xmlns`
+- `xml.rs`, shared by `jvm/maven.rs` (spec #26) and `dotnet/msbuild.rs` (spec #28): `XML_DEPTH` (64 nested elements), `XML_NAMESPACES` (16 `xmlns`
   occurrences in the file) and `XML_ATTRIBUTES` (64 per tag) are checked by one linear pass
   before parsing, since roxmltree copies the enclosing namespaces into each element that
   declares one and checks a tag's attributes pairwise; `XML_NODES` (65,536) bounds the parsed
   tree, in addition to `lang::MAX_BYTES`. `roxmltree` rejects DTDs and never loads external
-  entities. An over-limit, unterminated or malformed manifest reads as an empty summary;
-  indexing continues. `jvm/gradle.rs`: `GRADLE_DEPTH` (64) bounds nested blocks; a deeper build
+  entities. An over-limit, unterminated or malformed manifest reads as an empty summary (a
+  project file as no project); indexing continues. `jvm/gradle.rs`: `GRADLE_DEPTH` (64) bounds nested blocks; a deeper build
   or settings file reads as an empty summary. The Gradle scanner does not read Groovy slashy
   strings, and reads a triple-quoted string as quoted pairs. It keeps at most `MAX_ROOTS` (64)
   source directories. The Groovy and the Kotlin DSL files (`*.gradle`, `*.gradle.kts`) go

@@ -1,11 +1,20 @@
-//! SDK-style .NET project files, read as XML with no MSBuild evaluation: whether one is a
-//! project, and the usings it adds to every file of it.
+//! SDK-style MSBuild project files (`.csproj`), read as XML with no MSBuild evaluation:
+//! whether one is a project, and the usings it adds to every file of it, the SDK's implicit
+//! usings among them.
 
 use roxmltree::{Document, Node, ParsingOptions};
 
-use super::Using;
-use crate::jvm::maven::{XML_NODES, within_limits};
 use crate::lang::MAX_BYTES;
+use crate::xml::{XML_NODES, within_limits};
+
+/// A using directive: a namespace's types on demand, a type's static members and nested
+/// types (`using static`), or an alias (`using X = A.B`).
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Using {
+    Namespace(String),
+    Static(String),
+    Alias(String, String),
+}
 
 /// The namespaces implicit usings add in every SDK project (the SDK's own list).
 const IMPLICIT: &[&str] = &[
@@ -39,10 +48,11 @@ const WORKER: &[&str] = &[
 
 /// The usings an SDK-style project file adds to each of its files, in order: the implicit
 /// usings it enables, then its `<Using>` items, less those it removes. `None` when the file
-/// is no SDK-style project (no `Sdk`), or cannot be read.
+/// is no SDK-style project (no `Sdk` on `Project`, in an `Sdk` element or on an `Import`), or
+/// cannot be read.
 // ponytail: properties are read as written, with no `Condition`, import or
 // `Directory.Build.props`; the last `ImplicitUsings` written decides.
-pub(super) fn read(src: &[u8]) -> Option<Vec<Using>> {
+pub fn read(src: &[u8]) -> Option<Vec<Using>> {
     if src.len() > MAX_BYTES {
         return None;
     }
@@ -60,9 +70,9 @@ pub(super) fn read(src: &[u8]) -> Option<Vec<Using>> {
     if project.tag_name().name() != "Project" {
         return None;
     }
-    let sdk = project
-        .attribute("Sdk")
-        .or_else(|| elements(project, "Sdk").find_map(|n| n.attribute("Name")))?;
+    let sdk = (project.attribute("Sdk"))
+        .or_else(|| elements(project, "Sdk").find_map(|n| n.attribute("Name")))
+        .or_else(|| elements(project, "Import").find_map(|n| n.attribute("Sdk")))?;
     let sdk = sdk
         .split(';')
         .next()
@@ -70,16 +80,18 @@ pub(super) fn read(src: &[u8]) -> Option<Vec<Using>> {
         .split('/')
         .next()
         .unwrap_or("")
-        .trim();
+        .trim()
+        .to_ascii_lowercase();
     let implicit = (elements(project, "PropertyGroup").flat_map(|g| elements(g, "ImplicitUsings")))
         .last()
         .and_then(|n| n.text())
         .is_some_and(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "enable" | "true"));
     let mut usings: Vec<Using> = Vec::new();
     if implicit {
-        let more = match sdk {
-            "Microsoft.NET.Sdk.Web" => WEB,
-            "Microsoft.NET.Sdk.Worker" => WORKER,
+        // MSBuild reads SDK names in any case.
+        let more = match sdk.as_str() {
+            "microsoft.net.sdk.web" => WEB,
+            "microsoft.net.sdk.worker" => WORKER,
             _ => &[],
         };
         let all = IMPLICIT.iter().chain(more);
@@ -143,6 +155,20 @@ mod tests {
                 Using::Alias("F".into(), "D.E".into()),
                 Using::Static("G.H".into()),
             ]
+        );
+    }
+
+    #[test]
+    fn an_sdk_is_named_in_any_case_or_on_an_import() {
+        let lower = "<Project Sdk=\"microsoft.net.sdk.WEB\"><PropertyGroup>\
+                     <ImplicitUsings>true</ImplicitUsings></PropertyGroup></Project>";
+        let usings = read(lower.as_bytes()).unwrap();
+        assert!(usings.contains(&Using::Namespace("Microsoft.AspNetCore.Http".into())));
+        let import = "<Project><Import Project=\"Sdk.props\" Sdk=\"Microsoft.NET.Sdk\" />\
+                      <ItemGroup><Using Include=\"A\" /></ItemGroup></Project>";
+        assert_eq!(
+            read(import.as_bytes()).unwrap(),
+            [Using::Namespace("A".into())]
         );
     }
 

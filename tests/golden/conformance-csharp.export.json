@@ -6,16 +6,48 @@
       "hash": "7161d038cc2b6f216d980cccef2f41a6fbbd3755617a38f138e8cd6ad32aedd0"
     },
     {
+      "path": "src/Acme.Api/Board.Show.cs",
+      "hash": "4daaaa7bf50a2b4402163100332476d900b1721a06ff3429b136aaf420523b37"
+    },
+    {
       "path": "src/Acme.Api/Checkout.cs",
-      "hash": "876f8db9b77afdfa7535d8e56fbc39a3cef68ee23e54fb78ea3034317f40b372"
+      "hash": "3d3c6cee519f1a8e5c925d40b26e344ae3914c031d0a0d8bbef32254916119b8"
+    },
+    {
+      "path": "src/Acme.Api/Contracts.cs",
+      "hash": "caa22233891428dc67d60aba259886e4972d64fe21203ee76954b7fbb4a9f0d4"
+    },
+    {
+      "path": "src/Acme.Api/Inside.cs",
+      "hash": "4b7695397e7411a5d9bc3f03f986d456e83d3e9aadff2f3a0423c395acbe3a92"
+    },
+    {
+      "path": "src/Acme.Api/Namespaces.cs",
+      "hash": "d2a21371a0839e609c4be2a4fa75ea1625f97d935da97ff791a463599e8c6a31"
+    },
+    {
+      "path": "src/Acme.Api/Opaque.cs",
+      "hash": "86f398bf3addeb7e1a97ed527311ba365ce6d3406477e01896b37e57c173b4e6"
     },
     {
       "path": "src/Acme.Api/Shadows.cs",
       "hash": "067c703f754ef2c75f3fab0a6b4bf0a48694203be6be42471cf31926e04270c4"
     },
     {
+      "path": "src/Acme.Core/Contracts/Copies.cs",
+      "hash": "65aa7ede79e5ae4a485261467d020c4a5bf62428ed53270551910a6e4963978a"
+    },
+    {
       "path": "src/Acme.Core/GlobalUsings.cs",
       "hash": "b570023e5f1c24136a95a7612672fd034d2274fc2ce81c8afba72e837f097997"
+    },
+    {
+      "path": "src/Acme.Core/Orders/Carrier.Fees.cs",
+      "hash": "b6d2c30cde1754b3e2d76c8377cd248433c282bd41fb59417c994b8ecf1713fe"
+    },
+    {
+      "path": "src/Acme.Core/Orders/Courier.cs",
+      "hash": "820d61644a43e96d63a88ae17eb11f5fa43b1a502827977df5151b0bfb623a0f"
     },
     {
       "path": "src/Acme.Core/Orders/Order.Lines.cs",
@@ -31,7 +63,7 @@
     },
     {
       "path": "src/Acme.Core/Orders/Shipping.cs",
-      "hash": "c2c4ec8e7ebb85717fae87e493f8af4ad88504c76fe830ba419a91490b984e1d"
+      "hash": "d06793f0a13a3cc51a3c1f3bf60854fe4a4c94be3a66da0b876da63b0ae77ce6"
     },
     {
       "path": "src/Acme.Core/Store/Repository.cs",
@@ -39,7 +71,11 @@
     },
     {
       "path": "src/Acme.Core/Text/Format.cs",
-      "hash": "a5657bb9121faea761d3588a0bcbe334ec4e13b14cac466072d11222e551cb64"
+      "hash": "2e465a964063f0bed712538e3bd1e70d714886291719bf50d59d170d4732e727"
+    },
+    {
+      "path": "src/Acme.Core/Text/Nested.cs",
+      "hash": "85de0bac38f4a2e8f3a2037b21a90373d2833281102e70905b42434e99661cf2"
     }
   ],
   "symbols": [
@@ -60,19 +96,115 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board",
+      "span": {
+        "path": "src/Acme.Api/Board.Show.cs",
+        "start": 58,
+        "end": 127
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board.Show()",
+      "span": {
+        "path": "src/Acme.Api/Board.Show.cs",
+        "start": 91,
+        "end": 125
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout",
       "span": {
         "path": "src/Acme.Api/Checkout.cs",
-        "start": 156,
-        "end": 590
+        "start": 235,
+        "end": 884
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
       "span": {
         "path": "src/Acme.Api/Checkout.cs",
-        "start": 264,
-        "end": 584
+        "start": 343,
+        "end": 878
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Contracts.OrderDto",
+      "span": {
+        "path": "src/Acme.Api/Contracts.cs",
+        "start": 31,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Hosting.Shell",
+      "span": {
+        "path": "src/Acme.Api/Contracts.cs",
+        "start": 89,
+        "end": 159
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Hosting.Shell.Start()",
+      "span": {
+        "path": "src/Acme.Api/Contracts.cs",
+        "start": 130,
+        "end": 153
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside",
+      "span": {
+        "path": "src/Acme.Api/Inside.cs",
+        "start": 55,
+        "end": 131
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()",
+      "span": {
+        "path": "src/Acme.Api/Inside.cs",
+        "start": 89,
+        "end": 125
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside",
+      "span": {
+        "path": "src/Acme.Api/Namespaces.cs",
+        "start": 49,
+        "end": 211
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside.Run()",
+      "span": {
+        "path": "src/Acme.Api/Namespaces.cs",
+        "start": 169,
+        "end": 205
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Board",
+      "span": {
+        "path": "src/Acme.Api/Opaque.cs",
+        "start": 278,
+        "end": 325
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home",
+      "span": {
+        "path": "src/Acme.Api/Opaque.cs",
+        "start": 147,
+        "end": 225
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home.Index()",
+      "span": {
+        "path": "src/Acme.Api/Opaque.cs",
+        "start": 188,
+        "end": 223
       }
     },
     {
@@ -161,6 +293,70 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 607,
         "end": 687
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Contracts.OrderDto",
+      "span": {
+        "path": "src/Acme.Core/Contracts/Copies.cs",
+        "start": 31,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Hosting.Shell",
+      "span": {
+        "path": "src/Acme.Core/Contracts/Copies.cs",
+        "start": 89,
+        "end": 158
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Hosting.Shell.Stop()",
+      "span": {
+        "path": "src/Acme.Core/Contracts/Copies.cs",
+        "start": 130,
+        "end": 152
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Carrier.Fees.cs::Acme.Core.Orders.Carrier",
+      "span": {
+        "path": "src/Acme.Core/Orders/Carrier.Fees.cs",
+        "start": 103,
+        "end": 171
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Carrier.Fees.cs::Acme.Core.Orders.Carrier.Bill()",
+      "span": {
+        "path": "src/Acme.Core/Orders/Carrier.Fees.cs",
+        "start": 147,
+        "end": 169
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier",
+      "span": {
+        "path": "src/Acme.Core/Orders/Courier.cs",
+        "start": 29,
+        "end": 212
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Courier()",
+      "span": {
+        "path": "src/Acme.Core/Orders/Courier.cs",
+        "start": 73,
+        "end": 111
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()",
+      "span": {
+        "path": "src/Acme.Core/Orders/Courier.cs",
+        "start": 117,
+        "end": 210
       }
     },
     {
@@ -320,71 +516,47 @@
       "span": {
         "path": "src/Acme.Core/Orders/Shipping.cs",
         "start": 29,
-        "end": 293
+        "end": 301
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Carrier(string)",
       "span": {
         "path": "src/Acme.Core/Orders/Shipping.cs",
-        "start": 80,
-        "end": 114
+        "start": 88,
+        "end": 122
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Purge()",
       "span": {
         "path": "src/Acme.Core/Orders/Shipping.cs",
-        "start": 267,
-        "end": 291
+        "start": 275,
+        "end": 299
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Rate()",
       "span": {
         "path": "src/Acme.Core/Orders/Shipping.cs",
-        "start": 236,
-        "end": 261
+        "start": 244,
+        "end": 269
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Ship()",
       "span": {
         "path": "src/Acme.Core/Orders/Shipping.cs",
-        "start": 120,
-        "end": 150
+        "start": 128,
+        "end": 158
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Track()",
       "span": {
         "path": "src/Acme.Core/Orders/Shipping.cs",
-        "start": 156,
-        "end": 230
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Courier",
-      "span": {
-        "path": "src/Acme.Core/Orders/Shipping.cs",
-        "start": 295,
-        "end": 462
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Courier.Courier()",
-      "span": {
-        "path": "src/Acme.Core/Orders/Shipping.cs",
-        "start": 339,
-        "end": 377
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Courier.Ship()",
-      "span": {
-        "path": "src/Acme.Core/Orders/Shipping.cs",
-        "start": 383,
-        "end": 460
+        "start": 164,
+        "end": 238
       }
     },
     {
@@ -538,6 +710,46 @@
         "start": 568,
         "end": 600
       }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 725,
+        "end": 928
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock.Now()",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 773,
+        "end": 796
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.First",
+      "span": {
+        "path": "src/Acme.Core/Text/Nested.cs",
+        "start": 94,
+        "end": 116
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second",
+      "span": {
+        "path": "src/Acme.Core/Text/Nested.cs",
+        "start": 152,
+        "end": 233
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second.Make()",
+      "span": {
+        "path": "src/Acme.Core/Text/Nested.cs",
+        "start": 194,
+        "end": 223
+      }
     }
   ],
   "calls": [
@@ -553,14 +765,36 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board.Show()::Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board.Show()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Api/Board.Show.cs",
+        "start": 112,
+        "end": 122
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::Acme.Core.Text.Casing.Lower#0",
       "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
       "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing.Lower(string)",
       "level": "exact",
       "span": {
         "path": "src/Acme.Api/Checkout.cs",
-        "start": 391,
-        "end": 423
+        "start": 470,
+        "end": 502
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::Create#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 620,
+        "end": 628
       }
     },
     {
@@ -570,8 +804,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Checkout.cs",
-        "start": 559,
-        "end": 573
+        "start": 853,
+        "end": 867
       }
     },
     {
@@ -581,8 +815,23 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Checkout.cs",
-        "start": 535,
-        "end": 545
+        "start": 829,
+        "end": 839
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::OrderDto#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Contracts.OrderDto",
+        "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Contracts.OrderDto"
+      ],
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 714,
+        "end": 728
       }
     },
     {
@@ -592,8 +841,23 @@
       "level": "exact",
       "span": {
         "path": "src/Acme.Api/Checkout.cs",
-        "start": 437,
-        "end": 459
+        "start": 516,
+        "end": 538
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::Shell#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Hosting.Shell",
+        "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Hosting.Shell"
+      ],
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 742,
+        "end": 753
       }
     },
     {
@@ -603,8 +867,8 @@
       "level": "exact",
       "span": {
         "path": "src/Acme.Api/Checkout.cs",
-        "start": 364,
-        "end": 377
+        "start": 443,
+        "end": 456
       }
     },
     {
@@ -614,8 +878,8 @@
       "level": "exact",
       "span": {
         "path": "src/Acme.Api/Checkout.cs",
-        "start": 328,
-        "end": 350
+        "start": 407,
+        "end": 429
       }
     },
     {
@@ -625,8 +889,8 @@
       "level": "exact",
       "span": {
         "path": "src/Acme.Api/Checkout.cs",
-        "start": 304,
-        "end": 314
+        "start": 383,
+        "end": 393
       }
     },
     {
@@ -636,8 +900,41 @@
       "level": "exact",
       "span": {
         "path": "src/Acme.Api/Checkout.cs",
-        "start": 231,
-        "end": 253
+        "start": 310,
+        "end": 332
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()::Second.Make#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second.Make()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Inside.cs",
+        "start": 109,
+        "end": 122
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside.Run()::Second.Make#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside.Run()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Namespaces.cs",
+        "start": 189,
+        "end": 202
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home.Index()::Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home.Index()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Api/Opaque.cs",
+        "start": 210,
+        "end": 220
       }
     },
     {
@@ -748,6 +1045,50 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 665,
         "end": 682
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Courier()::Carrier#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Courier()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Carrier(string)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/Courier.cs",
+        "start": 90,
+        "end": 107
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()::Bill#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Carrier.Fees.cs::Acme.Core.Orders.Carrier.Bill()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/Courier.cs",
+        "start": 197,
+        "end": 203
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()::Track#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Track()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/Courier.cs",
+        "start": 180,
+        "end": 187
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()::base.Ship#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Ship()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/Courier.cs",
+        "start": 159,
+        "end": 170
       }
     },
     {
@@ -948,41 +1289,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Core/Orders/Shipping.cs",
-        "start": 157,
-        "end": 201
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Courier.Courier()::Carrier#0",
-      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Courier.Courier()",
-      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Carrier(string)",
-      "level": "exact",
-      "span": {
-        "path": "src/Acme.Core/Orders/Shipping.cs",
-        "start": 356,
-        "end": 373
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Courier.Ship()::Track#0",
-      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Courier.Ship()",
-      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Track()",
-      "level": "exact",
-      "span": {
-        "path": "src/Acme.Core/Orders/Shipping.cs",
-        "start": 446,
-        "end": 453
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Courier.Ship()::base.Ship#0",
-      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Courier.Ship()",
-      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Ship()",
-      "level": "exact",
-      "span": {
-        "path": "src/Acme.Core/Orders/Shipping.cs",
-        "start": 425,
-        "end": 436
+        "start": 165,
+        "end": 209
       }
     },
     {
@@ -1039,6 +1347,17 @@
         "start": 590,
         "end": 599
       }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock::Now#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock.Now()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 916,
+        "end": 921
+      }
     }
   ],
   "providers": [],
@@ -1047,6 +1366,8 @@
     {
       "name": "src/Acme.Api",
       "members": [
+        "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board.Show()",
+        "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home.Index()",
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.FieldShadow.Run()",
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Caught()",
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Lambda()",
@@ -1057,6 +1378,13 @@
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parse(object)",
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Pattern(object)",
         "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+      ]
+    },
+    {
+      "name": "src/Acme.Api#2",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()",
+        "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second.Make()"
       ]
     },
     {
@@ -1073,6 +1401,22 @@
     {
       "name": "src/Acme.Core/Orders#2",
       "members": [
+        "example.com/acme/conformance::src/Acme.Core/Orders/Carrier.Fees.cs::Acme.Core.Orders.Carrier.Bill()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Ship()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Track()"
+      ]
+    },
+    {
+      "name": "src/Acme.Core/Orders#3",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Courier()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Carrier(string)"
+      ]
+    },
+    {
+      "name": "src/Acme.Core/Orders#4",
+      "members": [
         "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order",
         "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()",
         "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Audit()",
@@ -1085,32 +1429,17 @@
       ]
     },
     {
-      "name": "src/Acme.Core/Orders#3",
+      "name": "src/Acme.Core/Orders#5",
       "members": [
         "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Sum()",
         "example.com/acme/conformance::src/Acme.Core/Orders/Order.cs::Acme.Core.Orders.Order.Total()"
       ]
     },
     {
-      "name": "src/Acme.Core/Orders#4",
+      "name": "src/Acme.Core/Orders#6",
       "members": [
         "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Add()",
         "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Count()"
-      ]
-    },
-    {
-      "name": "src/Acme.Core/Orders#5",
-      "members": [
-        "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Carrier(string)",
-        "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Courier.Courier()"
-      ]
-    },
-    {
-      "name": "src/Acme.Core/Orders#6",
-      "members": [
-        "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Ship()",
-        "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Track()",
-        "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Courier.Ship()"
       ]
     },
     {
@@ -1127,10 +1456,38 @@
         "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Double(int)",
         "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Twice()"
       ]
+    },
+    {
+      "name": "src/Acme.Core/Text#2",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock",
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock.Now()"
+      ]
     }
   ],
   "links": [],
   "processes": [
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board.Show()",
+      "kind": "export",
+      "label": "Acme.Api.Board.Show()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board.Show()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        }
+      ]
+    },
     {
       "entry_point": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
       "kind": "export",
@@ -1177,6 +1534,100 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing.Lower(string)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::OrderDto#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Contracts.OrderDto",
+            "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Contracts.OrderDto"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::Shell#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Hosting.Shell",
+            "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Hosting.Shell"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()",
+      "kind": "export",
+      "label": "Acme.Api.Inside.Run()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second.Make()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside.Run()",
+      "kind": "export",
+      "label": "Acme.Api.Outside.Run()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside.Run()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home.Index()",
+      "kind": "export",
+      "label": "Acme.Api.Home.Index()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home.Index()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
         }
       ]
     },
@@ -1356,6 +1807,83 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Courier()",
+      "kind": "export",
+      "label": "Acme.Core.Orders.Courier.Courier()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Courier()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Carrier(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()",
+      "kind": "export",
+      "label": "Acme.Core.Orders.Courier.Ship()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Ship()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Track()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Carrier.Fees.cs::Acme.Core.Orders.Carrier.Bill()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Orders/Order.cs::Acme.Core.Orders.Order.Total()",
+      "kind": "export",
+      "label": "Acme.Core.Orders.Order.Total()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Order.cs::Acme.Core.Orders.Order.Total()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Sum()"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Add()",
       "kind": "export",
       "label": "Acme.Core.Orders.OrderService.Line.Add()",
@@ -1491,55 +2019,6 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Rate()"
-        }
-      ]
-    },
-    {
-      "entry_point": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Courier.Courier()",
-      "kind": "export",
-      "label": "Acme.Core.Orders.Courier.Courier()",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/acme/conformance",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Courier.Courier()"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/conformance",
-          "level": "exact",
-          "via": "call",
-          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Carrier(string)"
-        }
-      ]
-    },
-    {
-      "entry_point": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Courier.Ship()",
-      "kind": "export",
-      "label": "Acme.Core.Orders.Courier.Ship()",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/acme/conformance",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Courier.Ship()"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/conformance",
-          "level": "exact",
-          "via": "call",
-          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Ship()"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/conformance",
-          "level": "exact",
-          "via": "call",
-          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Track()"
         }
       ]
     },
