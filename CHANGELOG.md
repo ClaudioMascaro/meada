@@ -33,7 +33,9 @@ All notable changes to Meada are recorded here. The format follows
   companions (`Class.Companion` when unnamed), top-level and extension functions, properties
   with getters and methods, with written parameter types. Single, aliased and star imports
   resolve through package declarations; bare, `this`, object and companion calls are `exact`
-  when the argument count, counting default values and `vararg`, leaves one function. Kotlin and
+  when the argument count, counting default values and `vararg`, leaves one function. An
+  extension function is never a member of the class it extends, even written in that class's
+  file: a member of the class or of a base wins, and a Java call never reaches it. Kotlin and
   Java files of one repository call each other by fully qualified name. No Kotlin compiler, JDK
   or Gradle is involved.
 

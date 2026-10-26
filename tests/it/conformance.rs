@@ -1680,6 +1680,14 @@ fn kotlin() {
             "src/main/kotlin/example/Receivers.kt::example.localFirst(Cache).size()",
             "src/main/kotlin/example/Receivers.kt::example.unknownReceiver()",
             "src/main/kotlin/example/Receivers.kt::example.Shelf",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.read()",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.reset()",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Meter",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Meter.ext(Int)",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)",
+            "src/main/java/example/legacy/Gauges.java::example.legacy.Gauges",
+            "src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)",
             "src/main/kotlin/example/Receivers.kt::example.implicitMember(Shelf)",
             "src/main/kotlin/example/Receivers.kt::example.localBeforeMember(Shelf,Store)",
             "src/main/kotlin/example/other/Others.kt::example.other.Cache.describe()",
@@ -2461,6 +2469,28 @@ fn kotlin() {
                 "src/main/kotlin/example/Receivers.kt::example.unknownReceiver()::(call_expression).loud#0",
                 INFERRED,
                 &["src/main/kotlin/example/Receivers.kt::example.String.loud()"],
+            ),
+            // An extension in its class's file is no member: Java never reaches it, and a member
+            // of a Java base wins over it.
+            (
+                "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)::gauge.reset#0",
+                EXACT,
+                &["src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.reset()"],
+            ),
+            (
+                "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)::meter.ext#0",
+                EXACT,
+                &["src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)"],
+            ),
+            (
+                "src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)::gauge.reset#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)::meter.ext#0",
+                EXACT,
+                &["src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)"],
             ),
             // A name read in a receiver's block is its member; a local around comes first.
             (

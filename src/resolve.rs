@@ -1641,7 +1641,13 @@ impl<'a> Resolver<'a> {
             let found = match self.defs[c.path].get_key_value(qualified.as_str()) {
                 Some((name, _)) if read => Binding::Def(Target { path: c.path, name }),
                 _ if read => Binding::Unknown,
-                _ => self.def(c.path, &qualified),
+                _ => match self.def(c.path, &qualified) {
+                    Binding::Def(t) if self.extends(t) => Binding::Unknown,
+                    Binding::Several(all) if all.iter().all(|t| self.extends(*t)) => {
+                        Binding::Unknown
+                    }
+                    found => found,
+                },
             };
             if !matches!(found, Binding::Unknown) {
                 return found;
@@ -1668,7 +1674,9 @@ impl<'a> Resolver<'a> {
     /// class declares one; unknown when the family has a base whose members are not known
     /// anywhere, since overloads merge across the family and that base may declare or override
     /// any of them (Opaque outside, strict: #353 tracks a relaxation). Other bindings of the
-    /// name (a field) are not methods and do not join the family.
+    /// name (a field) are not methods and do not join the family, nor does a Kotlin extension
+    /// written in its class's file (`fun Foo.x()` beside `class Foo`, a function named under
+    /// the class): it is reached through `Resolver::extensions` alone, after the members.
     fn overloaded(&self, family: &[Ancestor<'a>], member: &str) -> Option<Binding<'a>> {
         let (mut found, mut signatures, mut opaque) = (Vec::new(), HashSet::new(), false);
         for ancestor in family {
@@ -1687,6 +1695,9 @@ impl<'a> Resolver<'a> {
                 continue;
             };
             for t in all {
+                if self.extends(*t) {
+                    continue;
+                }
                 if signatures.insert(t.name.strip_prefix(c.name).unwrap_or(t.name)) {
                     found.push(*t);
                 }
@@ -1793,6 +1804,14 @@ impl<'a> Resolver<'a> {
             Ancestor::Class(b) if nested_in(b, class) => Some(b),
             _ => None,
         })
+    }
+
+    /// Whether `t` is a Kotlin extension function (`Resolver::extensions`): named under the
+    /// class it extends when written in that class's file, it is never one of its members.
+    fn extends(&self, t: Target<'a>) -> bool {
+        let name = t.name.split('(').next().unwrap_or(t.name);
+        let member = name.rsplit('.').next().unwrap_or(name);
+        (self.extensions.get(member)).is_some_and(|all| all.iter().any(|e| e.target == t))
     }
 
     /// The method `qualified` (`Type.method`) of `class` that another file of its package
@@ -2006,6 +2025,10 @@ impl<'a> Resolver<'a> {
         }
         if let Some(arity) = arity {
             found.retain(|t| self.arities.get(t).is_none_or(|n| n.fits(arity)));
+        }
+        // A file whose calls reach no extension function (Java's) matches none by name either.
+        if !self.extending.contains(path) {
+            found.retain(|t| !self.extends(*t));
         }
         found
     }

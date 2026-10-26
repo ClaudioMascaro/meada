@@ -10,6 +10,10 @@
       "hash": "578a47f0aacb99c3295e62c42712d646e8a7fbb40ffde6f0c7d669e554761ca7"
     },
     {
+      "path": "src/main/java/example/legacy/Gauges.java",
+      "hash": "b54a4145857677e59bb5f4ee7e582291ec40c3d5a64ded85b192812a14186ea8"
+    },
+    {
       "path": "src/main/java/example/legacy/Legacy.java",
       "hash": "c7834bf1fa8743a6a0d75bd5c6fe5991a6a8174ca5a18515307a45097308fb9c"
     },
@@ -190,6 +194,10 @@
       "hash": "f0aa2c6d332cd715deb2d0a0868fbf325c39cca5f4bfd56edeb398fdf415b511"
     },
     {
+      "path": "src/main/kotlin/example/legacy/Gauge.kt",
+      "hash": "345aeeb64fcc9c2b4a94661a6e8ec3dd8e274ad05258a19fddf5ba1d690f1a21"
+    },
+    {
       "path": "src/main/kotlin/example/legacy/PortExt.kt",
       "hash": "0c818d32b9290b616de0198f5536b71f6d2ef4ce04987394706ff0502b0f8f24"
     },
@@ -237,6 +245,22 @@
         "path": "scripts/seed.kts",
         "start": 59,
         "end": 93
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/java/example/legacy/Gauges.java::example.legacy.Gauges",
+      "span": {
+        "path": "src/main/java/example/legacy/Gauges.java",
+        "start": 148,
+        "end": 263
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)",
+      "span": {
+        "path": "src/main/java/example/legacy/Gauges.java",
+        "start": 174,
+        "end": 261
       }
     },
     {
@@ -3144,6 +3168,54 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge",
+      "span": {
+        "path": "src/main/kotlin/example/legacy/Gauge.kt",
+        "start": 165,
+        "end": 204
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.read()",
+      "span": {
+        "path": "src/main/kotlin/example/legacy/Gauge.kt",
+        "start": 183,
+        "end": 202
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.reset()",
+      "span": {
+        "path": "src/main/kotlin/example/legacy/Gauge.kt",
+        "start": 206,
+        "end": 226
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Meter",
+      "span": {
+        "path": "src/main/kotlin/example/legacy/Gauge.kt",
+        "start": 228,
+        "end": 248
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Meter.ext(Int)",
+      "span": {
+        "path": "src/main/kotlin/example/legacy/Gauge.kt",
+        "start": 250,
+        "end": 274
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)",
+      "span": {
+        "path": "src/main/kotlin/example/legacy/Gauge.kt",
+        "start": 276,
+        "end": 353
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/PortExt.kt::example.legacy.Port.ext(String)",
       "span": {
         "path": "src/main/kotlin/example/legacy/PortExt.kt",
@@ -3496,6 +3568,28 @@
         "path": "scripts/seed.kts",
         "start": 77,
         "end": 93
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)::gauge.reset#0",
+      "caller": "example.com/acme/conformance::src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/java/example/legacy/Gauges.java",
+        "start": 219,
+        "end": 232
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)::meter.ext#0",
+      "caller": "example.com/acme/conformance::src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)",
+      "target": "example.com/acme/conformance::src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/java/example/legacy/Gauges.java",
+        "start": 242,
+        "end": 254
       }
     },
     {
@@ -10079,6 +10173,28 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)::gauge.reset#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.reset()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/legacy/Gauge.kt",
+        "start": 321,
+        "end": 334
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)::meter.ext#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)",
+      "target": "example.com/acme/conformance::src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/legacy/Gauge.kt",
+        "start": 339,
+        "end": 351
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.shared()::closed#0",
       "caller": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.shared()",
       "target": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.closed()",
@@ -11191,8 +11307,11 @@
     {
       "name": "src/main/java/example/legacy",
       "members": [
+        "example.com/acme/conformance::src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)",
         "example.com/acme/conformance::src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)",
-        "example.com/acme/conformance::src/main/java/example/legacy/Port.java::example.legacy.Port.use(Port,String)"
+        "example.com/acme/conformance::src/main/java/example/legacy/Port.java::example.legacy.Port.use(Port,String)",
+        "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.reset()",
+        "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)"
       ]
     },
     {
@@ -17038,6 +17157,62 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().PATCH /api/admin/orders/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.read()",
+      "kind": "export",
+      "label": "example.legacy.Gauge.read()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.read()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Meter.ext(Int)",
+      "kind": "export",
+      "label": "example.legacy.Meter.ext(Int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Meter.ext(Int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)",
+      "kind": "export",
+      "label": "example.legacy.gauges(Gauge,Meter)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.reset()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)"
         }
       ]
     },

@@ -1395,7 +1395,11 @@ one for the area a change touches.
   file, so a type nothing binds is outside the repository (Opaque outside). An extension
   function or property is a `Facts::extensions` block of its receiver's type, named as the
   function is (`pkg.Receiver.f()`): it tells what `this` is in the extension's body, and its
-  functions are no members of the type, so Java calls never reach them. A Kotlin call no member
+  functions are no members of the type, so Java calls never reach them, not even by name
+  (`Resolver::candidates` drops them for a file whose pack has no extension functions). Written in
+  its class's file, an extension is named under the class as a member is, so the member lookup
+  (`Resolver::member`, `overloaded`) skips it by `Resolver::extends`: a member of the class or of
+  a base (a Java one too) comes first, and the extension is reached through `extended` alone. A Kotlin call no member
   answers (`LanguagePack::extension_functions`) reads `Resolver::extended`: the extensions of its
   name in scope of the file, first to last a scope around the call, an explicit import, the
   file's package, a star import (`visible`), narrowed by argument count. On a receiver of a class
@@ -1738,9 +1742,7 @@ one for the area a change touches.
   a receiver typed by one is outside it, and resolves to nothing. A name bound twice in one
   scope with different types, or named like a property, holds an unknown type. A call `X.f(..)`
   is read as a constructor only when `f` is capitalized, as Kotlin names classes. An import alias
-  of an extension (`import a.slug as s`) brings nothing in scope for it. An extension written in its
-  class's own file is named as a member would be (`pkg.Foo.x()`), so a call reaches it as a
-  member, a Java call too (the naming of #95). A bare call a top-level function of its name answers is
+  of an extension (`import a.slug as s`) brings nothing in scope for it. A bare call a top-level function of its name answers is
   exact to that function, though Kotlin prefers an extension of the implicit receiver. A
   companion is
   its class's last base, so `Type.m()` reads the class's own instance member first when both
