@@ -45,7 +45,8 @@ a review finding.
   values) climb `exact` hops alone. The one exception is a C# extension method called on a
   receiver (`x.M()`), which the resolver keeps a name match only because it does not look the
   extensions up: the value flow takes it when the static class declaring it is in scope of the
-  call by its name, as the compiler binds it (`Resolver::extension_callers`).
+  call by its name, as the compiler binds it (`Resolver::extension_callers`; decided in
+  `docs/adr/0018-csharp-extension-calls-in-the-value-flow.md`).
 - **Unreadable parts.** A path or prefix with a part that cannot be read (an unfolded template or
   f-string hole, a parameter, an environment read) yields no provider, never a `{}` segment. A
   parameter written in the literal (`:id`, `{id}`, `<int:id>`) stays one.

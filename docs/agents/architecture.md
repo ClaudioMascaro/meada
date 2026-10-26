@@ -1023,7 +1023,10 @@ one for the area a change touches.
   (`spring::CONFIG_FILES`), which the Java pack returns as its `config_files`. `names.rs`
   holds the name questions the JVM and C# kinds share: `one` (exactly one spelling in the kind's
   table), `known` (a name an import binds), `spellings`, `typed` and `declared` (the outside type
-  the source writes for a name) and `is_method` (an annotation on a method of the file);
+  the source writes for a name), `in_full` and `is_type` (a type written in full is the
+  library's unless a definition of the repository binds that very name, as a compiler prefers
+  the source's type; else the one spelling the usings give it, one rule for every C# kind) and
+  `is_method` (an annotation on a method of the file);
   `jvm/names.rs` keeps the Java readers' filters `java_files` and `jvm_files` (Java and Kotlin
   files), `kotlin` and `array_of`.
 - `dotnet/` holds what the .NET pack and ecosystems share (spec #28), as `jvm/` does for the
@@ -1360,8 +1363,9 @@ one for the area a change touches.
   `Value::New`, a local the pack bound to one, or a call on a client that makes another
   (`STEPS`: `Build`, `CreateConnection`, `CreateModel`, `GetDatabase`, `CreateSender`, the
   static `ConnectionMultiplexer.Connect` called on the type's own name; a builder's `Set*`
-  hands the builder back). A type is accepted as the one spelling in the table the usings give
-  it (`names::spellings`, `names::one`), so a type of the repository with the same name hides
+  hands the builder back). A type is accepted written in full (`names::in_full`) or as the one
+  spelling in the table the usings give it (`names::spellings`, `names::one`), so a type of the
+  repository with the same name hides
   the library's, and `ConnectionFactory` or `IConnection` with RabbitMQ.Client and NATS.Client
   both imported is none. The receiver is followed at most `CHANNEL_CLIENT_DEPTH` links. Names fold
   like a URL through `Code::expand` (a wrapper's parameter makes each caller a producer or a
@@ -1623,7 +1627,8 @@ one for the area a change touches.
   the seam's `programs`; Rust asks the crate `Tree` for its binary roots (`Tree::bins`). The forms per language are spec #31 "Program entry points per language
   pack": Python `if __name__ == "__main__":` as symbol `__main__` plus each `[project.scripts]`
   target; Go `func main` in package `main`; Java `public static void main(String[])`; Kotlin a
-  top-level `fun main`; C# a `static Main` and, for top-level statements, a symbol `Main`; Swift
+  top-level `fun main`; C# a `static Main` (any signature) and, for top-level statements, a
+  symbol `Main` (none when the file declares a global type `Main`, which would share it); Swift
   an `@main` type and `main.swift` as symbol `main`; Rust `fn main` in `src/main.rs` and
   `src/bin/`. TS/JS declares none.
   A pack whose files bind names another file writes (C#'s `global using` directives, and the
@@ -1737,7 +1742,8 @@ one for the area a change touches.
   definitions of its name (`calls.narrowed`), callable-to-signature and
   static-member names (`Facts::overloads`, `Facts::constructors` and
   `Facts::statics`), the namespaces and types a C# file's `global using` directives name
-  (`Facts::project`, names as `Facts::imports` holds them), the literal URL path fragments and the
+  (`Facts::project`, names as `Facts::imports` holds them), the qualified names of the types a C#
+  file declares in `partial` parts (`Facts::partial`), the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
   consumer reads from the parsed response, and those of the zod schema or object literals a
@@ -1767,7 +1773,10 @@ one for the area a change touches.
   (spec #26: literal Maven coordinates and versions, dependency coordinate fragments with `*`
   for computed parts, declared ranges and a `computed` source flag, source roots with the test ones marked, and Gradle's
   literal group, root project name and included project names/directories in `Summary::build`),
-  the `tsconfig.json` rows
+  of each SDK-style `.csproj` (spec #28: the package id, else assembly name, else file name, the
+  literal version, each `PackageReference` with its range as written, each `ProjectReference`
+  as a `path` folded from the project's directory, and `Summary::project`, the mark that it is
+  an SDK-style project that owns its files), the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition, constant, type or file they name), the `families` table (spec #26: each public
   Java class's ancestors past it, `Resolver::ancestries`, a repository class by file and name and
@@ -1959,7 +1968,10 @@ qualification budget does (ADR 0017).
 - `resolve.rs`: `TYPE_PARTS` (64) bounds the files of one unit one partial type is read across
   (`Resolver::parts`); classes of one name in more files are each a class of its own, so a
   member lookup reads its own file and a name binding them all is `ambiguous`. A C#
-  conformance test writes one type in 64 files and in 65.
+  conformance test writes one type in 64 files and in 65. Definitions of one name in files of
+  several units (C# projects) bind, from a file of one of those units, to its own unit's
+  (`Resolver::in_unit`, at the end of `resolve_as`), as the compiler prefers the project's type
+  to a reference's; from a file of no such unit the name stays `ambiguous`.
 
 - `lang/csharp.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the C# pack as they bound the Java pack's, with the same
@@ -1986,8 +1998,19 @@ qualification budget does (ADR 0017).
   parameter's `ref`, `out` and `in` are not part of a written signature, so `M(int)` and
   `M(ref int)` share one id; a static constructor, a primary constructor, an operator, an
   indexer, a property accessor and an explicit interface implementation define no symbol
-  (their calls are the type's). The parts of a partial type come from one project. Interpolated,
-  raw and concatenated strings are unknown values.
+  (their calls are the type's). The parts of a partial type come from one project. A raw string
+  literal over several lines (indented by its closing quotes) is an unknown value; plain,
+  verbatim, one-line raw and interpolated literals and `+` fold.
+  A configuration read is decided with the project of the file that holds the call, the
+  constructor or the registration it is read for (`http/csharp/reads.rs`), so a client in a
+  library project reads the library's `appsettings.json`, never the consuming app's.
+  An `internal` type joins its namespace's star for the whole repository, so a file of another
+  project links to it as to a public one. A repository extension method wins over an outside
+  type's instance member of the same name (`sb.Append("x")` beside a
+  `static StringBuilder Append(this StringBuilder b, string s)`), where C# picks the member
+  (ADR 0018). Only the nearest project's references are read (`package/nuget.rs`): the
+  `PackageReference`s of a project a `ProjectReference` names are not followed. Generated files
+  under `obj/` are indexed when no ignore file lists them.
 
 - `snapshot/pull.rs`: a generation's bundles hold at most `GENERATION_BYTES_MAX` (256 GiB)
   together, as the document records their sizes (checked before any download) and as the
@@ -2248,8 +2271,9 @@ qualification budget does (ADR 0017).
   so the attribute names live here: `Route`, `ApiController`, `ActionName`, `NonAction` and `Http<Method>`, with or without
   the `Attribute` suffix, count when a `using` of `Microsoft.AspNetCore.Mvc` binds them (the one
   on-demand candidate in the kind's table, through `names::known`)
-  or when written in full, and a class of the repository that the attribute's scope reaches
-  (`Code::definition`, named `<Name>` or `<Name>Attribute`) hides the framework's. A decorator
+  or when written in full (`names::in_full`), and a class of the repository that the
+  attribute's scope reaches (`Code::definition`, named `<Name>` or `<Name>Attribute`), or that
+  has the full name written with `Attribute` (`Hiding::full`), hides the framework's. A decorator
   named `Route` that is not confirmed as MVC's leaves its class or method unread (never a route
   without the prefix it would add). The class `[Route]` templates are the prefixes; each method
   attribute with a template is a route of its method, a method `[Route]` is one of every method
@@ -2298,8 +2322,8 @@ qualification budget does (ADR 0017).
 - `http/csharp/clients.rs` (spec #28, #111): an `HttpClient` call is a consumer when its method
   is in `CLIENT_METHODS` (`GetAsync` to `PutAsJsonAsync`) or is `SendAsync`, and its receiver is
   an `HttpClient`: `Code::written` gives the type text written for a field, a parameter or a
-  typed local, `names::spellings` confirms it through the usings (an alias counts, a class of
-  the repository named `HttpClient` hides the framework's), and a construction in place or a
+  typed local, `names::is_type` confirms it in full or through the usings (an alias counts, a
+  class of the repository named `HttpClient` hides the framework's), and a construction in place or a
   local made by `new HttpClient()` counts without a written type. The pack ships syntax only and
   adds no externs: C# types are not in `Facts::externs`, since `Binding::External` would turn
   the calls on them from inferred to unresolved. The call is read whole by `Expand::Chain`, so a
