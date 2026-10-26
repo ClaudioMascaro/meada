@@ -35,7 +35,7 @@
     },
     {
       "path": "src/main/kotlin/example/Receivers.kt",
-      "hash": "356d355391ac84c1237dbfe7362da6576732d08525ef7d1f8d1a023fe96ca794"
+      "hash": "c709ea19027b289ffcf72a56372557305e51668950043db6bed9ba89458f14cd"
     },
     {
       "path": "src/main/kotlin/example/Same.kt",
@@ -837,6 +837,14 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 3421,
         "end": 3449
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.asserted(Cache?)",
+      "span": {
+        "path": "src/main/kotlin/example/Receivers.kt",
+        "start": 4804,
+        "end": 4853
       }
     },
     {
@@ -4020,6 +4028,17 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 3077,
         "end": 3089
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.asserted(Cache?)::cache.tag#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.asserted(Cache?)",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.tag()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/Receivers.kt",
+        "start": 4838,
+        "end": 4851
       }
     },
     {
@@ -11461,6 +11480,7 @@
       "name": "src/main/kotlin/example#13",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.String.loud()",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.asserted(Cache?)",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.unknownReceiver()",
         "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.String.shout()",
@@ -12166,6 +12186,27 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Outside.spawn()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.asserted(Cache?)",
+      "kind": "export",
+      "label": "example.asserted(Cache?)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.asserted(Cache?)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.tag()"
         }
       ]
     },

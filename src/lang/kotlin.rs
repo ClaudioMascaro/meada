@@ -1930,6 +1930,13 @@ fn callee(node: Node, src: &[u8]) -> String {
                 let ids: Vec<Node> = named(n).filter(|n| n.kind() == "identifier").collect();
                 pending.extend(ids.into_iter().rev());
             }
+            // `a!!` is `a`, of the type `a` is declared with.
+            "unary_expression" if children(n).any(|c| c.kind() == "!!") => {
+                match n.child_by_field_name("argument") {
+                    Some(operand) => pending.push(operand),
+                    None => parts.push("(expression)"),
+                }
+            }
             // `a.b`, `a?.b`; a callable reference (`a::b`) is no member.
             "navigation_expression" if children(n).all(|c| c.kind() != "::") => {
                 let nodes: Vec<Node> = named(n)
@@ -2368,6 +2375,16 @@ mod tests {
         );
         // Two `val`s keep both, which `jvm::names::local` reads as a name declared twice.
         assert_eq!(bound("val a = xs.make(); val a = xs.other()"), ["a", "a"]);
+    }
+
+    /// `x!!.f()` and `x?.f()` are calls on `x`, of the type `x` is declared with; `(x).f()` and
+    /// `x++` are no name.
+    #[test]
+    fn a_not_null_assertion_calls_on_its_operand() {
+        let src = "package a\nfun f(x: Foo?) { x!!.ext(); x?.ext(); x!!!!.ext(); (x).ext() }\n";
+        let facts = parse(src.as_bytes(), false).unwrap();
+        let callees: Vec<&str> = facts.calls.iter().map(|c| c.callee.as_str()).collect();
+        assert_eq!(callees, ["x.ext", "x.ext", "x.ext", "(expression).ext"]);
     }
 
     /// A value as a line, for the tests that compare shapes.

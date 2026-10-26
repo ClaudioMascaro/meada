@@ -36,7 +36,8 @@ All notable changes to Meada are recorded here. The format follows
   when the argument count, counting default values and `vararg`, leaves one function. An
   extension function is never a member of the class it extends, even written in that class's
   file: a member of the class or of a base wins, and a Java call never reaches it. A call on a
-  class's name reaches its companion's member before an instance member of the same name. Kotlin and
+  class's name reaches its companion's member before an instance member of the same name. A call on
+  `x!!` or `x?.` is a call on `x`, of the type `x` is declared with. Kotlin and
   Java files of one repository call each other by fully qualified name. No Kotlin compiler, JDK
   or Gradle is involved.
 

@@ -204,3 +204,8 @@ fun implicitMember(shelf: Shelf) {
 fun localBeforeMember(shelf: Shelf, stock: Store) {
     shelf.apply { stock.get("k") }
 }
+
+// `x!!` is a call on `x`, of the type `x` is declared with.
+fun asserted(cache: Cache?) {
+    cache!!.tag()
+}

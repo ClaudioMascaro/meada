@@ -1686,6 +1686,7 @@ fn kotlin() {
             "src/main/kotlin/example/Receivers.kt::example.localFirst(Cache).size()",
             "src/main/kotlin/example/Receivers.kt::example.unknownReceiver()",
             "src/main/kotlin/example/Receivers.kt::example.Shelf",
+            "src/main/kotlin/example/Receivers.kt::example.asserted(Cache?)",
             "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge",
             "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.read()",
             "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.reset()",
@@ -2475,6 +2476,11 @@ fn kotlin() {
                 "src/main/kotlin/example/Receivers.kt::example.unknownReceiver()::(call_expression).loud#0",
                 INFERRED,
                 &["src/main/kotlin/example/Receivers.kt::example.String.loud()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.asserted(Cache?)::cache.tag#0",
+                EXACT,
+                &["src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.tag()"],
             ),
             // A call on the class's name reaches the companion, one on an instance the class.
             (

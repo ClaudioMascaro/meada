@@ -1396,7 +1396,8 @@ one for the area a change touches.
   Kotlin writes its receivers as Java does: a property, parameter or local typed by its written
   type (`Class::Type`) or initialized with a constructor call `T(..)` (`Class::Named`), where
   the one binding of its name says so; `Facts::externs` lists the type heads written in the
-  file, so a type nothing binds is outside the repository (Opaque outside). An extension
+  file, so a type nothing binds is outside the repository (Opaque outside). A call on `x!!` or
+  `x?.` is a call on `x` (`kotlin::callee`), of the type `x` is declared with. An extension
   function or property is a `Facts::extensions` block of its receiver's type, named as the
   function is (`pkg.Receiver.f()`): it tells what `this` is in the extension's body, and its
   functions are no members of the type, so Java calls never reach them, not even by name
