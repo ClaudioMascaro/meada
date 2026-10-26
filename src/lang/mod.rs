@@ -384,8 +384,8 @@ pub struct Facts {
     /// Not kept in the index (see `Call::args`).
     #[serde(skip)]
     pub annotated: Vec<Annotated>,
-    /// The value each Kotlin local, or the parameter of a tracked lambda, was given, where no
-    /// constant records it: the call a `val` holds, the receiver `use` passes on. Not kept in
+    /// The value each Kotlin or C# local, or the parameter of a tracked lambda, was given, where
+    /// no constant records it: the call a `val` holds, the receiver `use` passes on. Not kept in
     /// the index (see `Call::args`).
     #[serde(skip)]
     pub bound: Vec<Bound>,

@@ -3706,8 +3706,10 @@ pub enum Of<'a> {
 /// own facts and charges what it reads.
 #[derive(Clone, Copy, Debug)]
 pub enum Follow {
-    /// The value flow: constants and imports, the arguments exact callers pass to parameters,
-    /// what functions of the repository return, list items, a class attribute assigned once,
+    /// The value flow: constants and imports, locals bound to one value (`Facts::bound`), the
+    /// arguments exact callers pass to parameters (and the receiver a C# extension method is
+    /// called on, `Resolver::extension_callers`), what functions of the repository return,
+    /// list items, a class attribute assigned once,
     /// and in a fluent pack a builder chain down its receivers, kept only through methods the
     /// reader's table `passes` on (`Passes`; a pack that is not fluent never consults it).
     /// Charged to `EVAL_BUDGET`, at most `EVAL_DEPTH` deep.
@@ -4121,7 +4123,7 @@ impl<'a> Code<'a> {
     }
 
     /// The value the nearest binding of `name` around `scope` of `path` holds (`Facts::bound`,
-    /// which only the Kotlin pack fills), when no other binding of the name is in the same scope
+    /// which the Kotlin and C# packs fill), when no other binding of the name is in the same scope
     /// (a name declared twice, a loop variable, a parameter, a constant, a property). Each scope
     /// is looked up by name (`ByName::bound` and the resolver's maps), so a file of many locals
     /// and calls costs each lookup its depth, never the file's width.

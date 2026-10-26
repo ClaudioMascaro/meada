@@ -782,7 +782,7 @@ one for the area a change touches.
   RestTemplate, WebClient, `java.net.http` and OkHttp consumers, whose bases come from the
   Spring configuration `jvm/spring.rs` reads for the JVM packs' kinds; `http/kotlin.rs`, Ktor
   providers, and `http/kotlin/client.rs`, Ktor client consumers; `http/csharp.rs`, ASP.NET Core
-  controller providers), resource and channel
+  controller providers, and `http/csharp/minimal.rs`, minimal API providers), resource and channel
   kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
   contracts (specs #22, #24, #30, #25 and #26), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
@@ -976,7 +976,11 @@ one for the area a change touches.
   `App`, `web::scope`, `web::resource`, `.configure(f)` and Rocket's `build().mount(..)`, whose
   `routes![..]` the Rust pack reads as a list of the handlers' paths).
   `Code::returned` and `Code::constant` give a kind the values a call may return and a
-  constant holds, for what it must not leave unmounted.
+  constant holds, for what it must not leave unmounted. `Code::passed` gives what one call
+  passes for a parameter of the function the value flow reaches through it (its receiver for
+  a C# extension method's `this`): a kind that climbed a return value (`Route::through`) reads
+  a parameter of that function from the call it climbed alone, so two objects one factory
+  makes from two arguments stay apart (`http/csharp/minimal.rs`).
   `Expand::Chain` is `Code::expand` for a request built by a chain (`http/java/clients.rs`; in
   `channel/java.rs` an SQS request, the stream maps of a Redis group read and a
   `BindingBuilder` chain):
@@ -1588,6 +1592,22 @@ one for the area a change touches.
   `var` takes a type from `new` and a call alone (no cast, `await` or conditional), a
   target-typed `new()` records no constructor call, and a parameter type written `global::A`
   or `alias::A` is spelled `A` and `alias.A` in a signature.
+  The value flow (`Code::origins` with `Follow::Values`, spec #28, #110) follows what C#
+  code hands a route builder through. A call made on a receiver that the name match gives one
+  extension method (`inferred`) is taken as the language binds it when the static class
+  declaring the method is in scope of the call by its name (its namespace is the call's,
+  one around it, or a `using`'s): `Resolver::extension_callers` holds those calls beside the
+  exact `callers`, and the flow climbs them to the receiver (the `this` parameter) and into
+  what the method returns (`Resolver::flows_to`); wrapper expansion and `Code::param_args`
+  still climb exact calls alone. A local the pack bound to one value (`Facts::bound`: every
+  local declared in a definition, dropped when the file assigns its name anywhere with `=`,
+  a compound operator, `++`, `--`, `out` or `ref`) is followed into that value, for every pack
+  that fills `Facts::bound` (Kotlin's `val` too). The pack fills `Def::return_values` from
+  `return x;` and a method's or local function's `=> x`, and makes every lambda written in a
+  definition (not in a type's initializer) a `Kind::Inline` scope `@<offset>` with its
+  parameters, which a call's argument names (`Value::Function`) and which folds into the
+  symbol around it unless a kind claims it; `new[] { .. }`, `new T[] { .. }` and `[..]` are
+  lists.
 - New **config key**: add the field to `Config`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
 - New **MCP tool**: `mcp.rs`, one `Engine` method that builds the tool's result, its result
@@ -1797,7 +1817,9 @@ one for the area a change touches.
 
 - `jvm/names.rs`: `LOCAL_DEPTH` (8) bounds how many locals a JVM client reader (Ktor,
   `RestTemplate`, `WebClient`, Retrofit) follows a client through (`val b = a`, `val a =
-  HttpClient(..)`); past it the client is not followed and its calls are no consumers.
+  HttpClient(..)`) where the value flow does not reach it; past it the client is not followed
+  and its calls are no consumers. The value flow follows a Kotlin `val` itself (`Facts::bound`),
+  as deep as `EVAL_DEPTH`.
 
 - `lang/kotlin.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the Kotlin pack as they bound the Java pack's, with the same
@@ -2140,6 +2162,27 @@ qualification budget does (ADR 0017).
   `SuppressAsyncSuffixInActionNames` turned off is not read; `[HttpGet("a")] [Route("b")]`
   serves `GET /b` (ASP.NET Core may serve it for every method), and a method attribute without
   template beside a templated one gives no route.
+- `http/csharp/minimal.rs` (spec #28, #110): minimal API routes, through the same `Mounts` and
+  `prefixes` as the other routers, whose nodes are the origins of a builder (`Code::origins`
+  with `Follow::Values`, each with the calls the walk climbed through return values). A
+  `MapGroup(prefix)` call is mounted on the origins of its receiver under its prefix, a
+  convention of `CONVENTIONS` (`RequireAuthorization()`, `WithTags(..)`) with none, and the
+  application is the root: `WebApplication.Create(..)`, or `Build()` on what
+  `WebApplication.CreateBuilder`, `CreateSlimBuilder` or `CreateEmptyBuilder` made, as the
+  file's usings (the Web SDK's implicit ones included) spell them. `MapGet`, `MapPost`,
+  `MapPut`, `MapPatch`, `MapDelete` and `MapMethods(pattern, methods, handler)` (a list of
+  literals or `HttpMethods.X`) register a route; the pattern, the methods and the handler are
+  read positionally or by name (`pattern:`, `httpMethods:`, `handler:`, `prefix:`), and `?` of
+  `{id?}` is dropped as for controllers. A lambda handler is an inline handler named for the
+  first route it serves, a method group (`Handlers.List`) the method it names (one overload),
+  anything else the file. A method of the repository named like one of the framework's
+  (`MapGet`, `MapGroup`, `Build`, a convention) hides it. Ceilings: a builder Meada does not
+  read serves nothing (a lambda's parameter, as in `UseEndpoints(e => e.MapGet(..))`, a
+  parameter no call reaches, a field, a builder reassigned, one held by a local bound to a
+  parameter inside a factory reached through a return value, whose callers all count), and so
+  does a group configured through a call outside `CONVENTIONS`; `Map(pattern, handler)`,
+  `MapFallback`, `MapHub`, `MapControllers` and `MapRazorPages` are not read, and neither is a
+  pattern that does not fold to a literal.
 - `http/kotlin.rs` (spec #27, #98): Ktor routes, through the same `Mounts` and `prefixes` as
   the other routers, whose nodes are definitions (file, qualified name): the lambda of each
   `routing { }` call (a root), the lambda of each `route(prefix) { }` call (mounted under its
@@ -2721,7 +2764,8 @@ qualification budget does (ADR 0017).
   `cfg.service(a).route(..)`) is read to that many calls down to what starts it (`Code::chain`),
   and a call past it has no origin, so its route is no provider (the walk is memoized per call,
   linear in the chain). `PREFIX_DEPTH` (64) and `PREFIX_WORK` (4096):
-  `prefixes`, for every kind that mounts (Express, FastAPI, Flask, axum, actix-web, Rocket, Ktor), reads a router
+  `prefixes`, for every kind that mounts (Express, FastAPI, Flask, axum, actix-web, Rocket, Ktor,
+  ASP.NET Core minimal APIs), reads a router
   nested deeper than the first, or through more mounts than the second, as served nowhere
   rather than under part of its prefixes. A name bound again in its scope (`let mut`,
   shadowing) or assigned again holds no known value, and the routers its `let` holds

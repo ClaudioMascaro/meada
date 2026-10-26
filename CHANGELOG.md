@@ -48,6 +48,16 @@ All notable changes to Meada are recorded here. The format follows
   without a method attribute serves every method (`http::ANY::<path>`, linked to consumers of
   any method). Conventional routing, a controller with a base class of the repository, a class
   in `partial` parts, `[NonAction]` methods and attributes that are not MVC's are not read.
+- C# ASP.NET Core minimal APIs as HTTP providers (issue #110): `MapGet`, `MapPost`, `MapPut`,
+  `MapPatch`, `MapDelete` and `MapMethods(pattern, methods, handler)` on the application or a
+  `MapGroup(prefix)` group serve under every prefix around them, groups nested at any depth,
+  followed through locals, method arguments, return values and extension methods called on a
+  group (`group.MapOrders()`), so one called on two groups serves under both. A lambda handler
+  is an inline handler named for its route, a method group the method it names. A builder
+  Meada cannot read (a lambda's parameter, a field, a reassigned local) serves nothing.
+  The shared value flow now follows a local a pack binds to one value (C# and Kotlin) and a C#
+  extension method called on a receiver in scope; every C# lambda in a definition is a scope of
+  its own, so its parameters hide outer names only inside it.
 - Kotlin source indexing (issue #95): `.kt` and `.kts` files (Gradle's `build.gradle.kts` and
   `settings.gradle.kts` stay manifests) yield package-qualified classes, interfaces, objects,
   companions (`Class.Companion` when unnamed), top-level and extension functions, properties

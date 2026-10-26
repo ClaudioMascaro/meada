@@ -48,14 +48,31 @@ const CREATE: &str = "Create";
 /// What makes a builder whose `Build()` is an application.
 const BUILDERS: &[&str] = &["CreateBuilder", "CreateSlimBuilder", "CreateEmptyBuilder"];
 const HTTP_METHODS: &str = "Microsoft.AspNetCore.Http.HttpMethods.";
+/// The conventions a group is configured with, each returning the group it is called on
+/// (`app.MapGroup("/api").RequireAuthorization()`).
+// ponytail: the common ones; a group configured through another call is served nowhere.
+const CONVENTIONS: &[&str] = &[
+    "AddEndpointFilter",
+    "AllowAnonymous",
+    "DisableAntiforgery",
+    "RequireAuthorization",
+    "RequireCors",
+    "RequireRateLimiting",
+    "WithGroupName",
+    "WithMetadata",
+    "WithOpenApi",
+    "WithTags",
+];
 
 /// An origin of a builder: the call that made it and the calls the walk climbed through to
 /// reach it, outermost first (`Route::through`).
 type Node<'a> = (CallAt<'a>, Vec<CallAt<'a>>);
 
-/// The method a callee calls: `MapGet` of `app.MapGet`.
+/// The method a callee calls: `MapGet` of `app.MapGet`, `AddEndpointFilter` of
+/// `g.AddEndpointFilter<F>`.
 fn method(callee: &str) -> &str {
-    callee.rsplit('.').next().unwrap_or(callee)
+    let name = callee.rsplit('.').next().unwrap_or(callee);
+    name.split('<').next().unwrap_or(name)
 }
 
 struct Minimal<'c, 'a> {
@@ -100,6 +117,8 @@ impl<'c, 'a> Minimal<'c, 'a> {
         context: &[CallAt<'a>],
     ) -> Vec<Node<'a>> {
         let code = self.code;
+        // ponytail: only a parameter named in place is read from the climbed call; one held by
+        // a local first (`var p = parent;`) takes every caller's value.
         if let (Value::Ref(name), Some((&(at, index), rest))) = (value, context.split_last())
             && let Some((function, n)) = code.param_of(path, scope, name)
         {
@@ -137,8 +156,9 @@ impl<'c, 'a> Minimal<'c, 'a> {
         .is_some()
     }
 
-    /// Reads the node `id`: a `MapGroup` call is mounted on the origins of its receiver, the
-    /// application is a root, and anything else is left unread.
+    /// Reads the node `id`: a `MapGroup` call is mounted on the origins of its receiver under
+    /// its prefix, a convention (`CONVENTIONS`) with none, the application is a root, and
+    /// anything else is left unread.
     fn read(&mut self, id: usize) {
         let code = self.code;
         let ((path, index), context) = self.nodes[id].clone();
@@ -161,12 +181,17 @@ impl<'c, 'a> Minimal<'c, 'a> {
             }
             return;
         }
-        if name != MAP_GROUP || !self.framework(MAP_GROUP) {
+        let prefix = match name {
+            MAP_GROUP => (call.args.first())
+                .or_else(|| call.keyword("prefix"))
+                .and_then(|v| path_literal(code.value(path, scope, v))),
+            // A convention returns the group it configures.
+            _ if CONVENTIONS.contains(&name) => Some(String::new()),
+            _ => return,
+        };
+        if !self.framework(name) {
             return;
         }
-        let prefix = (call.args.first())
-            .or_else(|| call.keyword("prefix"))
-            .and_then(|v| path_literal(code.value(path, scope, v)));
         let parents = self.origins(path, scope, receiver, &context);
         let parents: Vec<(usize, Option<String>)> = (parents.into_iter())
             .map(|node| (self.intern(node), prefix.clone()))
@@ -414,7 +439,7 @@ mod tests {
     #[test]
     fn a_builder_meada_does_not_read_serves_nothing() {
         // A parameter no call reaches, a group whose prefix is unknown, an application that is
-        // not the framework's, and a builder reassigned (#111 makes it hold no one value).
+        // not the framework's, and a builder reassigned (the pack drops its bound).
         let found = served_in(&[(
             "Program.cs",
             &format!(
@@ -542,5 +567,34 @@ mod tests {
                 "http::GET::/b/sub/y",
             ]
         );
+    }
+
+    #[test]
+    fn a_convention_on_a_group_keeps_its_prefix() {
+        let found = served(
+            "var api = app.MapGroup(\"/api\").RequireAuthorization().WithTags(\"t\");\n\
+             api.AddEndpointFilter<F>().MapGet(\"/a\", () => 1);\n\
+             app.MapGroup(\"/b\").Configure().MapGet(\"/c\", () => 1);",
+        );
+        assert_eq!(contracts(found), ["http::GET::/api/a"]);
+    }
+
+    /// Groups nested in place are read once each: a deep nest costs its depth, and one past
+    /// the pack's `VALUE_DEPTH` (and so `PREFIX_DEPTH`) is served nowhere.
+    #[test]
+    fn a_deep_nest_of_groups_is_read_in_linear_time_and_served_nowhere_past_the_prefix_depth() {
+        let nest = |n: usize| {
+            let groups = ".MapGroup(\"/a\")".repeat(n);
+            format!("app{groups}.MapGet(\"/x\", () => 1);")
+        };
+        assert_eq!(contracts(served(&nest(3))), ["http::GET::/a/a/a/x"]);
+        assert_eq!(served(&nest(60)).len(), 1);
+        let time = |n: usize| {
+            let start = std::time::Instant::now();
+            assert!(served(&nest(n)).is_empty());
+            start.elapsed()
+        };
+        let (small, large) = (time(100), time(400));
+        assert!(large < small * 12, "{small:?} then {large:?}");
     }
 }
