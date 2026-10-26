@@ -23,7 +23,9 @@
 // not `const` or `static` is not folded; `AddHttpClient<T>` is #113's.
 
 use super::super::{based, consumer, fetches};
+use super::reads::Reads;
 use crate::contract::Found;
+use crate::index::Indexed;
 use crate::lang::{Bound, Invocation, Part, Value};
 use crate::names::{one, spellings};
 use crate::resolve::{Code, Expand, Expanded, method as member};
@@ -59,7 +61,8 @@ const MEMBERS: &[(&str, &str)] = &[
 const BASE: &str = "BaseAddress";
 
 /// C# HTTP consumers: see the module.
-pub(in crate::http) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
+pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
+    let reads = Reads::new(indexed.configs);
     let mut found = Vec::new();
     for (&path, facts) in code.files().iter().filter(|(p, _)| p.ends_with(".cs")) {
         for (n, stored) in facts.calls.iter().enumerate() {
@@ -77,7 +80,7 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
                     return None;
                 };
                 let at = (path, stored.scope.as_str());
-                let (url, method) = sends(code, at, n, receiver, sent, call);
+                let (url, method) = sends(code, &reads, at, n, receiver, sent, call);
                 fetches(&[url, method])
             };
             for Expanded {
@@ -174,6 +177,7 @@ fn written<'a>(
 /// stored call writes it) at `at`.
 fn sends<'a>(
     code: &Code<'a>,
+    reads: &Reads,
     (path, scope): (&'a str, &'a str),
     index: usize,
     receiver: &'a str,
@@ -201,7 +205,7 @@ fn sends<'a>(
             _ => (None, Value::Unknown),
         },
     };
-    let url = self::url(code, (path, scope), url);
+    let url = reads.value(code, path, self::url(code, (path, scope), url));
     match call.receiver.as_deref() {
         // A client a wrapper takes: its base is read at each caller.
         Some(Value::Ref(name)) => (Value::Ref(name.clone()), method),
@@ -209,7 +213,8 @@ fn sends<'a>(
             // The assignment on the name the call is made on wins over the initializer.
             let assigned = (written(code, (path, scope), receiver, BASE))
                 .map(|b| code.value(path, &b.within, &b.value));
-            (based_on(base(client, assigned.as_ref()), url), method)
+            let base = base(code, reads, path, client, assigned.as_ref());
+            (based_on(base, url), method)
         }
     }
 }
@@ -282,8 +287,14 @@ fn is_request<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), ty: &str) 
 }
 
 /// The base address of a client folded as `client` (a construction with an initializer) or
-/// assigned (`BaseAddress = new Uri(base)`); a hole when neither is read.
-fn base(client: Option<&Value>, assigned: Option<&Value>) -> Vec<Part> {
+/// assigned (`BaseAddress = new Uri(base)`); a hole when neither is read. Its environment and configuration reads are decided (`Reads`).
+fn base<'a>(
+    code: &Code<'a>,
+    reads: &Reads,
+    path: &'a str,
+    client: Option<&Value>,
+    assigned: Option<&Value>,
+) -> Vec<Part> {
     let initial = match client {
         Some(Value::New(_, args)) => match args.last() {
             Some(Value::Object(set)) => set.iter().rev().find(|(k, _)| k == BASE).map(|(_, v)| v),
@@ -292,11 +303,13 @@ fn base(client: Option<&Value>, assigned: Option<&Value>) -> Vec<Part> {
         _ => None,
     };
     match assigned.or(initial) {
-        Some(Value::New(_, args)) if args.len() == 1 => match &args[0] {
-            Value::Str(parts) => parts.clone(),
-            Value::Ref(name) => vec![Part::Ref(name.clone())],
-            _ => vec![Part::Hole],
-        },
+        Some(Value::New(_, args)) if args.len() == 1 => {
+            match reads.value(code, path, args[0].clone()) {
+                Value::Str(parts) => parts,
+                Value::Ref(name) => vec![Part::Ref(name)],
+                _ => vec![Part::Hole],
+            }
+        }
         _ => vec![Part::Hole],
     }
 }
@@ -305,8 +318,20 @@ fn base(client: Option<&Value>, assigned: Option<&Value>) -> Vec<Part> {
 /// path from the root (`/orders`) replaces the base's own path, and a relative one replaces the
 /// base's last segment (`https://c/v1` and `orders` give `/orders`, `https://c/v1/` gives
 /// `/v1/orders`).
-fn based_on(mut base: Vec<Part>, url: Value) -> Value {
-    let first = match &url {
+fn based_on(base: Vec<Part>, url: Value) -> Value {
+    // A base read from configuration (`Part::EnvOr`) joins on the literal it defaults to.
+    let base = match &base[..] {
+        [Part::EnvOr(var, default)] => {
+            vec![Part::EnvOr(var.clone(), rebase(default.clone(), &url))]
+        }
+        _ => rebase(base, &url),
+    };
+    based(Some(&base), &url)
+}
+
+/// `base` cut where `url` starts from, as `Uri` joins them (`based_on`).
+fn rebase(mut base: Vec<Part>, url: &Value) -> Vec<Part> {
+    let first = match url {
         Value::Str(parts) => match parts.first() {
             Some(Part::Text(t)) => Some(t.as_str()),
             _ => None,
@@ -330,7 +355,7 @@ fn based_on(mut base: Vec<Part>, url: Value) -> Value {
         }
         _ => {}
     }
-    based(Some(&base), &url)
+    base
 }
 
 /// `base` kept up to byte `at` of its part `n`.
@@ -376,20 +401,46 @@ mod tests {
     /// A consumer as `(contract, via, method)`, the method only for an unresolved one.
     type Sent = (Option<String>, Option<String>, Option<String>);
 
-    const USINGS: &str = "using System;\nusing System.Net.Http;\nusing System.Net.Http.Json;\n";
+    const USINGS: &str = "using System;\nusing System.Net.Http;\nusing System.Net.Http.Json;\n\
+                          using Microsoft.AspNetCore.Builder;\nusing Microsoft.Extensions.Configuration;\n";
+
+    /// The consumers `code` has, with `configs` as the config files the index read.
+    fn found(code: &Code, configs: &[(&str, &[u8])]) -> Vec<Found> {
+        let indexed = Indexed {
+            manifests: &[],
+            tsconfigs: &[],
+            exported: &[],
+            files: &[],
+            configs,
+        };
+        consumers(code, &indexed)
+    }
 
     /// The consumers of the class body `body` in `A/C.cs`, with other files of the repository.
     fn sent_with(body: &str, others: &[(&str, &str)]) -> Vec<Sent> {
+        sent_in(body, others, &[])
+    }
+
+    /// `sent_with`, with config files (`(path, bytes)`) beside the sources.
+    fn sent_in(body: &str, others: &[(&str, &str)], configs: &[(&str, &[u8])]) -> Vec<Sent> {
         let src = format!("{USINGS}\nnamespace A;\npublic class C {{\n{body}\n}}\n");
         let mut parsed = vec![("A/C.cs", CSharp.parse("A/C.cs", src.as_bytes()).unwrap())];
         for (path, source) in others {
             parsed.push((path, CSharp.parse(path, source.as_bytes()).unwrap()));
         }
+        // The projects give each file its unit, as the index does.
+        let join = {
+            let raw: BTreeMap<&str, &_> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+            CSharp.join(configs, &raw)
+        };
+        for (path, facts) in &mut parsed {
+            join(path, facts);
+        }
         let files: BTreeMap<&str, &_> = parsed.iter().map(|(p, f)| (*p, f)).collect();
         let layout = CSharp.layout(&[], &files).unwrap();
         let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &CSharp);
         let code = Code::new(&resolver, &files, &CSharp);
-        let mut found: Vec<Sent> = (consumers(&code).into_iter())
+        let mut found: Vec<Sent> = (found(&code, configs).into_iter())
             .map(|f| (f.contract, f.via, f.method))
             .collect();
         found.sort();
@@ -655,7 +706,7 @@ mod tests {
         let layout = CSharp.layout(&[], &files).unwrap();
         let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &CSharp);
         let code = Code::new(&resolver, &files, &CSharp);
-        let mut found: Vec<_> = consumers(&code)
+        let mut found: Vec<_> = self::found(&code, &[])
             .into_iter()
             .filter_map(|f| f.contract)
             .collect();
@@ -894,5 +945,346 @@ mod tests {
             sent_with(&body, &[("A/Repo.cs", other)]),
             [host("http::GET::/z", "z.example.com")]
         );
+    }
+
+    /// An unresolved consumer's `via` and a resolved one's, with the twin readings of a
+    /// configuration default (`http::fetches`) as the kind gives them.
+    fn env(contract: &str, var: &str) -> Sent {
+        (Some(contract.into()), Some(format!("env:{var}")), None)
+    }
+
+    fn twins(contract: &str, var: &str, host: &str) -> [Sent; 2] {
+        [
+            (
+                Some(contract.into()),
+                Some(format!("env:{var}|host:{host}")),
+                None,
+            ),
+            (
+                Some(contract.into()),
+                Some(format!("host:{host}|default")),
+                None,
+            ),
+        ]
+    }
+
+    const GET_ENV: &str = "Environment.GetEnvironmentVariable";
+
+    #[test]
+    fn an_environment_read_is_the_base_variable_through_fallbacks_trim_and_forms() {
+        let urls = [
+            format!("{GET_ENV}(\"X\") + \"/a\""),
+            format!("$\"{{{GET_ENV}(\"X\")}}/a\""),
+            format!("({GET_ENV}(\"X\") ?? \"http://localhost\") + \"/a\""),
+            format!("({GET_ENV}(\"X\") ?? throw new Exception()) + \"/a\""),
+            format!("{GET_ENV}(\"X\")!.TrimEnd('/') + \"/a\""),
+            format!("({GET_ENV}(\"X\") ?? \"d\").TrimEnd('/').Trim() + \"/a\""),
+            format!("System.{GET_ENV}(\"X\") + \"/a\""),
+            // A fallback chain with one read, whatever else the fallbacks are.
+            format!("({GET_ENV}(\"X\") ?? Other.Get(\"Y\")) + \"/a\""),
+            format!("({GET_ENV}(\"X\") ?? \"d\" ?? \"e\") + \"/a\""),
+            format!("(({GET_ENV}(\"X\") ?? \"d\") ?? \"e\") + \"/a\""),
+        ];
+        for url in urls {
+            let body = format!("{CLIENT}async Task F() {{ await _http.GetAsync({url}); }}");
+            assert_eq!(sent(&body), [env("http::GET::/a", "X")], "{url}");
+        }
+    }
+
+    #[test]
+    fn an_environment_read_is_one_read_and_the_framework_s() {
+        let not = [
+            // Two reads.
+            format!("({GET_ENV}(\"X\") ?? {GET_ENV}(\"Y\")) + \"/a\""),
+            // Three operands: the reads count across the whole chain.
+            format!("({GET_ENV}(\"X\") ?? \"d\" ?? {GET_ENV}(\"Y\")) + \"/a\""),
+            format!("({GET_ENV}(\"X\") ?? {GET_ENV}(\"Y\") ?? \"d\") + \"/a\""),
+            format!("(({GET_ENV}(\"X\") ?? \"d\") ?? {GET_ENV}(\"Y\")) + \"/a\""),
+            format!("({GET_ENV}(\"X\") ?? {GET_ENV}(\"Y\") ?? {GET_ENV}(\"Z\")) + \"/a\""),
+            // Not a literal name, or another call with a literal.
+            format!("{GET_ENV}(name) + \"/a\""),
+            format!("{GET_ENV}(\"X\", Machine) + \"/a\""),
+            "Settings.Get(\"X\") + \"/a\"".to_string(),
+            format!("{GET_ENV}(\"X\").ToLower() + \"/a\""),
+        ];
+        for url in not {
+            let body =
+                format!("{CLIENT}async Task F(string name) {{ await _http.GetAsync({url}); }}");
+            assert_eq!(contracts(&body), ["http::GET::/a"], "{url}");
+            assert_eq!(
+                sent(&body),
+                [(Some("http::GET::/a".into()), None, None)],
+                "{url}"
+            );
+        }
+        // A type of the repository named `Environment` hides the framework's.
+        let hiding = "namespace A;\npublic static class Environment { \
+                      public static string GetEnvironmentVariable(string s) => s; }\n";
+        let body = format!(
+            "{CLIENT}async Task F() {{ await _http.GetAsync({GET_ENV}(\"X\") + \"/a\"); }}"
+        );
+        assert_eq!(
+            sent_with(&body, &[("A/Environment.cs", hiding)]),
+            [(Some("http::GET::/a".into()), None, None)]
+        );
+    }
+
+    #[test]
+    fn a_local_or_a_field_bound_to_an_environment_read_is_the_read() {
+        let get = format!("{GET_ENV}(\"X\")");
+        for (decl, url) in [
+            (format!("var web = {get};"), "web + \"/a\""),
+            (format!("var web = {get};"), "$\"{web}/a\""),
+            (format!("string web = {get}!;"), "web + \"/a\""),
+            (format!("var web = {get} ?? \"d\";"), "web + \"/a\""),
+            (format!("var web = ({get}).TrimEnd('/');"), "web + \"/a\""),
+            (String::new(), "Web + \"/a\""),
+        ] {
+            let field = format!("private static readonly string Web = {get};\n");
+            let body =
+                format!("{field}{CLIENT}async Task F() {{ {decl} await _http.GetAsync({url}); }}");
+            assert_eq!(sent(&body), [env("http::GET::/a", "X")], "{decl} {url}");
+        }
+        // A local bound to a call with a literal that is no read stays unknown.
+        let body = format!(
+            "{CLIENT}async Task F() {{ var web = Other.Get(\"X\"); await _http.GetAsync(web + \"/a\"); }}"
+        );
+        assert_eq!(sent(&body), [(Some("http::GET::/a".into()), None, None)]);
+    }
+
+    #[test]
+    fn a_client_base_from_the_environment_joins_its_relative_urls() {
+        let body = format!(
+            "public async Task F() {{\n\
+             var home = {GET_ENV}(\"HOME_URL\") + \"/v1/\";\n\
+             var http = new HttpClient {{ BaseAddress = new Uri(home) }};\n\
+             await http.GetAsync(\"orders\");\n\
+             await http.GetAsync(\"/root\");\n\
+             var plain = new HttpClient {{ BaseAddress = new Uri({GET_ENV}(\"API_URL\")!) }};\n\
+             await plain.GetAsync(\"/plain\");\n}}"
+        );
+        assert_eq!(
+            sent(&body),
+            [
+                env("http::GET::/plain", "API_URL"),
+                env("http::GET::/root", "HOME_URL"),
+                env("http::GET::/v1/orders", "HOME_URL"),
+            ]
+        );
+    }
+
+    const SETTINGS: &[u8] = br#"{
+        // A comment, and a trailing comma below.
+        "Api": { "Url": "https://api.example.com/v1/", "Local": "http://localhost:5000", },
+        "audit": "https://audit.example.com",
+        "Port": 8080, "Empty": ""
+    }"#;
+
+    fn configured(body: &str) -> Vec<Sent> {
+        let body = format!("private readonly IConfiguration _config;\n{CLIENT}{body}");
+        sent_in(&body, &[], &[("appsettings.json", SETTINGS)])
+    }
+
+    #[test]
+    fn a_configuration_key_with_a_literal_is_its_variable_with_the_literal_as_default() {
+        let body = "async Task F() {\n\
+             await _http.GetAsync(_config[\"Api:Url\"] + \"orders\");\n\
+             await _http.GetAsync(_config[\"AUDIT\"] + \"/audit\");\n\
+             await _http.GetAsync(_config[\"Api:Local\"] + \"/local\");\n}";
+        let mut expected = Vec::new();
+        // `orders` has no slash after the variable: that reading names no path.
+        expected.push((
+            None,
+            Some("env:Api__Url|host:api.example.com".into()),
+            Some("GET".into()),
+        ));
+        expected.extend(
+            twins("http::GET::/v1/orders", "Api__Url", "api.example.com")
+                .into_iter()
+                .skip(1),
+        );
+        expected.extend(twins("http::GET::/audit", "AUDIT", "audit.example.com"));
+        // `localhost:5000` is a host too: both readings stay until a workspace serves it.
+        expected.extend(twins("http::GET::/local", "Api__Local", "localhost:5000"));
+        expected.sort();
+        let mut found = configured(body);
+        found.sort();
+        assert_eq!(found, expected);
+    }
+
+    #[test]
+    fn a_key_the_file_lacks_or_holds_as_no_string_is_the_variable_alone() {
+        let body = "async Task F() {\n\
+             await _http.GetAsync(_config[\"Missing:Key\"] + \"/m\");\n\
+             await _http.GetAsync(_config[\"Port\"] + \"/p\");\n\
+             await _http.GetAsync(_config[\"Empty\"] + \"/e\");\n\
+             await _http.GetAsync(_config[\"Api\"] + \"/o\");\n}";
+        assert_eq!(
+            configured(body),
+            [
+                env("http::GET::/e", "Empty"),
+                env("http::GET::/m", "Missing__Key"),
+                env("http::GET::/o", "Api"),
+                env("http::GET::/p", "Port"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_configuration_receiver_is_declared_so_or_a_web_application_builder_s() {
+        let src = |receiver: &str, decl: &str| {
+            let body = format!(
+                "{decl}\nasync Task F(HttpClient h) {{ await h.GetAsync({receiver}[\"audit\"] + \"/x\"); }}"
+            );
+            sent_in(&body, &[], &[("appsettings.json", SETTINGS)])
+        };
+        let twin = twins("http::GET::/x", "audit", "audit.example.com").to_vec();
+        assert_eq!(src("_c", "IConfiguration _c;"), twin);
+        assert_eq!(src("this._c", "IConfiguration _c;"), twin);
+        assert_eq!(
+            src(
+                "_c",
+                "Microsoft.Extensions.Configuration.IConfiguration _c;"
+            ),
+            twin
+        );
+        assert_eq!(src("_c.Configuration", "WebApplicationBuilder _c;"), twin);
+        let made = |factory: &str| {
+            let body = format!(
+                "async Task F(HttpClient h) {{ var builder = {factory}(); \
+                 await h.GetAsync(builder.Configuration[\"audit\"] + \"/x\"); }}"
+            );
+            sent_in(&body, &[], &[("appsettings.json", SETTINGS)])
+        };
+        assert_eq!(made("WebApplication.CreateSlimBuilder"), twin);
+        assert_eq!(made("WebApplication.CreateBuilder"), twin);
+        assert_eq!(
+            made("Other.CreateBuilder"),
+            [(Some("http::GET::/x".into()), None, None)]
+        );
+        // Another type, an undeclared name, a dictionary, a section and a method result.
+        for (receiver, decl) in [
+            ("_c", "Dictionary<string, string> _c;"),
+            ("_c", "IConfigurationSection _c;"),
+            ("_c", "IConfigurationRoot _c;"),
+            ("_c", ""),
+            ("_c.Settings", "IConfiguration _c;"),
+            ("_c.GetSection(\"Api\")", "IConfiguration _c;"),
+            ("builder.Environment", "WebApplicationBuilder builder;"),
+        ] {
+            let found = src(receiver, decl);
+            assert_eq!(
+                found,
+                [(Some("http::GET::/x".into()), None, None)],
+                "{receiver} {decl}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_configuration_type_of_the_repository_is_no_configuration() {
+        let body = "private readonly IConfiguration _config;\n\
+                    async Task F(HttpClient h) { await h.GetAsync(_config[\"audit\"] + \"/x\"); }";
+        let own =
+            "namespace A;\npublic interface IConfiguration { string this[string k] { get; } }\n";
+        assert_eq!(
+            sent_in(
+                body,
+                &[("A/IConfiguration.cs", own)],
+                &[("appsettings.json", SETTINGS)]
+            ),
+            [(Some("http::GET::/x".into()), None, None)]
+        );
+    }
+
+    #[test]
+    fn only_the_base_file_of_the_project_is_read_and_get_value_and_sections_are_not() {
+        let dev: &[u8] =
+            br#"{"Api": {"Url": "https://dev.example.com/"}, "audit": "https://dev.example.com"}"#;
+        let body = "async Task F() {\n\
+             await _http.GetAsync(_config[\"audit\"] + \"/x\");\n\
+             await _http.GetAsync(_config.GetValue<string>(\"audit\") + \"/v\");\n\
+             await _http.GetAsync(_config.GetSection(\"Api\")[\"Url\"] + \"/s\");\n}";
+        let body = format!("private readonly IConfiguration _config;\n{CLIENT}{body}");
+        let found = sent_in(
+            &body,
+            &[],
+            &[
+                ("appsettings.Development.json", dev),
+                ("appsettings.json", SETTINGS),
+            ],
+        );
+        let mut expected = twins("http::GET::/x", "audit", "audit.example.com").to_vec();
+        expected.extend([
+            (Some("http::GET::/s".into()), None, None),
+            (Some("http::GET::/v".into()), None, None),
+        ]);
+        expected.sort();
+        assert_eq!(found, expected);
+    }
+
+    #[test]
+    fn a_client_base_from_configuration_joins_on_the_literal_it_defaults_to() {
+        let body = "public async Task F() {\n\
+             var rel = new HttpClient { BaseAddress = new Uri(_config[\"Api:Url\"]!) };\n\
+             await rel.GetAsync(\"orders\");\n\
+             await rel.GetAsync(\"/root\");\n}";
+        // The variable's reading keeps the relative URL beside the base (`/orders`); the
+        // default's joins on the literal (`Uri`: `/v1/` + `orders`, a root-relative URL replaces the path).
+        let mut expected = Vec::new();
+        expected.extend(twins("http::GET::/root", "Api__Url", "api.example.com"));
+        expected.push((
+            Some("http::GET::/orders".into()),
+            Some("env:Api__Url|host:api.example.com".into()),
+            None,
+        ));
+        expected.push((
+            Some("http::GET::/v1/orders".into()),
+            Some("host:api.example.com|default".into()),
+            None,
+        ));
+        expected.sort();
+        assert_eq!(configured(body), expected);
+    }
+
+    #[test]
+    fn a_read_in_a_constructor_reaches_the_base_assigned_there() {
+        let body = "private readonly HttpClient _h = new HttpClient();\n\
+             public C(IConfiguration config) { _h.BaseAddress = new Uri(config[\"Missing:Url\"]!); }\n\
+             public async Task F() { await _h.GetAsync(\"/x\"); }";
+        assert_eq!(
+            sent_in(body, &[], &[("appsettings.json", SETTINGS)]),
+            [env("http::GET::/x", "Missing__Url")]
+        );
+    }
+
+    const SDK: &[u8] = br#"<Project Sdk="Microsoft.NET.Sdk"></Project>"#;
+    const OLD: &[u8] = b"<Project ToolsVersion=\"15.0\" \
+                         xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\"></Project>";
+
+    #[test]
+    fn a_file_reads_the_configuration_of_the_project_that_holds_it() {
+        let body = format!(
+            "private readonly IConfiguration _config;\n{CLIENT}\
+             async Task F() {{ await _http.GetAsync(_config[\"audit\"] + \"/x\"); }}"
+        );
+        let twin = twins("http::GET::/x", "audit", "audit.example.com").to_vec();
+        // The file of another project (`B/`) does not configure `A/C.cs` once a project holds it.
+        let found = sent_in(
+            &body,
+            &[],
+            &[("A/A.csproj", SDK), ("B/appsettings.json", SETTINGS)],
+        );
+        assert_eq!(found, [env("http::GET::/x", "audit")]);
+        // A project file the pack does not read (old-style) is no project: the SDK one above holds
+        // the file, as the pack's `join` says.
+        let configs = [
+            ("Root.csproj", SDK),
+            ("A/Old.csproj", OLD),
+            ("appsettings.json", SETTINGS),
+        ];
+        assert_eq!(sent_in(&body, &[], &configs), twin);
+        // A file in no project reads the nearest file above it.
+        assert_eq!(sent_in(&body, &[], &[("appsettings.json", SETTINGS)]), twin);
     }
 }
