@@ -311,9 +311,10 @@ mod tests {
         runs.min_by_key(|(_, took)| *took).unwrap()
     }
 
-    /// A client held through `LOCAL_DEPTH` locals is followed; one more is not.
+    /// A client held through locals is followed by the value flow (`Facts::bound`), past
+    /// `LOCAL_DEPTH`; a chain of locals past the value flow's own depth is not.
     #[test]
-    fn a_client_is_followed_through_at_most_local_depth_locals() {
+    fn a_client_is_followed_through_a_bounded_chain_of_locals() {
         let chain = |locals: usize| {
             let held: String = (1..locals)
                 .map(|i| format!("    val c{i} = c{}\n", i - 1))
@@ -324,8 +325,8 @@ mod tests {
                  c{last}.get(\"https://x.example.com/p\")\n}}\n"
             )
         };
-        assert_eq!(read(&chain(LOCAL_DEPTH)).0, 1);
-        assert_eq!(read(&chain(LOCAL_DEPTH + 1)).0, 0);
+        assert_eq!(read(&chain(LOCAL_DEPTH + 1)).0, 1);
+        assert_eq!(read(&chain(1024)).0, 0);
     }
 
     /// A file of many functions, each with a client local and a call, is read in time linear

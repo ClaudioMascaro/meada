@@ -16,6 +16,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+mod minimal;
+pub(super) use minimal::providers as minimal_providers;
+
 use super::{ANY, METHODS, balanced, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
 use crate::lang::{Call, Facts, Kind};
@@ -280,7 +283,7 @@ fn template<'a>(code: &Code<'a>, file: &'a str, index: usize) -> Option<Option<S
 }
 
 /// `path` without the `?` of an optional parameter (`{id?}`), which the trunk reads as a query.
-fn optional(path: String) -> String {
+pub(super) fn optional(path: String) -> String {
     let mut depth = 0usize;
     path.chars()
         .filter(|c| {
