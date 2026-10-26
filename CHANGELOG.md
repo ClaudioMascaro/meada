@@ -39,6 +39,15 @@ All notable changes to Meada are recorded here. The format follows
   file of that project. Bare, `this`, `base`, static and `using static` calls are `exact` when
   the argument count, counting `params` and default values, leaves one method. Attributes are
   calls on what they decorate. No .NET SDK or MSBuild is involved.
+- C# ASP.NET Core controllers as HTTP providers (issue #109): a public method of a class with
+  `[ApiController]`, or deriving from `ControllerBase` or `Controller`, carrying `[HttpGet]`,
+  `[HttpPost]`, `[HttpPut]`, `[HttpPatch]`, `[HttpDelete]`, `[HttpHead]` or `[HttpOptions]`
+  serves the class `[Route]` prefix joined to its template, with `[controller]`, `[action]`
+  (without `Async`, or a literal `[ActionName]`) and `{id}`, `{id:int}`, `{id?}` read as ASP.NET
+  Core does; a template starting with `/` or `~/` replaces the prefix, and a method `[Route]`
+  without a method attribute serves every method (`http::ANY::<path>`, linked to consumers of
+  any method). Conventional routing, a controller with a base class of the repository, a class
+  in `partial` parts, `[NonAction]` methods and attributes that are not MVC's are not read.
 - Kotlin source indexing (issue #95): `.kt` and `.kts` files (Gradle's `build.gradle.kts` and
   `settings.gradle.kts` stay manifests) yield package-qualified classes, interfaces, objects,
   companions (`Class.Companion` when unnamed), top-level and extension functions, properties

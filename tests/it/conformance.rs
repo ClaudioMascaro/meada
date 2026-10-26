@@ -3367,6 +3367,52 @@ fn csharp() {
         api("Controllers.cs", "Acme.Api.UsersController"),
         api("Controllers.cs", "Acme.Api.UsersController.List()"),
         api("Controllers.cs", "Acme.Api.ApiBase"),
+        api("ControllerEdges.cs", "Acme.Api.Edges.JobsController"),
+        api(
+            "ControllerEdges.cs",
+            "Acme.Api.Edges.JobsController.ListAsync()",
+        ),
+        api(
+            "ControllerEdges.cs",
+            "Acme.Api.Edges.JobsController.FinishAsync()",
+        ),
+        api(
+            "ControllerEdges.cs",
+            "Acme.Api.Edges.JobsController.Skipped()",
+        ),
+        api(
+            "ControllerEdges.cs",
+            "Acme.Api.Edges.JobsController.Helper()",
+        ),
+        api(
+            "ControllerEdges.cs",
+            "Acme.Api.Edges.JobsController.Internal()",
+        ),
+        api("ControllerEdges.cs", "Acme.Api.Edges.PagesController"),
+        api(
+            "ControllerEdges.cs",
+            "Acme.Api.Edges.PagesController.Index()",
+        ),
+        api("ControllerEdges.cs", "Acme.Api.Edges.RootController"),
+        api(
+            "ControllerEdges.cs",
+            "Acme.Api.Edges.RootController.Index()",
+        ),
+        api("ControllerEdges.cs", "Acme.Api.Edges.CrudController"),
+        api("ControllerEdges.cs", "Acme.Api.Edges.CrudController.All()"),
+        api("ControllerEdges.cs", "Acme.Api.Edges.GadgetsController"),
+        api("ControllerEdges.cs", "Acme.Api.Edges.PartsController"),
+        api("ControllerEdges.Legacy.cs", "Acme.Api.Legacy.Route"),
+        api("ControllerEdges.Legacy.cs", "Acme.Api.Legacy.OldController"),
+        api(
+            "ControllerEdges.Legacy.cs",
+            "Acme.Api.Legacy.OldController.Old()",
+        ),
+        api("ControllerEdges.Parts.cs", "Acme.Api.Edges.PartsController"),
+        api(
+            "ControllerEdges.Parts.cs",
+            "Acme.Api.Edges.PartsController.Part()",
+        ),
         api("Namespaces.cs", "Acme.Api.Outside"),
         api("Namespaces.cs", "Acme.Api.Outside.Run()"),
         api("Inside.cs", "Acme.Api.Inside"),
@@ -3667,7 +3713,7 @@ fn csharp_controllers_are_providers_with_their_full_paths() {
     let (_, actual) = providers(
         "csharp_controllers",
         "conformance-csharp",
-        "src/Acme.Api/Controllers.cs",
+        "src/Acme.Api/Controller",
     );
     let at = |method: &str| format!("src/Acme.Api/Controllers.cs::Acme.Api.{method}");
     let routes = [
@@ -3692,8 +3738,24 @@ fn csharp_controllers_are_providers_with_their_full_paths() {
         ),
         ("GET", "/ping", "PingController.Pong()"),
     ];
+    // What the controllers of `ControllerEdges.cs` serve: the rest of them is left out.
+    let edges = [
+        (
+            "GET",
+            "/edges/Jobs/List",
+            "Edges.JobsController.ListAsync()",
+        ),
+        (
+            "GET",
+            "/edges/Jobs/done",
+            "Edges.JobsController.FinishAsync()",
+        ),
+        ("GET", "/", "Edges.RootController.Index()"),
+    ];
+    let edge = |method: &str| format!("src/Acme.Api/ControllerEdges.cs::Acme.Api.{method}");
     let contracts: Vec<(String, String)> = (routes.iter())
         .map(|(m, path, method)| (format!("http::{m}::{path}"), at(method)))
+        .chain((edges.iter()).map(|(m, path, method)| (format!("http::{m}::{path}"), edge(method))))
         .collect();
     let expected: Vec<(&str, &str)> = contracts
         .iter()

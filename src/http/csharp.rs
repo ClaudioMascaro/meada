@@ -14,13 +14,13 @@
 //! Conventional routing (`MapControllerRoute`) is not read. A class deriving from a class of the
 //! repository is not read either, since it inherits that class's attributes.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::{ANY, METHODS, balanced, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
-use crate::lang::{Call, Kind};
+use crate::lang::{Call, Facts, Kind};
 use crate::names::{is_method, known};
-use crate::resolve::Code;
+use crate::resolve::{Code, Target};
 
 const MVC: &str = "Microsoft.AspNetCore.Mvc.";
 const BASES: &[&str] = &["ControllerBase", "Controller"];
@@ -31,7 +31,7 @@ fn attribute(spelled: &str) -> Option<&str> {
     let name = spelled.strip_prefix(MVC)?;
     let name = name.strip_suffix("Attribute").unwrap_or(name);
     let verb = name.strip_prefix("Http").map(str::to_uppercase);
-    (matches!(name, "ApiController" | "Route")
+    (matches!(name, "ApiController" | "Route" | "ActionName" | "NonAction")
         || verb.is_some_and(|v| METHODS.contains(&v.as_str())))
     .then_some(name)
 }
@@ -61,50 +61,95 @@ fn spelled<'a>(
 /// ASP.NET Core controller providers: see the module.
 pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
     let mut found = Vec::new();
-    // The attribute classes the repository declares, by name: one hides MVC's of the same name.
-    let declared: BTreeSet<&str> = (code.files().values())
-        .flat_map(|f| f.defs.iter())
+    let files: Vec<(&'a str, &'a Facts)> = (code.files().iter())
+        .filter(|(p, _)| p.ends_with(".cs"))
+        .map(|(p, f)| (*p, *f))
+        .collect();
+    // The attribute classes the repository declares, by name: one the file reaches hides MVC's.
+    let declared: BTreeSet<&'a str> = (files.iter())
+        .flat_map(|(_, f)| f.defs.iter())
         .filter(|d| d.kind == Kind::Class)
         .filter_map(|d| d.name.rsplit('.').next())
         .filter(|n| n.ends_with("Attribute"))
         .collect();
     // A namespace `Microsoft` of the repository could hide the framework's in a qualified name.
     let hidden =
-        (code.files().values()).any(|f| f.defs.iter().any(|d| d.name.starts_with("Microsoft.")));
-    for (path, facts) in code.files().iter().filter(|(p, _)| p.ends_with(".cs")) {
-        let (path, facts) = (*path, *facts);
-        let attributes: Vec<(usize, &'a Call, String)> = (facts.calls.iter().enumerate())
-            .filter(|(_, c)| c.decorates.is_some())
-            .filter_map(|(n, c)| {
-                let is_attribute = |s: &str| attribute(s).is_some();
-                let spelled = spelled(code, path, &c.scope, &c.callee, hidden, is_attribute)?;
-                // `[HttpGet]` may be a class of the repository named `HttpGetAttribute`.
-                let simple = c.callee.rsplit('.').next().unwrap_or(&c.callee);
-                if declared.contains(format!("{simple}Attribute").as_str()) {
-                    return None;
-                }
-                let name = attribute(&spelled)?.to_string();
-                Some((n, c, name))
-            })
-            .collect();
+        (files.iter()).any(|(_, f)| f.defs.iter().any(|d| d.name.starts_with("Microsoft.")));
+    // A class with a class of the repository as a base inherits its attributes, and that base
+    // passes them down: neither is read.
+    let (mut inheriting, mut based) = (BTreeSet::new(), BTreeSet::new());
+    let mut parts: BTreeMap<&str, usize> = BTreeMap::new();
+    for &(path, facts) in &files {
+        for name in &facts.partial {
+            *parts.entry(name).or_default() += 1;
+        }
         for class in facts.defs.iter().filter(|d| d.kind == Kind::Class) {
-            let on_class = |n: &'static str| {
-                (attributes.iter()).filter(move |(_, c, a)| {
-                    c.decorates.as_deref() == Some(class.name.as_str()) && a == n
-                })
-            };
-            let scope = crate::parent(&class.name);
-            // A base of the repository (not an interface) passes its attributes down: not read.
-            let inherits = class.bases.iter().any(|b| {
-                code.definition(path, scope, b)
-                    .is_some_and(|t| !code.files()[t.path].interfaces.iter().any(|i| i == t.name))
+            for b in &class.bases {
+                let target = code.definition(path, crate::parent(&class.name), b);
+                if let Some(t) = target.filter(|t| {
+                    !code.files()[t.path]
+                        .interfaces
+                        .contains(&t.name.to_string())
+                }) {
+                    inheriting.insert(Target {
+                        path,
+                        name: &class.name,
+                    });
+                    based.insert(t);
+                }
+            }
+        }
+    }
+    for &(path, facts) in &files {
+        // The MVC attributes (call index, call, name), and what an attribute not confirmed as
+        // MVC's `[Route]` leaves unread: the definitions it decorates.
+        let (mut attributes, mut unread): (Vec<(usize, &'a Call, String)>, BTreeSet<&str>) =
+            (Vec::new(), BTreeSet::new());
+        for (n, c) in (facts.calls.iter().enumerate()).filter(|(_, c)| c.decorates.is_some()) {
+            let simple = c.callee.rsplit('.').next().unwrap_or(&c.callee);
+            let is_attribute = |s: &str| attribute(s).is_some();
+            let spelled = spelled(code, path, &c.scope, &c.callee, hidden, is_attribute);
+            // `[HttpGet]` may be a class of the repository named `HttpGetAttribute`.
+            // The attribute is read from the scope around its target (a class's attribute is
+            // written in its namespace, a method's in its class).
+            let own = [
+                Some(c.callee.as_str()),
+                declared.get(format!("{simple}Attribute").as_str()).copied(),
+            ]
+            .into_iter()
+            .flatten()
+            .any(|own| {
+                [c.scope.as_str(), crate::parent(&c.scope)]
+                    .into_iter()
+                    .any(|scope| code.definition(path, scope, own).is_some())
             });
+            match spelled.as_deref().and_then(attribute).filter(|_| !own) {
+                Some(name) => attributes.push((n, c, name.to_string())),
+                None if simple.strip_suffix("Attribute").unwrap_or(simple) == "Route" => {
+                    unread.extend(c.decorates.as_deref());
+                }
+                None => {}
+            }
+        }
+        for class in facts.defs.iter().filter(|d| d.kind == Kind::Class) {
+            let on = |target: &'a str| {
+                (attributes.iter()).filter(move |(_, c, _)| c.decorates.as_deref() == Some(target))
+            };
+            let on_class = |n: &'static str| on(&class.name).filter(move |(.., a)| a == n);
+            let scope = crate::parent(&class.name);
             let controller = on_class("ApiController").next().is_some()
-                || class
-                    .bases
-                    .iter()
+                || (class.bases.iter())
                     .any(|b| spelled(code, path, scope, b, hidden, base).is_some());
-            if inherits || !controller {
+            let here = Target {
+                path,
+                name: &class.name,
+            };
+            if !controller
+                || inheriting.contains(&here)
+                || based.contains(&here)
+                || unread.contains(class.name.as_str())
+                || parts.get(class.name.as_str()) > Some(&1)
+            {
                 continue;
             }
             let Some(prefixes) = on_class("Route")
@@ -113,9 +158,12 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
             else {
                 continue;
             };
-            let prefixes: Vec<String> = match prefixes.into_iter().flatten().collect::<Vec<_>>() {
-                p if p.is_empty() => vec![String::new()],
-                p => p,
+            let prefixes: Vec<String> = prefixes.into_iter().flatten().collect();
+            // Without a class `[Route]` the template of an action stands alone, and an action
+            // with none is routed by convention, which is not read.
+            let (prefixed, prefixes) = match prefixes.is_empty() {
+                true => (false, vec![String::new()]),
+                false => (true, prefixes),
             };
             let targets: BTreeSet<&str> = (attributes.iter())
                 .filter(|(_, c, _)| c.scope == class.name)
@@ -123,18 +171,33 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
                 .filter(|t| is_method(facts, t))
                 .collect();
             for target in targets {
-                let on = || {
-                    (attributes.iter()).filter(|(_, c, _)| c.decorates.as_deref() == Some(target))
-                };
-                let verbs: Vec<(usize, String)> = on()
+                let verbs: Vec<(usize, String)> = on(target)
                     .filter_map(|(n, _, a)| Some((*n, a.strip_prefix("Http")?.to_uppercase())))
                     .collect();
+                let has = |n: &str| on(target).any(|(.., a)| a == n);
+                // Only a public method is an action, and `[NonAction]` says it is none.
+                if has("NonAction")
+                    || unread.contains(target)
+                    || facts.hidden.iter().any(|h| h == target)
+                {
+                    continue;
+                }
+                // `[ActionName]` renames the action, to a literal only.
+                let action = target.split('(').next().unwrap_or(target);
+                let action = action.rsplit('.').next().unwrap_or(action);
+                let action = match on(target).find(|(.., a)| a == "ActionName") {
+                    None => action.strip_suffix("Async").unwrap_or(action).to_string(),
+                    Some((n, ..)) => match template(code, path, *n) {
+                        Some(Some(name)) => name,
+                        _ => continue,
+                    },
+                };
                 let Some(routes) = routes(
                     code,
                     path,
                     &verbs,
-                    on().filter(|(.., a)| a.as_str() == "Route")
-                        .map(|(n, ..)| *n),
+                    on(target).filter(|(.., a)| a == "Route").map(|(n, ..)| *n),
+                    prefixed,
                 ) else {
                     continue;
                 };
@@ -146,11 +209,9 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
                         true => route.trim_start_matches('~').to_string(),
                         false => join(prefix.trim_start_matches('~'), route),
                     };
-                    let action = target.split('(').next().unwrap_or(target);
-                    let action = action.rsplit('.').next().unwrap_or(action);
                     let name = class.name.rsplit('.').next().unwrap_or(&class.name);
                     let name = name.strip_suffix("Controller").unwrap_or(name);
-                    let Some(full) = tokens(&full, name, action)
+                    let Some(full) = tokens(&full, name, &action)
                         .map(optional)
                         .filter(|f| balanced(f))
                     else {
@@ -174,12 +235,13 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
 /// `(call index, METHOD)`) and its `[Route]` attributes (call indexes): a method attribute with
 /// a template is a route of its method, a `[Route]` one of every method the action's method
 /// attributes name, or `ANY` without any; method attributes with no template give the prefix
-/// alone, when no attribute has a template. `None` when a template cannot be read.
+/// alone, when the class has a `[Route]` and no attribute has a template. `None` when a template cannot be read.
 fn routes<'a>(
     code: &Code<'a>,
     file: &'a str,
     verbs: &[(usize, String)],
     route: impl Iterator<Item = usize>,
+    prefixed: bool,
 ) -> Option<Vec<(Vec<String>, String)>> {
     let mut routes = Vec::new();
     for (n, verb) in verbs {
@@ -197,7 +259,7 @@ fn routes<'a>(
             routes.push((every.clone(), t));
         }
     }
-    if routes.is_empty() {
+    if routes.is_empty() && prefixed {
         routes = verbs
             .iter()
             .map(|(_, v)| (vec![v.clone()], String::new()))
@@ -403,5 +465,125 @@ mod tests {
             public class OrdersController : ControllerBase, IApi {{ [HttpGet(\"o\")] public void A() {{}} }}"
         );
         assert_eq!(served_in(&[("A/C.cs", &a)]), ["http::GET::/o"]);
+    }
+
+    const GET: &str = "[HttpGet(\"x\")] public void A() {}";
+
+    #[test]
+    fn a_route_that_is_not_mvcs_leaves_its_class_and_its_method_unread() {
+        // A class `Route` that is no attribute, and a `RouteAttribute` no using reaches.
+        let own = format!(
+            "public class Route {{}} [ApiController] [Route(\"api\")] \
+             public class OController : ControllerBase {{ {GET} }}"
+        );
+        assert!(served(USINGS, &own).is_empty());
+        let legacy = "namespace Legacy.Web; public class RouteAttribute : System.Attribute { \
+                      public RouteAttribute(string s) {} }";
+        let api = format!(
+            "{USINGS}\nnamespace A; [ApiController] [Route(\"api\")] \
+             public class OController : ControllerBase {{ {GET} }}"
+        );
+        assert_eq!(
+            served_in(&[("L/R.cs", legacy), ("A/C.cs", &api)]),
+            ["http::GET::/api/x"]
+        );
+        // Written in full, it is not MVC's either.
+        let full = format!(
+            "[ApiController] [Legacy.Web.Route(\"api\")] public class OController : \
+             ControllerBase {{ {GET} }}"
+        );
+        assert!(served(USINGS, &full).is_empty());
+        // The same on a method.
+        let method = "public class Route {} [ApiController] public class OController : \
+                      ControllerBase { [HttpGet] [Route(\"x\")] public void A() {} }";
+        assert!(served(USINGS, method).is_empty());
+        // An attribute class of another namespace the file does not reach hides nothing.
+        let other = format!(
+            "{USINGS}\nnamespace A; [ApiController] public class OController : ControllerBase \
+             {{ {GET} }}"
+        );
+        assert_eq!(
+            served_in(&[("L/R.cs", legacy), ("A/C.cs", &other)]),
+            ["http::GET::/x"]
+        );
+    }
+
+    #[test]
+    fn conventional_routing_serves_nothing_and_an_empty_route_serves_the_root() {
+        let conventional = "public class HomeController : Controller { \
+                            [HttpGet] public void Index() {} [HttpPost] public void Save() {} }";
+        assert!(served(USINGS, conventional).is_empty());
+        let rooted = "[Route(\"\")] public class HomeController : Controller { \
+                      [HttpGet] public void Index() {} }";
+        assert_eq!(served(USINGS, rooted), ["http::GET::/"]);
+        let prefixed = "[Route(\"api\")] public class HomeController : Controller { \
+                        [HttpGet] public void Index() {} }";
+        assert_eq!(served(USINGS, prefixed), ["http::GET::/api"]);
+    }
+
+    #[test]
+    fn action_drops_the_async_suffix_and_follows_a_literal_action_name() {
+        let class = |methods: &str| {
+            served(
+                USINGS,
+                &format!(
+                    "[Route(\"api/[controller]/[action]\")] public class OrdersController : \
+                     ControllerBase {{ {methods} }}"
+                ),
+            )
+        };
+        assert_eq!(
+            class("[HttpGet] public void GetAllAsync() {}"),
+            ["http::GET::/api/Orders/GetAll"]
+        );
+        assert_eq!(
+            class("[HttpGet] [ActionName(\"list\")] public void GetAllAsync() {}"),
+            ["http::GET::/api/Orders/list"]
+        );
+        assert!(class("[HttpGet] [ActionName(Other.Name)] public void A() {}").is_empty());
+    }
+
+    #[test]
+    fn a_base_class_of_the_repository_is_not_a_controller() {
+        let src = "[ApiController] [Route(\"api/[controller]\")] \
+                   public abstract class CrudController : ControllerBase { \
+                   [HttpGet] public void All() {} } \
+                   public class OrdersController : CrudController {}";
+        assert!(served(USINGS, src).is_empty());
+    }
+
+    #[test]
+    fn a_class_declared_in_parts_is_not_read() {
+        let a = format!(
+            "{USINGS}\nnamespace A; [Route(\"api/[controller]\")] \
+             public partial class OrdersController : ControllerBase {{}}"
+        );
+        let b = format!(
+            "{USINGS}\nnamespace A; public partial class OrdersController : ControllerBase \
+             {{ [HttpGet(\"x\")] public void A() {{}} }}"
+        );
+        assert!(served_in(&[("A/C.cs", &a), ("A/D.cs", &b)]).is_empty());
+        let alone = "[ApiController] public partial class OrdersController : ControllerBase { \
+                     [HttpGet(\"x\")] public void A() {} }";
+        assert_eq!(served(USINGS, alone), ["http::GET::/x"]);
+    }
+
+    #[test]
+    fn an_attribute_class_of_the_repository_hides_mvcs_by_either_spelling() {
+        let own = "public class HttpGetAttribute : System.Attribute { \
+                   public HttpGetAttribute(string s) {} } [ApiController] \
+                   public class C : ControllerBase { [HttpGetAttribute(\"x\")] public void A() {} }";
+        assert!(served(USINGS, own).is_empty());
+    }
+
+    #[test]
+    fn a_non_action_or_a_non_public_method_serves_nothing() {
+        let found = controller(
+            "[ApiController]",
+            "[NonAction] [HttpGet(\"n\")] public void N() {} \
+             [HttpGet(\"p\")] private void P() {} [HttpGet(\"i\")] void I() {} \
+             [HttpGet(\"ok\")] public void Ok() {}",
+        );
+        assert_eq!(found, ["http::GET::/ok"]);
     }
 }

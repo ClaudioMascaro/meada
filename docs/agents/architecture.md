@@ -2112,24 +2112,34 @@ qualification budget does (ADR 0017).
 - `http/csharp.rs` (spec #28, #109): an ASP.NET Core controller route is read from `Call::decorates`
   on a method of a class that is a controller: `[ApiController]`, or a base that `Code::outside`
   says is `Microsoft.AspNetCore.Mvc.ControllerBase` or `Controller`. The pack ships syntax only,
-  so the attribute names live here: `Route`, `ApiController` and `Http<Method>`, with or without
+  so the attribute names live here: `Route`, `ApiController`, `ActionName`, `NonAction` and `Http<Method>`, with or without
   the `Attribute` suffix, count when a `using` of `Microsoft.AspNetCore.Mvc` binds them (the one
   on-demand candidate in the kind's table, through `names::known`)
-  or when written in full, and a class of the repository named `<Name>Attribute` hides the
-  framework's. The class `[Route]` templates are the prefixes; each method attribute with a
-  template is a route of its method, a method `[Route]` is one of every method the action's
-  method attributes name, or of `ANY` (`http::ANY::<path>`, whose link reason says "any method"
-  in `http.rs`) without any, and a method attribute without template gives the prefix alone when
-  no attribute has one. A template starting with `/` or `~/` replaces the prefix; `[controller]`
-  and `[action]` are replaced on the joined path, `[[` and `]]` escape the brackets, any other
-  token or a pattern with a `/` inside braces (`balanced`, shared with `http/java.rs`) serves
-  nothing, and `?` of `{id?}` is dropped before the trunk's normalization, which reads it as a
-  query. Case is kept, so `[controller]` on `OrdersController` is `/api/Orders`. Ceilings: a
-  template that is not a string literal serves nothing (the pack folds no constants or `+`);
-  conventional routing (`MapControllerRoute`) is not read; a class with a base class of the
-  repository (an interface is fine) serves nothing, since it inherits attributes the kind does
-  not follow; a partial class reads the attributes and bases of its own part; `[NonAction]`,
-  `[Area]` and `[HttpGet(Name = ..)]` route names are not applied.
+  or when written in full, and a class of the repository that the attribute's scope reaches
+  (`Code::definition`, named `<Name>` or `<Name>Attribute`) hides the framework's. A decorator
+  named `Route` that is not confirmed as MVC's leaves its class or method unread (never a route
+  without the prefix it would add). The class `[Route]` templates are the prefixes; each method
+  attribute with a template is a route of its method, a method `[Route]` is one of every method
+  the action's method attributes name, or of `ANY` (`http::ANY::<path>`, whose link reason says
+  "any method" in `http.rs`) without any, and a method attribute without template gives the
+  prefix alone when the class has a `[Route]` and no attribute has a template: with no class
+  `[Route]` it is conventional routing, which is not read (`[Route("")]` is the root). A
+  template starting with `/` or `~/` replaces the prefix; `[controller]` and `[action]` are
+  replaced on the joined path (`[action]` is the method name without a trailing `Async`, as
+  ASP.NET Core does by default, or the literal of `[ActionName]`; a non-literal one serves
+  nothing), `[[` and `]]` escape the brackets, any other token or a pattern with a `/` inside
+  braces (`balanced`, shared with `http/java.rs`) serves nothing, and `?` of `{id?}` is dropped
+  before the trunk's normalization, which reads it as a query. Case is kept, so `[controller]`
+  on `OrdersController` is `/api/Orders` (ASP.NET Core matches case-insensitively; the trunk
+  does not). A method serves nothing when `[NonAction]` marks it or `Facts::hidden` says it is
+  not public. Ceilings: a template that is not a string literal serves nothing (the pack folds
+  no constants or `+`); a class with a base class of the repository (an interface is fine), a
+  class that is the base of another one of the repository, and a class declared in parts
+  (`Facts::partial` in several files) serve nothing, since the attributes they have or pass
+  down are not followed or joined; `[Area]` and `Name=` route names are not applied;
+  `SuppressAsyncSuffixInActionNames` turned off is not read; `[HttpGet("a")] [Route("b")]`
+  serves `GET /b` (ASP.NET Core may serve it for every method), and a method attribute without
+  template beside a templated one gives no route.
 - `http/kotlin.rs` (spec #27, #98): Ktor routes, through the same `Mounts` and `prefixes` as
   the other routers, whose nodes are definitions (file, qualified name): the lambda of each
   `routing { }` call (a root), the lambda of each `route(prefix) { }` call (mounted under its

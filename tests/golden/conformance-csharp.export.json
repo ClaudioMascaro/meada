@@ -26,6 +26,18 @@
       "hash": "caa22233891428dc67d60aba259886e4972d64fe21203ee76954b7fbb4a9f0d4"
     },
     {
+      "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
+      "hash": "56f5d663e96d2bf72192d041fc21fa0fb91be182dd4dd6fcaa1839ab47617756"
+    },
+    {
+      "path": "src/Acme.Api/ControllerEdges.Parts.cs",
+      "hash": "0a7da63182b9e02cdc5168d3e5ddcda325e58d689227b4d22af92a1bbf826816"
+    },
+    {
+      "path": "src/Acme.Api/ControllerEdges.cs",
+      "hash": "2cc3422625e05128d54001fc55e292b91e041fe7ad335275ece9e586be471c94"
+    },
+    {
       "path": "src/Acme.Api/Controllers.cs",
       "hash": "3feee918afea38c1201c9837e890a8dbdedaf1b096d27affdcc92d0e07b58e24"
     },
@@ -225,6 +237,158 @@
         "path": "src/Acme.Api/Contracts.cs",
         "start": 130,
         "end": 153
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.OldController",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
+        "start": 178,
+        "end": 306
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.OldController.Old()",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
+        "start": 262,
+        "end": 304
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.Route",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
+        "start": 154,
+        "end": 176
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Parts.cs::Acme.Api.Edges.PartsController",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.Parts.cs",
+        "start": 60,
+        "end": 166
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Parts.cs::Acme.Api.Edges.PartsController.Part()",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.Parts.cs",
+        "start": 120,
+        "end": 164
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 1197,
+        "end": 1364
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController.All()",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 1319,
+        "end": 1358
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.GadgetsController",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 1370,
+        "end": 1421
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 245,
+        "end": 684
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.FinishAsync()",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 402,
+        "end": 469
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Helper()",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 556,
+        "end": 619
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Internal()",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 629,
+        "end": 678
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.ListAsync()",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 347,
+        "end": 392
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Skipped()",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 479,
+        "end": 546
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PagesController",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 774,
+        "end": 877
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PagesController.Index()",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 830,
+        "end": 871
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PartsController",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 1467,
+        "end": 1558
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.RootController",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 917,
+        "end": 1035
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.RootController.Index()",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 988,
+        "end": 1029
       }
     },
     {
@@ -1536,6 +1700,226 @@
         "path": "src/Acme.Api/Checkout.cs",
         "start": 310,
         "end": 332
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.OldController::HttpGet#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.OldController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
+        "start": 263,
+        "end": 277
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy::ApiController#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
+        "start": 179,
+        "end": 192
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy::Route#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy",
+      "target": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.Route",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
+        "start": 195,
+        "end": 210
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Parts.cs::Acme.Api.Edges.PartsController::HttpGet#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Parts.cs::Acme.Api.Edges.PartsController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.Parts.cs",
+        "start": 121,
+        "end": 136
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController::HttpGet#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 1320,
+        "end": 1327
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::ActionName#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 412,
+        "end": 430
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::ActionName#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 489,
+        "end": 511
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::HttpGet#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 348,
+        "end": 355
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::HttpGet#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 403,
+        "end": 410
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::HttpGet#2",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 480,
+        "end": 487
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::HttpGet#3",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 568,
+        "end": 585
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::HttpGet#4",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 630,
+        "end": 649
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::NonAction#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 557,
+        "end": 566
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PagesController::HttpGet#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PagesController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 831,
+        "end": 838
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.RootController::HttpGet#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.RootController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 989,
+        "end": 996
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges::ApiController#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 1198,
+        "end": 1211
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges::Route#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 246,
+        "end": 282
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges::Route#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 918,
+        "end": 927
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges::Route#2",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 1218,
+        "end": 1245
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges::Route#3",
+      "caller": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/ControllerEdges.cs",
+        "start": 1468,
+        "end": 1495
       }
     },
     {
@@ -2852,12 +3236,24 @@
       "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Remove(int?)"
     },
     {
+      "contract": "http::GET::/",
+      "site": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.RootController.Index()"
+    },
+    {
       "contract": "http::GET::/api/Orders",
       "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.List()"
     },
     {
       "contract": "http::GET::/api/Orders/{}",
       "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Get(int)"
+    },
+    {
+      "contract": "http::GET::/edges/Jobs/List",
+      "site": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.ListAsync()"
+    },
+    {
+      "contract": "http::GET::/edges/Jobs/done",
+      "site": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.FinishAsync()"
     },
     {
       "contract": "http::GET::/health",
@@ -2921,6 +3317,12 @@
     },
     {
       "name": "src/Acme.Api#2",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.Route"
+      ]
+    },
+    {
+      "name": "src/Acme.Api#3",
       "members": [
         "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()",
         "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second.Make()"
@@ -3198,6 +3600,132 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/Acme.Api/Cli.cs::Acme.Api.Cli.Main(string[])"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.OldController.Old()",
+      "kind": "export",
+      "label": "Acme.Api.Legacy.OldController.Old()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.OldController.Old()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Parts.cs::Acme.Api.Edges.PartsController.Part()",
+      "kind": "export",
+      "label": "Acme.Api.Edges.PartsController.Part()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Parts.cs::Acme.Api.Edges.PartsController.Part()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController.All()",
+      "kind": "export",
+      "label": "Acme.Api.Edges.CrudController.All()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController.All()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.FinishAsync()::http::GET::/edges/Jobs/done",
+      "kind": "route",
+      "label": "GET /edges/Jobs/done",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.FinishAsync()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Helper()",
+      "kind": "export",
+      "label": "Acme.Api.Edges.JobsController.Helper()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Helper()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.ListAsync()::http::GET::/edges/Jobs/List",
+      "kind": "route",
+      "label": "GET /edges/Jobs/List",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.ListAsync()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Skipped()",
+      "kind": "export",
+      "label": "Acme.Api.Edges.JobsController.Skipped()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Skipped()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PagesController.Index()",
+      "kind": "export",
+      "label": "Acme.Api.Edges.PagesController.Index()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PagesController.Index()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.RootController.Index()::http::GET::/",
+      "kind": "route",
+      "label": "GET /",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.RootController.Index()"
         }
       ]
     },
