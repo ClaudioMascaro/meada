@@ -700,7 +700,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     }
 
     // The facts of every file: parsed now, or kept from the index.
-    let changed_paths: HashSet<&str> = changed.iter().map(|p| p.path.as_str()).collect();
+    let changed_paths: HashSet<String> = changed.iter().map(|p| p.path.clone()).collect();
     let rows = tx
         .prepare("SELECT path, facts FROM files")?
         .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
@@ -710,7 +710,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .filter(|(path, _)| !changed_paths.contains(path.as_str()))
         .map(|(path, facts)| Some((path, serde_json::from_str(&facts).ok()?)))
         .collect();
-    let Some(kept) = kept else {
+    let Some(mut kept) = kept else {
         // Facts this version cannot read, stored before a change whose golden was not
         // re-blessed: rebuild, as for another version. Without the identity, the next pass starts
         // over and keeps nothing.
@@ -718,6 +718,29 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         db.execute("DELETE FROM meta", [])?;
         return refresh(db, root, identity, serve);
     };
+    let found_configs = |pack: usize| -> Vec<(&str, &[u8])> {
+        (configs.get(&pack).into_iter().flatten())
+            .map(|(n, c)| (*n, c.as_slice()))
+            .collect()
+    };
+    // What each pack's files give one another (`LanguagePack::join`), from the facts as parsed:
+    // the index keeps those, so a refresh joins them as a cold index does, and joins the files
+    // the contracts parse again for their values the same way.
+    let mut raw: BTreeMap<usize, BTreeMap<&str, &Facts>> = BTreeMap::new();
+    let changed_facts = changed.iter().map(|p| (p.path.as_str(), &p.facts));
+    for (path, facts) in changed_facts.chain(kept.iter().map(|(p, f)| (p.as_str(), f))) {
+        raw.entry(packs[path]).or_default().insert(path, facts);
+    }
+    let joins: BTreeMap<usize, lang::Join> = (raw.iter())
+        .map(|(&pack, files)| (pack, lang::pack(pack).join(&found_configs(pack), files)))
+        .collect();
+    drop(raw);
+    for p in &mut changed {
+        joins[&packs[p.path.as_str()]](&p.path, &mut p.facts);
+    }
+    for (path, facts) in &mut kept {
+        joins[&packs[path.as_str()]](path, facts);
+    }
     let parsed: BTreeMap<&str, &Facts> = changed
         .iter()
         .map(|p| (p.path.as_str(), &p.facts))
@@ -731,11 +754,6 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         let group = lang::resolver_of(packs[path]);
         groups.entry(group).or_default().insert(path, facts);
     }
-    let found_configs = |pack: usize| -> Vec<(&str, &[u8])> {
-        (configs.get(&pack).into_iter().flatten())
-            .map(|(n, c)| (*n, c.as_slice()))
-            .collect()
-    };
     // What each pack makes of the whole repository, once (`LanguagePack::layout`).
     let mut layouts = BTreeMap::new();
     for (&pack, files) in &mut groups {
@@ -816,7 +834,10 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         for path in misses {
             let src = fs::read(root.join(&path))?;
             let pack = packs[path.as_str()];
-            let facts = lang::pack(pack).parse_with(&path, &src, &settings[&pack](&path))?;
+            let mut facts = lang::pack(pack).parse_with(&path, &src, &settings[&pack](&path))?;
+            if let Some(join) = joins.get(&pack) {
+                join(&path, &mut facts);
+            }
             reparsed.insert(path, facts);
         }
     };
@@ -1057,8 +1078,8 @@ struct Packs<'a> {
 type Setting = Box<dyn Fn(&str) -> String>;
 
 /// The packs of the files `walk` found under `root`, their config files read (`read_config`)
-/// on every call: they are few and small. A `**/` name takes every file of that name the walk
-/// found, in path order.
+/// on every call: they are few and small. A `**/` name takes every file of that name (or, for
+/// `**/*.ext`, of that ending) the walk found, in path order.
 fn packs_of<'a>(root: &Path, all: &'a [(String, PathBuf)]) -> Packs<'a> {
     let walked: Vec<(&String, &PathBuf, usize)> = (all.iter())
         .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
@@ -1072,7 +1093,9 @@ fn packs_of<'a>(root: &Path, all: &'a [(String, PathBuf)]) -> Packs<'a> {
             let paths: BTreeSet<&str> = match name.strip_prefix("**/") {
                 Some(file) => (all.iter())
                     .map(|(path, _)| path.as_str())
-                    .filter(|path| path.rsplit('/').next() == Some(file))
+                    .filter(|path| {
+                        lang::names_config(file, path.rsplit('/').next().unwrap_or(path))
+                    })
                     .collect(),
                 None => BTreeSet::from([name]),
             };
@@ -2635,6 +2658,7 @@ mod tests {
             ("sample.pom.xml", "pom.xml"),
             ("sample.build.gradle.kts", "build.gradle.kts"),
             ("sample.settings.gradle.kts", "settings.gradle.kts"),
+            ("sample.csproj", "src/Kit/Kit.csproj"),
         ] {
             let src = fs::read(tests.join("fixtures/schema").join(name)).unwrap();
             let summary = package::read_manifest(path, &src);

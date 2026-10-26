@@ -10,6 +10,7 @@ use tree_sitter::Node;
 
 use crate::Result;
 
+pub mod csharp;
 pub mod go;
 pub mod java;
 pub mod kotlin;
@@ -55,8 +56,19 @@ pub trait LanguagePack {
     /// `tsconfig.json`, or what the pack's contract kinds read (Java's Spring
     /// `application.properties`, through `Indexed::configs`). The shared side reads those
     /// present, hands them to `layout` and refreshes the contracts when one changes. A name starting with `**/` names every file of that name the walk finds, at
-    /// any depth, in path order (`**/Cargo.toml`: a Cargo workspace's members).
+    /// any depth, in path order (`**/Cargo.toml`: a Cargo workspace's members), and `**/*`
+    /// every file whose name ends with the rest (`**/*.csproj`).
     fn config_files(&self) -> &'static [&'static str];
+
+    /// What the pack's files give one another before they resolve (`Join`), built from the
+    /// config files as `layout` gets them and the facts of every file of the pack, as parsed:
+    /// C#'s `global using` directives and a project file's usings bind in every file of their
+    /// project. The index keeps the facts as parsed and joins each file's again on every
+    /// refresh, before `layout`, and those it parses again for their values too, so a file
+    /// another one's change affects resolves anew without being parsed again.
+    fn join(&self, _configs: &[(&str, &[u8])], _files: &BTreeMap<&str, &Facts>) -> Join {
+        Box::new(|_, _| {})
+    }
 
     /// How imports name files in one repository, built from its config files as
     /// `(path, contents)`, in `config_files` order, and from the facts of the pack's files: a
@@ -132,6 +144,15 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether the members of a class may be extended from outside it (C#'s `this` parameter),
+    /// where the pack does not read the extensions (`extension_functions`): a method whose first
+    /// parameter is `Binds::Instance` takes its receiver there. A call on a typed receiver that
+    /// no member answers, one of a class of the repository without an opaque base or one of a
+    /// type outside it, is a name match among those methods; otherwise it resolves to nothing.
+    fn extension_methods(&self) -> bool {
+        false
+    }
+
     /// Whether a method call that no function of the repository answers may hand back the
     /// value it was called on, as a builder does (`Router::new().route(..)` in Rust):
     /// `Code::origins` then follows the call's `receiver`, to a constructor whose outside name
@@ -171,6 +192,9 @@ pub trait LanguagePack {
 /// (first argument) may name, most likely first. The shared side takes the first one that
 /// the pack parses.
 pub type Modules = Box<dyn Fn(&str, &str) -> Vec<String>>;
+
+/// What `LanguagePack::join` does to a file's facts (second argument), by its path (first).
+pub type Join = Box<dyn Fn(&str, &mut Facts)>;
 
 /// Whether code in a file (first argument) may call into another (second argument).
 pub type Reaches = Box<dyn Fn(&str, &str) -> bool>;
@@ -213,7 +237,17 @@ const PACKS: &[&dyn LanguagePack] = &[
     &go::Go,
     &java::Java,
     &kotlin::Kotlin,
+    &csharp::CSharp,
 ];
+
+/// Whether a file named `file` is one a `**/` name of `config_files` names (`pattern`, past
+/// the `**/`): that name, or for `*.ext` any name ending so.
+pub fn names_config(pattern: &str, file: &str) -> bool {
+    match pattern.strip_prefix('*') {
+        Some(ending) => file.len() > ending.len() && file.ends_with(ending),
+        None => file == pattern,
+    }
+}
 
 /// The index of the pack that parses `path`, if any.
 pub fn pack_for(path: &str) -> Option<usize> {
@@ -350,11 +384,26 @@ pub struct Facts {
     /// Not kept in the index (see `Call::args`).
     #[serde(skip)]
     pub annotated: Vec<Annotated>,
-    /// The value each Kotlin local, or the parameter of a tracked lambda, was given, where no
-    /// constant records it: the call a `val` holds, the receiver `use` passes on. Not kept in
+    /// The value each Kotlin or C# local, or the parameter of a tracked lambda, was given, where
+    /// no constant records it: the call a `val` holds, the receiver `use` passes on; in C#, the
+    /// creation or call a field or a local is initialized with, and a member written through a
+    /// name (`c.BaseAddress = v`, named `c.BaseAddress`). Not kept in
     /// the index (see `Call::args`).
     #[serde(skip)]
     pub bound: Vec<Bound>,
+    /// What the file gives every file of its project, in the pack's spelling, which
+    /// `LanguagePack::join` applies to each: C#'s `global using` directives (`A.B`, `static
+    /// A.B`, `X = A.B`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub project: Vec<String>,
+    /// The types the file declares in parts (C#'s `partial`), by qualified name: the classes of
+    /// one such name in the files of one `unit` are one type (`Resolver::parts`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub partial: Vec<String>,
+    /// The compilation the file belongs to, which `LanguagePack::join` sets (C#'s project):
+    /// the parts of a partial type come from one. Not kept in the index: it is joined again.
+    #[serde(skip)]
+    pub unit: String,
     /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,
@@ -941,6 +990,19 @@ pub enum Part {
     /// variable is unset (Spring's `${X:http://api.example.com}`): the variable and the default's
     /// parts. Its value is never known, as `Env`'s.
     EnvOr(String, Vec<Part>),
+    /// A call or a subscript with one string literal, read inside a string without the pack
+    /// knowing what it reads (C#'s `Environment.GetEnvironmentVariable("X")` and
+    /// `configuration["A:B"]`): `callee` as written (a subscript's is its receiver and `[]`),
+    /// `key` the literal, `scope` where it is written (shared by the reads of one node) and
+    /// `then` the members called on what it reads, in order (`.TrimEnd('/')`), so the kind that
+    /// knows the library decides what it is (`Env`, `EnvOr` or `Hole`). Only the C# pack writes
+    /// it.
+    Read {
+        scope: std::sync::Arc<str>,
+        callee: String,
+        key: String,
+        then: Vec<String>,
+    },
     /// Any other expression inside a string.
     Hole,
 }

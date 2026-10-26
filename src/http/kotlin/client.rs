@@ -20,11 +20,12 @@
 use super::{VERBS, external, implicit};
 use crate::contract::Found;
 use crate::index::Indexed;
-use crate::jvm::names::{LOCAL_DEPTH, kotlin, one, spellings, typed};
+use crate::jvm::names::{LOCAL_DEPTH, kotlin};
 use crate::jvm::spring::{self, Configs};
 use crate::lang::kotlin::TYPE_ARGUMENT;
-use crate::lang::{Annotated, Bound, Call, Part, Value};
-use crate::resolve::{Code, Expand, Expanded, Follow, Of, passes_nothing};
+use crate::lang::{Bound, Call, Part, Value};
+use crate::names::{one, spellings, typed};
+use crate::resolve::{Code, Expand, Expanded, Follow, Injected, Of, passes_nothing};
 
 use super::super::{based, consumer, fetches};
 
@@ -205,9 +206,9 @@ fn text(method: String) -> Value {
 pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
     // Read the first time an annotation is injected: a repository without one parses none.
     let configs = std::cell::OnceCell::new();
-    let inject = |code: &Code<'a>, path: &'a str, annotated: &'a Annotated| {
+    let inject = |code: &Code<'a>, path: &'a str, on: Injected<'a>| {
         let configs = configs.get_or_init(|| Configs::read(indexed.configs, indexed.manifests));
-        spring::inject(configs, code, path, annotated)
+        spring::inject(configs, code, path, on.annotated()?)
     };
     let clients = Clients { code };
     let mut found = Vec::new();
@@ -280,7 +281,7 @@ mod tests {
     use crate::lang::LanguagePack;
     use crate::lang::java::Java;
     use crate::lang::kotlin::Kotlin;
-    use crate::resolve::Resolver;
+    use crate::resolve::{EVAL_DEPTH, Resolver};
     use std::collections::BTreeMap;
 
     const KOTLIN: &str = "src/main/kotlin/a/C.kt";
@@ -310,9 +311,10 @@ mod tests {
         runs.min_by_key(|(_, took)| *took).unwrap()
     }
 
-    /// A client held through `LOCAL_DEPTH` locals is followed; one more is not.
+    /// A client held through locals is followed by the value flow (`Facts::bound`), past
+    /// `LOCAL_DEPTH`; a chain of locals past the value flow's own depth is not.
     #[test]
-    fn a_client_is_followed_through_at_most_local_depth_locals() {
+    fn a_client_is_followed_through_a_bounded_chain_of_locals() {
         let chain = |locals: usize| {
             let held: String = (1..locals)
                 .map(|i| format!("    val c{i} = c{}\n", i - 1))
@@ -323,8 +325,10 @@ mod tests {
                  c{last}.get(\"https://x.example.com/p\")\n}}\n"
             )
         };
-        assert_eq!(read(&chain(LOCAL_DEPTH)).0, 1);
-        assert_eq!(read(&chain(LOCAL_DEPTH + 1)).0, 0);
+        assert_eq!(read(&chain(LOCAL_DEPTH + 1)).0, 1);
+        // The pack's own `LOCAL_DEPTH` locals, then the value flow's `EVAL_DEPTH`.
+        assert_eq!(read(&chain(EVAL_DEPTH + LOCAL_DEPTH)).0, 1);
+        assert_eq!(read(&chain(EVAL_DEPTH + LOCAL_DEPTH + 1)).0, 0);
     }
 
     /// A file of many functions, each with a client local and a call, is read in time linear

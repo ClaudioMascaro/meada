@@ -1,0 +1,26 @@
+example.com/dotnet/lib src/Kit/Pricing/Order.cs:3-19 Example.Kit.Pricing.Order
+community: none
+processes: none
+public class Order
+{
+    private readonly int quantity;
+
+    public Order(int quantity)
+    {
+        this.quantity = quantity;
+    }
+
+    public static Order Of(int quantity) => new Order(quantity);
+
+    public int Total() => Tax(Subtotal());
+
+    private int Subtotal() => quantity * 100;
+
+    private int Tax(int amount) => amount + amount / 10;
+}
+callers: none
+callees: none
+consumers:
+example.com/dotnet/app src/Web/Checkout.cs:9 Example.App.Web.Checkout.Pay(int) [range unchecked]
+example.com/dotnet/app src/Web/Checkout.cs:10 Example.App.Web.Checkout.Pay(int) [range unchecked]
+example.com/dotnet/app src/Web/Checkout.cs:13 Example.App.Web.Checkout.Create() [range unchecked]

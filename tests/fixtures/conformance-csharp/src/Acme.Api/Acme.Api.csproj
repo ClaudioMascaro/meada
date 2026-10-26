@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Acme.Core\Acme.Core.csproj" />
+    <!-- A project outside the repository, and a package. -->
+    <ProjectReference Include="..\..\..\Shared\Acme.Shared.csproj" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <Using Include="Acme.Core.Orders" />
+  </ItemGroup>
+
+</Project>

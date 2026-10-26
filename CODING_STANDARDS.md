@@ -42,7 +42,11 @@ a review finding.
 - **Name-matched hops.** A call resolved only by a name match (`inferred` or `ambiguous`) never
   feeds a contract, since it may be on any object or reach another function: wrapper expansion
   and the value flow that finds routers and clients (through constants, arguments and return
-  values) climb `exact` hops alone.
+  values) climb `exact` hops alone. The one exception is a C# extension method called on a
+  receiver (`x.M()`), which the resolver keeps a name match only because it does not look the
+  extensions up: the value flow takes it when the static class declaring it is in scope of the
+  call by its name, as the compiler binds it (`Resolver::extension_callers`; decided in
+  `docs/adr/0018-csharp-extension-calls-in-the-value-flow.md`).
 - **Unreadable parts.** A path or prefix with a part that cannot be read (an unfolded template or
   f-string hole, a parameter, an environment read) yields no provider, never a `{}` segment. A
   parameter written in the literal (`:id`, `{id}`, `<int:id>`) stays one.
@@ -98,7 +102,10 @@ in the same change:
   finding.
 - `jvm/` holds what the JVM ecosystems and kinds share (spec #26, user story 28): the build
   readers (`jvm/maven.rs`, `jvm/gradle.rs`), the Spring configuration reader with its injector
-  (`jvm/spring.rs`) and the name questions of the JVM forms (`jvm/names.rs`). An ecosystem's
+  (`jvm/spring.rs`) and the file readers of the JVM forms (`jvm/names.rs`). The name questions
+  every kind asks of a library name (`one`, `known`, `typed`, `spellings`, `declared`, `is_method`)
+  live in `names.rs`, shared with the C# kind; one a second ecosystem needs moves there, not into
+  `jvm/`. An ecosystem's
   rule stays in `package/maven.rs` and a library form in its kind (`http/java*`,
   `channel/java.rs`); either one in `jvm/` is a finding, and so is a JVM reader a second
   module copies instead of sharing.
@@ -106,6 +113,10 @@ in the same change:
   forms of the libraries a kind reads (web frameworks and HTTP clients, message brokers) live
   under the kind, one module per language (`http/<language>.rs`, `channel/<language>.rs`); a
   form may live in a submodule of that module (`http/rust/frameworks.rs`). A table or a form of
-  a library in a pack is a finding, and the kind owns it. The one exception is decided: the Rust
+  a library in a pack is a finding, and the kind owns it. Two exceptions are decided. The Rust
   pack folds `Method::GET` constants at parse time (`METHOD_CRATES` and `VERBS`) and keeps them,
-  `VERBS` being the one pack constant a kind reads. A table anywhere else in a pack is a finding.
+  `VERBS` being the one pack constant a kind reads. A pack may recognise the one call that reads
+  the platform's environment, as a form and not a table: Java's and Kotlin's `System.getenv`
+  (`getenv` in `lang/java.rs` and `lang/kotlin.rs`) and C#'s `GetEnvironmentVariable`
+  (`ENVIRONMENT_READ` in `lang/csharp.rs`, which leaves the kind to decide whether the
+  `Environment` is the framework's). A table anywhere else in a pack is a finding.

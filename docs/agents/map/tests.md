@@ -380,6 +380,32 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   members. Goldens `jvm-*.export.json`, `jvm-maven.context-total.txt`,
   `jvm-maven.context-order.txt` and `jvm-client.trace-down.txt`. Unit tests in
   `package/maven.rs` and `jvm/gradle.rs`.
+
+- `tests/it/nugetpkg.rs` (spec #28, ticket #116): the fixtures `dotnet-lib` (a `PackageId`
+  project `Example.Kit` with `Order`, and a `Money` project whose `AssemblyName` differs from its
+  file) and `dotnet-app` (a `PackageReference` project, a `ProjectReference` one to the other
+  repository and to a project of its own, an outside `Newtonsoft.Json`), and `dotnet-twin`
+  (a second provider of the same type, for the ambiguous hop). Manifest links, `using` and
+  `using static` imports, `context` on the type and a method, `trace` down across the hop, and an
+  edited, renamed and added `.csproj` refreshing like a cold workspace. Goldens
+  `dotnet-{lib,app}.export.json`, `dotnet-lib.context-{order,total}.txt` and
+  `dotnet-app.trace-down.txt`. Unit tests in `package/nuget.rs` and `dotnet/msbuild.rs`.
+- C# channels (spec #28, ticket #115): `conformance-csharp` gains `Channels.cs` and
+  `Channels.Nats.cs` (a client of each library: Confluent.Kafka, RabbitMQ.Client with a
+  default-exchange publish and a named one routed by a binding, AWSSDK.SQS, NATS.Client with a
+  wildcard subject, StackExchange.Redis streams, Azure.Messaging.ServiceBus with a queue, a
+  topic and two processors on it, and names read from the environment on both sides) and
+  `Channels.Writes.cs` (a sender written more than once, one made for a parameter,
+  `String.Empty`, `ConfigureAwait`, a consumer-first `BasicConsume` and two handlers on one
+  event), checked by
+  `csharp` (the definitions and the golden) and `csharp_channel_clients_link_their_producers_to_their_handlers`
+  (every link with its level, and the unresolved sides); `xlang-csharp-web` gains `src/events.ts`
+  (`announceShipment`, kafkajs) and `xlang-csharp-api` `Messaging/ShipmentListener.cs`, and
+  `trace_down_from_a_typescript_producer_reaches_the_csharp_kafka_consumer` holds
+  `xlang-csharp.trace-channel-down.txt`. Unit tests in `channel/csharp.rs` (each library, a
+  repository type that hides the library's, two namespaces for one name, a name assigned twice, a
+  wrapper, the client depth, every write of a sender) and in `lang/csharp.rs` (`await`, `+=`,
+  one `name=` per write, a linear pass over thousands of them).
 - **The loopback decider stub** (`tests/it/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500

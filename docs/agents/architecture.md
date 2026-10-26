@@ -761,7 +761,7 @@ one for the area a change touches.
   one, never a missing or empty file; `refresh` stays one transaction in place. An operator
   renames an index in (built elsewhere) only while no `meada index` writes that index, one
   writer per index: a refresh's live `index.db-journal` would be taken for the new file's. `lang/`: the
-  language adapter and the TS/JS, Python, Rust, Go, Java and Kotlin packs. `resolve.rs`: calls to definitions (`Resolver`), values
+  language adapter and the TS/JS, Python, Rust, Go, Java, Kotlin and C# packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`: `Code::origins`, the one origin question, with three evidence policies
   (`Values`, `Constants` for the TypeScript forms, `Declarations` for Go's typed clients and
   forms), `Code::outside` for what an import from outside binds a name to, `Code::extensions`
@@ -769,7 +769,7 @@ one for the area a change touches.
   for wrappers, `Expand::Chain` reading a call whole). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs` and its `channel/` submodules
-  (`channel/message.rs`: the message types and broker helpers; `channel/{ts,python,rust,go,java}.rs`:
+  (`channel/message.rs`: the message types and broker helpers; `channel/{ts,python,rust,go,java,csharp}.rs`:
   the message libraries of each language): the
   `ContractKind` trait and the HTTP kind (`http.rs`: the contract and path rules, the mount
   machinery and the shared consumer readers; one submodule per language: `http/ts.rs` and
@@ -781,9 +781,12 @@ one for the area a change touches.
   with resty; `http/java.rs` and `http/java/clients.rs`, Spring MVC providers and the
   RestTemplate, WebClient, `java.net.http` and OkHttp consumers, whose bases come from the
   Spring configuration `jvm/spring.rs` reads for the JVM packs' kinds; `http/kotlin.rs`, Ktor
-  providers, and `http/kotlin/client.rs`, Ktor client consumers), resource and channel
-  kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
-  contracts (specs #22, #24, #30, #25 and #26), the shared steps and one module per ecosystem behind
+  providers, and `http/kotlin/client.rs`, Ktor client consumers; `http/csharp.rs`, ASP.NET Core
+  controller providers, `http/csharp/minimal.rs`, minimal API providers,
+  `http/csharp/clients.rs`, HttpClient and typed client consumers, and `http/csharp/refit.rs`,
+  Refit consumers), resource and channel
+  kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go, Maven and NuGet packages as
+  contracts (specs #22, #24, #30, #25, #26 and #28), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `literals.rs`, `zod.rs` (and `meada-core`'s `shape.rs`): OpenAPI and AsyncAPI
@@ -832,7 +835,8 @@ one for the area a change touches.
 - Package: `package::npm::<name>`, `package::pypi::<name>` (the PEP 503 normalized name) or
   `package::cargo::<name>` (the `[package] name`; a dependent's site names the key it writes, so
   a renamed crate has its own site) or `package::go::<module path>` (the `module` of a `go.mod`), or
-  `package::maven::<group>:<artifact>` (a Maven or Gradle artifact),
+  `package::maven::<group>:<artifact>` (a Maven or Gradle artifact) or `package::nuget::<id>` (an
+  SDK-style `.csproj`: its `PackageId`, else `AssemblyName`, else file name),
   provided at `<repository>::<manifest path>` (such as `example.com/pkg/shared::package.json` or
   `example.com/pkg/pylib::pyproject.toml`) and consumed at `<repository>::<manifest
   path>::<field>::<name>` (PyPI fields: `project.dependencies`, `tool.poetry.dependencies`, and
@@ -975,7 +979,15 @@ one for the area a change touches.
   `App`, `web::scope`, `web::resource`, `.configure(f)` and Rocket's `build().mount(..)`, whose
   `routes![..]` the Rust pack reads as a list of the handlers' paths).
   `Code::returned` and `Code::constant` give a kind the values a call may return and a
-  constant holds, for what it must not leave unmounted.
+  constant holds, for what it must not leave unmounted. `Code::origins_within` is the value
+  flow of what is written inside the functions some calls reach (an origin's
+  `Route::through`), each call binding the parameters of its function as when the walk climbs
+  its return values: a kind that climbed to a value reads what is written there with that
+  call's arguments alone, so two objects one factory makes from two arguments stay apart,
+  through a local holding the parameter too (`http/csharp/minimal.rs`). `Code::reaches` says
+  which function of the repository the value flow reaches through a call (exact, or a C#
+  extension method), for a kind whose library name a method of the repository hides only
+  where it answers the call.
   `Expand::Chain` is `Code::expand` for a request built by a chain (`http/java/clients.rs`; in
   `channel/java.rs` an SQS request, the stream maps of a Redis group read and a
   `BindingBuilder` chain):
@@ -987,9 +999,12 @@ one for the area a change touches.
   arguments or makes a `Value::External`: `Expand::Call` and `Code::value` leave them as
   written, so no other reader sees a change.
   `Code::expand_with` is `Code::expand` with an injector (`resolve::Inject`): what a kind reads
-  off an annotation written on a field or a parameter (`Facts::annotated`, transient, read
-  from the full facts so a file the index kept is parsed again through `Code::misses`). The
-  shared side asks it for a field no file assigns (`Code::field_written`, the `.f` marker
+  off an annotation written on a field or a parameter (`Injected::Annotated`, from
+  `Facts::annotated`, transient, read from the full facts so a file the index kept is parsed
+  again through `Code::misses`), and, for a parameter no annotation on it injects into, what it
+  gives the parameter itself (`Injected::Param(function, n)`: a dependency injection container
+  passes a constructor's parameter by its type, with no annotation, as C#'s typed client takes
+  its `HttpClient`). The shared side asks it for a field no file assigns (`Code::field_written`, the `.f` marker
   constants the Java pack writes for every `f = v` and `x.f = v`) and for a parameter no frame
   binds of a function no call of the repository may reach (`Code::may_be_called`: an exact
   caller, or any callee ending in its name, so a name match, a call on an opaque receiver, a
@@ -999,16 +1014,29 @@ one for the area a change touches.
   constructor's parameter a `final` field holds (`Const::scope`, the constructor the value is
   written in) is no wrapper's parameter: it is injected or unknown, never climbed. The values
   an injector gives are transient like the arguments they stand for, so the index stays free of
-  them. `jvm/spring.rs` is the one injector (Spring's `@Value`, `spring::inject`, which is given
-  the annotation with what it marks), shared by the JVM packs; `spring::resolved` is the one
+  them. `jvm/spring.rs` is the JVM packs' injector (Spring's `@Value`, `spring::inject`, which is
+  given the annotation with what it marks, and nothing for `Injected::Param`), and
+  `http/csharp/clients.rs` C#'s (an `HttpClient` constructor parameter, `Injected::Param` only); `spring::resolved` is the one
   rule for an annotation's text Spring resolves (`@Value`, a Feign `url` or `path`, a listener's
   topic or queue): literal text with its placeholders resolved, an environment read kept, any
   other part unknown. The list of Spring's config files is the reader's too
-  (`spring::CONFIG_FILES`), which the Java pack returns as its `config_files`. `jvm/names.rs`
-  holds the name questions the JVM kinds share: `one` (exactly one spelling in the kind's
-  table), `known` (a name an import binds), `spellings` and `typed` (the outside type the source
-  writes for a name), and the Java readers' shared filters `java_files`, `jvm_files` (Java and
-  Kotlin files) and `is_method` (an annotation on a method of the file).
+  (`spring::CONFIG_FILES`), which the Java pack returns as its `config_files`. `names.rs`
+  holds the name questions the JVM and C# kinds share: `one` (exactly one spelling in the kind's
+  table), `known` (a name an import binds), `spellings`, `typed` and `declared` (the outside type
+  the source writes for a name), `in_full` and `is_type` (a type written in full is the
+  library's unless a definition of the repository binds that very name, as a compiler prefers
+  the source's type; else the one spelling the usings give it, one rule for every C# kind) and
+  `is_method` (an annotation on a method of the file);
+  `jvm/names.rs` keeps the Java readers' filters `java_files` and `jvm_files` (Java and Kotlin
+  files), `kotlin` and `array_of`.
+- `dotnet/` holds what the .NET pack and ecosystems share (spec #28), as `jvm/` does for the
+  JVM: `dotnet/msbuild.rs` reads an SDK-style project file (`msbuild::read`: whether it is a
+  project and, if so, its `Using`s (the SDK's implicit usings among them), its `PackageId`,
+  `AssemblyName` and version, and its `PackageReference` and `ProjectReference` items), which the
+  C# pack's `join` and the NuGet ecosystem (#116) both read; a second reader of project files is
+  a finding. `xml.rs` holds the bounds every XML build file reader shares
+  (`within_limits`, `XML_NODES`), owned by neither ecosystem: `jvm/maven.rs` and
+  `dotnet/msbuild.rs` both check them before roxmltree parses.
 - New **Go router** (spec #25; net/http, gin, echo, chi and gorilla): a row of `ROUTERS` in
   `http/go.rs` (the package, the functions that make a router, the methods that make a group
   (a `Form`: `Group(prefix)`, chi's `Group(fn)` and `Route(prefix, fn)`, gorilla's
@@ -1082,8 +1110,8 @@ one for the area a change touches.
 - **Java channels** (spec #26, #92): `channel/java.rs` lists each client by the outside types
   the source may write for its receiver (`CLIENTS`: `KafkaTemplate`, `RabbitTemplate`,
   `JmsTemplate`, the SQS clients, jnats `Connection` and `Dispatcher`, the Jedis clients and
-  Lettuce's `RedisCommands`), read through `jvm::names::typed` and `one`, and the listener
-  annotations (`@KafkaListener`, `@RabbitListener`, `@JmsListener`) through `jvm::names::known`
+  Lettuce's `RedisCommands`), read through `names::typed` and `one`, and the listener
+  annotations (`@KafkaListener`, `@RabbitListener`, `@JmsListener`) through `names::known`
   on a method's `Call::decorates`. Names fold through `Code::expand_with` with
   `jvm::spring::inject` (`Expand::Chain` for an SQS request, a Redis group read and a
   `BindingBuilder` chain); an annotation's values fold through `Code::value` and its placeholders
@@ -1092,7 +1120,7 @@ one for the area a change touches.
   that names the topic or queue (the Java pack keeps a lambda's calls in the method that writes
   it, so a jnats callback is that method too). The overload of `RabbitTemplate.convertAndSend`
   and `JmsTemplate.convertAndSend` is told by the type of the argument a `MessagePostProcessor`
-  would take (`of`, through `jvm::names::declared`): a name the source types as one, or a `new`
+  would take (`of`, through `names::declared`): a name the source types as one, or a `new`
   of one, picks the routing-key form, and so does a `CorrelationData` there
   (`(routingKey, message, correlation)`) unless a `MessagePostProcessor` before it makes it
   `(message, postProcessor, correlation)`; an argument whose type the source does not tell (a
@@ -1104,7 +1132,7 @@ one for the area a change touches.
   otherwise: a direct or fanout exchange keeps only the keys with no wildcard word, a headers or
   custom one none, a topic one, or one whose type is not read, every key; a `DirectExchange` in
   `BindingBuilder` keeps only a key with no wildcard. The listener annotation is asked first
-  (`jvm::names::known`), and only then whether it is on a method (a set of the file's methods,
+  (`names::known`), and only then whether it is on a method (a set of the file's methods,
   built once), so a file of many `@Override` methods is read in linear time. The Java pack reads an
   annotation written as an element value as `Value::New(name, [Object(elements)])`, its unnamed
   element as `value` (the shape of a Go composite literal; `Code::eval` folds it), only inside
@@ -1147,7 +1175,7 @@ one for the area a change touches.
   `xlang-kotlin` one a TypeScript producer reaching a Kotlin `@KafkaListener`.
 - New **package ecosystem** (spec #22 user story 26, spec #225; track B packs): implement the
   `Ecosystem` trait of `package.rs` in a module of its own under `package/` (`npm`, `pypi`,
-  `cargo`, `go`, `maven` today) and add it to `ECOSYSTEMS`; the package kind, the index writer
+  `cargo`, `go`, `maven`, `nuget` today) and add it to `ECOSYSTEMS`; the package kind, the index writer
   and the packs learn no name. An arm for one ecosystem added to the shared code is a finding. It plugs
   in another manifest format (`Cargo.toml`, `go.mod`) without a new kind of contract: the
   contract `package::<name>::<package>` (`Ecosystem::prefix`, derived from `name`) still routes
@@ -1170,13 +1198,21 @@ one for the area a change touches.
     its name imports; `kotlin.` and `java.` packages are none). `declares(..)` (whether a
     provider declares what the `(specifier, chain)` names, whatever its signature) defaults to
     `true`: `import` lets none of one site's pairs enter when two are declared, so only an
-    ecosystem with several pairs per call answers it.
+    ecosystem with several pairs per call answers it. `settle(..)` (default: nothing) runs at the
+    start of the workspace step, over every repository's manifests, for an ecosystem whose
+    entries name a provider by location: NuGet gives a `ProjectReference` entry the id of the
+    project at its path (a project file's name need not be its id), and a `PackageReference` the
+    spelling of the one provider whose id differs by case only, before `consume` reads them,
+    each by one folded-location map (linear in the manifests).
   - `fits`: literal package-name equality; Maven matches the literal fragments of a computed
     coordinate. `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
   - `flag`: the range is unchecked (`range unchecked`); npm checks semver.
   - `reaches`: every provider; npm's `workspace:` keeps the dependent's own repository, Cargo
     and Go share `sourced`, in the seam (a `path` by the folded location, a `git` by the
-    remote's identity).
+    remote's identity); NuGet's `ProjectReference` (a `path <project file>` source) uses it too
+    and only for a project of another repository, so a reference inside one repository adds no
+    package link (the pack resolves it), while a `PackageReference` reaches every provider of
+    the id.
   - `owns`: every manifest of the ecosystem bounds the files under it; PyPI only a
     `pyproject.toml`, Cargo only a manifest with a `[package]`.
   - `ways` and `resolve`: Node's rule (`exports`, else `types`, `module` and `main`, else the
@@ -1204,7 +1240,24 @@ one for the area a change touches.
     class's own after; a plain chain is the instance's, in the reverse order. A function with a
     default parameter or a vararg has a `flexible` row (`resolve::Flexible`, the least and most
     argument counts), which `Classes::fits` reads before counting the parameters in the id.
-    `member_of`: none; Maven's
+    NuGet shares Maven's `imports`, `resolutions` and `declares` (free functions in
+    `package/maven.rs`, taking the ecosystem and the `How` to report: `How::Namespace`,
+    `; import namespace`): C# exports its types as Java does, under the qualified name, so the
+    class lookup, the family walk and the argument-count pick are the same code; `declaring`
+    counts a file only for the ecosystem whose `sources()` has its extension; `entries` is the
+    references of the nearest SDK-style `.csproj` above the file (`owner`, `Summary::project`,
+    as the pack's `join`); the three provider loops keep the providers an entry's `reaches`
+    lets through, as the default `resolutions` does, so a `ProjectReference` pins its project;
+    the shared code names no ecosystem: each passes its platform prefixes (`java.`, `kotlin.`
+    for Maven, `System.` for NuGet) to `imports`, and the class tables take every ecosystem's
+    source extensions.
+    Ceilings: a `ProjectReference` path written in another case than the file system's does not
+    match (ids match case-insensitively, paths do not), extension methods and a name written
+    fully qualified with no `using` are not followed, a receiver typed by a `var` whose value is
+    a call through a package (`var o = Order.Of(1); o.Total()`) is not followed (the return
+    type lives in the provider's index; Java has the same gap), and two projects in one
+    directory share it (the first by path owns the files).
+    `member_of`: none; Maven's and NuGet's
     constructors and methods of a class (a companion's too), so `context` on a public class
     lists, once per call, the calls that reach its members (`reached`, at the best level of the
     call's links into the class). `JVM` source roots (`jvm::ROOTS`, `jvm::TEST_ROOTS`) are
@@ -1247,9 +1300,9 @@ one for the area a change touches.
   as paths, never opening one, so a symlink changes nothing. A change to what is stored
   re-blesses `tests/golden/schema.txt`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the
-  channel kind's module for that language (TS/JS: `channel/ts.rs`; Python: `channel/python.rs`; Rust: `channel/rust.rs`; Go: `channel/go.rs`; Java: `channel/java.rs`), never in the pack, matching a call's
+  channel kind's module for that language (TS/JS: `channel/ts.rs`; Python: `channel/python.rs`; Rust: `channel/rust.rs`; Go: `channel/go.rs`; Java: `channel/java.rs`; C#: `channel/csharp.rs`), never in the pack, matching a call's
   method and the `Code::origins` of its receiver, asked with the policy its language needs (TS/JS:
-  `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Java: the written type, `jvm::names::typed`; Python and Rust:
+  `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Java: the written type, `names::typed`; C#: the written type or the construction, `Code::written` and `names::spellings`; Python and Rust:
   `Values`, the constructors named by the file's imports), reading the name through `Code::expand` (a reader that
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
   and giving the handler. A wildcard match (`inferred`, reason `<producer contract> wildcard
@@ -1299,6 +1352,54 @@ one for the area a change touches.
   of its own and reads no kind: it reads `Link::drift`, the exports' consumer shapes (which
   consumers read fields), their calls (where each consumer is) and the seam's `parts` (the part
   of a contract `search` ranks against).
+- **C# channels** (spec #28, ticket #115): `channel/csharp.rs` answers for the `cs` pack only.
+  A form is a method called on a client, and a call counts only when its receiver is one of
+  `TYPES` (Confluent.Kafka's `IProducer`, `IConsumer` and builders, RabbitMQ.Client's
+  `ConnectionFactory`, `IConnection`, `IModel`, `IChannel` and the eventing consumers,
+  AWSSDK.SQS's `IAmazonSQS` and `AmazonSQSClient`, NATS.Client's `ConnectionFactory` and
+  `IConnection`, StackExchange.Redis's multiplexer and `IDatabase`, Azure.Messaging.ServiceBus's
+  `ServiceBusClient` and `ServiceBusSender`) by the type the source writes for it (`Code::written`:
+  a field, a property, a parameter, a typed local) or by the construction it was made by: a
+  `Value::New`, a local the pack bound to one, or a call on a client that makes another
+  (`STEPS`: `Build`, `CreateConnection`, `CreateModel`, `GetDatabase`, `CreateSender`, the
+  static `ConnectionMultiplexer.Connect` called on the type's own name; a builder's `Set*`
+  hands the builder back). A type is accepted written in full (`names::in_full`) or as the one
+  spelling in the table the usings give it (`names::spellings`, `names::one`), so a type of the
+  repository with the same name hides
+  the library's, and `ConnectionFactory` or `IConnection` with RabbitMQ.Client and NATS.Client
+  both imported is none. The receiver is followed at most `CHANNEL_CLIENT_DEPTH` links. Names fold
+  like a URL through `Code::expand` (a wrapper's parameter makes each caller a producer or a
+  consumer): `string.Empty`, and `String.Empty` or `System.String.Empty` that bind
+  `System.String` (`names::is_type`), written in the exchange of a `BasicPublish`, is `""`
+  (`empty`), the pack folding none of them; an environment or configuration read is
+  `Part::Read`, so an unresolved name; the first argument names a Kafka topic (a list for
+  `Subscribe`), an SQS queue (the last segment of the URL, or the `QueueUrl` of a request
+  built in place or in a local), a NATS subject, a Redis stream key and a Service Bus queue or
+  topic. A named argument is read by its parameter name. RabbitMQ: `BasicPublish(Async)` is a
+  publish to an exchange (the empty one is a producer of the queue its key names), `QueueBind(Async)`
+  a binding (spec #20's routing rules), `BasicConsume(Async)` takes its queue from the first
+  argument (the second when the first is a consumer by its type, a field and a parameter
+  included). `.ConfigureAwait(..)` hands the client back, as a builder's `Set*` does. Service
+  Bus: a send method on a sender is a producer named by the first argument of the `CreateSender`
+  call that made it (in place, or held by a local, a field or a property written once: every
+  write of a name is a `name=` bound of its own, an initializer that is written again
+  included, and `sender` accepts exactly one); when that argument is a parameter, the producers
+  are the callers of the method around the `CreateSender` call (`Code::expand` from it, once
+  for all the sends on the sender), at their call sites. `CreateProcessor(queue)` and
+  `CreateProcessor(topic, subscription)` are consumers of the first argument alone, so a
+  processor on a topic consumes every message sent to it whatever its subscription.
+  Handlers: the pack records each `x.Event += handler` as a bound named `x.Event+=` (a lambda as
+  its `Kind::Inline` definition, a method group as the name it writes), one per attachment, and
+  the reader makes a consumer of each handler on the event (`Received`, `ReceivedAsync`,
+  `MessageHandler`, `ProcessMessageAsync`) of the consumer, subscription or processor the
+  call's result is held by, in the order attached
+  (`Code::bindings`, read once per file into a map by the call's range); a NATS
+  `SubscribeAsync` takes the callback it is given, a lambda or a method of the repository; every
+  other client, and a callback not found, takes `consume`'s default, the method holding the call.
+  The pack also reads an `await` as its operand, in a value and in what a field or a local holds
+  (`held`). The `conformance-csharp` fixture holds a client of each library
+  (`Channels.cs`, `Channels.Nats.cs`) and `xlang-csharp-{web,api}` a topic produced in
+  TypeScript and consumed in C#.
 - **Shapes through package imports** (issue #175): a source reading a name that `Code::imported`
   says comes from outside the repository records a `shape::Import` on the shape (its path, the
   importing file, the specifier and name, and the `Want` view: `zod`, `infer`, `literals`,
@@ -1437,7 +1538,8 @@ one for the area a change touches.
   would have resolved. A language whose files are not all built, or whose imports name files by
   a tree spread over several files (Rust's crates and `mod` declarations), says so through
   three more: `config_files` names with a `**/` prefix (every `Cargo.toml` the walk finds, in
-  path order, each read as a root config is (`read_config`) and folded into the configs digest on
+  path order, or with `**/*.ext` every file ending so, as C#'s `**/*.csproj`; `lang::names_config`
+  in the index and in `meada decide`, each read as a root config is (`read_config`) and folded into the configs digest on
   every refresh) and `layout`, which `refresh` calls once per pack and refresh with the configs
   and every file the pack parsed, and which answers five things from one build (Rust's crate
   `Tree`, so the manifests are parsed and the module trees walked once): `Layout::members` (the
@@ -1446,7 +1548,7 @@ one for the area a change touches.
   and `Layout::programs` (both below), and `Layout::reaches` (default: none, every file), the
   files a name match may reach from a caller (`Resolver::reaching`, called by `refresh`):
   Rust's are its crate's and those of the repository's libraries it depends on. A language whose
-  files share one scope (a Go package: the files of one directory that declare one package; Java and Kotlin packages, which share the Java layout; C# packages next) says which through `Layout::shared`, groups of files that
+  files share one scope (a Go package: the files of one directory that declare one package; Java and Kotlin packages, which share the Java layout, as C# namespaces do) says which through `Layout::shared`, groups of files that
   `Resolver::with_shared` takes: a name a file and its imports leave unbound is looked up
   among the top-level definitions and constants of the others in its group, private ones
   included (`Resolver::sibling`, at the end of `lexical_as`), and an import that names any
@@ -1525,9 +1627,82 @@ one for the area a change touches.
   the seam's `programs`; Rust asks the crate `Tree` for its binary roots (`Tree::bins`). The forms per language are spec #31 "Program entry points per language
   pack": Python `if __name__ == "__main__":` as symbol `__main__` plus each `[project.scripts]`
   target; Go `func main` in package `main`; Java `public static void main(String[])`; Kotlin a
-  top-level `fun main`; C# a `static Main` and, for top-level statements, a symbol `Main`; Swift
+  top-level `fun main`; C# a `static Main` (any signature) and, for top-level statements, a
+  symbol `Main` (none when the file declares a global type `Main`, which would share it); Swift
   an `@main` type and `main.swift` as symbol `main`; Rust `fn main` in `src/main.rs` and
   `src/bin/`. TS/JS declares none.
+  A pack whose files bind names another file writes (C#'s `global using` directives, and the
+  `<Using>` items and implicit usings of a project file, which apply to every file of the
+  project) gives `LanguagePack::join`: on every refresh, before `layout`, the index hands it the
+  pack's config files and the facts of all its files as parsed, and it gives back a `Join`, what
+  to do to one file's facts, which the index applies to each file and to each file the
+  contracts parse again for their values (the C# pack appends each project's usings to the
+  `imports` of each of its files, from `Facts::project` and `dotnet::msbuild`, reads an alias as
+  a type's when a class of the repository has its target's name, and sets `Facts::unit` to the
+  project). The index keeps the facts as parsed and joins them again each time, so a file whose
+  own text did not change resolves as a cold index resolves it; `resolved` then rewrites its
+  rows. A type a pack declares in parts (`Facts::partial`, C#'s `partial`) in several files of
+  one `Facts::unit` is one type (`Resolver::parts`): a member lookup (`member`, `overloaded`,
+  `inherited_field`) reads every part after each class of a family (`with_parts`), the family
+  linearizes the bases every part writes (`bases`), a name the parts' files export binds the
+  asking file's own part, else the first by path (`exports`), several parts a name binds
+  construct the first (`one_type`), and a constructor call takes the constructors of every part.
+  Classes of one name that are not parts of one type stay several, `ambiguous`. A glob of a
+  namespace (`wildcard`'s `Imported::Namespace` source, `Resolver::glob_namespace`) takes the
+  classes declared in that namespace alone (`Binding::of_namespace`), since a C# file's group
+  is its first namespace's and it may declare types in another; the C# layout names such a file
+  for each other namespace it declares types in, when no file has that namespace as package.
+  C# method calls (spec #28, #108) use the seams Java's do and add none but one flag. The pack
+  writes `Facts::receivers` from the declared type of a field, a property, a parameter
+  (primary constructors' too), a local with an explicit type, a `foreach`, `out` or pattern
+  variable, and a `var` initialized with `new T(..)` (`Class::Type`), or with a call
+  (`Class::Result`); a target-typed `new()` takes the declared type. `Def::result` is a
+  method's or local function's written return type, so `Make().Save()`, `Make()?.Save()` and
+  `var x = Make()` follow it (`Call::on`). A type is read as written, without its type
+  arguments or a nullable mark; a predefined type, an array, a tuple, `var` and a type
+  parameter are no class. A name bound twice in a scope with two classes, or by a local named
+  like a field of the file, is unknown. A class's written bases (`Def::bases`) serve
+  unqualified, `this.` and receiver calls, an interface receiver reaches the interface's
+  member alone, and overloads are narrowed by `Call::arity`, a tie `ambiguous`. The `this`
+  parameter of an extension method is `Binds::Instance`: a call made on a receiver counts one
+  argument fewer than `Ext.F(x)` does (`Arity::receiver`, `Resolver::on_receiver`), so
+  `AddOrders(this S)` and `AddOrders(this S, Action<O>)` tell `s.AddOrders(f)` from
+  `Ext.AddOrders(s)`, and `Code::arg` binds the receiver to that parameter.
+  `LanguagePack::extension_methods` (C# only) lets an extension method answer a call no member
+  does: on a receiver of a class of the repository whose family lacks the method and has no
+  opaque base, or whose written type is outside the repository (`List<T>`), the name match
+  keeps the methods with a `Binds::Instance` first parameter alone (`inferred`, or `ambiguous`
+  with every one that fits). With an opaque base, or on a type's name (`Teller.Missing()`),
+  or a bare call, the call resolves to nothing, and so does a method of the repository that
+  is no extension. A receiver without a written type (`var x = Make()` of unknown result, a
+  lambda parameter, a type parameter) keeps the broad name match. The extensions are not
+  looked up: an extension method called as `x.M()` is never `exact`, one called as `Ext.M(x)`
+  is. A local a call from outside initialized (`var app = builder.Build()`, `var b =
+  WebApplication.CreateBuilder(args)`) is from outside too (`Resolver::outside_result`): the
+  call resolves to nothing of the repository and is made on a name that binds nothing of the
+  repository, on a receiver of a written outside type or on such a local, so a call on it
+  takes extension methods alone (`app.Run()` reaches no repository `Run()`). The callee keeps
+  no type argument, so a local of `GetRequiredService<OrderService>()` or
+  `Deserialize<Order>(..)` is from outside too: its calls lose their name match. Ceilings: no generic type argument is read (`Result` and `Result<T>` are one type), a
+  `var` takes a type from `new` and a call alone (no cast, `await` or conditional), a
+  target-typed `new()` records no constructor call, and a parameter type written `global::A`
+  or `alias::A` is spelled `A` and `alias.A` in a signature.
+  The value flow (`Code::origins` with `Follow::Values`, spec #28, #110) follows what C#
+  code hands a route builder through. A call made on a receiver that the name match gives one
+  extension method (`inferred`) is taken as the language binds it when the static class
+  declaring the method is in scope of the call by its name (its namespace is the call's,
+  one around it, or a `using`'s): `Resolver::extension_callers` holds those calls beside the
+  exact `callers`, and the flow climbs them to the receiver (the `this` parameter) and into
+  what the method returns (`Resolver::flows_to`); wrapper expansion and `Code::param_args`
+  still climb exact calls alone. A local the pack bound to one value (`Facts::bound`: every
+  local declared in a definition, dropped when the file assigns its name anywhere with `=`,
+  a compound operator, `++`, `--`, `out` or `ref`) is followed into that value, for every pack
+  that fills `Facts::bound` (Kotlin's `val` too). The pack fills `Def::return_values` from
+  `return x;` and a method's or local function's `=> x`, and makes every lambda written in a
+  definition (not in a type's initializer) a `Kind::Inline` scope `@<offset>` with its
+  parameters, which a call's argument names (`Value::Function`) and which folds into the
+  symbol around it unless a kind claims it; `new[] { .. }`, `new T[] { .. }` and `[..]` are
+  lists.
 - New **config key**: add the field to `Config`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
 - New **MCP tool**: `mcp.rs`, one `Engine` method that builds the tool's result, its result
@@ -1566,7 +1741,9 @@ one for the area a change touches.
   chained call is made on (`Call::on`), whether an `inferred` call was narrowed from several
   definitions of its name (`calls.narrowed`), callable-to-signature and
   static-member names (`Facts::overloads`, `Facts::constructors` and
-  `Facts::statics`), the literal URL path fragments and the
+  `Facts::statics`), the namespaces and types a C# file's `global using` directives name
+  (`Facts::project`, names as `Facts::imports` holds them), the qualified names of the types a C#
+  file declares in `partial` parts (`Facts::partial`), the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
   consumer reads from the parsed response, and those of the zod schema or object literals a
@@ -1596,7 +1773,10 @@ one for the area a change touches.
   (spec #26: literal Maven coordinates and versions, dependency coordinate fragments with `*`
   for computed parts, declared ranges and a `computed` source flag, source roots with the test ones marked, and Gradle's
   literal group, root project name and included project names/directories in `Summary::build`),
-  the `tsconfig.json` rows
+  of each SDK-style `.csproj` (spec #28: the package id, else assembly name, else file name, the
+  literal version, each `PackageReference` with its range as written, each `ProjectReference`
+  as a `path` folded from the project's directory, and `Summary::project`, the mark that it is
+  an SDK-style project that owns its files), the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition, constant, type or file they name), the `families` table (spec #26: each public
   Java class's ancestors past it, `Resolver::ancestries`, a repository class by file and name and
@@ -1725,6 +1905,9 @@ one for the area a change touches.
 
 ## Known ceilings
 
+- `jvm/spring.rs` (`read_yaml`): the dotted keys a YAML file flattens to are charged to
+  `YAML_KEY_BUDGET` (1 MiB); a file past it (a long key over thousands of children) reads as
+  empty, so its `${key}` placeholders name environment variables.
 - `lang/java.rs`: `DEFINITION_DEPTH` (128) bounds nested named types; deeper definitions and
   their bindings stay with the enclosing symbol. `VALUE_DEPTH` (64) bounds nested values and
   `PATH_DEPTH` (256) bounds callee segments; deeper values or callees are unknown.
@@ -1736,7 +1919,9 @@ one for the area a change touches.
 
 - `jvm/names.rs`: `LOCAL_DEPTH` (8) bounds how many locals a JVM client reader (Ktor,
   `RestTemplate`, `WebClient`, Retrofit) follows a client through (`val b = a`, `val a =
-  HttpClient(..)`); past it the client is not followed and its calls are no consumers.
+  HttpClient(..)`) where the value flow does not reach it; past it the client is not followed
+  and its calls are no consumers. The value flow follows a Kotlin `val` itself (`Facts::bound`),
+  as deep as `EVAL_DEPTH`.
 
 - `lang/kotlin.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the Kotlin pack as they bound the Java pack's, with the same
@@ -1779,6 +1964,53 @@ one for the area a change touches.
   A declaration the grammar reads as an
 infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out, as the
 qualification budget does (ADR 0017).
+
+- `resolve.rs`: `TYPE_PARTS` (64) bounds the files of one unit one partial type is read across
+  (`Resolver::parts`); classes of one name in more files are each a class of its own, so a
+  member lookup reads its own file and a name binding them all is `ambiguous`. A C#
+  conformance test writes one type in 64 files and in 65. Definitions of one name in files of
+  several units (C# projects) bind, from a file of one of those units, to its own unit's
+  (`Resolver::in_unit`, at the end of `resolve_as`), as the compiler prefers the project's type
+  to a reference's; from a file of no such unit the name stays `ambiguous`.
+
+- `lang/csharp.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
+  `QUALIFICATION_BYTES` (4 MiB) bound the C# pack as they bound the Java pack's, with the same
+  outcome past each (a call inside a definition nested too deep is `(opaque).`, resolving to
+  nothing); `PROJECT_USINGS` (256) bounds the distinct usings `join` adds to every file of a
+  project, past which the project's files keep no facts, since a partial set could make a
+  name exact that a missing using leaves ambiguous. The C# hostile-depth, long-prefix and
+  pack unit tests exceed them. Beyond the limits, what the pack leaves out (spec #28, #107):
+  a `using` inside a namespace block binds in the whole file, and a file joins its first
+  namespace's group (`Facts::package`): a type it declares in another namespace binds there
+  through the file (`Binding::of_namespace`) only when no file has that namespace as package,
+  and by full name otherwise; the global namespace's types are seen only from the global
+  namespace. A project file is SDK-style when its `Project` has an `Sdk` attribute, an `Sdk`
+  element or an `Import` with an `Sdk` (any case); its properties are read as written, with no `Condition`, import or
+  `Directory.Build.props`, and the nearest project directory owns a file (MSBuild items that
+  include or remove files are not read; two project files in one directory take the first).
+  Implicit usings add the SDK's own list for `Microsoft.NET.Sdk`, plus `.Web`'s and
+  `.Worker`'s; other SDKs add the base list. `.sln` files are not read: they only group
+  projects for display, which nothing shows. A field, property, event, primary constructor
+  parameter or local hides an outer name with no type read (calls on typed receivers are
+  #108's), so `Name.M()` on a property named like its type is a name match. A bare call no
+  class of its family declares, and an unbound capitalized receiver (as Java's), resolve to
+  nothing; an extension method's `this` parameter counts toward its argument count. A
+  parameter's `ref`, `out` and `in` are not part of a written signature, so `M(int)` and
+  `M(ref int)` share one id; a static constructor, a primary constructor, an operator, an
+  indexer, a property accessor and an explicit interface implementation define no symbol
+  (their calls are the type's). The parts of a partial type come from one project. A raw string
+  literal over several lines (indented by its closing quotes) is an unknown value; plain,
+  verbatim, one-line raw and interpolated literals and `+` fold.
+  A configuration read is decided with the project of the file that holds the call, the
+  constructor or the registration it is read for (`http/csharp/reads.rs`), so a client in a
+  library project reads the library's `appsettings.json`, never the consuming app's.
+  An `internal` type joins its namespace's star for the whole repository, so a file of another
+  project links to it as to a public one. A repository extension method wins over an outside
+  type's instance member of the same name (`sb.Append("x")` beside a
+  `static StringBuilder Append(this StringBuilder b, string s)`), where C# picks the member
+  (ADR 0018). Only the nearest project's references are read (`package/nuget.rs`): the
+  `PackageReference`s of a project a `ProjectReference` names are not followed. Generated files
+  under `obj/` are indexed when no ignore file lists them.
 
 - `snapshot/pull.rs`: a generation's bundles hold at most `GENERATION_BYTES_MAX` (256 GiB)
   together, as the document records their sizes (checked before any download) and as the
@@ -1955,6 +2187,24 @@ qualification budget does (ADR 0017).
   (`sendMessage(b -> b.queueUrl(..))`) or held in a local, and Redis streams held in a map
   variable, are unresolved. The same file reads Kotlin (see Kotlin channels above), with the
   same limits.
+- `channel/csharp.rs` (spec #28, #115): `CHANNEL_CLIENT_DEPTH` (32) bounds how many links a
+  receiver is followed through (a local bound to a call on a local bound to another); past it
+  the call is no form, and the unit test holds a client behind thousands of locals. A client
+  counts by its written type or its construction only: a value a repository method returns, a
+  client built by a factory the table does not list, one injected as `object` or an interface of
+  the repository, and a local assigned twice are no client. The pack's `name=` bounds (one per
+  write, looked up by a map, never searched) are as many as the file's writes. Left out:
+  MassTransit; `SubscribeSync`, `QueueSubscribe` and `Request` of NATS.Client, and NATS.Net v2 as
+  a whole; `BasicGet` and a consumer class that overrides `HandleBasicDeliver` (the handler is
+  the method holding `BasicConsume`); `CreateReceiver` and `CreateSessionProcessor`; a Service
+  Bus sender made in another file than the one that sends; a stream read by an array of
+  `StreamPosition` (unresolved); a `TopicPartition` as the Kafka target; a topic list built as
+  `new List<string> { .. }` (unresolved); `request.QueueUrl = ..` set after the construction; a
+  name read from `IConfiguration` or the environment (unresolved on both sides, so appsettings
+  are not read); `String.Empty` passed by a wrapper's caller to the exchange of a `BasicPublish`
+  (unresolved: only the exchange the form's own call writes is read). A `+=` handler is recorded
+  only for a member target (`x.Event += h`), not for `Event += h` on `this`, and for a lambda, an
+  anonymous method, a name or a member access.
 - `http/java.rs` (spec #26, #86): a Spring MVC route is read from `Call::decorates` on a method
   of a `@RestController` or `@Controller` class, under the class's `@RequestMapping` prefix
   (nested classes do not inherit the outer prefix). An annotation or `RequestMethod.X` counts
@@ -2015,6 +2265,178 @@ qualification budget does (ADR 0017).
   (#354), since its annotations are read in the class scope, where an inherited member type
   could shadow the import. A fully qualified annotation without an import (`@javax.ws.rs.GET`)
   and annotations an implementation inherits from an interface are not read.
+- `http/csharp.rs` (spec #28, #109): an ASP.NET Core controller route is read from `Call::decorates`
+  on a method of a class that is a controller: `[ApiController]`, or a base that `Code::outside`
+  says is `Microsoft.AspNetCore.Mvc.ControllerBase` or `Controller`. The pack ships syntax only,
+  so the attribute names live here: `Route`, `ApiController`, `ActionName`, `NonAction` and `Http<Method>`, with or without
+  the `Attribute` suffix, count when a `using` of `Microsoft.AspNetCore.Mvc` binds them (the one
+  on-demand candidate in the kind's table, through `names::known`)
+  or when written in full (`names::in_full`), and a class of the repository that the
+  attribute's scope reaches (`Code::definition`, named `<Name>` or `<Name>Attribute`), or that
+  has the full name written with `Attribute` (`Hiding::full`), hides the framework's. A decorator
+  named `Route` that is not confirmed as MVC's leaves its class or method unread (never a route
+  without the prefix it would add). The class `[Route]` templates are the prefixes; each method
+  attribute with a template is a route of its method, a method `[Route]` is one of every method
+  the action's method attributes name, or of `ANY` (`http::ANY::<path>`, whose link reason says
+  "any method" in `http.rs`) without any, and a method attribute without template gives the
+  prefix alone when the class has a `[Route]` and no attribute has a template: with no class
+  `[Route]` it is conventional routing, which is not read (`[Route("")]` is the root). A
+  template starting with `/` or `~/` replaces the prefix; `[controller]` and `[action]` are
+  replaced on the joined path (`[action]` is the method name without a trailing `Async`, as
+  ASP.NET Core does by default, or the literal of `[ActionName]`; a non-literal one serves
+  nothing), `[[` and `]]` escape the brackets, any other token or a pattern with a `/` inside
+  braces (`balanced`, shared with `http/java.rs`) serves nothing, and `?` of `{id?}` is dropped
+  before the trunk's normalization, which reads it as a query. Case is kept, so `[controller]`
+  on `OrdersController` is `/api/Orders` (ASP.NET Core matches case-insensitively; the trunk
+  does not). A method serves nothing when `[NonAction]` marks it or `Facts::hidden` says it is
+  not public. Ceilings: a template that does not fold to a literal serves nothing; a class with a base class of the repository (an interface is fine), a
+  class that is the base of another one of the repository, and a class declared in parts
+  (`Facts::partial` in several files) serve nothing, since the attributes they have or pass
+  down are not followed or joined; `[Area]` and `Name=` route names are not applied;
+  `SuppressAsyncSuffixInActionNames` turned off is not read; `[HttpGet("a")] [Route("b")]`
+  serves `GET /b` (ASP.NET Core may serve it for every method), and a method attribute without
+  template beside a templated one gives no route.
+- `http/csharp/minimal.rs` (spec #28, #110): minimal API routes, through the same `Mounts` and
+  `prefixes` as the other routers, whose nodes are the origins of a builder (`Code::origins`
+  with `Follow::Values`, each with the calls the walk climbed through return values). A
+  `MapGroup(prefix)` call is mounted on the origins of its receiver under its prefix, a
+  convention of `CONVENTIONS` (`RequireAuthorization()`, `WithTags(..)`) with none, and the
+  application is the root: `WebApplication.Create(..)`, or `Build()` on what
+  `WebApplication.CreateBuilder`, `CreateSlimBuilder` or `CreateEmptyBuilder` made, as the
+  file's usings (the Web SDK's implicit ones included) spell them. `MapGet`, `MapPost`,
+  `MapPut`, `MapPatch`, `MapDelete` and `MapMethods(pattern, methods, handler)` (a list of
+  literals or `HttpMethods.X`) register a route; the pattern, the methods and the handler are
+  read positionally or by name (`pattern:`, `httpMethods:`, `handler:`, `prefix:`), and `?` of
+  `{id?}` is dropped as for controllers. A lambda handler is an inline handler named for the
+  first route it serves, a method group (`Handlers.List`) the method it names (one overload),
+  anything else the file. A method of the repository hides the framework's `MapGet`,
+  `MapGroup` or convention only where it answers the call (`Code::reaches`); `Build()` is the
+  framework's when what it is called on comes from its builder. A route above a node whose
+  origins climb one call twice (a factory that calls itself to make the group it returns) is
+  served nowhere, and so is every route past `MINIMAL_NODES` (4096) nodes in a repository.
+  Ceilings: a builder Meada does not read serves nothing (a lambda's parameter, as in
+  `UseEndpoints(e => e.MapGet(..))`, a parameter no call reaches, a field, a builder
+  reassigned), and so does a group configured through a call outside `CONVENTIONS`; `Map(pattern, handler)`,
+  `MapFallback`, `MapHub`, `MapControllers` and `MapRazorPages` are not read, and neither is a
+  pattern that does not fold to a literal.
+- `http/csharp/clients.rs` (spec #28, #111): an `HttpClient` call is a consumer when its method
+  is in `CLIENT_METHODS` (`GetAsync` to `PutAsJsonAsync`) or is `SendAsync`, and its receiver is
+  an `HttpClient`: `Code::written` gives the type text written for a field, a parameter or a
+  typed local, `names::is_type` confirms it in full or through the usings (an alias counts, a
+  class of the repository named `HttpClient` hides the framework's), and a construction in place or a
+  local made by `new HttpClient()` counts without a written type. The pack ships syntax only and
+  adds no externs: C# types are not in `Facts::externs`, since `Binding::External` would turn
+  the calls on them from inferred to unresolved. The call is read whole by `Expand::Chain`, so a
+  wrapper (the URL, the method, the `HttpRequestMessage` or the client a parameter) is a consumer
+  at each caller with the trunk's depth bound and cycle check; `SendAsync(new
+  HttpRequestMessage(HttpMethod.X, url))` takes its method and URL from the request, and
+  `new Uri(x)` is `x`. The pack folds string literals, verbatim, raw (one line) and interpolated
+  strings (`{{` and `}}` unescaped, a hole with an alignment or format clause is a parameter),
+  `+`, and `const` and `static readonly` fields, of other types too (`Facts::consts` and
+  `Facts::statics`, as Java's `static final`). The pack binds every local to its initializer
+  (`Facts::bound`, an `Unknown` bound for a loop variable, a pattern or a lambda parameter, so
+  that a second binding of the name leaves none), and a field or property that holds a
+  construction or a call. A name assigned anywhere in its file (`=`, `+=`, `++`, `out`,
+  `ref`, `this.x = v`) loses its bound: it holds no one value (the rule of the minimal API
+  reader, spec #28, #110), so a reassigned local, request or client is unknown, and
+  `Code::local` follows a local of unknown class when the pack bound it once. A base is the
+  `BaseAddress = new Uri(x)` of the client's initializer (the pack gives an initializer as the
+  last argument of the creation, a `Value::Object`) or an assignment on the name the call is
+  made on (a `Bound` named `<name>.BaseAddress`, in the scope that declares `<name>`, which
+  `clients.rs` checks against `Code::written` so that a parameter that hides a field, or a
+  nested type's own field, keeps its own); two assignments leave an `Unknown` bound, which is
+  an unknown base. The assignment wins over the initializer. A relative URL joins the base as
+  RFC 3986 does (`https://c/v1` and `orders` give `/orders`, `https://c/v1/` gives
+  `/v1/orders`) and one starting with `/` keeps the origin; a base with no literal scheme is
+  cut at the first text after its non-literal parts. `request.Method = HttpMethod.X`, set
+  after the construction, is read the same way (a `Bound` named `<name>.Method`). A client with
+  no readable base is a path-only contract. Named clients (`CreateClient(name)`) held by a
+  local or by a field assigned from it (a `Bound` named `<field>=`, read with `Code::bounds`)
+  are not consumers. `a?.M()` is a call of `M` on `a` (the grammar parses `await a?.M()` with
+  the `await` around `a`; `condition` reads through it). Ceilings: a field is followed only
+  when it holds a construction or a call (an instance `readonly` string is not folded, only
+  `const` and `static readonly`); a name assigned anywhere in the file is unknown in all of
+  it, even in another method; `new Uri(base, relative)` with two arguments, a
+  `HttpRequestMessage` built with an object initializer and a raw string of several lines are
+  not read.
+  A member assigned by `??=` or a compound operator, or by an assignment that may not run when
+  its definition does (the pack's `Visit::conditional`: inside a branch, a loop, a `catch`,
+  `?.` or the right of `&&`, `||`, `??`, reset at each method, constructor and lambda), is an
+  `Unknown` bound, and an assignment whose address differs from the initializer's leaves the
+  base unknown (the call may come before it).
+  Typed clients (spec #28, #113): an instance `readonly` field with no initializer that one
+  write of its class sets, a plain `=` in a constructor (`this.f = v`, or `f = v` with no
+  parameter or local `f` there; `out` and `ref`, `this.f` too, count as writes), is a constant
+  of the class whose value is written in that constructor (`Const::scope`, Java's `final`
+  model), so `_http = http` makes `_http` the constructor's parameter (`x ?? throw ..` is `x`).
+  The pass groups the writes by class and name once. The pack gives a call's type arguments
+  as written (`Call::uses`, one chain `[Step::Argument(tys)]`, the meaning shape facts give
+  it), and a target-typed `new(..)` whose declared type it reads (a local, a field or a
+  property declaration) is a construction call of that type, so `may_be_called` sees it. The
+  kind expands with an injector for `Injected::Param` only: a parameter of a constructor no
+  call may reach, declared `HttpClient`, is a client whose base is the one
+  `<param>.BaseAddress` the constructor assigns when every registration of its class sets the
+  same address or none does, else the one address every framework `AddHttpClient<T>(..)` of
+  its class sets (`AddHttpClient<I, T>`: the last type argument; the call must reach no
+  function of the repository, `Code::reaches`). A registration's address is the one
+  `<param>.BaseAddress` bound of its lambda's parameters (its bindings of no class and no
+  value, so a local of the lambda is none), folded and its reads decided where the lambda is
+  written; one that only names the client adds none, and a method group, a lambda that passes
+  a parameter to a call, or a `ConfigureHttpClient` chained on it (`Call::on`) add an unknown
+  one. Two registrations with different addresses, one that does not fold, a constructor some
+  call reaches, or a parameter of a method leave the base unknown. The injected value is a
+  construction (`new HttpClient { BaseAddress = new Uri(parts) }`), so the base is read as an
+  initializer's, and an assignment on the field still wins. Ceilings: a primary constructor's
+  parameter (`class T(HttpClient http)`) is a binding of the class, no constructor parameter,
+  so it is not injected; a target-typed `new(..)` passed, returned or assigned is no call.
+- `http/csharp/refit.rs` (spec #28, #113): a method of an interface (`Facts::interfaces`) with
+  Refit's `[Get]`, `[Post]`, `[Put]`, `[Patch]`, `[Delete]` or `[Head]` (through the usings, or
+  written as `Refit.Get`, read in the scope around the interface so that a method named like the
+  attribute is no type; `Hiding`, shared with the controllers, says a class of the repository
+  named `GetAttribute` hides it) and a path from the root is a consumer at its definition
+  (`Site::Def`), as Retrofit's are. Its bases are the first arguments of each framework
+  `RestService.For<Api>(base)` whose first type argument names the interface, read with
+  `Expand::Call` (a wrapper's callers pass it) and the reads decided in the file of `For`; one
+  consumer per base, and an interface no `For` makes has an unknown base. The route follows the
+  base's own path (Refit appends it). `AddRefitClient` and `For` given an `HttpClient` are not
+  read. A caller reaches the method through a receiver whose type is declared (a field, a
+  parameter, a typed local); `var api = RestService.For<Api>(..)` types nothing, since the
+  resolver reads no library's result (the kinds run after it), so its calls stay name matches.
+- `http/csharp/reads.rs` and `dotnet/appsettings.rs` (spec #28, #112): environment and
+  configuration reads in a consumer's URL. The pack records what looks like a read without
+  deciding what it reads: a subscript with one string literal, and a call of
+  `GetEnvironmentVariable` (`ENVIRONMENT_READ`, the pack's one library form, on the precedent of
+  Java's and Kotlin's `getenv`) with one, is `Value::Str([Part::Read { .. }])` (a
+  neutral carrier, since only `Env` and `EnvOr` survive `unbind`; a call of any other member, as
+  `MapGroup("/api")`, stays a call). Being a string, a local or a field bound to a read folds
+  into the URL like any other. The reads of one node share one `Arc` of their scope. The pack
+  folds `??` chains (the first operand a read and no other operand a read, so the reads count
+  across the whole chain; past `VALUE_DEPTH` operands it is unknown), `!` around it, and keeps
+  the members called on it in `then`. `Reads::value` in the kind turns the part into `Env`,
+  `EnvOr` or `Hole` with the resolver: a read whose `then` holds a member other than `Trim`,
+  `TrimStart` and `TrimEnd` (`TRIMS`) is a hole, `Environment.GetEnvironmentVariable` is the
+  framework's `System.Environment` (a repository type of that name hides it, through
+  `names::spellings`), and `x[".."]` is a configuration when `x` is declared `IConfiguration`
+  (`Code::written`, confirmed through the usings) or is `builder.Configuration` of a
+  `WebApplicationBuilder` (declared, or made by `WebApplication.Create*Builder`). A configuration
+  key is the variable `Section__Key`, as the code spells it; the literal that `Settings` finds
+  for it is the variable's default (`Part::EnvOr`), so `http::fetches` keeps the twin readings
+  Spring's `${X:default}` has: by host when a workspace provider serves the default's host, else
+  through the variable and `base_url_env`. `based_on` rebases such a default on a relative URL
+  as `Uri` joins. `Settings` reads, from `Indexed::configs` (`**/appsettings.json` beside
+  `**/*.csproj`, which the pack's `join` reads), the base file of the project of a source (its
+  `Facts::unit`; a file in no project reads the nearest file above it) with serde_json after
+  dropping comments, trailing commas and a byte order mark. The parsed document is kept as it is
+  and a key `A:B` is looked up by descending its segments without case (cost: segments times
+  children), never flattened to full keys; serde_json's recursion limit (`JSON_DEPTH`, 128)
+  bounds the nesting, and a file past it is not read. Only strings are values. A value lives
+  only during the extraction (`Facts` is not serialized), and a config edit re-extracts the
+  consumers through the config digest. Ceilings: a read passed in through another file's
+  wrapper call, `using static System.Environment` and a read behind a `??` fallback of a local
+  are an unknown part (`ponytail:` marker in `reads.rs`); the variable keeps the key's spelling
+  and `base_url_env` compares it as written, though .NET compares keys without case; a JSON key
+  that holds a `:` is not matched; `appsettings.<Environment>.json`, `GetValue`, `GetSection`,
+  options binding, arrays and user secrets are not read; a chain past `VALUE_DEPTH` is a hole.
 - `http/kotlin.rs` (spec #27, #98): Ktor routes, through the same `Mounts` and `prefixes` as
   the other routers, whose nodes are definitions (file, qualified name): the lambda of each
   `routing { }` call (a root), the lambda of each `route(prefix) { }` call (mounted under its
@@ -2041,13 +2463,13 @@ qualification budget does (ADR 0017).
   `delete`, `head`, `options` and `request` of `io.ktor.client.request`, counted by the import
   `Code::outside` says binds the verb) on a receiver that is an `io.ktor.client.HttpClient`: one
   `Code::origins` (`Follow::Values`) traces to a call to it (counted by the import of its
-  callee as `jvm::names::spellings` reads it, so `import io.ktor.client.*` counts), a local the
+  callee as `names::spellings` reads it, so `import io.ktor.client.*` counts), a local the
   pack recorded (`Facts::bound`: a `val x = Callee(..)` with no written type, and the parameter
   of a `let`, `also` or `use` lambda, whose value is the receiver; `Code::local` takes the
   nearest binding of the name and none when another binding of it shares its scope, so a
   parameter, a loop variable, a `var`, a local named like a property of the file or one declared
   twice hides it) followed through `origins` again, or one whose written type is it
-  (`jvm::names::typed`); a map, another library's client and a name a local hides are none. The
+  (`names::typed`); a map, another library's client and a name a local hides are none. The
   call is read whole (`Expand::Chain`, which also gives the reader the call's keyword arguments),
   so an enum member a wrapper passes keeps the evidence of the caller's imports. The URL (first
   argument, or `urlString`) goes through `Code::expand`, as the Go clients do, so a wrapper is
@@ -2596,7 +3018,8 @@ qualification budget does (ADR 0017).
   `cfg.service(a).route(..)`) is read to that many calls down to what starts it (`Code::chain`),
   and a call past it has no origin, so its route is no provider (the walk is memoized per call,
   linear in the chain). `PREFIX_DEPTH` (64) and `PREFIX_WORK` (4096):
-  `prefixes`, for every kind that mounts (Express, FastAPI, Flask, axum, actix-web, Rocket, Ktor), reads a router
+  `prefixes`, for every kind that mounts (Express, FastAPI, Flask, axum, actix-web, Rocket, Ktor,
+  ASP.NET Core minimal APIs), reads a router
   nested deeper than the first, or through more mounts than the second, as served nowhere
   rather than under part of its prefixes. A name bound again in its scope (`let mut`,
   shadowing) or assigned again holds no known value, and the routers its `let` holds
@@ -2742,13 +3165,13 @@ qualification budget does (ADR 0017).
   budget and nesting limit; a `.properties` file is bounded by `lang::MAX_BYTES` like every pack
   config. A same-package `System` type in another file is not seen by the Java pack's
   `getenv`.
-- `jvm/maven.rs` (spec #26): `XML_DEPTH` (64 nested elements), `XML_NAMESPACES` (16 `xmlns`
+- `xml.rs`, shared by `jvm/maven.rs` (spec #26) and `dotnet/msbuild.rs` (spec #28): `XML_DEPTH` (64 nested elements), `XML_NAMESPACES` (16 `xmlns`
   occurrences in the file) and `XML_ATTRIBUTES` (64 per tag) are checked by one linear pass
   before parsing, since roxmltree copies the enclosing namespaces into each element that
   declares one and checks a tag's attributes pairwise; `XML_NODES` (65,536) bounds the parsed
   tree, in addition to `lang::MAX_BYTES`. `roxmltree` rejects DTDs and never loads external
-  entities. An over-limit, unterminated or malformed manifest reads as an empty summary;
-  indexing continues. `jvm/gradle.rs`: `GRADLE_DEPTH` (64) bounds nested blocks; a deeper build
+  entities. An over-limit, unterminated or malformed manifest reads as an empty summary (a
+  project file as no project); indexing continues. `jvm/gradle.rs`: `GRADLE_DEPTH` (64) bounds nested blocks; a deeper build
   or settings file reads as an empty summary. The Gradle scanner does not read Groovy slashy
   strings, and reads a triple-quoted string as quoted pairs. It keeps at most `MAX_ROOTS` (64)
   source directories. The Groovy and the Kotlin DSL files (`*.gradle`, `*.gradle.kts`) go

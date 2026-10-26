@@ -48,3 +48,9 @@ Una clave desconocida o mal escrita da un error con el archivo, la línea y la c
 Los contratos de paquetes JVM se descubren en los manifests: `pom.xml`, `settings.gradle`, `settings.gradle.kts`, `build.gradle` y `build.gradle.kts`. No necesitan una clave adicional en `meada.toml`. Declare otros repositorios en `[[peer]]` como en los ejemplos anteriores. Use coordenadas literales para vínculos `exact`; las propiedades Maven y expresiones Gradle quedan sin evaluar, y las que forman el grupo o el artefacto producen candidatos `ambiguous`.
 
 En Java y Kotlin con Spring, la URL base puede venir de `@Value("${clave}")` (en Kotlin, `@Value("\${clave}")`, con el `$` escapado), leída del `application.properties`, del `application.yml` o del `application.yaml` en `src/main/resources` de cada módulo, sin clave nueva en `meada.toml`. Una URL literal vincula por host en `[serve] hosts`; un placeholder `${VAR}` (con o sin `:valor`) usa las mismas claves `base_url_env` de `[[peer]]`. Un valor por defecto cuyo host sirve algún par vincula por ese host.
+
+En C#, la URL base puede venir de `Environment.GetEnvironmentVariable("X")` o de `configuration["Seccion:Clave"]`, leída del `appsettings.json` del proyecto (solo el archivo base), sin clave nueva en `meada.toml`. Una clave es la variable `Seccion__Clave` en los `base_url_env` del `[[peer]]`; una URL literal que el archivo guarda para ella vincula por host en `[serve] hosts` cuando algún peer sirve ese host.
+
+## Paquetes NuGet
+
+Los contratos de paquetes NuGet se descubren en los `.csproj` con SDK. No necesitan ninguna clave extra en `meada.toml`: un `PackageReference` enlaza con el proveedor por su id, y un `ProjectReference` por la ruta de su archivo de proyecto, que alcanza un proyecto de otro repositorio por las raíces de los repositorios del workspace (decláralo en `[[peer]]`). Valores de propiedad como `$(Version)` quedan sin evaluar.

@@ -8,6 +8,23 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Spring `application.yml` whose joined keys pass 1 MiB (`YAML_KEY_BUDGET`) reads as empty
+  instead of allocating every key joined to each of its children: a crafted file no longer
+  costs gigabytes to index.
+- A Java chain of locals each made by a call on the one before (`var a2 = a1.m();`) costs its
+  length to resolve: a call's result was read twice per link, through exact targets and again
+  by name, which doubled the cost of every link.
+- A C# type two projects of one repository declare under one qualified name binds, from a file
+  of one of them, to that project's own type, as the compiler prefers it; before, every link
+  to the name was dropped, same-project calls included. A caller in neither project still finds
+  the name ambiguous.
+- A C# library type or attribute written in full (`System.Net.Http.HttpClient`,
+  `[Microsoft.AspNetCore.Mvc.HttpGet]`) is the library's unless the repository declares that
+  very name: a client of the repository's own `System.Net.Http.HttpClient` is no consumer, and a
+  repository namespace under the library's root (`Microsoft.Acme`) no longer hides every name
+  written in full.
+- C# top-level statements in a file that also declares a global type `Main` make no synthetic
+  `Main` program, which would share the type's name.
 - A Java OpenFeign or Retrofit method whose link is ambiguous (a Feign client without `url`
   whose path two repositories serve) or whose URL is unresolved (Retrofit's `@Url`) is an open
   item at the method: `search` with `kind=ambiguous` or `kind=unresolved` lists it, and
@@ -28,6 +45,93 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- NuGet packages (spec #28): each SDK-style `.csproj` provides `package::nuget::<id>` (its
+  `PackageId`, else `AssemblyName`, else file name). A `PackageReference` naming a workspace
+  package and a `ProjectReference` to a project of another repository link to it at `exact`
+  (`range unchecked`); a `using` of a namespace of a project the file depends on reaches its
+  types, so `context` on a public type lists the calls in other repositories and `trace` crosses
+  the hop, with `; import namespace` in the reason. The exported import's `how` can now be
+  `namespace`.
+  A `ProjectReference` pins its project (a twin package id elsewhere never makes the link
+  `ambiguous`), only an SDK-style project owns files (the stored manifest summary gains a
+  `project` marker, so existing indexes are rebuilt), and package ids match without regard to case.
+- C# source indexing (issue #107): `.cs` files, grouped into projects by SDK-style `.csproj`
+  files (an old-style one, with no `Sdk`, is none; `.sln` files change nothing), yield
+  namespace-qualified classes, records, structs and interfaces, nested and `partial` ones
+  included (each part in its own file of one project, a member lookup reading every
+  part and its bases), methods and
+  constructors with written parameter types, and local functions (`Method.Local`). `using`,
+  `using static`, aliases and `global using` resolve through every project's namespaces; a
+  `global using`, a project file's `<Using>` items and its enabled implicit usings apply to every
+  file of that project. Bare, `this`, `base`, static and `using static` calls are `exact` when
+  the argument count, counting `params` and default values, leaves one method. Attributes are
+  calls on what they decorate. No .NET SDK or MSBuild is involved.
+- C# ASP.NET Core controllers as HTTP providers (issue #109): a public method of a class with
+  `[ApiController]`, or deriving from `ControllerBase` or `Controller`, carrying `[HttpGet]`,
+  `[HttpPost]`, `[HttpPut]`, `[HttpPatch]`, `[HttpDelete]`, `[HttpHead]` or `[HttpOptions]`
+  serves the class `[Route]` prefix joined to its template, with `[controller]`, `[action]`
+  (without `Async`, or a literal `[ActionName]`) and `{id}`, `{id:int}`, `{id?}` read as ASP.NET
+  Core does; a template starting with `/` or `~/` replaces the prefix, and a method `[Route]`
+  without a method attribute serves every method (`http::ANY::<path>`, linked to consumers of
+  any method). Conventional routing, a controller with a base class of the repository, a class
+  in `partial` parts, `[NonAction]` methods and attributes that are not MVC's are not read.
+- C# ASP.NET Core minimal APIs as HTTP providers (issue #110): `MapGet`, `MapPost`, `MapPut`,
+  `MapPatch`, `MapDelete` and `MapMethods(pattern, methods, handler)` on the application or a
+  `MapGroup(prefix)` group serve under every prefix around them, groups nested at any depth,
+  followed through locals, method arguments, return values and extension methods called on a
+  group (`group.MapOrders()`), so one called on two groups serves under both. A lambda handler
+  is an inline handler named for its route, a method group the method it names. A builder
+  Meada cannot read (a lambda's parameter, a field, a reassigned local) serves nothing.
+  The shared value flow now follows a local a pack binds to one value (C# and Kotlin) and a C#
+  extension method called on a receiver in scope; every C# lambda in a definition is a scope of
+  its own, so its parameters hide outer names only inside it. A C# local an outside call made
+  (`var app = builder.Build()`) is of an outside type, so `app.Run()` reaches no repository
+  `Run()`.
+- C# HttpClient calls as HTTP consumers (issue #111): `GetAsync`, `PostAsync`, `PutAsync`,
+  `PatchAsync`, `DeleteAsync`, `GetStringAsync`, `GetStreamAsync`, `GetByteArrayAsync`,
+  `GetFromJsonAsync`, `PostAsJsonAsync`, `PutAsJsonAsync` and `SendAsync` with a
+  `new HttpRequestMessage(HttpMethod.X, url)` on an `HttpClient` (by its declared type or
+  construction, resolved through usings) are consumers with the method and the evaluated path.
+  URLs fold string literals, interpolation, verbatim and raw strings, `+`, and `const` and
+  `static readonly` fields, also of other types, and locals bound once. A name assigned again
+  anywhere in its file is unknown. `BaseAddress = new Uri(base)` in the client's initializer
+  (field, local or property) or one assignment is its host, joined to a relative URL as `Uri`
+  does, and a wrapper is read at each of its callers. `request.Method = HttpMethod.X` and
+  `a?.M()` calls are read.
+  A call whose URL cannot be evaluated is an unresolved consumer; clients from
+  `IHttpClientFactory.CreateClient(name)` are not read.
+- C# base URLs from the environment and configuration (issue #112): `Environment.GetEnvironmentVariable("X")`,
+  through `??`, `!` and `Trim`/`TrimStart`/`TrimEnd`, is the base URL variable `X`; `configuration["A:B"]` on
+  an `IConfiguration` or on `builder.Configuration` is the variable `A__B`, with the literal the project's
+  base `appsettings.json` holds for it (comments, trailing commas, case-insensitive keys, nested
+  objects) as its default, so a literal host some peer serves links by host and any other goes
+  through `base_url_env`. `appsettings.<Environment>.json`, `GetValue`, `GetSection` and options
+  binding are not read. New neutral fixtures `xlang-csharp-{web,api}` cover the TypeScript to C#
+  and C# to TypeScript chain.
+- C# typed clients and Refit interfaces as HTTP consumers (issue #113): `AddHttpClient<T>(c =>
+  c.BaseAddress = ...)` gives its base, folded and read from the environment or configuration, to
+  the `HttpClient` the container passes to `T`'s constructor and to every call on it in `T`,
+  through a `readonly` field the constructor assigns; two registrations with different bases, a
+  registration Meada cannot read, or a constructor the code calls (a typed `T t = new(..)`
+  included) leave it unknown. A `BaseAddress` assigned conditionally, or one that differs from
+  the client's initializer, is unknown. Each method of a Refit interface (`[Get]`, `[Post]`, `[Put]`, `[Patch]`,
+  `[Delete]`, `[Head]`) is a consumer with the base of each `RestService.For<T>(url)`, and its
+  callers reach it, so `trace` crosses it; `AddRefitClient` is not read. The shared injector
+  (`resolve::Inject`) is now also asked about a parameter no annotation marks
+  (`Injected::Param`).
+- C# messaging channels (issue #115): Confluent.Kafka (`Produce`, `ProduceAsync`, `Subscribe`),
+  RabbitMQ.Client (`BasicPublish`, `BasicConsume`, `QueueBind`, with spec #20's routing rules),
+  AWSSDK.SQS (`SendMessageAsync`, `ReceiveMessageAsync`), NATS.Client (`Publish`,
+  `SubscribeAsync`, wildcards `inferred`), StackExchange.Redis streams (`StreamAdd`,
+  `StreamReadGroup`) and Azure Service Bus (`CreateSender`, `CreateProcessor`) are producers and
+  consumers of channel contracts, with the new broker kind `servicebus` (a processor on a topic
+  consumes every message sent to it, whatever the subscription). A client counts by its written
+  type or its construction, resolved through the usings. Handlers are the callback (a lambda or a
+  method group) or each one attached with `+=` (a consumer per handler) or, for a polling
+  client, the method holding the call. Names fold like URLs, a Service Bus sender made for a
+  parameter is named by the callers of its method, and `String.Empty` is the default exchange;
+  an environment or configuration read is an unresolved side, and so is a sender written more
+  than once. MassTransit is not read.
 - Kotlin source indexing (issue #95): `.kt` and `.kts` files (Gradle's `build.gradle.kts` and
   `settings.gradle.kts` stay manifests) yield package-qualified classes, interfaces, objects,
   companions (`Class.Companion` when unnamed), top-level and extension functions, properties
@@ -792,6 +896,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- A Kotlin `HttpClient` held through more locals than `LOCAL_DEPTH` (8) is now a consumer:
+  the shared value flow follows the `val`s the pack binds (`Facts::bound`, issue #110), up to
+  its own depth (`EVAL_DEPTH`, 256 more). Before, such a chain of locals gave no consumer.
 - The repository is a Cargo workspace (ADR 0014, #296): beside the `meada` binary, the library
   crate `meada-core` holds the schema of a workspace manifest's `[[repository]]` entries with
   every check their text decides, the bundle and generation ids of ADR 0012 and the new

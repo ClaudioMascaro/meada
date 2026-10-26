@@ -1,0 +1,19 @@
+example.com/acme/conformance src/Acme.Core/Billing/Accounts.cs:30-30 Acme.Core.Billing.Account.Freeze()
+community: src/Acme.Core/Billing
+processes: 6 (6 export; 1 repository): Acme.Api.Desk.Serve(Account) (example.com/acme/conformance), Acme.Core.Billing.Probes.Blocks(bool) (example.com/acme/conformance), Acme.Core.Billing.Probes.Field() (example.com/acme/conformance), Acme.Core.Billing.Probes.Generic(T) (example.com/acme/conformance), Acme.Core.Billing.Probes.Hides(List<Savings>,object) (example.com/acme/conformance), Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane) (example.com/acme/conformance)
+public void Freeze() { }
+callers:
+example.com/acme/conformance src/Acme.Core/Billing/Accounts.cs:42 Acme.Core.Billing.Savings.Sweep()
+example.com/acme/conformance src/Acme.Core/Billing/Accounts.cs:59 Acme.Core.Billing.Ledger.Post(T) [inferred: one method named Freeze]
+example.com/acme/conformance src/Acme.Core/Billing/Probes.cs:21 Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)
+example.com/acme/conformance src/Acme.Core/Billing/Probes.cs:29 Acme.Core.Billing.Probes.Blocks(bool) [inferred: one method named Freeze]
+example.com/acme/conformance src/Acme.Core/Billing/Probes.cs:33 Acme.Core.Billing.Probes.Generic(T) [inferred: one method named Freeze]
+example.com/acme/conformance src/Acme.Core/Billing/Probes.cs:39 Acme.Core.Billing.Probes.Hides(List<Savings>,object) [inferred: one method named Freeze]
+example.com/acme/conformance src/Acme.Core/Billing/Probes.cs:40 Acme.Core.Billing.Probes.Hides(List<Savings>,object) [inferred: one method named Freeze]
+example.com/acme/conformance src/Acme.Core/Billing/Probes.cs:41 Acme.Core.Billing.Probes.Hides(List<Savings>,object) [inferred: one method named Freeze]
+example.com/acme/conformance src/Acme.Core/Billing/Probes.cs:42 Acme.Core.Billing.Probes.Hides(List<Savings>,object) [inferred: one method named Freeze]
+example.com/acme/conformance src/Acme.Core/Billing/Probes.cs:45 Acme.Core.Billing.Probes.Field()
+example.com/acme/conformance src/Acme.Core/Billing/Teller.cs:19 Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)
+example.com/acme/conformance src/Acme.Core/Billing/Teller.cs:29 Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)
+example.com/acme/conformance src/Acme.Core/Billing/Teller.cs:36 Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)
+callees: none

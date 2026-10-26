@@ -15,6 +15,110 @@ use meada::engine::Engine;
 const ORIGIN: Option<&str> = Some("https://example.com/acme/conformance.git");
 const WEB: Option<&str> = Some("https://example.com/acme/web.git");
 
+/// The level of the call `id` ends with in the export `json`.
+fn level<'j>(json: &'j serde_json::Value, id: &str) -> &'j serde_json::Value {
+    let calls = json["calls"].as_array().unwrap();
+    let call = calls
+        .iter()
+        .find(|c| c["id"].as_str().unwrap().ends_with(id));
+    &call.unwrap_or_else(|| panic!("no call {id}"))["level"]
+}
+
+/// Refreshes a copy of the C# fixture after `edit`, checks it equals a cold export of the same
+/// files and differs from the export before, and gives the refreshed export.
+fn csharp_refreshed(case: &str, edit: impl Fn(&Path)) -> serde_json::Value {
+    let repo = fixture_repo(case, "conformance-csharp", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    let cold = cold_export(&format!("{case}_cold"), "conformance-csharp", ORIGIN, &edit);
+    assert_eq!(refreshed, cold);
+    serde_json::from_str(&refreshed).unwrap()
+}
+
+/// Rewrites a file of the repository with `from` replaced by `to`.
+fn replace(repo: &Path, file: &str, from: &str, to: &str) {
+    let path = repo.join(file);
+    let before = fs::read_to_string(&path).unwrap();
+    assert!(before.contains(from), "{file}: {from}");
+    fs::write(&path, before.replace(from, to)).unwrap();
+}
+
+const GLOBALS: &str = "src/Acme.Core/GlobalUsings.cs";
+const API_PROJECT: &str = "src/Acme.Api/Acme.Api.csproj";
+
+/// Edits a global using file, adds and deletes `.cs` files, deletes one project file and adds
+/// another: files that did not change on disk resolve anew.
+#[test]
+fn csharp_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
+    let json = csharp_refreshed("fresh_csharp", |repo: &Path| {
+        replace(
+            repo,
+            GLOBALS,
+            "global using Fmt = ",
+            "global using Other = ",
+        );
+        fs::write(
+            repo.join("src/Acme.Core/Orders/Extra.cs"),
+            "namespace Acme.Core.Orders;\n\npublic class Extra\n{\n    public void Run() { Format.Upper(\"e\"); }\n}\n",
+        )
+        .unwrap();
+        fs::remove_file(repo.join("src/Acme.Core/Orders/Order.Lines.cs")).unwrap();
+        fs::remove_file(repo.join(API_PROJECT)).unwrap();
+        fs::write(
+            repo.join("legacy/Modern.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <ItemGroup>\n    \
+             <Using Include=\"Acme.Core.Text.Format\" Static=\"true\" />\n  </ItemGroup>\n</Project>\n",
+        )
+        .unwrap();
+    });
+    // The alias is gone from every file of Acme.Core, Acme.Api's project file with its
+    // `<Using>`, and the new SDK-style project file adds a `using static`.
+    assert!(level(&json, "OrderService.Place(string,int)::Fmt.Upper#0").is_null());
+    assert!(level(&json, "Checkout.Run()::OrderService.Default#0").is_null());
+    assert_eq!(level(&json, "Legacy.Old.Run()::Upper#0"), "exact");
+    assert_eq!(
+        level(&json, "Acme.Core.Orders.Extra.Run()::Format.Upper#0"),
+        "exact"
+    );
+}
+
+/// A project file changes alone: the files of its project resolve anew.
+#[test]
+fn csharp_refreshed_export_after_a_project_file_edit_equals_a_cold_export() {
+    let json = csharp_refreshed("fresh_csharp_project", |repo: &Path| {
+        replace(
+            repo,
+            API_PROJECT,
+            "<Using Include=\"Acme.Core.Orders\" />",
+            "",
+        );
+    });
+    assert!(level(&json, "Checkout.Run()::OrderService.Default#0").is_null());
+    assert_eq!(level(&json, "Checkout.Run()::Svc.Default#0"), "exact");
+}
+
+/// A global using file changes alone: the other files of its project resolve anew.
+#[test]
+fn csharp_refreshed_export_after_a_global_using_edit_equals_a_cold_export() {
+    let json = csharp_refreshed("fresh_csharp_globals", |repo: &Path| {
+        replace(
+            repo,
+            GLOBALS,
+            "global using static Acme.Core.Text.Casing;\n",
+            "",
+        );
+    });
+    assert!(level(&json, "OrderService.Place(string,int)::Lower#0").is_null());
+    assert_eq!(
+        level(&json, "OrderService.Place(string,int)::Fmt.Upper#0"),
+        "exact"
+    );
+}
+
 #[test]
 fn kotlin_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
     let edit = |repo: &Path| {
@@ -1335,6 +1439,117 @@ fn an_edited_spring_configuration_alone_refreshes_the_kotlin_consumers() {
 
     assert!(before.contains("\"via\": \"env:WEB_URL\""));
     assert!(refreshed.contains("\"via\": \"env:SITE_URL\""));
+}
+
+/// Edits, adds and deletes `.cs` files of the C# api and edits its `appsettings.json`: the
+/// environment variable one client reads changes, the file with the configuration read of
+/// `builder.Configuration` goes, a client appears that reads the environment, and two keys of
+/// the configuration change their literal (one now names a host the web app serves, the other no
+/// longer does).
+fn edit_xlang_csharp((_, api): &(PathBuf, PathBuf)) {
+    edit_file(api, "Clients/StockClient.cs", "\"WEB_URL\"", "\"SITE_URL\"");
+    fs::remove_file(api.join("Program.cs")).unwrap();
+    fs::write(
+        api.join("Clients/ToolClient.cs"),
+        "namespace Api.Clients;\n\n\
+         public class ToolClient\n{\n\
+         \x20   private static readonly HttpClient Http = new HttpClient();\n\n\
+         \x20   public Task<string> Level() =>\n\
+         \x20       Http.GetStringAsync(Environment.GetEnvironmentVariable(\"WEB_URL\") + \"/api/stock\");\n}\n",
+    )
+    .unwrap();
+    edit_file(
+        api,
+        "appsettings.json",
+        "\"BaseUrl\": \"http://localhost:3000\"",
+        "\"BaseUrl\": \"https://web.example.com\"",
+    );
+    edit_file(
+        api,
+        "appsettings.json",
+        "\"URL\": \"https://web.example.com/api/\"",
+        "\"URL\": \"https://audit.internal/\"",
+    );
+}
+
+#[test]
+fn a_refreshed_csharp_cross_language_pair_exports_what_a_cold_pair_does() {
+    let exports = |(web, api): &(PathBuf, PathBuf)| -> Vec<String> {
+        [web, api]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = common::xlang_csharp("fresh_xlang_csharp");
+    [&repos.0, &repos.1].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_xlang_csharp(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = common::xlang_csharp("fresh_xlang_csharp_cold");
+    edit_xlang_csharp(&cold);
+    assert_eq!(refreshed, exports(&cold));
+    assert_ne!(refreshed[1], before[1]);
+    // The key now served by host links by it, the one that no longer is maps to its variable.
+    let audit = "\"contract\": \"http::POST::/api/audit\"";
+    let prices = "\"via\": \"env:Prices__BaseUrl\"";
+    assert!(before[1].contains(audit) && before[1].contains(prices));
+    assert!(!refreshed[1].contains(audit) && !refreshed[1].contains(prices));
+    assert!(before[1].contains("\"via\": \"env:WEB_URL\""));
+    assert!(refreshed[1].contains("\"via\": \"env:SITE_URL\""));
+    assert!(refreshed[1].contains("\"via\": \"env:Audit__Url\""));
+    assert!(before[1].contains("Program.cs") && !refreshed[1].contains("Program.cs"));
+    assert!(refreshed[1].contains("Clients/ToolClient.cs"));
+}
+
+/// An `appsettings.json` edited alone, with no `.cs` file changed, refreshes the contracts.
+#[test]
+fn an_edited_appsettings_alone_refreshes_the_csharp_consumers() {
+    let (_, api) = common::xlang_csharp("fresh_xlang_csharp_config");
+    age(&api);
+    let before = Engine::open(&api).unwrap().export().unwrap();
+    edit_file(
+        &api,
+        "appsettings.json",
+        "\"BaseUrl\": \"http://localhost:3000\"",
+        "\"BaseUrl\": \"https://web.example.com\"",
+    );
+
+    let refreshed = Engine::open(&api).unwrap().export().unwrap();
+
+    assert!(before.contains("\"via\": \"env:Prices__BaseUrl\""));
+    assert!(!refreshed.contains("\"via\": \"env:Prices__BaseUrl\""));
+}
+
+/// An `appsettings.json` deleted, and then added back, refreshes the C# consumers as a cold
+/// export of the same files does: without it, a key whose literal the web app serves is its
+/// variable alone, and with it back the key links by that host again.
+#[test]
+fn a_deleted_then_added_appsettings_refreshes_like_a_cold_export() {
+    let settings = "appsettings.json";
+    let export = |repo: &Path| Engine::open(repo).unwrap().export().unwrap();
+    let (_, api) = common::xlang_csharp("fresh_xlang_csharp_settings");
+    age(&api);
+    let before = export(&api);
+    let kept = fs::read(api.join(settings)).unwrap();
+    fs::remove_file(api.join(settings)).unwrap();
+
+    let deleted = export(&api);
+
+    let (_, cold) = common::xlang_csharp("fresh_xlang_csharp_settings_cold");
+    fs::remove_file(cold.join(settings)).unwrap();
+    assert_eq!(deleted, export(&cold));
+    let audit = "\"contract\": \"http::POST::/api/audit\"";
+    assert!(before.contains(audit) && !deleted.contains(audit));
+    assert!(deleted.contains("\"via\": \"env:Audit__Url\""));
+
+    fs::write(api.join(settings), &kept).unwrap();
+    let added = export(&api);
+
+    fs::write(cold.join(settings), &kept).unwrap();
+    assert_eq!(added, export(&cold));
+    assert_eq!(added, before);
 }
 
 #[test]

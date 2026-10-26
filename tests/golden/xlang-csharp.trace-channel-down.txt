@@ -1,0 +1,3 @@
+example.com/xlang-csharp/web src/events.ts:7 announceShipment
+  →[exact: channel::kafka::orders.shipped] example.com/xlang-csharp/api Messaging/ShipmentListener.cs:16 Api.Messaging.ShipmentListener.OnShipment()
+chain: exact · 1 hops · 2 repos · 65 tokens

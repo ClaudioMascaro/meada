@@ -1924,6 +1924,218 @@ sample.kt
   "package": "example"
 }
 
+sample.cs
+{
+  "defs": [
+    {
+      "name": "Example.Store",
+      "kind": "Class",
+      "range": {
+        "start": 81,
+        "end": 331
+      },
+      "params": []
+    },
+    {
+      "name": "Example.Store.Store(string)",
+      "kind": "Method",
+      "range": {
+        "start": 114,
+        "end": 143
+      },
+      "params": [
+        {
+          "name": "name",
+          "binds": "Any"
+        }
+      ]
+    },
+    {
+      "name": "Example.Store.Save(int,string[])",
+      "kind": "Method",
+      "range": {
+        "start": 149,
+        "end": 274
+      },
+      "params": [
+        {
+          "name": "id",
+          "binds": "Any"
+        },
+        {
+          "name": "tags",
+          "binds": "Rest"
+        }
+      ]
+    },
+    {
+      "name": "Example.Store.Save(int,string[]).Twice",
+      "kind": "Function",
+      "range": {
+        "start": 209,
+        "end": 235
+      },
+      "params": [
+        {
+          "name": "n",
+          "binds": "Any"
+        }
+      ]
+    },
+    {
+      "name": "Example.Store.Open()",
+      "kind": "Method",
+      "range": {
+        "start": 280,
+        "end": 329
+      },
+      "params": [],
+      "result": {
+        "Type": "Store"
+      }
+    }
+  ],
+  "overloads": {
+    "Example.Store.Open": [
+      "Example.Store.Open()"
+    ],
+    "Example.Store.Save": [
+      "Example.Store.Save(int,string[])"
+    ],
+    "Example.Store.Save(int,string[]).Twice": [
+      "Example.Store.Save(int,string[]).Twice"
+    ]
+  },
+  "constructors": {
+    "Example.Store": [
+      "Example.Store.Store(string)"
+    ]
+  },
+  "statics": [
+    "Example.Store.Open()"
+  ],
+  "imports": [
+    {
+      "local": "@glob0",
+      "source": "Example",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob0",
+          "inside": true,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "@static2",
+      "source": "Example.Util.Tools",
+      "name": "Qualified"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@static2",
+          "inside": false,
+          "public": false
+        }
+      }
+    }
+  ],
+  "exports": [
+    {
+      "Local": {
+        "exported": "Store",
+        "local": "Example.Store"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Example.Store",
+        "local": "Example.Store"
+      }
+    }
+  ],
+  "star": {
+    "Only": [
+      "Store",
+      "Example.Store"
+    ]
+  },
+  "calls": [
+    {
+      "scope": "Example.Store.Save(int,string[])",
+      "callee": "Twice",
+      "arity": 1,
+      "range": {
+        "start": 251,
+        "end": 267
+      },
+      "by_path": true
+    },
+    {
+      "scope": "Example.Store.Save(int,string[])",
+      "callee": "Check",
+      "arity": 1,
+      "range": {
+        "start": 257,
+        "end": 266
+      },
+      "by_path": true
+    },
+    {
+      "scope": "Example.Store.Open()",
+      "callee": "Store",
+      "arity": 1,
+      "constructs": true,
+      "range": {
+        "start": 310,
+        "end": 328
+      },
+      "by_path": true
+    }
+  ],
+  "consts": [],
+  "receivers": [
+    {
+      "scope": "Example.Store.Store(string)",
+      "name": "name",
+      "class": "Unknown"
+    },
+    {
+      "scope": "Example.Store.Save(int,string[])",
+      "name": "id",
+      "class": "Unknown"
+    },
+    {
+      "scope": "Example.Store.Save(int,string[])",
+      "name": "tags",
+      "class": "Unknown"
+    },
+    {
+      "scope": "Example.Store.Save(int,string[]).Twice",
+      "name": "n",
+      "class": "Unknown"
+    }
+  ],
+  "hidden": [
+    "Example.Store.Save(int,string[]).Twice"
+  ],
+  "package": "Example",
+  "project": [
+    "Example.Util"
+  ],
+  "partial": [
+    "Example.Store"
+  ]
+}
+
 sample.openapi.yaml
 {
   "format": "openapi",
@@ -2241,6 +2453,25 @@ sample.settings.gradle.kts
       ]
     ]
   }
+}
+
+sample.csproj
+{
+  "name": "Example.Kit",
+  "version": "1.2.0",
+  "dependencies": [
+    {
+      "field": "PackageReference",
+      "name": "Example.Json",
+      "range": "[1.0,2.0)"
+    },
+    {
+      "field": "ProjectReference",
+      "name": "Core",
+      "via": "path src/Core/Core.csproj"
+    }
+  ],
+  "project": true
 }
 
 sample.tsconfig.json

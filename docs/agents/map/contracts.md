@@ -179,7 +179,7 @@ modules updates it.
   the side: the `site` is the bare repository identity (no `::`), the **repository-level** side.
   `report` gives the status lines per repository: each unmatched `via`, the fallback to repository
   level, and a resource with no link in the workspace (unlinked). `channel.rs` (spec #20):
-  `extract` calls the five readers (`channel/{ts,python,rust,go,java}.rs`), each answering for its own pack only (`code.pack().extensions()`), in that order; the message types and broker helpers live in `channel/message.rs`; a producer is a provider at its call site, a
+  `extract` calls the six readers (`channel/{ts,python,rust,go,java,csharp}.rs`), each answering for its own pack only (`code.pack().extensions()`), in that order; the message types and broker helpers live in `channel/message.rs`; a producer is a provider at its call site, a
   consumer a consumer at its handler (an inline handler is named `<broker> <names in order>`,
   such as `kafka orders.created`). `contract(broker, name)` is `channel::<broker>::<name>`, or
   `channel::<broker>` for an unresolved side (`channel::parse`, `Channel::unresolved`, and the seam's `shown`, which
@@ -448,3 +448,19 @@ modules updates it.
   `project(':x')`, `configure(..)`) or a conditional is not kept; `named("set")` and
   `getByName("set")` name the set by their literal. The source directories past `MAX_ROOTS` are
   dropped before the defaults join, so the test roots are always among the kept ones.
+
+- NuGet packages (spec #28, ticket #116): `package/nuget.rs` implements `Ecosystem` for
+  `*.csproj`, read by `dotnet/msbuild.rs` (`Project`: usings, the `PackageId`, `AssemblyName` and
+  `PackageVersion`/`Version` properties as written, and the `PackageReference` and
+  `ProjectReference` items), the reader the C# pack's `join` shares. A project with an SDK
+  provides `package::nuget::<id>`: `PackageId`, else `AssemblyName`, else the file name; a
+  computed (`$(..)`) or invalid one makes no provider. A `PackageReference` is an entry with its
+  `Version` as range (`range unchecked`). A `ProjectReference` is an entry whose `via` is
+  `path <project file>`, folded from the project's directory (backslashes read as `/`), named by
+  the file name until `Ecosystem::settle`, at the start of `Packages::workspace_step`, gives it
+  the id of the project at that path in another repository; `reaches` keeps it to that project
+  and to other repositories (`sourced`), so a reference inside one repository adds no package
+  link. Imports share Maven's code (`maven::{imports, resolutions, declares}`, with `How`
+  `Namespace`, the reason's `; import namespace`): the `.cs` exports rows give a public type its
+  qualified name, as Java's do. `How::Namespace` is a new value of the exported `how`; the
+  stored format gains only a `manifests` summary kind, with `tests/fixtures/schema/sample.csproj`.

@@ -1,0 +1,4 @@
+example.com/acme/conformance Main process::example.com/acme/conformance::src/Acme.Api/Top.cs::Main (program)
+example.com/acme/conformance Main process::example.com/acme/conformance::src/Acme.Web/Program.cs::Main (program)
+example.com/acme/conformance Acme.Api.Cli.Main(int) process::example.com/acme/conformance::src/Acme.Api/Cli.cs::Acme.Api.Cli.Main(int) (export)
+example.com/acme/conformance Acme.Api.Cli.Main(string[]) process::example.com/acme/conformance::src/Acme.Api/Cli.cs::Acme.Api.Cli.Main(string[]) (program)

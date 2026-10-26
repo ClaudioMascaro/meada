@@ -3258,6 +3258,1857 @@ fn conform(fixture: &str, symbols: &[&str], programs: &[&str], calls: &[Expected
     assert_golden(&format!("{fixture}.export.json"), &export);
 }
 
+const CORE: &str = "src/Acme.Core";
+const API: &str = "src/Acme.Api";
+
+#[test]
+fn csharp() {
+    let core = |file: &str, name: &str| format!("{CORE}/{file}::{name}");
+    let api = |file: &str, name: &str| format!("{API}/{file}::{name}");
+    let format = |name: &str| core("Text/Format.cs", &format!("Acme.Core.Text.{name}"));
+    let orders = |file: &str, name: &str| {
+        core(
+            &format!("Orders/{file}"),
+            &format!("Acme.Core.Orders.{name}"),
+        )
+    };
+    let service = |name: &str| orders("OrderService.cs", &format!("OrderService{name}"));
+    let store = |name: &str| core("Store/Repository.cs", &format!("Acme.Core.Store.{name}"));
+    let shadows = |name: &str| api("Shadows.cs", &format!("Acme.Api.{name}"));
+    let symbols = [
+        format("Format"),
+        format("Format.Upper(string)"),
+        format("Format.Pad(string)"),
+        format("Format.Pad(string,int)"),
+        format("Format.Hidden()"),
+        format("Casing"),
+        format("Casing.Lower(string)"),
+        format("Money"),
+        format("Point"),
+        format("Point.Point(int)"),
+        format("Point.Twice()"),
+        format("Point.Double(int)"),
+        format("IClock"),
+        format("IClock.Now()"),
+        format("SystemClock"),
+        format("SystemClock.Now()"),
+        core("Text/Nested.cs", "Acme.Core.Outer.First"),
+        core("Text/Nested.cs", "Acme.Core.Outer.Inner.Second"),
+        core("Text/Nested.cs", "Acme.Core.Outer.Inner.Second.Make()"),
+        core("Contracts/Copies.cs", "Acme.Contracts.OrderDto"),
+        core("Contracts/Copies.cs", "Acme.Hosting.Shell"),
+        core("Contracts/Copies.cs", "Acme.Hosting.Shell.Stop()"),
+        store("Repository"),
+        store("Repository.Save(T)"),
+        store("Repository.Save(List<T>,int)"),
+        store("Repository.SaveAll(T[])"),
+        store("Repository.Flush()"),
+        service(""),
+        service(".OrderService()"),
+        service(".OrderService(string)"),
+        service(".Place(string,int)"),
+        service(".Place(string,int).Check"),
+        service(".Place(string)"),
+        service(".Audit()"),
+        service(".Validate(string)"),
+        service(".Notify(string)"),
+        service(".Notify(int)"),
+        service(".Default()"),
+        service(".Line"),
+        service(".Line.Add()"),
+        service(".Line.Count()"),
+        orders("Order.cs", "Order"),
+        orders("Order.cs", "Order.Total()"),
+        orders("Order.Lines.cs", "Order"),
+        orders("Order.Lines.cs", "Order.Sum()"),
+        orders("Order.Lines.cs", "Order.Create()"),
+        orders("Shipping.cs", "Carrier"),
+        orders("Shipping.cs", "Carrier.Carrier(string)"),
+        orders("Shipping.cs", "Carrier.Ship()"),
+        orders("Shipping.cs", "Carrier.Track()"),
+        orders("Shipping.cs", "Carrier.Rate()"),
+        orders("Shipping.cs", "Carrier.Purge()"),
+        orders("Carrier.Fees.cs", "Carrier"),
+        orders("Carrier.Fees.cs", "Carrier.Bill()"),
+        orders("Courier.cs", "Courier"),
+        orders("Courier.cs", "Courier.Courier()"),
+        orders("Courier.cs", "Courier.Ship()"),
+        api("Checkout.cs", "Acme.Api.Checkout"),
+        api("Checkout.cs", "Acme.Api.Checkout.Run()"),
+        api("Contracts.cs", "Acme.Contracts.OrderDto"),
+        api("Contracts.cs", "Acme.Hosting.Shell"),
+        api("Contracts.cs", "Acme.Hosting.Shell.Start()"),
+        api("Cli.cs", "Acme.Api.Cli"),
+        api("Cli.cs", "Acme.Api.Cli.Main(string[])"),
+        api("Cli.cs", "Acme.Api.Cli.Main(int)"),
+        api("Cli.cs", "Acme.Api.Cli.Start()"),
+        "src/Acme.Api/Top.cs::Main".to_string(),
+        "src/Acme.Api/Top.cs::Main.Shout".to_string(),
+        api("Opaque.cs", "Acme.Api.Home"),
+        api("Opaque.cs", "Acme.Api.Home.Index()"),
+        api("Opaque.cs", "Acme.Api.Board"),
+        api("Board.Show.cs", "Acme.Api.Board"),
+        api("Board.Show.cs", "Acme.Api.Board.Show()"),
+        api("Controllers.cs", "Acme.Api.OrdersController"),
+        api("Controllers.cs", "Acme.Api.OrdersController.List()"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Get(int)"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Create()"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Replace(int)"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Touch(int)"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Remove(int?)"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Probe()"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Allowed()"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Health()"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Status(int?)"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Anything()"),
+        api("Controllers.cs", "Acme.Api.OrdersController.Helper()"),
+        api("Controllers.cs", "Acme.Api.PingController"),
+        api("Controllers.cs", "Acme.Api.PingController.Pong()"),
+        api("Controllers.cs", "Acme.Api.UsersController"),
+        api("Controllers.cs", "Acme.Api.UsersController.List()"),
+        api("Controllers.cs", "Acme.Api.ApiBase"),
+        api("ControllerEdges.cs", "Acme.Api.Edges.JobsController"),
+        api(
+            "ControllerEdges.cs",
+            "Acme.Api.Edges.JobsController.ListAsync()",
+        ),
+        api(
+            "ControllerEdges.cs",
+            "Acme.Api.Edges.JobsController.FinishAsync()",
+        ),
+        api(
+            "ControllerEdges.cs",
+            "Acme.Api.Edges.JobsController.Skipped()",
+        ),
+        api(
+            "ControllerEdges.cs",
+            "Acme.Api.Edges.JobsController.Helper()",
+        ),
+        api(
+            "ControllerEdges.cs",
+            "Acme.Api.Edges.JobsController.Internal()",
+        ),
+        api("ControllerEdges.cs", "Acme.Api.Edges.PagesController"),
+        api(
+            "ControllerEdges.cs",
+            "Acme.Api.Edges.PagesController.Index()",
+        ),
+        api("ControllerEdges.cs", "Acme.Api.Edges.RootController"),
+        api(
+            "ControllerEdges.cs",
+            "Acme.Api.Edges.RootController.Index()",
+        ),
+        api("ControllerEdges.cs", "Acme.Api.Edges.CrudController"),
+        api("ControllerEdges.cs", "Acme.Api.Edges.CrudController.All()"),
+        api("ControllerEdges.cs", "Acme.Api.Edges.GadgetsController"),
+        api("ControllerEdges.cs", "Acme.Api.Edges.PartsController"),
+        api("ControllerEdges.Legacy.cs", "Acme.Api.Legacy.Route"),
+        api("ControllerEdges.Legacy.cs", "Acme.Api.Legacy.OldController"),
+        api(
+            "ControllerEdges.Legacy.cs",
+            "Acme.Api.Legacy.OldController.Old()",
+        ),
+        api("ControllerEdges.Parts.cs", "Acme.Api.Edges.PartsController"),
+        api(
+            "ControllerEdges.Parts.cs",
+            "Acme.Api.Edges.PartsController.Part()",
+        ),
+        api("Namespaces.cs", "Acme.Api.Outside"),
+        api("Namespaces.cs", "Acme.Api.Outside.Run()"),
+        api("Inside.cs", "Acme.Api.Inside"),
+        api("Inside.cs", "Acme.Api.Inside.Run()"),
+        orders("Routes.cs", "Routes"),
+        api("Channels.cs", "Acme.Api.Channels.Topics"),
+        api("Channels.cs", "Acme.Api.Channels.KafkaSales"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.KafkaSales.KafkaSales(IProducer<string,string>)",
+        ),
+        api("Channels.cs", "Acme.Api.Channels.KafkaSales.Created()"),
+        api("Channels.cs", "Acme.Api.Channels.KafkaSales.Paid()"),
+        api("Channels.cs", "Acme.Api.Channels.KafkaSales.Dynamic()"),
+        api("Channels.cs", "Acme.Api.Channels.KafkaFeed"),
+        api("Channels.cs", "Acme.Api.Channels.KafkaFeed.OnSale()"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.KafkaFeed.OnMissing(IConsumer<string,string>)",
+        ),
+        api("Channels.cs", "Acme.Api.Channels.RabbitInvoicing"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.RabbitInvoicing.RabbitInvoicing(IChannel)",
+        ),
+        api("Channels.cs", "Acme.Api.Channels.RabbitInvoicing.Invoice()"),
+        api("Channels.cs", "Acme.Api.Channels.RabbitInvoicing.Refund()"),
+        api("Channels.cs", "Acme.Api.Channels.RabbitInvoicing.Attend()"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.RabbitInvoicing.Attend().amqp refunds",
+        ),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.RabbitInvoicing.OnInvoice(object,BasicDeliverEventArgs)",
+        ),
+        api("Channels.cs", "Acme.Api.Channels.SqsShipments"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.SqsShipments.SqsShipments(IAmazonSQS)",
+        ),
+        api("Channels.cs", "Acme.Api.Channels.SqsShipments.Ship()"),
+        api("Channels.cs", "Acme.Api.Channels.SqsShipments.Poll()"),
+        api("Channels.cs", "Acme.Api.Channels.RedisAudits"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.RedisAudits.RedisAudits(IConnectionMultiplexer)",
+        ),
+        api("Channels.cs", "Acme.Api.Channels.RedisAudits.Record()"),
+        api("Channels.cs", "Acme.Api.Channels.RedisAudits.Drain()"),
+        api("Channels.cs", "Acme.Api.Channels.BusDispatch"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.BusDispatch.BusDispatch(ServiceBusClient)",
+        ),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)",
+        ),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)",
+        ),
+        api("Channels.cs", "Acme.Api.Channels.BusDispatch.Work()"),
+        api("Channels.cs", "Acme.Api.Channels.BusDispatch.Watch()"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.BusDispatch.Watch().servicebus dispatch.events",
+        ),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.BusDispatch.OnDispatch(ProcessMessageEventArgs)",
+        ),
+        api("Channels.Nats.cs", "Acme.Api.Channels.NatsDelivery"),
+        api(
+            "Channels.Nats.cs",
+            "Acme.Api.Channels.NatsDelivery.NatsDelivery(IConnection)",
+        ),
+        api(
+            "Channels.Nats.cs",
+            "Acme.Api.Channels.NatsDelivery.Track(byte[])",
+        ),
+        api("Channels.Nats.cs", "Acme.Api.Channels.NatsDelivery.Watch()"),
+        api(
+            "Channels.Nats.cs",
+            "Acme.Api.Channels.NatsDelivery.Watch().nats delivery.*.tracked",
+        ),
+        api("Channels.Nats.cs", "Acme.Api.Channels.NatsDelivery.Poll()"),
+        api("Channels.Writes.cs", "Acme.Api.Channels.BusRewritten"),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.BusRewritten(ServiceBusClient)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.BusRewritten(ServiceBusSender)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.Use(ServiceBusSender)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.Reset()",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.Constructed(ServiceBusMessage)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.Swapped(ServiceBusMessage)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.Replaced(ServiceBusMessage)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)",
+        ),
+        api("Channels.Writes.cs", "Acme.Api.Channels.BusWrapped"),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusWrapped.BusWrapped(ServiceBusClient)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusWrapped.Send(string,ServiceBusMessage)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusWrapped.Order(ServiceBusMessage)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusWrapped.Audit(ServiceBusMessage)",
+        ),
+        api("Channels.Writes.cs", "Acme.Api.Channels.BusWrapped.Work()"),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusWrapped.OnOrder(ProcessMessageEventArgs)",
+        ),
+        api("Channels.Writes.cs", "Acme.Api.Channels.RabbitFanOut"),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.RabbitFanOut.RabbitFanOut(ConnectionFactory)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.RabbitFanOut.Announce()",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.RabbitFanOut.Attend(IChannel)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.RabbitFanOut.OnFirst(object,BasicDeliverEventArgs)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.RabbitFanOut.OnSecond(object,BasicDeliverEventArgs)",
+        ),
+        api("Clients.cs", "Acme.Api.Clients.Hosts"),
+        api("Clients.cs", "Acme.Api.Clients.Verbs"),
+        api("Clients.cs", "Acme.Api.Clients.Verbs.Verbs(HttpClient)"),
+        api("Clients.cs", "Acme.Api.Clients.Verbs.Run(int)"),
+        api("Clients.cs", "Acme.Api.Clients.Based"),
+        api("Clients.cs", "Acme.Api.Clients.Based.Run()"),
+        api("Clients.cs", "Acme.Api.Clients.Folds"),
+        api("Clients.cs", "Acme.Api.Clients.Folds.Folds(HttpClient)"),
+        api("Clients.cs", "Acme.Api.Clients.Folds.Run(string)"),
+        api("Clients.cs", "Acme.Api.Clients.Wrappers"),
+        api(
+            "Clients.cs",
+            "Acme.Api.Clients.Wrappers.Wrappers(HttpClient)",
+        ),
+        api("Clients.cs", "Acme.Api.Clients.Wrappers.Fetch(string)"),
+        api("Clients.cs", "Acme.Api.Clients.Wrappers.ForOrder(string)"),
+        api("Clients.cs", "Acme.Api.Clients.Wrappers.Run(string)"),
+        api("Clients.cs", "Acme.Api.Clients.Unread"),
+        api(
+            "Clients.cs",
+            "Acme.Api.Clients.Unread.Unread(HttpClient,IHttpClientFactory)",
+        ),
+        api("Clients.cs", "Acme.Api.Clients.Unread.Lookup()"),
+        api("Clients.cs", "Acme.Api.Clients.Unread.Run()"),
+        api("Clients.cs", "Acme.Api.Clients.Reassigned"),
+        api(
+            "Clients.cs",
+            "Acme.Api.Clients.Reassigned.Reassigned(HttpClient)",
+        ),
+        api("Clients.cs", "Acme.Api.Clients.Reassigned.Prod()"),
+        api("Clients.cs", "Acme.Api.Clients.Reassigned.Stage()"),
+        api("Clients.cs", "Acme.Api.Clients.Reassigned.Run(bool)"),
+        api(
+            "Clients.cs",
+            "Acme.Api.Clients.Reassigned.Hidden(HttpClient)",
+        ),
+        api("Clients.cs", "Acme.Api.Clients.Reassigned.Use()"),
+        api("Clients.cs", "Acme.Api.Clients.Reassigned.Inner"),
+        api("Clients.cs", "Acme.Api.Clients.Reassigned.Inner.Run()"),
+        api("Clients.cs", "Acme.Api.Clients.Reads"),
+        api(
+            "Clients.cs",
+            "Acme.Api.Clients.Reads.Reads(HttpClient,IHttpClientFactory)",
+        ),
+        api("Clients.cs", "Acme.Api.Clients.Reads.Config()"),
+        api("Clients.cs", "Acme.Api.Clients.Reads.Run(int)"),
+        api("Clients.cs", "Acme.Api.Clients.Settings"),
+        api(
+            "Clients.cs",
+            "Acme.Api.Clients.Settings.Settings(HttpClient,IConfiguration)",
+        ),
+        api("Clients.cs", "Acme.Api.Clients.Settings.Run()"),
+        api("Clients.cs", "Acme.Api.Clients.Repo"),
+        api("Clients.cs", "Acme.Api.Clients.Repo.GetAsync(string)"),
+        api("Typed.cs", "Acme.Api.Typed.CatalogClient"),
+        api(
+            "Typed.cs",
+            "Acme.Api.Typed.CatalogClient.CatalogClient(HttpClient)",
+        ),
+        api("Typed.cs", "Acme.Api.Typed.CatalogClient.Products()"),
+        api("Typed.cs", "Acme.Api.Typed.CatalogClient.Product(int)"),
+        api("Typed.cs", "Acme.Api.Typed.StockClient"),
+        api(
+            "Typed.cs",
+            "Acme.Api.Typed.StockClient.StockClient(HttpClient)",
+        ),
+        api("Typed.cs", "Acme.Api.Typed.StockClient.Level()"),
+        api("Typed.cs", "Acme.Api.Typed.TwiceClient"),
+        api(
+            "Typed.cs",
+            "Acme.Api.Typed.TwiceClient.TwiceClient(HttpClient)",
+        ),
+        api("Typed.cs", "Acme.Api.Typed.TwiceClient.Run()"),
+        api("Typed.cs", "Acme.Api.Typed.BuiltClient"),
+        api(
+            "Typed.cs",
+            "Acme.Api.Typed.BuiltClient.BuiltClient(HttpClient)",
+        ),
+        api("Typed.cs", "Acme.Api.Typed.BuiltClient.Run()"),
+        api("Typed.cs", "Acme.Api.Typed.Registrations"),
+        api("Typed.cs", "Acme.Api.Typed.Registrations.Build()"),
+        api(
+            "Typed.cs",
+            "Acme.Api.Typed.Registrations.AddClients(IServiceCollection)",
+        ),
+        api("Remote.cs", "Acme.Api.Remote.IInventoryApi"),
+        api("Remote.cs", "Acme.Api.Remote.IInventoryApi.Item(string)"),
+        api("Remote.cs", "Acme.Api.Remote.IInventoryApi.Add(string)"),
+        api("Remote.cs", "Acme.Api.Remote.IInventoryApi.Delete(string)"),
+        api("Remote.cs", "Acme.Api.Remote.IReportsApi"),
+        api("Remote.cs", "Acme.Api.Remote.IReportsApi.All()"),
+        api("Remote.cs", "Acme.Api.Remote.Inventory"),
+        api("Remote.cs", "Acme.Api.Remote.Inventory.Find(string)"),
+        api(
+            "Remote.cs",
+            "Acme.Api.Remote.Inventory.AddReports(IServiceCollection)",
+        ),
+        shadows("Shadows"),
+        shadows("Shadows.Parameter(object)"),
+        shadows("Shadows.Local()"),
+        shadows("Shadows.Lambda()"),
+        shadows("Shadows.Loop(object[])"),
+        shadows("Shadows.Caught()"),
+        shadows("Shadows.Out()"),
+        shadows("Shadows.Pattern(object)"),
+        shadows("Shadows.Parse(object)"),
+        shadows("FieldShadow"),
+        shadows("FieldShadow.Run()"),
+        shadows("ReadonlyShadow"),
+        shadows("ReadonlyShadow.ReadonlyShadow(object)"),
+        shadows("ReadonlyShadow.Run()"),
+        "legacy/Old.cs::Legacy.Old".to_string(),
+        "legacy/Old.cs::Legacy.Old.Run()".to_string(),
+    ]
+    .into_iter()
+    .chain(billing_symbols())
+    .chain(web_symbols())
+    .collect::<Vec<_>>();
+    let place = |callee: &str| format!("{}::{callee}", service(".Place(string,int)"));
+    let run = |callee: &str| {
+        format!(
+            "{}::{callee}",
+            api("Checkout.cs", "Acme.Api.Checkout.Run()")
+        )
+    };
+    let upper = format("Format.Upper(string)");
+    let lower = format("Casing.Lower(string)");
+    let mut calls: Vec<(String, Option<&str>, Vec<String>)> = vec![
+        // Unqualified calls, `this.`, local functions and lambdas in the type.
+        (
+            place("Check#0"),
+            EXACT,
+            vec![service(".Place(string,int).Check")],
+        ),
+        (
+            place("Validate#0"),
+            EXACT,
+            vec![service(".Validate(string)")],
+        ),
+        (place("this.Audit#0"), EXACT, vec![service(".Audit()")]),
+        (place("Audit#0"), EXACT, vec![service(".Audit()")]),
+        (place("Place#0"), EXACT, vec![service(".Place(string)")]),
+        (
+            place("Notify#0"),
+            AMBIGUOUS,
+            vec![service(".Notify(int)"), service(".Notify(string)")],
+        ),
+        // The project's global usings: a namespace, a static class and an alias.
+        (place("Lower#0"), EXACT, vec![lower.clone()]),
+        (place("Fmt.Upper#0"), EXACT, vec![upper.clone()]),
+        (
+            place("Format.Pad#0"),
+            EXACT,
+            vec![format("Format.Pad(string,int)")],
+        ),
+        (
+            place("Format.Pad#1"),
+            EXACT,
+            vec![format("Format.Pad(string)")],
+        ),
+        // A partial type: each part is its own definition, its members are all one type's, and
+        // constructing it with no constructor names its first part.
+        (
+            place("Order.Create#0"),
+            EXACT,
+            vec![orders("Order.Lines.cs", "Order.Create()")],
+        ),
+        (
+            place("Order#0"),
+            EXACT,
+            vec![orders("Order.Lines.cs", "Order")],
+        ),
+        (
+            format!("{}::Order#0", orders("Order.Lines.cs", "Order.Create()")),
+            EXACT,
+            vec![orders("Order.Lines.cs", "Order")],
+        ),
+        (
+            format!("{}::Sum#0", orders("Order.cs", "Order.Total()")),
+            EXACT,
+            vec![orders("Order.Lines.cs", "Order.Sum()")],
+        ),
+        // Constructors, `: this(..)` and `: base(..)`; written bases and `base.`.
+        (
+            format!("{}::OrderService#0", service(".OrderService()")),
+            EXACT,
+            vec![service(".OrderService(string)")],
+        ),
+        (
+            format!("{}::OrderService#0", service(".Default()")),
+            EXACT,
+            vec![service(".OrderService()")],
+        ),
+        (
+            format!("{}::Count#0", service(".Line.Add()")),
+            EXACT,
+            vec![service(".Line.Count()")],
+        ),
+        // A base that is a partial type: every part's members are inherited.
+        (
+            format!("{}::Carrier#0", orders("Courier.cs", "Courier.Courier()")),
+            EXACT,
+            vec![orders("Shipping.cs", "Carrier.Carrier(string)")],
+        ),
+        (
+            format!("{}::base.Ship#0", orders("Courier.cs", "Courier.Ship()")),
+            EXACT,
+            vec![orders("Shipping.cs", "Carrier.Ship()")],
+        ),
+        (
+            format!("{}::Track#0", orders("Courier.cs", "Courier.Ship()")),
+            EXACT,
+            vec![orders("Shipping.cs", "Carrier.Track()")],
+        ),
+        (
+            format!("{}::Bill#0", orders("Courier.cs", "Courier.Ship()")),
+            EXACT,
+            vec![orders("Carrier.Fees.cs", "Carrier.Bill()")],
+        ),
+        // An explicit interface implementation's calls are its type's.
+        (
+            format!("{}::Now#0", format("SystemClock")),
+            EXACT,
+            vec![format("SystemClock.Now()")],
+        ),
+        (
+            format!("{}::Double#0", format("Point.Twice()")),
+            EXACT,
+            vec![format("Point.Double(int)")],
+        ),
+        // An attribute is a call on what it decorates, written in the scope around it.
+        (
+            format!("{CORE}/Orders/Shipping.cs::Acme.Core.Orders::Serializable#0"),
+            None,
+            vec![],
+        ),
+        (
+            format!("{}::Obsolete#0", orders("Shipping.cs", "Carrier")),
+            None,
+            vec![],
+        ),
+        // Overloads narrowed by argument count, `params` taking any.
+        (
+            format!("{}::Save#0", store("Repository.SaveAll(T[])")),
+            EXACT,
+            vec![store("Repository.Save(T)")],
+        ),
+        (
+            format!("{}::SaveAll#0", store("Repository.Flush()")),
+            EXACT,
+            vec![store("Repository.SaveAll(T[])")],
+        ),
+        (
+            format!("{}::SaveAll#1", store("Repository.Flush()")),
+            EXACT,
+            vec![store("Repository.SaveAll(T[])")],
+        ),
+        // Another project: `using`, `using static`, aliases, a fully qualified name and the
+        // project file's `<Using>`.
+        (
+            format!(
+                "{}::OrderService#0",
+                api("Checkout.cs", "Acme.Api.Checkout")
+            ),
+            EXACT,
+            vec![service(".OrderService(string)")],
+        ),
+        (run("Upper#0"), EXACT, vec![upper.clone()]),
+        (run("Text.Format.Upper#0"), EXACT, vec![upper.clone()]),
+        (run("Svc.Default#0"), EXACT, vec![service(".Default()")]),
+        (
+            run("Acme.Core.Text.Casing.Lower#0"),
+            EXACT,
+            vec![lower.clone()],
+        ),
+        (
+            run("OrderService.Default#0"),
+            EXACT,
+            vec![service(".Default()")],
+        ),
+        (
+            run("Create#0"),
+            EXACT,
+            vec![orders("Order.Lines.cs", "Order.Create()")],
+        ),
+        // A type Acme.Core also declares under its name is Acme.Api's own from Acme.Api: the
+        // compiler prefers the project's type to a reference's.
+        (
+            run("OrderDto#0"),
+            EXACT,
+            vec![api("Contracts.cs", "Acme.Contracts.OrderDto")],
+        ),
+        (
+            run("Shell#0"),
+            EXACT,
+            vec![api("Contracts.cs", "Acme.Hosting.Shell")],
+        ),
+        // Opaque outside: a base from outside the repository, written on the type or on another
+        // of its parts, may declare the name, so what the file binds is a name match at most.
+        (
+            format!("{}::Upper#0", api("Opaque.cs", "Acme.Api.Home.Index()")),
+            INFERRED,
+            vec![upper.clone()],
+        ),
+        (
+            format!("{}::Upper#0", api("Board.Show.cs", "Acme.Api.Board.Show()")),
+            INFERRED,
+            vec![upper.clone()],
+        ),
+        // A type of a second namespace in a file binds under that namespace alone.
+        (
+            format!(
+                "{}::Second.Make#0",
+                api("Namespaces.cs", "Acme.Api.Outside.Run()")
+            ),
+            None,
+            vec![],
+        ),
+        (
+            format!(
+                "{}::Second.Make#0",
+                api("Inside.cs", "Acme.Api.Inside.Run()")
+            ),
+            EXACT,
+            vec![core(
+                "Text/Nested.cs",
+                "Acme.Core.Outer.Inner.Second.Make()",
+            )],
+        ),
+        // Acme.Core's global usings stop at its project: a bare call no family declares and a
+        // type name nothing binds resolve to nothing.
+        (run("Lower#0"), None, vec![]),
+        // The top-level statements of a file are the calls of its `Main`.
+        (
+            "src/Acme.Api/Top.cs::Main::Shout#1".to_string(),
+            EXACT,
+            vec!["src/Acme.Api/Top.cs::Main.Shout".to_string()],
+        ),
+        (
+            "src/Acme.Api/Top.cs::Main::Shout#0".to_string(),
+            EXACT,
+            vec!["src/Acme.Api/Top.cs::Main.Shout".to_string()],
+        ),
+        // The project's `<Using>` binds a type for the top-level statements too.
+        (
+            "src/Acme.Api/Top.cs::Main::Order.Create#0".to_string(),
+            EXACT,
+            vec![orders("Order.Lines.cs", "Order.Create()")],
+        ),
+        (run("Fmt.Upper#0"), None, vec![]),
+        // A caller of a Refit interface's method reaches it through the field's declared type.
+        (
+            api(
+                "Remote.cs",
+                "Acme.Api.Remote.Inventory.Find(string)::_api.Item#0",
+            ),
+            EXACT,
+            vec![api(
+                "Remote.cs",
+                "Acme.Api.Remote.IInventoryApi.Item(string)",
+            )],
+        ),
+        // A project file that is not SDK-style adds nothing.
+        (
+            "legacy/Old.cs::Legacy.Old.Run()::Upper#0".to_string(),
+            None,
+            vec![],
+        ),
+    ];
+    // Every binding form hides the type `Format` in its scope.
+    for scope in [
+        "Shadows.Parameter(object)",
+        "Shadows.Local()",
+        "Shadows.Lambda()",
+        "Shadows.Loop(object[])",
+        "Shadows.Caught()",
+        "Shadows.Out()",
+        "Shadows.Pattern(object)",
+        "FieldShadow.Run()",
+        "ReadonlyShadow.Run()",
+    ] {
+        let id = format!("{}::Format.Upper#0", shadows(scope));
+        calls.push((id, INFERRED, vec![upper.clone()]));
+    }
+    calls.extend(billing_calls());
+    calls.extend(web_calls());
+    let symbols: Vec<&str> = symbols.iter().map(String::as_str).collect();
+    let targets: Vec<Vec<&str>> = (calls.iter())
+        .map(|(_, _, t)| t.iter().map(String::as_str).collect())
+        .collect();
+    let calls: Vec<ExpectedCall> = (calls.iter().zip(&targets))
+        .map(|((id, level, _), targets)| (id.as_str(), *level, targets.as_slice()))
+        .collect();
+    conform(
+        "conformance-csharp",
+        &symbols,
+        &[
+            "src/Acme.Api/Cli.cs::Acme.Api.Cli.Main(string[])",
+            "src/Acme.Api/Top.cs::Main",
+            "src/Acme.Web/Program.cs::Main",
+        ],
+        &calls,
+    );
+}
+
+/// ASP.NET Core controllers are providers (spec #28, #109): `[controller]` and `[action]` are
+/// replaced, `{id:int}` and `{id?}` are parameters, a rooted template replaces the class prefix,
+/// a method `[Route]` without a method attribute serves every method, and a controller of a
+/// repository base class is not read.
+#[test]
+fn csharp_controllers_are_providers_with_their_full_paths() {
+    let (_, actual) = providers(
+        "csharp_controllers",
+        "conformance-csharp",
+        "src/Acme.Api/Controller",
+    );
+    let at = |method: &str| format!("src/Acme.Api/Controllers.cs::Acme.Api.{method}");
+    let routes = [
+        ("GET", "/api/Orders", "OrdersController.List()"),
+        ("GET", "/api/Orders/{}", "OrdersController.Get(int)"),
+        ("POST", "/api/Orders", "OrdersController.Create()"),
+        ("PUT", "/api/Orders/{}", "OrdersController.Replace(int)"),
+        (
+            "PATCH",
+            "/api/Orders/{}/Touch",
+            "OrdersController.Touch(int)",
+        ),
+        ("DELETE", "/api/Orders/{}", "OrdersController.Remove(int?)"),
+        ("HEAD", "/api/Orders", "OrdersController.Probe()"),
+        ("OPTIONS", "/api/Orders", "OrdersController.Allowed()"),
+        ("GET", "/health", "OrdersController.Health()"),
+        ("GET", "/status/{}", "OrdersController.Status(int?)"),
+        (
+            "ANY",
+            "/api/Orders/any/Anything",
+            "OrdersController.Anything()",
+        ),
+        ("GET", "/ping", "PingController.Pong()"),
+    ];
+    // What the controllers of `ControllerEdges.cs` serve: the rest of them is left out.
+    let edges = [
+        (
+            "GET",
+            "/edges/Jobs/List",
+            "Edges.JobsController.ListAsync()",
+        ),
+        (
+            "GET",
+            "/edges/Jobs/done",
+            "Edges.JobsController.FinishAsync()",
+        ),
+        ("GET", "/", "Edges.RootController.Index()"),
+    ];
+    let edge = |method: &str| format!("src/Acme.Api/ControllerEdges.cs::Acme.Api.{method}");
+    let contracts: Vec<(String, String)> = (routes.iter())
+        .map(|(m, path, method)| (format!("http::{m}::{path}"), at(method)))
+        .chain((edges.iter()).map(|(m, path, method)| (format!("http::{m}::{path}"), edge(method))))
+        .collect();
+    let expected: Vec<(&str, &str)> = contracts
+        .iter()
+        .map(|(c, s)| (c.as_str(), s.as_str()))
+        .collect();
+    assert_eq!(actual, pairs(&expected));
+}
+
+const WEB: &str = "src/Acme.Web";
+
+/// A definition of the minimal API's routes (`Routes/<file>`, namespace `Acme.Web.Routes`).
+fn web(file: &str, name: &str) -> String {
+    format!("{WEB}/Routes/{file}::Acme.Web.Routes.{name}")
+}
+
+/// The symbols of the minimal API project: the route handlers a kind claims are named for
+/// their route (the first one, when a handler serves several).
+fn web_symbols() -> Vec<String> {
+    let mut symbols: Vec<String> = ["Main", "Main.GET /health"]
+        .iter()
+        .map(|s| format!("{WEB}/Program.cs::{s}"))
+        .collect();
+    let routes = [
+        ("Admin.cs", "Admin"),
+        ("Admin.cs", "Admin.Map(RouteGroupBuilder)"),
+        ("Admin.cs", "Reports"),
+        ("Admin.cs", "Reports.Group(WebApplication)"),
+        ("Handlers.cs", "Handlers"),
+        ("Handlers.cs", "Handlers.Ban(int)"),
+        ("Handlers.cs", "Handlers.Daily()"),
+        ("Handlers.cs", "Handlers.Echo(string)"),
+        ("Handlers.cs", "Handlers.Find(int)"),
+        ("Handlers.cs", "Handlers.Sync()"),
+        ("Handlers.cs", "Store"),
+        ("Handlers.cs", "Store.All()"),
+        ("Handlers.cs", "Store.Remove(int)"),
+        ("Handlers.cs", "Shelf"),
+        ("Handlers.cs", "Shelf.Stock()"),
+        ("Handlers.cs", "Crate"),
+        ("Handlers.cs", "Crate.Stock()"),
+        ("OrderRoutes.cs", "OrderRoutes"),
+        ("OrderRoutes.cs", "OrderRoutes.MapOrders(RouteGroupBuilder)"),
+        (
+            "OrderRoutes.cs",
+            "OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders",
+        ),
+        (
+            "OrderRoutes.cs",
+            "OrderRoutes.MapOrders(RouteGroupBuilder).DELETE /api/v1/orders/{}",
+        ),
+        ("OrderRoutes.cs", "OrderRoutes.Nest(RouteGroupBuilder)"),
+        (
+            "OrderRoutes.cs",
+            "OrderRoutes.Nest(RouteGroupBuilder).GET /loop/leaf",
+        ),
+    ];
+    symbols.extend(routes.iter().map(|(f, n)| web(f, n)));
+    symbols
+}
+
+/// The calls of the minimal API project: an extension method called on a group is a name
+/// match, a lambda's parameter hides a local of its name only inside the lambda, and the
+/// application an outside call made reaches no method of the repository.
+fn web_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
+    let main = |callee: &str| format!("{WEB}/Program.cs::Main::{callee}");
+    let orders = web("OrderRoutes.cs", "OrderRoutes.MapOrders(RouteGroupBuilder)");
+    let stock = |class: &str| web("Handlers.cs", &format!("{class}.Stock()"));
+    vec![
+        (
+            main("(invocation_expression).MapOrders#0"),
+            INFERRED,
+            vec![orders.clone()],
+        ),
+        (
+            main("(invocation_expression).MapOrders#1"),
+            INFERRED,
+            vec![orders],
+        ),
+        (
+            main("Admin.Map#0"),
+            EXACT,
+            vec![web("Admin.cs", "Admin.Map(RouteGroupBuilder)")],
+        ),
+        (main("shelf.Stock#0"), EXACT, vec![stock("Shelf")]),
+        // A local an outside call made is from outside: only an extension method answers it.
+        (main("app.Run#0"), None, vec![]),
+        (main("stocked.Stock#0"), None, vec![]),
+        (
+            main("shelf.Stock#1"),
+            AMBIGUOUS,
+            vec![stock("Crate"), stock("Shelf")],
+        ),
+    ]
+}
+
+/// Minimal APIs are providers (spec #28, #110): routes on the application and on nested
+/// groups, through locals, chains, a method argument, a return value and an extension method
+/// called on two groups (one provider per prefix), a group mounted inside itself, `MapMethods`
+/// and both handler forms; a builder in a lambda's parameter serves nothing.
+#[test]
+fn csharp_minimal_apis_are_providers_with_their_full_paths() {
+    let (_, actual) = providers("csharp_minimal", "conformance-csharp", WEB);
+    // The project files beside the routes provide packages, not routes.
+    let actual: Vec<_> = (actual.into_iter())
+        .filter(|(contract, _)| contract.starts_with("http::"))
+        .collect();
+    let handler = |name: &str| web("Handlers.cs", &format!("Handlers.{name}"));
+    let orders = |name: &str| web("OrderRoutes.cs", name);
+    let all = orders("OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders");
+    let remove = orders("OrderRoutes.MapOrders(RouteGroupBuilder).DELETE /api/v1/orders/{}");
+    let leaf = orders("OrderRoutes.Nest(RouteGroupBuilder).GET /loop/leaf");
+    let routes = [
+        (
+            "GET",
+            "/health",
+            format!("{WEB}/Program.cs::Main.GET /health"),
+        ),
+        ("POST", "/echo", handler("Echo(string)")),
+        ("PUT", "/sync", handler("Sync()")),
+        ("PATCH", "/sync", handler("Sync()")),
+        ("GET", "/api/v1/orders", all.clone()),
+        ("GET", "/api/v2/orders", all),
+        ("GET", "/api/v1/orders/{}", handler("Find(int)")),
+        ("GET", "/api/v2/orders/{}", handler("Find(int)")),
+        ("DELETE", "/api/v1/orders/{}", remove.clone()),
+        ("DELETE", "/api/v2/orders/{}", remove),
+        ("DELETE", "/api/admin/users/{}", handler("Ban(int)")),
+        ("GET", "/reports/daily", handler("Daily()")),
+        ("GET", "/loop/leaf", leaf.clone()),
+        ("GET", "/loop/again/leaf", leaf),
+    ];
+    let contracts: Vec<(String, String)> = (routes.iter())
+        .map(|(m, path, site)| (format!("http::{m}::{path}"), site.clone()))
+        .collect();
+    let expected: Vec<(&str, &str)> = (contracts.iter())
+        .map(|(c, s)| (c.as_str(), s.as_str()))
+        .collect();
+    assert_eq!(actual, pairs(&expected));
+}
+
+/// Each C# channel client links its producer to its handler (spec #28, #115): Kafka topics from
+/// constants and an array, a RabbitMQ publish to the default exchange (`string.Empty`) and to a
+/// named exchange routed by a binding (`inferred`), the handler a consumer's `+=` attached (a
+/// method and a lambda), an SQS queue named by the end of its URL, a NATS wildcard subject
+/// (`inferred`), a Redis stream, a Service Bus queue and a topic (two processors on it, whatever
+/// their subscriptions), and the names that cannot be evaluated left unresolved.
+#[test]
+fn csharp_channel_clients_link_their_producers_to_their_handlers() {
+    let repo = fixture_repo("csharp_channels", "conformance-csharp", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let short = |site: &str| {
+        let site = site.rsplit("src/Acme.Api/").next().unwrap_or(site);
+        site.split_once("::Acme.Api.Channels.")
+            .map_or(site, |(_, s)| s)
+            .to_string()
+    };
+    let links: Vec<String> = (json["links"].as_array().unwrap().iter())
+        .filter(|l| l["contract"].as_str().unwrap().starts_with("channel::"))
+        .map(|l| {
+            let (level, contract) = (
+                l["level"].as_str().unwrap(),
+                l["contract"].as_str().unwrap(),
+            );
+            let (provider, consumer) = (
+                l["provider"].as_str().unwrap(),
+                l["consumer"].as_str().unwrap(),
+            );
+            format!(
+                "{level} {contract} {} -> {}",
+                short(provider),
+                short(consumer)
+            )
+        })
+        .collect();
+    for wanted in [
+        "exact channel::kafka::orders.created KafkaSales.Created()::_producer.Produce#0 -> KafkaFeed.OnSale()",
+        "exact channel::kafka::orders.paid KafkaSales.Paid()::_producer.ProduceAsync#0 -> KafkaFeed.OnSale()",
+        "inferred channel::amqp::invoices RabbitInvoicing.Invoice()::_channel.BasicPublishAsync#0 -> RabbitInvoicing.OnInvoice(object,BasicDeliverEventArgs)",
+        "exact channel::amqp::refunds RabbitInvoicing.Refund()::_channel.BasicPublishAsync#0 -> RabbitInvoicing.Attend().amqp refunds",
+        "exact channel::sqs::shipments SqsShipments.Ship()::_sqs.SendMessageAsync#0 -> SqsShipments.Poll()",
+        "inferred channel::nats::delivery.*.tracked NatsDelivery.Track(byte[])::_connection.Publish#0 -> NatsDelivery.Watch().nats delivery.*.tracked",
+        "exact channel::redis::audits RedisAudits.Record()::db.StreamAddAsync#0 -> RedisAudits.Drain()",
+        "exact channel::servicebus::dispatch BusDispatch.Send(ServiceBusMessage)::sender.SendMessageAsync#0 -> BusDispatch.OnDispatch(ProcessMessageEventArgs)",
+        "exact channel::servicebus::dispatch.events BusDispatch.Send(ServiceBusMessage)::(invocation_expression).SendMessageAsync#0 -> BusDispatch.OnDispatch(ProcessMessageEventArgs)",
+        "exact channel::servicebus::dispatch.events BusDispatch.Send(ServiceBusMessage)::(invocation_expression).SendMessageAsync#0 -> BusDispatch.Watch().servicebus dispatch.events",
+        // A sender made for a parameter is named by the callers of the method that makes it.
+        "exact channel::servicebus::wrapped.orders BusWrapped.Order(ServiceBusMessage)::Send#0 -> BusWrapped.OnOrder(ProcessMessageEventArgs)",
+        // `String.Empty` is the default exchange, and each handler of the event is a consumer.
+        "exact channel::amqp::fanout RabbitFanOut.Announce()::channel.BasicPublishAsync#0 -> RabbitFanOut.OnFirst(object,BasicDeliverEventArgs)",
+        "exact channel::amqp::fanout RabbitFanOut.Announce()::channel.BasicPublishAsync#0 -> RabbitFanOut.OnSecond(object,BasicDeliverEventArgs)",
+    ] {
+        assert!(
+            links.contains(&wanted.to_string()),
+            "{wanted} in {links:#?}"
+        );
+    }
+    assert_eq!(links.len(), 13, "{links:#?}");
+    // A name read from the environment is unresolved on both sides, and so is a sender made for
+    // one; a subject no publish names has no producer to link to.
+    let unresolved = |side: &str, kind: &str| -> Vec<String> {
+        let mut sites: Vec<String> = (json[side].as_array().unwrap().iter())
+            .filter(|s| s["contract"] == kind)
+            .map(|s| short(s["site"].as_str().unwrap()))
+            .collect();
+        sites.sort();
+        sites
+    };
+    assert_eq!(
+        unresolved("providers", "channel::kafka"),
+        ["KafkaSales.Dynamic()::_producer.Produce#0"]
+    );
+    assert_eq!(
+        unresolved("consumers", "channel::kafka"),
+        ["KafkaFeed.OnMissing(IConsumer<string,string>)"]
+    );
+    // A sender written more than once is unknown, never the one write that makes it: one made
+    // by a constructor and handed in by another, replaced by a setter, written by its initializer
+    // and again, and a local made twice (both sends).
+    assert_eq!(
+        unresolved("providers", "channel::servicebus"),
+        [
+            "BusDispatch.Dynamic(ServiceBusMessage)::sender.SendMessageAsync#0",
+            "BusRewritten.Constructed(ServiceBusMessage)::_constructed.SendMessageAsync#0",
+            "BusRewritten.Replaced(ServiceBusMessage)::_replaced.SendMessageAsync#0",
+            "BusRewritten.Swapped(ServiceBusMessage)::_swapped.SendMessageAsync#0",
+            "BusRewritten.Twice(ServiceBusMessage)::outbox.SendMessageAsync#0",
+            "BusRewritten.Twice(ServiceBusMessage)::outbox.SendMessageAsync#1",
+        ]
+    );
+    assert_eq!(
+        unresolved("consumers", "channel::nats::delivery.polled"),
+        ["NatsDelivery.Poll()"]
+    );
+}
+
+/// HttpClient calls are consumers (spec #28, #111): every method, `SendAsync` with a request, a
+/// `BaseAddress` from an initializer, a constant and an assignment, strings folded across
+/// interpolation, `+`, verbatim text and constants of other types, and a wrapper read at each call
+/// site. A call whose URL cannot be evaluated is unresolved, and a named client is not read.
+#[test]
+fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
+    let repo = fixture_repo("csharp_http_consumers", "conformance-csharp", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let at = |function: &str, call: &str| {
+        format!("src/Acme.Api/Clients.cs::Acme.Api.Clients.{function}::{call}")
+    };
+    // Each method with its verb, base address, folded URL, wrapper, and the names that hold no
+    // one value (`Reassigned`), read once through `Reads`.
+    let expected = triples(&[
+        // Based.Run()
+        (
+            "http::GET::/api/items",
+            "host:shared.example.com",
+            &at("Based.Run()", "Shared.GetAsync#0"),
+        ),
+        (
+            "http::GET::/root",
+            "host:shared.example.com",
+            &at("Based.Run()", "Shared.GetAsync#1"),
+        ),
+        (
+            "http::GET::/billing",
+            "host:billing.example.com",
+            &at("Based.Run()", "field.GetAsync#0"),
+        ),
+        (
+            "http::GET::/orders/1",
+            "host:local.example.com",
+            &at("Based.Run()", "local.GetStringAsync#0"),
+        ),
+        (
+            "http::GET::/v1/orders/2",
+            "host:slash.example.com",
+            &at("Based.Run()", "slash.GetStringAsync#0"),
+        ),
+        // Folds.Run(string)
+        (
+            "http::GET::/invoices/{}",
+            "host:billing.example.com",
+            &at("Folds.Run(string)", "http.GetAsync#0"),
+        ),
+        (
+            "http::GET::/api/invoices",
+            "host:billing.example.com",
+            &at("Folds.Run(string)", "http.GetAsync#1"),
+        ),
+        (
+            "http::GET::/items/stock",
+            "host:orders.example.com",
+            &at("Folds.Run(string)", "http.GetAsync#2"),
+        ),
+        (
+            "http::GET::/plus/{}",
+            "host:local.example.com",
+            &at("Folds.Run(string)", "http.GetAsync#3"),
+        ),
+        (
+            "http::GET::/a",
+            "host:verbatim.example.com",
+            &at("Folds.Run(string)", "http.GetAsync#4"),
+        ),
+        (
+            "http::GET::/{}/b",
+            "host:verbatim.example.com",
+            &at("Folds.Run(string)", "http.GetAsync#5"),
+        ),
+        (
+            "http::GET::/{}/{}",
+            "host:format.example.com",
+            &at("Folds.Run(string)", "http.GetAsync#6"),
+        ),
+        // Reads.Run(int)
+        (
+            "http::GET::/property",
+            "host:property.example.com",
+            &at("Reads.Run(int)", "Client.GetAsync#0"),
+        ),
+        (
+            "http::GET::/u/{}",
+            "host:locals.example.com",
+            &at("Reads.Run(int)", "http.GetAsync#0"),
+        ),
+        (
+            "http::GET::/s",
+            "host:locals.example.com",
+            &at("Reads.Run(int)", "http.GetAsync#1"),
+        ),
+        (
+            "http::GET::/c",
+            "host:locals.example.com",
+            &at("Reads.Run(int)", "http.GetAsync#2"),
+        ),
+        (
+            "http::GET::/n",
+            "host:null.example.com",
+            &at("Reads.Run(int)", "http.GetAsync#3"),
+        ),
+        (
+            "http::PUT::/m",
+            "host:method.example.com",
+            &at("Reads.Run(int)", "http.SendAsync#0"),
+        ),
+        (
+            "http::GET::/q",
+            "host:qualified.example.com",
+            &at("Reads.Run(int)", "qualified.GetAsync#0"),
+        ),
+        (
+            "http::GET::/rooted",
+            "",
+            &at("Reads.Run(int)", "unknown.GetAsync#0"),
+        ),
+        // Reassigned.Inner.Run()
+        (
+            "http::GET::/inner",
+            "",
+            &at("Reassigned.Inner.Run()", "shadow.GetAsync#0"),
+        ),
+        // Reassigned.Run(bool)
+        (
+            "http::GET::/branch",
+            "",
+            &at("Reassigned.Run(bool)", "branch.GetAsync#0"),
+        ),
+        (
+            "http::GET::/client",
+            "",
+            &at("Reassigned.Run(bool)", "c.GetAsync#0"),
+        ),
+        (
+            "unresolved",
+            "",
+            &at("Reassigned.Run(bool)", "http.GetAsync#0"),
+        ),
+        (
+            "unresolved",
+            "",
+            &at("Reassigned.Run(bool)", "http.SendAsync#0"),
+        ),
+        (
+            "http::GET::/swapped",
+            "",
+            &at("Reassigned.Run(bool)", "swapped.GetAsync#0"),
+        ),
+        (
+            "http::GET::/twice",
+            "",
+            &at("Reassigned.Run(bool)", "twice.GetAsync#0"),
+        ),
+        // Reassigned.Use()
+        (
+            "http::GET::/hidden",
+            "host:arg.example.com",
+            &at("Reassigned.Use()", "Hidden#0"),
+        ),
+        // Settings.Run(): an environment variable, and a key of appsettings.json as its variable
+        // (its literal host is served by no provider of the workspace, so only that reading
+        // stays).
+        (
+            "http::GET::/api/invoices",
+            "env:BILLING_URL",
+            &at("Settings.Run()", "http.GetAsync#0"),
+        ),
+        (
+            "http::GET::/levels",
+            "env:Services__Stock",
+            &at("Settings.Run()", "http.GetAsync#1"),
+        ),
+        // Unread.Run()
+        ("unresolved", "", &at("Unread.Run()", "http.GetAsync#0")),
+        // Verbs.Run(int)
+        (
+            "http::DELETE::/orders/3",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.DeleteAsync#0"),
+        ),
+        (
+            "http::GET::/orders",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.GetAsync#0"),
+        ),
+        (
+            "http::GET::/bytes",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.GetByteArrayAsync#0"),
+        ),
+        (
+            "http::GET::/json",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.GetFromJsonAsync#0"),
+        ),
+        (
+            "http::GET::/stream",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.GetStreamAsync#0"),
+        ),
+        (
+            "http::GET::/text",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.GetStringAsync#0"),
+        ),
+        (
+            "http::PATCH::/orders/2",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.PatchAsync#0"),
+        ),
+        (
+            "http::POST::/json",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.PostAsJsonAsync#0"),
+        ),
+        (
+            "http::POST::/orders",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.PostAsync#0"),
+        ),
+        (
+            "http::PUT::/json/1",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.PutAsJsonAsync#0"),
+        ),
+        (
+            "http::PUT::/orders/1",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.PutAsync#0"),
+        ),
+        (
+            "http::DELETE::/send",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.SendAsync#0"),
+        ),
+        (
+            "http::POST::/uri",
+            "host:orders.example.com",
+            &at("Verbs.Run(int)", "http.SendAsync#1"),
+        ),
+        // Wrappers.Run(string)
+        (
+            "http::GET::/direct",
+            "host:wrapped.example.com",
+            &at("Wrappers.Run(string)", "Fetch#0"),
+        ),
+        (
+            "http::GET::/orders/7",
+            "host:wrapped.example.com",
+            &at("Wrappers.Run(string)", "ForOrder#0"),
+        ),
+        (
+            "http::GET::/orders/{}",
+            "host:wrapped.example.com",
+            &at("Wrappers.Run(string)", "ForOrder#1"),
+        ),
+    ]);
+    assert_eq!(consumers(&json, "src/Acme.Api/Clients.cs"), expected);
+}
+
+/// Typed clients and Refit interfaces are consumers (spec #28, #113): a typed client's calls take
+/// the base its registration or its constructor gives the client the container passes, and two
+/// registrations with different bases leave it unknown; each method of a Refit interface is a
+/// consumer with the base `RestService.For` makes it with, and one only `AddRefitClient`
+/// registers has an unknown base.
+#[test]
+fn csharp_typed_clients_and_refit_methods_are_consumers() {
+    let repo = fixture_repo("csharp_typed_consumers", "conformance-csharp", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let typed = |site: &str| format!("src/Acme.Api/Typed.cs::Acme.Api.Typed.{site}");
+    let remote = |site: &str| format!("src/Acme.Api/Remote.cs::Acme.Api.Remote.{site}");
+    let expected = triples(&[
+        (
+            "http::GET::/v1/products",
+            "host:catalog.example.com",
+            &typed("CatalogClient.Products()::_http.GetStringAsync#0"),
+        ),
+        (
+            "http::GET::/products/{}",
+            "host:catalog.example.com",
+            &typed("CatalogClient.Product(int)::this._http.GetStringAsync#0"),
+        ),
+        (
+            "http::GET::/level",
+            "host:stock.example.com",
+            &typed("StockClient.Level()::_http.GetStringAsync#0"),
+        ),
+        (
+            "http::GET::/twice",
+            "",
+            &typed("TwiceClient.Run()::_http.GetStringAsync#0"),
+        ),
+        (
+            "http::GET::/built",
+            "",
+            &typed("BuiltClient.Run()::_http.GetStringAsync#0"),
+        ),
+    ]);
+    assert_eq!(consumers(&json, "src/Acme.Api/Typed.cs"), expected);
+    let expected = triples(&[
+        (
+            "http::GET::/api/items/{}",
+            "host:inventory.example.com",
+            &remote("IInventoryApi.Item(string)"),
+        ),
+        (
+            "http::POST::/api/items",
+            "host:inventory.example.com",
+            &remote("IInventoryApi.Add(string)"),
+        ),
+        (
+            "http::DELETE::/api/items/{}",
+            "host:inventory.example.com",
+            &remote("IInventoryApi.Delete(string)"),
+        ),
+        ("http::GET::/reports", "", &remote("IReportsApi.All()")),
+    ]);
+    assert_eq!(consumers(&json, "src/Acme.Api/Remote.cs"), expected);
+}
+
+/// Context lists the consumer an HttpClient call that cannot be evaluated is, unresolved.
+#[test]
+fn csharp_context_shows_an_unresolved_consumer() {
+    let repo = fixture_repo(
+        "csharp_unresolved_consumer",
+        "conformance-csharp",
+        Some(ORIGIN),
+    );
+    assert_golden(
+        "conformance-csharp.context-unresolved.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .context("Acme.Api.Clients.Unread.Run()", None)
+            .unwrap(),
+    );
+}
+
+fn billing(file: &str, name: &str) -> String {
+    format!("{CORE}/Billing/{file}::Acme.Core.Billing.{name}")
+}
+
+fn billing_symbols() -> Vec<String> {
+    let accounts = |name: &str| billing("Accounts.cs", name);
+    let mut symbols: Vec<String> = [
+        "IAuditor",
+        "IAuditor.Review()",
+        "Auditor",
+        "Auditor.Review()",
+        "Account",
+        "Account.Deposit(int)",
+        "Account.Deposit(int,string)",
+        "Account.Close(int)",
+        "Account.Close(string)",
+        "Account.Freeze()",
+        "Account.Thaw()",
+        "IReviewer",
+        "IReviewer.Escalate()",
+        "IServices",
+        "AccountExtensions.Audit(Account)",
+        "SavingsExtensions",
+        "SavingsExtensions.Audit(Savings)",
+        "ServiceExtensions",
+        "ServiceExtensions.AddOrders(IServices)",
+        "ServiceExtensions.AddOrders(IServices,Action<Account>)",
+        "Savings",
+        "Savings.Accrue()",
+        "Savings.Sweep()",
+        "AccountExtensions",
+        "AccountExtensions.Summarize(Account)",
+        "AccountExtensions.Archive(IEnumerable<Account>)",
+        "Ledger",
+        "Ledger.Post(T)",
+    ]
+    .iter()
+    .map(|name| accounts(name))
+    .collect();
+    symbols.extend(
+        [
+            "Teller",
+            "Teller.Teller(IAuditor)",
+            "Teller.Open()",
+            "Teller.Current()",
+        ]
+        .iter()
+        .map(|name| billing("Teller.cs", name)),
+    );
+    symbols.push(billing(
+        "Teller.cs",
+        "Teller.Run(Account,IAuditor,List<Account>)",
+    ));
+    symbols.extend(
+        [
+            "Pane",
+            "Pane.Touch()",
+            "Probes",
+            "Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)",
+            "Probes.Blocks(bool)",
+            "Probes.Generic(T)",
+            "Probes.Hides(List<Savings>,object)",
+            "Probes.Field()",
+            "Probes.Outside(List<Account>,Account,IReviewer,IServices)",
+            "Batch",
+            "Batch.Run()",
+        ]
+        .iter()
+        .map(|name| billing("Probes.cs", name)),
+    );
+    symbols.extend(
+        [
+            "Acme.Api.Desk",
+            "Acme.Api.Desk.Desk(Teller)",
+            "Acme.Api.Desk.Serve(Account)",
+        ]
+        .iter()
+        .map(|name| format!("{API}/Desk.cs::{name}")),
+    );
+    symbols.extend(
+        ["Acme.Api.Booth", "Acme.Api.Booth.Open()"]
+            .iter()
+            .map(|name| format!("{API}/Desk.cs::{name}")),
+    );
+    symbols
+}
+
+/// Calls through the types the source declares (#108): each form of receiver, the base types
+/// written in a declaration, and the name rule for what no declared type answers.
+fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
+    let accounts = |name: &str| billing("Accounts.cs", name);
+    let run = |callee: &str| {
+        format!(
+            "{}::{callee}",
+            billing("Teller.cs", "Teller.Run(Account,IAuditor,List<Account>)")
+        )
+    };
+    let freeze = accounts("Account.Freeze()");
+    let thaw = accounts("Account.Thaw()");
+    let accrue = accounts("Savings.Accrue()");
+    let review = accounts("IAuditor.Review()");
+    let probe = |method: &str, callee: &str| {
+        let signature = match method {
+            "Written" => "Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)",
+            "Blocks" => "Blocks(bool)",
+            "Generic" => "Generic(T)",
+            "Hides" => "Hides(List<Savings>,object)",
+            "Outside" => "Outside(List<Account>,Account,IReviewer,IServices)",
+            _ => "Field()",
+        };
+        format!(
+            "{}::{callee}",
+            billing("Probes.cs", &format!("Probes.{signature}"))
+        )
+    };
+    vec![
+        // A field, a property and a parameter; overloads narrowed by argument count.
+        (run("vault.Freeze#0"), EXACT, vec![freeze.clone()]),
+        (run("Primary.Accrue#0"), EXACT, vec![accrue.clone()]),
+        (
+            run("given.Deposit#0"),
+            EXACT,
+            vec![accounts("Account.Deposit(int)")],
+        ),
+        (
+            run("given.Deposit#1"),
+            EXACT,
+            vec![accounts("Account.Deposit(int,string)")],
+        ),
+        (
+            run("given.Close#0"),
+            AMBIGUOUS,
+            vec![
+                accounts("Account.Close(int)"),
+                accounts("Account.Close(string)"),
+            ],
+        ),
+        // A local with its type written, `var` with `new`, a target-typed `new()`.
+        (run("explicitly.Thaw#0"), EXACT, vec![thaw.clone()]),
+        (run("made.Accrue#0"), EXACT, vec![accrue.clone()]),
+        (run("made.Freeze#0"), EXACT, vec![freeze.clone()]),
+        (run("targeted.Thaw#0"), EXACT, vec![thaw.clone()]),
+        // A method's declared return type, through a `var` and in a chain.
+        (run("opened.Accrue#0"), EXACT, vec![accrue.clone()]),
+        (
+            run("(invocation_expression).Sweep#0"),
+            EXACT,
+            vec![accounts("Savings.Sweep()")],
+        ),
+        (
+            run("(invocation_expression).Freeze#0"),
+            EXACT,
+            vec![freeze.clone()],
+        ),
+        // An interface receiver reaches the interface member, `?.` too.
+        (run("reviewer.Review#0"), EXACT, vec![review.clone()]),
+        (run("auditor.Review#0"), EXACT, vec![review.clone()]),
+        // Unqualified and `this.` calls look in the written base.
+        (
+            format!("{}::Freeze#0", accounts("Savings.Sweep()")),
+            EXACT,
+            vec![freeze.clone()],
+        ),
+        (
+            format!("{}::this.Thaw#0", accounts("Savings.Sweep()")),
+            EXACT,
+            vec![thaw.clone()],
+        ),
+        // An extension method, on a type of the repository and on one outside it, and a method
+        // the known type lacks: name matches.
+        (
+            run("given.Summarize#0"),
+            INFERRED,
+            vec![accounts("AccountExtensions.Summarize(Account)")],
+        ),
+        (
+            run("queue.Archive#0"),
+            INFERRED,
+            vec![accounts("AccountExtensions.Archive(IEnumerable<Account>)")],
+        ),
+        // A method of the repository's that the known type lacks is no extension method.
+        (run("given.Accrue#0"), None, vec![]),
+        // A receiver of unknown type, or a type parameter's.
+        (
+            run("unknown.Sweep#0"),
+            INFERRED,
+            vec![accounts("Savings.Sweep()")],
+        ),
+        (
+            run("unknown.Review#0"),
+            AMBIGUOUS,
+            vec![accounts("Auditor.Review()"), review.clone()],
+        ),
+        (run("unknown.Missing#0"), None, vec![]),
+        (
+            format!("{}::entry.Freeze#0", accounts("Ledger.Post(T)")),
+            INFERRED,
+            vec![freeze.clone()],
+        ),
+        // Probes: the type through a generic, a nullable and a qualified name; a base from
+        // outside; names two blocks bind differently; every binding hides the field.
+        (
+            probe("Written", "ledger.Post#0"),
+            EXACT,
+            vec![accounts("Ledger.Post(T)")],
+        ),
+        (
+            probe("Written", "maybe.Freeze#0"),
+            EXACT,
+            vec![freeze.clone()],
+        ),
+        (probe("Written", "full.Thaw#0"), EXACT, vec![thaw.clone()]),
+        (probe("Written", "pane.Freeze#0"), None, vec![]),
+        (
+            format!("{}::this.Thaw#0", billing("Probes.cs", "Pane.Touch()")),
+            None,
+            vec![],
+        ),
+        (
+            format!("{}::Freeze#0", billing("Probes.cs", "Pane.Touch()")),
+            None,
+            vec![],
+        ),
+        (
+            probe("Blocks", "item.Freeze#0"),
+            INFERRED,
+            vec![freeze.clone()],
+        ),
+        (probe("Blocks", "item.Thaw#0"), INFERRED, vec![thaw.clone()]),
+        (
+            probe("Generic", "value.Freeze#0"),
+            INFERRED,
+            vec![freeze.clone()],
+        ),
+        (
+            probe("Hides", "slot.Freeze#0"),
+            INFERRED,
+            vec![freeze.clone()],
+        ),
+        (
+            probe("Hides", "slot.Freeze#1"),
+            INFERRED,
+            vec![freeze.clone()],
+        ),
+        (
+            probe("Hides", "slot.Freeze#2"),
+            INFERRED,
+            vec![freeze.clone()],
+        ),
+        (
+            probe("Hides", "slot.Freeze#3"),
+            INFERRED,
+            vec![freeze.clone()],
+        ),
+        (probe("Field", "slot.Freeze#0"), EXACT, vec![freeze.clone()]),
+        // Outside the repository, or the repository's type without the method: extension
+        // methods alone, overloads by the form of the call; an interface's base interface.
+        (probe("Outside", "items.Count#0"), None, vec![]),
+        (probe("Outside", "Teller.Accrue#0"), None, vec![]),
+        (
+            probe("Outside", "given.Audit#0"),
+            AMBIGUOUS,
+            vec![
+                accounts("AccountExtensions.Audit(Account)"),
+                accounts("SavingsExtensions.Audit(Savings)"),
+            ],
+        ),
+        (
+            probe("Outside", "reviewer.Review#0"),
+            EXACT,
+            vec![review.clone()],
+        ),
+        (
+            probe("Outside", "reviewer.Escalate#0"),
+            EXACT,
+            vec![accounts("IReviewer.Escalate()")],
+        ),
+        (
+            probe("Outside", "services.AddOrders#0"),
+            INFERRED,
+            vec![accounts("ServiceExtensions.AddOrders(IServices)")],
+        ),
+        (
+            probe("Outside", "services.AddOrders#1"),
+            INFERRED,
+            vec![accounts(
+                "ServiceExtensions.AddOrders(IServices,Action<Account>)",
+            )],
+        ),
+        (
+            probe("Outside", "ServiceExtensions.AddOrders#0"),
+            EXACT,
+            vec![accounts("ServiceExtensions.AddOrders(IServices)")],
+        ),
+        (
+            probe("Outside", "ServiceExtensions.AddOrders#1"),
+            EXACT,
+            vec![accounts(
+                "ServiceExtensions.AddOrders(IServices,Action<Account>)",
+            )],
+        ),
+        (
+            format!("{}::Format.Upper#0", billing("Probes.cs", "Batch.Run()")),
+            INFERRED,
+            vec![format!(
+                "{CORE}/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+            )],
+        ),
+        // Another project: a field and a primary constructor's parameter.
+        (
+            format!("{API}/Desk.cs::Acme.Api.Desk.Serve(Account)::teller.Run#0"),
+            EXACT,
+            vec![billing(
+                "Teller.cs",
+                "Teller.Run(Account,IAuditor,List<Account>)",
+            )],
+        ),
+        (
+            format!("{API}/Desk.cs::Acme.Api.Booth.Open()::teller.Current#0"),
+            EXACT,
+            vec![billing("Teller.cs", "Teller.Current()")],
+        ),
+    ]
+}
+
+/// Public and protected members of public types are export doors when uncalled; private and
+/// internal ones, and those of a type that is not public, are not.
+#[test]
+fn csharp_public_and_protected_members_are_export_doors() {
+    let repo = fixture_repo("csharp_doors", "conformance-csharp", Some(ORIGIN));
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let doors: Vec<&str> = (json["processes"].as_array().unwrap().iter())
+        .filter(|p| p["kind"] == "export")
+        .map(|p| p["entry_point"].as_str().unwrap())
+        .collect();
+    for door in [
+        "Acme.Core.Orders.Carrier.Rate()",
+        "Acme.Core.Orders.OrderService.Line.Add()",
+        "Acme.Core.Text.IClock.Now()",
+    ] {
+        assert!(doors.iter().any(|d| d.ends_with(door)), "{door}");
+    }
+    for hidden in [
+        "Acme.Core.Orders.Carrier.Purge()",
+        "Acme.Core.Text.Format.Hidden()",
+        "Legacy.Old.Run()",
+    ] {
+        assert!(!doors.iter().any(|d| d.ends_with(hidden)), "{hidden}");
+    }
+}
+
+#[test]
+fn csharp_search_finds_a_type_and_context_lists_callers_and_callees() {
+    let repo = fixture_repo("csharp_queries", "conformance-csharp", Some(ORIGIN));
+    let engine = Engine::open(&repo).unwrap();
+    assert_golden(
+        "conformance-csharp.search-orderservice.txt",
+        &engine.search("OrderService", Some("symbol"), None).unwrap(),
+    );
+    assert_golden(
+        "conformance-csharp.context-default.txt",
+        &engine
+            .context("Acme.Core.Orders.OrderService.Default()", None)
+            .unwrap(),
+    );
+}
+
+/// A method's callers, each with its level and why: a field, a parameter, a base type, a
+/// chain, a name match and a tie.
+#[test]
+fn csharp_context_lists_the_callers_of_a_method_with_levels_and_reasons() {
+    let repo = fixture_repo("csharp_callers", "conformance-csharp", Some(ORIGIN));
+    let engine = Engine::open(&repo).unwrap();
+    for (golden, method) in [
+        ("freeze", "Acme.Core.Billing.Account.Freeze()"),
+        ("review", "Acme.Core.Billing.IAuditor.Review()"),
+    ] {
+        assert_golden(
+            &format!("conformance-csharp.context-{golden}.txt"),
+            &engine.context(method, None).unwrap(),
+        );
+    }
+}
+
+#[test]
+fn csharp_search_finds_the_program_entry_points() {
+    let repo = fixture_repo("csharp_programs", "conformance-csharp", Some(ORIGIN));
+    assert_golden(
+        "conformance-csharp.search-process-main.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .search("main", Some("process"), None)
+            .unwrap(),
+    );
+}
+
+#[test]
+fn csharp_hostile_definition_and_member_depths_remain_bounded() {
+    let repo = fixture_repo("csharp_depths", "conformance-csharp", Some(ORIGIN));
+    let mut deep = String::from("namespace Hostile; public class Deep { void Ping() {}");
+    for n in 0..132 {
+        deep.push_str(&format!("public class Inner{n} {{"));
+    }
+    deep.push_str("void Ping() {} void Leaf() { Ping(); this.Ping(); Missing(); }");
+    deep.push_str(&"}".repeat(133));
+    std::fs::write(repo.join("Deep.cs"), deep).unwrap();
+    let expression = format!("{}\"value\"{}", "(".repeat(1024), ")".repeat(1024));
+    let member = format!("root{}.Send()", ".Part".repeat(300));
+    let values = format!(
+        "namespace Hostile; public class Values {{ public void Run() {{ Take({expression}); {member}; }} }}"
+    );
+    std::fs::write(repo.join("Values.cs"), values).unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let definitions = (json["symbols"].as_array().unwrap().iter())
+        .filter(|s| s["span"]["path"] == "Deep.cs")
+        .count();
+    assert_eq!(definitions, 129);
+    assert!(
+        (json["calls"].as_array().unwrap().iter())
+            .filter(|c| c["span"]["path"] == "Deep.cs")
+            .all(|c| c["level"] != "exact")
+    );
+    assert!(
+        (json["calls"].as_array().unwrap().iter())
+            .any(|c| c["span"]["path"] == "Values.cs" && c["target"].is_null())
+    );
+}
+
+#[test]
+fn csharp_qualification_expansion_discards_the_whole_file_and_keeps_other_files() {
+    let repo = fixture_repo(
+        "csharp_qualification_budget",
+        "conformance-csharp",
+        Some(ORIGIN),
+    );
+    let namespace = format!("N{}", "a".repeat(4096));
+    let mut source = format!(
+        "namespace {namespace};\npublic class Expanded {{\npublic static void Overloaded(string value) {{}}\n"
+    );
+    for n in 0..600 {
+        source.push_str(&format!("public void Method{n}() {{}}\n"));
+    }
+    source.push_str("public static void Overloaded(int value) {}\n}\n");
+    std::fs::write(repo.join("Expanded.cs"), source).unwrap();
+    let caller = format!(
+        "using {namespace};\nnamespace Budget;\npublic class Caller {{ public void Run() {{ Expanded.Overloaded(\"value\"); }} }}\n"
+    );
+    std::fs::write(repo.join("Budget.cs"), caller).unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let symbols = json["symbols"].as_array().unwrap();
+    assert!(symbols.iter().all(|s| s["span"]["path"] != "Expanded.cs"));
+    assert!((symbols.iter()).any(|s| s["id"].as_str().unwrap().ends_with("Budget.Caller.Run()")));
+    let called = (json["calls"].as_array().unwrap().iter())
+        .find(|c| {
+            c["caller"]
+                .as_str()
+                .unwrap()
+                .ends_with("Budget.Caller.Run()")
+        })
+        .unwrap();
+    assert!(called["target"].is_null());
+    assert!(called["level"].is_null());
+}
+
+/// A type written in more files of one project than `TYPE_PARTS` is no one type: constructing
+/// it is ambiguous. Written in fewer, it is one, its first part constructed.
+#[test]
+fn csharp_a_type_in_too_many_parts_is_several_classes() {
+    for (parts, level, candidates) in [(64, "exact", 0), (65, "ambiguous", 65)] {
+        let case = format!("csharp_type_parts_{parts}");
+        let repo = fixture_repo(&case, "conformance-csharp", Some(ORIGIN));
+        let dir = repo.join("src/Acme.Core/Parts");
+        std::fs::create_dir_all(&dir).unwrap();
+        for n in 0..parts {
+            let part =
+                format!("namespace Parts;\npublic partial class Wide {{ void M{n}() {{}} }}\n");
+            std::fs::write(dir.join(format!("Wide{n:02}.cs")), part).unwrap();
+        }
+        let caller = "namespace Parts;\npublic class Maker { Wide Make() => new Wide(); }\n";
+        std::fs::write(dir.join("Maker.cs"), caller).unwrap();
+        let json: Value =
+            serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+        let made = (json["calls"].as_array().unwrap().iter())
+            .find(|c| {
+                c["id"]
+                    .as_str()
+                    .unwrap()
+                    .ends_with("Parts.Maker.Make()::Wide#0")
+            })
+            .unwrap();
+        assert_eq!(made["level"], level, "{parts}");
+        let found = made["candidates"].as_array().map_or(0, Vec::len);
+        assert_eq!(found, candidates, "{parts}");
+    }
+}
+
 #[test]
 fn typescript_and_javascript() {
     conform(

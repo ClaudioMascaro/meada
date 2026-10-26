@@ -141,6 +141,23 @@ pub fn xlang_kotlin(case: &str) -> (PathBuf, PathBuf) {
     )
 }
 
+/// The web app (TypeScript) and the api service (C#, ASP.NET Core) of spec #28, in a workspace of
+/// their own under `case`: web first, then api.
+pub fn xlang_csharp(case: &str) -> (PathBuf, PathBuf) {
+    (
+        fixture_repo(
+            case,
+            "xlang-csharp-web",
+            Some("https://example.com/xlang-csharp/web.git"),
+        ),
+        fixture_repo(
+            case,
+            "xlang-csharp-api",
+            Some("git@example.com:xlang-csharp/api.git"),
+        ),
+    )
+}
+
 /// The Java chain with a mirror of the web app beside it, serving the web app's `routes` under
 /// its own host, and a peer of the api: a consumer that leaves its host open links to both.
 pub fn xlang_java_mirror(case: &str, routes: &[&str]) -> (PathBuf, PathBuf) {

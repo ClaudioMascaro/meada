@@ -1,0 +1,3 @@
+example.com/xlang-csharp/api Clients/CatalogClient.cs:15 Api.Clients.CatalogClient.Products()
+  →[exact: host web.example.com is served by example.com/xlang-csharp/web] example.com/xlang-csharp/web app/api/catalog/route.ts:1 GET
+chain: exact · 1 hops · 2 repos · 70 tokens

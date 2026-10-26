@@ -90,6 +90,16 @@ fn kotlin_exports_of_the_same_files_are_byte_identical() {
 }
 
 #[test]
+fn csharp_exports_of_the_same_files_are_byte_identical() {
+    let origin = Some("https://example.com/acme/conformance.git");
+    let a = fixture_repo("csharp_byte_identical_a", "conformance-csharp", origin);
+    let b = fixture_repo("csharp_byte_identical_b", "conformance-csharp", origin);
+    let first = Engine::open(&a).unwrap().export().unwrap();
+    assert_eq!(first, Engine::open(&a).unwrap().export().unwrap());
+    assert_eq!(first, Engine::open(&b).unwrap().export().unwrap());
+}
+
+#[test]
 fn rust_exports_of_the_same_files_are_byte_identical() {
     let origin = Some("https://example.com/acme/conformance.git");
     let a = fixture_repo("rust_byte_identical_a", "conformance-rust", origin);

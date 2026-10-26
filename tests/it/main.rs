@@ -29,6 +29,7 @@ mod jvmpkg;
 mod kotlinpkg;
 mod manifest;
 mod mcp;
+mod nugetpkg;
 mod oidc;
 mod packages;
 mod processes;

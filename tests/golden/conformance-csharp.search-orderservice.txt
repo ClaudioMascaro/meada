@@ -1,0 +1,14 @@
+example.com/acme/conformance src/Acme.Core/Orders/OrderService.cs:3 Acme.Core.Orders.OrderService
+example.com/acme/conformance src/Acme.Core/Orders/OrderService.cs:5 Acme.Core.Orders.OrderService.OrderService()
+example.com/acme/conformance src/Acme.Core/Orders/OrderService.cs:7 Acme.Core.Orders.OrderService.OrderService(string)
+example.com/acme/conformance src/Acme.Core/Orders/OrderService.cs:28 Acme.Core.Orders.OrderService.Audit()
+example.com/acme/conformance src/Acme.Core/Orders/OrderService.cs:36 Acme.Core.Orders.OrderService.Default()
+example.com/acme/conformance src/Acme.Core/Orders/OrderService.cs:38 Acme.Core.Orders.OrderService.Line
+example.com/acme/conformance src/Acme.Core/Orders/OrderService.cs:40 Acme.Core.Orders.OrderService.Line.Add()
+example.com/acme/conformance src/Acme.Core/Orders/OrderService.cs:42 Acme.Core.Orders.OrderService.Line.Count()
+example.com/acme/conformance src/Acme.Core/Orders/OrderService.cs:34 Acme.Core.Orders.OrderService.Notify(int)
+example.com/acme/conformance src/Acme.Core/Orders/OrderService.cs:32 Acme.Core.Orders.OrderService.Notify(string)
+example.com/acme/conformance src/Acme.Core/Orders/OrderService.cs:26 Acme.Core.Orders.OrderService.Place(string)
+example.com/acme/conformance src/Acme.Core/Orders/OrderService.cs:9 Acme.Core.Orders.OrderService.Place(string,int)
+example.com/acme/conformance src/Acme.Core/Orders/OrderService.cs:11 Acme.Core.Orders.OrderService.Place(string,int).Check
+example.com/acme/conformance src/Acme.Core/Orders/OrderService.cs:30 Acme.Core.Orders.OrderService.Validate(string)

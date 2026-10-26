@@ -287,6 +287,13 @@ type Family<'a> = Option<Vec<Ancestor<'a>>>;
 // thousands from overflowing the stack and from keeping families quadratic in its length.
 const FAMILY_DEPTH: usize = 128;
 
+/// The most files one type may be written in (`LanguagePack::partial_types`). Classes of one
+/// name in more files are each its own class, so a lookup reads its own file alone and a
+/// name that binds them all is `ambiguous`.
+// ponytail: real partial types have a handful of parts; the limit keeps a crafted type in
+// thousands of files from making every member lookup of it read them all.
+const TYPE_PARTS: usize = 64;
+
 /// A linearization given up because the bases nest deeper than `FAMILY_DEPTH` below the
 /// families being resolved, or a receiver or a family reached through a member was cut
 /// (`Work::cut`): no family is kept on the way up, since the cut depends on where the walk
@@ -339,6 +346,8 @@ pub struct Resolver<'a> {
     base_receiver: Option<&'static str>,
     /// The pack's `LanguagePack::unordered_bases`.
     unordered_bases: bool,
+    /// The pack's `LanguagePack::extension_methods`.
+    extension_methods: bool,
     /// The pack's `LanguagePack::implicit_members`.
     implicit: &'static [&'static str],
     /// The pack's names bound everywhere (`LanguagePack::globals`).
@@ -348,6 +357,9 @@ pub struct Resolver<'a> {
     /// reach another function: it is not kept, so a wrapper or a parameter is never climbed
     /// through it.
     callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
+    /// The calls made on a receiver that reach each extension method (`Resolver::extension_call`),
+    /// sorted: a name match the value flow takes, as the language binds it.
+    extension_callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
     /// Name inference candidates, sorted: methods by their last name (`true`), top-level
     /// functions and classes, and those of modules written in place, by their name (`false`).
     by_name: HashMap<(bool, &'a str), Vec<Target<'a>>>,
@@ -385,6 +397,10 @@ pub struct Resolver<'a> {
     /// place in `groups`.
     shared: HashMap<&'a str, usize>,
     groups: Vec<Group<'a>>,
+    /// The files of each type declared in parts (`Facts::partial`) in several files of one
+    /// unit (`Facts::unit`), sorted, by unit and name: one type, whose members and bases are
+    /// all of theirs.
+    parts: HashMap<(&'a str, &'a str), Vec<&'a str>>,
 }
 
 /// Whether `inner` is a class nested directly in the class `outer`.
@@ -398,6 +414,9 @@ fn nested_in(inner: Target, outer: Target) -> bool {
 struct Arity {
     least: usize,
     most: Option<usize>,
+    /// Whether the first parameter is the instance a call made on a receiver supplies (C#'s
+    /// extension `this`): such a call counts one argument fewer than `Ext.F(x)` does.
+    receiver: bool,
 }
 
 impl Arity {
@@ -406,11 +425,19 @@ impl Arity {
         Arity {
             least: params.iter().filter(required).count(),
             most: (!params.iter().any(|p| p.binds == Binds::Rest)).then_some(params.len()),
+            receiver: params.first().is_some_and(|p| p.binds == Binds::Instance),
         }
     }
 
     fn fits(self, arity: usize) -> bool {
         self.least <= arity && self.most.is_none_or(|most| arity <= most)
+    }
+
+    /// `fits` for a call whose form `on_receiver` tells, only when the function takes its
+    /// receiver as a first parameter.
+    fn fits_call(self, arity: usize, on_receiver: &dyn Fn() -> bool) -> bool {
+        let arity = arity + usize::from(self.receiver && on_receiver());
+        self.fits(arity)
     }
 }
 
@@ -549,6 +576,17 @@ impl<'a> Resolver<'a> {
                 exporting,
             });
         }
+        let mut parts: HashMap<(&str, &str), Vec<&str>> = HashMap::new();
+        for (&path, facts) in files {
+            for name in &facts.partial {
+                let key = (facts.unit.as_str(), name.as_str());
+                parts.entry(key).or_default().push(path);
+            }
+        }
+        parts.retain(|_, paths| {
+            paths.dedup();
+            (2..=TYPE_PARTS).contains(&paths.len())
+        });
         let written = (files.values())
             .flat_map(|f| f.consts.iter())
             .filter_map(|c| c.name.strip_prefix('.'))
@@ -693,9 +731,11 @@ impl<'a> Resolver<'a> {
             receiver: language.receiver(),
             base_receiver: language.base_receiver(),
             unordered_bases: language.unordered_bases(),
+            extension_methods: language.extension_methods(),
             implicit: language.implicit_members(),
             globals: language.globals(),
             callers: HashMap::new(),
+            extension_callers: HashMap::new(),
             by_name,
             modules,
             impls: HashMap::new(),
@@ -716,6 +756,7 @@ impl<'a> Resolver<'a> {
             later,
             shared: sharing,
             groups,
+            parts,
         };
         let mut work = Work::default();
         for (path, facts) in files {
@@ -840,18 +881,52 @@ impl<'a> Resolver<'a> {
         (resolver.impls, resolver.blocks, resolver.outside) = (impls, blocks, outside);
         (resolver.unread, resolver.extensions) = (unread, extensions);
         let mut callers: HashMap<Target, Vec<Caller>> = HashMap::new();
+        let mut extension_callers: HashMap<Target, Vec<Caller>> = HashMap::new();
         for (path, facts) in files {
             for (index, call) in facts.calls.iter().enumerate() {
-                if let Resolution::Exact(target) = resolver.call(path, call) {
-                    callers
-                        .entry(target)
-                        .or_default()
-                        .push(Caller { path, index });
+                match resolver.call(path, call) {
+                    Resolution::Exact(target) => {
+                        callers
+                            .entry(target)
+                            .or_default()
+                            .push(Caller { path, index });
+                    }
+                    Resolution::Inferred(target) if resolver.extension_call(path, call, target) => {
+                        (extension_callers.entry(target).or_default()).push(Caller { path, index });
+                    }
+                    _ => {}
                 }
             }
         }
-        resolver.callers = callers;
+        (resolver.callers, resolver.extension_callers) = (callers, extension_callers);
         resolver
+    }
+
+    /// Whether `call`, written in `path` and found by name to `target`, is a call of the
+    /// extension method `target` made on a receiver (`x.M()`) as C# binds it: in a pack whose
+    /// members may be extended (`LanguagePack::extension_methods`), `target` takes its receiver
+    /// as a first parameter (`Binds::Instance`) and the class declaring it is in scope of the
+    /// call by its name (its namespace is the call's own, one around it, or imported). The
+    /// resolver keeps such a call a name match, since it does not look the extensions up; the
+    /// value flow takes it (`flows_to`).
+    fn extension_call(&self, path: &'a str, call: &'a Call, target: Target<'a>) -> bool {
+        let class = crate::parent(target.name);
+        let simple = class.rsplit('.').next().unwrap_or(class);
+        self.extension_methods
+            && call.callee.contains('.')
+            && (self.defs[target.path][target.name].params.first())
+                .is_some_and(|p| p.binds == Binds::Instance)
+            && matches!(self.binding(path, &call.scope, simple), Binding::Def(c) if c.name == class)
+    }
+
+    /// The function the value flow reaches through `call`, written in `path`: its exact target,
+    /// or the extension method a call made on a receiver reaches (`extension_call`).
+    fn flows_to(&self, path: &'a str, call: &'a Call) -> Option<Target<'a>> {
+        match self.call(path, call) {
+            Resolution::Exact(target) => Some(target),
+            Resolution::Inferred(target) if self.extension_call(path, call, target) => Some(target),
+            _ => None,
+        }
     }
 
     /// Limits `exported` to these files (`Layout::published`); `None` keeps every file.
@@ -868,12 +943,18 @@ impl<'a> Resolver<'a> {
     }
 
     pub fn call(&self, path: &'a str, call: &'a Call) -> Resolution<'a> {
-        self.resolved(path, call, &mut Work::default())
+        self.resolved(path, call, true, &mut Work::default())
     }
 
     /// `call`, with what resolving it carries along (a chain of calls on call results is
     /// bounded by `RECEIVER_DEPTH`).
-    fn resolved(&self, path: &'a str, call: &'a Call, work: &mut Work<'a>) -> Resolution<'a> {
+    fn resolved(
+        &self,
+        path: &'a str,
+        call: &'a Call,
+        matching: bool,
+        work: &mut Work<'a>,
+    ) -> Resolution<'a> {
         if self.strict && call.decorates.is_some() {
             return Resolution::Unresolved;
         }
@@ -902,7 +983,9 @@ impl<'a> Resolver<'a> {
                 match classes[..] {
                     [] => return Resolution::Unresolved,
                     [one] => Binding::Def(one),
-                    _ => Binding::Several(classes),
+                    _ => self
+                        .one_type(&classes)
+                        .map_or(Binding::Several(classes), Binding::Def),
                 }
             }
             found => found,
@@ -917,14 +1000,19 @@ impl<'a> Resolver<'a> {
                 } else {
                     (&self.overloads, Binding::Unknown)
                 };
-                families[t.path]
-                    .get(t.name)
-                    .map_or(absent, |all| Binding::Several(all.clone()))
+                let all: Vec<Target> = (self.parts(t).into_iter())
+                    .flat_map(|part| families[part.path].get(part.name).into_iter().flatten())
+                    .copied()
+                    .collect();
+                match all.is_empty() {
+                    true => absent,
+                    false => Binding::Several(all),
+                }
             }
             found => found,
         };
         let known = matches!(binding, Binding::Def(_) | Binding::Several(_));
-        let binding = self.narrow(binding, call.arity);
+        let binding = self.narrow(binding, call.arity, &|| self.on_receiver(path, call));
         // No member fits: an extension function in scope may.
         if matches!(binding, Binding::Unknown | Binding::External(..))
             && let Some(found) = self.extended(path, call, on.clone(), work)
@@ -936,6 +1024,8 @@ impl<'a> Resolver<'a> {
         }
         match binding {
             Binding::Def(t) => Resolution::Exact(t),
+            // A call's result is read from an exact target alone (`result_of`): no name match.
+            _ if !matching => Resolution::Unresolved,
             Binding::Several(all) => Resolution::Ambiguous(all),
             Binding::External(..) => Resolution::Unresolved,
             Binding::Unknown if self.owned_outside(path, call) || self.lacks(path, call) => {
@@ -951,6 +1041,21 @@ impl<'a> Resolver<'a> {
         }
     }
 
+    /// Whether `call` is made on a receiver (`x.F()`, `this.F()`), not bare or on a type's name
+    /// (`Ext.F(x)`): the form that decides how many arguments a function that takes its receiver
+    /// as a first parameter (`Arity::receiver`) is given.
+    fn on_receiver(&self, path: &'a str, call: &'a Call) -> bool {
+        let Some((head, _)) = call.callee.rsplit_once('.') else {
+            return false;
+        };
+        if call.on.is_some() || Some(head) == self.receiver || Some(head) == self.base_receiver {
+            return true;
+        }
+        let (seen, work) = (&mut self.seen(path, &call.scope), &mut Work::default());
+        let found = self.resolve_as(path, &call.scope, head, seen, work, Reading::Value);
+        !matches!(found, Binding::Def(t) if self.is_class(t))
+    }
+
     /// The name match of a call that no binding answers (`infer`). A call narrowed by its
     /// argument count (`Call::arity`, a pack whose overloads merge across a class family) reads
     /// the family that owns it: a receiver whose class the source writes, `this` and a bare
@@ -958,7 +1063,12 @@ impl<'a> Resolver<'a> {
     /// base and declares none falls back to what its scope binds, as a name match. A base call
     /// (`super.f()`) the family does not answer resolves to nothing. Any other receiver keeps the
     /// repository's candidates, and several of them take the one declared in the family of the
-    /// class around the call, other than the calling method itself.
+    /// class around the call, other than the calling method itself. In a pack whose members may
+    /// be extended (`LanguagePack::extension_methods`) a receiver the source types is not
+    /// "any other": one of a class of the repository whose family lacks the method, with no
+    /// opaque base, and one whose written type is outside the repository, match the methods that
+    /// take their receiver as a first parameter alone (`Arity::receiver`); with an opaque base
+    /// the member may be the base's, and the call resolves to nothing.
     fn matched(
         &self,
         path: &'a str,
@@ -975,7 +1085,9 @@ impl<'a> Resolver<'a> {
             return Resolution::Unresolved;
         }
         let bare = head.is_none() && self.members_in_scope;
-        let all = self.candidates(path, callee, call.by_path, call.arity, bare);
+        let on_receiver = || self.on_receiver(path, call);
+        let all = self.candidates(path, callee, call.by_path, call.arity, bare, &on_receiver);
+        let mut written = false;
         let owner = match head {
             None if bare => self.class(path, scope),
             None => Binding::Unknown,
@@ -986,9 +1098,39 @@ impl<'a> Resolver<'a> {
                     (None, Some(inner)) => self.result_of(path, inner, work),
                     (None, None) => self.resolve_as(path, scope, head, seen, work, Reading::Value),
                 };
+                // The source writes a type for the receiver.
+                written = (self.holder(&receiver)).is_some_and(|(p, s, n)| {
+                    matches!(self.receivers[p].get(&(s, n)), Some(Class::Type(_)))
+                });
+                // A local a call from outside initialized (`var app = builder.Build()`) holds
+                // something from outside as well.
+                if self.extension_methods
+                    && !written
+                    && let Some((p, s, n)) = self.holder(&receiver)
+                    && let Some(Class::Result(made)) = self.receivers[p].get(&(s, n))
+                {
+                    written = self.outside_result(p, *made, work);
+                }
                 self.instance(receiver, work)
             }
         };
+        let on_instance = matches!(owner, Binding::Instance(_)) || head == self.receiver;
+        // An extension method may answer a call on a receiver the repository lacks the member
+        // of, or whose written type is outside it; no other method of that name does.
+        let extensions = |all: &[Target<'a>]| -> Vec<Target<'a>> {
+            (all.iter().copied())
+                .filter(|t| {
+                    (self.defs[t.path][t.name].params.first())
+                        .is_some_and(|p| p.binds == Binds::Instance)
+                })
+                .collect()
+        };
+        if self.extension_methods
+            && written
+            && !matches!(owner, Binding::Instance(_) | Binding::Def(_))
+        {
+            return one_of(extensions(&all));
+        }
         let family = match owner {
             Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => {
                 self.family(t, work).map(|f| (f, true))
@@ -1043,11 +1185,17 @@ impl<'a> Resolver<'a> {
                     work,
                     Reading::Path,
                 );
-                match self.narrow(found, call.arity) {
+                match self.narrow(found, call.arity, &|| self.on_receiver(path, call)) {
                     Binding::Def(t) => narrowed(t, all.len().max(1)),
                     Binding::Several(several) => Resolution::Ambiguous(several),
                     _ => Resolution::Unresolved,
                 }
+            }
+            [] if self.extension_methods
+                && on_instance
+                && !family.iter().any(|a| matches!(a, Ancestor::Opaque(_))) =>
+            {
+                one_of(extensions(&all))
             }
             [] => Resolution::Unresolved,
         }
@@ -1072,7 +1220,7 @@ impl<'a> Resolver<'a> {
             return Binding::Unknown;
         }
         work.busy.push(key);
-        let found = match self.resolved(path, call, work) {
+        let found = match self.resolved(path, call, false, work) {
             Resolution::Exact(t) => match &self.defs[t.path][t.name].result {
                 Some(Class::Type(class)) => {
                     let seen = &mut self.seen(t.path, t.name);
@@ -1090,9 +1238,70 @@ impl<'a> Resolver<'a> {
         found
     }
 
-    fn narrow(&self, binding: Binding<'a>, arity: Option<usize>) -> Binding<'a> {
+    /// Whether the call at `index` of `path` gives something from outside the repository, as
+    /// a pack whose members may be extended (C#) writes it: no function of the repository
+    /// answers it, and it is made on what is outside too: a name that binds nothing of the
+    /// repository (`WebApplication.CreateBuilder(..)`), a receiver whose written type is
+    /// outside, or a local such a call initialized (`builder.Build()`). At most
+    /// `RECEIVER_DEPTH` calls deep.
+    // ponytail: the callee keeps no type argument, so `Deserialize<Order>(..)` counts as from
+    // outside although it may give a type of the repository: a call on it takes extension
+    // methods alone, a name match lost rather than one guessed.
+    fn outside_result(&self, path: &'a str, index: usize, work: &mut Work<'a>) -> bool {
+        let Some(call) = self.files[path].calls.get(index) else {
+            return false;
+        };
+        let Some((head, _)) = call.callee.rsplit_once('.') else {
+            return false;
+        };
+        let key = Busy::Call(path, index);
+        let depth = (work.busy.iter())
+            .filter(|b| matches!(b, Busy::Local(..) | Busy::Call(..)))
+            .count();
+        if (call.on.is_none() && head.starts_with('('))
+            || depth >= RECEIVER_DEPTH
+            || work.busy.contains(&key)
+        {
+            return false;
+        }
+        work.busy.push(key);
+        let unanswered = matches!(
+            self.resolved(path, call, false, work),
+            Resolution::Unresolved
+        );
+        let outside = unanswered
+            && match call.on {
+                Some(inner) => self.outside_result(path, inner, work),
+                None => {
+                    let seen = &mut self.seen(path, &call.scope);
+                    let receiver =
+                        self.resolve_as(path, &call.scope, head, seen, work, Reading::Value);
+                    match self.holder(&receiver) {
+                        Some((p, s, n)) => match self.receivers[p].get(&(s, n)) {
+                            Some(Class::Type(_)) => !matches!(
+                                self.instance(receiver, work),
+                                Binding::Instance(_) | Binding::Def(_)
+                            ),
+                            Some(Class::Result(made)) => self.outside_result(p, *made, work),
+                            _ => false,
+                        },
+                        None => matches!(receiver, Binding::Unknown | Binding::External(..)),
+                    }
+                }
+            };
+        work.busy.pop();
+        outside
+    }
+
+    fn narrow(
+        &self,
+        binding: Binding<'a>,
+        arity: Option<usize>,
+        on_receiver: &dyn Fn() -> bool,
+    ) -> Binding<'a> {
         let Some(arity) = arity else { return binding };
-        let fits = |t: &Target<'a>| self.arities.get(t).is_none_or(|n| n.fits(arity));
+        let fits =
+            |t: &Target<'a>| (self.arities.get(t)).is_none_or(|n| n.fits_call(arity, on_receiver));
         match binding {
             Binding::Def(t) if !fits(&t) => Binding::Unknown,
             Binding::Several(all) => match all.into_iter().filter(fits).collect::<Vec<_>>()[..] {
@@ -1400,7 +1609,8 @@ impl<'a> Resolver<'a> {
         {
             (binding, members) = found;
         }
-        self.walk(binding, members, seen, work, reading)
+        let found = self.walk(binding, members, seen, work, reading);
+        self.in_unit(path, found)
     }
 
     /// `binding`'s dotted `members`, each looked up in what the one before gives (`member` for
@@ -1667,8 +1877,8 @@ impl<'a> Resolver<'a> {
         if !read && let Some(found) = self.overloaded(&family, member) {
             return found;
         }
-        for ancestor in family {
-            let Ancestor::Class(c) = ancestor else {
+        for ancestor in self.with_parts(&family).iter() {
+            let Ancestor::Class(c) = *ancestor else {
                 return Binding::Unknown;
             };
             if let Some(found) = self.block_member(c, member) {
@@ -1716,7 +1926,7 @@ impl<'a> Resolver<'a> {
     /// the class): it is reached through `Resolver::extensions` alone, after the members.
     fn overloaded(&self, family: &[Ancestor<'a>], member: &str) -> Option<Binding<'a>> {
         let (mut found, mut signatures, mut opaque) = (Vec::new(), HashSet::new(), false);
-        for ancestor in family {
+        for ancestor in self.with_parts(family).iter() {
             let Ancestor::Class(c) = *ancestor else {
                 opaque = true;
                 continue;
@@ -1776,7 +1986,7 @@ impl<'a> Resolver<'a> {
         let Some(family) = self.families.get(&Target { path, name: class })? else {
             return Some(Binding::Unknown);
         };
-        for ancestor in family {
+        for ancestor in self.with_parts(family).iter() {
             let Ancestor::Class(c) = *ancestor else {
                 return Some(Binding::Unknown);
             };
@@ -1858,6 +2068,45 @@ impl<'a> Resolver<'a> {
         let (&name, files) = group.methods.get_key_value(qualified)?;
         let path = *files.iter().find(|f| **f != class.path)?;
         Some(Binding::Def(Target { path, name }))
+    }
+
+    /// The files of the type `class` is a part of (`parts`), if it is one.
+    fn parts_of(&self, class: Target<'a>) -> Option<&Vec<&'a str>> {
+        let unit = self.files.get(class.path)?.unit.as_str();
+        self.parts.get(&(unit, class.name))
+    }
+
+    /// `class` and the other parts of its type (`parts`), its own file first.
+    fn parts(&self, class: Target<'a>) -> Vec<Target<'a>> {
+        let others = self.parts_of(class).into_iter().flatten();
+        let others = others
+            .filter(|&&path| path != class.path)
+            .map(|&path| Target {
+                path,
+                name: class.name,
+            });
+        std::iter::once(class).chain(others).collect()
+    }
+
+    /// `family` with the other parts of each class after it (`parts`).
+    fn with_parts<'f>(&self, family: &'f [Ancestor<'a>]) -> std::borrow::Cow<'f, [Ancestor<'a>]> {
+        if self.parts.is_empty() {
+            return std::borrow::Cow::Borrowed(family);
+        }
+        let parts = family.iter().flat_map(|ancestor| match ancestor {
+            Ancestor::Class(c) => self.parts(*c).into_iter().map(Ancestor::Class).collect(),
+            opaque => vec![opaque.clone()],
+        });
+        std::borrow::Cow::Owned(parts.collect())
+    }
+
+    /// One class for `all` when they are the parts of one type (`parts`): the first part.
+    fn one_type(&self, all: &[Target<'a>]) -> Option<Target<'a>> {
+        let first = *all.iter().min()?;
+        let paths = self.parts_of(first)?;
+        all.iter()
+            .all(|t| t.name == first.name && paths.contains(&t.path))
+            .then_some(first)
     }
 
     /// `member` of `class` in its blocks (`Facts::impls`): the inherent blocks' first, else the
@@ -1963,24 +2212,24 @@ impl<'a> Resolver<'a> {
     /// What each base `class` writes is, in order, resolved from the scope enclosing it.
     fn bases(&self, class: Target<'a>, work: &mut Work<'a>) -> Vec<Ancestor<'a>> {
         let scope = crate::parent(class.name);
-        let bases = self.defs[class.path][class.name].bases.iter().enumerate();
-        bases
-            .map(|(n, base)| {
-                match self.resolve(
-                    class.path,
-                    scope,
-                    base,
-                    &mut self.seen(class.path, scope),
-                    work,
-                ) {
+        let mut out = Vec::new();
+        // A type written in parts has the bases every part writes, its own first.
+        for class in self.parts(class) {
+            for (n, base) in self.defs[class.path][class.name].bases.iter().enumerate() {
+                let seen = &mut self.seen(class.path, scope);
+                let base = match self.resolve(class.path, scope, base, seen, work) {
                     Binding::Def(t) if self.is_class(t) => Ancestor::Class(t),
                     _ if base.starts_with('(') => {
                         Ancestor::Opaque(format!("{}::{}#{n}", class.path, class.name))
                     }
                     _ => Ancestor::Opaque(self.imported_name(class.path, scope, base)),
+                };
+                if !out.contains(&base) {
+                    out.push(base);
                 }
-            })
-            .collect()
+            }
+        }
+        out
     }
 
     /// `name` as the file's imports spell it: the module and name its head imports, then the
@@ -2032,7 +2281,7 @@ impl<'a> Resolver<'a> {
         arity: Option<usize>,
         bare: bool,
     ) -> Resolution<'a> {
-        one_of(self.candidates(path, callee, by_path, arity, bare))
+        one_of(self.candidates(path, callee, by_path, arity, bare, &|| false))
     }
 
     /// The definitions whose name matches the callee's last name anywhere `path` reaches
@@ -2046,6 +2295,7 @@ impl<'a> Resolver<'a> {
         by_path: bool,
         arity: Option<usize>,
         bare: bool,
+        on_receiver: &dyn Fn() -> bool,
     ) -> Vec<Target<'a>> {
         let (member, last) = match callee.rsplit_once('.') {
             Some((_, last)) => (true, last),
@@ -2061,7 +2311,7 @@ impl<'a> Resolver<'a> {
             found.retain(|t| reaches(path, t.path));
         }
         if let Some(arity) = arity {
-            found.retain(|t| self.arities.get(t).is_none_or(|n| n.fits(arity)));
+            found.retain(|t| (self.arities.get(t)).is_none_or(|n| n.fits_call(arity, on_receiver)));
         }
         // A file whose calls reach no extension function (Java's) matches none by name either.
         if !self.extending.contains(path) {
@@ -2368,6 +2618,25 @@ impl<'a> Resolver<'a> {
         one(found.collect())
     }
 
+    /// `found`, when files define its name apart (`Several`), narrowed to the definitions of the
+    /// compilation of `path` (`Facts::unit`, C#'s project) if it holds any: the compiler prefers
+    /// a type its own project declares to one of the same name a reference or another project
+    /// brings. A file of no compilation, or one that defines none of them, keeps them all.
+    fn in_unit(&self, path: &'a str, found: Binding<'a>) -> Binding<'a> {
+        let Binding::Several(all) = found else {
+            return found;
+        };
+        let unit = self.files.get(path).map_or("", |f| f.unit.as_str());
+        let own = |t: &&Target| self.files.get(t.path).is_some_and(|f| f.unit == unit);
+        let kept: Vec<Target<'a>> = all.iter().filter(own).copied().collect();
+        match kept[..] {
+            _ if unit.is_empty() => Binding::Several(all),
+            [] => Binding::Several(all),
+            [one] => Binding::Def(one),
+            _ => Binding::Several(kept),
+        }
+    }
+
     /// What the file's imports bind `name` to. Several imports may bind one name: the latest
     /// in source order decides, whatever it resolves to. An import of every name binds
     /// `name` only if the module exports it (`star`), to whatever it is there. The imports a
@@ -2492,7 +2761,10 @@ impl<'a> Resolver<'a> {
                 // `internal` members) gives an outside source only, as the repository's names
                 // are bound before this is asked.
                 _ if *inside => None,
-                other => match self.through_glob(other, false, name, work, seen) {
+                other => match self
+                    .through_glob(other, false, name, work, seen)
+                    .of_namespace(self, self.glob_namespace(path, target))
+                {
                     Binding::Unknown => None,
                     _ => return Vec::new(),
                 },
@@ -2506,6 +2778,16 @@ impl<'a> Resolver<'a> {
         sources.sort_unstable();
         sources.dedup();
         sources
+    }
+
+    /// The namespace a glob of `path` whose target is the import `target` takes the names of
+    /// (`wildcard`'s `Imported::Namespace` source), if it is one.
+    fn glob_namespace(&self, path: &'a str, target: &str) -> Option<&'a str> {
+        let imports = &self.files[path].imports;
+        (self.by_local[path].of(target).iter().rev())
+            .map(|&at| &imports[at])
+            .find(|i| matches!(i.name, Imported::Namespace))
+            .map(|i| i.source.as_str())
     }
 
     /// What a glob import whose target is `bound` gives `name` (`globs`).
@@ -2596,6 +2878,7 @@ impl<'a> Resolver<'a> {
             let work = &mut Work::default();
             let bound = self.resolve_as(path, scope, target, seen, work, Reading::Alias);
             let found = self.through_glob(bound, *inside, name, work, seen);
+            let found = found.of_namespace(self, self.glob_namespace(path, target));
             seen.depth -= 1;
             if seen.cut {
                 return Some(Binding::Unknown);
@@ -2772,7 +3055,21 @@ impl<'a> Resolver<'a> {
         let found = at
             .into_iter()
             .filter_map(|at| self.file_exports(files[at], name, seen, value));
-        one(found.collect())
+        // The parts of one type the files export are that type: the asking file's own part, else
+        // the first.
+        match one(found.collect()) {
+            Some(Binding::Several(all)) => Some(match self.one_type(&all) {
+                Some(first) => {
+                    let own = Target {
+                        path,
+                        name: first.name,
+                    };
+                    Binding::Def(if all.contains(&own) { own } else { first })
+                }
+                None => Binding::Several(all),
+            }),
+            found => found,
+        }
     }
 
     /// `exports` of the one file `path`.
@@ -3127,6 +3424,29 @@ fn one_of(found: Vec<Target>) -> Resolution {
     }
 }
 
+impl<'a> Binding<'a> {
+    /// What a glob of `namespace` gives, as `self`: the classes declared in that namespace
+    /// alone. A file's group may hold another namespace's types too (a C# file declaring two).
+    fn of_namespace(self, resolver: &Resolver<'a>, namespace: Option<&str>) -> Binding<'a> {
+        let Some(namespace) = namespace else {
+            return self;
+        };
+        let foreign = |t: &Target| resolver.is_class(*t) && crate::parent(t.name) != namespace;
+        match self {
+            Binding::Def(t) if foreign(&t) => Binding::Unknown,
+            Binding::Several(all) => {
+                let kept: Vec<_> = all.into_iter().filter(|t| !foreign(t)).collect();
+                match kept[..] {
+                    [] => Binding::Unknown,
+                    [one] => Binding::Def(one),
+                    _ => Binding::Several(kept),
+                }
+            }
+            found => found,
+        }
+    }
+}
+
 fn alternatives(found: Vec<Binding>) -> Option<Binding> {
     one(found
         .into_iter()
@@ -3316,7 +3636,7 @@ pub(crate) const EVAL_BUDGET: usize = 1 << 16;
 /// the next (`Follow::Values`), and the constants it follows for `Follow::Constants`.
 // ponytail: real values nest a few levels; the limit keeps a crafted chain of thousands of
 // constants from overflowing the stack.
-const EVAL_DEPTH: usize = 256;
+pub(crate) const EVAL_DEPTH: usize = 256;
 
 /// How many wrapper calls `Code::expand` climbs from a call; at the limit, the site is read
 /// where the climb stops, its parameters unknown.
@@ -3338,10 +3658,30 @@ struct Fold<'a, 'i> {
     foreign: usize,
 }
 
-/// What a contract kind reads off one annotation written on a field or a parameter
-/// (`Facts::annotated`), given the file and the annotation with what it marks: the value it
-/// injects there, or `None` when it is no annotation the kind reads or it injects nothing there.
-pub type Inject<'a, 'i> = dyn Fn(&Code<'a>, &'a str, &'a Annotated) -> Option<Value> + 'i;
+/// What a contract kind injects where the source gives no value (`Code::expand_with`), given
+/// the file and what it is asked about: the value, or `None` when it injects nothing there.
+pub type Inject<'a, 'i> = dyn Fn(&Code<'a>, &'a str, Injected<'a>) -> Option<Value> + 'i;
+
+/// What `Inject` is asked about.
+#[derive(Clone, Copy)]
+pub enum Injected<'a> {
+    /// One annotation written on a field or a parameter (`Facts::annotated`), with what it marks.
+    Annotated(&'a Annotated),
+    /// The parameter at this position of a function no exact call reaches, once no annotation
+    /// on it injects anything: a dependency injection container's constructor, which passes it
+    /// by its type (C#'s typed client).
+    Param(Target<'a>, usize),
+}
+
+impl<'a> Injected<'a> {
+    /// The annotation asked about, for a kind that reads annotations alone.
+    pub fn annotated(self) -> Option<&'a Annotated> {
+        match self {
+            Injected::Annotated(a) => Some(a),
+            Injected::Param(..) => None,
+        }
+    }
+}
 
 /// How many calls a builder chain is read through, down to what starts it.
 // ponytail: a chain of more builder calls than this is not read to its start; its calls past
@@ -3361,6 +3701,8 @@ enum Flow<'a> {
     Const(&'a str, &'a str),
     Param(Target<'a>, usize),
     Returns(Target<'a>),
+    /// A local the pack bound to one value (`Facts::bound`): its file, scope and name.
+    Local(&'a str, &'a str, &'a str),
 }
 
 /// What `Code::origins` carries along: `frames` bind the parameters of the functions whose
@@ -3476,8 +3818,10 @@ pub enum Of<'a> {
 /// own facts and charges what it reads.
 #[derive(Clone, Copy, Debug)]
 pub enum Follow {
-    /// The value flow: constants and imports, the arguments exact callers pass to parameters,
-    /// what functions of the repository return, list items, a class attribute assigned once,
+    /// The value flow: constants and imports, locals bound to one value (`Facts::bound`), the
+    /// arguments exact callers pass to parameters (and the receiver a C# extension method is
+    /// called on, `Resolver::extension_callers`), what functions of the repository return,
+    /// list items, a class attribute assigned once,
     /// and in a fluent pack a builder chain down its receivers, kept only through methods the
     /// reader's table `passes` on (`Passes`; a pack that is not fluent never consults it).
     /// Charged to `EVAL_BUDGET`, at most `EVAL_DEPTH` deep.
@@ -3620,23 +3964,7 @@ impl<'a> Code<'a> {
         follow: Follow,
     ) -> Vec<Origin<'a>> {
         match follow {
-            Follow::Values { passes } => {
-                let mut trail = Trail::new(passes);
-                match of {
-                    Of::Name(name) => self.flow_name(path, scope, name, &mut trail),
-                    Of::Value(value) => self.flow(path, scope, value, &mut trail),
-                }
-                let origin = |((p, n), routes): ((&'a str, usize), BTreeSet<Route<'a>>)| {
-                    let call = &self.resolver.files[p].calls[n];
-                    Origin {
-                        call: Some((p, n)),
-                        form: Form::Call,
-                        outside: self.outside(p, &call.scope, &call.callee, call.by_path),
-                        routes: routes.into_iter().collect(),
-                    }
-                };
-                trail.out.into_iter().map(origin).collect()
-            }
+            Follow::Values { passes } => self.origins_within(path, scope, of, passes, &[]),
             Follow::Constants => {
                 let seen = &mut Vec::new();
                 let made = match of {
@@ -3891,7 +4219,7 @@ impl<'a> Code<'a> {
     }
 
     /// The value the nearest binding of `name` around `scope` of `path` holds (`Facts::bound`,
-    /// which only the Kotlin pack fills), when no other binding of the name is in the same scope
+    /// which the Kotlin and C# packs fill), when no other binding of the name is in the same scope
     /// (a name declared twice, a loop variable, a parameter, a constant, a property). Each scope
     /// is looked up by name (`ByName::bound` and the resolver's maps), so a file of many locals
     /// and calls costs each lookup its depth, never the file's width.
@@ -3912,7 +4240,9 @@ impl<'a> Code<'a> {
                     && (held.is_none() || receiver.is_some()))
                 || r.consts[path].contains(qualified.as_str())
                 || r.defs[path].get(s).is_some_and(|d| d.params.iter().any(|p| p.name == name))
-                || receiver.is_some_and(|c| **c == Class::Unknown);
+                // A receiver of unknown class beside a bound is the local's own (C#'s `var x`);
+                // the pack binds the other bindings of the name too, so two bounds leave none.
+                || (held.is_none() && receiver.is_some_and(|c| **c == Class::Unknown));
             match (held, others) {
                 (Some(found), false) => return Some(found),
                 (None, false) if receiver.is_none() => {
@@ -3922,6 +4252,23 @@ impl<'a> Code<'a> {
             }
         }
         None
+    }
+
+    /// Every name `path` binds to a value (`Facts::bound`), in source order: the kinds that need
+    /// the name a call's result is held by read them once per file.
+    pub fn bindings(&self, path: &'a str) -> &'a [Bound] {
+        self.full(path).map_or(&[], |f| f.bound.as_slice())
+    }
+
+    /// Every bound of `name` in exactly `scope` of `path`, in source order (`Facts::bound`):
+    /// the packs that record a name once per assignment (C#'s `name=`) are read whole here.
+    pub fn bounds(&self, path: &'a str, scope: &'a str, name: &str) -> Vec<&'a Bound> {
+        let Some(by_name) = self.by_name(path) else {
+            return Vec::new();
+        };
+        (by_name.bound.get(&(scope, name)).into_iter().flatten())
+            .copied()
+            .collect()
     }
 
     /// The values the call at `index` of `path` may return, when a function of the repository
@@ -4256,6 +4603,10 @@ impl<'a> Code<'a> {
             true => n.checked_sub(1),
             false => Some(n),
         };
+        // The receiver of a call made on one (C#'s `x.M()` of `M(this X x)`) is its instance.
+        if bound && n == 0 && param.binds == Binds::Instance {
+            return call.receiver.as_ref();
+        }
         match param.binds {
             Binds::Rest => None,
             Binds::Keyword => call.keyword(&param.name),
@@ -4269,7 +4620,7 @@ impl<'a> Code<'a> {
     /// `EVAL_DEPTH` deep, and charged to the `EVAL_BUDGET` of the file it reads.
     fn follows(&self, trail: &Trail<'a>, flow: &Flow<'a>) -> bool {
         let file = match flow {
-            Flow::Const(at, _) => at,
+            Flow::Const(at, _) | Flow::Local(at, ..) => at,
             Flow::Param(function, _) | Flow::Returns(function) => function.path,
         };
         !trail.busy.contains(flow) && trail.busy.len() < EVAL_DEPTH && self.charge(file, 1)
@@ -4352,8 +4703,8 @@ impl<'a> Code<'a> {
     /// the repository returns, the value the call is made on, or the call itself.
     fn flow_from(&self, path: &'a str, index: usize, trail: &mut Trail<'a>) {
         let calls = &self.resolver.files[path].calls;
-        let function = match self.resolver.call(path, &calls[index]) {
-            Resolution::Exact(t) if !self.resolver.is_class(t) => t,
+        let function = match self.resolver.flows_to(path, &calls[index]) {
+            Some(t) if !self.resolver.is_class(t) => t,
             _ if self.pack.fluent() => match self.receiver(path, index) {
                 None => {
                     self.reached(path, index, trail);
@@ -4497,8 +4848,16 @@ impl<'a> Code<'a> {
                     // not followed.
                     Some(_) => return,
                     // Its exact callers alone (`callers`): one found only by a name match may
-                    // pass any object.
+                    // pass any object, but for the calls of an extension method made on a
+                    // receiver (`extension_callers`).
                     None => (self.resolver.callers.get(&function).into_iter().flatten())
+                        .chain(
+                            self.resolver
+                                .extension_callers
+                                .get(&function)
+                                .into_iter()
+                                .flatten(),
+                        )
                         .map(|c| (c.path, c.index))
                         .collect(),
                 };
@@ -4516,6 +4875,19 @@ impl<'a> Code<'a> {
                 trail.frames.extend(frame);
                 trail.busy.pop();
             }
+            // A local the pack bound to one value (`Facts::bound`) holds it, read where it is
+            // written.
+            Binding::Hidden | Binding::Local(..)
+                if let Some(bound) = self.local(path, scope, name) =>
+            {
+                let flow = Flow::Local(path, &bound.scope, &bound.name);
+                if !self.follows(trail, &flow) {
+                    return;
+                }
+                trail.busy.push(flow);
+                self.flow(path, &bound.within, &bound.value, trail);
+                trail.busy.pop();
+            }
             // ponytail: a name its scope binds more than once, and an attribute not assigned a
             // call once in its class, hold no constant, so what they hold is not followed.
             _ => {}
@@ -4530,6 +4902,25 @@ impl<'a> Code<'a> {
             .arg_types
             .get(n)?
             .as_ref()
+    }
+
+    /// The type the source writes for the field, property, parameter or local `name`, read in
+    /// `scope` of `path`: the file and scope that write it and the type as written, to read
+    /// through the imports there (`Code::outside`). `None` when no type is written for the name.
+    /// Unlike `names::typed`, it needs no entry in `Facts::externs` (a pack that keeps outside
+    /// types out of it, so that a call on one stays a name match, as C#'s does).
+    pub fn written(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Option<(&'a str, &'a str, &'a str)> {
+        let r = self.resolver;
+        let (at, within, held) = r.holder(&r.read_member(path, scope, name))?;
+        match r.receivers[at].get(&(within, held))? {
+            Class::Type(written) => Some((at, within, written)),
+            _ => None,
+        }
     }
 
     /// The type the constant `constant` of `path` is declared to have (`Const::ty`).
@@ -4582,7 +4973,7 @@ impl<'a> Code<'a> {
     }
 
     /// The parameter at position `n` of `function`.
-    fn param(&self, function: Target<'a>, n: usize) -> Option<&'a Param> {
+    pub fn param(&self, function: Target<'a>, n: usize) -> Option<&'a Param> {
         self.def(function.path, function.name)?.params.get(n)
     }
 
@@ -4716,6 +5107,56 @@ impl<'a> Code<'a> {
             ))
         });
         args.collect()
+    }
+
+    /// The function of the repository the value flow reaches through the call at `index` of
+    /// `path` (`Follow::Values`): its exact target, or the extension method a call made on a
+    /// receiver reaches (`Resolver::flows_to`). A kind asks it whether a function of the
+    /// repository answers a call it would read as a library's.
+    pub fn reaches(&self, path: &'a str, index: usize) -> Option<Target<'a>> {
+        let call = self.resolver.files[path].calls.get(index)?;
+        self.resolver.flows_to(path, call)
+    }
+
+    /// `Code::origins` with `Follow::Values` of what is written inside the functions the calls
+    /// `through` reach, outermost first (an `Origin`'s `Route::through`): each call binds the
+    /// parameters of the function it reaches, as when the walk climbs its return values, so a
+    /// reader that climbed to a value reads what is written there with that call's arguments
+    /// alone. A route's own `through` keeps the calls of `through` still around where its
+    /// origin is written, then those it climbed. None when a call reaches no function.
+    pub fn origins_within(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        of: Of<'a>,
+        passes: Passes,
+        through: &[(&'a str, usize)],
+    ) -> Vec<Origin<'a>> {
+        let mut trail = Trail::new(passes);
+        for &(at, index) in through {
+            let Some(def) = self.reaches(at, index) else {
+                return Vec::new();
+            };
+            trail.frames.push(Frame {
+                def,
+                path: at,
+                index,
+            });
+        }
+        match of {
+            Of::Name(name) => self.flow_name(path, scope, name, &mut trail),
+            Of::Value(value) => self.flow(path, scope, value, &mut trail),
+        }
+        let origin = |((p, n), routes): ((&'a str, usize), BTreeSet<Route<'a>>)| {
+            let call = &self.resolver.files[p].calls[n];
+            Origin {
+                call: Some((p, n)),
+                form: Form::Call,
+                outside: self.outside(p, &call.scope, &call.callee, call.by_path),
+                routes: routes.into_iter().collect(),
+            }
+        };
+        trail.out.into_iter().map(origin).collect()
     }
 
     /// Whether `name`, written in `path` within `scope`, is no binding of the file at all: a
@@ -5036,7 +5477,7 @@ impl<'a> Code<'a> {
         let annotated = &self.full(path)?.annotated;
         (annotated.iter())
             .filter(|a| marks(&a.on))
-            .find_map(|a| inject(self, path, a))
+            .find_map(|a| inject(self, path, Injected::Annotated(a)))
     }
 
     /// `value` with its names folded. `frames[depth..]` bind the parameters of the function
@@ -5211,12 +5652,13 @@ impl<'a> Code<'a> {
                     }
                 }
                 frame => {
-                    // No frame binds it: what an annotation injects, when no exact call can
-                    // pass it.
+                    // No frame binds it: what an annotation injects, or what the kind injects
+                    // into the parameter itself, when no exact call can pass it.
                     let called = self.may_be_called(function);
                     let marks = |on: &Marked| matches!(on, Marked::Param(f, at) if f == function.name && *at == n);
                     if let (false, None, Some(inject)) = (called, field, fold.inject)
-                        && let Some(value) = self.injected(function.path, marks, inject)
+                        && let Some(value) = (self.injected(function.path, marks, inject))
+                            .or_else(|| inject(self, function.path, Injected::Param(function, n)))
                     {
                         return value;
                     }
@@ -5382,6 +5824,41 @@ mod tests {
                 Resolution::Exact(_)
             ));
         }
+    }
+
+    #[test]
+    fn a_chain_of_locals_on_call_results_resolves_each_call_once() {
+        use crate::lang::java::Java;
+        // `var a1 = a0.m(); var a2 = a1.m(); ..`: each local takes its class from the result of
+        // a call on the one before, and no definition answers. Each result is read once, through
+        // exact targets alone, so the chain costs its length, not two to the power of it.
+        let n = RECEIVER_DEPTH + 16;
+        let locals: String = (1..=n)
+            .map(|i| format!("var a{i} = a{}.m(); ", i - 1))
+            .collect();
+        let src = format!(
+            "package a;\nimport b.Outside;\nclass C {{ void f(Outside a0) {{ {locals}a{n}.m(); }} }}\n"
+        );
+        let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("a/C.java", &facts)]);
+        let layout = Java.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
+        assert!(
+            facts.calls.len() > RECEIVER_DEPTH,
+            "{} calls",
+            facts.calls.len()
+        );
+        let start = std::time::Instant::now();
+        for call in &facts.calls {
+            assert!(!matches!(
+                resolver.call("a/C.java", call),
+                Resolution::Exact(_)
+            ));
+        }
+        // Reading each result twice, through the walk and the name match, doubled the cost per
+        // link: past twenty links, minutes.
+        let took = start.elapsed();
+        assert!(took.as_secs() < 10, "{took:?}");
     }
 
     #[test]
@@ -8453,5 +8930,93 @@ mod tests {
         ] {
             assert!(!calls[call].starts_with("exact"), "{call}: {}", calls[call]);
         }
+    }
+}
+
+#[cfg(test)]
+mod csharp_tests {
+    use super::*;
+    use crate::lang::LanguagePack;
+    use crate::lang::csharp::CSharp;
+
+    const PROJECT: &[u8] = b"<Project Sdk=\"Microsoft.NET.Sdk\"></Project>";
+    const ORDER: &str = "namespace P;\npublic class Order { public static Order Of() => null; \
+                         public int Total() => 1; }\n";
+
+    /// How each call of `files`, joined into their projects (`Kit`, `Kit2`, `App`), resolves:
+    /// `(path, callee, level, targets' paths)`.
+    fn resolved(files: &[(&str, &str)]) -> Vec<(String, String, &'static str, Vec<String>)> {
+        let configs: Vec<(&str, &[u8])> = ["Kit/Kit.csproj", "Kit2/Kit2.csproj", "App/App.csproj"]
+            .into_iter()
+            .map(|p| (p, PROJECT))
+            .collect();
+        let mut parsed: Vec<(&str, Facts)> = (files.iter())
+            .map(|(p, s)| (*p, CSharp.parse(p, s.as_bytes()).unwrap()))
+            .collect();
+        let join = {
+            let raw: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+            CSharp.join(&configs, &raw)
+        };
+        for (path, facts) in &mut parsed {
+            join(path, facts);
+        }
+        let files: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let layout = CSharp.layout(&configs, &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &CSharp);
+        let paths = |ts: &[Target]| ts.iter().map(|t| t.path.to_string()).collect();
+        let mut out = Vec::new();
+        for (&path, facts) in &files {
+            for call in &facts.calls {
+                let (level, targets) = match resolver.call(path, call) {
+                    Resolution::Exact(t) => ("exact", paths(&[t])),
+                    Resolution::Inferred(t) => ("inferred", paths(&[t])),
+                    Resolution::Narrowed(t) => ("narrowed", paths(&[t])),
+                    Resolution::Ambiguous(ts) => ("ambiguous", paths(&ts)),
+                    Resolution::Unresolved => ("unresolved", Vec::new()),
+                };
+                out.push((path.to_string(), call.callee.clone(), level, targets));
+            }
+        }
+        out
+    }
+
+    /// A type two projects of the repository declare under one qualified name binds, from a
+    /// file of one of them, to that project's own (the compiler prefers the source's type); from
+    /// a file of neither, the name is ambiguous, and a receiver of that type unknown.
+    #[test]
+    fn a_type_two_projects_declare_binds_to_the_caller_s_project_first() {
+        let use_it = "namespace P;\nclass Use { void F(Order o) { o.Total(); Order.Of(); \
+                      P.Order.Of(); } }\n";
+        let app =
+            "namespace Q;\nusing P;\nclass Run { void F(Order o) { o.Total(); Order.Of(); } }\n";
+        let found = resolved(&[
+            ("Kit/Order.cs", ORDER),
+            ("Kit2/Order.cs", ORDER),
+            ("Kit2/Use.cs", use_it),
+            ("App/Run.cs", app),
+        ]);
+        let of = |path: &str| {
+            (found.iter())
+                .filter(|(p, ..)| p == path)
+                .map(|(_, callee, level, targets)| (callee.as_str(), *level, targets.clone()))
+                .collect::<Vec<_>>()
+        };
+        let kit2 = vec!["Kit2/Order.cs".to_string()];
+        assert_eq!(
+            of("Kit2/Use.cs"),
+            [
+                ("o.Total", "exact", kit2.clone()),
+                ("Order.Of", "exact", kit2.clone()),
+                ("P.Order.Of", "exact", kit2),
+            ]
+        );
+        let both = vec!["Kit/Order.cs".to_string(), "Kit2/Order.cs".to_string()];
+        assert_eq!(
+            of("App/Run.cs"),
+            [
+                ("o.Total", "unresolved", vec![]),
+                ("Order.Of", "ambiguous", both)
+            ]
+        );
     }
 }
