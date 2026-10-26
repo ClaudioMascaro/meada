@@ -782,7 +782,7 @@ one for the area a change touches.
   RestTemplate, WebClient, `java.net.http` and OkHttp consumers, whose bases come from the
   Spring configuration `jvm/spring.rs` reads for the JVM packs' kinds; `http/kotlin.rs`, Ktor
   providers, and `http/kotlin/client.rs`, Ktor client consumers; `http/csharp.rs`, ASP.NET Core
-  controller providers), resource and channel
+  controller providers and `http/csharp/clients.rs`, HttpClient consumers), resource and channel
   kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
   contracts (specs #22, #24, #30, #25 and #26), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
@@ -2132,14 +2132,38 @@ qualification budget does (ADR 0017).
   before the trunk's normalization, which reads it as a query. Case is kept, so `[controller]`
   on `OrdersController` is `/api/Orders` (ASP.NET Core matches case-insensitively; the trunk
   does not). A method serves nothing when `[NonAction]` marks it or `Facts::hidden` says it is
-  not public. Ceilings: a template that is not a string literal serves nothing (the pack folds
-  no constants or `+`); a class with a base class of the repository (an interface is fine), a
+  not public. Ceilings: a template that does not fold to a literal serves nothing; a class with a base class of the repository (an interface is fine), a
   class that is the base of another one of the repository, and a class declared in parts
   (`Facts::partial` in several files) serve nothing, since the attributes they have or pass
   down are not followed or joined; `[Area]` and `Name=` route names are not applied;
   `SuppressAsyncSuffixInActionNames` turned off is not read; `[HttpGet("a")] [Route("b")]`
   serves `GET /b` (ASP.NET Core may serve it for every method), and a method attribute without
   template beside a templated one gives no route.
+- `http/csharp/clients.rs` (spec #28, #111): an `HttpClient` call is a consumer when its method
+  is in `CLIENT_METHODS` (`GetAsync` to `PutAsJsonAsync`) or is `SendAsync`, and its receiver is
+  an `HttpClient`: `Code::written` gives the type text written for a field, a parameter or a
+  typed local, `names::spellings` confirms it through the usings (an alias counts, a class of
+  the repository named `HttpClient` hides the framework's), and a construction in place or a
+  local made by `new HttpClient()` counts without a written type. The pack ships syntax only and
+  adds no externs: C# types are not in `Facts::externs`, since `Binding::External` would turn
+  the calls on them from inferred to unresolved. The call is read whole by `Expand::Chain`, so a
+  wrapper (the URL, the method, the `HttpRequestMessage` or the client a parameter) is a consumer
+  at each caller with the trunk's depth bound and cycle check; `SendAsync(new
+  HttpRequestMessage(HttpMethod.X, url))` takes its method and URL from the request, and
+  `new Uri(x)` is `x`. The pack folds string literals, verbatim, raw (one line) and interpolated
+  strings (`{{` and `}}` unescaped, a hole with an alignment or format clause is a parameter),
+  `+`, and `const` and `static readonly` fields, of other types too (`Facts::consts` and
+  `Facts::statics`, as Java's `static final`). A base is the `BaseAddress = new Uri(x)` of the
+  client's initializer (the pack gives an initializer as the last argument of the creation, a
+  `Value::Object`) or an assignment on the name the call is made on (a `Bound` named
+  `<name>.BaseAddress`, at the class when `<name>` is a field, at the method otherwise); the
+  assignment wins, a relative URL joins it and one starting with `/` keeps its origin. A client
+  with no readable base is a path-only contract. Named clients (`CreateClient(name)`, local or
+  chained) are not consumers. Ceilings: a local `string url = ...` is not followed; an instance
+  `readonly` field is not folded (only `const` and `static readonly`); a type written fully
+  qualified in place is not resolved; a field assigned a client more than once has an unknown
+  base; `new Uri(base, relative)` with two arguments, a `HttpRequestMessage` built with an
+  object initializer and `AddHttpClient<T>` bases (spec #28, #113) are not read.
 - `http/kotlin.rs` (spec #27, #98): Ktor routes, through the same `Mounts` and `prefixes` as
   the other routers, whose nodes are definitions (file, qualified name): the lambda of each
   `routing { }` call (a root), the lambda of each `route(prefix) { }` call (mounted under its

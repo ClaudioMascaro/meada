@@ -48,6 +48,16 @@ All notable changes to Meada are recorded here. The format follows
   without a method attribute serves every method (`http::ANY::<path>`, linked to consumers of
   any method). Conventional routing, a controller with a base class of the repository, a class
   in `partial` parts, `[NonAction]` methods and attributes that are not MVC's are not read.
+- C# HttpClient calls as HTTP consumers (issue #111): `GetAsync`, `PostAsync`, `PutAsync`,
+  `PatchAsync`, `DeleteAsync`, `GetStringAsync`, `GetStreamAsync`, `GetByteArrayAsync`,
+  `GetFromJsonAsync`, `PostAsJsonAsync`, `PutAsJsonAsync` and `SendAsync` with a
+  `new HttpRequestMessage(HttpMethod.X, url)` on an `HttpClient` (by its declared type or
+  construction, resolved through usings) are consumers with the method and the evaluated path.
+  URLs fold string literals, interpolation, verbatim and raw strings, `+`, and `const` and
+  `static readonly` fields, also of other types. `BaseAddress = new Uri(base)` in the client's
+  initializer or an assignment is its host, and a wrapper is read at each of its callers.
+  A call whose URL cannot be evaluated is an unresolved consumer; clients from
+  `IHttpClientFactory.CreateClient(name)` are not read.
 - Kotlin source indexing (issue #95): `.kt` and `.kts` files (Gradle's `build.gradle.kts` and
   `settings.gradle.kts` stay manifests) yield package-qualified classes, interfaces, objects,
   companions (`Class.Companion` when unnamed), top-level and extension functions, properties

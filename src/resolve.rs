@@ -4722,6 +4722,23 @@ impl<'a> Code<'a> {
             .as_ref()
     }
 
+    /// The type the source writes for the field, property, parameter or local `name`, read in
+    /// `scope` of `path`: the file and scope that write it and the type as written, to read
+    /// through the imports there (`Code::outside`). `None` when no type is written for the name.
+    pub fn written(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Option<(&'a str, &'a str, &'a str)> {
+        let r = self.resolver;
+        let (at, within, held) = r.holder(&r.read_member(path, scope, name))?;
+        match r.receivers[at].get(&(within, held))? {
+            Class::Type(written) => Some((at, within, written)),
+            _ => None,
+        }
+    }
+
     /// The type the constant `constant` of `path` is declared to have (`Const::ty`).
     pub fn constant_type(&self, path: &'a str, constant: &str) -> Option<&'a Ty> {
         let consts = self.consts(path, constant);

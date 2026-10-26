@@ -3417,6 +3417,31 @@ fn csharp() {
         api("Namespaces.cs", "Acme.Api.Outside.Run()"),
         api("Inside.cs", "Acme.Api.Inside"),
         api("Inside.cs", "Acme.Api.Inside.Run()"),
+        orders("Routes.cs", "Routes"),
+        api("Clients.cs", "Acme.Api.Clients.Hosts"),
+        api("Clients.cs", "Acme.Api.Clients.Verbs"),
+        api("Clients.cs", "Acme.Api.Clients.Verbs.Verbs(HttpClient)"),
+        api("Clients.cs", "Acme.Api.Clients.Verbs.Run(int)"),
+        api("Clients.cs", "Acme.Api.Clients.Based"),
+        api("Clients.cs", "Acme.Api.Clients.Based.Run()"),
+        api("Clients.cs", "Acme.Api.Clients.Folds"),
+        api("Clients.cs", "Acme.Api.Clients.Folds.Folds(HttpClient)"),
+        api("Clients.cs", "Acme.Api.Clients.Folds.Run(string)"),
+        api("Clients.cs", "Acme.Api.Clients.Wrappers"),
+        api(
+            "Clients.cs",
+            "Acme.Api.Clients.Wrappers.Wrappers(HttpClient)",
+        ),
+        api("Clients.cs", "Acme.Api.Clients.Wrappers.Fetch(string)"),
+        api("Clients.cs", "Acme.Api.Clients.Wrappers.ForOrder(string)"),
+        api("Clients.cs", "Acme.Api.Clients.Wrappers.Run(string)"),
+        api("Clients.cs", "Acme.Api.Clients.Unread"),
+        api(
+            "Clients.cs",
+            "Acme.Api.Clients.Unread.Unread(HttpClient,IHttpClientFactory)",
+        ),
+        api("Clients.cs", "Acme.Api.Clients.Unread.Lookup()"),
+        api("Clients.cs", "Acme.Api.Clients.Unread.Run()"),
         shadows("Shadows"),
         shadows("Shadows.Parameter(object)"),
         shadows("Shadows.Local()"),
@@ -3762,6 +3787,158 @@ fn csharp_controllers_are_providers_with_their_full_paths() {
         .map(|(c, s)| (c.as_str(), s.as_str()))
         .collect();
     assert_eq!(actual, pairs(&expected));
+}
+
+/// HttpClient calls are consumers (spec #28, #111): every method, `SendAsync` with a request, a
+/// `BaseAddress` from an initializer, a constant and an assignment, strings folded across
+/// interpolation, `+`, verbatim text and constants of other types, and a wrapper read at each call
+/// site. A call whose URL cannot be evaluated is unresolved, and a named client is not read.
+#[test]
+fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
+    let repo = fixture_repo("csharp_http_consumers", "conformance-csharp", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let at = |function: &str, call: &str| {
+        format!("src/Acme.Api/Clients.cs::Acme.Api.Clients.{function}::{call}")
+    };
+    let (orders, billing, shared, local) = (
+        "host:orders.example.com",
+        "host:billing.example.com",
+        "host:shared.example.com",
+        "host:local.example.com",
+    );
+    let (verbs, based, folds, wrap) = (
+        "Verbs.Run(int)",
+        "Based.Run()",
+        "Folds.Run(string)",
+        "Wrappers.Run(string)",
+    );
+    let (verbatim, format, wrapped) = (
+        "host:verbatim.example.com",
+        "host:format.example.com",
+        "host:wrapped.example.com",
+    );
+    let expected = triples(&[
+        // Every method, and `SendAsync` with a request made in place.
+        ("http::GET::/orders", orders, &at(verbs, "http.GetAsync#0")),
+        (
+            "http::POST::/orders",
+            orders,
+            &at(verbs, "http.PostAsync#0"),
+        ),
+        (
+            "http::PUT::/orders/1",
+            orders,
+            &at(verbs, "http.PutAsync#0"),
+        ),
+        (
+            "http::PATCH::/orders/2",
+            orders,
+            &at(verbs, "http.PatchAsync#0"),
+        ),
+        (
+            "http::DELETE::/orders/3",
+            orders,
+            &at(verbs, "http.DeleteAsync#0"),
+        ),
+        (
+            "http::GET::/text",
+            orders,
+            &at(verbs, "http.GetStringAsync#0"),
+        ),
+        (
+            "http::GET::/stream",
+            orders,
+            &at(verbs, "http.GetStreamAsync#0"),
+        ),
+        (
+            "http::GET::/bytes",
+            orders,
+            &at(verbs, "http.GetByteArrayAsync#0"),
+        ),
+        (
+            "http::GET::/json",
+            orders,
+            &at(verbs, "http.GetFromJsonAsync#0"),
+        ),
+        (
+            "http::POST::/json",
+            orders,
+            &at(verbs, "http.PostAsJsonAsync#0"),
+        ),
+        (
+            "http::PUT::/json/1",
+            orders,
+            &at(verbs, "http.PutAsJsonAsync#0"),
+        ),
+        (
+            "http::DELETE::/send",
+            orders,
+            &at(verbs, "http.SendAsync#0"),
+        ),
+        ("http::POST::/uri", orders, &at(verbs, "http.SendAsync#1")),
+        // The base address of the client each call is made on.
+        (
+            "http::GET::/api/items",
+            shared,
+            &at(based, "Shared.GetAsync#0"),
+        ),
+        ("http::GET::/root", shared, &at(based, "Shared.GetAsync#1")),
+        (
+            "http::GET::/billing",
+            billing,
+            &at(based, "field.GetAsync#0"),
+        ),
+        (
+            "http::GET::/v1/orders/1",
+            local,
+            &at(based, "local.GetStringAsync#0"),
+        ),
+        // Strings folded.
+        (
+            "http::GET::/invoices/{}",
+            billing,
+            &at(folds, "http.GetAsync#0"),
+        ),
+        (
+            "http::GET::/api/invoices",
+            billing,
+            &at(folds, "http.GetAsync#1"),
+        ),
+        (
+            "http::GET::/items/stock",
+            orders,
+            &at(folds, "http.GetAsync#2"),
+        ),
+        ("http::GET::/plus/{}", local, &at(folds, "http.GetAsync#3")),
+        ("http::GET::/a", verbatim, &at(folds, "http.GetAsync#4")),
+        ("http::GET::/{}/b", verbatim, &at(folds, "http.GetAsync#5")),
+        ("http::GET::/{}/{}", format, &at(folds, "http.GetAsync#6")),
+        // A wrapper, read at each call site of the wrapper and of the one that calls it.
+        ("http::GET::/orders/7", wrapped, &at(wrap, "ForOrder#0")),
+        ("http::GET::/orders/{}", wrapped, &at(wrap, "ForOrder#1")),
+        ("http::GET::/direct", wrapped, &at(wrap, "Fetch#0")),
+        // A URL that cannot be evaluated; the named client has no consumer.
+        ("unresolved", "", &at("Unread.Run()", "http.GetAsync#0")),
+    ]);
+    assert_eq!(consumers(&json, "src/Acme.Api/Clients.cs"), expected);
+}
+
+/// Context lists the consumer an HttpClient call that cannot be evaluated is, unresolved.
+#[test]
+fn csharp_context_shows_an_unresolved_consumer() {
+    let repo = fixture_repo(
+        "csharp_unresolved_consumer",
+        "conformance-csharp",
+        Some(ORIGIN),
+    );
+    assert_golden(
+        "conformance-csharp.context-unresolved.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .context("Acme.Api.Clients.Unread.Run()", None)
+            .unwrap(),
+    );
 }
 
 fn billing(file: &str, name: &str) -> String {
