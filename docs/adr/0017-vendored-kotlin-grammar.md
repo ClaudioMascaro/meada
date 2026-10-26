@@ -38,6 +38,8 @@ reach `cargo install meada`, which builds from the registry.
   file into an ERROR (declarations after it vanished). It is C that reads lookahead only, as the
   scanner already does, with no new external token and no `parser.c` change. Without a patch the
   fix would wait for a release; a pack-side guard was measured and flags 30 files for one target.
+  It is upstream pull request tree-sitter-grammars/tree-sitter-kotlin#24, which fixes issue
+  tree-sitter-grammars/tree-sitter-kotlin#25.
 - The binary's `build.rs` compiles them with `cc`, with the flags of the crate's own build
   script, and `src/lang/kotlin.rs` declares `tree_sitter_kotlin` and wraps it in a
   `tree_sitter_language::LanguageFn`, so the pack calls the grammar as it calls a crate's. The
@@ -58,7 +60,8 @@ reach `cargo install meada`, which builds from the registry.
   Dockerfile and `.dockerignore` lines. The conformance fixture's trees must stay byte-identical.
 - A local patch is dropped when a pull request upstream ships it: re-take the file from that
   head, delete the patch and its `PROVENANCE.md` entry, and check the conformance trees are
-  unchanged. A patch that stops applying to a newer upstream file is rebased, not edited in place.
+  unchanged. Patch 0001 goes when tree-sitter-grammars/tree-sitter-kotlin#24 merges, or another
+  fix closes tree-sitter-grammars/tree-sitter-kotlin#25: re-vendor `src/scanner.c` from upstream. A patch that stops applying to a newer upstream file is rebased, not edited in place.
 - Taking another upstream fix means copying its generated `src/parser.c` or `src/scanner.c`
   from the pull request's head, checking that it differs from the vendored file only by the
   pull request's diff and that the external tokens of `parser.c` and `scanner.c` agree, and

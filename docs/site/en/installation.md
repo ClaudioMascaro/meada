@@ -28,4 +28,4 @@ files at `/usr/share/meada/ui`; the default image and prebuilt binaries still ca
 Node is needed only to build the frontend from source, never to install through Cargo or
 run the console.
 
-To index Java, only the Meada binary and git are needed. No JDK, Maven or Gradle is required; analysis reads `.java` files without compiling or running the project.
+To index Java and Kotlin, only the Meada binary and git are needed. No JDK, Kotlin compiler, Maven or Gradle is required; analysis reads `.java`, `.kt` and `.kts` files without compiling or running the project.

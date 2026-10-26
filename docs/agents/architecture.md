@@ -781,7 +781,7 @@ one for the area a change touches.
   with resty; `http/java.rs` and `http/java/clients.rs`, Spring MVC providers and the
   RestTemplate, WebClient, `java.net.http` and OkHttp consumers, whose bases come from the
   Spring configuration `jvm/spring.rs` reads for the JVM packs' kinds; `http/kotlin.rs`, Ktor
-  providers), resource and channel
+  providers, and `http/kotlin/client.rs`, Ktor client consumers), resource and channel
   kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
   contracts (specs #22, #24, #30, #25 and #26), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
@@ -1600,7 +1600,9 @@ one for the area a change touches.
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition, constant, type or file they name), the `families` table (spec #26: each public
   Java class's ancestors past it, `Resolver::ancestries`, a repository class by file and name and
-  an opaque one as `null`), the `entry_points` table (spec #31:
+  an opaque one as `null`), the `flexible` table (spec #27, #106: each function that takes more
+  than one count of arguments, a default parameter or a vararg, by file and qualified name with
+  its parameter types, with the least and the most count, `resolve::Flexible`), the `entry_points` table (spec #31:
   each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
   each community's name and member identities (`communities`, spec #31). `Call::args`,
   `Call::kwargs`, `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::return_values`, `Def::type_params`, `Param::default`,

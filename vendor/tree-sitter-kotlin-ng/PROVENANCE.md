@@ -44,8 +44,10 @@ is to be offered upstream. A patch is dropped when upstream ships it.
   anything else inserts the statement separator. The accessor forms of `src/lang/kotlin.rs`'s `accessors_stay_accessors_beside_the_scanner_patch` parse as before.
   Measured on the 1,691-file corpus of ADR 0017: files with an ERROR 71 to 69, the only
   declaration change a false `P /list` removed, and the trees of the other fixtures unchanged.
-  Not upstream yet (no issue or pull request); the infix `get` shape of upstream PR #22 is a
-  separate, unpatched defect.
+  Offered upstream as pull request tree-sitter-grammars/tree-sitter-kotlin#24, which fixes
+  issue tree-sitter-grammars/tree-sitter-kotlin#25: when either merges (that pull request, or
+  another fix that closes the issue), re-vendor `src/scanner.c` from upstream and drop the patch
+  and its row. The infix `get` shape of upstream PR #22 is a separate, unpatched defect.
 
 To check: `sha256sum -c` over the table, and for each upstream copy
 `git diff v1.1.0 <head> -- <path>` in a clone of the upstream repository; for `src/scanner.c`, that
