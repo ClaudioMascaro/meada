@@ -43,4 +43,25 @@ public class Probes
     }
 
     public void Field() { slot.Freeze(); }
+
+    // A type outside the repository, or the repository's without the method, is no receiver of
+    // any method of that name; an extension method may be.
+    public void Outside(List<Account> items, Account given, IReviewer reviewer, IServices services)
+    {
+        items.Count();
+        Teller.Accrue();
+        given.Audit();
+        reviewer.Review();
+        reviewer.Escalate();
+        services.AddOrders();
+        services.AddOrders(config => { });
+        ServiceExtensions.AddOrders(services);
+        ServiceExtensions.AddOrders(services, null);
+    }
+}
+
+// A `params` array of a primary constructor hides the type of its name.
+public class Batch(params Format[] Format)
+{
+    public void Run() { Format.Upper("x"); }
 }

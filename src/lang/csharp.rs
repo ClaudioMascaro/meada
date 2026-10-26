@@ -921,8 +921,10 @@ fn parameters_of(list: Option<Node>, src: &[u8]) -> Vec<(String, String, Binds)>
                 name.map_or("", |n| text(n, src)).to_string(),
                 ty.map_or_else(String::new, |t| type_spelling(t, src)),
                 // The `this` parameter of an extension method is the receiver of a call written
-                // `x.Method(..)`: a call may leave it out.
-                if defaulted || named(p).any(|m| m.kind() == "modifier" && text(m, src) == "this") {
+                // `x.Method(..)`.
+                if named(p).any(|m| m.kind() == "modifier" && text(m, src) == "this") {
+                    Binds::Instance
+                } else if defaulted {
                     Binds::Optional
                 } else {
                     Binds::Any
@@ -940,20 +942,27 @@ fn parameters_of(list: Option<Node>, src: &[u8]) -> Vec<(String, String, Binds)>
     out
 }
 
-/// Each typed parameter of `list`: its name and the class its type names. A `params` array is
-/// no class.
+/// Each parameter of `list`: its name and the class its type names; a `params` array is no
+/// class.
 fn parameter_classes(list: Option<Node>, src: &[u8], generics: &[String]) -> Vec<(String, Class)> {
     let Some(list) = list.filter(|l| l.kind() == "parameter_list") else {
         return Vec::new();
     };
-    (named(list).filter(|p| p.kind() == "parameter"))
+    let mut out: Vec<(String, Class)> = (named(list).filter(|p| p.kind() == "parameter"))
         .filter_map(|p| {
             let name = text(p.child_by_field_name("name")?, src).to_string();
             let class = (p.child_by_field_name("type"))
                 .map_or(Class::Unknown, |t| class_of(t, src, generics));
             Some((name, class))
         })
-        .collect()
+        .collect();
+    // A `params` array binds its name too, as no class.
+    if children(list).any(|c| c.kind() == "params")
+        && let Some(name) = list.child_by_field_name("name")
+    {
+        out.push((text(name, src).to_string(), Class::Unknown));
+    }
+    out
 }
 
 /// The class a written type names, as a callee-like name: unknown for a predefined type, an
@@ -1079,7 +1088,7 @@ fn type_name(node: Node, src: &[u8]) -> String {
 }
 
 /// A type as written, its tokens joined without spaces but between words (`List<T>`,
-/// `Dictionary<string,int>`, `int[]`), comments left out.
+/// `Dictionary<string,int>`, `int[]`), comments left out, `::` read as `.`.
 fn type_spelling(node: Node, src: &[u8]) -> String {
     let mut spelling = String::new();
     let mut pending = vec![node];
@@ -1098,7 +1107,9 @@ fn type_spelling(node: Node, src: &[u8]) -> String {
             pending.extend(children(node).collect::<Vec<_>>().into_iter().rev());
         }
     }
-    spelling
+    // `global::A` is `A`, and `alias::A` reads as `alias.A`: a signature holds no `::`, which
+    // separates a symbol's path from its name in an id.
+    spelling.replace("global::", "").replace("::", ".")
 }
 
 /// The normalized callee of an expression or a name: `a.b.c` for names and member accesses,

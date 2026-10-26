@@ -3658,6 +3658,15 @@ fn billing_symbols() -> Vec<String> {
         "Account.Close(string)",
         "Account.Freeze()",
         "Account.Thaw()",
+        "IReviewer",
+        "IReviewer.Escalate()",
+        "IServices",
+        "AccountExtensions.Audit(Account)",
+        "SavingsExtensions",
+        "SavingsExtensions.Audit(Savings)",
+        "ServiceExtensions",
+        "ServiceExtensions.AddOrders(IServices)",
+        "ServiceExtensions.AddOrders(IServices,Action<Account>)",
         "Savings",
         "Savings.Accrue()",
         "Savings.Sweep()",
@@ -3689,11 +3698,14 @@ fn billing_symbols() -> Vec<String> {
             "Pane",
             "Pane.Touch()",
             "Probes",
-            "Probes.Written(Ledger<Account>,Account?,global::Acme.Core.Billing.Account,Pane)",
+            "Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)",
             "Probes.Blocks(bool)",
             "Probes.Generic(T)",
             "Probes.Hides(List<Savings>,object)",
             "Probes.Field()",
+            "Probes.Outside(List<Account>,Account,IReviewer,IServices)",
+            "Batch",
+            "Batch.Run()",
         ]
         .iter()
         .map(|name| billing("Probes.cs", name)),
@@ -3731,10 +3743,11 @@ fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
     let review = accounts("IAuditor.Review()");
     let probe = |method: &str, callee: &str| {
         let signature = match method {
-            "Written" => "Written(Ledger<Account>,Account?,global::Acme.Core.Billing.Account,Pane)",
+            "Written" => "Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)",
             "Blocks" => "Blocks(bool)",
             "Generic" => "Generic(T)",
             "Hides" => "Hides(List<Savings>,object)",
+            "Outside" => "Outside(List<Account>,Account,IReviewer,IServices)",
             _ => "Field()",
         };
         format!(
@@ -3807,7 +3820,8 @@ fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
             INFERRED,
             vec![accounts("AccountExtensions.Archive(IEnumerable<Account>)")],
         ),
-        (run("given.Accrue#0"), INFERRED, vec![accrue]),
+        // A method of the repository's that the known type lacks is no extension method.
+        (run("given.Accrue#0"), None, vec![]),
         // A receiver of unknown type, or a type parameter's.
         (
             run("unknown.Sweep#0"),
@@ -3817,7 +3831,7 @@ fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
         (
             run("unknown.Review#0"),
             AMBIGUOUS,
-            vec![accounts("Auditor.Review()"), review],
+            vec![accounts("Auditor.Review()"), review.clone()],
         ),
         (run("unknown.Missing#0"), None, vec![]),
         (
@@ -3838,15 +3852,11 @@ fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
             vec![freeze.clone()],
         ),
         (probe("Written", "full.Thaw#0"), EXACT, vec![thaw.clone()]),
-        (
-            probe("Written", "pane.Freeze#0"),
-            INFERRED,
-            vec![freeze.clone()],
-        ),
+        (probe("Written", "pane.Freeze#0"), None, vec![]),
         (
             format!("{}::this.Thaw#0", billing("Probes.cs", "Pane.Touch()")),
-            INFERRED,
-            vec![thaw.clone()],
+            None,
+            vec![],
         ),
         (
             format!("{}::Freeze#0", billing("Probes.cs", "Pane.Touch()")),
@@ -3885,6 +3895,59 @@ fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
             vec![freeze.clone()],
         ),
         (probe("Field", "slot.Freeze#0"), EXACT, vec![freeze.clone()]),
+        // Outside the repository, or the repository's type without the method: extension
+        // methods alone, overloads by the form of the call; an interface's base interface.
+        (probe("Outside", "items.Count#0"), None, vec![]),
+        (probe("Outside", "Teller.Accrue#0"), None, vec![]),
+        (
+            probe("Outside", "given.Audit#0"),
+            AMBIGUOUS,
+            vec![
+                accounts("AccountExtensions.Audit(Account)"),
+                accounts("SavingsExtensions.Audit(Savings)"),
+            ],
+        ),
+        (
+            probe("Outside", "reviewer.Review#0"),
+            EXACT,
+            vec![review.clone()],
+        ),
+        (
+            probe("Outside", "reviewer.Escalate#0"),
+            EXACT,
+            vec![accounts("IReviewer.Escalate()")],
+        ),
+        (
+            probe("Outside", "services.AddOrders#0"),
+            INFERRED,
+            vec![accounts("ServiceExtensions.AddOrders(IServices)")],
+        ),
+        (
+            probe("Outside", "services.AddOrders#1"),
+            INFERRED,
+            vec![accounts(
+                "ServiceExtensions.AddOrders(IServices,Action<Account>)",
+            )],
+        ),
+        (
+            probe("Outside", "ServiceExtensions.AddOrders#0"),
+            EXACT,
+            vec![accounts("ServiceExtensions.AddOrders(IServices)")],
+        ),
+        (
+            probe("Outside", "ServiceExtensions.AddOrders#1"),
+            EXACT,
+            vec![accounts(
+                "ServiceExtensions.AddOrders(IServices,Action<Account>)",
+            )],
+        ),
+        (
+            format!("{}::Format.Upper#0", billing("Probes.cs", "Batch.Run()")),
+            INFERRED,
+            vec![format!(
+                "{CORE}/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+            )],
+        ),
         // Another project: a field and a primary constructor's parameter.
         (
             format!("{API}/Desk.cs::Acme.Api.Desk.Serve(Account)::teller.Run#0"),

@@ -145,9 +145,10 @@ pub trait LanguagePack {
     }
 
     /// Whether the members of a class may be extended from outside it (C#'s `this` parameter),
-    /// where the pack does not read the extensions (`extension_functions`): a call on a receiver
-    /// of a class of the repository, whose family does not declare the method, is a name match,
-    /// as one on a receiver of unknown type is. Otherwise it resolves to nothing.
+    /// where the pack does not read the extensions (`extension_functions`): a method whose first
+    /// parameter is `Binds::Instance` takes its receiver there. A call on a typed receiver that
+    /// no member answers, one of a class of the repository without an opaque base or one of a
+    /// type outside it, is a name match among those methods; otherwise it resolves to nothing.
     fn extension_methods(&self) -> bool {
         false
     }

@@ -2114,6 +2114,11 @@ sample.cs
       "class": "Unknown"
     },
     {
+      "scope": "Example.Store.Save(int,string[])",
+      "name": "tags",
+      "class": "Unknown"
+    },
+    {
       "scope": "Example.Store.Save(int,string[]).Twice",
       "name": "n",
       "class": "Unknown"

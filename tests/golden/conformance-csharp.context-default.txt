@@ -1,5 +1,5 @@
 example.com/acme/conformance src/Acme.Core/Orders/OrderService.cs:36-36 Acme.Core.Orders.OrderService.Default()
-community: src/Acme.Api
+community: src/Acme.Core/Orders
 processes: 1 (1 export; 1 repository): Acme.Api.Checkout.Run() (example.com/acme/conformance)
 public static OrderService Default() => new OrderService();
 callers:
