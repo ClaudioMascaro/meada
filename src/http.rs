@@ -866,6 +866,7 @@ mod tests {
             scope: "".into(),
             callee: "c[]".into(),
             key: "K".into(),
+            then: Vec::new(),
         };
         let text = |t: &str| Value::Str(vec![Part::Text(t.into())]);
         for lead in [Part::Hole, read] {

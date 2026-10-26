@@ -1609,7 +1609,8 @@ impl<'a> Resolver<'a> {
         {
             (binding, members) = found;
         }
-        self.walk(binding, members, seen, work, reading)
+        let found = self.walk(binding, members, seen, work, reading);
+        self.in_unit(path, found)
     }
 
     /// `binding`'s dotted `members`, each looked up in what the one before gives (`member` for
@@ -2617,6 +2618,25 @@ impl<'a> Resolver<'a> {
         one(found.collect())
     }
 
+    /// `found`, when files define its name apart (`Several`), narrowed to the definitions of the
+    /// compilation of `path` (`Facts::unit`, C#'s project) if it holds any: the compiler prefers
+    /// a type its own project declares to one of the same name a reference or another project
+    /// brings. A file of no compilation, or one that defines none of them, keeps them all.
+    fn in_unit(&self, path: &'a str, found: Binding<'a>) -> Binding<'a> {
+        let Binding::Several(all) = found else {
+            return found;
+        };
+        let unit = self.files.get(path).map_or("", |f| f.unit.as_str());
+        let own = |t: &&Target| self.files.get(t.path).is_some_and(|f| f.unit == unit);
+        let kept: Vec<Target<'a>> = all.iter().filter(own).copied().collect();
+        match kept[..] {
+            _ if unit.is_empty() => Binding::Several(all),
+            [] => Binding::Several(all),
+            [one] => Binding::Def(one),
+            _ => Binding::Several(kept),
+        }
+    }
+
     /// What the file's imports bind `name` to. Several imports may bind one name: the latest
     /// in source order decides, whatever it resolves to. An import of every name binds
     /// `name` only if the module exports it (`star`), to whatever it is there. The imports a
@@ -3616,7 +3636,7 @@ pub(crate) const EVAL_BUDGET: usize = 1 << 16;
 /// the next (`Follow::Values`), and the constants it follows for `Follow::Constants`.
 // ponytail: real values nest a few levels; the limit keeps a crafted chain of thousands of
 // constants from overflowing the stack.
-const EVAL_DEPTH: usize = 256;
+pub(crate) const EVAL_DEPTH: usize = 256;
 
 /// How many wrapper calls `Code::expand` climbs from a call; at the limit, the site is read
 /// where the climb stops, its parameters unknown.
@@ -5828,12 +5848,17 @@ mod tests {
             "{} calls",
             facts.calls.len()
         );
+        let start = std::time::Instant::now();
         for call in &facts.calls {
             assert!(!matches!(
                 resolver.call("a/C.java", call),
                 Resolution::Exact(_)
             ));
         }
+        // Reading each result twice, through the walk and the name match, doubled the cost per
+        // link: past twenty links, minutes.
+        let took = start.elapsed();
+        assert!(took.as_secs() < 10, "{took:?}");
     }
 
     #[test]
@@ -8905,5 +8930,93 @@ mod tests {
         ] {
             assert!(!calls[call].starts_with("exact"), "{call}: {}", calls[call]);
         }
+    }
+}
+
+#[cfg(test)]
+mod csharp_tests {
+    use super::*;
+    use crate::lang::LanguagePack;
+    use crate::lang::csharp::CSharp;
+
+    const PROJECT: &[u8] = b"<Project Sdk=\"Microsoft.NET.Sdk\"></Project>";
+    const ORDER: &str = "namespace P;\npublic class Order { public static Order Of() => null; \
+                         public int Total() => 1; }\n";
+
+    /// How each call of `files`, joined into their projects (`Kit`, `Kit2`, `App`), resolves:
+    /// `(path, callee, level, targets' paths)`.
+    fn resolved(files: &[(&str, &str)]) -> Vec<(String, String, &'static str, Vec<String>)> {
+        let configs: Vec<(&str, &[u8])> = ["Kit/Kit.csproj", "Kit2/Kit2.csproj", "App/App.csproj"]
+            .into_iter()
+            .map(|p| (p, PROJECT))
+            .collect();
+        let mut parsed: Vec<(&str, Facts)> = (files.iter())
+            .map(|(p, s)| (*p, CSharp.parse(p, s.as_bytes()).unwrap()))
+            .collect();
+        let join = {
+            let raw: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+            CSharp.join(&configs, &raw)
+        };
+        for (path, facts) in &mut parsed {
+            join(path, facts);
+        }
+        let files: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let layout = CSharp.layout(&configs, &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &CSharp);
+        let paths = |ts: &[Target]| ts.iter().map(|t| t.path.to_string()).collect();
+        let mut out = Vec::new();
+        for (&path, facts) in &files {
+            for call in &facts.calls {
+                let (level, targets) = match resolver.call(path, call) {
+                    Resolution::Exact(t) => ("exact", paths(&[t])),
+                    Resolution::Inferred(t) => ("inferred", paths(&[t])),
+                    Resolution::Narrowed(t) => ("narrowed", paths(&[t])),
+                    Resolution::Ambiguous(ts) => ("ambiguous", paths(&ts)),
+                    Resolution::Unresolved => ("unresolved", Vec::new()),
+                };
+                out.push((path.to_string(), call.callee.clone(), level, targets));
+            }
+        }
+        out
+    }
+
+    /// A type two projects of the repository declare under one qualified name binds, from a
+    /// file of one of them, to that project's own (the compiler prefers the source's type); from
+    /// a file of neither, the name is ambiguous, and a receiver of that type unknown.
+    #[test]
+    fn a_type_two_projects_declare_binds_to_the_caller_s_project_first() {
+        let use_it = "namespace P;\nclass Use { void F(Order o) { o.Total(); Order.Of(); \
+                      P.Order.Of(); } }\n";
+        let app =
+            "namespace Q;\nusing P;\nclass Run { void F(Order o) { o.Total(); Order.Of(); } }\n";
+        let found = resolved(&[
+            ("Kit/Order.cs", ORDER),
+            ("Kit2/Order.cs", ORDER),
+            ("Kit2/Use.cs", use_it),
+            ("App/Run.cs", app),
+        ]);
+        let of = |path: &str| {
+            (found.iter())
+                .filter(|(p, ..)| p == path)
+                .map(|(_, callee, level, targets)| (callee.as_str(), *level, targets.clone()))
+                .collect::<Vec<_>>()
+        };
+        let kit2 = vec!["Kit2/Order.cs".to_string()];
+        assert_eq!(
+            of("Kit2/Use.cs"),
+            [
+                ("o.Total", "exact", kit2.clone()),
+                ("Order.Of", "exact", kit2.clone()),
+                ("P.Order.Of", "exact", kit2),
+            ]
+        );
+        let both = vec!["Kit/Order.cs".to_string(), "Kit2/Order.cs".to_string()];
+        assert_eq!(
+            of("App/Run.cs"),
+            [
+                ("o.Total", "unresolved", vec![]),
+                ("Order.Of", "ambiguous", both)
+            ]
+        );
     }
 }

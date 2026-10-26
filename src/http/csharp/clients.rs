@@ -34,7 +34,7 @@ use super::reads::Reads;
 use crate::contract::Found;
 use crate::index::Indexed;
 use crate::lang::{Bound, Class, Facts, Invocation, Part, Receiver, Step, Ty, Value};
-use crate::names::{one, spellings};
+use crate::names::{is_type, one};
 use crate::resolve::{Code, Expand, Expanded, Injected, Target, method as member};
 use std::cell::OnceCell;
 use std::collections::BTreeMap;
@@ -155,7 +155,7 @@ fn is_client<'a>(code: &Code<'a>, path: &'a str, index: usize, receiver: &'a str
 /// Whether `ty`, written in `scope` of `path`, is `System.Net.Http.HttpClient`, in full or
 /// through the usings.
 fn is_http_client<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, ty: &'a str) -> bool {
-    ty == HTTP_CLIENT || one(&spellings(code, path, scope, ty), |t| t == HTTP_CLIENT).is_some()
+    is_type(code, path, scope, ty, HTTP_CLIENT)
 }
 
 /// Whether the name `receiver` holds the client `CreateClient(name)` made: a local declared
@@ -266,10 +266,7 @@ fn member_set<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), value: &'a
     };
     let method = HTTP_METHOD.trim_end_matches('.');
     match named {
-        Some((ty, name))
-            if ty == method
-                || one(&spellings(code, path, scope, ty), |s| s == method).is_some() =>
-        {
+        Some((ty, name)) if is_type(code, path, scope, ty, method) => {
             match MEMBERS.iter().find(|(m, _)| *m == name) {
                 Some((_, verb)) => Value::Str(vec![Part::Text(verb.to_string())]),
                 None => Value::Unknown,
@@ -296,14 +293,13 @@ fn is_uri<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), ty: &str) -> b
     ty == "System.Uri" || (ty == "Uri" && code.definition(path, scope, "Uri").is_none())
 }
 
-/// Whether `ty`, written in `scope`, is `HttpRequestMessage`, through the usings of the call.
+/// Whether `ty`, written in `scope`, is `HttpRequestMessage`: in full or through the usings of
+/// the call (`is_type`).
+// ponytail: the type of a construction read whole is no name of the file, so it is looked up as
+// the end of `REQUEST` it writes; an alias using (`using R = ..HttpRequestMessage`) is not seen.
 fn is_request<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), ty: &str) -> bool {
-    ty == REQUEST
-        || (ty == "HttpRequestMessage"
-            && one(&spellings(code, path, scope, "HttpRequestMessage"), |s| {
-                s == REQUEST
-            })
-            .is_some())
+    let end = REQUEST.len().checked_sub(ty.len()).map(|at| &REQUEST[at..]);
+    end.is_some_and(|end| end == ty && is_type(code, path, scope, end, REQUEST))
 }
 
 /// The base address of a client folded as `client` (a construction with an initializer) or
@@ -905,6 +901,23 @@ mod tests {
                 &[("A/Other/Fake.cs", other), ("A/Mine/User.cs", hidden)]
             ),
             [to("http::GET::/kept")]
+        );
+    }
+
+    /// A type written in full is the library's unless the repository declares that very name:
+    /// the compiler prefers the source's type. Another type under the library's root hides
+    /// nothing.
+    #[test]
+    fn a_type_written_in_full_is_the_library_s_unless_the_repository_declares_it() {
+        let body = "System.Net.Http.HttpClient _full;\n\
+                    async void F() { await _full.GetAsync(\"https://x.example.com/full\"); }";
+        let own = "namespace System.Net.Http;\n\
+                   public class HttpClient { public Task GetAsync(string u) => null; }\n";
+        let other = "namespace System.Acme;\npublic class Tool { }\n";
+        assert_eq!(sent_with(body, &[("S/Http.cs", own)]), []);
+        assert_eq!(
+            sent_with(body, &[("S/Tool.cs", other)]),
+            [host("http::GET::/full", "x.example.com")]
         );
     }
 

@@ -27,11 +27,13 @@ use std::cell::OnceCell;
 use super::minimal::{APP, BUILDERS};
 use crate::dotnet::appsettings::Settings;
 use crate::lang::{Facts, Part, Value};
-use crate::names::{one, spellings};
+use crate::names::{is_type, one, spellings};
 use crate::resolve::Code;
 
 const ENVIRONMENT: &str = "System.Environment";
 const GET: &str = "GetEnvironmentVariable";
+/// The methods of `System.String` that trim it: on a read, they leave it the read.
+const TRIMS: &[&str] = &["Trim", "TrimEnd", "TrimStart"];
 const CONFIGURATION: &str = "Microsoft.Extensions.Configuration.IConfiguration";
 const BUILDER: &str = "Microsoft.AspNetCore.Builder.WebApplicationBuilder";
 
@@ -64,7 +66,16 @@ impl<'i> Reads<'i> {
     /// What a part is: a read decided, anything else as it is.
     fn part<'a>(&self, code: &Code<'a>, path: &'a str, part: Part) -> Vec<Part> {
         match part {
-            Part::Read { scope, callee, key } => self.read(code, (path, &scope), &callee, &key),
+            // A trimmed read is still the read; any other member called on it is unknown.
+            Part::Read {
+                scope,
+                callee,
+                key,
+                then,
+            } if then.iter().all(|m| TRIMS.contains(&m.as_str())) => {
+                self.read(code, (path, &scope), &callee, &key)
+            }
+            Part::Read { .. } => vec![Part::Hole],
             part => vec![part],
         }
     }
@@ -156,7 +167,7 @@ fn declared<'a>(
     let Some((at, within, ty)) = code.written(path, scope, name) else {
         return false;
     };
-    ty == full || one(&spellings(code, at, within, ty), |s| s == full).is_some()
+    is_type(code, at, within, ty, full)
 }
 
 /// Whether `name` is a web application builder: declared as one, or a local made by

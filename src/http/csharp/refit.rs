@@ -18,7 +18,7 @@ use super::{Hiding, optional, template};
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
 use crate::lang::{Facts, Part, Step, Ty, Value};
-use crate::names::{is_method, known};
+use crate::names::{in_full, is_method, known};
 use crate::resolve::{Code, Expand};
 use std::collections::BTreeMap;
 
@@ -54,7 +54,7 @@ pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
         .filter(|(p, _)| p.ends_with(".cs"))
         .map(|(p, f)| (*p, *f))
         .collect();
-    let hiding = Hiding::of(&files, REFIT);
+    let hiding = Hiding::of(&files);
     let mut interfaces: BTreeMap<(&'a str, &'a str), Vec<Endpoint<'a>>> = BTreeMap::new();
     for &(path, facts) in files.iter().filter(|(_, f)| !f.interfaces.is_empty()) {
         for (n, c) in facts.calls.iter().enumerate() {
@@ -88,7 +88,7 @@ pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
     if interfaces.is_empty() {
         return Vec::new();
     }
-    let bases = bases(code, &files, &hiding, indexed, &interfaces);
+    let bases = bases(code, &files, indexed, &interfaces);
     let mut found = Vec::new();
     for (key, endpoints) in &interfaces {
         let bases: Vec<Option<&[Part]>> = match bases.get(key).filter(|b| !b.is_empty()) {
@@ -119,7 +119,6 @@ pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
 fn bases<'a>(
     code: &Code<'a>,
     files: &[(&'a str, &'a Facts)],
-    hiding: &Hiding<'a>,
     indexed: &Indexed,
     interfaces: &BTreeMap<(&'a str, &'a str), Vec<Endpoint<'a>>>,
 ) -> BTreeMap<(&'a str, &'a str), Vec<Vec<Part>>> {
@@ -130,9 +129,10 @@ fn bases<'a>(
             let Some((ty, "For")) = stored.callee.rsplit_once('.') else {
                 continue;
             };
-            let full = ty == REST_SERVICE && !hiding.hidden;
+            let rest = |s: &str| s == REST_SERVICE;
             if stored.decorates.is_some()
-                || !(full || known(code, path, &stored.scope, ty, |s| s == REST_SERVICE).is_some())
+                || !(in_full(code, path, &stored.scope, ty, rest)
+                    || known(code, path, &stored.scope, ty, rest).is_some())
             {
                 continue;
             }

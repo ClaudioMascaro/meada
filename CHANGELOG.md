@@ -8,6 +8,23 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Spring `application.yml` whose joined keys pass 1 MiB (`YAML_KEY_BUDGET`) reads as empty
+  instead of allocating every key joined to each of its children: a crafted file no longer
+  costs gigabytes to index.
+- A Java chain of locals each made by a call on the one before (`var a2 = a1.m();`) costs its
+  length to resolve: a call's result was read twice per link, through exact targets and again
+  by name, which doubled the cost of every link.
+- A C# type two projects of one repository declare under one qualified name binds, from a file
+  of one of them, to that project's own type, as the compiler prefers it; before, every link
+  to the name was dropped, same-project calls included. A caller in neither project still finds
+  the name ambiguous.
+- A C# library type or attribute written in full (`System.Net.Http.HttpClient`,
+  `[Microsoft.AspNetCore.Mvc.HttpGet]`) is the library's unless the repository declares that
+  very name: a client of the repository's own `System.Net.Http.HttpClient` is no consumer, and a
+  repository namespace under the library's root (`Microsoft.Acme`) no longer hides every name
+  written in full.
+- C# top-level statements in a file that also declares a global type `Main` make no synthetic
+  `Main` program, which would share the type's name.
 - A Java OpenFeign or Retrofit method whose link is ambiguous (a Feign client without `url`
   whose path two repositories serve) or whose URL is unresolved (Retrofit's `@Url`) is an open
   item at the method: `search` with `kind=ambiguous` or `kind=unresolved` lists it, and
@@ -879,6 +896,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- A Kotlin `HttpClient` held through more locals than `LOCAL_DEPTH` (8) is now a consumer:
+  the shared value flow follows the `val`s the pack binds (`Facts::bound`, issue #110), up to
+  its own depth (`EVAL_DEPTH`, 256 more). Before, such a chain of locals gave no consumer.
 - The repository is a Cargo workspace (ADR 0014, #296): beside the `meada` binary, the library
   crate `meada-core` holds the schema of a workspace manifest's `[[repository]]` entries with
   every check their text decides, the bundle and generation ids of ADR 0012 and the new
