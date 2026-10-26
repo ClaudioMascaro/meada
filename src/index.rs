@@ -2658,6 +2658,7 @@ mod tests {
             ("sample.pom.xml", "pom.xml"),
             ("sample.build.gradle.kts", "build.gradle.kts"),
             ("sample.settings.gradle.kts", "settings.gradle.kts"),
+            ("sample.csproj", "src/Kit/Kit.csproj"),
         ] {
             let src = fs::read(tests.join("fixtures/schema").join(name)).unwrap();
             let summary = package::read_manifest(path, &src);

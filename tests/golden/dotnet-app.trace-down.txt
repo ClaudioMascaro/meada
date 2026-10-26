@@ -1,0 +1,5 @@
+example.com/dotnet/app src/Web/Checkout.cs:10 order.Total
+  →[exact: package::nuget::Example.Kit [1.0,2.0) (local 1.2.0), range unchecked; import namespace] example.com/dotnet/lib src/Kit/Pricing/Order.cs:14 Example.Kit.Pricing.Order.Total()
+    example.com/dotnet/lib src/Kit/Pricing/Order.cs:18 Example.Kit.Pricing.Order.Tax(int)
+    example.com/dotnet/lib src/Kit/Pricing/Order.cs:16 Example.Kit.Pricing.Order.Subtotal()
+chain: exact · 1 hops · 2 repos · 119 tokens
