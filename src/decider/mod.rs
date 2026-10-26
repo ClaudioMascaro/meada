@@ -255,9 +255,26 @@ fn setting_on_disk(pack: &dyn lang::LanguagePack, root: &Path, path: &str) -> St
     for name in pack.config_files() {
         let name = name.strip_prefix("**/").unwrap_or(name);
         for dir in &dirs {
-            let config = format!("{dir}{name}");
-            if let Some(src) = crate::index::read_config(root, &config) {
-                found.push((config, src));
+            // `*.ext` names every file of the directory ending so, in name order.
+            let configs: Vec<String> = match name.starts_with('*') {
+                true => {
+                    let entries = fs::read_dir(root.join(dir)).into_iter().flatten();
+                    let mut names: Vec<String> = (entries.flatten())
+                        .filter_map(|e| e.file_name().into_string().ok())
+                        .filter(|file| lang::names_config(name, file))
+                        .collect();
+                    names.sort();
+                    names
+                        .into_iter()
+                        .map(|file| format!("{dir}{file}"))
+                        .collect()
+                }
+                false => vec![format!("{dir}{name}")],
+            };
+            for config in configs {
+                if let Some(src) = crate::index::read_config(root, &config) {
+                    found.push((config, src));
+                }
             }
         }
     }

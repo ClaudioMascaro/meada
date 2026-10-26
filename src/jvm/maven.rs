@@ -2,17 +2,8 @@
 
 use crate::lang::MAX_BYTES;
 use crate::package::{Entry, Summary};
+use crate::xml::{XML_NODES, within_limits};
 use roxmltree::{Document, Node, ParsingOptions};
-
-// ponytail: a POM is shallow; deeper elements make the file no POM.
-const XML_DEPTH: usize = 64;
-// ponytail: bounds the in-memory tree independently of the manifest's byte limit.
-const XML_NODES: u32 = 65_536;
-// ponytail: a POM declares two or three namespaces; each nested declaration copies the
-// enclosing ones in roxmltree.
-const XML_NAMESPACES: usize = 16;
-// ponytail: a POM tag has a few attributes; roxmltree checks duplicates pairwise.
-const XML_ATTRIBUTES: usize = 64;
 
 fn child<'a, 'input>(node: Node<'a, 'input>, name: &str) -> Option<Node<'a, 'input>> {
     let mut children = node.children().filter(|n| {
@@ -36,65 +27,6 @@ fn field(node: Node<'_, '_>, name: &str) -> Option<String> {
                 .to_string()
         })
         .filter(|s| !s.is_empty())
-}
-
-/// Whether the POM stays within the limits roxmltree's cost depends on, read in one linear pass
-/// before parsing: namespace declarations, attributes per tag and element depth. Comments,
-/// CDATA, processing instructions and declarations are skipped; an unterminated one, or an
-/// unterminated tag, is no POM.
-fn within_limits(text: &str) -> bool {
-    if text.matches("xmlns").count() > XML_NAMESPACES {
-        return false;
-    }
-    const SKIPPED: [(&str, &str); 4] = [
-        ("<!--", "-->"),
-        ("<![CDATA[", "]]>"),
-        ("<?", "?>"),
-        ("<!", ">"),
-    ];
-    let mut depth = 0usize;
-    let mut rest = text;
-    while let Some(at) = rest.find('<') {
-        rest = &rest[at..];
-        if let Some((open, close)) = SKIPPED.iter().find(|(open, _)| rest.starts_with(open)) {
-            let Some(end) = rest[open.len()..].find(close) else {
-                return false;
-            };
-            rest = &rest[open.len() + end + close.len()..];
-            continue;
-        }
-        let tag = rest.as_bytes();
-        let (mut quote, mut attributes, mut end) = (None, 0usize, None);
-        for (i, &b) in tag.iter().enumerate().skip(1) {
-            match (quote, b) {
-                (Some(q), _) if b == q => quote = None,
-                (Some(_), _) => {}
-                (None, b'"' | b'\'') => quote = Some(b),
-                (None, b'=') => attributes += 1,
-                (None, b'>') => {
-                    end = Some(i);
-                    break;
-                }
-                _ => {}
-            }
-        }
-        let Some(end) = end else {
-            return false;
-        };
-        if attributes > XML_ATTRIBUTES {
-            return false;
-        }
-        if tag.get(1) == Some(&b'/') {
-            depth = depth.saturating_sub(1);
-        } else if tag[end - 1] != b'/' {
-            depth += 1;
-            if depth > XML_DEPTH {
-                return false;
-            }
-        }
-        rest = &rest[end + 1..];
-    }
-    true
 }
 
 pub fn read(src: &[u8]) -> Summary {
@@ -195,6 +127,7 @@ pub fn read(src: &[u8]) -> Summary {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::xml::{XML_ATTRIBUTES, XML_DEPTH, XML_NAMESPACES};
 
     fn name(src: &str) -> Option<String> {
         read(src.as_bytes()).name

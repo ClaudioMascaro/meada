@@ -28,6 +28,17 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- C# source indexing (issue #107): `.cs` files, grouped into projects by SDK-style `.csproj`
+  files (an old-style one, with no `Sdk`, is none; `.sln` files change nothing), yield
+  namespace-qualified classes, records, structs and interfaces, nested and `partial` ones
+  included (each part in its own file of one project, a member lookup reading every
+  part and its bases), methods and
+  constructors with written parameter types, and local functions (`Method.Local`). `using`,
+  `using static`, aliases and `global using` resolve through every project's namespaces; a
+  `global using`, a project file's `<Using>` items and its enabled implicit usings apply to every
+  file of that project. Bare, `this`, `base`, static and `using static` calls are `exact` when
+  the argument count, counting `params` and default values, leaves one method. Attributes are
+  calls on what they decorate. No .NET SDK or MSBuild is involved.
 - Kotlin source indexing (issue #95): `.kt` and `.kts` files (Gradle's `build.gradle.kts` and
   `settings.gradle.kts` stay manifests) yield package-qualified classes, interfaces, objects,
   companions (`Class.Companion` when unnamed), top-level and extension functions, properties

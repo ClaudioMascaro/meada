@@ -1,0 +1,2117 @@
+{
+  "repository": "example.com/acme/conformance",
+  "files": [
+    {
+      "path": "legacy/Old.cs",
+      "hash": "7161d038cc2b6f216d980cccef2f41a6fbbd3755617a38f138e8cd6ad32aedd0"
+    },
+    {
+      "path": "src/Acme.Api/Board.Show.cs",
+      "hash": "4daaaa7bf50a2b4402163100332476d900b1721a06ff3429b136aaf420523b37"
+    },
+    {
+      "path": "src/Acme.Api/Checkout.cs",
+      "hash": "3d3c6cee519f1a8e5c925d40b26e344ae3914c031d0a0d8bbef32254916119b8"
+    },
+    {
+      "path": "src/Acme.Api/Contracts.cs",
+      "hash": "caa22233891428dc67d60aba259886e4972d64fe21203ee76954b7fbb4a9f0d4"
+    },
+    {
+      "path": "src/Acme.Api/Inside.cs",
+      "hash": "4b7695397e7411a5d9bc3f03f986d456e83d3e9aadff2f3a0423c395acbe3a92"
+    },
+    {
+      "path": "src/Acme.Api/Namespaces.cs",
+      "hash": "d2a21371a0839e609c4be2a4fa75ea1625f97d935da97ff791a463599e8c6a31"
+    },
+    {
+      "path": "src/Acme.Api/Opaque.cs",
+      "hash": "86f398bf3addeb7e1a97ed527311ba365ce6d3406477e01896b37e57c173b4e6"
+    },
+    {
+      "path": "src/Acme.Api/Shadows.cs",
+      "hash": "067c703f754ef2c75f3fab0a6b4bf0a48694203be6be42471cf31926e04270c4"
+    },
+    {
+      "path": "src/Acme.Core/Contracts/Copies.cs",
+      "hash": "65aa7ede79e5ae4a485261467d020c4a5bf62428ed53270551910a6e4963978a"
+    },
+    {
+      "path": "src/Acme.Core/GlobalUsings.cs",
+      "hash": "b570023e5f1c24136a95a7612672fd034d2274fc2ce81c8afba72e837f097997"
+    },
+    {
+      "path": "src/Acme.Core/Orders/Carrier.Fees.cs",
+      "hash": "b6d2c30cde1754b3e2d76c8377cd248433c282bd41fb59417c994b8ecf1713fe"
+    },
+    {
+      "path": "src/Acme.Core/Orders/Courier.cs",
+      "hash": "820d61644a43e96d63a88ae17eb11f5fa43b1a502827977df5151b0bfb623a0f"
+    },
+    {
+      "path": "src/Acme.Core/Orders/Order.Lines.cs",
+      "hash": "70e1e4e05fe75700f85fea0845c0662c7de91c2d107a356ec480d1cd432ead0d"
+    },
+    {
+      "path": "src/Acme.Core/Orders/Order.cs",
+      "hash": "b8cd726d08f8fc1326a7b428a70be7ebe0a83f779adbe1dafc6682e89c7b0d04"
+    },
+    {
+      "path": "src/Acme.Core/Orders/OrderService.cs",
+      "hash": "a8457d32a8e5bdb8bf9314c97a581a061986b9017e3c6c0554b5ebd2fa4991b2"
+    },
+    {
+      "path": "src/Acme.Core/Orders/Shipping.cs",
+      "hash": "d06793f0a13a3cc51a3c1f3bf60854fe4a4c94be3a66da0b876da63b0ae77ce6"
+    },
+    {
+      "path": "src/Acme.Core/Store/Repository.cs",
+      "hash": "c0742ddce30e4bd6efebe4edd448497ae32fc69f6dde71e01ad93dd42655dd80"
+    },
+    {
+      "path": "src/Acme.Core/Text/Format.cs",
+      "hash": "2e465a964063f0bed712538e3bd1e70d714886291719bf50d59d170d4732e727"
+    },
+    {
+      "path": "src/Acme.Core/Text/Nested.cs",
+      "hash": "85de0bac38f4a2e8f3a2037b21a90373d2833281102e70905b42434e99661cf2"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/conformance::legacy/Old.cs::Legacy.Old",
+      "span": {
+        "path": "legacy/Old.cs",
+        "start": 89,
+        "end": 145
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::legacy/Old.cs::Legacy.Old.Run()",
+      "span": {
+        "path": "legacy/Old.cs",
+        "start": 113,
+        "end": 139
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board",
+      "span": {
+        "path": "src/Acme.Api/Board.Show.cs",
+        "start": 58,
+        "end": 127
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board.Show()",
+      "span": {
+        "path": "src/Acme.Api/Board.Show.cs",
+        "start": 91,
+        "end": 125
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout",
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 235,
+        "end": 884
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 343,
+        "end": 878
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Contracts.OrderDto",
+      "span": {
+        "path": "src/Acme.Api/Contracts.cs",
+        "start": 31,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Hosting.Shell",
+      "span": {
+        "path": "src/Acme.Api/Contracts.cs",
+        "start": 89,
+        "end": 159
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Hosting.Shell.Start()",
+      "span": {
+        "path": "src/Acme.Api/Contracts.cs",
+        "start": 130,
+        "end": 153
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside",
+      "span": {
+        "path": "src/Acme.Api/Inside.cs",
+        "start": 55,
+        "end": 131
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()",
+      "span": {
+        "path": "src/Acme.Api/Inside.cs",
+        "start": 89,
+        "end": 125
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside",
+      "span": {
+        "path": "src/Acme.Api/Namespaces.cs",
+        "start": 49,
+        "end": 211
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside.Run()",
+      "span": {
+        "path": "src/Acme.Api/Namespaces.cs",
+        "start": 169,
+        "end": 205
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Board",
+      "span": {
+        "path": "src/Acme.Api/Opaque.cs",
+        "start": 278,
+        "end": 325
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home",
+      "span": {
+        "path": "src/Acme.Api/Opaque.cs",
+        "start": 147,
+        "end": 225
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home.Index()",
+      "span": {
+        "path": "src/Acme.Api/Opaque.cs",
+        "start": 188,
+        "end": 223
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.FieldShadow",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 751,
+        "end": 852
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.FieldShadow.Run()",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 810,
+        "end": 850
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 98,
+        "end": 749
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Caught()",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 445,
+        "end": 532
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Lambda()",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 265,
+        "end": 344
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Local()",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 190,
+        "end": 259
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Loop(object[])",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 350,
+        "end": 439
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Out()",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 538,
+        "end": 601
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parameter(object)",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 125,
+        "end": 184
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parse(object)",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 693,
+        "end": 747
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Pattern(object)",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 607,
+        "end": 687
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Contracts.OrderDto",
+      "span": {
+        "path": "src/Acme.Core/Contracts/Copies.cs",
+        "start": 31,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Hosting.Shell",
+      "span": {
+        "path": "src/Acme.Core/Contracts/Copies.cs",
+        "start": 89,
+        "end": 158
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Hosting.Shell.Stop()",
+      "span": {
+        "path": "src/Acme.Core/Contracts/Copies.cs",
+        "start": 130,
+        "end": 152
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Carrier.Fees.cs::Acme.Core.Orders.Carrier",
+      "span": {
+        "path": "src/Acme.Core/Orders/Carrier.Fees.cs",
+        "start": 103,
+        "end": 171
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Carrier.Fees.cs::Acme.Core.Orders.Carrier.Bill()",
+      "span": {
+        "path": "src/Acme.Core/Orders/Carrier.Fees.cs",
+        "start": 147,
+        "end": 169
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier",
+      "span": {
+        "path": "src/Acme.Core/Orders/Courier.cs",
+        "start": 29,
+        "end": 212
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Courier()",
+      "span": {
+        "path": "src/Acme.Core/Orders/Courier.cs",
+        "start": 73,
+        "end": 111
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()",
+      "span": {
+        "path": "src/Acme.Core/Orders/Courier.cs",
+        "start": 117,
+        "end": 210
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order",
+      "span": {
+        "path": "src/Acme.Core/Orders/Order.Lines.cs",
+        "start": 29,
+        "end": 141
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()",
+      "span": {
+        "path": "src/Acme.Core/Orders/Order.Lines.cs",
+        "start": 95,
+        "end": 139
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Sum()",
+      "span": {
+        "path": "src/Acme.Core/Orders/Order.Lines.cs",
+        "start": 62,
+        "end": 89
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Order.cs::Acme.Core.Orders.Order",
+      "span": {
+        "path": "src/Acme.Core/Orders/Order.cs",
+        "start": 29,
+        "end": 96
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Order.cs::Acme.Core.Orders.Order.Total()",
+      "span": {
+        "path": "src/Acme.Core/Orders/Order.cs",
+        "start": 62,
+        "end": 94
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 29,
+        "end": 905
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Audit()",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 579,
+        "end": 605
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Default()",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 736,
+        "end": 795
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 801,
+        "end": 903
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Add()",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 833,
+        "end": 863
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Count()",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 873,
+        "end": 897
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Notify(int)",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 698,
+        "end": 730
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Notify(string)",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 654,
+        "end": 692
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService()",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 61,
+        "end": 104
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService(string)",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 110,
+        "end": 148
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string)",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 540,
+        "end": 573
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 154,
+        "end": 534
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int).Check",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 209,
+        "end": 231
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Validate(string)",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 611,
+        "end": 648
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier",
+      "span": {
+        "path": "src/Acme.Core/Orders/Shipping.cs",
+        "start": 29,
+        "end": 301
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Carrier(string)",
+      "span": {
+        "path": "src/Acme.Core/Orders/Shipping.cs",
+        "start": 88,
+        "end": 122
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Purge()",
+      "span": {
+        "path": "src/Acme.Core/Orders/Shipping.cs",
+        "start": 275,
+        "end": 299
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Rate()",
+      "span": {
+        "path": "src/Acme.Core/Orders/Shipping.cs",
+        "start": 244,
+        "end": 269
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Ship()",
+      "span": {
+        "path": "src/Acme.Core/Orders/Shipping.cs",
+        "start": 128,
+        "end": 158
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Track()",
+      "span": {
+        "path": "src/Acme.Core/Orders/Shipping.cs",
+        "start": 164,
+        "end": 238
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository",
+      "span": {
+        "path": "src/Acme.Core/Store/Repository.cs",
+        "start": 56,
+        "end": 445
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Flush()",
+      "span": {
+        "path": "src/Acme.Core/Store/Repository.cs",
+        "start": 318,
+        "end": 435
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Save(List<T>,int)",
+      "span": {
+        "path": "src/Acme.Core/Store/Repository.cs",
+        "start": 147,
+        "end": 193
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Save(T)",
+      "span": {
+        "path": "src/Acme.Core/Store/Repository.cs",
+        "start": 105,
+        "end": 133
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.SaveAll(T[])",
+      "span": {
+        "path": "src/Acme.Core/Store/Repository.cs",
+        "start": 207,
+        "end": 304
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 309,
+        "end": 406
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing.Lower(string)",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 350,
+        "end": 400
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 31,
+        "end": 303
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Hidden()",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 259,
+        "end": 297
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string)",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 132,
+        "end": 180
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string,int)",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 190,
+        "end": 249
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 72,
+        "end": 122
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.IClock",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 664,
+        "end": 719
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.IClock.Now()",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 702,
+        "end": 713
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Money",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 412,
+        "end": 465
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 471,
+        "end": 658
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Double(int)",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 610,
+        "end": 652
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Point(int)",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 528,
+        "end": 558
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Twice()",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 568,
+        "end": 600
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 725,
+        "end": 928
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock.Now()",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 773,
+        "end": 796
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.First",
+      "span": {
+        "path": "src/Acme.Core/Text/Nested.cs",
+        "start": 94,
+        "end": 116
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second",
+      "span": {
+        "path": "src/Acme.Core/Text/Nested.cs",
+        "start": 152,
+        "end": 233
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second.Make()",
+      "span": {
+        "path": "src/Acme.Core/Text/Nested.cs",
+        "start": 194,
+        "end": 223
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/conformance::legacy/Old.cs::Legacy.Old.Run()::Upper#0",
+      "caller": "example.com/acme/conformance::legacy/Old.cs::Legacy.Old.Run()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "legacy/Old.cs",
+        "start": 126,
+        "end": 136
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board.Show()::Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board.Show()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Api/Board.Show.cs",
+        "start": 112,
+        "end": 122
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::Acme.Core.Text.Casing.Lower#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing.Lower(string)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 470,
+        "end": 502
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::Create#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 620,
+        "end": 628
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::Fmt.Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 853,
+        "end": 867
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::Lower#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 829,
+        "end": 839
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::OrderDto#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Contracts.OrderDto",
+        "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Contracts.OrderDto"
+      ],
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 714,
+        "end": 728
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::OrderService.Default#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Default()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 516,
+        "end": 538
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::Shell#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Hosting.Shell",
+        "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Hosting.Shell"
+      ],
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 742,
+        "end": 753
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::Svc.Default#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Default()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 443,
+        "end": 456
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::Text.Format.Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 407,
+        "end": 429
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 383,
+        "end": 393
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout::OrderService#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService(string)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Checkout.cs",
+        "start": 310,
+        "end": 332
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()::Second.Make#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second.Make()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Inside.cs",
+        "start": 109,
+        "end": 122
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside.Run()::Second.Make#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside.Run()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Namespaces.cs",
+        "start": 189,
+        "end": 202
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home.Index()::Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home.Index()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Api/Opaque.cs",
+        "start": 210,
+        "end": 220
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.FieldShadow.Run()::Format.Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.FieldShadow.Run()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 830,
+        "end": 847
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Caught()::Format.Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Caught()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 510,
+        "end": 527
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Lambda()::Format.Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Lambda()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 324,
+        "end": 341
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Local()::Format.Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Local()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 239,
+        "end": 256
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Local()::object#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Local()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 225,
+        "end": 237
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Loop(object[])::Format.Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Loop(object[])",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 417,
+        "end": 434
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Out()::Format.Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Out()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 581,
+        "end": 598
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Out()::Parse#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Out()",
+      "target": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parse(object)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 558,
+        "end": 579
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parameter(object)::Format.Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parameter(object)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 164,
+        "end": 181
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Pattern(object)::Format.Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Pattern(object)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 665,
+        "end": 682
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Courier()::Carrier#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Courier()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Carrier(string)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/Courier.cs",
+        "start": 90,
+        "end": 107
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()::Bill#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Carrier.Fees.cs::Acme.Core.Orders.Carrier.Bill()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/Courier.cs",
+        "start": 197,
+        "end": 203
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()::Track#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Track()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/Courier.cs",
+        "start": 180,
+        "end": 187
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()::base.Ship#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Ship()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/Courier.cs",
+        "start": 159,
+        "end": 170
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()::Order#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/Order.Lines.cs",
+        "start": 127,
+        "end": 138
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Order.cs::Acme.Core.Orders.Order.Total()::Sum#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/Order.cs::Acme.Core.Orders.Order.Total()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Sum()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/Order.cs",
+        "start": 88,
+        "end": 93
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Default()::OrderService#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Default()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 776,
+        "end": 794
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Add()::Count#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Add()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Count()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 853,
+        "end": 860
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService()::OrderService#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService(string)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 83,
+        "end": 100
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)::Audit#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Audit()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 378,
+        "end": 385
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)::Check#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int).Check",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 240,
+        "end": 252
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)::Fmt.Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 415,
+        "end": 429
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)::Format.Pad#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string,int)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 439,
+        "end": 457
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)::Format.Pad#1",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 467,
+        "end": 482
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)::Lower#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing.Lower(string)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 395,
+        "end": 405
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)::Notify#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Notify(int)",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Notify(string)"
+      ],
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 327,
+        "end": 338
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)::Order#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 492,
+        "end": 503
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)::Order.Create#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 513,
+        "end": 527
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)::Place#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 307,
+        "end": 317
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)::Validate#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Validate(string)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 262,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)::this.Audit#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Audit()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Orders/OrderService.cs",
+        "start": 285,
+        "end": 297
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier::Obsolete#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Core/Orders/Shipping.cs",
+        "start": 165,
+        "end": 209
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders::Serializable#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Core/Orders/Shipping.cs",
+        "start": 30,
+        "end": 42
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Flush()::SaveAll#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Flush()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.SaveAll(T[])",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Store/Repository.cs",
+        "start": 368,
+        "end": 377
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Flush()::SaveAll#1",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Flush()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.SaveAll(T[])",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Store/Repository.cs",
+        "start": 395,
+        "end": 420
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.SaveAll(T[])::Save#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.SaveAll(T[])",
+      "target": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Save(T)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Store/Repository.cs",
+        "start": 275,
+        "end": 289
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Twice()::Double#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Twice()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Double(int)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 590,
+        "end": 599
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock::Now#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock.Now()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Text/Format.cs",
+        "start": 916,
+        "end": 921
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [],
+  "communities": [
+    {
+      "name": "src/Acme.Api",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board.Show()",
+        "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home.Index()",
+        "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.FieldShadow.Run()",
+        "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Caught()",
+        "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Lambda()",
+        "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Local()",
+        "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Loop(object[])",
+        "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Out()",
+        "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parameter(object)",
+        "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parse(object)",
+        "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Pattern(object)",
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+      ]
+    },
+    {
+      "name": "src/Acme.Api#2",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()",
+        "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second.Make()"
+      ]
+    },
+    {
+      "name": "src/Acme.Core/Orders",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout",
+        "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Default()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService(string)",
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing.Lower(string)"
+      ]
+    },
+    {
+      "name": "src/Acme.Core/Orders#2",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Core/Orders/Carrier.Fees.cs::Acme.Core.Orders.Carrier.Bill()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Ship()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Track()"
+      ]
+    },
+    {
+      "name": "src/Acme.Core/Orders#3",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Courier()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Carrier(string)"
+      ]
+    },
+    {
+      "name": "src/Acme.Core/Orders#4",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order",
+        "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Audit()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string)",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int).Check",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Validate(string)",
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string)",
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string,int)"
+      ]
+    },
+    {
+      "name": "src/Acme.Core/Orders#5",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Sum()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/Order.cs::Acme.Core.Orders.Order.Total()"
+      ]
+    },
+    {
+      "name": "src/Acme.Core/Orders#6",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Add()",
+        "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Count()"
+      ]
+    },
+    {
+      "name": "src/Acme.Core/Store",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Flush()",
+        "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Save(T)",
+        "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.SaveAll(T[])"
+      ]
+    },
+    {
+      "name": "src/Acme.Core/Text",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Double(int)",
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Twice()"
+      ]
+    },
+    {
+      "name": "src/Acme.Core/Text#2",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock",
+        "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock.Now()"
+      ]
+    }
+  ],
+  "links": [],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board.Show()",
+      "kind": "export",
+      "label": "Acme.Api.Board.Show()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board.Show()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
+      "kind": "export",
+      "label": "Acme.Api.Checkout.Run()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Default()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService()"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService(string)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing.Lower(string)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::OrderDto#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Contracts.OrderDto",
+            "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Contracts.OrderDto"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()::Shell#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Hosting.Shell",
+            "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Hosting.Shell"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()",
+      "kind": "export",
+      "label": "Acme.Api.Inside.Run()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second.Make()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside.Run()",
+      "kind": "export",
+      "label": "Acme.Api.Outside.Run()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside.Run()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home.Index()",
+      "kind": "export",
+      "label": "Acme.Api.Home.Index()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home.Index()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.FieldShadow.Run()",
+      "kind": "export",
+      "label": "Acme.Api.FieldShadow.Run()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.FieldShadow.Run()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Caught()",
+      "kind": "export",
+      "label": "Acme.Api.Shadows.Caught()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Caught()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Lambda()",
+      "kind": "export",
+      "label": "Acme.Api.Shadows.Lambda()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Lambda()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Local()",
+      "kind": "export",
+      "label": "Acme.Api.Shadows.Local()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Local()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Loop(object[])",
+      "kind": "export",
+      "label": "Acme.Api.Shadows.Loop(object[])",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Loop(object[])"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Out()",
+      "kind": "export",
+      "label": "Acme.Api.Shadows.Out()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Out()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parse(object)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parameter(object)",
+      "kind": "export",
+      "label": "Acme.Api.Shadows.Parameter(object)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parameter(object)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Pattern(object)",
+      "kind": "export",
+      "label": "Acme.Api.Shadows.Pattern(object)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Pattern(object)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Courier()",
+      "kind": "export",
+      "label": "Acme.Core.Orders.Courier.Courier()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Courier()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Carrier(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()",
+      "kind": "export",
+      "label": "Acme.Core.Orders.Courier.Ship()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Ship()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Track()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Carrier.Fees.cs::Acme.Core.Orders.Carrier.Bill()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Orders/Order.cs::Acme.Core.Orders.Order.Total()",
+      "kind": "export",
+      "label": "Acme.Core.Orders.Order.Total()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Order.cs::Acme.Core.Orders.Order.Total()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Sum()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Add()",
+      "kind": "export",
+      "label": "Acme.Core.Orders.OrderService.Line.Add()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Add()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Count()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
+      "kind": "export",
+      "label": "Acme.Core.Orders.OrderService.Place(string,int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int).Check"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Validate(string)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Audit()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)::Notify#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Notify(int)",
+            "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Notify(string)"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing.Lower(string)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string,int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order",
+          "mark": "seen"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Rate()",
+      "kind": "export",
+      "label": "Acme.Core.Orders.Carrier.Rate()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Rate()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Flush()",
+      "kind": "export",
+      "label": "Acme.Core.Store.Repository.Flush()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Flush()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.SaveAll(T[])"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Save(T)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Save(List<T>,int)",
+      "kind": "export",
+      "label": "Acme.Core.Store.Repository.Save(List<T>,int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Save(List<T>,int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.IClock.Now()",
+      "kind": "export",
+      "label": "Acme.Core.Text.IClock.Now()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.IClock.Now()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Point(int)",
+      "kind": "export",
+      "label": "Acme.Core.Text.Point.Point(int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Point(int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Twice()",
+      "kind": "export",
+      "label": "Acme.Core.Text.Point.Twice()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Twice()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Double(int)"
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Capacidades y límites
 
-Meada 0.1 indexa TypeScript, JavaScript, Python, Rust, Go, Java y Kotlin. Encuentra llamadas en el código y conecta repositorios mediante HTTP, paquetes y canales de mensajes. Cada vínculo indica su nivel de certeza.
+Meada 0.1 indexa TypeScript, JavaScript, Python, Rust, Go, Java, Kotlin y C#. Encuentra llamadas en el código y conecta repositorios mediante HTTP, paquetes y canales de mensajes. Cada vínculo indica su nivel de certeza.
 
 El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [retención](generations.md) y [workspace gestionado](workspaces.md) mediante módulos opcionales. La consola tiene editor, diff, playground y grafo. [Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/) y [Helm](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/) ofrecen ejemplos de despliegue.
 
@@ -14,6 +14,7 @@ El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [rete
 | Go | `.go` incluidos por las reglas de build del paquete |
 | Java | `.java`, resueltos por sus declaraciones de `package` |
 | Kotlin | `.kt` y `.kts` (salvo `build.gradle.kts` y `settings.gradle.kts`), resueltos por sus declaraciones de `package` |
+| C# | `.cs`, agrupados en proyectos por los `.csproj` de estilo SDK y resueltos por sus `namespace` |
 
 ### Rust
 
@@ -52,6 +53,14 @@ Meada lee clases (también `data`, `sealed`, `enum` y `annotation`), interfaces,
 Los imports simples, con `as` y con `*` se resuelven por las declaraciones de paquete, y el propio paquete es visible sin import. Las llamadas sin receptor, con `this`, sobre un objeto (`Registry.find()`) o sobre un companion (`Point.origin()`) son `exact` cuando la cantidad de argumentos deja una sola función, contando los parámetros con valor por defecto y `vararg`; las sobrecargas con la misma cantidad quedan `ambiguous`. Llamar al nombre de una clase la construye. Dentro de una lambda, una llamada sin receptor o con `this` puede ser de un receptor implícito, y se resuelve solo por nombre. Kotlin y Java del mismo repositorio se llaman por el nombre totalmente calificado. Los nombres de fuera del repositorio siguen siendo externos.
 
 Las declaraciones que no son `private` ni `internal` forman la superficie exportada; una `internal` es visible en todo el repositorio, y una `private` de nivel superior solo en su propio archivo. La indexación no necesita compilador de Kotlin, JDK ni Gradle.
+
+### C#
+
+Cada `.csproj` de estilo SDK (con `Sdk`) es un proyecto y contiene los `.cs` de su carpeta, dentro de un `.sln` o no; los `.sln` no cambian nada, y un `.csproj` antiguo, sin `Sdk`, no es un proyecto. Meada lee clases, records, structs e interfaces, también anidados (`Externa.Interna`) y `partial` (cada parte en su archivo, con los miembros de todas), métodos y constructores con los tipos escritos de sus parámetros (`Acme.Orders.OrderService.Place(string,int)`) y funciones locales (`Metodo.Local`). Los namespaces de bloque y de archivo dan los nombres completos. Las llamadas de una lambda pertenecen al símbolo que la contiene, y un atributo es una llamada sobre lo que decora.
+
+`using`, `using static`, los alias (`using X = A.B`) y `global using` se resuelven por los namespaces de todos los proyectos; un `global using`, los `<Using>` del `.csproj` y los implicit usings activados (`ImplicitUsings`) valen en todos los archivos del proyecto, y solo en él. Las llamadas sin receptor, con `this`, `base`, estáticas (`Tipo.Metodo()`) y por `using static` son `exact` cuando la cantidad de argumentos deja un solo método, contando `params` y los parámetros con valor por defecto; las sobrecargas con la misma cantidad quedan `ambiguous`. Los tipos de fuera del repositorio siguen siendo externos. Las llamadas sobre un receptor de tipo escrito todavía no se resuelven por ese tipo.
+
+Los tipos públicos y sus miembros públicos o protegidos forman la superficie exportada. La indexación no necesita .NET SDK ni MSBuild y no ejecuta código del repositorio.
 
 ## HTTP y documentos de contrato
 
