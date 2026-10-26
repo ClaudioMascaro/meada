@@ -1669,11 +1669,6 @@ fn template(parts: &mut Vec<Part>, text: &str) {
     append(parts, vec![Part::Text(rest.into())]);
 }
 
-/// The key a Ktor request block's `method = value` or `this.method = value` is recorded under
-/// in `Call::kwargs` of the call whose lambda holds it (the Ktor client reads it). It is no
-/// Kotlin name, so it matches no parameter.
-const METHOD: &str = "method=";
-
 /// The name an assignment writes: a bare name, or the last of a path (`this.base`, `o.base`).
 fn assignee(node: Node, src: &[u8]) -> Option<String> {
     let left = node.child_by_field_name("left")?;
@@ -1685,12 +1680,13 @@ fn assignee(node: Node, src: &[u8]) -> Option<String> {
     name.map(|n| text(n, src).to_string())
 }
 
-/// Records `method = value` and `this.method = value`, written in a lambda that is a call's
-/// argument, as the `METHOD` keyword of that call: the setting of a property of the lambda's
-/// receiver, which no call or constant records. The value is kept where the statement is the
-/// lambda's own; where it may not run (an `if`, a `try`, a loop) or sets the outer receiver
-/// from a lambda inside, the call it reaches is told `Unknown`, as it is when a second statement
-/// sets it again.
+/// Records `name = value` and `this.name = value`, written in a lambda that is a call's
+/// argument, as the keyword `name=` of that call (a key no Kotlin name spells, so it matches no
+/// parameter): the setting of a property of the lambda's receiver, which no call or constant
+/// records, read by the kind that knows the receiver (Ktor's request `method`). The value is
+/// kept where the statement is the lambda's own; where it may not run (an `if`, a `try`, a loop)
+/// or sets the outer receiver from a lambda inside, the call it reaches is told `Unknown`, as it
+/// is when a second statement sets it again.
 fn assigned(calls: &mut [Call], node: Node, src: &[u8]) {
     let (Some(left), Some(right), Some(operator)) = (
         node.child_by_field_name("left"),
@@ -1699,18 +1695,20 @@ fn assigned(calls: &mut [Call], node: Node, src: &[u8]) {
     ) else {
         return;
     };
-    let set = match left.kind() {
-        "identifier" => text(left, src) == "method",
+    let property = match left.kind() {
+        "identifier" => Some(left),
         "navigation_expression" => {
             let mut parts = named(left);
             let this = parts.next().is_some_and(|n| n.kind() == "this_expression");
-            this && parts.next().is_some_and(|n| text(n, src) == "method") && parts.next().is_none()
+            let name = parts.next().filter(|n| n.kind() == "identifier");
+            name.filter(|_| this && parts.next().is_none())
         }
-        _ => false,
+        _ => None,
     };
-    if !set || text(operator, src) != "=" {
+    let Some(property) = property.filter(|_| text(operator, src) == "=") else {
         return;
-    }
+    };
+    let key = format!("{}=", text(property, src));
     let (mut at, mut own) = (node, true);
     while let Some(parent) = at.parent() {
         match parent.kind() {
@@ -1726,9 +1724,9 @@ fn assigned(calls: &mut [Call], node: Node, src: &[u8]) {
                 let Some(call) = calls.iter_mut().rev().find(|c| c.range == range) else {
                     return;
                 };
-                match call.kwargs.iter_mut().find(|(k, _)| k == METHOD) {
+                match call.kwargs.iter_mut().find(|(k, _)| *k == key) {
                     Some((_, set)) => *set = Value::Unknown,
-                    None => call.kwargs.push((METHOD.into(), given)),
+                    None => call.kwargs.push((key.clone(), given)),
                 }
                 own = false;
             }
@@ -2385,6 +2383,27 @@ mod tests {
         let facts = parse(src.as_bytes(), false).unwrap();
         let callees: Vec<&str> = facts.calls.iter().map(|c| c.callee.as_str()).collect();
         assert_eq!(callees, ["x.ext", "x.ext", "x.ext", "(expression).ext"]);
+    }
+
+    /// A property assigned in a lambda passed to a call is the call's `name=` keyword, whatever
+    /// the name; one that may not run is unknown.
+    #[test]
+    fn a_property_assigned_in_a_lambda_is_a_keyword_of_its_call() {
+        let src =
+            "package a\nfun f() { run { size = 3; this.label = \"x\"; if (c) { kind = 1 } } }\n";
+        let facts = parse(src.as_bytes(), false).unwrap();
+        let run = facts.calls.iter().find(|c| c.callee == "run").unwrap();
+        let keys: Vec<(&str, String)> = (run.kwargs.iter())
+            .map(|(k, v)| (k.as_str(), show(v)))
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                ("size=", "?".into()),
+                ("label=", "\"x\"".into()),
+                ("kind=", "?".into())
+            ]
+        );
     }
 
     /// A value as a line, for the tests that compare shapes.

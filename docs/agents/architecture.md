@@ -2054,13 +2054,14 @@ qualification budget does (ADR 0017).
   `defaultRequest { }` in the configuration lambda of that call (Ktor 2 and 3
   `io.ktor.client.plugins.defaultRequest`, Ktor 1 `io.ktor.client.features.defaultRequest`),
   folded in its scope: a hole when it is set more than once or not by a string, none for a client
-  known by its type alone. `request` sends the method its block assigns: the pack records
-  `method = v` and `this.method = v` written as a statement of a lambda argument as the
-  `method=` key of that call's `Call::kwargs` (a key no Kotlin name matches; `given` in
-  `http/kotlin.rs` ignores keys ending in `=`), `Unknown` where the statement may not run (inside
-  an `if`, `when`, `try` or loop) and, for the call that owns each lambda around a nested
-  assignment (`headers { method = X }`), because the inner lambda may not run, and when the block
-  assigns it twice. `GET` when it assigns none and the call is given no other argument, a `Ref`
+  known by its type alone. `request` sends the method its block assigns: the pack records any
+  property assignment `p = v` or `this.p = v` written as a statement of a lambda argument as the
+  `p=` key of that call's `Call::kwargs` (`kotlin::assigned`, a key no Kotlin name matches and the
+  pack names no property; `given` in `http/kotlin.rs` and in `http/kotlin/client.rs` ignores keys
+  ending in `=`), `Unknown` where the statement may not run (inside an `if`, `when`, `try` or
+  loop) and, for the call that owns each lambda around a nested assignment (`headers { method = X
+  }`), because the inner lambda may not run, and when the block assigns it twice. The Ktor
+  client reads the `method=` key (`client.rs`). `GET` when it assigns none and the call is given no other argument, a `Ref`
   while it depends on a parameter of a wrapper, unknown for anything else (a block passed as a
   value, `HttpMethod.parse(..)`, a method that is no `HttpMethod` member of Ktor).
   The Kotlin pack folds a string literal's templates into parts (`$name`, `${name}` as names,

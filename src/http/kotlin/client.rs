@@ -22,6 +22,7 @@ use crate::contract::Found;
 use crate::index::Indexed;
 use crate::jvm::names::{LOCAL_DEPTH, one, spellings, typed};
 use crate::jvm::spring::{self, Configs};
+use crate::lang::kotlin::TYPE_ARGUMENT;
 use crate::lang::{Annotated, Bound, Call, Part, Value};
 use crate::resolve::{Code, Expand, Expanded, Follow, Of, passes_nothing};
 
@@ -39,7 +40,8 @@ const DEFAULT_REQUEST: &[&str] = &[
 /// The request functions that name their method, and the one that takes it from its block.
 const VERBS: &[&str] = &["get", "post", "put", "patch", "delete", "head", "options"];
 const REQUEST_FUNCTION: &str = "request";
-/// The key the pack records `method = value` under in `Call::kwargs`.
+/// The key the pack records a request block's `method = value` under in `Call::kwargs` (a
+/// property assigned in a lambda passed to the call is `<name>=`, `kotlin::assigned`).
 const METHOD: &str = "method=";
 
 /// A client, as far as the source tells: the call that makes it, only its type, or one whose
@@ -251,7 +253,8 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
                 let rest = request.args.iter().skip(usize::from(first.is_some()));
                 let given = rest.into_iter().any(|v| !matches!(v, Value::Function(_)))
                     || (kwargs.iter()).any(|(k, v)| {
-                        k != "urlString" && k != METHOD && !matches!(v, Value::Function(_))
+                        let assigned = k.ends_with('=') && k != TYPE_ARGUMENT;
+                        k != "urlString" && !assigned && !matches!(v, Value::Function(_))
                     });
                 let method = match member {
                     REQUEST_FUNCTION => requested(kwargs, given),
