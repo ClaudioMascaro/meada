@@ -1,0 +1,4 @@
+example.com/xlang-csharp/web app/api/prices/[sku]/route.ts:1 GET
+  →[inferred: base URL from Prices__BaseUrl, a base_url_env of peer example.com/xlang-csharp/web] example.com/xlang-csharp/api Controllers/OrdersController.cs:25 Api.Controllers.OrdersController.Status(string)
+    →[inferred: base URL from API_URL, a base_url_env of peer example.com/xlang-csharp/api] example.com/xlang-csharp/web src/sync.ts:4 syncOrders
+chain: inferred · 2 hops · 2 repos · 119 tokens

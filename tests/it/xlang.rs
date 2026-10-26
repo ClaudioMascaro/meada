@@ -8,8 +8,8 @@ use crate::common;
 use std::fs;
 
 use common::{
-    assert_golden, without_processes, xlang, xlang_go, xlang_java, xlang_java_mirror, xlang_kotlin,
-    xlang_rust,
+    assert_golden, without_processes, xlang, xlang_csharp, xlang_go, xlang_java, xlang_java_mirror,
+    xlang_kotlin, xlang_rust,
 };
 use meada::engine::{Direction, Engine, Start};
 
@@ -597,6 +597,96 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_kotlin_file() {
         .unwrap();
 
     assert_golden("xlang-kotlin.trace-uncommitted.txt", &answer);
+}
+
+/// The same chain with a C# service (spec #28): the web app (TypeScript, Next.js) reaches the api
+/// (ASP.NET Core) through `API_URL` and through the api's declared host; the api reaches the web
+/// app with `HttpClient` through bases it reads from the environment (`WEB_URL`, through a
+/// fallback and `TrimEnd`) and from `appsettings.json` (a key whose literal host the web app
+/// serves, links by host; one whose host no peer serves, and one the file lacks, map to the
+/// variable `Section__Key`).
+#[test]
+fn csharp_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_host() {
+    let (web, api) = xlang_csharp("xlang_csharp_export");
+
+    for (repo, name) in [(web, "web"), (api, "api")] {
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        assert_golden(
+            &format!("xlang-csharp-{name}.export.json"),
+            &without_processes(&export),
+        );
+    }
+}
+
+#[test]
+fn two_exports_of_the_csharp_cross_language_fixture_are_byte_identical() {
+    let export = |case| {
+        let (web, api) = xlang_csharp(case);
+        [web, api].map(|r| Engine::open(&r).unwrap().export().unwrap())
+    };
+
+    assert_eq!(
+        export("xlang_csharp_twice_a"),
+        export("xlang_csharp_twice_b")
+    );
+}
+
+#[test]
+fn trace_down_crosses_into_csharp_and_back_to_typescript() {
+    let (web, _) = xlang_csharp("xlang_csharp_down");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("syncOrders"), Direction::Down, None)
+        .unwrap();
+
+    // Each way a base reaches the web app: the environment read through a fallback and
+    // `TrimEnd`, a configuration key mapped to its variable (a literal no peer serves, and
+    // `builder.Configuration` with no literal), and a literal whose host the web app serves.
+    for link in [
+        "→[inferred: base URL from API_URL, a base_url_env of peer example.com/xlang-csharp/api]",
+        "→[exact: host api.example.com is served by example.com/xlang-csharp/api]",
+        "→[inferred: base URL from Prices__BaseUrl, a base_url_env of peer example.com/xlang-csharp/web] example.com/xlang-csharp/web app/api/prices/[sku]/route.ts:1 GET",
+        "→[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-csharp/web] example.com/xlang-csharp/web app/api/stock/route.ts:1 GET",
+        "→[exact: host web.example.com is served by example.com/xlang-csharp/web] example.com/xlang-csharp/web app/api/audit/route.ts:1 POST",
+    ] {
+        assert!(answer.contains(link), "{link}\n{answer}");
+    }
+    assert_golden("xlang-csharp.trace-down.txt", &answer);
+}
+
+#[test]
+fn trace_up_crosses_into_csharp_and_back_to_typescript() {
+    let (web, _) = xlang_csharp("xlang_csharp_up");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(
+            Start::From("http::GET::/api/prices/{}"),
+            Direction::Up,
+            None,
+        )
+        .unwrap();
+
+    assert_golden("xlang-csharp.trace-up.txt", &answer);
+}
+
+#[test]
+fn trace_from_uncommitted_changes_starts_at_an_edited_csharp_file() {
+    let (_, api) = xlang_csharp("xlang_csharp_uncommitted");
+    let controller = api.join("Controllers/OrdersController.cs");
+    let edited = fs::read_to_string(&controller).unwrap().replace(
+        "return await _prices.PriceOf(id);",
+        "Console.WriteLine(id);\n        return await _prices.PriceOf(id);",
+    );
+    fs::write(&controller, edited).unwrap();
+
+    let answer = Engine::open(&api)
+        .unwrap()
+        .trace(Start::Uncommitted, Direction::Up, None)
+        .unwrap();
+
+    assert_golden("xlang-csharp.trace-uncommitted.txt", &answer);
 }
 
 /// The default's host two repositories serve (a mirror of the web app beside it): the one

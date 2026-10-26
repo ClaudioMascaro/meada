@@ -86,7 +86,7 @@ impl LanguagePack for CSharp {
 
     /// Every project file: an SDK-style one is a project (`join`).
     fn config_files(&self) -> &'static [&'static str] {
-        &["**/*.csproj"]
+        &["**/*.csproj", "**/appsettings.json"]
     }
 
     fn modules(
@@ -356,6 +356,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
             });
         };
         qualification_bytes = remaining;
+        SCOPE.with_borrow_mut(|s| *s = scope.clone());
         let (mut inner, mut inner_namespace) = (scope.clone(), namespace.clone());
         let (mut in_interface, mut public, mut nested) = (interface, visible, depth);
         let defining = definitions && depth < DEFINITION_DEPTH;
@@ -1488,6 +1489,43 @@ fn arguments(list: Option<Node>, src: &[u8], depth: usize) -> (Vec<Value>, Vec<(
     (args, kwargs)
 }
 
+thread_local! {
+    /// The scope of the node `parse` is reading, which a read `value` writes records
+    /// (`Part::Read`).
+    static SCOPE: std::cell::RefCell<Rc<String>> = std::cell::RefCell::new(Rc::new(String::new()));
+}
+
+/// The methods of a string that trim it: on a read, they leave it the read.
+const TRIMS: &[&str] = &["Trim", "TrimEnd", "TrimStart"];
+
+/// `callee` and `key` as a read in the scope `parse` is reading.
+fn read(callee: String, key: String) -> Part {
+    Part::Read {
+        scope: SCOPE.with_borrow(|s| s.as_ref().clone()),
+        callee,
+        key,
+    }
+}
+
+/// The read a value is: a subscript already written as one, or a call of a name with one string
+/// literal (`Environment.GetEnvironmentVariable("X")`, `Get("k")`), which the kind decides on.
+fn read_of(value: &Value) -> Option<Part> {
+    match value {
+        Value::Str(parts) => match &parts[..] {
+            [read @ Part::Read { .. }] => Some(read.clone()),
+            _ => None,
+        },
+        Value::Call(call) if !call.callee.contains('(') => match &call.args[..] {
+            [Value::Str(key)] => match &key[..] {
+                [Part::Text(key)] => Some(read(call.callee.clone(), key.clone())),
+                _ => None,
+            },
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 /// An expression as written, as far as this pack folds one: string literals (plain, verbatim,
 /// raw and interpolated), `+` between strings, names, calls and constructions; the rest is
 /// unknown. A construction's object initializer (`new T { A = 1 }`) is its last argument, an
@@ -1539,13 +1577,51 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                         numbers += 1;
                         parts.push(Part::Hole);
                     }
-                    _ => parts.push(Part::Hole),
+                    Some(call) => parts.push(read_of(&call).unwrap_or(Part::Hole)),
+                    None => parts.push(Part::Hole),
                 }
             }
             // `1 + 2` adds numbers.
             match numbers == sides {
                 true => Value::Unknown,
                 false => Value::Str(parts),
+            }
+        }
+        // `a ?? b` keeps a read on its left, unless the fallback is a read too: exactly one.
+        "binary_expression"
+            if node
+                .child_by_field_name("operator")
+                .is_some_and(|n| text(n, src) == "??") =>
+        {
+            let side = |name| {
+                node.child_by_field_name(name)
+                    .map(|n| value(n, src, depth + 1))
+            };
+            match (side("left").as_ref().and_then(read_of), side("right")) {
+                (Some(_), Some(right)) if read_of(&right).is_some() => Value::Str(vec![Part::Hole]),
+                (Some(left), Some(_)) => Value::Str(vec![left]),
+                _ => Value::Unknown,
+            }
+        }
+        // `x!` is `x`.
+        "postfix_unary_expression" if children(node).any(|c| c.kind() == "!") => named(node)
+            .next()
+            .map_or(Value::Unknown, |n| value(n, src, depth + 1)),
+        // `receiver["key"]`: a read, as far as the receiver is a name.
+        "element_access_expression" => {
+            let receiver = (node.child_by_field_name("expression")).map(|n| callee(n, src));
+            let keys = (node.child_by_field_name("subscript"))
+                .map(|list| arguments(Some(list), src, depth).0);
+            match (receiver, keys.as_deref()) {
+                (Some(receiver), Some([Value::Str(key)])) if !receiver.contains('(') => {
+                    match &key[..] {
+                        [Part::Text(key)] => {
+                            Value::Str(vec![read(format!("{receiver}[]"), key.clone())])
+                        }
+                        _ => Value::Unknown,
+                    }
+                }
+                _ => Value::Unknown,
             }
         }
         "identifier" | "member_access_expression" | "qualified_name" => {
@@ -1557,9 +1633,16 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             let object = function
                 .filter(|f| f.kind() == "member_access_expression")
                 .and_then(|f| f.child_by_field_name("expression"));
+            let receiver = object.map(|n| value(n, src, depth + 1));
+            // A trimmed read is still the read.
+            let trimmed = (function.and_then(|f| f.child_by_field_name("name")))
+                .is_some_and(|n| TRIMS.contains(&text(n, src)));
+            if let Some(read) = receiver.as_ref().filter(|_| trimmed).and_then(read_of) {
+                return Value::Str(vec![read]);
+            }
             Value::Call(Invocation {
                 callee: function.map_or_else(String::new, |f| callee(f, src)),
-                receiver: object.map(|n| Box::new(value(n, src, depth + 1))),
+                receiver: receiver.map(Box::new),
                 args: arguments(node.child_by_field_name("arguments"), src, depth).0,
                 range: node.byte_range(),
             })
@@ -1663,6 +1746,7 @@ fn interpolated(node: Node, src: &[u8], depth: usize) -> Value {
                 match hole.map(|n| value(n, src, depth + 1)) {
                     Some(Value::Str(found)) if !clause => parts.extend(found),
                     Some(Value::Ref(name)) if !clause => parts.push(Part::Ref(name)),
+                    Some(call) if !clause => parts.push(read_of(&call).unwrap_or(Part::Hole)),
                     _ => parts.push(Part::Hole),
                 }
             }
@@ -1742,6 +1826,40 @@ mod tests {
         let took = start.elapsed();
         assert_eq!(facts.calls.len(), 4096);
         assert!(took.as_secs() < 10, "{took:?}");
+    }
+
+    /// A read under a long `Trim` chain or a long `??` chain stays linear, and a read is only
+    /// recorded as a part: the pack decides nothing about what it reads.
+    #[test]
+    fn a_long_trim_or_fallback_chain_around_a_read_is_read_in_linear_time() {
+        let trims = format!("Env.Get(\"X\"){}", ".Trim()".repeat(4096));
+        let falls = format!("Env.Get(\"X\"){}", " ?? \"d\"".repeat(4096));
+        let source = format!(
+            "class C {{ void M() {{ H.Get({trims} + \"/a\"); H.Get(({falls}) + \"/b\"); }} }}"
+        );
+        let start = std::time::Instant::now();
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        let took = start.elapsed();
+        assert!(took.as_secs() < 10, "{took:?}");
+        let read = Part::Read {
+            scope: "C.M()".into(),
+            callee: "Env.Get".into(),
+            key: "X".into(),
+        };
+        let strs: Vec<_> = (facts
+            .calls
+            .iter()
+            .filter(|c| c.callee == "H.Get")
+            .flat_map(|c| &c.args))
+        .filter_map(|a| match a {
+            Value::Str(p) => Some(p.clone()),
+            _ => None,
+        })
+        .collect();
+        // A chain past `VALUE_DEPTH` is an unknown part, never a read.
+        assert_eq!(strs[0], [Part::Hole, Part::Text("/a".into())]);
+        assert_eq!(strs[1], [read, Part::Text("/b".into())]);
+        assert_eq!(strs.len(), 2);
     }
 
     #[test]

@@ -73,6 +73,14 @@ All notable changes to Meada are recorded here. The format follows
   `a?.M()` calls are read.
   A call whose URL cannot be evaluated is an unresolved consumer; clients from
   `IHttpClientFactory.CreateClient(name)` are not read.
+- C# base URLs from the environment and configuration (issue #112): `Environment.GetEnvironmentVariable("X")`,
+  through `??`, `!` and `Trim`/`TrimStart`/`TrimEnd`, is the base URL variable `X`; `configuration["A:B"]` on
+  an `IConfiguration` or on `builder.Configuration` is the variable `A__B`, with the literal the project's
+  base `appsettings.json` holds for it (comments, trailing commas, case-insensitive keys, nested
+  objects) as its default, so a literal host some peer serves links by host and any other goes
+  through `base_url_env`. `appsettings.<Environment>.json`, `GetValue`, `GetSection` and options
+  binding are not read. New neutral fixtures `xlang-csharp-{web,api}` cover the TypeScript to C#
+  and C# to TypeScript chain.
 - Kotlin source indexing (issue #95): `.kt` and `.kts` files (Gradle's `build.gradle.kts` and
   `settings.gradle.kts` stay manifests) yield package-qualified classes, interfaces, objects,
   companions (`Class.Companion` when unnamed), top-level and extension functions, properties

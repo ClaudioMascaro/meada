@@ -1441,6 +1441,87 @@ fn an_edited_spring_configuration_alone_refreshes_the_kotlin_consumers() {
     assert!(refreshed.contains("\"via\": \"env:SITE_URL\""));
 }
 
+/// Edits, adds and deletes `.cs` files of the C# api and edits its `appsettings.json`: the
+/// environment variable one client reads changes, the file with the configuration read of
+/// `builder.Configuration` goes, a client appears that reads the environment, and two keys of
+/// the configuration change their literal (one now names a host the web app serves, the other no
+/// longer does).
+fn edit_xlang_csharp((_, api): &(PathBuf, PathBuf)) {
+    edit_file(api, "Clients/StockClient.cs", "\"WEB_URL\"", "\"SITE_URL\"");
+    fs::remove_file(api.join("Program.cs")).unwrap();
+    fs::write(
+        api.join("Clients/ToolClient.cs"),
+        "namespace Api.Clients;\n\n\
+         public class ToolClient\n{\n\
+         \x20   private static readonly HttpClient Http = new HttpClient();\n\n\
+         \x20   public Task<string> Level() =>\n\
+         \x20       Http.GetStringAsync(Environment.GetEnvironmentVariable(\"WEB_URL\") + \"/api/stock\");\n}\n",
+    )
+    .unwrap();
+    edit_file(
+        api,
+        "appsettings.json",
+        "\"BaseUrl\": \"http://localhost:3000\"",
+        "\"BaseUrl\": \"https://web.example.com\"",
+    );
+    edit_file(
+        api,
+        "appsettings.json",
+        "\"URL\": \"https://web.example.com/api/\"",
+        "\"URL\": \"https://audit.internal/\"",
+    );
+}
+
+#[test]
+fn a_refreshed_csharp_cross_language_pair_exports_what_a_cold_pair_does() {
+    let exports = |(web, api): &(PathBuf, PathBuf)| -> Vec<String> {
+        [web, api]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = common::xlang_csharp("fresh_xlang_csharp");
+    [&repos.0, &repos.1].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_xlang_csharp(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = common::xlang_csharp("fresh_xlang_csharp_cold");
+    edit_xlang_csharp(&cold);
+    assert_eq!(refreshed, exports(&cold));
+    assert_ne!(refreshed[1], before[1]);
+    // The key now served by host links by it, the one that no longer is maps to its variable.
+    let audit = "\"contract\": \"http::POST::/api/audit\"";
+    let prices = "\"via\": \"env:Prices__BaseUrl\"";
+    assert!(before[1].contains(audit) && before[1].contains(prices));
+    assert!(!refreshed[1].contains(audit) && !refreshed[1].contains(prices));
+    assert!(before[1].contains("\"via\": \"env:WEB_URL\""));
+    assert!(refreshed[1].contains("\"via\": \"env:SITE_URL\""));
+    assert!(refreshed[1].contains("\"via\": \"env:Audit__Url\""));
+    assert!(before[1].contains("Program.cs") && !refreshed[1].contains("Program.cs"));
+    assert!(refreshed[1].contains("Clients/ToolClient.cs"));
+}
+
+/// An `appsettings.json` edited alone, with no `.cs` file changed, refreshes the contracts.
+#[test]
+fn an_edited_appsettings_alone_refreshes_the_csharp_consumers() {
+    let (_, api) = common::xlang_csharp("fresh_xlang_csharp_config");
+    age(&api);
+    let before = Engine::open(&api).unwrap().export().unwrap();
+    edit_file(
+        &api,
+        "appsettings.json",
+        "\"BaseUrl\": \"http://localhost:3000\"",
+        "\"BaseUrl\": \"https://web.example.com\"",
+    );
+
+    let refreshed = Engine::open(&api).unwrap().export().unwrap();
+
+    assert!(before.contains("\"via\": \"env:Prices__BaseUrl\""));
+    assert!(!refreshed.contains("\"via\": \"env:Prices__BaseUrl\""));
+}
+
 #[test]
 fn an_edited_meada_toml_relinks_resources_like_a_cold_chain() {
     let exports = |gateway: &Path| -> Vec<String> {

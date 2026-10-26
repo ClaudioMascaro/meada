@@ -15,6 +15,7 @@
 //! repository is not read either, since it inherits that class's attributes.
 
 mod clients;
+mod reads;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -23,6 +24,7 @@ pub(super) use minimal::providers as minimal_providers;
 
 use super::{ANY, METHODS, balanced, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
+use crate::index::Indexed;
 use crate::lang::{Call, Facts, Kind};
 use crate::names::{is_method, known};
 use crate::resolve::{Code, Target};
@@ -64,8 +66,8 @@ fn spelled<'a>(
 }
 
 /// The consumers of the `HttpClient` (`clients.rs`).
-pub(super) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
-    clients::consumers(code)
+pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
+    clients::consumers(code, indexed)
 }
 
 /// ASP.NET Core controller providers: see the module.

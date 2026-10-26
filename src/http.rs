@@ -405,7 +405,7 @@ fn render(parts: &[Part]) -> String {
         .iter()
         .map(|p| match p {
             Part::Text(t) => t.as_str(),
-            Part::Env(_) | Part::EnvOr(..) | Part::Ref(_) | Part::Hole => PARAM,
+            Part::Env(_) | Part::EnvOr(..) | Part::Read { .. } | Part::Ref(_) | Part::Hole => PARAM,
         })
         .collect()
 }
@@ -592,7 +592,7 @@ impl ContractKind for Http {
         found.extend(kotlin::providers(code));
         found.extend(kotlin::consumers(code, indexed));
         found.extend(java::consumers(code, indexed));
-        found.extend(csharp::consumers(code));
+        found.extend(csharp::consumers(code, indexed));
         found
     }
 

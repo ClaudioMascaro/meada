@@ -429,7 +429,7 @@ pub(super) fn plain(value: &Value, scope: &str, consts: &HashMap<&str, &Value>) 
             Value::Str(parts) => parts.iter().all(|p| match p {
                 Part::Text(_) => true,
                 Part::Ref(n) => name(n),
-                Part::Env(_) | Part::EnvOr(..) | Part::Hole => false,
+                Part::Env(_) | Part::EnvOr(..) | Part::Read { .. } | Part::Hole => false,
             }),
             Value::Ref(n) => name(n),
             _ => false,
@@ -850,7 +850,7 @@ mod tests {
                 .map(|p| match p {
                     Part::Text(t) => t.clone(),
                     Part::Ref(r) => format!("<{r}>"),
-                    Part::Env(_) | Part::EnvOr(..) | Part::Hole => "{}".into(),
+                    Part::Env(_) | Part::EnvOr(..) | Part::Read { .. } | Part::Hole => "{}".into(),
                 })
                 .collect(),
         )
