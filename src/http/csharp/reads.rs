@@ -2,8 +2,9 @@
 //! writes what looks like a read, without knowing what it reads: a call or a subscript with one
 //! string literal (`Part::Read`, or a `Value::Call` the kind turns into one). This module decides.
 //!
-//! - `Environment.GetEnvironmentVariable("X")`, with `Environment` the framework's `System.Environment` (a
-//!   type of the repository with that name hides it), is the variable `X` (`Part::Env`).
+//! - `Environment.GetEnvironmentVariable("X")`, with `Environment` the framework's
+//!   `System.Environment` (a type of the repository with that name hides it), is the variable
+//!   `X` (`Part::Env`), also through a local or a field it is bound to.
 //! - `configuration["Section:Key"]` on a receiver declared `IConfiguration`, or on
 //!   `builder.Configuration` with `builder` a `WebApplicationBuilder` (its declared type, or made
 //!   by `WebApplication.CreateBuilder` and its siblings), names a key of the project's base
@@ -15,6 +16,9 @@
 //!
 //! Any other call or subscript (`GetValue<T>("k")`, `GetSection("s")`, `connectionStrings["x"]`)
 //! is no read: an unknown part. Meada never reads an environment value.
+//!
+//! The variable keeps the spelling of the key as the code writes it, and `base_url_env` compares
+//! it as written: .NET compares keys without case, Meada's peers do not.
 // ponytail: the receiver and the scope of a read are looked up in the file that holds the
 // consumer, so a read passed in from another file's wrapper call is an unknown part.
 
@@ -45,26 +49,14 @@ impl<'i> Reads<'i> {
         }
     }
 
-    /// `value`, written in `scope` of `path`, with the reads in it decided: a string's reads
-    /// and a call that is one become their parts.
-    pub(super) fn value<'a>(
-        &self,
-        code: &Code<'a>,
-        (path, scope): (&'a str, &str),
-        value: Value,
-    ) -> Value {
+    /// `value`, written in `path`, with the reads in a string decided (each read carries the
+    /// scope it was written in).
+    pub(super) fn value<'a>(&self, code: &Code<'a>, path: &'a str, value: Value) -> Value {
         match value {
             Value::Str(parts) => {
                 let read = |p| self.part(code, path, p);
                 Value::Str(parts.into_iter().flat_map(read).collect())
             }
-            Value::Call(call) => match (&call.args[..], call.callee.contains('(')) {
-                ([Value::Str(key)], false) if let [Part::Text(key)] = &key[..] => {
-                    let at = (path, scope);
-                    Value::Str(self.read(code, at, &call.callee, key))
-                }
-                _ => Value::Call(call),
-            },
             other => other,
         }
     }
@@ -100,9 +92,9 @@ impl<'i> Reads<'i> {
             }
             let variable = key.replace(':', "__");
             let settings = self.settings.get_or_init(|| Settings::read(self.configs));
-            let literal = settings.of(path).and_then(|p| p.get(&key.to_lowercase()));
+            let literal = settings.get(&facts.unit, key);
             return match literal.filter(|v| !v.is_empty()) {
-                Some(value) => vec![Part::EnvOr(variable, vec![Part::Text(value.clone())])],
+                Some(value) => vec![Part::EnvOr(variable, vec![Part::Text(value.to_string())])],
                 None => vec![Part::Env(variable)],
             };
         }

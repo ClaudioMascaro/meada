@@ -205,16 +205,15 @@ fn sends<'a>(
             _ => (None, Value::Unknown),
         },
     };
-    let url = reads.value(code, (path, scope), self::url(code, (path, scope), url));
+    let url = reads.value(code, path, self::url(code, (path, scope), url));
     match call.receiver.as_deref() {
         // A client a wrapper takes: its base is read at each caller.
         Some(Value::Ref(name)) => (Value::Ref(name.clone()), method),
         client => {
             // The assignment on the name the call is made on wins over the initializer.
             let assigned = (written(code, (path, scope), receiver, BASE))
-                .map(|b| (code.value(path, &b.within, &b.value), b.within.as_str()));
-            let assigned = assigned.as_ref().map(|(v, within)| (v, *within));
-            let base = base(code, reads, (path, scope), client, assigned);
+                .map(|b| code.value(path, &b.within, &b.value));
+            let base = base(code, reads, path, client, assigned.as_ref());
             (based_on(base, url), method)
         }
     }
@@ -288,14 +287,13 @@ fn is_request<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), ty: &str) 
 }
 
 /// The base address of a client folded as `client` (a construction with an initializer) or
-/// assigned (`BaseAddress = new Uri(base)`, with the scope the assignment is written in); a
-/// hole when neither is read. Its environment and configuration reads are decided (`Reads`).
+/// assigned (`BaseAddress = new Uri(base)`); a hole when neither is read. Its environment and configuration reads are decided (`Reads`).
 fn base<'a>(
     code: &Code<'a>,
     reads: &Reads,
-    (path, scope): (&'a str, &'a str),
+    path: &'a str,
     client: Option<&Value>,
-    assigned: Option<(&Value, &str)>,
+    assigned: Option<&Value>,
 ) -> Vec<Part> {
     let initial = match client {
         Some(Value::New(_, args)) => match args.last() {
@@ -304,13 +302,9 @@ fn base<'a>(
         },
         _ => None,
     };
-    let (value, scope) = match assigned {
-        Some((value, within)) => (Some(value), within),
-        None => (initial, scope),
-    };
-    match value {
+    match assigned.or(initial) {
         Some(Value::New(_, args)) if args.len() == 1 => {
-            match reads.value(code, (path, scope), args[0].clone()) {
+            match reads.value(code, path, args[0].clone()) {
                 Value::Str(parts) => parts,
                 Value::Ref(name) => vec![Part::Ref(name)],
                 _ => vec![Part::Hole],
@@ -433,6 +427,14 @@ mod tests {
         let mut parsed = vec![("A/C.cs", CSharp.parse("A/C.cs", src.as_bytes()).unwrap())];
         for (path, source) in others {
             parsed.push((path, CSharp.parse(path, source.as_bytes()).unwrap()));
+        }
+        // The projects give each file its unit, as the index does.
+        let join = {
+            let raw: BTreeMap<&str, &_> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+            CSharp.join(configs, &raw)
+        };
+        for (path, facts) in &mut parsed {
+            join(path, facts);
         }
         let files: BTreeMap<&str, &_> = parsed.iter().map(|(p, f)| (*p, f)).collect();
         let layout = CSharp.layout(&[], &files).unwrap();
@@ -978,6 +980,10 @@ mod tests {
             format!("{GET_ENV}(\"X\")!.TrimEnd('/') + \"/a\""),
             format!("({GET_ENV}(\"X\") ?? \"d\").TrimEnd('/').Trim() + \"/a\""),
             format!("System.{GET_ENV}(\"X\") + \"/a\""),
+            // A fallback chain with one read, whatever else the fallbacks are.
+            format!("({GET_ENV}(\"X\") ?? Other.Get(\"Y\")) + \"/a\""),
+            format!("({GET_ENV}(\"X\") ?? \"d\" ?? \"e\") + \"/a\""),
+            format!("(({GET_ENV}(\"X\") ?? \"d\") ?? \"e\") + \"/a\""),
         ];
         for url in urls {
             let body = format!("{CLIENT}async Task F() {{ await _http.GetAsync({url}); }}");
@@ -988,9 +994,13 @@ mod tests {
     #[test]
     fn an_environment_read_is_one_read_and_the_framework_s() {
         let not = [
-            // Two reads, or a read of another source beside it.
+            // Two reads.
             format!("({GET_ENV}(\"X\") ?? {GET_ENV}(\"Y\")) + \"/a\""),
-            format!("({GET_ENV}(\"X\") ?? Other.Get(\"Y\")) + \"/a\""),
+            // Three operands: the reads count across the whole chain.
+            format!("({GET_ENV}(\"X\") ?? \"d\" ?? {GET_ENV}(\"Y\")) + \"/a\""),
+            format!("({GET_ENV}(\"X\") ?? {GET_ENV}(\"Y\") ?? \"d\") + \"/a\""),
+            format!("(({GET_ENV}(\"X\") ?? \"d\") ?? {GET_ENV}(\"Y\")) + \"/a\""),
+            format!("({GET_ENV}(\"X\") ?? {GET_ENV}(\"Y\") ?? {GET_ENV}(\"Z\")) + \"/a\""),
             // Not a literal name, or another call with a literal.
             format!("{GET_ENV}(name) + \"/a\""),
             format!("{GET_ENV}(\"X\", Machine) + \"/a\""),
@@ -1017,6 +1027,29 @@ mod tests {
             sent_with(&body, &[("A/Environment.cs", hiding)]),
             [(Some("http::GET::/a".into()), None, None)]
         );
+    }
+
+    #[test]
+    fn a_local_or_a_field_bound_to_an_environment_read_is_the_read() {
+        let get = format!("{GET_ENV}(\"X\")");
+        for (decl, url) in [
+            (format!("var web = {get};"), "web + \"/a\""),
+            (format!("var web = {get};"), "$\"{web}/a\""),
+            (format!("string web = {get}!;"), "web + \"/a\""),
+            (format!("var web = {get} ?? \"d\";"), "web + \"/a\""),
+            (format!("var web = ({get}).TrimEnd('/');"), "web + \"/a\""),
+            (String::new(), "Web + \"/a\""),
+        ] {
+            let field = format!("private static readonly string Web = {get};\n");
+            let body =
+                format!("{field}{CLIENT}async Task F() {{ {decl} await _http.GetAsync({url}); }}");
+            assert_eq!(sent(&body), [env("http::GET::/a", "X")], "{decl} {url}");
+        }
+        // A local bound to a call with a literal that is no read stays unknown.
+        let body = format!(
+            "{CLIENT}async Task F() {{ var web = Other.Get(\"X\"); await _http.GetAsync(web + \"/a\"); }}"
+        );
+        assert_eq!(sent(&body), [(Some("http::GET::/a".into()), None, None)]);
     }
 
     #[test]
@@ -1225,19 +1258,33 @@ mod tests {
         );
     }
 
+    const SDK: &[u8] = br#"<Project Sdk="Microsoft.NET.Sdk"></Project>"#;
+    const OLD: &[u8] = b"<Project ToolsVersion=\"15.0\" \
+                         xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\"></Project>";
+
     #[test]
-    fn a_file_in_no_project_of_the_settings_reads_none() {
-        let body = "private readonly IConfiguration _config;\n{CLIENT}async Task F() {{ await _http.GetAsync(_config[\"audit\"] + \"/x\"); }}";
-        let _ = body;
+    fn a_file_reads_the_configuration_of_the_project_that_holds_it() {
         let body = format!(
-            "private readonly IConfiguration _config;\n{CLIENT}async Task F() {{ await _http.GetAsync(_config[\"audit\"] + \"/x\"); }}"
+            "private readonly IConfiguration _config;\n{CLIENT}\
+             async Task F() {{ await _http.GetAsync(_config[\"audit\"] + \"/x\"); }}"
         );
+        let twin = twins("http::GET::/x", "audit", "audit.example.com").to_vec();
         // The file of another project (`B/`) does not configure `A/C.cs` once a project holds it.
         let found = sent_in(
             &body,
             &[],
-            &[("A/A.csproj", b""), ("B/appsettings.json", SETTINGS)],
+            &[("A/A.csproj", SDK), ("B/appsettings.json", SETTINGS)],
         );
         assert_eq!(found, [env("http::GET::/x", "audit")]);
+        // A project file the pack does not read (old-style) is no project: the SDK one above holds
+        // the file, as the pack's `join` says.
+        let configs = [
+            ("Root.csproj", SDK),
+            ("A/Old.csproj", OLD),
+            ("appsettings.json", SETTINGS),
+        ];
+        assert_eq!(sent_in(&body, &[], &configs), twin);
+        // A file in no project reads the nearest file above it.
+        assert_eq!(sent_in(&body, &[], &[("appsettings.json", SETTINGS)]), twin);
     }
 }

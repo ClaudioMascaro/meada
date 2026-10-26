@@ -260,6 +260,20 @@
       "reason": "host web.example.com is served by example.com/xlang-csharp/web"
     },
     {
+      "consumer": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient.Pages(string)::Http.GetStringAsync#0",
+      "provider": "example.com/xlang-csharp/web::app/api/prices/[sku]/route.ts::GET",
+      "contract": "http::GET::/api/prices/{}",
+      "level": "inferred",
+      "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-csharp/web"
+    },
+    {
+      "consumer": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient.Pages(string)::Http.GetStringAsync#1",
+      "provider": "example.com/xlang-csharp/web::app/api/promotions/route.ts::GET",
+      "contract": "http::GET::/api/promotions",
+      "level": "inferred",
+      "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-csharp/web"
+    },
+    {
       "consumer": "example.com/xlang-csharp/api::Clients/StockClient.cs::Api.Clients.StockClient.Level()::Http.GetStringAsync#0",
       "provider": "example.com/xlang-csharp/web::app/api/stock/route.ts::GET",
       "contract": "http::GET::/api/stock",

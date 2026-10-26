@@ -2238,29 +2238,37 @@ qualification budget does (ADR 0017).
   not read.
 - `http/csharp/reads.rs` and `dotnet/appsettings.rs` (spec #28, #112): environment and
   configuration reads in a consumer's URL. The pack records what looks like a read without
-  deciding what it reads: a call or a subscript with one string literal is `Part::Read { scope,
-  callee, key }` (a neutral carrier, since only `Env` and `EnvOr` survive `unbind`), and the pack
-  folds `??` (the left read, or a hole when the fallback is a read too), `!` and `Trim`,
+  deciding what it reads: a subscript with one string literal, and a call of a member in `READS`
+  (`GetEnvironmentVariable`) with one, is `Value::Str([Part::Read { scope, callee, key }])` (a
+  neutral carrier, since only `Env` and `EnvOr` survive `unbind`; a call of any other member, as
+  `MapGroup("/api")`, stays a call). Being a string, a local or a field bound to a read folds
+  into the URL like any other. The reads of one node share one `Arc` of their scope. The pack
+  folds `??` chains (the first operand a read and no other operand a read, so the reads count
+  across the whole chain; past `VALUE_DEPTH` operands it is unknown), `!` and `Trim`,
   `TrimStart`, `TrimEnd` around it (`TRIMS`). `Reads::value` in the kind turns the part into
   `Env`, `EnvOr` or `Hole` with the resolver: `Environment.GetEnvironmentVariable` is the
   framework's `System.Environment` (a repository type of that name hides it, through
   `names::spellings`), and `x[".."]` is a configuration when `x` is declared `IConfiguration`
   (`Code::written`, confirmed through the usings) or is `builder.Configuration` of a
   `WebApplicationBuilder` (declared, or made by `WebApplication.Create*Builder`). A configuration
-  key is the variable `Section__Key`; the literal that `Settings` finds for it is the variable's
-  default (`Part::EnvOr`), so `http::fetches` keeps the twin readings Spring's `${X:default}`
-  has: by host when a workspace provider serves the default's host, else through the variable
-  and `base_url_env`. `based_on` rebases such a default on a relative URL as `Uri` joins. `Settings`
-  reads, from `Indexed::configs` (`**/appsettings.json` beside `**/*.csproj`, which gives the
-  directory of a project), the base file of the project that holds a source (the nearest
-  directory with a `.csproj`, else with an `appsettings.json`) with serde_json after dropping
-  comments, trailing commas and a byte order mark; keys lower-case and join with `:`, and only
-  strings are kept. A value lives only during the extraction (`Facts` is not serialized), and
-  a config edit re-extracts the consumers through the config digest. Ceilings: a read passed in
-  through another file's wrapper call, `using static System.Environment` and a read inside a
-  `??` fallback of a local are an unknown part (`ponytail:` marker in `reads.rs`);
-  `appsettings.<Environment>.json`, `GetValue`, `GetSection`, options binding, arrays and user
-  secrets are not read; a chain past `VALUE_DEPTH` is a hole.
+  key is the variable `Section__Key`, as the code spells it; the literal that `Settings` finds
+  for it is the variable's default (`Part::EnvOr`), so `http::fetches` keeps the twin readings
+  Spring's `${X:default}` has: by host when a workspace provider serves the default's host, else
+  through the variable and `base_url_env`. `based_on` rebases such a default on a relative URL
+  as `Uri` joins. `Settings` reads, from `Indexed::configs` (`**/appsettings.json` beside
+  `**/*.csproj`, which the pack's `join` reads), the base file of the project of a source (its
+  `Facts::unit`; a file in no project reads the nearest file above it) with serde_json after
+  dropping comments, trailing commas and a byte order mark. The parsed document is kept as it is
+  and a key `A:B` is looked up by descending its segments without case (cost: segments times
+  children), never flattened to full keys; serde_json's recursion limit (`JSON_DEPTH`, 128)
+  bounds the nesting, and a file past it is not read. Only strings are values. A value lives
+  only during the extraction (`Facts` is not serialized), and a config edit re-extracts the
+  consumers through the config digest. Ceilings: a read passed in through another file's
+  wrapper call, `using static System.Environment` and a read behind a `??` fallback of a local
+  are an unknown part (`ponytail:` marker in `reads.rs`); the variable keeps the key's spelling
+  and `base_url_env` compares it as written, though .NET compares keys without case; a JSON key
+  that holds a `:` is not matched; `appsettings.<Environment>.json`, `GetValue`, `GetSection`,
+  options binding, arrays and user secrets are not read; a chain past `VALUE_DEPTH` is a hole.
 - `http/kotlin.rs` (spec #27, #98): Ktor routes, through the same `Mounts` and `prefixes` as
   the other routers, whose nodes are definitions (file, qualified name): the lambda of each
   `routing { }` call (a root), the lambda of each `route(prefix) { }` call (mounted under its

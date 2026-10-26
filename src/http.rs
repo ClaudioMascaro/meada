@@ -282,7 +282,8 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>)> {
                 }
                 None => {
                     // `${base}/users`: an unknown base, the host unresolved.
-                    let base = parts.iter().take_while(|p| matches!(p, Part::Hole)).count();
+                    let unknown = |p: &&Part| matches!(p, Part::Hole | Part::Read { .. });
+                    let base = parts.iter().take_while(unknown).count();
                     let rest = render(&parts[base..]);
                     (None, (base == 0 || rest.starts_with('/')).then_some(rest))
                 }
@@ -856,6 +857,24 @@ mod tests {
     use crate::contract::{ContractKind, Role, Search, View};
     use crate::entry::EntryKind;
     use crate::index::{Consumer, Gateway, Provider};
+    use crate::lang::{Part, Value};
+
+    /// A read no kind decided is an unknown base, as a hole: the host is unresolved, the path is read.
+    #[test]
+    fn a_leading_read_nobody_decided_is_an_unknown_base() {
+        let read = Part::Read {
+            scope: "".into(),
+            callee: "c[]".into(),
+            key: "K".into(),
+        };
+        let text = |t: &str| Value::Str(vec![Part::Text(t.into())]);
+        for lead in [Part::Hole, read] {
+            let url = Value::Str(vec![lead, Part::Text("/a".into())]);
+            let found = super::fetches(&[url, text("GET")]).unwrap();
+            assert_eq!(found[0].contract.as_deref(), Some("http::GET::/a"));
+            assert_eq!(found[0].via, None);
+        }
+    }
 
     fn provider(contract: &str) -> Provider {
         Provider {

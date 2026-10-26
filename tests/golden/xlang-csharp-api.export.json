@@ -10,6 +10,10 @@
       "hash": "01d5ec63bbe7be8d64373e01130ad132b3cf36b86ae5e4f2483ee943f81f4cdc"
     },
     {
+      "path": "Clients/SiteClient.cs",
+      "hash": "7ffc3b84df69f358b504bdb1ed2b9ee902cd755411173ac586f05b436757e016"
+    },
+    {
       "path": "Clients/StockClient.cs",
       "hash": "54bdfadb32f79abde26c3449c9497109bb392627d1122724be3dc464a59e0033"
     },
@@ -69,6 +73,22 @@
         "path": "Clients/PriceClient.cs",
         "start": 398,
         "end": 484
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient",
+      "span": {
+        "path": "Clients/SiteClient.cs",
+        "start": 118,
+        "end": 499
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient.Pages(string)",
+      "span": {
+        "path": "Clients/SiteClient.cs",
+        "start": 213,
+        "end": 497
       }
     },
     {
@@ -182,6 +202,50 @@
         "path": "Clients/PriceClient.cs",
         "start": 252,
         "end": 268
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient.Pages(string)::Environment.GetEnvironmentVariable#0",
+      "caller": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient.Pages(string)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Clients/SiteClient.cs",
+        "start": 281,
+        "end": 326
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient.Pages(string)::Http.GetStringAsync#0",
+      "caller": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient.Pages(string)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Clients/SiteClient.cs",
+        "start": 361,
+        "end": 408
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient.Pages(string)::Http.GetStringAsync#1",
+      "caller": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient.Pages(string)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Clients/SiteClient.cs",
+        "start": 446,
+        "end": 490
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient::HttpClient#0",
+      "caller": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Clients/SiteClient.cs",
+        "start": 190,
+        "end": 206
       }
     },
     {
@@ -444,6 +508,16 @@
       "via": "host:web.example.com"
     },
     {
+      "contract": "http::GET::/api/prices/{}",
+      "site": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient.Pages(string)::Http.GetStringAsync#0",
+      "via": "env:WEB_URL"
+    },
+    {
+      "contract": "http::GET::/api/promotions",
+      "site": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient.Pages(string)::Http.GetStringAsync#1",
+      "via": "env:WEB_URL"
+    },
+    {
       "contract": "http::GET::/api/stock",
       "site": "example.com/xlang-csharp/api::Clients/StockClient.cs::Api.Clients.StockClient.Level()::Http.GetStringAsync#0",
       "via": "env:WEB_URL"
@@ -483,6 +557,20 @@
       "contract": "http::POST::/api/audit",
       "level": "exact",
       "reason": "host web.example.com is served by example.com/xlang-csharp/web"
+    },
+    {
+      "consumer": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient.Pages(string)::Http.GetStringAsync#0",
+      "provider": "example.com/xlang-csharp/web::app/api/prices/[sku]/route.ts::GET",
+      "contract": "http::GET::/api/prices/{}",
+      "level": "inferred",
+      "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-csharp/web"
+    },
+    {
+      "consumer": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient.Pages(string)::Http.GetStringAsync#1",
+      "provider": "example.com/xlang-csharp/web::app/api/promotions/route.ts::GET",
+      "contract": "http::GET::/api/promotions",
+      "level": "inferred",
+      "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-csharp/web"
     },
     {
       "consumer": "example.com/xlang-csharp/api::Clients/StockClient.cs::Api.Clients.StockClient.Level()::Http.GetStringAsync#0",
