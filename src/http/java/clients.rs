@@ -27,9 +27,9 @@ use crate::contract::Found;
 use crate::index::Indexed;
 use crate::jvm::names::jvm_files;
 use crate::jvm::spring::{self, Configs};
-use crate::lang::{Annotated, Call, Invocation, Part, Value};
+use crate::lang::{Call, Invocation, Part, Value};
 use crate::names::{one, spellings, typed};
-use crate::resolve::{Code, Expand, Expanded, FLUENT_CHAIN, method as member};
+use crate::resolve::{Code, Expand, Expanded, FLUENT_CHAIN, Injected, method as member};
 
 const REST_TEMPLATE: &str = "org.springframework.web.client.RestTemplate";
 /// The methods of a RestTemplate that send one method; `exchange` names it.
@@ -93,9 +93,9 @@ enum Client {
 pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
     // Read the first time an annotation is injected: a repository without one parses none.
     let configs = std::cell::OnceCell::new();
-    let inject = |code: &Code<'a>, path: &'a str, annotated: &'a Annotated| {
+    let inject = |code: &Code<'a>, path: &'a str, on: Injected<'a>| {
         let configs = configs.get_or_init(|| Configs::read(indexed.configs, indexed.manifests));
-        spring::inject(configs, code, path, annotated)
+        spring::inject(configs, code, path, on.annotated()?)
     };
     let mut found = Vec::new();
     for (path, facts) in jvm_files(code) {

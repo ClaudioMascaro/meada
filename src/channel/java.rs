@@ -34,9 +34,9 @@ use super::message::{
 use crate::index::Indexed;
 use crate::jvm::names::{array_of, jvm_files, kotlin};
 use crate::jvm::spring::{self, Configs, Properties};
-use crate::lang::{Annotated, Call, Invocation, Kind, Part, Value};
+use crate::lang::{Call, Invocation, Kind, Part, Value};
 use crate::names::{declared, known, one, spellings, typed};
-use crate::resolve::{Code, Expand, Inject, Keywords, Target, method as member};
+use crate::resolve::{Code, Expand, Inject, Injected, Keywords, Target, method as member};
 
 const KAFKA_LISTENER: &str = "org.springframework.kafka.annotation.KafkaListener";
 const RABBIT_LISTENER: &str = "org.springframework.amqp.rabbit.annotation.RabbitListener";
@@ -128,8 +128,8 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
     // Read the first time a form needs them: a repository without one parses none.
     let configs = OnceCell::new();
     let configs = || configs.get_or_init(|| Configs::read(indexed.configs, indexed.manifests));
-    let inject = |code: &Code<'a>, path: &'a str, annotated: &'a Annotated| {
-        spring::inject(configs(), code, path, annotated)
+    let inject = |code: &Code<'a>, path: &'a str, on: Injected<'a>| {
+        spring::inject(configs(), code, path, on.annotated()?)
     };
     let mut out = Vec::new();
     for (path, facts) in jvm_files(code) {

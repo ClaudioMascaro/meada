@@ -11,7 +11,7 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Binds, Bound, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Join, Kind,
-    LanguagePack, Layout, Modules, Param, Part, Receiver, Value, children, named, text,
+    LanguagePack, Layout, Modules, Param, Part, Receiver, Step, Ty, Value, children, named, text,
 };
 use crate::dotnet::msbuild::{self, Using};
 use crate::{Result, qualify};
@@ -283,6 +283,10 @@ fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
 /// The symbol of a file's top-level statements.
 const MAIN: &str = "Main";
 
+/// A write of a name or of `this.name` (`parse`): the scope written in, whether through
+/// `this.`, and the value of a plain `=` (none for `+=`, `++`, `out`, `ref` or a tuple).
+type Write = (String, bool, Option<Value>);
+
 struct Visit<'t> {
     node: Node<'t>,
     scope: Rc<String>,
@@ -296,6 +300,9 @@ struct Visit<'t> {
     definitions: bool,
     /// The type parameters declared around the node: a type they name is no class.
     generics: Rc<Vec<String>>,
+    /// Whether the node may not run when its definition (method, constructor, lambda) does: it
+    /// sits in a branch, a loop, a `catch` or the right of `&&`, `||` or `??` there.
+    conditional: bool,
 }
 
 fn parse(src: &[u8]) -> Result<Facts> {
@@ -314,6 +321,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         depth: 0,
         definitions: true,
         generics: Rc::new(Vec::new()),
+        conditional: false,
     }];
     let mut usings = Vec::new();
     let mut namespaces = BTreeSet::new();
@@ -331,6 +339,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // The assignments through a name (`c.BaseAddress = v`, `_c = v`): the scope written in, the
     // path without a leading `this.`, whether it began with one, and the value.
     let mut members: Vec<(String, String, bool, Value)> = Vec::new();
+    // The instance `readonly` fields with no initializer, by class and name, and every write of
+    // a name or of `this.name` in the file: the scope written in, whether through `this.`, and
+    // the value of a plain `=` (none for `+=`, `++`, `out`, `ref` or a tuple).
+    let mut readonly: Vec<(String, String)> = Vec::new();
+    let mut writes: BTreeMap<String, Vec<Write>> = BTreeMap::new();
     // Initializer calls of `var` locals (by `Class::Result` place) and chained calls (by place
     // in `facts.calls`), linked to the calls they name once every call is read.
     let mut results: Vec<Range<usize>> = Vec::new();
@@ -347,6 +360,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         depth,
         definitions,
         mut generics,
+        conditional,
     }) = stack.pop()
     {
         let Some(remaining) = qualification_bytes.checked_sub(scope.len()) else {
@@ -575,6 +589,19 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         lambdas(list, &scope, &mut at.args, &mut at.kwargs);
                     }
                     at.arity = Some(at.args.len() + at.kwargs.len());
+                    // `For<Api>(..)`: the type arguments the call is given, as written.
+                    let generic = match function {
+                        Some(f) if f.kind() == "member_access_expression" => {
+                            f.child_by_field_name("name")
+                        }
+                        f => f,
+                    };
+                    if let Some(list) = (generic.filter(|g| g.kind() == "generic_name"))
+                        .and_then(|g| named(g).find(|n| n.kind() == "type_argument_list"))
+                    {
+                        let tys = named(list).map(|t| Ty::Named(type_name(t, src))).collect();
+                        at.uses = vec![vec![Step::Argument(tys)]];
+                    }
                     let object = match function {
                         Some(f) if f.kind() == "member_access_expression" => {
                             f.child_by_field_name("expression")
@@ -617,6 +644,27 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     at.by_path = true;
                     at.constructs = true;
                     (at.args, at.kwargs) = arguments(node.child_by_field_name("arguments"), src, 0);
+                    at.arity = Some(at.args.len() + at.kwargs.len());
+                    facts.calls.push(opaque(at, definitions));
+                }
+            }
+            // `T x = new(..)`, a field or a property too: a construction of the declared type.
+            // ponytail: a target-typed `new(..)` passed, returned or assigned is no call: its
+            // type is the parameter's, the return's or the name's, which the pack does not read.
+            "implicit_object_creation_expression" => {
+                let declared = match node.parent() {
+                    Some(d) if d.kind() == "variable_declarator" => (d.parent())
+                        .filter(|p| p.kind() == "variable_declaration")
+                        .and_then(|p| p.child_by_field_name("type")),
+                    Some(p) if p.kind() == "property_declaration" => p.child_by_field_name("type"),
+                    _ => None,
+                };
+                if let Some(ty) = declared.filter(|t| t.kind() != "implicit_type") {
+                    let mut at = call(&scope, type_name(ty, src), node.byte_range());
+                    at.by_path = true;
+                    at.constructs = true;
+                    let list = named(node).find(|n| n.kind() == "argument_list");
+                    (at.args, at.kwargs) = arguments(list, src, 0);
                     at.arity = Some(at.args.len() + at.kwargs.len());
                     facts.calls.push(opaque(at, definitions));
                 }
@@ -680,6 +728,12 @@ fn parse(src: &[u8]) -> Result<Facts> {
                             ty: None,
                             scope: None,
                         });
+                    } else if definitions
+                        && initial.is_none()
+                        && modifiers.contains(&"readonly")
+                        && !modifiers.contains(&"static")
+                    {
+                        readonly.push((scope.as_ref().clone(), text(name, src).to_string()));
                     } else if let Some(v) = initial.filter(|n| definitions && held(n)) {
                         bound.push(Bound {
                             scope: scope.as_ref().clone(),
@@ -702,28 +756,35 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     "tuple_expression" => named(l).flat_map(named).collect(),
                     _ => vec![l],
                 });
+                let plain = node
+                    .child_by_field_name("operator")
+                    .is_some_and(|o| text(o, src) == "=");
+                let one = plain && left.is_some_and(|l| l.kind() != "tuple_expression");
+                let given = right.filter(|_| one).map(|r| value(r, src, 0));
                 for target in targets {
-                    match target.kind() {
-                        "identifier" => {
-                            assigned.insert(text(target, src).to_string());
-                        }
+                    let (name, this) = match target.kind() {
+                        "identifier" => (target, false),
                         // `this.x = v` assigns the field `x`.
                         "member_access_expression"
                             if target
                                 .child_by_field_name("expression")
                                 .is_some_and(|e| text(e, src) == "this") =>
                         {
-                            if let Some(name) = target.child_by_field_name("name") {
-                                assigned.insert(text(name, src).to_string());
+                            match target.child_by_field_name("name") {
+                                Some(name) => (name, true),
+                                None => continue,
                             }
                         }
-                        _ => {}
-                    }
+                        _ => continue,
+                    };
+                    assigned.insert(text(name, src).to_string());
+                    let at = (scope.as_ref().clone(), this, given.clone());
+                    writes
+                        .entry(text(name, src).to_string())
+                        .or_default()
+                        .push(at);
                 }
-                let plain = node
-                    .child_by_field_name("operator")
-                    .is_some_and(|o| text(o, src) == "=");
-                if let (Some(left), Some(right), true, true) = (left, right, plain, definitions)
+                if let (Some(left), Some(right), true) = (left, right, definitions)
                     && matches!(left.kind(), "member_access_expression" | "identifier")
                 {
                     let path = callee(left, src);
@@ -731,17 +792,19 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     // A name assigned from a call or a construction is also recorded as
                     // `name=`: the kinds tell what it was made from (a factory's client).
                     let rest = rooted.unwrap_or(&path);
-                    if !path.contains('(') && (rest.contains('.') || held(&right)) {
-                        let name = match rest.contains('.') {
+                    let member = rest.contains('.');
+                    if !path.contains('(') && (member || (plain && held(&right))) {
+                        let name = match member {
                             true => rest.to_string(),
                             false => format!("{rest}="),
                         };
-                        members.push((
-                            scope.as_ref().clone(),
-                            name,
-                            rooted.is_some(),
-                            value(right, src, 0),
-                        ));
+                        // A member set by `??=` or `+=`, or by an assignment that may not run,
+                        // holds no one value.
+                        let value = match member && (!plain || conditional) {
+                            true => Value::Unknown,
+                            false => value(right, src, 0),
+                        };
+                        members.push((scope.as_ref().clone(), name, rooted.is_some(), value));
                     }
                 }
                 // `x.Event += handler` attaches a handler to an event of the name: a bound of
@@ -782,11 +845,32 @@ fn parse(src: &[u8]) -> Result<Facts> {
             {
                 for target in named(node).filter(|t| t.kind() == "identifier") {
                     assigned.insert(text(target, src).to_string());
+                    let at = (scope.as_ref().clone(), false, None);
+                    writes
+                        .entry(text(target, src).to_string())
+                        .or_default()
+                        .push(at);
                 }
             }
             "argument" if children(node).any(|c| matches!(c.kind(), "out" | "ref")) => {
-                for target in named(node).filter(|t| t.kind() == "identifier") {
+                // `out x`, and `out this.x`, which writes the field `x`.
+                let this = |t: &Node| {
+                    t.kind() == "member_access_expression"
+                        && (t.child_by_field_name("expression"))
+                            .is_some_and(|e| text(e, src) == "this")
+                };
+                let targets = named(node).filter_map(|t| match t.kind() {
+                    "identifier" => Some((t, false)),
+                    _ if this(&t) => Some((t.child_by_field_name("name")?, true)),
+                    _ => None,
+                });
+                for (target, this) in targets {
                     assigned.insert(text(target, src).to_string());
+                    let at = (scope.as_ref().clone(), this, None);
+                    writes
+                        .entry(text(target, src).to_string())
+                        .or_default()
+                        .push(at);
                 }
             }
             "property_declaration" | "event_declaration" => {
@@ -973,6 +1057,28 @@ fn parse(src: &[u8]) -> Result<Facts> {
             });
             facts.programs.push(MAIN.to_string());
         }
+        // A definition starts its own run; a branch, a loop or a short circuit may not run all
+        // that is inside it.
+        let starts = kind.is_some()
+            || matches!(
+                node.kind(),
+                "lambda_expression" | "anonymous_method_expression"
+            );
+        let branches = match node.kind() {
+            "if_statement"
+            | "conditional_expression"
+            | "switch_statement"
+            | "switch_expression"
+            | "while_statement"
+            | "do_statement"
+            | "for_statement"
+            | "foreach_statement"
+            | "catch_clause"
+            | "conditional_access_expression" => true,
+            "binary_expression" => (node.child_by_field_name("operator"))
+                .is_some_and(|o| matches!(text(o, src), "&&" | "||" | "??")),
+            _ => false,
+        };
         for child in named(node) {
             // Attributes are read as calls on the definition they decorate (`attributes`).
             if child.kind() == "attribute_list" {
@@ -997,6 +1103,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 depth: nested,
                 definitions: definitions && (kind.is_none() || defining),
                 generics: generics.clone(),
+                conditional: !starts && (conditional || branches),
             });
         }
         stack.extend(visits.into_iter().rev());
@@ -1112,6 +1219,49 @@ fn parse(src: &[u8]) -> Result<Facts> {
         }
     }
     bound.retain(|b| !assigned.contains(&b.name));
+    // An instance `readonly` field written once in the file, by a plain `=` in a constructor of
+    // its class (as `this.f`, or as `f` where no parameter or local of the constructor is `f`),
+    // holds that value, written in the constructor: a constant of the class, as Java's `final`
+    // fields are (`Const::scope`).
+    // ponytail: a part of a `partial` type in another file may assign the field too.
+    let enclosing = |scope: &str| {
+        let mut class = scope;
+        while !classes.contains(class) && !class.is_empty() {
+            class = crate::parent(class);
+        }
+        class.to_string()
+    };
+    // Each looked up once: the writes by class and name, the constructors, the bindings.
+    let mut by_class: BTreeMap<(String, &str), Vec<&Write>> = BTreeMap::new();
+    for (name, written) in &writes {
+        for write in written {
+            let at = (enclosing(&write.0), name.as_str());
+            by_class.entry(at).or_default().push(write);
+        }
+    }
+    let ctors: BTreeSet<&str> = (facts.constructors.values().flatten())
+        .map(String::as_str)
+        .collect();
+    let bindings: BTreeSet<(&str, &str)> = (facts.receivers.iter())
+        .map(|r| (r.scope.as_str(), r.name.as_str()))
+        .collect();
+    let mut given = Vec::new();
+    for (class, name) in readonly {
+        let written = by_class.get(&(class.clone(), name.as_str()));
+        if let Some([(ctor, this, Some(value))]) = written.map(Vec::as_slice)
+            && ctors.contains(ctor.as_str())
+            && crate::parent(ctor) == class
+            && (*this || !bindings.contains(&(ctor.as_str(), name.as_str())))
+        {
+            given.push(Const {
+                name: qualify(&class, &name),
+                value: value.clone(),
+                ty: None,
+                scope: Some(ctor.clone()),
+            });
+        }
+    }
+    facts.consts.extend(given);
     facts.bound = bound;
     facts.bound.extend(through);
     facts.externs = outside.into_iter().collect();
@@ -1648,9 +1798,14 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 .child_by_field_name("operator")
                 .is_some_and(|n| text(n, src) == "??") =>
         {
-            let Some(operands) = coalesced(node, src) else {
+            let Some(mut operands) = coalesced(node, src) else {
                 return Value::Unknown;
             };
+            // `x ?? throw ..` is `x` when it gives a value at all.
+            operands.retain(|n| n.kind() != "throw_expression");
+            if let [one] = operands[..] {
+                return value(one, src, depth + 1);
+            }
             let mut reads = operands
                 .into_iter()
                 .map(|n| read_of(&value(n, src, depth + 1)));
@@ -2092,5 +2247,96 @@ mod tests {
         // The file's own global using still binds in it, as in a project of its own.
         assert!(namespaces(&facts["old/A.cs"]).is_empty());
         assert_eq!(namespaces(&facts["old/G.cs"]), ["Y"]);
+    }
+
+    /// The constants of `body`, the members of `class C` in namespace `A`, whose value a
+    /// constructor writes (`Const::scope`), with that constructor; the value must be a name.
+    fn given(body: &str) -> Vec<(String, String)> {
+        let source = format!("namespace A;\nclass C {{\n{body}\n}}\n");
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        (facts.consts.into_iter())
+            .filter_map(|c| {
+                let scope = c.scope?;
+                assert!(matches!(c.value, Value::Ref(_)), "{}", c.name);
+                Some((c.name, scope))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_readonly_field_one_constructor_writes_once_holds_that_value() {
+        let at = |ctor: &str| vec![("A.C._h".to_string(), format!("A.C.{ctor}"))];
+        let field = "readonly HttpClient _h;\n";
+        for ctor in [
+            "C(HttpClient h) { _h = h; }",
+            "C(HttpClient h) { this._h = h; }",
+            "C(HttpClient h) { _h = h ?? throw new ArgumentNullException(nameof(h)); }",
+        ] {
+            assert_eq!(
+                given(&format!("{field}{ctor}")),
+                at("C(HttpClient)"),
+                "{ctor}"
+            );
+        }
+        // A nested type's constructor writes a field of its own name, not this one.
+        let nested = "class Inner { readonly HttpClient _h; Inner(HttpClient x) { _h = x; } }";
+        assert_eq!(
+            given(&format!("{field}C(HttpClient h) {{ _h = h; }}\n{nested}")),
+            [
+                ("A.C._h".to_string(), "A.C.C(HttpClient)".to_string()),
+                (
+                    "A.C.Inner._h".to_string(),
+                    "A.C.Inner.Inner(HttpClient)".to_string()
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_readonly_field_written_twice_hidden_or_outside_a_constructor_holds_no_value() {
+        let none: Vec<(String, String)> = Vec::new();
+        for body in [
+            // A parameter or a local of the constructor named like the field.
+            "readonly HttpClient _h; C(HttpClient _h) { _h = _h; }",
+            "readonly HttpClient _h; C() { HttpClient _h = null; _h = new HttpClient(); }",
+            // Two writes.
+            "readonly HttpClient _h; C(HttpClient h) { _h = h; } C() { _h = new HttpClient(); }",
+            "readonly HttpClient _h; C(HttpClient h) { _h = h; Make(out _h); }",
+            "readonly HttpClient _h; C(HttpClient h) { _h = h; Make(out this._h); }",
+            "readonly HttpClient _h; C(HttpClient h) { _h = h; Make(ref this._h); }",
+            "readonly string _s; C(string s) { _s = s; _s += \"/x\"; }",
+            "readonly HttpClient _h; C(HttpClient a, HttpClient b) { (_h, _x) = (a, b); }",
+            // Outside a constructor, in a lambda of it, or in a nested type's.
+            "readonly HttpClient _h; void M(HttpClient h) { _h = h; }",
+            "readonly HttpClient _h; C(HttpClient h) { Action a = () => _h = h; }",
+            "readonly HttpClient _h; class Inner { Inner(HttpClient h) { _h = h; } }",
+            // An initializer, or `static`.
+            "readonly HttpClient _h = new HttpClient(); C(HttpClient h) { _h = h; }",
+            "static readonly HttpClient S; static C() { S = new HttpClient(); }",
+            // Not `readonly`.
+            "HttpClient _h; C(HttpClient h) { _h = h; }",
+        ] {
+            assert_eq!(given(body), none, "{body}");
+        }
+    }
+
+    /// Many types writing a field of one name each cost their number, not its square.
+    #[test]
+    fn readonly_fields_of_many_types_are_read_in_linear_time() {
+        let source: String = (0..8192)
+            .map(|n| {
+                format!(
+                    "class C{n} {{ readonly HttpClient _h; C{n}(HttpClient h) {{ _h = h; }} }}\n"
+                )
+            })
+            .collect();
+        let start = std::time::Instant::now();
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        let took = start.elapsed();
+        assert_eq!(
+            facts.consts.iter().filter(|c| c.scope.is_some()).count(),
+            8192
+        );
+        assert!(took.as_secs() < 10, "{took:?}");
     }
 }

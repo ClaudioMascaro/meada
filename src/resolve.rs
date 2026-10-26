@@ -3638,10 +3638,30 @@ struct Fold<'a, 'i> {
     foreign: usize,
 }
 
-/// What a contract kind reads off one annotation written on a field or a parameter
-/// (`Facts::annotated`), given the file and the annotation with what it marks: the value it
-/// injects there, or `None` when it is no annotation the kind reads or it injects nothing there.
-pub type Inject<'a, 'i> = dyn Fn(&Code<'a>, &'a str, &'a Annotated) -> Option<Value> + 'i;
+/// What a contract kind injects where the source gives no value (`Code::expand_with`), given
+/// the file and what it is asked about: the value, or `None` when it injects nothing there.
+pub type Inject<'a, 'i> = dyn Fn(&Code<'a>, &'a str, Injected<'a>) -> Option<Value> + 'i;
+
+/// What `Inject` is asked about.
+#[derive(Clone, Copy)]
+pub enum Injected<'a> {
+    /// One annotation written on a field or a parameter (`Facts::annotated`), with what it marks.
+    Annotated(&'a Annotated),
+    /// The parameter at this position of a function no exact call reaches, once no annotation
+    /// on it injects anything: a dependency injection container's constructor, which passes it
+    /// by its type (C#'s typed client).
+    Param(Target<'a>, usize),
+}
+
+impl<'a> Injected<'a> {
+    /// The annotation asked about, for a kind that reads annotations alone.
+    pub fn annotated(self) -> Option<&'a Annotated> {
+        match self {
+            Injected::Annotated(a) => Some(a),
+            Injected::Param(..) => None,
+        }
+    }
+}
 
 /// How many calls a builder chain is read through, down to what starts it.
 // ponytail: a chain of more builder calls than this is not read to its start; its calls past
@@ -4933,7 +4953,7 @@ impl<'a> Code<'a> {
     }
 
     /// The parameter at position `n` of `function`.
-    fn param(&self, function: Target<'a>, n: usize) -> Option<&'a Param> {
+    pub fn param(&self, function: Target<'a>, n: usize) -> Option<&'a Param> {
         self.def(function.path, function.name)?.params.get(n)
     }
 
@@ -5437,7 +5457,7 @@ impl<'a> Code<'a> {
         let annotated = &self.full(path)?.annotated;
         (annotated.iter())
             .filter(|a| marks(&a.on))
-            .find_map(|a| inject(self, path, a))
+            .find_map(|a| inject(self, path, Injected::Annotated(a)))
     }
 
     /// `value` with its names folded. `frames[depth..]` bind the parameters of the function
@@ -5612,12 +5632,13 @@ impl<'a> Code<'a> {
                     }
                 }
                 frame => {
-                    // No frame binds it: what an annotation injects, when no exact call can
-                    // pass it.
+                    // No frame binds it: what an annotation injects, or what the kind injects
+                    // into the parameter itself, when no exact call can pass it.
                     let called = self.may_be_called(function);
                     let marks = |on: &Marked| matches!(on, Marked::Param(f, at) if f == function.name && *at == n);
                     if let (false, None, Some(inject)) = (called, field, fold.inject)
-                        && let Some(value) = self.injected(function.path, marks, inject)
+                        && let Some(value) = (self.injected(function.path, marks, inject))
+                            .or_else(|| inject(self, function.path, Injected::Param(function, n)))
                     {
                         return value;
                     }
