@@ -26,6 +26,15 @@ pub struct Build {
     pub includes: Vec<(String, String)>,
 }
 
+/// The source roots every JVM module has, and the test ones among them: Java's and Kotlin's.
+pub const ROOTS: [&str; 4] = [
+    "src/main/java",
+    "src/main/kotlin",
+    "src/test/java",
+    "src/test/kotlin",
+];
+pub const TEST_ROOTS: [&str; 2] = ["src/test/java", "src/test/kotlin"];
+
 /// A group/artifact component of a literal coordinate.
 pub fn literal(value: &str) -> bool {
     !value.is_empty()

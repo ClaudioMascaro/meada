@@ -1,3 +1,7 @@
 [[peer]]
 repo = "example.com/kotlin/lib"
 path = "../kotlin-pkg-lib"
+
+[[peer]]
+repo = "example.com/kotlin/kit"
+path = "../kotlin-pkg-kit"

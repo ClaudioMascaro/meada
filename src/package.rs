@@ -37,7 +37,7 @@ use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
 use crate::lang::{Call, MAX_BYTES, python};
 use crate::literals::Literals;
 use crate::render::{Files, label, rank, section};
-use crate::resolve::{Ancestry, Code, Exported};
+use crate::resolve::{Ancestry, Code, Exported, Flexible};
 use crate::shape::{self, Shape, Want};
 use crate::workspace::Repository;
 
@@ -226,17 +226,17 @@ trait Ecosystem {
     }
 
     /// Whether a provider of an artifact the file `from.1` of the repository `from.0` depends on
-    /// declares `specifier` itself, whatever the import's chain names there: of the calls one
-    /// site makes through several candidates (`imports`, Java's on-demand imports), the one a
-    /// provider declares enters only when it is alone (`import`). An ecosystem whose `imports`
-    /// gives one at most per call never asks.
+    /// declares what `specifier` and `chain` name, whatever the method or signature there: of
+    /// the calls one site makes through several candidates (`imports`, Java's on-demand
+    /// imports), the one a provider declares enters only when it is alone (`import`). An
+    /// ecosystem whose `imports` gives one at most per call never asks.
     fn declares<'e>(
         &self,
         _exports: &'e [Export],
         _providers: &Providers,
         _at: &dyn Fn(usize) -> &'e Provided<'e>,
         _from: (usize, &str),
-        _specifier: &str,
+        _import: (&str, &str),
     ) -> bool {
         true
     }
@@ -781,6 +781,8 @@ struct Provided<'e> {
     classes: OnceCell<maven::Classes<'e>>,
     /// The families of the public classes (`Ancestry`), for `Classes`.
     ancestries: &'e [Ancestry],
+    /// The functions that take more than one count of arguments (`Flexible`), for `Classes`.
+    flexible: &'e [Flexible],
 }
 
 /// What an import of a package resolved to in one provider: what named the entry, the import's
@@ -813,6 +815,7 @@ impl<'e> Provided<'e> {
             go_dirs: OnceCell::new(),
             classes: OnceCell::new(),
             ancestries: &export.ancestries,
+            flexible: &export.flexible,
         }
     }
 
@@ -1057,7 +1060,13 @@ fn import(exports: &mut [Export], providers: &Providers) {
         let sites = export.import_calls.chunk_by(|a, b| a.site == b.site);
         let declared = |call: &ImportCall| {
             let from = (n, call.path.as_str());
-            declares(exports, providers, &provided, from, &call.specifier)
+            declares(
+                exports,
+                providers,
+                &provided,
+                from,
+                (&call.specifier, &call.chain),
+            )
         };
         let calls = sites
             .filter(|calls| calls.len() < 2 || calls.iter().filter(|c| declared(c)).count() < 2)
@@ -1236,19 +1245,20 @@ fn resolutions<'e>(
 }
 
 /// Whether a provider of an artifact the file `from.1` of the repository `from.0` depends on
-/// declares `specifier`, by the rules of the file's ecosystem (`Ecosystem::declares`).
+/// declares the import's `(specifier, chain)`, by the rules of the file's ecosystem
+/// (`Ecosystem::declares`).
 fn declares<'e>(
     exports: &'e [Export],
     providers: &Providers,
     provided: &'e [OnceCell<Provided<'e>>],
     from: (usize, &str),
-    specifier: &str,
+    import: (&str, &str),
 ) -> bool {
     let Some(ecosystem) = of_source(from.1) else {
         return false;
     };
     let at = |m: usize| provided[m].get_or_init(|| Provided::new(&exports[m]));
-    ecosystem.declares(exports, providers, &at, from, specifier)
+    ecosystem.declares(exports, providers, &at, from, import)
 }
 
 /// The files of a repository an import of one of its packages can reach (issue #175), so the
@@ -1277,6 +1287,7 @@ fn surface(
         go_dirs: OnceCell::new(),
         classes: OnceCell::new(),
         ancestries: &[],
+        flexible: &[],
     };
     let mut queue = Vec::new();
     // Shapes cross through the packages of an ecosystem that says so (`Ecosystem::shapes`).
@@ -2641,6 +2652,7 @@ mod tests {
             import_calls: Vec::new(),
             communities: Vec::new(),
             ancestries: Vec::new(),
+            flexible: Vec::new(),
             exported: (files.iter())
                 .map(|(p, _)| row(p, Some("S"), Some(p), Some("S")))
                 .collect(),
@@ -2717,6 +2729,7 @@ mod tests {
             go_dirs: OnceCell::new(),
             classes: OnceCell::new(),
             ancestries: &[],
+            flexible: &[],
         }
     }
 
