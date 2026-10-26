@@ -7,7 +7,7 @@ use crate::resolve::{Code, Expand, Expanded, Inject, Keywords};
 
 /// A call that produces to or consumes from a channel: a queue or topic of one broker kind.
 pub struct Message {
-    /// `kafka`, `amqp`, `jms`, `sqs`, `nats`, `bullmq` or `redis`.
+    /// `kafka`, `amqp`, `jms`, `sqs`, `nats`, `bullmq`, `redis` or `servicebus`.
     pub broker: &'static str,
     /// The channel name as evaluated, kept as it is; `None` when it cannot be evaluated (an
     /// unresolved side, never linked).

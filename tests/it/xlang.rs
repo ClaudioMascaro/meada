@@ -676,6 +676,28 @@ fn trace_down_from_a_csharp_typed_client_reaches_the_typescript_provider() {
     assert_golden("xlang-csharp.trace-typed-client.txt", &answer);
 }
 
+/// The web app produces the Kafka topic `orders.shipped` in TypeScript (kafkajs); the api
+/// service consumes it with a Confluent.Kafka consumer written in C#, the method that subscribes
+/// being the handler (spec #28, #115).
+#[test]
+fn trace_down_from_a_typescript_producer_reaches_the_csharp_kafka_consumer() {
+    let (web, _) = xlang_csharp("xlang_csharp_channel_down");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("announceShipment"), Direction::Down, None)
+        .unwrap();
+
+    assert!(
+        answer.contains(
+            "→[exact: channel::kafka::orders.shipped] example.com/xlang-csharp/api \
+             Messaging/ShipmentListener.cs:16 Api.Messaging.ShipmentListener.OnShipment()"
+        ),
+        "{answer}"
+    );
+    assert_golden("xlang-csharp.trace-channel-down.txt", &answer);
+}
+
 #[test]
 fn trace_up_crosses_into_csharp_and_back_to_typescript() {
     let (web, _) = xlang_csharp("xlang_csharp_up");

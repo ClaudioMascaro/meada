@@ -2,7 +2,7 @@
 //! SDK-style project files say which files form a project, for the usings that apply to all of
 //! them (`join`).
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ops::Range;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -783,28 +783,69 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         .entry(text(name, src).to_string())
                         .or_default()
                         .push(at);
+                    // Every write is a `name=` of its own (`Facts::bound`): the value of a call
+                    // or a construction, unknown for any other.
+                    if definitions {
+                        let held = given.clone().filter(|_| right.is_some_and(|r| held(&r)));
+                        members.push((
+                            scope.as_ref().clone(),
+                            format!("{}=", text(name, src)),
+                            this,
+                            held.unwrap_or(Value::Unknown),
+                        ));
+                    }
                 }
                 if let (Some(left), Some(right), true) = (left, right, definitions)
                     && matches!(left.kind(), "member_access_expression" | "identifier")
                 {
                     let path = callee(left, src);
                     let rooted = path.strip_prefix("this.");
-                    // A name assigned from a call or a construction is also recorded as
-                    // `name=`: the kinds tell what it was made from (a factory's client).
                     let rest = rooted.unwrap_or(&path);
-                    let member = rest.contains('.');
-                    if !path.contains('(') && (member || (plain && held(&right))) {
-                        let name = match member {
-                            true => rest.to_string(),
-                            false => format!("{rest}="),
-                        };
+                    if !path.contains('(') && rest.contains('.') {
                         // A member set by `??=` or `+=`, or by an assignment that may not run,
                         // holds no one value.
-                        let value = match member && (!plain || conditional) {
+                        let value = match !plain || conditional {
                             true => Value::Unknown,
                             false => value(right, src, 0),
                         };
-                        members.push((scope.as_ref().clone(), name, rooted.is_some(), value));
+                        members.push((
+                            scope.as_ref().clone(),
+                            rest.to_string(),
+                            rooted.is_some(),
+                            value,
+                        ));
+                    }
+                }
+                // `x.Event += handler` attaches a handler to an event of the name: a bound of
+                // its own for each attachment (`x.Event+=`), the lambda as the inline definition
+                // it makes and a method group as the name it writes.
+                let attaches = node
+                    .child_by_field_name("operator")
+                    .is_some_and(|o| text(o, src) == "+=");
+                if let (Some(left), Some(right), true, true) = (left, right, attaches, definitions)
+                    && left.kind() == "member_access_expression"
+                {
+                    let path = callee(left, src);
+                    let rooted = path.strip_prefix("this.");
+                    let rest = rooted.unwrap_or(&path);
+                    let handler = match right.kind() {
+                        "lambda_expression" | "anonymous_method_expression" => {
+                            let def = qualify(&scope, &format!("@{}", right.start_byte()));
+                            inline(defining, &scope, &classes).then_some(Value::Function(def))
+                        }
+                        "identifier" | "member_access_expression" => Some(value(right, src, 0)),
+                        _ => None,
+                    };
+                    if let Some(handler) = handler
+                        && rest.contains('.')
+                        && !path.contains('(')
+                    {
+                        members.push((
+                            scope.as_ref().clone(),
+                            format!("{rest}+="),
+                            rooted.is_some(),
+                            handler,
+                        ));
                     }
                 }
             }
@@ -818,6 +859,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         .entry(text(target, src).to_string())
                         .or_default()
                         .push(at);
+                    if definitions {
+                        let name = format!("{}=", text(target, src));
+                        members.push((scope.as_ref().clone(), name, false, Value::Unknown));
+                    }
                 }
             }
             "argument" if children(node).any(|c| matches!(c.kind(), "out" | "ref")) => {
@@ -839,6 +884,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         .entry(text(target, src).to_string())
                         .or_default()
                         .push(at);
+                    if definitions {
+                        let name = format!("{}=", text(target, src));
+                        members.push((scope.as_ref().clone(), name, this, Value::Unknown));
+                    }
                 }
             }
             "property_declaration" | "event_declaration" => {
@@ -1144,6 +1193,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         .map(|r| (r.scope.as_str(), r.name.as_str()))
         .collect();
     let mut through: Vec<Bound> = Vec::new();
+    let mut member_at: HashMap<(String, String), usize> = HashMap::new();
     for (scope, path, this, value) in members {
         let head = path
             .split('.')
@@ -1172,21 +1222,37 @@ fn parse(src: &[u8]) -> Result<Facts> {
             }
             (false, None) => scope.clone(),
         };
-        // A member written twice holds no one value.
-        match through
-            .iter_mut()
-            .find(|b| b.scope == at && b.name == path && !path.ends_with('='))
-        {
-            Some(twice) => twice.value = Value::Unknown,
-            None => through.push(Bound {
-                scope: at,
-                within: scope,
-                name: path,
-                value,
-            }),
+        // A member written twice holds no one value; a `name=` is one write, each kept.
+        let written = match path.ends_with('=') {
+            true => None,
+            false => member_at.get(&(at.clone(), path.clone())).copied(),
+        };
+        match written {
+            Some(twice) => through[twice].value = Value::Unknown,
+            None => {
+                member_at.insert((at.clone(), path.clone()), through.len());
+                through.push(Bound {
+                    scope: at,
+                    within: scope,
+                    name: path,
+                    value,
+                });
+            }
         }
     }
-    bound.retain(|b| !assigned.contains(&b.name));
+    // A name assigned anywhere holds no one value, and its initializer is one more write of it
+    // (`name=`, the first): the kinds that read a name's only write count them.
+    let (kept, initial): (Vec<Bound>, Vec<Bound>) =
+        bound.into_iter().partition(|b| !assigned.contains(&b.name));
+    let bound = kept;
+    let mut all: Vec<Bound> = (initial.into_iter())
+        .map(|b| Bound {
+            name: format!("{}=", b.name),
+            ..b
+        })
+        .collect();
+    all.append(&mut through);
+    let through = all;
     // An instance `readonly` field written once in the file, by a plain `=` in a constructor of
     // its class (as `this.f`, or as `f` where no parameter or local of the constructor is `f`),
     // holds that value, written in the constructor: a constant of the class, as Java's `final`
@@ -1301,12 +1367,15 @@ fn bind_unknown(bound: &mut Vec<Bound>, defining: bool, scope: &str, name: &str)
 /// Whether a local or a field with this initializer is bound to it (`Facts::bound`): a
 /// construction or a call, whose value the kinds read the client a name holds off.
 fn held(initializer: &Node) -> bool {
-    matches!(
-        initializer.kind(),
-        "object_creation_expression"
-            | "implicit_object_creation_expression"
-            | "invocation_expression"
-    )
+    match initializer.kind() {
+        "await_expression" => named(*initializer).next().is_some_and(|n| held(&n)),
+        kind => matches!(
+            kind,
+            "object_creation_expression"
+                | "implicit_object_creation_expression"
+                | "invocation_expression"
+        ),
+    }
 }
 
 /// `at`, made on nothing the repository holds when written outside `definitions`.
@@ -1801,6 +1870,17 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 _ => Value::Unknown,
             }
         }
+        // The keyword `string` is `System.String` whatever the repository declares.
+        "member_access_expression"
+            if node
+                .child_by_field_name("expression")
+                .is_some_and(|e| e.kind() == "predefined_type" && text(e, src) == "string")
+                && node
+                    .child_by_field_name("name")
+                    .is_some_and(|n| text(n, src) == "Empty") =>
+        {
+            Value::Str(Vec::new())
+        }
         "identifier" | "member_access_expression" | "qualified_name" => {
             Value::Ref(callee(node, src))
         }
@@ -1883,7 +1963,8 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
         "integer_literal" => Value::Scalar(text(node, src).parse().ok()),
         "boolean_literal" => Value::Scalar(None),
         "null_literal" => Value::Undefined,
-        "parenthesized_expression" => named(node)
+        // An awaited value is the value of its operand.
+        "parenthesized_expression" | "await_expression" => named(node)
             .next()
             .map_or(Value::Unknown, |n| value(n, src, depth + 1)),
         _ => Value::Unknown,
@@ -2091,6 +2172,115 @@ mod tests {
         assert_eq!(scopes.len(), 100);
         assert!(scopes.iter().all(|s| Arc::ptr_eq(s, scopes[0])));
         assert!(scopes[0].len() > 2_000);
+    }
+
+    /// What a call awaited is bound to: the call itself, as the same call not awaited is.
+    #[test]
+    fn a_name_is_bound_to_the_call_it_awaits() {
+        let source = "class C { IChannel _ch; IChannel Ch { get; set; }\n\
+            async Task M(IConnection c) {\n\
+              var a = await c.CreateChannelAsync();\n\
+              _ch = await c.CreateChannelAsync();\n\
+              var b = await Task.Delay(1);\n\
+              var n = (await c.Count());\n\
+            } }";
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        let held = |name: &str| -> Vec<String> {
+            (facts.bound.iter().filter(|b| b.name == name))
+                .map(|b| match &b.value {
+                    Value::Call(call) => call.callee.clone(),
+                    _ => "other".into(),
+                })
+                .collect()
+        };
+        assert_eq!(held("a"), ["c.CreateChannelAsync"]);
+        assert_eq!(held("_ch="), ["c.CreateChannelAsync"]);
+        assert_eq!(held("b"), ["Task.Delay"]);
+        // A parenthesized await is the value of the expression inside.
+        assert_eq!(held("n"), ["c.Count"]);
+    }
+
+    /// Every write of a name is a `name=` of its own, a call or a construction by its value and
+    /// any other by none, and the initializer of a name written again is one of them; a name
+    /// written once through its initializer keeps the plain name.
+    #[test]
+    fn every_write_of_a_name_is_a_bound_of_its_own() {
+        let source = "class C { ServiceBusSender _s = Make(); ServiceBusSender _t = Make();\n\
+            C(X x, ServiceBusSender given) { _s = x.Create(\"a\"); this._t = given; }\n\
+            void M(X x) { var l = x.Create(\"b\"); l = x.Create(\"c\"); int n = 0; n++; var k = x.Create(\"d\"); }\n\
+            }";
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        let writes = |name: &str| -> Vec<&str> {
+            (facts.bound.iter().filter(|b| b.name == name))
+                .map(|b| match &b.value {
+                    Value::Call(call) => call.callee.as_str(),
+                    _ => "other",
+                })
+                .collect()
+        };
+        // The initializer is the first write; the constructor's is the second.
+        assert_eq!(writes("_s="), ["Make", "x.Create"]);
+        assert_eq!(writes("_t="), ["Make", "other"]);
+        assert_eq!(writes("l="), ["x.Create", "x.Create"]);
+        assert_eq!(writes("n="), ["other", "other"]);
+        assert!(writes("_s").is_empty() && writes("l").is_empty());
+        // Written once, it is bound by its plain name only.
+        assert_eq!(writes("k"), ["x.Create"]);
+        assert!(writes("k=").is_empty());
+    }
+
+    /// A file of thousands of writes is read in one pass: a write is looked up, never searched for.
+    #[test]
+    fn thousands_of_writes_of_a_name_are_read_in_linear_time() {
+        let mut source = String::from("class C { object _f; void M(X x) {\n");
+        for _ in 0..20_000 {
+            source += "_f = x.Make();\n";
+        }
+        source += "} }";
+        let start = std::time::Instant::now();
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        assert_eq!(
+            facts.bound.iter().filter(|b| b.name == "_f=").count(),
+            20_000
+        );
+        assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
+    }
+
+    /// Each handler attached to an event of a name with `+=` is a bound of its own, the lambda
+    /// as the inline definition it makes and a method group as the name it writes.
+    #[test]
+    fn a_handler_attached_with_plus_equals_is_bound_for_each_attachment() {
+        let source = "class C { void M(X x) {\n\
+              x.Received += (s, e) => { };\n\
+              x.Received += OnReceived;\n\
+              x.Count += 1;\n\
+              y -= OnReceived;\n\
+            }\n\
+            void OnReceived(object s, object e) { } }";
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        let attached: Vec<(&str, &str, String)> = (facts.bound.iter())
+            .filter(|b| b.name.ends_with("+="))
+            .map(|b| {
+                let value = match &b.value {
+                    Value::Function(def) => format!("function {def}"),
+                    Value::Ref(name) => format!("ref {name}"),
+                    _ => "other".into(),
+                };
+                (b.scope.as_str(), b.name.as_str(), value)
+            })
+            .collect();
+        let lambda = source.find("(s, e)").unwrap();
+        assert_eq!(
+            attached,
+            [
+                (
+                    "C.M(X)",
+                    "x.Received+=",
+                    format!("function C.M(X).@{lambda}")
+                ),
+                ("C.M(X)", "x.Received+=", "ref OnReceived".to_string()),
+            ]
+        );
     }
 
     #[test]

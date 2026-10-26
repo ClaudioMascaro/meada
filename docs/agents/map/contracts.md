@@ -179,7 +179,7 @@ modules updates it.
   the side: the `site` is the bare repository identity (no `::`), the **repository-level** side.
   `report` gives the status lines per repository: each unmatched `via`, the fallback to repository
   level, and a resource with no link in the workspace (unlinked). `channel.rs` (spec #20):
-  `extract` calls the five readers (`channel/{ts,python,rust,go,java}.rs`), each answering for its own pack only (`code.pack().extensions()`), in that order; the message types and broker helpers live in `channel/message.rs`; a producer is a provider at its call site, a
+  `extract` calls the six readers (`channel/{ts,python,rust,go,java,csharp}.rs`), each answering for its own pack only (`code.pack().extensions()`), in that order; the message types and broker helpers live in `channel/message.rs`; a producer is a provider at its call site, a
   consumer a consumer at its handler (an inline handler is named `<broker> <names in order>`,
   such as `kafka orders.created`). `contract(broker, name)` is `channel::<broker>::<name>`, or
   `channel::<broker>` for an unresolved side (`channel::parse`, `Channel::unresolved`, and the seam's `shown`, which

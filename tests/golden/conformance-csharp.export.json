@@ -14,6 +14,18 @@
       "hash": "4daaaa7bf50a2b4402163100332476d900b1721a06ff3429b136aaf420523b37"
     },
     {
+      "path": "src/Acme.Api/Channels.Nats.cs",
+      "hash": "1e9054ebe9285ff238c82a977ea3ea31de7547b98e594d3829fed6d53224600d"
+    },
+    {
+      "path": "src/Acme.Api/Channels.Writes.cs",
+      "hash": "3e92e54d48e925cc6affe17a6a0ad8830b5085587197212e6aba1f8d200c97b3"
+    },
+    {
+      "path": "src/Acme.Api/Channels.cs",
+      "hash": "c18dc2d6c858adfcf6da114da56452d756c5f47174f7c2e9f21947bf4f484b55"
+    },
+    {
       "path": "src/Acme.Api/Checkout.cs",
       "hash": "3d3c6cee519f1a8e5c925d40b26e344ae3914c031d0a0d8bbef32254916119b8"
     },
@@ -197,6 +209,486 @@
         "path": "src/Acme.Api/Board.Show.cs",
         "start": 91,
         "end": 125
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery",
+      "span": {
+        "path": "src/Acme.Api/Channels.Nats.cs",
+        "start": 150,
+        "end": 801
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.NatsDelivery(IConnection)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Nats.cs",
+        "start": 241,
+        "end": 314
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Poll()",
+      "span": {
+        "path": "src/Acme.Api/Channels.Nats.cs",
+        "start": 593,
+        "end": 795
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Track(byte[])",
+      "span": {
+        "path": "src/Acme.Api/Channels.Nats.cs",
+        "start": 324,
+        "end": 408
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Watch()",
+      "span": {
+        "path": "src/Acme.Api/Channels.Nats.cs",
+        "start": 418,
+        "end": 583
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Watch().nats delivery.*.tracked",
+      "span": {
+        "path": "src/Acme.Api/Channels.Nats.cs",
+        "start": 509,
+        "end": 571
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 352,
+        "end": 1772
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.BusRewritten(ServiceBusClient)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 666,
+        "end": 878
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.BusRewritten(ServiceBusSender)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 888,
+        "end": 959
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Constructed(ServiceBusMessage)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 1124,
+        "end": 1230
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Replaced(ServiceBusMessage)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 1348,
+        "end": 1448
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Reset()",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 1039,
+        "end": 1114
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Swapped(ServiceBusMessage)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 1240,
+        "end": 1338
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 1458,
+        "end": 1766
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Use(ServiceBusSender)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 969,
+        "end": 1029
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 1870,
+        "end": 2763
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Audit(ServiceBusMessage)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 2351,
+        "end": 2443
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.BusWrapped(ServiceBusClient)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 1960,
+        "end": 2024
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.OnOrder(ProcessMessageEventArgs)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 2684,
+        "end": 2757
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Order(ServiceBusMessage)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 2248,
+        "end": 2341
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Send(string,ServiceBusMessage)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 2034,
+        "end": 2238
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Work()",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 2453,
+        "end": 2674
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 2953,
+        "end": 4030
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 3181,
+        "end": 3517
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Attend(IChannel)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 3527,
+        "end": 3823
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.OnFirst(object,BasicDeliverEventArgs)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 3833,
+        "end": 3923
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.OnSecond(object,BasicDeliverEventArgs)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 3933,
+        "end": 4024
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.RabbitFanOut(ConnectionFactory)",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 3101,
+        "end": 3171
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 4254,
+        "end": 5707
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.BusDispatch(ServiceBusClient)",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 4345,
+        "end": 4410
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 4708,
+        "end": 4933
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.OnDispatch(ProcessMessageEventArgs)",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 5625,
+        "end": 5701
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 4420,
+        "end": 4698
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch()",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 5205,
+        "end": 5615
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch().servicebus dispatch.events",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 5492,
+        "end": 5556
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Work()",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 4943,
+        "end": 5195
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1186,
+        "end": 1612
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnMissing(IConsumer<string,string>)",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1444,
+        "end": 1606
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1223,
+        "end": 1434
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 589,
+        "end": 1180
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Created()",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 779,
+        "end": 870
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Dynamic()",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1020,
+        "end": 1174
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.KafkaSales(IProducer<string,string>)",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 690,
+        "end": 769
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Paid()",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 880,
+        "end": 1010
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1812,
+        "end": 2971
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend()",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 2289,
+        "end": 2863
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend().amqp refunds",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 2704,
+        "end": 2754
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Invoice()",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1974,
+        "end": 2133
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.OnInvoice(object,BasicDeliverEventArgs)",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 2873,
+        "end": 2965
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.RabbitInvoicing(IChannel)",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1900,
+        "end": 1964
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Refund()",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 2143,
+        "end": 2279
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 3572,
+        "end": 4083
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Drain()",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 3912,
+        "end": 4077
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Record()",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 3746,
+        "end": 3902
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.RedisAudits(IConnectionMultiplexer)",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 3668,
+        "end": 3736
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 3031,
+        "end": 3518
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Poll()",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 3352,
+        "end": 3512
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Ship()",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 3272,
+        "end": 3342
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.SqsShipments(IAmazonSQS)",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 3211,
+        "end": 3262
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.Topics",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 258,
+        "end": 402
       }
     },
     {
@@ -2299,6 +2791,809 @@
         "path": "src/Acme.Api/Board.Show.cs",
         "start": 112,
         "end": 122
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Poll()::(expression).CreateConnection#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Poll()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Nats.cs",
+        "start": 659,
+        "end": 726
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Poll()::ConnectionFactory#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Poll()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Nats.cs",
+        "start": 659,
+        "end": 682
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Poll()::connection.SubscribeAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Poll()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Nats.cs",
+        "start": 740,
+        "end": 784
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Track(byte[])::_connection.Publish#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Track(byte[])",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Nats.cs",
+        "start": 357,
+        "end": 405
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Watch().nats delivery.*.tracked::Console.WriteLine#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Watch().nats delivery.*.tracked",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Nats.cs",
+        "start": 529,
+        "end": 568
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Watch()::_connection.SubscribeAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Watch()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Nats.cs",
+        "start": 460,
+        "end": 572
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.BusRewritten(ServiceBusClient)::client.CreateSender#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.BusRewritten(ServiceBusClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 778,
+        "end": 812
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.BusRewritten(ServiceBusClient)::client.CreateSender#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.BusRewritten(ServiceBusClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 837,
+        "end": 867
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Constructed(ServiceBusMessage)::_constructed.SendMessageAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Constructed(ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 1189,
+        "end": 1227
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Replaced(ServiceBusMessage)::_replaced.SendMessageAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Replaced(ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 1410,
+        "end": 1445
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Reset()::Shared.CreateSender#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Reset()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 1073,
+        "end": 1111
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Swapped(ServiceBusMessage)::_swapped.SendMessageAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Swapped(ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 1301,
+        "end": 1335
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)::_client.CreateSender#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 1557,
+        "end": 1592
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)::_client.CreateSender#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 1667,
+        "end": 1703
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)::outbox.SendMessageAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 1612,
+        "end": 1644
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)::outbox.SendMessageAsync#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 1723,
+        "end": 1755
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten::Shared.CreateSender#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 618,
+        "end": 655
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Audit(ServiceBusMessage)::Send#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Audit(ServiceBusMessage)",
+      "target": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Send(string,ServiceBusMessage)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 2410,
+        "end": 2440
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Order(ServiceBusMessage)::Send#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Order(ServiceBusMessage)",
+      "target": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Send(string,ServiceBusMessage)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 2307,
+        "end": 2338
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Send(string,ServiceBusMessage)::_client.CreateSender#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Send(string,ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 2147,
+        "end": 2174
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Send(string,ServiceBusMessage)::wrapped.SendMessageAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Send(string,ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 2194,
+        "end": 2227
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Work()::_client.CreateProcessor#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Work()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 2516,
+        "end": 2557
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Work()::processor.StartProcessingAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Work()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 2631,
+        "end": 2663
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()::(invocation_expression).ConfigureAwait#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 3255,
+        "end": 3309
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()::(invocation_expression).ConfigureAwait#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 3343,
+        "end": 3396
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()::(invocation_expression).ConfigureAwait#2",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 3416,
+        "end": 3506
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()::_factory.CreateConnectionAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 3255,
+        "end": 3287
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()::channel.BasicPublishAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 3416,
+        "end": 3484
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()::connection.CreateChannelAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 3343,
+        "end": 3374
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Attend(IChannel)::AsyncEventingBasicConsumer#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Attend(IChannel)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 3604,
+        "end": 3643
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Attend(IChannel)::channel.BasicConsumeAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Attend(IChannel)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.Writes.cs",
+        "start": 3760,
+        "end": 3812
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)::Environment.GetEnvironmentVariable#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 4817,
+        "end": 4869
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)::_client.CreateSender#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 4796,
+        "end": 4870
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)::sender.SendMessageAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 4890,
+        "end": 4922
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)::(invocation_expression).SendMessageAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 4622,
+        "end": 4687
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)::_client.CreateSender#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 4518,
+        "end": 4550
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)::_client.CreateSender#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 4622,
+        "end": 4661
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)::sender.SendMessageAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 4570,
+        "end": 4602
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch().servicebus dispatch.events::args.CompleteMessageAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch().servicebus dispatch.events",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 5514,
+        "end": 5553
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch()::_client.CreateProcessor#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 5265,
+        "end": 5316
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch()::_client.CreateProcessor#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 5396,
+        "end": 5448
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch()::audit.StartProcessingAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 5576,
+        "end": 5604
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Work()::ServiceBusProcessorOptions#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Work()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 5042,
+        "end": 5074
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Work()::_client.CreateProcessor#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Work()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 5006,
+        "end": 5075
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Work()::processor.StartProcessingAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Work()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 5152,
+        "end": 5184
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnMissing(IConsumer<string,string>)::Environment.GetEnvironmentVariable#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnMissing(IConsumer<string,string>)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1543,
+        "end": 1594
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnMissing(IConsumer<string,string>)::consumer.Subscribe#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnMissing(IConsumer<string,string>)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1524,
+        "end": 1595
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()::(expression).Build#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()",
+      "target": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1287,
+        "end": 1352
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()::ConsumerBuilder#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1287,
+        "end": 1344
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()::ConsumerConfig#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1323,
+        "end": 1343
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()::consumer.Subscribe#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1366,
+        "end": 1423
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Created()::Message#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Created()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 837,
+        "end": 866
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Created()::_producer.Produce#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Created()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 803,
+        "end": 867
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Dynamic()::Environment.GetEnvironmentVariable#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Dynamic()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1082,
+        "end": 1131
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Dynamic()::Message#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Dynamic()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1133,
+        "end": 1162
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Dynamic()::_producer.Produce#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Dynamic()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 1064,
+        "end": 1163
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Paid()::Message#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Paid()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 969,
+        "end": 998
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Paid()::_producer.ProduceAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Paid()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 933,
+        "end": 999
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend().amqp refunds::Task.Yield#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend().amqp refunds",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 2739,
+        "end": 2751
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend()::AsyncEventingBasicConsumer#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 2434,
+        "end": 2474
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend()::AsyncEventingBasicConsumer#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 2625,
+        "end": 2665
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend()::_channel.BasicConsumeAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 2543,
+        "end": 2597
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend()::_channel.BasicConsumeAsync#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 2774,
+        "end": 2852
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend()::_channel.QueueBindAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 2344,
+        "end": 2405
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Invoice()::_channel.BasicPublishAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Invoice()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 2030,
+        "end": 2122
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Refund()::_channel.BasicPublishAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Refund()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 2198,
+        "end": 2268
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Drain()::_redis.GetDatabase#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Drain()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 3969,
+        "end": 3989
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Drain()::db.StreamReadGroupAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Drain()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 4009,
+        "end": 4066
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Record()::_redis.GetDatabase#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Record()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 3804,
+        "end": 3824
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Record()::db.StreamAddAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Record()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 3844,
+        "end": 3891
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Poll()::ReceiveMessageRequest#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Poll()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 3430,
+        "end": 3500
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Poll()::_sqs.ReceiveMessageAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Poll()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 3405,
+        "end": 3501
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Ship()::_sqs.SendMessageAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Ship()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Channels.cs",
+        "start": 3305,
+        "end": 3339
       }
     },
     {
@@ -5676,6 +6971,78 @@
   ],
   "providers": [
     {
+      "contract": "channel::amqp::fanout",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()::channel.BasicPublishAsync#0"
+    },
+    {
+      "contract": "channel::amqp::refunds",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Refund()::_channel.BasicPublishAsync#0"
+    },
+    {
+      "contract": "channel::kafka",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Dynamic()::_producer.Produce#0"
+    },
+    {
+      "contract": "channel::kafka::orders.created",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Created()::_producer.Produce#0"
+    },
+    {
+      "contract": "channel::kafka::orders.paid",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Paid()::_producer.ProduceAsync#0"
+    },
+    {
+      "contract": "channel::nats::delivery.eu.tracked",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Track(byte[])::_connection.Publish#0"
+    },
+    {
+      "contract": "channel::redis::audits",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Record()::db.StreamAddAsync#0"
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Constructed(ServiceBusMessage)::_constructed.SendMessageAsync#0"
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Replaced(ServiceBusMessage)::_replaced.SendMessageAsync#0"
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Swapped(ServiceBusMessage)::_swapped.SendMessageAsync#0"
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)::outbox.SendMessageAsync#0"
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)::outbox.SendMessageAsync#1"
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)::sender.SendMessageAsync#0"
+    },
+    {
+      "contract": "channel::servicebus::dispatch",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)::sender.SendMessageAsync#0"
+    },
+    {
+      "contract": "channel::servicebus::dispatch.events",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)::(invocation_expression).SendMessageAsync#0"
+    },
+    {
+      "contract": "channel::servicebus::wrapped.audit",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Audit(ServiceBusMessage)::Send#0"
+    },
+    {
+      "contract": "channel::servicebus::wrapped.orders",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Order(ServiceBusMessage)::Send#0"
+    },
+    {
+      "contract": "channel::sqs::shipments",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Ship()::_sqs.SendMessageAsync#0"
+    },
+    {
       "contract": "http::ANY::/api/Orders/any/Anything",
       "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Anything()"
     },
@@ -5805,6 +7172,81 @@
     }
   ],
   "consumers": [
+    {
+      "contract": "channel::nats::delivery.polled",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Poll()",
+      "via": null
+    },
+    {
+      "contract": "channel::nats::delivery.*.tracked",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Watch().nats delivery.*.tracked",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::wrapped.orders",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.OnOrder(ProcessMessageEventArgs)",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::fanout",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.OnFirst(object,BasicDeliverEventArgs)",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::fanout",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.OnSecond(object,BasicDeliverEventArgs)",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::dispatch",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.OnDispatch(ProcessMessageEventArgs)",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::dispatch.events",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.OnDispatch(ProcessMessageEventArgs)",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::dispatch.events",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch().servicebus dispatch.events",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnMissing(IConsumer<string,string>)",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::orders.created",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::orders.paid",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::refunds",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend().amqp refunds",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::invoices",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.OnInvoice(object,BasicDeliverEventArgs)",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::audits",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Drain()",
+      "via": null
+    },
+    {
+      "contract": "channel::sqs::shipments",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Poll()",
+      "via": null
+    },
     {
       "contract": "http::GET::/api/items",
       "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()::Shared.GetAsync#0",
@@ -6076,6 +7518,21 @@
       "via": null
     }
   ],
+  "bindings": [
+    {
+      "contract": "channel::amqp::invoices",
+      "exchange": "invoicing",
+      "pattern": "invoice.*",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend()::_channel.QueueBindAsync#0"
+    }
+  ],
+  "publishes": [
+    {
+      "exchange": "invoicing",
+      "key": "invoice.created",
+      "site": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Invoice()::_channel.BasicPublishAsync#0"
+    }
+  ],
   "packages": [
     {
       "name": "Acme.Api",
@@ -6132,33 +7589,56 @@
     {
       "name": "src/Acme.Api#10",
       "members": [
+        "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi",
+        "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Delete(string)"
+      ]
+    },
+    {
+      "name": "src/Acme.Api#11",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Item(string)",
+        "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.Inventory.Find(string)"
+      ]
+    },
+    {
+      "name": "src/Acme.Api#2",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Audit(ServiceBusMessage)",
+        "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Order(ServiceBusMessage)",
+        "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Send(string,ServiceBusMessage)"
+      ]
+    },
+    {
+      "name": "src/Acme.Api#3",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()",
         "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.BuiltClient(HttpClient)",
         "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()"
       ]
     },
     {
-      "name": "src/Acme.Api#2",
+      "name": "src/Acme.Api#4",
       "members": [
         "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Config()",
         "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)"
       ]
     },
     {
-      "name": "src/Acme.Api#3",
+      "name": "src/Acme.Api#5",
       "members": [
         "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Hidden(HttpClient)",
         "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Use()"
       ]
     },
     {
-      "name": "src/Acme.Api#4",
+      "name": "src/Acme.Api#6",
       "members": [
         "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Lookup()",
         "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Run()"
       ]
     },
     {
-      "name": "src/Acme.Api#5",
+      "name": "src/Acme.Api#7",
       "members": [
         "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Wrappers.Fetch(string)",
         "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Wrappers.ForOrder(string)",
@@ -6166,30 +7646,16 @@
       ]
     },
     {
-      "name": "src/Acme.Api#6",
+      "name": "src/Acme.Api#8",
       "members": [
         "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.Route"
       ]
     },
     {
-      "name": "src/Acme.Api#7",
+      "name": "src/Acme.Api#9",
       "members": [
         "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()",
         "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second.Make()"
-      ]
-    },
-    {
-      "name": "src/Acme.Api#8",
-      "members": [
-        "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi",
-        "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Delete(string)"
-      ]
-    },
-    {
-      "name": "src/Acme.Api#9",
-      "members": [
-        "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Item(string)",
-        "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.Inventory.Find(string)"
       ]
     },
     {
@@ -6330,7 +7796,99 @@
       ]
     }
   ],
-  "links": [],
+  "links": [
+    {
+      "consumer": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Watch().nats delivery.*.tracked",
+      "provider": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Track(byte[])::_connection.Publish#0",
+      "contract": "channel::nats::delivery.*.tracked",
+      "level": "inferred",
+      "reason": "channel::nats::delivery.eu.tracked wildcard delivery.*.tracked"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.OnOrder(ProcessMessageEventArgs)",
+      "provider": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Order(ServiceBusMessage)::Send#0",
+      "contract": "channel::servicebus::wrapped.orders",
+      "level": "exact",
+      "reason": "channel::servicebus::wrapped.orders"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.OnFirst(object,BasicDeliverEventArgs)",
+      "provider": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()::channel.BasicPublishAsync#0",
+      "contract": "channel::amqp::fanout",
+      "level": "exact",
+      "reason": "channel::amqp::fanout"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.OnSecond(object,BasicDeliverEventArgs)",
+      "provider": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()::channel.BasicPublishAsync#0",
+      "contract": "channel::amqp::fanout",
+      "level": "exact",
+      "reason": "channel::amqp::fanout"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.OnDispatch(ProcessMessageEventArgs)",
+      "provider": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)::(invocation_expression).SendMessageAsync#0",
+      "contract": "channel::servicebus::dispatch.events",
+      "level": "exact",
+      "reason": "channel::servicebus::dispatch.events"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.OnDispatch(ProcessMessageEventArgs)",
+      "provider": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)::sender.SendMessageAsync#0",
+      "contract": "channel::servicebus::dispatch",
+      "level": "exact",
+      "reason": "channel::servicebus::dispatch"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch().servicebus dispatch.events",
+      "provider": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)::(invocation_expression).SendMessageAsync#0",
+      "contract": "channel::servicebus::dispatch.events",
+      "level": "exact",
+      "reason": "channel::servicebus::dispatch.events"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()",
+      "provider": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Created()::_producer.Produce#0",
+      "contract": "channel::kafka::orders.created",
+      "level": "exact",
+      "reason": "channel::kafka::orders.created"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()",
+      "provider": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Paid()::_producer.ProduceAsync#0",
+      "contract": "channel::kafka::orders.paid",
+      "level": "exact",
+      "reason": "channel::kafka::orders.paid"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend().amqp refunds",
+      "provider": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Refund()::_channel.BasicPublishAsync#0",
+      "contract": "channel::amqp::refunds",
+      "level": "exact",
+      "reason": "channel::amqp::refunds"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.OnInvoice(object,BasicDeliverEventArgs)",
+      "provider": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Invoice()::_channel.BasicPublishAsync#0",
+      "contract": "channel::amqp::invoices",
+      "level": "inferred",
+      "reason": "channel::amqp::invoices binding invoicing invoice.*"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Drain()",
+      "provider": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Record()::db.StreamAddAsync#0",
+      "contract": "channel::redis::audits",
+      "level": "exact",
+      "reason": "channel::redis::audits"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Poll()",
+      "provider": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Ship()::_sqs.SendMessageAsync#0",
+      "contract": "channel::sqs::shipments",
+      "level": "exact",
+      "reason": "channel::sqs::shipments"
+    }
+  ],
   "processes": [
     {
       "entry_point": "example.com/acme/conformance::legacy/Top.cs::Main",
@@ -6371,6 +7929,930 @@
           "level": "inferred",
           "via": "call",
           "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.NatsDelivery(IConnection)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.NatsDelivery.NatsDelivery(IConnection)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.NatsDelivery(IConnection)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Poll()::channel::nats::delivery.polled",
+      "kind": "channel",
+      "label": "channel::nats::delivery.polled",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Poll()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Track(byte[])",
+      "kind": "export",
+      "label": "Acme.Api.Channels.NatsDelivery.Track(byte[])",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Track(byte[])"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Watch().nats delivery.*.tracked",
+          "reason": "channel::nats::delivery.eu.tracked wildcard delivery.*.tracked"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Watch()",
+      "kind": "export",
+      "label": "Acme.Api.Channels.NatsDelivery.Watch()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Watch()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Watch().nats delivery.*.tracked::channel::nats::delivery.*.tracked",
+      "kind": "channel",
+      "label": "channel::nats::delivery.*.tracked",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Watch().nats delivery.*.tracked"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.BusRewritten(ServiceBusClient)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusRewritten.BusRewritten(ServiceBusClient)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.BusRewritten(ServiceBusClient)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Constructed(ServiceBusMessage)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusRewritten.Constructed(ServiceBusMessage)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Constructed(ServiceBusMessage)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Constructed(ServiceBusMessage)::_constructed.SendMessageAsync#0",
+          "mark": "produces",
+          "contract": "channel::servicebus"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Replaced(ServiceBusMessage)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusRewritten.Replaced(ServiceBusMessage)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Replaced(ServiceBusMessage)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Replaced(ServiceBusMessage)::_replaced.SendMessageAsync#0",
+          "mark": "produces",
+          "contract": "channel::servicebus"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Reset()",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusRewritten.Reset()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Reset()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Swapped(ServiceBusMessage)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusRewritten.Swapped(ServiceBusMessage)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Swapped(ServiceBusMessage)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Swapped(ServiceBusMessage)::_swapped.SendMessageAsync#0",
+          "mark": "produces",
+          "contract": "channel::servicebus"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)::outbox.SendMessageAsync#0",
+          "mark": "produces",
+          "contract": "channel::servicebus"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)::outbox.SendMessageAsync#1",
+          "mark": "produces",
+          "contract": "channel::servicebus"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Use(ServiceBusSender)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusRewritten.Use(ServiceBusSender)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Use(ServiceBusSender)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Audit(ServiceBusMessage)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusWrapped.Audit(ServiceBusMessage)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Audit(ServiceBusMessage)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Send(string,ServiceBusMessage)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.BusWrapped(ServiceBusClient)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusWrapped.BusWrapped(ServiceBusClient)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.BusWrapped(ServiceBusClient)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.OnOrder(ProcessMessageEventArgs)::channel::servicebus::wrapped.orders",
+      "kind": "channel",
+      "label": "channel::servicebus::wrapped.orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.OnOrder(ProcessMessageEventArgs)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Order(ServiceBusMessage)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusWrapped.Order(ServiceBusMessage)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Order(ServiceBusMessage)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Send(string,ServiceBusMessage)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.OnOrder(ProcessMessageEventArgs)",
+          "reason": "channel::servicebus::wrapped.orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Work()",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusWrapped.Work()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Work()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()",
+      "kind": "export",
+      "label": "Acme.Api.Channels.RabbitFanOut.Announce()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.OnFirst(object,BasicDeliverEventArgs)",
+          "reason": "channel::amqp::fanout"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.OnSecond(object,BasicDeliverEventArgs)",
+          "reason": "channel::amqp::fanout"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Attend(IChannel)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.RabbitFanOut.Attend(IChannel)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Attend(IChannel)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.OnFirst(object,BasicDeliverEventArgs)::channel::amqp::fanout",
+      "kind": "channel",
+      "label": "channel::amqp::fanout",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.OnFirst(object,BasicDeliverEventArgs)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.OnSecond(object,BasicDeliverEventArgs)::channel::amqp::fanout",
+      "kind": "channel",
+      "label": "channel::amqp::fanout",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.OnSecond(object,BasicDeliverEventArgs)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.RabbitFanOut(ConnectionFactory)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.RabbitFanOut.RabbitFanOut(ConnectionFactory)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.RabbitFanOut(ConnectionFactory)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.BusDispatch(ServiceBusClient)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusDispatch.BusDispatch(ServiceBusClient)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.BusDispatch(ServiceBusClient)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)::sender.SendMessageAsync#0",
+          "mark": "produces",
+          "contract": "channel::servicebus"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.OnDispatch(ProcessMessageEventArgs)::channel::servicebus::dispatch",
+      "kind": "channel",
+      "label": "channel::servicebus::dispatch",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.OnDispatch(ProcessMessageEventArgs)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.OnDispatch(ProcessMessageEventArgs)::channel::servicebus::dispatch.events",
+      "kind": "channel",
+      "label": "channel::servicebus::dispatch.events",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.OnDispatch(ProcessMessageEventArgs)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.OnDispatch(ProcessMessageEventArgs)",
+          "reason": "channel::servicebus::dispatch"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch().servicebus dispatch.events",
+          "reason": "channel::servicebus::dispatch.events"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch()",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusDispatch.Watch()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch().servicebus dispatch.events::channel::servicebus::dispatch.events",
+      "kind": "channel",
+      "label": "channel::servicebus::dispatch.events",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch().servicebus dispatch.events"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Work()",
+      "kind": "export",
+      "label": "Acme.Api.Channels.BusDispatch.Work()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Work()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnMissing(IConsumer<string,string>)::channel::kafka",
+      "kind": "channel",
+      "label": "channel::kafka (unresolved)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnMissing(IConsumer<string,string>)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnMissing(IConsumer<string,string>)",
+          "mark": "consumes",
+          "contract": "channel::kafka"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()::channel::kafka::orders.created",
+      "kind": "channel",
+      "label": "channel::kafka::orders.created",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.BuiltClient(HttpClient)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()::channel::kafka::orders.paid",
+      "kind": "channel",
+      "label": "channel::kafka::orders.paid",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.BuiltClient(HttpClient)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Created()",
+      "kind": "export",
+      "label": "Acme.Api.Channels.KafkaSales.Created()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Created()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()",
+          "reason": "channel::kafka::orders.created"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.BuiltClient(HttpClient)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Dynamic()",
+      "kind": "export",
+      "label": "Acme.Api.Channels.KafkaSales.Dynamic()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Dynamic()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Dynamic()::_producer.Produce#0",
+          "mark": "produces",
+          "contract": "channel::kafka"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.KafkaSales(IProducer<string,string>)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.KafkaSales.KafkaSales(IProducer<string,string>)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.KafkaSales(IProducer<string,string>)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Paid()",
+      "kind": "export",
+      "label": "Acme.Api.Channels.KafkaSales.Paid()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Paid()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()",
+          "reason": "channel::kafka::orders.paid"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.BuiltClient(HttpClient)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend()",
+      "kind": "export",
+      "label": "Acme.Api.Channels.RabbitInvoicing.Attend()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend().amqp refunds::channel::amqp::refunds",
+      "kind": "channel",
+      "label": "channel::amqp::refunds",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend().amqp refunds"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Invoice()",
+      "kind": "export",
+      "label": "Acme.Api.Channels.RabbitInvoicing.Invoice()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Invoice()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.OnInvoice(object,BasicDeliverEventArgs)",
+          "reason": "channel::amqp::invoices binding invoicing invoice.*"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.OnInvoice(object,BasicDeliverEventArgs)::channel::amqp::invoices",
+      "kind": "channel",
+      "label": "channel::amqp::invoices",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.OnInvoice(object,BasicDeliverEventArgs)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.RabbitInvoicing(IChannel)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.RabbitInvoicing.RabbitInvoicing(IChannel)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.RabbitInvoicing(IChannel)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Refund()",
+      "kind": "export",
+      "label": "Acme.Api.Channels.RabbitInvoicing.Refund()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Refund()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend().amqp refunds",
+          "reason": "channel::amqp::refunds"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Drain()::channel::redis::audits",
+      "kind": "channel",
+      "label": "channel::redis::audits",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Drain()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Record()",
+      "kind": "export",
+      "label": "Acme.Api.Channels.RedisAudits.Record()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Record()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Drain()",
+          "reason": "channel::redis::audits"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.RedisAudits(IConnectionMultiplexer)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.RedisAudits.RedisAudits(IConnectionMultiplexer)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.RedisAudits(IConnectionMultiplexer)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Poll()::channel::sqs::shipments",
+      "kind": "channel",
+      "label": "channel::sqs::shipments",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Poll()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Ship()",
+      "kind": "export",
+      "label": "Acme.Api.Channels.SqsShipments.Ship()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Ship()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Poll()",
+          "reason": "channel::sqs::shipments"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.SqsShipments(IAmazonSQS)",
+      "kind": "export",
+      "label": "Acme.Api.Channels.SqsShipments.SqsShipments(IAmazonSQS)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.SqsShipments(IAmazonSQS)"
         }
       ]
     },
@@ -8175,27 +10657,6 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.AddClients(IServiceCollection)"
-        }
-      ]
-    },
-    {
-      "entry_point": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()",
-      "kind": "export",
-      "label": "Acme.Api.Typed.Registrations.Build()",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/acme/conformance",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/conformance",
-          "level": "exact",
-          "via": "call",
-          "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.BuiltClient(HttpClient)"
         }
       ]
     },
