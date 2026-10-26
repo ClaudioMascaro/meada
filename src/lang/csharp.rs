@@ -9,8 +9,8 @@ use std::rc::Rc;
 use tree_sitter::{Node, Parser};
 
 use super::{
-    Binds, Call, Class, Def, Export, Facts, Import, Imported, Invocation, Join, Kind, LanguagePack,
-    Layout, Modules, Param, Part, Receiver, Value, children, named, text,
+    Binds, Bound, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Join, Kind,
+    LanguagePack, Layout, Modules, Param, Part, Receiver, Value, children, named, text,
 };
 use crate::dotnet::msbuild::{self, Using};
 use crate::{Result, qualify};
@@ -323,6 +323,13 @@ fn parse(src: &[u8]) -> Result<Facts> {
     let mut locals: Vec<Receiver> = Vec::new();
     // The types declared so far: a local whose scope is one sits in an initializer.
     let mut classes = BTreeSet::new();
+    // What a name written in a definition is bound to (`Facts::bound`), and the names assigned
+    // anywhere in the file (`=`, `+=`, `++`, `out`, `ref`), which hold no one value.
+    let mut bound: Vec<Bound> = Vec::new();
+    let mut assigned: BTreeSet<String> = BTreeSet::new();
+    // The assignments through a name (`c.BaseAddress = v`, `_c = v`): the scope written in, the
+    // path without a leading `this.`, whether it began with one, and the value.
+    let mut members: Vec<(String, String, bool, Value)> = Vec::new();
     // Initializer calls of `var` locals (by `Class::Result` place) and chained calls (by place
     // in `facts.calls`), linked to the calls they name once every call is read.
     let mut results: Vec<Range<usize>> = Vec::new();
@@ -560,9 +567,14 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     at.by_path = bare;
                     (at.args, at.kwargs) = arguments(node.child_by_field_name("arguments"), src, 0);
                     at.arity = Some(at.args.len() + at.kwargs.len());
-                    let object = function
-                        .filter(|f| f.kind() == "member_access_expression")
-                        .and_then(|f| f.child_by_field_name("expression"));
+                    let object = match function {
+                        Some(f) if f.kind() == "member_access_expression" => {
+                            f.child_by_field_name("expression")
+                        }
+                        // `a?.M()`: the call of `M` on `a`.
+                        Some(f) if f.kind() == "conditional_access_expression" => condition(f),
+                        _ => None,
+                    };
                     at.receiver = object.map(|n| value(n, src, 0));
                     // `Make().Save()`, `Make().x.Save()`, `Make()?.Save()`: the call the chain
                     // is made on.
@@ -634,13 +646,107 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     Some(ty) if definitions => class_of(ty, src, &generics),
                     _ => Class::Unknown,
                 };
-                for name in declarators.filter_map(|d| d.child_by_field_name("name")) {
+                // A `const` or `static readonly` field is a constant of its type: what a name
+                // folds to. A field that holds a construction is bound to it (`Facts::bound`).
+                let constant = definitions
+                    && node.kind() == "field_declaration"
+                    && (modifiers.contains(&"const")
+                        || (modifiers.contains(&"static") && modifiers.contains(&"readonly")));
+                for declarator in declarators.filter(|d| d.child_by_field_name("name").is_some()) {
+                    let Some(name) = declarator.child_by_field_name("name") else {
+                        continue;
+                    };
                     fields.insert(text(name, src).to_string());
                     facts.receivers.push(Receiver {
                         scope: scope.as_ref().clone(),
                         name: text(name, src).to_string(),
                         class: class.clone(),
                     });
+                    let initial = named(declarator).find(|n| n.id() != name.id());
+                    if constant {
+                        let name = qualify(&scope, text(name, src));
+                        facts.statics.push(name.clone());
+                        facts.consts.push(Const {
+                            name,
+                            value: initial.map_or(Value::Unknown, |n| value(n, src, 0)),
+                            ty: None,
+                            scope: None,
+                        });
+                    } else if let Some(v) = initial.filter(|n| definitions && held(n)) {
+                        bound.push(Bound {
+                            scope: scope.as_ref().clone(),
+                            within: scope.as_ref().clone(),
+                            name: text(name, src).to_string(),
+                            value: value(v, src, 0),
+                        });
+                    }
+                }
+            }
+            // `new T { A = v }` assigns no name in scope.
+            "assignment_expression"
+                if !node
+                    .parent()
+                    .is_some_and(|p| p.kind() == "initializer_expression") =>
+            {
+                let left = node.child_by_field_name("left");
+                let right = node.child_by_field_name("right");
+                let targets = left.into_iter().flat_map(|l| match l.kind() {
+                    "tuple_expression" => named(l).flat_map(named).collect(),
+                    _ => vec![l],
+                });
+                for target in targets {
+                    match target.kind() {
+                        "identifier" => {
+                            assigned.insert(text(target, src).to_string());
+                        }
+                        // `this.x = v` assigns the field `x`.
+                        "member_access_expression"
+                            if target
+                                .child_by_field_name("expression")
+                                .is_some_and(|e| text(e, src) == "this") =>
+                        {
+                            if let Some(name) = target.child_by_field_name("name") {
+                                assigned.insert(text(name, src).to_string());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                let plain = node
+                    .child_by_field_name("operator")
+                    .is_some_and(|o| text(o, src) == "=");
+                if let (Some(left), Some(right), true, true) = (left, right, plain, definitions)
+                    && matches!(left.kind(), "member_access_expression" | "identifier")
+                {
+                    let path = callee(left, src);
+                    let rooted = path.strip_prefix("this.");
+                    // A name assigned from a call or a construction is also recorded as
+                    // `name=`: the kinds tell what it was made from (a factory's client).
+                    let rest = rooted.unwrap_or(&path);
+                    if !path.contains('(') && (rest.contains('.') || held(&right)) {
+                        let name = match rest.contains('.') {
+                            true => rest.to_string(),
+                            false => format!("{rest}="),
+                        };
+                        members.push((
+                            scope.as_ref().clone(),
+                            name,
+                            rooted.is_some(),
+                            value(right, src, 0),
+                        ));
+                    }
+                }
+            }
+            "postfix_unary_expression" | "prefix_unary_expression"
+                if children(node).any(|c| matches!(c.kind(), "++" | "--")) =>
+            {
+                for target in named(node).filter(|t| t.kind() == "identifier") {
+                    assigned.insert(text(target, src).to_string());
+                }
+            }
+            "argument" if children(node).any(|c| matches!(c.kind(), "out" | "ref")) => {
+                for target in named(node).filter(|t| t.kind() == "identifier") {
+                    assigned.insert(text(target, src).to_string());
                 }
             }
             "property_declaration" | "event_declaration" => {
@@ -657,6 +763,16 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         name: text(name, src).to_string(),
                         class,
                     });
+                    // A property initialized with a construction or a call is bound to it.
+                    let initial = node.child_by_field_name("value");
+                    if let Some(v) = initial.filter(|n| definitions && held(n)) {
+                        bound.push(Bound {
+                            scope: scope.as_ref().clone(),
+                            within: scope.as_ref().clone(),
+                            name: text(name, src).to_string(),
+                            value: value(v, src, 0),
+                        });
+                    }
                 }
             }
             // The other bindings hide an outer name in the whole definition around them.
@@ -689,6 +805,14 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         Some(ty) => class_of(ty, src, &generics),
                         None => Class::Unknown,
                     };
+                    if definitions && !initializer {
+                        bound.push(Bound {
+                            scope: scope.as_ref().clone(),
+                            within: scope.as_ref().clone(),
+                            name: text(name, src).to_string(),
+                            value: value.map_or(Value::Unknown, |v| self::value(v, src, 0)),
+                        });
+                    }
                     locals.push(Receiver {
                         scope: scope.as_ref().clone(),
                         name: text(name, src).to_string(),
@@ -713,6 +837,13 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     _ => Class::Unknown,
                 };
                 for name in names {
+                    // It holds no one value, and shares the name of a local of the scope.
+                    bind_unknown(
+                        &mut bound,
+                        definitions && !classes.contains(scope.as_str()),
+                        &scope,
+                        text(name, src),
+                    );
                     locals.push(Receiver {
                         scope: scope.as_ref().clone(),
                         name: text(name, src).to_string(),
@@ -728,10 +859,12 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 };
                 match node.child_by_field_name("parameters") {
                     Some(p) if p.kind() == "implicit_parameter" => {
+                        bind_unknown(&mut bound, definitions, &inner, text(p, src));
                         locals.push(unknown(text(p, src)));
                     }
                     list => {
                         for (name, _, _) in parameters_of(list, src) {
+                            bind_unknown(&mut bound, definitions, &inner, &name);
                             locals.push(unknown(&name));
                         }
                     }
@@ -844,6 +977,58 @@ fn parse(src: &[u8]) -> Result<Facts> {
         }
     }
     facts.receivers = receivers;
+    // A name assigned through a field (`_c.BaseAddress = v`, `this.c.BaseAddress = v`, `_c = v`) is
+    // bound in the type that declares the field, so any method of it reads the value; through a
+    // local or a parameter, in the scope that declares it.
+    let bindings: BTreeSet<(&str, &str)> = (facts.receivers.iter())
+        .map(|r| (r.scope.as_str(), r.name.as_str()))
+        .collect();
+    let mut through: Vec<Bound> = Vec::new();
+    for (scope, path, this, value) in members {
+        let head = path
+            .split('.')
+            .next()
+            .unwrap_or(&path)
+            .trim_end_matches('=');
+        let mut within = scope.as_str();
+        let mut declared = None;
+        while !this && declared.is_none() {
+            if bindings.contains(&(within, head)) {
+                declared = Some(within);
+            }
+            if within.is_empty() {
+                break;
+            }
+            within = crate::parent(within);
+        }
+        let at = match (this, declared) {
+            (false, Some(s)) => s.to_string(),
+            (true, _) => {
+                let mut class = scope.as_str();
+                while !classes.contains(class) && !class.is_empty() {
+                    class = crate::parent(class);
+                }
+                class.to_string()
+            }
+            (false, None) => scope.clone(),
+        };
+        // A member written twice holds no one value.
+        match through
+            .iter_mut()
+            .find(|b| b.scope == at && b.name == path && !path.ends_with('='))
+        {
+            Some(twice) => twice.value = Value::Unknown,
+            None => through.push(Bound {
+                scope: at,
+                within: scope,
+                name: path,
+                value,
+            }),
+        }
+    }
+    bound.retain(|b| !assigned.contains(&b.name));
+    facts.bound = bound;
+    facts.bound.extend(through);
     facts.externs = outside.into_iter().collect();
     // A using of the namespace takes its types, internal ones too (they are the assembly's),
     // never the names the file's own usings bind.
@@ -861,6 +1046,31 @@ fn parse(src: &[u8]) -> Result<Facts> {
         names.sort();
     }
     Ok(facts)
+}
+
+/// A name bound in `scope` to no value the source gives (a loop variable, a pattern, a lambda
+/// parameter): a bound of its own, so that a local of the scope that shares the name is not
+/// taken for the only one (`Code::local`).
+fn bind_unknown(bound: &mut Vec<Bound>, defining: bool, scope: &str, name: &str) {
+    if defining {
+        bound.push(Bound {
+            scope: scope.to_string(),
+            within: scope.to_string(),
+            name: name.to_string(),
+            value: Value::Unknown,
+        });
+    }
+}
+
+/// Whether a local or a field with this initializer is bound to it (`Facts::bound`): a
+/// construction or a call, whose value the kinds read the client a name holds off.
+fn held(initializer: &Node) -> bool {
+    matches!(
+        initializer.kind(),
+        "object_creation_expression"
+            | "implicit_object_creation_expression"
+            | "invocation_expression"
+    )
 }
 
 /// `at`, made on nothing the repository holds when written outside `definitions`.
@@ -987,12 +1197,22 @@ fn class_of(ty: Node, src: &[u8], generics: &[String]) -> Class {
     Class::Type(name)
 }
 
+/// What a conditional access `a?.M` reads its member from: `a`, which the grammar wraps in
+/// the `await` around it (`await a?.M()` is `await (a?.M())` in C#).
+fn condition(node: Node) -> Option<Node> {
+    let condition = node.child_by_field_name("condition")?;
+    match condition.kind() {
+        "await_expression" => named(condition).next(),
+        _ => Some(condition),
+    }
+}
+
 /// What a receiver is written on: the expression a member access or a conditional access reads
 /// its member from.
 fn receiver_of(node: Node) -> Option<Node> {
     match node.kind() {
         "member_access_expression" => node.child_by_field_name("expression"),
-        "conditional_access_expression" => node.child_by_field_name("condition"),
+        "conditional_access_expression" => condition(node),
         _ => None,
     }
 }
@@ -1143,7 +1363,7 @@ fn callee(node: Node, src: &[u8]) -> String {
                 match member {
                     Some(member) => {
                         pending.push(member);
-                        pending.extend(n.child_by_field_name("condition"));
+                        pending.extend(condition(n));
                     }
                     // `a?[0]` is no name.
                     None => parts.push("(expression)"),
@@ -1184,9 +1404,10 @@ fn arguments(list: Option<Node>, src: &[u8], depth: usize) -> (Vec<Value>, Vec<(
     (args, kwargs)
 }
 
-/// An expression as written, as far as this pack folds one: string literals, names, calls and
-/// constructions; the rest is unknown.
-// ponytail: interpolated, raw and `+` strings are unknown until URL folding reads them.
+/// An expression as written, as far as this pack folds one: string literals (plain, verbatim,
+/// raw and interpolated), `+` between strings, names, calls and constructions; the rest is
+/// unknown. A construction's object initializer (`new T { A = 1 }`) is its last argument, an
+/// `Object` of what it assigns.
 fn value(node: Node, src: &[u8], depth: usize) -> Value {
     if depth >= VALUE_DEPTH {
         return Value::Unknown;
@@ -1205,6 +1426,44 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 None => Value::Unknown,
             }
         }
+        // A raw literal on one line: its content as written. Several lines are indented by the
+        // closing quotes' column, which is not read.
+        "raw_string_literal" => match named(node).find(|n| n.kind() == "raw_string_content") {
+            Some(content) if !text(content, src).contains('\n') => {
+                Value::Str(vec![Part::Text(text(content, src).to_string())])
+            }
+            None => Value::Str(Vec::new()),
+            _ => Value::Unknown,
+        },
+        "interpolated_string_expression" => interpolated(node, src, depth),
+        "binary_expression"
+            if node
+                .child_by_field_name("operator")
+                .is_some_and(|n| text(n, src) == "+") =>
+        {
+            let mut parts = Vec::new();
+            let (mut numbers, mut sides) = (0, 0);
+            for side in ["left", "right"] {
+                sides += 1;
+                match node
+                    .child_by_field_name(side)
+                    .map(|n| value(n, src, depth + 1))
+                {
+                    Some(Value::Str(found)) => parts.extend(found),
+                    Some(Value::Ref(name)) => parts.push(Part::Ref(name)),
+                    Some(Value::Scalar(_)) => {
+                        numbers += 1;
+                        parts.push(Part::Hole);
+                    }
+                    _ => parts.push(Part::Hole),
+                }
+            }
+            // `1 + 2` adds numbers.
+            match numbers == sides {
+                true => Value::Unknown,
+                false => Value::Str(parts),
+            }
+        }
         "identifier" | "member_access_expression" | "qualified_name" => {
             Value::Ref(callee(node, src))
         }
@@ -1221,12 +1480,30 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 range: node.byte_range(),
             })
         }
-        "object_creation_expression" => {
-            node.child_by_field_name("type")
-                .map_or(Value::Unknown, |ty| {
-                    let args = arguments(node.child_by_field_name("arguments"), src, depth).0;
-                    Value::New(type_name(ty, src), args)
-                })
+        "object_creation_expression" | "implicit_object_creation_expression" => {
+            let ty = match node.child_by_field_name("type") {
+                Some(ty) => type_name(ty, src),
+                // A target-typed `new(..)` names no type here.
+                None if node.kind() == "implicit_object_creation_expression" => String::new(),
+                None => return Value::Unknown,
+            };
+            let list = node
+                .child_by_field_name("arguments")
+                .or_else(|| named(node).find(|n| n.kind() == "argument_list"));
+            let mut args = arguments(list, src, depth).0;
+            let initializer = named(node).find(|n| n.kind() == "initializer_expression");
+            if let Some(set) = initializer {
+                let set = (named(set).filter(|n| n.kind() == "assignment_expression"))
+                    .filter_map(|a| {
+                        let left = a.child_by_field_name("left")?;
+                        let right = a.child_by_field_name("right")?;
+                        (left.kind() == "identifier")
+                            .then(|| (text(left, src).to_string(), value(right, src, depth + 1)))
+                    })
+                    .collect();
+                args.push(Value::Object(set));
+            }
+            Value::New(ty, args)
         }
         "integer_literal" => Value::Scalar(text(node, src).parse().ok()),
         "boolean_literal" => Value::Scalar(None),
@@ -1238,22 +1515,82 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
     }
 }
 
+/// An interpolated string, `$"{base}/orders/{id}"`: its text with `{{` and `}}` read as the
+/// braces they escape (verbatim ones also `""`), a name or a string in a hole as its parts, any
+/// other hole (one with an alignment or a format clause too) a `Hole`. A raw one (`$$"""..."""`)
+/// escapes nothing: its holes are the doubled braces the grammar already splits.
+fn interpolated(node: Node, src: &[u8], depth: usize) -> Value {
+    let start = named(node).find(|n| n.kind() == "interpolation_start");
+    let verbatim = start.is_some_and(|s| text(s, src).contains('@'));
+    let raw = named(node).any(|n| n.kind() == "interpolation_quote");
+    let (mut parts, mut done, mut chunk) = (Vec::new(), String::new(), String::new());
+    // The text written between two holes or escapes, as it reads.
+    let flush = |chunk: &mut String, done: &mut String| {
+        let written = std::mem::take(chunk);
+        done.push_str(&match (raw, verbatim) {
+            (true, _) => written,
+            (_, true) => written
+                .replace("{{", "{")
+                .replace("}}", "}")
+                .replace("\"\"", "\""),
+            _ => written.replace("{{", "{").replace("}}", "}"),
+        });
+    };
+    for child in named(node) {
+        match child.kind() {
+            "string_content" => chunk.push_str(text(child, src)),
+            "escape_sequence" if !raw && !verbatim => {
+                flush(&mut chunk, &mut done);
+                match escape(text(child, src)) {
+                    Some(c) => done.push(c),
+                    None => return Value::Unknown,
+                }
+            }
+            "interpolation" => {
+                flush(&mut chunk, &mut done);
+                if !done.is_empty() {
+                    parts.push(Part::Text(std::mem::take(&mut done)));
+                }
+                let clause = named(child).any(|n| n.kind().ends_with("_clause"));
+                let hole = named(child)
+                    .find(|n| !n.kind().ends_with("_clause") && n.kind() != "interpolation_brace");
+                match hole.map(|n| value(n, src, depth + 1)) {
+                    Some(Value::Str(found)) if !clause => parts.extend(found),
+                    Some(Value::Ref(name)) if !clause => parts.push(Part::Ref(name)),
+                    _ => parts.push(Part::Hole),
+                }
+            }
+            _ => {}
+        }
+    }
+    flush(&mut chunk, &mut done);
+    if !done.is_empty() {
+        parts.push(Part::Text(done));
+    }
+    Value::Str(parts)
+}
+
+/// The character a simple escape sequence of a regular string writes.
+fn escape(written: &str) -> Option<char> {
+    Some(match written {
+        "\\\"" => '"',
+        "\\'" => '\'',
+        "\\\\" => '\\',
+        "\\n" => '\n',
+        "\\r" => '\r',
+        "\\t" => '\t',
+        "\\0" => '\0',
+        _ => return None,
+    })
+}
+
 /// The text of a regular string literal, its simple escapes read; `None` with another escape.
 fn string(node: Node, src: &[u8]) -> Option<String> {
     let mut out = String::new();
     for part in named(node) {
         match part.kind() {
             "string_literal_content" => out.push_str(text(part, src)),
-            "escape_sequence" => out.push(match text(part, src) {
-                "\\\"" => '"',
-                "\\'" => '\'',
-                "\\\\" => '\\',
-                "\\n" => '\n',
-                "\\r" => '\r',
-                "\\t" => '\t',
-                "\\0" => '\0',
-                _ => return None,
-            }),
+            "escape_sequence" => out.push(escape(text(part, src))?),
             _ => return None,
         }
     }
