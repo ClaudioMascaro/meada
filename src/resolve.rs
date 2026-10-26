@@ -206,11 +206,13 @@ enum Reading {
     Method,
     /// A name read, not called: `Value` but that, where class members are in scope (Java), a
     /// method does not bind it, since fields and methods are separate namespaces (`repo` in
-    /// `repo.save()` is the field `repo`, never a method `repo()`).
+    /// `repo.save()` is the field `repo`, never a method `repo()`). In Kotlin the members of a
+    /// class of the repository that receives a block around it (`apply`, `run`, `with`, an
+    /// extension function) come before the names outside the block, after its locals.
     Read,
-    /// `Read`, asked for the type a name is declared with (`Code::declared`): where class
-    /// members are in scope (Kotlin), the members of the receiver of a block around it
-    /// (`apply`, `run`, `with`, an extension function) come before the names outside the block.
+    /// `Read`, asked for the object a name holds (`Code::declared`, the flow of `Follow::Values`):
+    /// a receiver of a block whose type is not the repository's may hold one of any name, so
+    /// the name is unknown there.
     Member,
 }
 
@@ -1291,7 +1293,7 @@ impl<'a> Resolver<'a> {
         self.resolve_as(path, scope, callee, seen, work, Reading::Value)
     }
 
-    /// `read`, for the type the name is declared with (`Reading::Member`).
+    /// `read`, for the object the name holds (`Reading::Member`).
     fn read_member(&self, path: &'a str, scope: &'a str, name: &'a str) -> Binding<'a> {
         let (seen, work) = (&mut self.seen(path, scope), &mut Work::default());
         self.resolve_as(path, scope, name, seen, work, Reading::Member)
@@ -2204,16 +2206,18 @@ impl<'a> Resolver<'a> {
                 None => {}
             }
             // The receiver of a block (a Kotlin `with`, `apply`, `run`, or an extension
-            // function) has its members first: a field of a class of the repository is that
-            // name, and a receiver of another type may have one of any name. Only where the
-            // type of the name is asked (`Reading::Member`): the value of a constant, or a
-            // called name, may be one of the file's or an imported extension.
-            if self.members_in_scope && reading == Reading::Member {
+            // function) has its members before the names outside the block, after the locals
+            // of the code around it: a field of a class of the repository is that name. A
+            // receiver of another type may have one of any name, which only the object a name
+            // holds asks (`Reading::Member`): a constant's value and a call's receiver are read
+            // outside the block (a Ktor `Application` or `Route` declares no `V1`). A called
+            // name reads the block's methods (`Reading::Method`).
+            if self.members_in_scope && reading.read() && !self.local_around(path, s, name) {
                 if let Some(class) = self.blocks.get(&(path, s)) {
                     if let Some(found) = self.inherited_field(class.path, class.name, name) {
                         return found;
                     }
-                } else if self.unread.contains(&(path, s)) {
+                } else if reading == Reading::Member && self.unread.contains(&(path, s)) {
                     return Binding::Hidden;
                 }
             }
@@ -2227,6 +2231,28 @@ impl<'a> Resolver<'a> {
             }
             found => found,
         }
+    }
+
+    /// Whether a function or lambda around the block `block`, up to a class or the top level,
+    /// binds `name` (a parameter, a local, a binding with a class): Kotlin reads a local before
+    /// a member of an implicit receiver.
+    fn local_around(&self, path: &'a str, block: &'a str, name: &'a str) -> bool {
+        let defs = &self.defs[path];
+        let mut s = crate::parent(block);
+        while (defs.get(s))
+            .is_some_and(|d| matches!(d.kind, Kind::Function | Kind::Method | Kind::Inline))
+        {
+            let qualified = crate::qualify(s, name);
+            if self.locals[path].contains(qualified.as_str())
+                || self.consts[path].contains(qualified.as_str())
+                || self.params[path].contains_key(&(s, name))
+                || self.receivers[path].contains_key(&(s, name))
+            {
+                return true;
+            }
+            s = crate::parent(s);
+        }
+        false
     }
 
     /// The local function `name` of the functions around the block `scope` (Kotlin's `fun size()`
@@ -3576,7 +3602,7 @@ impl<'a> Code<'a> {
                 let Some((form, outside, steps)) = self.declared(path, scope, name, 0) else {
                     return Vec::new();
                 };
-                let held = match self.resolver.read(path, scope, name) {
+                let held = match self.resolver.read_member(path, scope, name) {
                     Binding::Const(at, constant) => Some((at, constant)),
                     _ => None,
                 };
@@ -4337,7 +4363,7 @@ impl<'a> Code<'a> {
     }
 
     fn flow_name(&self, path: &'a str, scope: &'a str, name: &'a str, trail: &mut Trail<'a>) {
-        let binding = self.resolver.read(path, scope, name);
+        let binding = self.resolver.read_member(path, scope, name);
         // An attribute assigned a call once in its class (`self.client = Client()`) is a
         // constant of the class.
         let binding = match binding {

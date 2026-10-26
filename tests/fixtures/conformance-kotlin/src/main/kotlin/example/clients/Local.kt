@@ -40,3 +40,15 @@ suspend fun variable() {
     client = HttpClient(CIO) { defaultRequest { url("https://local.example.com/other") } }
     client.get("/var")
 }
+
+// A client read in the block of a receiver is the receiver's: `Rack.outer` sets no base, though
+// the client of the file does.
+val outer = HttpClient(CIO) { defaultRequest { url("https://outer.example.com/") } }
+
+class Rack {
+    val outer: HttpClient = HttpClient(CIO)
+}
+
+suspend fun implicitClient(rack: Rack) {
+    with(rack) { outer.get("/implicit") }
+}

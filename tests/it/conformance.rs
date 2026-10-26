@@ -1548,6 +1548,8 @@ fn kotlin() {
             "src/main/kotlin/example/clients/Local.kt::example.clients.two()",
             "src/main/kotlin/example/clients/Local.kt::example.clients.shadows()",
             "src/main/kotlin/example/clients/Local.kt::example.clients.variable()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.Rack",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.implicitClient(Rack)",
             "src/main/kotlin/example/clients/Methods.kt::example.clients.send(HttpMethod,String)",
             "src/main/kotlin/example/clients/Methods.kt::example.clients.sends()",
             "src/main/kotlin/example/clients/Methods.kt::example.clients.sendFrom(HttpMethod,String)",
@@ -1677,6 +1679,9 @@ fn kotlin() {
             "src/main/kotlin/example/Receivers.kt::example.localFirst(Cache)",
             "src/main/kotlin/example/Receivers.kt::example.localFirst(Cache).size()",
             "src/main/kotlin/example/Receivers.kt::example.unknownReceiver()",
+            "src/main/kotlin/example/Receivers.kt::example.Shelf",
+            "src/main/kotlin/example/Receivers.kt::example.implicitMember(Shelf)",
+            "src/main/kotlin/example/Receivers.kt::example.localBeforeMember(Shelf,Store)",
             "src/main/kotlin/example/other/Others.kt::example.other.Cache.describe()",
             "src/main/kotlin/example/other/Others.kt::example.other.String.reversed()",
             "src/main/java/example/legacy/Port.java::example.legacy.Port",
@@ -2457,6 +2462,17 @@ fn kotlin() {
                 INFERRED,
                 &["src/main/kotlin/example/Receivers.kt::example.String.loud()"],
             ),
+            // A name read in a receiver's block is its member; a local around comes first.
+            (
+                "src/main/kotlin/example/Receivers.kt::example.implicitMember(Shelf)::stock.clear#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.clear()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.localBeforeMember(Shelf,Store)::stock.get#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Store.get(String)"],
+            ),
             (
                 "src/main/java/example/legacy/Port.java::example.legacy.Port.use(Port,String)::port.ext#0",
                 EXACT,
@@ -2775,6 +2791,12 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
             "http::GET::/v9/x",
             shadow,
             &file("Local", "shadows()", "billing.get#0"),
+        ),
+        // A client read in a receiver's block is the receiver's, with no base.
+        (
+            "http::GET::/implicit",
+            "",
+            &file("Local", "implicitClient(Rack)", "outer.get#0"),
         ),
         // The method of a wrapper is substituted at each call site, whether the URL depends on
         // the wrapper's parameters or not.

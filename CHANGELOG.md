@@ -101,8 +101,10 @@ All notable changes to Meada are recorded here. The format follows
   trailing-lambda post-processor (`convertAndSend("x") { m -> m }`) is an untold overload, as
   Java's lambda: its producer is unresolved. A message built in the call (`Order("1")`) picks
   the overload as Java's `new` does. In `with`, `run`, `apply` and extension function blocks, a
-  member of the implicit receiver hides the property of the class around, for channel and HTTP
-  clients alike. A call on the receiver itself (an extension function on the client, `apply`,
+  member of the implicit receiver hides the property of the class around and a top-level
+  property, after the parameters and locals of the code around, for channel and HTTP clients,
+  call resolution and folded values alike; a client read in the block of a receiver whose type is
+  outside the repository is unknown. A call on the receiver itself (an extension function on the client, `apply`,
   `with`) is not read. A cross-language fixture produces a topic in TypeScript
   and consumes it in a Kotlin `@KafkaListener`, and `trace` down from the producer reaches the
   handler.

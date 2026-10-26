@@ -190,3 +190,17 @@ fun localFirst(cache: Cache) {
 fun unknownReceiver() {
     build().loud()
 }
+
+// A name read in the block of a receiver is the receiver's member, before a top-level one; a
+// parameter or a local of the code around comes before both.
+class Shelf(val stock: Cache)
+
+val stock: Store = Cache()
+
+fun implicitMember(shelf: Shelf) {
+    with(shelf) { stock.clear() }
+}
+
+fun localBeforeMember(shelf: Shelf, stock: Store) {
+    shelf.apply { stock.get("k") }
+}

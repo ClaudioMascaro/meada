@@ -1132,11 +1132,15 @@ one for the area a change touches.
   A member of an implicit receiver comes before the names around it, as Kotlin resolves them:
   in the block of a `with`, `run` or `apply`, or in an extension function, `kafka` in
   `kafka.send(..)` is the receiver's property when the receiver is a class of the repository
-  that has one (`Resolver::lexical_as`, `Reading::Member`, through `Facts::impls` and
-  `Facts::extensions`), unknown when the receiver's type is not the repository's, and the
-  property of the class around only when the receiver is a class of the repository without that
-  member. Only the type a name is declared with asks (`Code::declared`): a constant's value and a
-  called name (an imported extension) are read as before. A call on the receiver itself
+  that has one (`Resolver::lexical_as`, through `Facts::impls` and `Facts::extensions`), for
+  every name read: the head of a call, a constant's value, the type a name is declared with
+  (`Code::declared`) and the object the flow of `Follow::Values` follows. A parameter or a local
+  of the code around the block comes first (`Resolver::local_around`), and the property of the
+  class around only when the receiver is a class of the repository without that member. A
+  receiver whose type is not the repository's leaves the name unknown only where the object it
+  holds is asked (`Reading::Member`: `Code::declared` and the flow of `Follow::Values`, which find
+  clients); a constant's value and a call's receiver are read outside the block (a Known
+  ceiling). A call on the receiver itself
   (`kafka.apply { send(..) }`, `with(kafka) { send(..) }`, an extension function of the
   template) is not read: its callee has no receiver name. The `conformance-kotlin` fixture holds
   each channel form and the hidden-name cases (`channels/Receivers.kt`, `jvm/Hidden.kt`), and the
@@ -1741,7 +1745,10 @@ one for the area a change touches.
   companion is
   its class's last base, so `Type.m()` reads the class's own instance member first when both
   declare `m` with one signature. A star import of a class (`import a.C.*`) reads every export of
-  the class's file. A fully qualified function call (`example.helper()`) is a name match. A class
+  the class's file. In the block of a receiver whose type is outside the repository (a Ktor
+  `Application` or `Route` extension function), a constant's value and a call's receiver are
+  the names outside the block, though that type may declare a member of the name; the object a
+  client walk or a declared type asks is unknown there. A fully qualified function call (`example.helper()`) is a name match. A class
   with a secondary constructor is not in its name's overload family, so calling it resolves to
   nothing. A single import of a top-level declaration named like a package of the repository
   (`import app.config` beside package `app.config`) binds nothing, since the package keeps the
