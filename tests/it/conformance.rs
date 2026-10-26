@@ -3338,6 +3338,12 @@ fn csharp() {
         api("Contracts.cs", "Acme.Contracts.OrderDto"),
         api("Contracts.cs", "Acme.Hosting.Shell"),
         api("Contracts.cs", "Acme.Hosting.Shell.Start()"),
+        api("Cli.cs", "Acme.Api.Cli"),
+        api("Cli.cs", "Acme.Api.Cli.Main(string[])"),
+        api("Cli.cs", "Acme.Api.Cli.Main(int)"),
+        api("Cli.cs", "Acme.Api.Cli.Start()"),
+        "legacy/Top.cs::Main".to_string(),
+        "legacy/Top.cs::Main.Shout".to_string(),
         api("Opaque.cs", "Acme.Api.Home"),
         api("Opaque.cs", "Acme.Api.Home.Index()"),
         api("Opaque.cs", "Acme.Api.Board"),
@@ -3579,6 +3585,17 @@ fn csharp() {
         // Acme.Core's global usings stop at its project: a bare call no family declares and a
         // type name nothing binds resolve to nothing.
         (run("Lower#0"), None, vec![]),
+        // The top-level statements of a file are the calls of its `Main`.
+        (
+            "legacy/Top.cs::Main::Shout#1".to_string(),
+            EXACT,
+            vec!["legacy/Top.cs::Main.Shout".to_string()],
+        ),
+        (
+            "legacy/Top.cs::Main::Shout#0".to_string(),
+            EXACT,
+            vec!["legacy/Top.cs::Main.Shout".to_string()],
+        ),
         (run("Fmt.Upper#0"), None, vec![]),
         // A project file that is not SDK-style adds nothing.
         (
@@ -3608,7 +3625,15 @@ fn csharp() {
     let calls: Vec<ExpectedCall> = (calls.iter().zip(&targets))
         .map(|((id, level, _), targets)| (id.as_str(), *level, targets.as_slice()))
         .collect();
-    conform("conformance-csharp", &symbols, &[], &calls);
+    conform(
+        "conformance-csharp",
+        &symbols,
+        &[
+            "legacy/Top.cs::Main",
+            "src/Acme.Api/Cli.cs::Acme.Api.Cli.Main(string[])",
+        ],
+        &calls,
+    );
 }
 
 /// Public and protected members of public types are export doors when uncalled; private and
@@ -3650,6 +3675,18 @@ fn csharp_search_finds_a_type_and_context_lists_callers_and_callees() {
         "conformance-csharp.context-default.txt",
         &engine
             .context("Acme.Core.Orders.OrderService.Default()", None)
+            .unwrap(),
+    );
+}
+
+#[test]
+fn csharp_search_finds_the_program_entry_points() {
+    let repo = fixture_repo("csharp_programs", "conformance-csharp", Some(ORIGIN));
+    assert_golden(
+        "conformance-csharp.search-process-main.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .search("main", Some("process"), None)
             .unwrap(),
     );
 }
