@@ -23,7 +23,7 @@ use crate::entry::{self, EntryKind, EntryPoint};
 use crate::lang::{self, Facts};
 use crate::msg::{Fix, Msg};
 use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package};
-use crate::resolve::{Ancestry, Code, Exported, Resolution, Resolver, Target};
+use crate::resolve::{Ancestry, Code, Exported, Flexible, Resolution, Resolver, Target};
 use crate::shape::{Shape, Want};
 pub(crate) use meada_core::export as written;
 pub(crate) use meada_core::export::{Binding, CallSite, File, Process, Publish, Span, Symbol};
@@ -79,7 +79,10 @@ pub(crate) fn schema_version() -> i32 {
 /// JSON array of `[file, qualified name]` for a class of the repository and `null` for an
 /// opaque one (`ancestors` NULL when the family is not known); a class with no base has no row.
 /// Rewritten with the contracts, and read at query time to merge a provider class's overloads
-/// over its family (spec #26). `entry_points` holds the repository's doors (spec #31, `entry`): the `identity`, the `kind`
+/// over its family (spec #26). `flexible` holds the functions that take more than one count of
+/// arguments (`resolve::Flexible`): the `path` and `name` of the definition, and the `least` and
+/// `most` counts (`most` NULL for a vararg); rewritten with the contracts, and read to tell which
+/// overloads a call through an import may reach. `entry_points` holds the repository's doors (spec #31, `entry`): the `identity`, the `kind`
 /// (`route`, `export`, `channel` or `program`), the `label` that names its process and the `site` the process starts
 /// from; rewritten with the contracts.
 const SCHEMA: &str = "
@@ -112,6 +115,7 @@ CREATE TABLE manifests (
 );
 CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
 CREATE TABLE families (path TEXT NOT NULL, class TEXT NOT NULL, ancestors TEXT);
+CREATE TABLE flexible (path TEXT NOT NULL, name TEXT NOT NULL, least INTEGER NOT NULL, most INTEGER);
 CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL, site TEXT NOT NULL);
 CREATE TABLE communities (name TEXT NOT NULL, member TEXT NOT NULL);
 ";
@@ -605,7 +609,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
                 "DELETE FROM meta; DELETE FROM files; DELETE FROM symbols; \
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
                  DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports; \
-                 DELETE FROM families; DELETE FROM entry_points; DELETE FROM communities;",
+                 DELETE FROM families; DELETE FROM flexible; DELETE FROM entry_points; DELETE FROM communities;",
             )?;
             None
         }
@@ -720,13 +724,15 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .chain(kept.iter().map(|(path, facts)| (path.as_str(), facts)))
         .collect();
 
-    // Calls resolve among the files of their own pack, those the pack builds.
+    // Calls resolve among the files of their own pack, those the pack builds, and of the packs
+    // that resolve with it (`lang::resolver_of`): groups are keyed by that pack.
     let mut groups: BTreeMap<usize, BTreeMap<&str, &Facts>> = BTreeMap::new();
     for (&path, &facts) in &parsed {
-        groups.entry(packs[path]).or_default().insert(path, facts);
+        let group = lang::resolver_of(packs[path]);
+        groups.entry(group).or_default().insert(path, facts);
     }
     let found_configs = |pack: usize| -> Vec<(&str, &[u8])> {
-        (configs[&pack].iter())
+        (configs.get(&pack).into_iter().flatten())
             .map(|(n, c)| (*n, c.as_slice()))
             .collect()
     };
@@ -765,6 +771,13 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     }
     let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
     let files: Vec<&str> = all.keys().copied().collect();
+    tx.execute("DELETE FROM flexible", [])?;
+    for f in resolvers.values().flat_map(Resolver::flexible) {
+        tx.execute(
+            "INSERT INTO flexible VALUES (?1, ?2, ?3, ?4)",
+            params![f.path, f.name, f.least as i64, f.most.map(|m| m as i64)],
+        )?;
+    }
     let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
     let pack_configs: Vec<(&str, &[u8])> = (configs.values().flatten())
         .map(|(path, src)| (*path, src.as_slice()))
@@ -820,7 +833,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         order.reverse();
     }
     for (&path, &facts) in order {
-        let rows = resolve_file(identity, path, facts, &resolvers[&packs[path]], &names);
+        let resolver = &resolvers[&lang::resolver_of(packs[path])];
+        let rows = resolve_file(identity, path, facts, resolver, &names);
         symbols.extend(rows.symbols.iter().map(|(id, ..)| id.clone()));
         for call in &rows.calls {
             // A self-call is no caller: recursion keeps an exported function a door.
@@ -1564,6 +1578,9 @@ pub(crate) struct Export {
     /// The families of the public classes (the `families` table), sorted, for
     /// `package::import`.
     pub(crate) ancestries: Vec<Ancestry>,
+    /// The functions that take more than one count of arguments (the `flexible` table), sorted,
+    /// for `package::import`.
+    pub(crate) flexible: Vec<Flexible>,
     /// The shapes kept for what each file exports (`shape` rows, issue #175), for
     /// `package::shapes`.
     pub(crate) shapes: Vec<package::ExportedShape>,
@@ -1914,6 +1931,22 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })?
             .collect::<rusqlite::Result<_>>()?,
     };
+    let flexible = match provides {
+        false => Vec::new(),
+        true => db
+            .prepare(&format!(
+                "SELECT path, name, least, most FROM {schema}.flexible ORDER BY path, name"
+            ))?
+            .query_map([], |r| {
+                Ok(Flexible {
+                    path: r.get(0)?,
+                    name: r.get(1)?,
+                    least: r.get::<_, i64>(2)? as usize,
+                    most: r.get::<_, Option<i64>>(3)?.map(|m| m as usize),
+                })
+            })?
+            .collect::<rusqlite::Result<_>>()?,
+    };
     let shapes = match provides {
         false => Vec::new(),
         true => db
@@ -1994,6 +2027,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         import_calls,
         exported,
         ancestries,
+        flexible,
         shapes,
         imports: Vec::new(),
         communities,

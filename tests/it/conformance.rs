@@ -491,6 +491,77 @@ fn java_channel_clients_link_their_producers_to_their_handlers() {
     assert_eq!(unresolved("consumers"), ["Sales.onMissing(String)"]);
 }
 
+/// Each Kotlin channel client links its producer to its handler (spec #27, #104), as the Java
+/// ones do (`java_channel_clients_link_their_producers_to_their_handlers`): a topic from a
+/// constant, a companion's constant, the module's Spring configuration and a wrapper's caller;
+/// named arguments and array literals; a publish to a named exchange routed by an annotation's
+/// and a configuration's bindings; the default exchange; a NATS wildcard as `inferred`; and the
+/// names that cannot be evaluated left unresolved on both sides.
+#[test]
+fn kotlin_channel_clients_link_their_producers_to_their_handlers() {
+    let repo = fixture_repo("kotlin_channels", "conformance-kotlin", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let short = |site: &str| {
+        let site = site.rsplit("example/channels/").next().unwrap_or(site);
+        site.split_once("::example.channels.")
+            .map_or(site, |(_, s)| s)
+            .to_string()
+    };
+    let links: Vec<String> = (json["links"].as_array().unwrap().iter())
+        .filter(|l| l["contract"].as_str().unwrap().starts_with("channel::"))
+        .map(|l| {
+            let (level, contract) = (
+                l["level"].as_str().unwrap(),
+                l["contract"].as_str().unwrap(),
+            );
+            let (provider, consumer) = (
+                l["provider"].as_str().unwrap(),
+                l["consumer"].as_str().unwrap(),
+            );
+            format!(
+                "{level} {contract} {} -> {}",
+                short(provider),
+                short(consumer)
+            )
+        })
+        .collect();
+    for wanted in [
+        "exact channel::kafka::orders.created Sales.created(String)::kafka.send#0 -> Sales.onSale(String)",
+        "exact channel::kafka::orders.paid Sales.paid(String)::kafka.send#0 -> Sales.onSale(String)",
+        "exact channel::kafka::orders.paid Sales.fromConfig(String)::this.kafka.send#0 -> Sales.onSale(String)",
+        "exact channel::kafka::orders.shipped Sales.shipped(String)::emit#0 -> Sales.onShipped(String)",
+        "inferred channel::amqp::invoices Billing.invoice(String)::rabbit.convertAndSend#0 -> Billing.onInvoice(String)",
+        "inferred channel::amqp::audit Billing.invoice(String)::rabbit.convertAndSend#0 -> Billing.onRefund(String)",
+        "exact channel::amqp::refunds Billing.refund(String)::rabbit.convertAndSend#0 -> Billing.onRefund(String)",
+        "exact channel::jms::notifications Delivery.notifyCustomer(String)::jms.convertAndSend#0 -> Delivery.onNotification(String)",
+        "exact channel::sqs::shipments Delivery.ship(String)::sqs.sendMessage#0 -> Delivery.shipments()",
+        "inferred channel::nats::delivery.*.tracked Delivery.track(String)::nats.publish#0 -> Delivery.watch(Dispatcher)",
+        "exact channel::redis::events Streams.record(String)::jedis.xadd#0 -> Streams.consume()",
+        "exact channel::redis::audits Streams.record(String)::lettuce.xadd#0 -> Streams.consume()",
+    ] {
+        assert!(
+            links.contains(&wanted.to_string()),
+            "{wanted} in {links:#?}"
+        );
+    }
+    assert_eq!(links.len(), 12, "{links:#?}");
+    let unresolved = |side: &str| -> Vec<String> {
+        (json[side].as_array().unwrap().iter())
+            .filter(|s| s["contract"] == "channel::kafka")
+            .map(|s| short(s["site"].as_str().unwrap()))
+            .collect()
+    };
+    assert_eq!(
+        unresolved("providers"),
+        [
+            "Sales.computed(String)::kafka.send#0",
+            "Sales.suffixed(String,String)::kafka.send#0"
+        ]
+    );
+    assert_eq!(unresolved("consumers"), ["Sales.onMissing(String)"]);
+}
+
 #[test]
 fn java_context_lists_callers_through_receivers_and_name_matches() {
     let repo = fixture_repo("java_receiver_context", "conformance-java", Some(ORIGIN));
@@ -1366,6 +1437,1775 @@ fn java_qualification_expansion_discards_the_whole_file_and_keeps_other_files() 
                 .unwrap()
                 .ends_with("example.BudgetCaller.run()")
         })
+        .unwrap();
+    assert!(called["target"].is_null());
+    assert!(called["level"].is_null());
+}
+
+#[test]
+fn kotlin() {
+    conform(
+        "conformance-kotlin",
+        &[
+            "scripts/seed.kts::seed()",
+            "src/main/kotlin/example/Members.kt::example.Base",
+            "src/main/kotlin/example/Members.kt::example.Base.log(String)",
+            "src/main/kotlin/example/Members.kt::example.log(String)",
+            "src/main/kotlin/example/Members.kt::example.origin()",
+            "src/main/kotlin/example/Members.kt::example.Derived",
+            "src/main/kotlin/example/Members.kt::example.Derived.go()",
+            "src/main/kotlin/example/Members.kt::example.Derived.first()",
+            "src/main/kotlin/example/Members.kt::example.Derived.Companion",
+            "src/main/kotlin/example/Members.kt::example.Derived.Companion.origin()",
+            "src/main/kotlin/example/Members.kt::example.Logged",
+            "src/main/kotlin/example/Members.kt::example.Logged.go()",
+            "src/main/kotlin/example/Members.kt::example.Logged.self()",
+            "src/main/kotlin/example/Members.kt::example.Logged.own()",
+            "src/main/kotlin/example/Members.kt::example.Quiet",
+            "src/main/kotlin/example/Members.kt::example.Quiet.go()",
+            "src/main/kotlin/example/Members.kt::example.Quiet.own()",
+            "src/main/kotlin/example/Members.kt::example.Quiet.make()",
+            "src/main/kotlin/example/Members.kt::example.Quiet.Companion",
+            "src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
+            "src/main/kotlin/example/Members.kt::example.util()",
+            "src/main/kotlin/example/Members.kt::example.Init",
+            "src/main/kotlin/example/Members.kt::example.Level",
+            "src/main/kotlin/example/Members.kt::example.Level.label()",
+            "src/main/kotlin/example/Members.kt::example.Twin",
+            "src/main/kotlin/example/Members.kt::example.Twin.m()",
+            "src/main/kotlin/example/Members.kt::example.Twin.own()",
+            "src/main/kotlin/example/Members.kt::example.Twin.Companion",
+            "src/main/kotlin/example/Members.kt::example.Twin.Companion.m()",
+            "src/main/kotlin/example/Members.kt::example.twins(Twin)",
+            "src/main/kotlin/example/Main.kt::example.main(Array<String>)",
+            "src/main/kotlin/example/Main.kt::example.Runner",
+            "src/main/kotlin/example/Main.kt::example.Runner.main()",
+            "src/main/kotlin/example/Main.kt::example.Launcher",
+            "src/main/kotlin/example/Main.kt::example.Launcher.main()",
+            "src/main/kotlin/example/Main.kt::example.String.main()",
+            "src/main/kotlin/example/Shapes.kt::example.Point.fromOrigin()",
+            "src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.visible()",
+            "src/main/kotlin/example/util/Hidden.kt::example.util.viaPackage()",
+            "src/main/kotlin/example/calls/Other.kt::example.calls.greet()",
+            "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy",
+            "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()",
+            "src/main/kotlin/example/Same.kt::example.notSecret()",
+            "src/main/kotlin/example/Same.kt::example.same()",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.invoice(String)",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.refund(String)",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.notifyCustomer(String)",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.onNotification(String)",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.shipments()",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.loop(Any)",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.track(String)",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.watch(Dispatcher)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.created(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.paid(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.shipped(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.fromConfig(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.computed(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.suffixed(String,String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.emit(String,String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onMissing(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onShipped(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onEurope(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.Companion",
+            "src/main/kotlin/example/channels/Receivers.kt::example.channels.Pipe",
+            "src/main/kotlin/example/channels/Receivers.kt::example.channels.Pipe.send(String,String)",
+            "src/main/kotlin/example/channels/Receivers.kt::example.channels.Holder",
+            "src/main/kotlin/example/channels/Receivers.kt::example.channels.Plain",
+            "src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers",
+            "src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.viaWith(Holder)",
+            "src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.viaRun(Holder)",
+            "src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.viaApply(Holder)",
+            "src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.viaOutside(Foreign)",
+            "src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.viaPlain(Plain)",
+            "src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.Holder.viaExtension()",
+            "src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.Plain.viaPlainExtension()",
+            "src/main/kotlin/example/channels/Streams.kt::example.channels.Streams",
+            "src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)",
+            "src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.Gateway",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.Gateway.health()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.based()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.builder()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.count()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.folds()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.lookup()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.reassigned()",
+            "src/main/kotlin/example/clients/Client.kt::example.clients.verbs()",
+            "src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByLocal()",
+            "src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByParameter(Map<String,String>)",
+            "src/main/kotlin/example/clients/Probes.kt::example.clients.otherLibrary()",
+            "src/main/kotlin/example/clients/Probes.kt::example.clients.typed(HttpClient)",
+            "src/main/kotlin/example/clients/Star.kt::example.clients.star()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.untyped()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.closing()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.closingNamed()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.two()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.shadows()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.variable()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.Rack",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.implicitClient(Rack)",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.localBase()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.varBase()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.send(HttpMethod,String)",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.sends()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.sendFrom(HttpMethod,String)",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.sendsFrom()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.sendFixed(HttpMethod)",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.callsFixed()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.named()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.blockNamed()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.thisPut()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.blockValue(HttpRequestBuilder.()->Unit)",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.conditional(Boolean)",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.nested()",
+            "src/main/kotlin/example/clients/Methods.kt::example.clients.parsed()",
+            "src/main/kotlin/example/clients/Legacy.kt::example.clients.old()",
+            "src/main/kotlin/example/clients/Probes.kt::example.clients.Cache",
+            "src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByOtherLocal()",
+            "src/main/kotlin/example/clients/Wrappers.kt::example.clients.fetch(HttpClient,String)",
+            "src/main/kotlin/example/clients/Wrappers.kt::example.clients.order(String)",
+            "src/main/kotlin/example/clients/Wrappers.kt::example.clients.ping(String)",
+            "src/main/kotlin/example/clients/Wrappers.kt::example.clients.pong(String)",
+            "src/main/kotlin/example/clients/Wrappers.kt::example.clients.report()",
+            "src/main/kotlin/example/clients/Wrappers.kt::example.clients.start()",
+            "src/main/kotlin/example/clients/Wrappers.kt::example.clients.user(Int)",
+            "src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.HttpClient",
+            "src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.HttpClient.options(String)",
+            "src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.fake(HttpClient,Map<String,String>)",
+            "src/main/kotlin/example/clients/urls/Urls.kt::example.clients.urls.Paths",
+            "src/main/kotlin/example/Shapes.kt::example.Box",
+            "src/main/kotlin/example/Shapes.kt::example.Box.Factory",
+            "src/main/kotlin/example/Shapes.kt::example.Box.Factory.create()",
+            "src/main/kotlin/example/Shapes.kt::example.Box.label()",
+            "src/main/kotlin/example/Shapes.kt::example.Box.later()",
+            "src/main/kotlin/example/Shapes.kt::example.Box.name()",
+            "src/main/kotlin/example/Shapes.kt::example.Box.relabel()",
+            "src/main/kotlin/example/Shapes.kt::example.Color",
+            "src/main/kotlin/example/Shapes.kt::example.Marker",
+            "src/main/kotlin/example/Shapes.kt::example.Named",
+            "src/main/kotlin/example/Shapes.kt::example.Named.name()",
+            "src/main/kotlin/example/Shapes.kt::example.Point",
+            "src/main/kotlin/example/Shapes.kt::example.Point.Companion",
+            "src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin()",
+            "src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin(Int)",
+            "src/main/kotlin/example/Shapes.kt::example.Point.moved(Int)",
+            "src/main/kotlin/example/Shapes.kt::example.Point.norm()",
+            "src/main/kotlin/example/Shapes.kt::example.Point.scaled(Int)",
+            "src/main/kotlin/example/Shapes.kt::example.Point.twice()",
+            "src/main/kotlin/example/Shapes.kt::example.Registry",
+            "src/main/kotlin/example/Shapes.kt::example.Registry.all()",
+            "src/main/kotlin/example/Shapes.kt::example.Registry.find(String)",
+            "src/main/kotlin/example/Shapes.kt::example.Registry.find(String,Point)",
+            "src/main/kotlin/example/Shapes.kt::example.Shape",
+            "src/main/kotlin/example/Shapes.kt::example.Shape.Square",
+            "src/main/kotlin/example/Shapes.kt::example.Shape.Square.Corner",
+            "src/main/kotlin/example/Shapes.kt::example.Shape.Square.Corner.area()",
+            "src/main/kotlin/example/Shapes.kt::example.Shape.Square.area()",
+            "src/main/kotlin/example/Shapes.kt::example.Shape.area()",
+            "src/main/kotlin/example/Shapes.kt::example.String.shout()",
+            "src/main/kotlin/example/Shapes.kt::example.calls()",
+            "src/main/kotlin/example/Shapes.kt::example.defaults(Int,Int)",
+            "src/main/kotlin/example/Shapes.kt::example.greeting",
+            "src/main/kotlin/example/Shapes.kt::example.helper()",
+            "src/main/kotlin/example/Shapes.kt::example.helper(Int)",
+            "src/main/kotlin/example/Shapes.kt::example.helper(String)",
+            "src/main/kotlin/example/Shapes.kt::example.hiding((Int)->Int,List<()->Int>)",
+            "src/main/kotlin/example/Shapes.kt::example.hiding((Int)->Int,List<()->Int>).inside()",
+            "src/main/kotlin/example/Shapes.kt::example.inside()",
+            "src/main/kotlin/example/Shapes.kt::example.many(vararg Int)",
+            "src/main/kotlin/example/Shapes.kt::example.open()",
+            "src/main/kotlin/example/Shapes.kt::example.secret()",
+            "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()",
+            "src/main/kotlin/example/calls/Imports.kt::example.calls.qualified()",
+            "src/main/kotlin/example/calls/Imports.kt::example.calls.shadowed(()->Int)",
+            "src/main/kotlin/example/calls/Imports.kt::example.calls.unknown()",
+            "src/main/kotlin/example/util/Hidden.kt::example.util.FilePrivate",
+            "src/main/kotlin/example/util/Hidden.kt::example.util.Hidden",
+            "src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.closed()",
+            "src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.shared()",
+            "src/main/kotlin/example/util/Tools.kt::example.util.Tools",
+            "src/main/kotlin/example/util/Tools.kt::example.util.Tools.doubled()",
+            "src/main/kotlin/example/util/Tools.kt::example.util.Tools.single()",
+            "src/main/kotlin/example/util/Tools.kt::example.util.internalTool()",
+            "src/main/kotlin/example/util/Tools.kt::example.util.tool()",
+            "src/main/kotlin/example/util/Tools.kt::example.util.tool(Int,Int)",
+            "src/main/kotlin/example/Receivers.kt::example.Store",
+            "src/main/kotlin/example/Receivers.kt::example.Store.get(String)",
+            "src/main/kotlin/example/Receivers.kt::example.Store.put(String,String)",
+            "src/main/kotlin/example/Receivers.kt::example.Cache",
+            "src/main/kotlin/example/Receivers.kt::example.Cache.get(String)",
+            "src/main/kotlin/example/Receivers.kt::example.Cache.put(String,String)",
+            "src/main/kotlin/example/Receivers.kt::example.Cache.size()",
+            "src/main/kotlin/example/Receivers.kt::example.Cache.size(Int)",
+            "src/main/kotlin/example/Receivers.kt::example.Cache.clear()",
+            "src/main/kotlin/example/Receivers.kt::example.Cache.wipe()",
+            "src/main/kotlin/example/Receivers.kt::example.Cache.add(String)",
+            "src/main/kotlin/example/Receivers.kt::example.Cache.add(Int)",
+            "src/main/kotlin/example/Receivers.kt::example.Disk",
+            "src/main/kotlin/example/Receivers.kt::example.Disk.flush()",
+            "src/main/kotlin/example/Receivers.kt::example.Disk.inherited()",
+            "src/main/kotlin/example/Receivers.kt::example.build()",
+            "src/main/kotlin/example/Receivers.kt::example.parameter(Cache,Store,Disk)",
+            "src/main/kotlin/example/Receivers.kt::example.local()",
+            "src/main/kotlin/example/Receivers.kt::example.String.loud()",
+            "src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)",
+            "src/main/kotlin/example/Receivers.kt::example.scopes(Cache,Disk,Store)",
+            "src/main/kotlin/example/Receivers.kt::example.Mixed",
+            "src/main/kotlin/example/Receivers.kt::example.Mixed.get(String)",
+            "src/main/kotlin/example/Receivers.kt::example.Mixed.put(String,String)",
+            "src/main/kotlin/example/Receivers.kt::example.outsiders(Outside,Mixed,List<Int>)",
+            "src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.describe()",
+            "src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.describe(Boolean)",
+            "src/main/kotlin/example/ext/Extensions.kt::example.ext.Store.tag()",
+            "src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.tag()",
+            "src/main/kotlin/example/Receivers.kt::example.scoped(String)",
+            "src/main/kotlin/example/Receivers.kt::example.Outside.spawn()",
+            "src/main/kotlin/example/Receivers.kt::example.Outside.items()",
+            "src/main/kotlin/example/Receivers.kt::example.Outside.orders()",
+            "src/main/kotlin/example/Receivers.kt::example.Map.Entry.entryLabel()",
+            "src/main/kotlin/example/Receivers.kt::example.opaque(Outside,Map<String,Int>)",
+            "src/main/kotlin/example/Receivers.kt::example.Any.toJson()",
+            "src/main/kotlin/example/Receivers.kt::example.T.logged()",
+            "src/main/kotlin/example/Receivers.kt::example.CharSequence.blankish()",
+            "src/main/kotlin/example/Receivers.kt::example.general(Cache,String)",
+            "src/main/kotlin/example/Receivers.kt::example.Outside.pretty()",
+            "src/main/kotlin/example/Receivers.kt::example.String.pretty()",
+            "src/main/kotlin/example/Receivers.kt::example.called()",
+            "src/main/kotlin/example/Receivers.kt::example.nestedIt(Cache,List<Disk>)",
+            "src/main/kotlin/example/Receivers.kt::example.localFirst(Cache)",
+            "src/main/kotlin/example/Receivers.kt::example.localFirst(Cache).size()",
+            "src/main/kotlin/example/Receivers.kt::example.unknownReceiver()",
+            "src/main/kotlin/example/Receivers.kt::example.Shelf",
+            "src/main/kotlin/example/Receivers.kt::example.asserted(Cache?)",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.read()",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.reset()",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Meter",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Meter.ext(Int)",
+            "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)",
+            "src/main/java/example/legacy/Gauges.java::example.legacy.Gauges",
+            "src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)",
+            "src/main/kotlin/example/Receivers.kt::example.implicitMember(Shelf)",
+            "src/main/kotlin/example/Receivers.kt::example.localBeforeMember(Shelf,Store)",
+            "src/main/kotlin/example/other/Others.kt::example.other.Cache.describe()",
+            "src/main/kotlin/example/other/Others.kt::example.other.String.reversed()",
+            "src/main/java/example/legacy/Port.java::example.legacy.Port",
+            "src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)",
+            "src/main/java/example/legacy/Port.java::example.legacy.Port.use(Port,String)",
+            "src/main/kotlin/example/legacy/PortExt.kt::example.legacy.Port.ext(String)",
+            "src/main/kotlin/example/legacy/PortExt.kt::example.legacy.String.length()",
+            "src/main/kotlin/example/web/Api.kt::example.web.Api",
+            "src/main/kotlin/example/web/OrderController.kt::example.web.OrderController",
+            "src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.Companion",
+            "src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.list()",
+            "src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.fetch(String)",
+            "src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()",
+            "src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.replace()",
+            "src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.flag()",
+            "src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.remove()",
+            "src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.several()",
+            "src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.single()",
+            "src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.any()",
+            "src/main/kotlin/example/web/PageController.kt::example.web.PageController",
+            "src/main/kotlin/example/web/PageController.kt::example.web.PageController.page()",
+            "src/main/kotlin/example/web/StarController.kt::example.web.StarController",
+            "src/main/kotlin/example/web/StarController.kt::example.web.StarController.one()",
+            "src/main/kotlin/example/web/StarController.kt::example.web.StarController.removeAll()",
+            "src/main/kotlin/example/web/VarargController.kt::example.web.VarargController",
+            "src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()",
+            "src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()",
+            "src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()",
+            // Shapes the published grammar lost (ADR 0017).
+            "src/main/kotlin/example/web/HealthController.kt::example.web.HealthController",
+            "src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.Companion",
+            "src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.live()",
+            "src/main/kotlin/example/OneLine.kt::example.Twins",
+            "src/main/kotlin/example/OneLine.kt::example.Twins.left()",
+            "src/main/kotlin/example/OneLine.kt::example.Twins.right()",
+            // Ktor routes (#98): each inline handler is named for its route.
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /health",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/v1",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().POST /api/v1/items/{}",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().HEAD /api/ping",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes()",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes().DELETE /api/admin/cache",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.prefix()",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.orphan()",
+            "src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()",
+            "src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders",
+            "src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().PATCH /api/admin/orders/{}",
+            "src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.listing()",
+            "src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.fake()",
+            "src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.options(String,()->Unit)",
+            "src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.routing(()->Unit)",
+            "src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Application.typed()",
+            "src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Route.orderRoutes()",
+            "src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Typed",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/named",
+            "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/kw",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Application.hidden(Route.()->Unit)",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Application.local()",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.catalog()",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.users()",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Application.cycle()",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Routing.top()",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Routing.top().GET /top",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.again()",
+            "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.again().GET /cyc/loop",
+            // A local `val` before a line starting with `get` or `set` (ADR 0017's scanner patch).
+            "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()",
+            "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /local",
+            "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /",
+            "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.stored()",
+            "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.configured()",
+            "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.keyed()",
+            "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spaced()",
+            "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spacedPair()",
+            "src/main/kotlin/example/ktor/Locals.kt::example.ktor.afterLocals()",
+            // JVM HTTP clients (#101): RestTemplate, WebClient, OkHttp and Retrofit.
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest",
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.list()",
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.one(String)",
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.create()",
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.change(String)",
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.single()",
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.send(HttpMethod,String)",
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.remove(String)",
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.drop()",
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.lookup()",
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Made",
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Made.property()",
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Made.local()",
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake",
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake.delete(String)",
+            "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake.probe(Fake,Map<String,String>)",
+            "src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive",
+            "src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.get()",
+            "src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.flag()",
+            "src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typed()",
+            "src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.local()",
+            "src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()",
+            "src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()",
+            "src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.other(Other)",
+            "src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other",
+            "src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.get()",
+            "src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.anything()",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.local()",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.parameter(Any)",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.lambda(List<Any>)",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.client()",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.loop(List<Any>)",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.caught()",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Gate",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Gate.delete(String)",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Slot",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Plain",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers.viaWith(Slot)",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers.viaRun(Slot)",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers.viaApply(Slot)",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers.viaOutside(HttpClient)",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers.viaPlain(Plain)",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers.Slot.viaExtension()",
+            "src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers.Plain.viaPlainExtension()",
+            "src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok",
+            "src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.list()",
+            "src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.remove()",
+            "src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.create()",
+            "src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.replace()",
+            "src/main/kotlin/example/jvm/Ok.kt::example.jvm.notOkHttp()",
+            "src/main/kotlin/example/jvm/Star.kt::example.jvm.Star",
+            "src/main/kotlin/example/jvm/Star.kt::example.jvm.Star.rest()",
+            "src/main/kotlin/example/jvm/Star.kt::example.jvm.Star.web()",
+            "src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.RestTemplate",
+            "src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.RestTemplate.exchange(String)",
+            "src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient",
+            "src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.get()",
+            "src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)",
+            "src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.probe(RestTemplate,WebClient)",
+            "src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk",
+            "src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.list()",
+            "src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.create()",
+            "src/main/kotlin/example/jvm/Injected.kt::example.jvm.Injected",
+            "src/main/kotlin/example/jvm/Injected.kt::example.jvm.Injected.send()",
+            "src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger",
+            "src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.entry(String)",
+            "src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.record()",
+            "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Remotes",
+            "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Remotes.ledger()",
+            "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Shared",
+            "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Shared.ledger()",
+            "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Configured",
+            "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Configured.ledger()",
+            "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Configured.fromEnvironment()",
+            "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Books",
+            "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Books.open(String)",
+            "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Books.write()",
+            "src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive",
+            "src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive.find(String)",
+            "src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal",
+            "src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal.drop(String)",
+            "src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes",
+            "src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes.save()",
+            "src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified",
+            "src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.archive()",
+            "src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.journal()",
+            "src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Retrofit.create()",
+            "src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere",
+            "src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere.notes()",
+            "src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan",
+            "src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan.get()",
+        ],
+        &["src/main/kotlin/example/Main.kt::example.main(Array<String>)"],
+        &[
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::helper#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.helper()"],
+            ),
+            (
+                "src/main/kotlin/example/Same.kt::example.same()::helper#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.helper()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::helper#1",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/Shapes.kt::example.helper(Int)",
+                    "src/main/kotlin/example/Shapes.kt::example.helper(String)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.Registry.find(String,Point)::find#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Registry.find(String)"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::defaults#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.defaults(Int,Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::defaults#1",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.defaults(Int,Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::many#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.many(vararg Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.Box.relabel()::this.label#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Box.label()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.Box.name()::label#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Box.label()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Registry.find#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Registry.find(String)"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Registry.find#1",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Registry.find(String,Point)"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Point.origin#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Point.origin#1",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin(Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.Point.twice()::Point.origin#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Box.create#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Box.Factory.create()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Box.Factory.create#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Box.Factory.create()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Point#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Point"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::Shape.Square#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Shape.Square"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example::Marker#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Marker"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::(anonymous).helper#0",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/Shapes.kt::example.helper(Int)",
+                    "src/main/kotlin/example/Shapes.kt::example.helper(String)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.Box.later()::(anonymous).label#0",
+                INFERRED,
+                &["src/main/kotlin/example/Shapes.kt::example.Box.label()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.greeting::Registry.all#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Registry.all()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.open()::secret#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.secret()"],
+            ),
+            (
+                "src/main/kotlin/example/Same.kt::example.notSecret()::secret#0",
+                INFERRED,
+                &["src/main/kotlin/example/Shapes.kt::example.secret()"],
+            ),
+            (
+                "src/main/kotlin/example/Same.kt::example.same()::inside#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.inside()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::internalTool#0",
+                EXACT,
+                &["src/main/kotlin/example/util/Tools.kt::example.util.internalTool()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::Point.origin#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::Lookup.find#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Registry.find(String)"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::tool#0",
+                EXACT,
+                &["src/main/kotlin/example/util/Tools.kt::example.util.tool()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::run#0",
+                EXACT,
+                &["src/main/kotlin/example/util/Tools.kt::example.util.tool(Int,Int)"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::Tools.single#0",
+                EXACT,
+                &["src/main/kotlin/example/util/Tools.kt::example.util.Tools.single()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.qualified()::example.util.Tools.doubled#0",
+                EXACT,
+                &["src/main/kotlin/example/util/Tools.kt::example.util.Tools.doubled()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::Legacy.make#0",
+                EXACT,
+                &["src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()"],
+            ),
+            (
+                "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()::Box#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Box"],
+            ),
+            (
+                "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()::box.label#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Box.label()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.hiding((Int)->Int,List<()->Int>)::inside#0",
+                EXACT,
+                &[
+                    "src/main/kotlin/example/Shapes.kt::example.hiding((Int)->Int,List<()->Int>).inside()",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.hiding((Int)->Int,List<()->Int>)::same#0",
+                INFERRED,
+                &["src/main/kotlin/example/Same.kt::example.same()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.shadowed(()->Int)::run#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.unknown()::outside#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.unknown()::Missing.call#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.calls()::println#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Derived.go()::log#0",
+                EXACT,
+                &["src/main/kotlin/example/Members.kt::example.Base.log(String)"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Derived.first()::origin#0",
+                EXACT,
+                &["src/main/kotlin/example/Members.kt::example.Derived.Companion.origin()"],
+            ),
+            (
+                "src/main/kotlin/example/Shapes.kt::example.Point.fromOrigin()::origin#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Logged.self()::this.own#0",
+                INFERRED,
+                &["src/main/kotlin/example/Members.kt::example.Logged.own()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Quiet.go()::this.own#0",
+                EXACT,
+                &["src/main/kotlin/example/Members.kt::example.Quiet.own()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Quiet.make()::Quiet.build#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Logged.go()::log#0",
+                INFERRED,
+                &["src/main/kotlin/example/Members.kt::example.log(String)"],
+            ),
+            (
+                "src/main/kotlin/example/util/Hidden.kt::example.util.viaPackage()::tool#0",
+                EXACT,
+                &["src/main/kotlin/example/util/Tools.kt::example.util.tool()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Init::helper#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.helper()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Init::local#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Level::helper#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.helper()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Level::(anonymous).label#0",
+                INFERRED,
+                &["src/main/kotlin/example/Members.kt::example.Level.label()"],
+            ),
+            (
+                "src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::greet#0",
+                INFERRED,
+                &["src/main/kotlin/example/calls/Other.kt::example.calls.greet()"],
+            ),
+            (
+                "scripts/run.kts::seed#0",
+                INFERRED,
+                &["scripts/seed.kts::seed()"],
+            ),
+            (
+                "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()::Registry.INSTANCE.all#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Registry.all()"],
+            ),
+            (
+                "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()::Registry.INSTANCE.find#0",
+                EXACT,
+                &["src/main/kotlin/example/Shapes.kt::example.Registry.find(String)"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.Disk.flush()::cache.clear#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.clear()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.Disk.flush()::store.put#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Store.put(String,String)"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.Disk.flush()::spare.size#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.size()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.Disk.flush()::spare.size#1",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.size(Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.Disk.flush()::boxed.wipe#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.wipe()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.Disk.flush()::this.cache.size#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.size(Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.Disk.flush()::made.wipe#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.wipe()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.Disk::plain.wipe#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.wipe()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.Disk.inherited()::this.size#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.size()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.parameter(Cache,Store,Disk)::cache.size#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.size()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.parameter(Cache,Store,Disk)::cache.size#1",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.parameter(Cache,Store,Disk)::cache.add#0",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/Receivers.kt::example.Cache.add(Int)",
+                    "src/main/kotlin/example/Receivers.kt::example.Cache.add(String)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.parameter(Cache,Store,Disk)::store.get#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Store.get(String)"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.parameter(Cache,Store,Disk)::disk.size#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.size()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.parameter(Cache,Store,Disk)::disk.get#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.get(String)"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.parameter(Cache,Store,Disk)::disk.cache.wipe#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.wipe()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.local()::declared.clear#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.clear()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.local()::created.size#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.size(Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.local()::created.size#1",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.size()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.local()::guessed.clear#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.clear()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.local()::guessed.get#0",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/Receivers.kt::example.Cache.get(String)",
+                    "src/main/kotlin/example/Receivers.kt::example.Mixed.get(String)",
+                    "src/main/kotlin/example/Receivers.kt::example.Store.get(String)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)::cache.describe#0",
+                EXACT,
+                &["src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.describe()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)::cache.describe#1",
+                EXACT,
+                &["src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.describe(Boolean)"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)::store.tag#0",
+                EXACT,
+                &["src/main/kotlin/example/ext/Extensions.kt::example.ext.Store.tag()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)::disk.tag#0",
+                EXACT,
+                &["src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.tag()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)::disk.describe#0",
+                EXACT,
+                &["src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.describe()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)::text.loud#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.String.loud()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)::text.shout#0",
+                INFERRED,
+                &["src/main/kotlin/example/Shapes.kt::example.String.shout()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)::(call_expression).tag#0",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.tag()",
+                    "src/main/kotlin/example/ext/Extensions.kt::example.ext.Store.tag()",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.scopes(Cache,Disk,Store)::size#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.size()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.scopes(Cache,Disk,Store)::this.clear#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.clear()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.scopes(Cache,Disk,Store)::build#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.build()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.scopes(Cache,Disk,Store)::wipe#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.wipe()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.scopes(Cache,Disk,Store)::flush#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Disk.flush()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.scopes(Cache,Disk,Store)::inherited#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Disk.inherited()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.scopes(Cache,Disk,Store)::it.size#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.size(Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.scopes(Cache,Disk,Store)::value.flush#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Disk.flush()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.scopes(Cache,Disk,Store)::build#1",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.build()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.scopes(Cache,Disk,Store)::it.wipe#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.wipe()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.outsiders(Outside,Mixed,List<Int>)::foreign.clear#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.outsiders(Outside,Mixed,List<Int>)::list.wipe#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.outsiders(Outside,Mixed,List<Int>)::mixed.put#0",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/Receivers.kt::example.Mixed.put(String,String)",
+                    "src/main/kotlin/example/Receivers.kt::example.Store.put(String,String)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.outsiders(Outside,Mixed,List<Int>)::mixed.size#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.scoped(String)::text.reversed#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.Outside.orders()::items#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Outside.items()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.Outside.orders()::this.items#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Outside.items()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.opaque(Outside,Map<String,Int>)::foreign.items#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Outside.items()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.opaque(Outside,Map<String,Int>)::Outside.spawn#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.opaque(Outside,Map<String,Int>)::entries.entryLabel#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Map.Entry.entryLabel()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.general(Cache,String)::cache.toJson#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Any.toJson()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.general(Cache,String)::text.toJson#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Any.toJson()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.general(Cache,String)::text.logged#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.T.logged()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.general(Cache,String)::text.blankish#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.CharSequence.blankish()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.called()::shown.pretty#0",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/Receivers.kt::example.Outside.pretty()",
+                    "src/main/kotlin/example/Receivers.kt::example.String.pretty()",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.called()::held.wipe#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.wipe()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.nestedIt(Cache,List<Disk>)::it.size#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.size(Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.nestedIt(Cache,List<Disk>)::it.flush#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.Disk.flush()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.localFirst(Cache)::size#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.localFirst(Cache).size()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.unknownReceiver()::(call_expression).loud#0",
+                INFERRED,
+                &["src/main/kotlin/example/Receivers.kt::example.String.loud()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.asserted(Cache?)::cache.tag#0",
+                EXACT,
+                &["src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.tag()"],
+            ),
+            // A call on the class's name reaches the companion, one on an instance the class.
+            (
+                "src/main/kotlin/example/Members.kt::example.twins(Twin)::Twin.m#0",
+                EXACT,
+                &["src/main/kotlin/example/Members.kt::example.Twin.Companion.m()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.twins(Twin)::twin.m#0",
+                EXACT,
+                &["src/main/kotlin/example/Members.kt::example.Twin.m()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Twin.own()::this.m#0",
+                EXACT,
+                &["src/main/kotlin/example/Members.kt::example.Twin.m()"],
+            ),
+            // An extension in its class's file is no member: Java never reaches it, and a member
+            // of a Java base wins over it.
+            (
+                "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)::gauge.reset#0",
+                EXACT,
+                &["src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.reset()"],
+            ),
+            (
+                "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)::meter.ext#0",
+                EXACT,
+                &["src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)"],
+            ),
+            (
+                "src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)::gauge.reset#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)::meter.ext#0",
+                EXACT,
+                &["src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)"],
+            ),
+            // A name read in a receiver's block is its member; a local around comes first.
+            (
+                "src/main/kotlin/example/Receivers.kt::example.implicitMember(Shelf)::stock.clear#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Cache.clear()"],
+            ),
+            (
+                "src/main/kotlin/example/Receivers.kt::example.localBeforeMember(Shelf,Store)::stock.get#0",
+                EXACT,
+                &["src/main/kotlin/example/Receivers.kt::example.Store.get(String)"],
+            ),
+            (
+                "src/main/java/example/legacy/Port.java::example.legacy.Port.use(Port,String)::port.ext#0",
+                EXACT,
+                &["src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)"],
+            ),
+            (
+                "src/main/java/example/legacy/Port.java::example.legacy.Port.use(Port,String)::s.length#0",
+                None,
+                &[],
+            ),
+            (
+                "scripts/seed.kts::seed#0",
+                EXACT,
+                &["scripts/seed.kts::seed()"],
+            ),
+            // The callers of a Retrofit interface reach its function like any call (#101).
+            (
+                "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Books.open(String)::ledger.entry#0",
+                EXACT,
+                &[
+                    "src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.entry(String)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Books.write()::ledger.record#0",
+                EXACT,
+                &[
+                    "src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.record()",
+                ],
+            ),
+        ],
+    );
+}
+
+/// A `private` or `internal` member is no export door, and a public one is (export doors are
+/// the processes of kind `export`).
+#[test]
+fn kotlin_private_and_internal_members_are_no_export_doors() {
+    let repo = fixture_repo("kotlin_doors", "conformance-kotlin", Some(ORIGIN));
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let doors: Vec<&str> = (json["processes"].as_array().unwrap().iter())
+        .filter(|p| p["kind"] == "export")
+        .map(|p| p["entry_point"].as_str().unwrap())
+        .collect();
+    let door = |name: &str| doors.iter().any(|d| d.ends_with(name));
+    assert!(door("::example.util.Hidden.visible()"), "{doors:?}");
+    assert!(!door("::example.util.Hidden.shared()"), "{doors:?}");
+    assert!(!door("::example.util.Hidden.closed()"), "{doors:?}");
+}
+
+/// A Spring controller with two annotations, no constructor and a one-line companion body
+/// provides its mapping (the published grammar read the class as an infix call, ADR 0017).
+#[test]
+fn kotlin_annotated_class_with_a_one_line_companion_provides_its_mapping() {
+    let (_, actual) = providers(
+        "kotlin_health",
+        "conformance-kotlin",
+        "src/main/kotlin/example/web/HealthController.kt",
+    );
+    let expected = pairs(&[(
+        "http::GET::/health/live",
+        "src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.live()",
+    )]);
+    assert_eq!(actual, expected);
+}
+
+/// Ktor routes take the prefix of every enclosing `route` block, through the routing extension
+/// functions called in one (once per prefix), and each is served by its inline handler. Names
+/// like Ktor's without its import, type-safe routing, an unread prefix, an extension function
+/// no routing scope calls, one out of scope and one a parameter or a local function hides
+/// serve nothing; a path passed by name is read, a `Routing` receiver mounts and a cycle adds
+/// no prefix.
+#[test]
+fn kotlin_ktor_routes_take_every_enclosing_prefix() {
+    let (json, actual) = providers(
+        "kotlin_ktor",
+        "conformance-kotlin",
+        "src/main/kotlin/example/ktor/",
+    );
+    let server = "src/main/kotlin/example/ktor/Server.kt::example.ktor";
+    let module = format!("{server}.Application.module()");
+    let admin = format!("{server}.Route.adminRoutes()");
+    let hidden = "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden".to_string();
+    let orders = "src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()";
+    let locals = "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()";
+    let site = |scope: &str, name: &str| format!("{scope}.{name}");
+    let expected: Vec<(String, String)> = pairs(&[
+        ("http::GET::/health", &site(&module, "GET /health")),
+        ("http::GET::/api/v1", &site(&module, "GET /api/v1")),
+        (
+            "http::POST::/api/v1/items/{}",
+            &site(&module, "POST /api/v1/items/{}"),
+        ),
+        ("http::HEAD::/api/ping", &site(&module, "HEAD /api/ping")),
+        ("http::GET::/api/named", &site(&module, "GET /api/named")),
+        ("http::GET::/api/kw", &site(&module, "GET /api/kw")),
+        ("http::GET::/top", &site(&hidden, "Routing.top().GET /top")),
+        // A route after a local `val`, with and without a path (ADR 0017's scanner patch).
+        ("http::GET::/local", &site(locals, "GET /local")),
+        ("http::GET::/", &site(locals, "GET /")),
+        (
+            "http::GET::/cyc/loop",
+            &site(&hidden, "Route.again().GET /cyc/loop"),
+        ),
+        (
+            "http::DELETE::/api/admin/cache",
+            &site(&admin, "DELETE /api/admin/cache"),
+        ),
+        (
+            "http::GET::/api/admin/orders",
+            &site(orders, "GET /api/admin/orders"),
+        ),
+        (
+            "http::GET::/api/v1/orders",
+            &site(orders, "GET /api/admin/orders"),
+        ),
+        (
+            "http::PATCH::/api/admin/orders/{}",
+            &site(orders, "PATCH /api/admin/orders/{}"),
+        ),
+        (
+            "http::PATCH::/api/v1/orders/{}",
+            &site(orders, "PATCH /api/admin/orders/{}"),
+        ),
+    ]);
+    assert_eq!(actual, expected);
+    // A call in a handler belongs to the handler.
+    let calls = json["calls"].as_array().unwrap();
+    let call = |id: &str| calls.iter().find(|c| c["id"] == format!("{REPO}::{id}"));
+    let audit = format!("{module}.POST /api/v1/items/{{}}::(anonymous).audit#0");
+    let found = call(&audit).unwrap_or_else(|| panic!("no call {audit}"));
+    assert_eq!(found["target"], format!("{REPO}::{server}.audit()"));
+}
+
+/// Ktor client calls are consumers with their URLs folded: every verb and `request` with the
+/// method its block sets, a `defaultRequest` base joined in front, strings, templates, `+` and
+/// constants folded (a hole that does not fold is a parameter), a wrapper read at each of its
+/// call sites through two levels (a cycle adds none), and a path that cannot be evaluated left
+/// unresolved. A name Ktor's `get` shares with a repository class, a map, a hidden client or another
+/// library's client is no consumer.
+#[test]
+fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
+    let repo = fixture_repo("kotlin_ktor_client", "conformance-kotlin", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let (orders, billing, other, gateway) = (
+        "host:orders.example.com",
+        "host:billing.example.com",
+        "host:other.example.com",
+        "host:gateway.example.com",
+    );
+    let at = |function: &str, call: &str| {
+        format!("src/main/kotlin/example/clients/Client.kt::example.clients.{function}::{call}")
+    };
+    let wrapper = |function: &str, call: &str| {
+        format!("src/main/kotlin/example/clients/Wrappers.kt::example.clients.{function}::{call}")
+    };
+    let probe = |function: &str, call: &str| {
+        format!("src/main/kotlin/example/clients/Probes.kt::example.clients.{function}::{call}")
+    };
+    let file = |name: &str, function: &str, call: &str| {
+        format!("src/main/kotlin/example/clients/{name}.kt::example.clients.{function}::{call}")
+    };
+    let (star, local, shadow, legacy) = (
+        "host:star.example.com",
+        "host:local.example.com",
+        "host:shadow.example.com",
+        "host:legacy.example.com",
+    );
+    let expected = triples(&[
+        // Every verb, and `request` with the method its block sets.
+        ("http::GET::/orders", orders, &at("verbs()", "orders.get#0")),
+        (
+            "http::POST::/orders",
+            orders,
+            &at("verbs()", "orders.post#0"),
+        ),
+        (
+            "http::PUT::/orders/1",
+            orders,
+            &at("verbs()", "orders.put#0"),
+        ),
+        (
+            "http::PATCH::/orders/1",
+            orders,
+            &at("verbs()", "orders.patch#0"),
+        ),
+        (
+            "http::DELETE::/orders/1",
+            orders,
+            &at("verbs()", "orders.delete#0"),
+        ),
+        (
+            "http::HEAD::/orders/head",
+            orders,
+            &at("verbs()", "orders.head#0"),
+        ),
+        (
+            "http::OPTIONS::/orders/options",
+            orders,
+            &at("verbs()", "orders.options#0"),
+        ),
+        (
+            "http::PUT::/orders/request",
+            orders,
+            &at("verbs()", "orders.request#0"),
+        ),
+        (
+            "http::GET::/orders/default",
+            orders,
+            &at("verbs()", "orders.request#1"),
+        ),
+        // A `defaultRequest` base: joined, ignored by an absolute URL, folded from a template.
+        (
+            "http::GET::/api/invoices",
+            billing,
+            &at("based()", "billing.get#0"),
+        ),
+        (
+            "http::GET::/absolute",
+            other,
+            &at("based()", "billing.get#1"),
+        ),
+        (
+            "http::POST::/v2/things",
+            orders,
+            &at("based()", "versioned.post#0"),
+        ),
+        (
+            "http::GET::/health",
+            gateway,
+            &at("Gateway.health()", "client.get#0"),
+        ),
+        // Constants, templates and `+`; a hole that does not fold is a parameter.
+        ("http::GET::/users", orders, &at("folds()", "orders.get#0")),
+        (
+            "http::GET::/users/me",
+            orders,
+            &at("folds()", "orders.get#1"),
+        ),
+        ("http::GET::/items", orders, &at("folds()", "orders.get#2")),
+        (
+            "http::GET::/items/stock",
+            orders,
+            &at("folds()", "orders.get#3"),
+        ),
+        (
+            "http::GET::/users/{}/profile",
+            orders,
+            &at("folds()", "orders.get#4"),
+        ),
+        // A path that cannot be evaluated, a `var` and a `url { path(..) }` builder.
+        ("unresolved", "", &at("lookup()", "orders.get#0")),
+        ("unresolved", "", &at("reassigned()", "orders.get#0")),
+        ("unresolved", "", &at("builder()", "orders.get#0")),
+        // A client known by its written type alone.
+        (
+            "http::GET::/typed",
+            orders,
+            &probe("typed(HttpClient)", "client.get#0"),
+        ),
+        // A wrapper at the call site that determines it, through two levels (`order` reaches
+        // `fetch`); a cycle reads the entry alone; an uncalled one has a hole.
+        (
+            "http::GET::/orders/a1",
+            orders,
+            &wrapper("report()", "order#0"),
+        ),
+        (
+            "http::GET::/orders/b2",
+            orders,
+            &wrapper("report()", "order#1"),
+        ),
+        ("http::GET::/loop", orders, &wrapper("start()", "ping#0")),
+        (
+            "http::GET::/users/{}",
+            orders,
+            &wrapper("user(Int)", "orders.get#0"),
+        ),
+        // `HttpClient` and the request functions imported by `*`.
+        (
+            "http::GET::/one",
+            star,
+            &file("Star", "star()", "starred.get#0"),
+        ),
+        // A client a local holds with no type written, made by a call the walk finds, also as
+        // the receiver of `use`; each of two locals keeps its own configuration, and a local
+        // hides the client of the same name.
+        (
+            "http::GET::/untyped",
+            local,
+            &file("Local", "untyped()", "client.get#0"),
+        ),
+        (
+            "http::GET::/use",
+            local,
+            &file("Local", "closing()", "it.get#0"),
+        ),
+        (
+            "http::GET::/named/inner",
+            local,
+            &file("Local", "closingNamed()", "client.get#0"),
+        ),
+        (
+            "http::GET::/plain",
+            local,
+            &file("Local", "two()", "plain.get#0"),
+        ),
+        (
+            "http::GET::/api/items",
+            local,
+            &file("Local", "two()", "based.get#0"),
+        ),
+        (
+            "http::GET::/v9/x",
+            shadow,
+            &file("Local", "shadows()", "billing.get#0"),
+        ),
+        // A local `val` folds, an environment read through a fallback too; a `var` does not.
+        (
+            "http::GET::/env",
+            "env:LOCAL_URL",
+            &file("Local", "localBase()", "client.get#0"),
+        ),
+        (
+            "http::GET::/var-base",
+            "",
+            &file("Local", "varBase()", "(call_expression).get#0"),
+        ),
+        // A client read in a receiver's block is the receiver's, with no base.
+        (
+            "http::GET::/implicit",
+            "",
+            &file("Local", "implicitClient(Rack)", "outer.get#0"),
+        ),
+        // The method of a wrapper is substituted at each call site, whether the URL depends on
+        // the wrapper's parameters or not.
+        (
+            "http::DELETE::/users/1",
+            orders,
+            &file("Methods", "sends()", "send#0"),
+        ),
+        (
+            "http::POST::/users",
+            orders,
+            &file("Methods", "sends()", "send#1"),
+        ),
+        (
+            "http::PUT::/m1",
+            orders,
+            &file("Methods", "sendsFrom()", "sendFrom#0"),
+        ),
+        (
+            "http::PATCH::/api/m",
+            billing,
+            &file("Methods", "callsFixed()", "sendFixed#0"),
+        ),
+        // The block is the lambda argument wherever it is; `this.method` is the property.
+        (
+            "http::POST::/named",
+            orders,
+            &file("Methods", "named()", "orders.request#0"),
+        ),
+        (
+            "http::PUT::/block-named",
+            orders,
+            &file("Methods", "blockNamed()", "orders.request#0"),
+        ),
+        (
+            "http::PUT::/this",
+            orders,
+            &file("Methods", "thisPut()", "orders.request#0"),
+        ),
+        // A method Meada cannot read is unknown, never `GET`.
+        (
+            "unresolved",
+            orders,
+            &file(
+                "Methods",
+                "blockValue(HttpRequestBuilder.()->Unit)",
+                "orders.request#0",
+            ),
+        ),
+        (
+            "unresolved",
+            orders,
+            &file("Methods", "conditional(Boolean)", "orders.request#0"),
+        ),
+        (
+            "unresolved",
+            orders,
+            &file("Methods", "nested()", "orders.request#0"),
+        ),
+        (
+            "unresolved",
+            orders,
+            &file("Methods", "parsed()", "orders.request#0"),
+        ),
+        // Ktor 1's `defaultRequest`.
+        (
+            "http::GET::/v1/ping",
+            legacy,
+            &file("Legacy", "old()", "legacy.get#0"),
+        ),
+    ]);
+    assert_eq!(
+        consumers(&json, "src/main/kotlin/example/clients/"),
+        expected
+    );
+}
+
+/// Context lists the consumer a Ktor call that cannot be evaluated is, unresolved.
+#[test]
+fn kotlin_context_shows_an_unresolved_consumer() {
+    let repo = fixture_repo(
+        "kotlin_unresolved_consumer",
+        "conformance-kotlin",
+        Some(ORIGIN),
+    );
+    assert_golden(
+        "conformance-kotlin.context-unresolved.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .context("example.clients.lookup()", None)
+            .unwrap(),
+    );
+}
+
+/// Search finds an extension function by name.
+#[test]
+fn kotlin_search_finds_an_extension_function() {
+    let repo = fixture_repo(
+        "kotlin_search_extension",
+        "conformance-kotlin",
+        Some(ORIGIN),
+    );
+    assert_golden(
+        "conformance-kotlin.search-norm.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .search("norm", None, None)
+            .unwrap(),
+    );
+}
+
+/// Context lists a function's callers and callees.
+#[test]
+fn kotlin_context_lists_callers_and_callees() {
+    let repo = fixture_repo("kotlin_context_helper", "conformance-kotlin", Some(ORIGIN));
+    assert_golden(
+        "conformance-kotlin.context-helper.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .context("example.helper()", None)
+            .unwrap(),
+    );
+}
+
+/// Context lists a method's callers with their levels and reasons: typed receivers and scope
+/// functions exact, an untyped receiver a name match.
+#[test]
+fn kotlin_context_lists_callers_by_receiver_type() {
+    let repo = fixture_repo("kotlin_context_wipe", "conformance-kotlin", Some(ORIGIN));
+    assert_golden(
+        "conformance-kotlin.context-wipe.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .context("example.Cache.wipe()", None)
+            .unwrap(),
+    );
+}
+
+/// Tracked lambdas nested past the definition depth, and long `apply` chains, stay bounded.
+#[test]
+fn kotlin_hostile_scope_function_nesting_remains_bounded() {
+    let repo = fixture_repo("kotlin_scopes_depth", "conformance-kotlin", Some(ORIGIN));
+    let mut nested = String::from("package hostile\nclass Box { fun size() = 0 }\n");
+    nested.push_str("fun deep(box: Box) {\n");
+    for _ in 0..300 {
+        nested.push_str("box.apply {\n");
+    }
+    nested.push_str("size()\n");
+    nested.push_str(&"}\n".repeat(300));
+    nested.push_str("}\n");
+    let chain = format!(
+        "fun chain() {{ Box(){}.size() }}\n",
+        ".apply { }".repeat(300)
+    );
+    std::fs::write(repo.join("Nested.kt"), nested + &chain).unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let size: Vec<&Value> = (json["calls"].as_array().unwrap().iter())
+        .filter(|c| c["span"]["path"] == "Nested.kt")
+        .filter(|c| c["id"].as_str().unwrap().contains("::(anonymous).size#"))
+        .collect();
+    // The innermost call is past the depth where lambdas are scopes: a name match.
+    assert!(size.iter().any(|c| c["level"] == "inferred"), "{size:?}");
+}
+
+/// Thousands of `apply` lambdas on one class index in time linear in their number: a lambda's
+/// scope adds no members to its receiver's class, so no lookup of the class reads them all.
+#[test]
+fn kotlin_scope_functions_on_one_class_stay_linear_in_width() {
+    const WIDTH: usize = 4000;
+    let repo = fixture_repo("kotlin_scopes_width", "conformance-kotlin", Some(ORIGIN));
+    let mut wide = String::from("package wide\nclass Foo { fun size() = 0 }\n");
+    for i in 0..WIDTH {
+        wide.push_str(&format!(
+            "fun f{i}(foo: Foo) {{ foo.apply {{ size() }} }}\n"
+        ));
+    }
+    std::fs::write(repo.join("Wide.kt"), wide).unwrap();
+    let started = std::time::Instant::now();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let took = started.elapsed();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let exact = (json["calls"].as_array().unwrap().iter())
+        .filter(|c| c["span"]["path"] == "Wide.kt" && c["level"] == "exact")
+        .filter(|c| c["target"] == format!("{REPO}::Wide.kt::wide.Foo.size()"))
+        .count();
+    assert_eq!(exact, WIDTH);
+    // Quadratic work took 70 s here in debug; linear work, a few.
+    eprintln!("kotlin scope functions, {WIDTH} wide: {took:?}");
+    assert!(took < std::time::Duration::from_secs(30), "{took:?}");
+}
+
+/// A large file of nested lambdas (a Compose-like UI) is indexed: a lambda's scope costs the
+/// qualification budget where it is stored, not at every syntax node.
+#[test]
+fn kotlin_large_nested_lambda_file_stays_within_the_qualification_budget() {
+    let repo = fixture_repo("kotlin_compose", "conformance-kotlin", Some(ORIGIN));
+    // The review's generator (20 sections, 6 levels, about 1,100 lines): the base indexed it.
+    let (sections, depth) = (20, 6);
+    let mut ui = String::from(
+        "package com.example.feature.home.ui.screens.details\n\n\
+         import androidx.compose.runtime.Composable\n\n",
+    );
+    for f in 0..sections {
+        ui.push_str(&format!(
+            "@Composable\nfun DetailsSection{f}(viewModel: DetailsViewModel, \
+             onNavigate: (String) -> Unit, modifier: Modifier) {{\n"
+        ));
+        let column = "Column(modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp)\
+                      .fillMaxWidth()) {\n";
+        ui.push_str(&column.repeat(depth));
+        for i in 0..20 {
+            ui.push_str(&format!(
+                "Text(text = stringResource(R.string.title_{i}), style = \
+                 MaterialTheme.typography.titleLarge, maxLines = 2, modifier = \
+                 Modifier.padding(top = 4.dp))\n\
+                 Button(onClick = {{ viewModel.onEvent(DetailsEvent.Clicked({i})); \
+                 onNavigate(\"route/{i}\") }}) {{ Text(\"go {i}\") }}\n"
+            ));
+        }
+        ui.push_str(&"}\n".repeat(depth + 1));
+    }
+    std::fs::write(repo.join("Ui.kt"), ui).unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let found = (json["symbols"].as_array().unwrap().iter())
+        .filter(|s| s["id"].as_str().unwrap().contains("Ui.kt::"))
+        .filter(|s| s["id"].as_str().unwrap().contains(".DetailsSection"))
+        .count();
+    assert_eq!(found, sections);
+}
+
+/// Ktor `route` blocks nest as deep as prefixes are read. Past the depth where lambdas are
+/// scopes, a route and a routing extension function are served nowhere, never under part of
+/// their prefix, and many calls deep in the blocks index in bounded time.
+#[test]
+fn kotlin_ktor_deep_route_nesting_remains_bounded() {
+    let repo = fixture_repo("kotlin_ktor_depth", "conformance-kotlin", Some(ORIGIN));
+    let head = "package deep\nimport example.ktor.adminRoutes\n\
+                import io.ktor.server.application.Application\nimport io.ktor.server.routing.*\n";
+    let nested = |name: &str, segment: &str, depth: usize, inner: &str| {
+        let mut src = format!("{head}fun Application.{name}() {{\nrouting {{\n");
+        src.push_str(&format!("route(\"/{segment}\") {{\n").repeat(depth));
+        src.push_str(inner);
+        src.push_str(&"}\n".repeat(depth + 2));
+        src
+    };
+    let deep = nested("deep", "a", 40, "get(\"/x\") { }\n");
+    std::fs::write(repo.join("Deep.kt"), deep).unwrap();
+    let past = nested("past", "b", 300, "get(\"/y\") { }\nadminRoutes()\n");
+    std::fs::write(repo.join("Past.kt"), past).unwrap();
+    let started = std::time::Instant::now();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let took = started.elapsed();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let routes: Vec<&str> = (json["providers"].as_array().unwrap().iter())
+        .map(|p| p["contract"].as_str().unwrap())
+        .filter(|c| c.contains("/a/") || c.contains("/b/") || c.contains("/cache"))
+        .collect();
+    let a = format!("http::GET::{}/x", "/a".repeat(40));
+    assert_eq!(routes, ["http::DELETE::/api/admin/cache", a.as_str()]);
+    eprintln!("kotlin ktor routes, 300 deep: {took:?}");
+    assert!(took < std::time::Duration::from_secs(30), "{took:?}");
+}
+
+#[test]
+fn kotlin_hostile_definition_value_and_member_depths_remain_bounded() {
+    let repo = fixture_repo("kotlin_depths", "conformance-kotlin", Some(ORIGIN));
+    let mut deep = String::from("package hostile\nclass Deep { fun ping() {}\n");
+    for n in 0..132 {
+        deep.push_str(&format!("class Inner{n} {{\n"));
+    }
+    deep.push_str("fun ping() {}\nfun leaf() { ping(); this.ping(); missing() }\n");
+    deep.push_str(&"}\n".repeat(133));
+    std::fs::write(repo.join("Deep.kt"), deep).unwrap();
+    let expression = format!("{}\"value\"{}", "(".repeat(1024), ")".repeat(1024));
+    let member = format!("root{}.send()", ".part".repeat(300));
+    let values = format!("package hostile\nval V = {expression}\nfun run() {{ {member} }}\n");
+    std::fs::write(repo.join("Values.kt"), values).unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let definitions = json["symbols"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|s| s["span"]["path"] == "Deep.kt")
+        .count();
+    assert_eq!(definitions, 129);
+    assert!(
+        json["calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|c| c["span"]["path"] == "Deep.kt")
+            .all(|c| c["level"] != "exact")
+    );
+    assert!(
+        json["calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["span"]["path"] == "Values.kt" && c["target"].is_null())
+    );
+}
+
+#[test]
+fn kotlin_qualification_expansion_discards_the_whole_file_and_keeps_other_files() {
+    let repo = fixture_repo(
+        "kotlin_qualification_budget",
+        "conformance-kotlin",
+        Some(ORIGIN),
+    );
+    let package = format!("p{}", "a".repeat(4096));
+    let mut source =
+        format!("package {package}\nobject Expanded {{\nfun overloaded(value: String) {{}}\n");
+    for n in 0..600 {
+        source.push_str(&format!("fun method{n}() {{}}\n"));
+    }
+    source.push_str("fun overloaded(value: Int) {}\n}\n");
+    std::fs::write(repo.join("Expanded.kt"), source).unwrap();
+    let caller = format!(
+        "package example\nimport {package}.Expanded\nfun budget() {{ Expanded.overloaded(\"value\") }}\n"
+    );
+    std::fs::write(repo.join("Budget.kt"), caller).unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let symbols = json["symbols"].as_array().unwrap();
+    assert!(symbols.iter().all(|s| s["span"]["path"] != "Expanded.kt"));
+    assert!(
+        symbols
+            .iter()
+            .any(|s| s["id"].as_str().unwrap().ends_with("example.budget()"))
+    );
+    let called = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["caller"].as_str().unwrap().ends_with("example.budget()"))
         .unwrap();
     assert!(called["target"].is_null());
     assert!(called["level"].is_null());

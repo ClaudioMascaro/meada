@@ -16,6 +16,58 @@ const ORIGIN: Option<&str> = Some("https://example.com/acme/conformance.git");
 const WEB: Option<&str> = Some("https://example.com/acme/web.git");
 
 #[test]
+fn kotlin_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
+    let edit = |repo: &Path| {
+        let path = repo.join("src/main/kotlin/example/util/Tools.kt");
+        let before = fs::read_to_string(&path).unwrap();
+        fs::write(
+            &path,
+            before.replace("fun tool(): Int", "fun tool(count: Int): Int"),
+        )
+        .unwrap();
+        let script = repo.join("scripts/seed.kts");
+        let before = fs::read_to_string(&script).unwrap();
+        fs::write(
+            &script,
+            before.replace("seed()\n", "seed()\nexample.same()\n"),
+        )
+        .unwrap();
+        fs::write(
+            repo.join("Extra.kt"),
+            "package example\n\nfun extra(): Int = helper()\n",
+        )
+        .unwrap();
+        fs::write(repo.join("extra.kts"), "example.helper()\n").unwrap();
+        fs::remove_file(repo.join("src/main/kotlin/example/Same.kt")).unwrap();
+    };
+    let repo = fixture_repo("fresh_kotlin", "conformance-kotlin", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_kotlin_cold", "conformance-kotlin", ORIGIN, edit)
+    );
+    // The edited overload takes one argument now: `tool()` no longer fits it.
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    let called = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| {
+            c["id"]
+                .as_str()
+                .unwrap()
+                .ends_with("example.calls.imported()::tool#0")
+        })
+        .unwrap();
+    assert!(called["target"].is_null());
+}
+
+#[test]
 fn java_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
     let edit = |repo: &Path| {
         let path = repo.join("maven/api/src/main/java/example/util/Tools.java");
@@ -1170,6 +1222,105 @@ fn a_refreshed_java_cross_language_pair_exports_what_a_cold_pair_does() {
 #[test]
 fn an_edited_spring_configuration_alone_refreshes_the_java_consumers() {
     let (_, api) = common::xlang_java("fresh_xlang_java_config");
+    age(&api);
+    let before = Engine::open(&api).unwrap().export().unwrap();
+    let properties = "src/main/resources/application.properties";
+    edit_file(
+        &api,
+        properties,
+        "web.url=${WEB_URL}",
+        "web.url=${SITE_URL}",
+    );
+
+    let refreshed = Engine::open(&api).unwrap().export().unwrap();
+
+    assert!(before.contains("\"via\": \"env:WEB_URL\""));
+    assert!(refreshed.contains("\"via\": \"env:SITE_URL\""));
+}
+
+/// Edits, adds and deletes `.kt` and Spring configuration files of the Kotlin api: a placeholder's
+/// default goes, the YAML file that gave a constructor property its literal URL goes (its key
+/// now names a variable), a module appears with a client and a configuration of its own, a
+/// `@Value` key changes, and the file with the environment read goes.
+fn edit_xlang_kotlin((_, api): &(PathBuf, PathBuf)) {
+    let kotlin = "src/main/kotlin/com/example/api";
+    edit_file(
+        api,
+        "src/main/resources/application.properties",
+        "${AUDIT_URL:https://web.example.com/api}",
+        "${AUDIT_URL}",
+    );
+    fs::remove_file(api.join("src/main/resources/application.yml")).unwrap();
+    edit_file(
+        api,
+        &format!("{kotlin}/PromotionClient.kt"),
+        "${PROMO_URL:http://promotions.internal/v2}",
+        "${web.url}",
+    );
+    fs::remove_file(api.join(format!("{kotlin}/ReportClient.kt"))).unwrap();
+    let tools = api.join("tools/src/main");
+    fs::create_dir_all(tools.join("resources")).unwrap();
+    fs::create_dir_all(tools.join("kotlin/com/example/tools")).unwrap();
+    fs::write(
+        tools.join("resources/application.properties"),
+        "tool.url=https://web.example.com/api\n",
+    )
+    .unwrap();
+    fs::write(
+        tools.join("kotlin/com/example/tools/ToolClient.kt"),
+        "package com.example.tools\n\n\
+         import io.ktor.client.HttpClient\n\
+         import io.ktor.client.engine.cio.CIO\n\
+         import io.ktor.client.request.get\n\
+         import org.springframework.beans.factory.annotation.Value\n\n\
+         class ToolClient {\n\
+         \x20   @Value(\"\\${tool.url}\")\n\
+         \x20   private lateinit var toolUrl: String\n\
+         \x20   private val client = HttpClient(CIO)\n\n\
+         \x20   suspend fun level() {\n\
+         \x20       client.get(\"$toolUrl/stock\")\n\
+         \x20   }\n\
+         }\n",
+    )
+    .unwrap();
+}
+
+#[test]
+fn a_refreshed_kotlin_cross_language_pair_exports_what_a_cold_pair_does() {
+    let exports = |(web, api): &(PathBuf, PathBuf)| -> Vec<String> {
+        [web, api]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = common::xlang_kotlin("fresh_xlang_kotlin");
+    [&repos.0, &repos.1].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_xlang_kotlin(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = common::xlang_kotlin("fresh_xlang_kotlin_cold");
+    edit_xlang_kotlin(&cold);
+    assert_eq!(refreshed, exports(&cold));
+    assert_ne!(refreshed[1], before[1]);
+    // The default left the configuration, the literal with its file, and the new module's
+    // configuration gives its client a host.
+    assert!(before[1].contains("\"contract\": \"http::POST::/api/audit\""));
+    assert!(!before[1].contains("env:AUDIT_URL"));
+    assert!(refreshed[1].contains("\"via\": \"env:AUDIT_URL\""));
+    assert!(!refreshed[1].contains("\"contract\": \"http::POST::/api/audit\""));
+    assert!(refreshed[1].contains("\"env:stock.url\""));
+    assert!(refreshed[1].contains("tools/src/main/kotlin/com/example/tools/ToolClient.kt"));
+    assert!(!refreshed[1].contains("ReportClient.kt"));
+    let tool = "\"contract\": \"http::GET::/api/stock\",\n      \"site\": \"example.com/xlang-kotlin/api::tools/";
+    assert!(refreshed[1].contains(tool), "{}", refreshed[1]);
+}
+
+/// A Spring configuration edited alone, with no `.kt` file changed, refreshes the contracts.
+#[test]
+fn an_edited_spring_configuration_alone_refreshes_the_kotlin_consumers() {
+    let (_, api) = common::xlang_kotlin("fresh_xlang_kotlin_config");
     age(&api);
     let before = Engine::open(&api).unwrap().export().unwrap();
     let properties = "src/main/resources/application.properties";

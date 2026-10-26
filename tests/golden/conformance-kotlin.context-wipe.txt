@@ -1,0 +1,13 @@
+example.com/acme/conformance src/main/kotlin/example/Receivers.kt:25-25 example.Cache.wipe()
+community: src/main/kotlin/example#11
+processes: 4 (4 export; 1 repository): example.called() (example.com/acme/conformance), example.nestedIt(Cache,List<Disk>) (example.com/acme/conformance), example.parameter(Cache,Store,Disk) (example.com/acme/conformance), example.scopes(Cache,Disk,Store) (example.com/acme/conformance)
+fun wipe() {}
+callers:
+example.com/acme/conformance src/main/kotlin/example/Receivers.kt:38 example.Disk
+example.com/acme/conformance src/main/kotlin/example/Receivers.kt:46 example.Disk.flush()
+example.com/acme/conformance src/main/kotlin/example/Receivers.kt:48 example.Disk.flush() [inferred: one method named wipe]
+example.com/acme/conformance src/main/kotlin/example/Receivers.kt:63 example.parameter(Cache,Store,Disk)
+example.com/acme/conformance src/main/kotlin/example/Receivers.kt:96 example.scopes(Cache,Disk,Store)
+example.com/acme/conformance src/main/kotlin/example/Receivers.kt:104 example.scopes(Cache,Disk,Store) [inferred: one method named wipe]
+example.com/acme/conformance src/main/kotlin/example/Receivers.kt:172 example.called() [inferred: one method named wipe]
+callees: none

@@ -234,6 +234,23 @@ fn java_programs_are_found_as_processes() {
 }
 
 #[test]
+fn kotlin_programs_are_found_as_processes() {
+    let repo = fixture_repo(
+        "search_kotlin_programs",
+        "conformance-kotlin",
+        Some("https://example.com/acme/conformance.git"),
+    );
+    // Only the top-level `fun main` starts a program, not `Runner.main()`.
+    assert_golden(
+        "conformance-kotlin.search-process-main.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .search("main", Some("process"), None)
+            .unwrap(),
+    );
+}
+
+#[test]
 fn go_programs_are_found_as_processes() {
     let repo = fixture_repo(
         "context_go_programs",

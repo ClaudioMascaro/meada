@@ -12,6 +12,7 @@ use crate::Result;
 
 pub mod go;
 pub mod java;
+pub mod kotlin;
 pub mod python;
 pub mod rust;
 pub mod ts;
@@ -19,6 +20,20 @@ pub mod ts;
 pub trait LanguagePack {
     /// The file extensions the pack parses, without the dot.
     fn extensions(&self) -> &'static [&'static str];
+
+    /// Whether a file with one of the pack's extensions is code the pack parses: Kotlin's Gradle
+    /// build scripts (`build.gradle.kts`, `settings.gradle.kts`) are manifests, which the
+    /// package ecosystems read instead.
+    fn is_code(&self, _path: &str) -> bool {
+        true
+    }
+
+    /// The pack whose resolution takes this pack's files too, when it is another one: Kotlin's
+    /// files resolve with Java's, in one `Resolver` and one `Code` under that pack's `layout`
+    /// and flags, so calls between them resolve by fully qualified name (`resolver_of`).
+    fn resolves_with(&self) -> Option<&'static dyn LanguagePack> {
+        None
+    }
 
     /// What one file defines, imports, exports and calls. `path` is repository-relative.
     fn parse(&self, path: &str, src: &[u8]) -> Result<Facts>;
@@ -110,6 +125,13 @@ pub trait LanguagePack {
         &[]
     }
 
+    /// Whether a member call of the pack's files may reach an extension function
+    /// (`Facts::extensions`) in scope of its file where no member answers it (Kotlin): those its
+    /// explicit imports bring, then those of its package, then those of its star imports.
+    fn extension_functions(&self) -> bool {
+        false
+    }
+
     /// Whether a method call that no function of the repository answers may hand back the
     /// value it was called on, as a builder does (`Router::new().route(..)` in Rust):
     /// `Code::origins` then follows the call's `receiver`, to a constructor whose outside name
@@ -190,6 +212,7 @@ const PACKS: &[&dyn LanguagePack] = &[
     &rust::Rust,
     &go::Go,
     &java::Java,
+    &kotlin::Kotlin,
 ];
 
 /// The index of the pack that parses `path`, if any.
@@ -198,6 +221,15 @@ pub fn pack_for(path: &str) -> Option<usize> {
     PACKS
         .iter()
         .position(|p| p.extensions().contains(&extension))
+        .filter(|&pack| PACKS[pack].is_code(path))
+}
+
+/// The index of the pack whose `Resolver` takes the files of the pack `index`: its own, or the
+/// one it resolves with (`LanguagePack::resolves_with`). Extensions name one pack each.
+pub fn resolver_of(index: usize) -> usize {
+    (PACKS[index].resolves_with())
+        .and_then(|with| (PACKS.iter()).position(|p| p.extensions() == with.extensions()))
+        .unwrap_or(index)
 }
 
 pub fn pack(index: usize) -> &'static dyn LanguagePack {
@@ -272,6 +304,12 @@ pub struct Facts {
     /// the shared side looks a member of the type up in each block too.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub impls: Vec<Impl>,
+    /// The blocks of a type's extension functions (Kotlin's `fun String.shout()`), one per
+    /// receiver type and scope written in: their definitions (`scope.<name>`) are no members of
+    /// the type. A call of the pack (`LanguagePack::extension_functions`) on a receiver no
+    /// member answers reaches those its file has in scope.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub extensions: Vec<Impl>,
     /// Names a path of the file begins with that nothing in it binds: the crates outside the
     /// file (Rust's extern prelude). They resolve after every import and glob: to another crate
     /// of the repository by its name, else to something outside it.
@@ -312,9 +350,22 @@ pub struct Facts {
     /// Not kept in the index (see `Call::args`).
     #[serde(skip)]
     pub annotated: Vec<Annotated>,
+    /// The value each Kotlin local, or the parameter of a tracked lambda, was given, where no
+    /// constant records it: the call a `val` holds, the receiver `use` passes on. Not kept in
+    /// the index (see `Call::args`).
+    #[serde(skip)]
+    pub bound: Vec<Bound>,
     /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,
+}
+
+/// The value a name bound in `scope` holds, written in `within` (`Facts::bound`).
+pub struct Bound {
+    pub scope: String,
+    pub within: String,
+    pub name: String,
+    pub value: Value,
 }
 
 /// An annotation written on a field or a parameter: the binding it marks and the annotation as
@@ -584,8 +635,11 @@ pub enum Binds {
     Any,
     /// Only a keyword argument: a Python parameter after `*` or `*args`.
     Keyword,
-    /// No single argument: Python's `*args` and `**kwargs`.
+    /// No single argument: Python's `*args` and `**kwargs`, Kotlin's `vararg`.
     Rest,
+    /// A positional or a keyword argument that a call may leave out: a Kotlin parameter with a
+    /// default value. The argument counts an overload takes (`Resolver::narrow`) allow for it.
+    Optional,
     /// The receiver of a method (`self`): a call on an instance binds it, so its positional
     /// arguments start at the next parameter; a call on the class passes it first.
     Instance,

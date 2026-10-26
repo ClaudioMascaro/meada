@@ -1414,6 +1414,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "blake3",
+ "cc",
  "clap",
  "futures",
  "http-body-util",
@@ -1444,6 +1445,7 @@ dependencies = [
  "tree-sitter-go",
  "tree-sitter-java",
  "tree-sitter-javascript",
+ "tree-sitter-language",
  "tree-sitter-python",
  "tree-sitter-rust",
  "tree-sitter-typescript",

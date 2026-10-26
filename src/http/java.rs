@@ -7,6 +7,7 @@
 //! repository with the same name hides it), and a path folds `static final` constants and `+`
 //! through `Code::value`. `@RequestMapping` without `method` serves every method (`ANY`).
 //! `server.servlet.context-path` is not applied.
+//! Kotlin controllers (#97) are read the same way: the Kotlin pack gives the same facts.
 //! The consumers are `clients.rs`'s and `declarative.rs`'s.
 
 mod clients;
@@ -15,9 +16,11 @@ mod declarative;
 use super::{ANY, METHODS, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
-use crate::jvm::names::{is_method, java_files, known, one, typed};
-use crate::lang::{Call, Value};
-use crate::resolve::{Code, Follow, Of, passes_nothing};
+use crate::jvm::names::{
+    LOCAL_DEPTH, array_of, is_method, java_files, jvm_files, known, one, typed,
+};
+use crate::lang::{Bound, Call, Value};
+use crate::resolve::{Code, Expand, Follow, Inject, Of, passes_nothing};
 
 const WEB: &str = "org.springframework.web.bind.annotation.";
 const CONTROLLERS: &[&str] = &[
@@ -51,7 +54,7 @@ pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
 /// Spring MVC providers: see the module.
 pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
     let mut found = Vec::new();
-    for (path, facts) in java_files(code) {
+    for (path, facts) in jvm_files(code) {
         // What Spring annotation a call is, by its name outside the repository.
         let spring = |call: &'a Call| -> Option<String> {
             known(code, path, &call.scope, &call.callee, annotation)
@@ -232,6 +235,17 @@ fn made<'a>(
     ty: &str,
     makes: impl Fn(&Code<'a>, &'a str, usize) -> bool,
 ) -> bool {
+    reach(code, (path, scope), client, ty, &makes, 0)
+}
+
+fn reach<'a>(
+    code: &Code<'a>,
+    (path, scope): (&'a str, &'a str),
+    client: &'a Value,
+    ty: &str,
+    makes: &impl Fn(&Code<'a>, &'a str, usize) -> bool,
+    depth: usize,
+) -> bool {
     match client {
         Value::Ref(name) => {
             if one(&typed(code, path, scope, name), |t| t == ty).is_some() {
@@ -241,7 +255,16 @@ fn made<'a>(
                 passes: passes_nothing,
             };
             let origins = code.origins(path, scope, Of::Name(name), follow);
-            (origins.iter().filter_map(|o| o.call)).any(|(at, i)| makes(code, at, i))
+            if (origins.iter().filter_map(|o| o.call)).any(|(at, i)| makes(code, at, i)) {
+                return true;
+            }
+            // A local the source writes no type of holds what the pack recorded for it (Kotlin).
+            match code.local(path, scope, name) {
+                Some(Bound { within, value, .. }) if depth < LOCAL_DEPTH => {
+                    reach(code, (path, within), value, ty, makes, depth + 1)
+                }
+                _ => false,
+            }
         }
         Value::Call(inner) => code
             .call_index(path, &inner.range)
@@ -250,23 +273,61 @@ fn made<'a>(
     }
 }
 
+/// What the local `client` (a name the source writes no type for) holds, folded where it is made:
+/// the chain `WebClient.create(..)` or `Retrofit.Builder()...build()` it is bound to, whose base
+/// a reader joins. `None` for anything but a name bound to exactly one call (Kotlin's
+/// `Facts::bound`, so never in Java) and for a call a wrapper's callers fold to several values.
+fn folded_local<'a>(
+    code: &Code<'a>,
+    (path, scope): (&'a str, &'a str),
+    client: &'a Value,
+    inject: Option<&Inject<'a, '_>>,
+) -> Option<Value> {
+    let (mut scope, mut client) = (scope, client);
+    for _ in 0..LOCAL_DEPTH {
+        let Value::Ref(name) = client else { break };
+        let Bound { within, value, .. } = code.local(path, scope, name)?;
+        (scope, client) = (within, value);
+    }
+    let Value::Call(made) = client else {
+        return None;
+    };
+    let at = code.call_index(path, &made.range)?;
+    let read = |values: &[Value], _: &[(String, Value)]| match values {
+        [call @ Value::Call(_)] => Some(call.clone()),
+        _ => None,
+    };
+    let mut folded = code.expand_with(Expand::Chain(path, at), inject, &read);
+    match folded.len() {
+        1 => folded.pop().map(|f| f.found),
+        _ => None,
+    }
+}
+
 /// The paths of a mapping annotation: one of the elements `keys` names (Spring's `value` or
-/// `path`), or the one unnamed argument, a string or an array of them, constants folded; the
-/// root when it gives none. `None` when it gives two, or a value that is no list of strings; a
-/// path that cannot be read yields none.
+/// `path`), or the unnamed arguments (one string or array, or Kotlin's several, which fill the
+/// `value` array), constants folded; the root when it gives none. `None` when it gives two
+/// kinds, or a value that is no list of strings; a path that cannot be read yields none.
 fn paths<'a>(code: &Code<'a>, file: &'a str, call: &'a Call, keys: &[&str]) -> Option<Vec<String>> {
     let given: Vec<&Value> = (call.args.iter())
         .chain(keys.iter().filter_map(|k| call.keyword(k)))
         .collect();
-    let value = match given.as_slice() {
+    let fold = |v: &'a Value| code.value(file, &call.scope, v);
+    let items: Vec<Value> = match given.as_slice() {
         [] => return Some(vec![String::new()]),
-        [one] => code.value(file, &call.scope, one),
+        [one] => match array_of(code, file, &call.scope, one) {
+            Some(elements) => elements.iter().map(fold).collect(),
+            None => match fold(one) {
+                Value::List(items) => items,
+                one => return path_literal(one).map(|p| vec![p]),
+            },
+        },
+        several if call.args.len() == several.len() => several.iter().map(|v| fold(v)).collect(),
         _ => return None,
     };
-    match value {
-        Value::List(items) if items.is_empty() => Some(vec![String::new()]),
-        Value::List(items) => Some(items.into_iter().filter_map(path_literal).collect()),
-        one => path_literal(one).map(|p| vec![p]),
+    match items.is_empty() {
+        true => Some(vec![String::new()]),
+        false => Some(items.into_iter().filter_map(path_literal).collect()),
     }
 }
 
@@ -282,12 +343,17 @@ fn request_methods<'a>(code: &Code<'a>, file: &'a str, call: &'a Call) -> Option
         let spelled = known(code, file, &call.scope, name, member)?;
         member_of(&spelled, REQUEST_METHOD).map(str::to_string)
     };
-    let methods: Vec<String> = match call.keyword("method") {
-        None => return Some(vec![ANY.into()]),
-        Some(Value::List(items)) => items.iter().filter_map(member).collect(),
-        Some(one) => member(one).into_iter().collect(),
+    let listed: Option<&[Value]> = match call.keyword("method") {
+        Some(Value::List(items)) => Some(items),
+        Some(one) => array_of(code, file, &call.scope, one),
+        None => None,
     };
-    let empty = matches!(call.keyword("method"), Some(Value::List(items)) if items.is_empty());
+    let methods: Vec<String> = match (call.keyword("method"), listed) {
+        (None, _) => return Some(vec![ANY.into()]),
+        (_, Some(items)) => items.iter().filter_map(member).collect(),
+        (Some(one), None) => member(one).into_iter().collect(),
+    };
+    let empty = listed.is_some_and(<[Value]>::is_empty);
     match (methods.is_empty(), empty) {
         (true, true) => Some(vec![ANY.into()]),
         (true, false) => None,
@@ -524,6 +590,148 @@ mod tests {
             "@RequestMapping(value = {\"/a\", Api.NOT_A_CONSTANT}, method = {RequestMethod.GET, Missing.X}) void f() {}",
         );
         assert_eq!(found, ["http::GET::/a"]);
+    }
+
+    const KOTLIN_IMPORTS: &str = "import org.springframework.web.bind.annotation.GetMapping\n\
+        import org.springframework.web.bind.annotation.RequestMapping\n\
+        import org.springframework.web.bind.annotation.RequestMethod\n\
+        import org.springframework.web.bind.annotation.RestController\n";
+
+    /// The contracts of the Spring providers of Kotlin controllers: `body` after `imports` in
+    /// `a/C.kt`, with other files of the repository (`(path, source)`), which Java's resolver
+    /// reads with the Java ones.
+    fn served_kotlin(imports: &str, body: &str, others: &[(&str, &str)]) -> Vec<String> {
+        use crate::lang::kotlin::Kotlin;
+        let src = format!("package a\n{imports}\n{body}\n");
+        let mut parsed = vec![("a/C.kt", Kotlin.parse("a/C.kt", src.as_bytes()).unwrap())];
+        for (path, source) in others {
+            let facts = match path.ends_with(".kt") {
+                true => Kotlin.parse(path, source.as_bytes()),
+                false => Java.parse(path, source.as_bytes()),
+            };
+            parsed.push((path, facts.unwrap()));
+        }
+        let files: BTreeMap<&str, &_> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let layout = Java.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
+        let code = Code::new(&resolver, &files, &Java);
+        let mut found: Vec<String> = (providers(&code).into_iter())
+            .filter_map(|f| f.contract)
+            .collect();
+        found.sort();
+        found
+    }
+
+    #[test]
+    fn a_kotlin_controller_reads_arrays_methods_and_every_method() {
+        let body = "@RestController @RequestMapping([\"/a\", \"/b\"]) class C {\n\
+            @GetMapping(\"/x/{id}\") fun f() {}\n\
+            @RequestMapping(path = [\"/y\"], method = [RequestMethod.GET, RequestMethod.HEAD]) fun g() {}\n\
+            @RequestMapping(\"/z\") fun h() {}\n}";
+        assert_eq!(
+            served_kotlin(KOTLIN_IMPORTS, body, &[]),
+            [
+                "http::ANY::/a/z",
+                "http::ANY::/b/z",
+                "http::GET::/a/x/{}",
+                "http::GET::/a/y",
+                "http::GET::/b/x/{}",
+                "http::GET::/b/y",
+                "http::HEAD::/a/y",
+                "http::HEAD::/b/y",
+            ]
+        );
+    }
+
+    #[test]
+    fn kotlin_paths_fold_constants_of_the_class_its_companion_and_other_files() {
+        let others = [
+            (
+                "a/Api.kt",
+                "package a\nconst val BASE = \"/api\"\nobject Api { const val ITEM = \"/{id}\" }",
+            ),
+            (
+                "a/Paths.java",
+                "package a; class Paths { static final String JAVA = \"/java\"; }",
+            ),
+        ];
+        let body = "@RestController @RequestMapping(BASE + \"/v1\") class C {\n\
+            companion object {\n const val FLAG = \"/flag\"\n }\n\
+            @GetMapping(Api.ITEM + FLAG) fun f() {}\n\
+            @GetMapping(path = [Paths.JAVA, \"/\" + \"lit\"]) fun g() {}\n}";
+        assert_eq!(
+            served_kotlin(KOTLIN_IMPORTS, body, &others),
+            [
+                "http::GET::/api/v1/java",
+                "http::GET::/api/v1/lit",
+                "http::GET::/api/v1/{}/flag",
+            ]
+        );
+    }
+
+    #[test]
+    fn a_kotlin_star_import_from_spring_binds_its_annotations_and_enum() {
+        let imports = "import org.springframework.web.bind.annotation.*\n";
+        let body = "@RestController class C {\n\
+            @GetMapping(\"/x\") fun f() {}\n\
+            @RequestMapping(\"/y\", method = [RequestMethod.PUT]) fun g() {}\n}";
+        assert_eq!(
+            served_kotlin(imports, body, &[]),
+            ["http::GET::/x", "http::PUT::/y"]
+        );
+        // A type of the package hides the star import's name.
+        let own = [("a/GetMapping.kt", "package a\nannotation class GetMapping")];
+        assert_eq!(served_kotlin(imports, body, &own), ["http::PUT::/y"]);
+    }
+
+    #[test]
+    fn kotlin_several_paths_and_array_of_fill_the_arrays() {
+        let body = "@RestController @RequestMapping(\"/p\", \"/q\") class C {\n\
+            @GetMapping(\"/a\", \"/b\") fun f() {}\n\
+            @PostMapping(value = arrayOf(\"/c\")) fun g() {}\n\
+            @RequestMapping(\"/d\", method = arrayOf(RequestMethod.PUT)) fun h() {}\n\
+            @RequestMapping(\"/e\", method = arrayOf()) fun i() {}\n}";
+        let imports =
+            format!("{KOTLIN_IMPORTS}import org.springframework.web.bind.annotation.PostMapping\n");
+        let found = served_kotlin(&imports, body, &[]);
+        let wanted = |m: &str, route: &str| ["/p", "/q"].map(|p| format!("http::{m}::{p}{route}"));
+        let mut expected: Vec<String> = [
+            ("GET", "/a"),
+            ("GET", "/b"),
+            ("POST", "/c"),
+            ("PUT", "/d"),
+            ("ANY", "/e"),
+        ]
+        .iter()
+        .flat_map(|(m, r)| wanted(m, r))
+        .collect();
+        expected.sort();
+        assert_eq!(found, expected);
+        // Two kinds of argument, or an `arrayOf` of the repository, serve nothing.
+        let mixed = "@RestController class C { @GetMapping(\"/a\", path = [\"/b\"]) fun f() {} }";
+        assert!(served_kotlin(KOTLIN_IMPORTS, mixed, &[]).is_empty());
+        let own = [(
+            "a/Own.kt",
+            "package a\nfun arrayOf(vararg s: String): Array<String> = emptyArray()",
+        )];
+        let hidden = "@RestController class C { @GetMapping(arrayOf(\"/a\")) fun f() {} }";
+        assert!(served_kotlin(KOTLIN_IMPORTS, hidden, &own).is_empty());
+        let plain = "@RestController class C { @GetMapping(arrayOf(\"/a\")) fun f() {} }";
+        assert_eq!(served_kotlin(KOTLIN_IMPORTS, plain, &[]), ["http::GET::/a"]);
+    }
+
+    #[test]
+    fn a_kotlin_name_of_the_repository_hides_springs() {
+        let own = [(
+            "a/GetMapping.kt",
+            "package a\nannotation class GetMapping(val value: String)",
+        )];
+        let imports = KOTLIN_IMPORTS.replace(
+            "import org.springframework.web.bind.annotation.GetMapping\n",
+            "",
+        );
+        let body = "@RestController class C { @GetMapping(\"/x\") fun f() {} }";
+        assert!(served_kotlin(&imports, body, &own).is_empty());
     }
 
     const JAXRS: &str = "import javax.ws.rs.GET;\nimport javax.ws.rs.Path;\n";

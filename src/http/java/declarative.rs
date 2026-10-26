@@ -23,16 +23,17 @@
 // kept as written.
 
 use super::{
-    MAPPING, MAPPING_PATHS, balanced, jax_rs_annotation, made, mapping, paths, request_methods,
-    shortcut,
+    MAPPING, MAPPING_PATHS, balanced, folded_local, jax_rs_annotation, made, mapping, paths,
+    request_methods, shortcut,
 };
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
-use crate::jvm::names::{is_method, java_files, known, one, spellings};
+use crate::jvm::names::{is_method, java_files, jvm_files, known, kotlin, one, spellings};
 use crate::jvm::spring::{self, Configs};
-use crate::lang::{Call, Facts, Invocation, Part, Value, literal};
+use crate::lang::kotlin::TYPE_ARGUMENT;
+use crate::lang::{Annotated, Call, Facts, Invocation, Part, Value, literal};
 use crate::resolve::Code;
-use crate::resolve::{Expand, method as member};
+use crate::resolve::{Expand, Inject, method as member};
 use std::cell::OnceCell;
 use std::collections::BTreeMap;
 
@@ -64,7 +65,7 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
             &mut found,
         );
     }
-    retrofit_clients(code, &mut found);
+    retrofit_clients(code, (&configs, indexed), &mut found);
     found
 }
 
@@ -229,6 +230,8 @@ fn schemed(mut url: Vec<Part>) -> Vec<Part> {
 const RETROFIT: &str = "retrofit2.Retrofit";
 const RETROFIT_BUILDER: &str = "retrofit2.Retrofit.Builder";
 const RETROFIT_HTTP: &str = "retrofit2.http.";
+/// Kotlin's extension `inline fun <reified T> Retrofit.create(): T`.
+const RETROFIT_CREATE: &str = "retrofit2.create";
 
 /// The verb of Retrofit's annotation `spelled`.
 fn retrofit_verb(spelled: &str) -> Option<&str> {
@@ -247,9 +250,13 @@ struct Endpoint<'a> {
 type Interface<'a> = (&'a str, &'a str);
 
 /// The consumers of the Retrofit interfaces of the repository, one per base each is created with.
-fn retrofit_clients<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
+fn retrofit_clients<'a>(
+    code: &Code<'a>,
+    (configs, indexed): (&OnceCell<Configs>, &Indexed),
+    found: &mut Vec<Found>,
+) {
     let mut interfaces: BTreeMap<Interface, Vec<Endpoint>> = BTreeMap::new();
-    for (path, facts) in java_files(code) {
+    for (path, facts) in jvm_files(code) {
         if facts.interfaces.is_empty() {
             continue;
         }
@@ -298,7 +305,7 @@ fn retrofit_clients<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
     }
     // The bases each interface is created with: `retrofit.create(Api.class)`.
     let mut bases: BTreeMap<Interface, Vec<Vec<Part>>> = BTreeMap::new();
-    for (path, facts) in java_files(code) {
+    for (path, facts) in jvm_files(code) {
         if interfaces.is_empty() {
             break;
         }
@@ -309,8 +316,16 @@ fn retrofit_clients<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
             let Some(call) = code.call(path, n) else {
                 continue;
             };
-            let [Value::Member(ty, class)] = call.args.as_slice() else {
-                continue;
+            // `retrofit.create(Api::class.java)`, or the extension `retrofit2.create<Api>()`.
+            let (ty, class) = match (call.args.as_slice(), call.keyword(TYPE_ARGUMENT)) {
+                ([Value::Member(ty, class)], _) => (ty, class),
+                ([], Some(Value::Member(ty, class)))
+                    if known(code, path, &call.scope, "create", |s| s == RETROFIT_CREATE)
+                        .is_some() =>
+                {
+                    (ty, class)
+                }
+                _ => continue,
             };
             let made = code.definition(path, &call.scope, ty);
             let Some(key) = made
@@ -319,18 +334,28 @@ fn retrofit_clients<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
             else {
                 continue;
             };
+            // Kotlin's `@Value` bases come from the module's configuration. Java's Retrofit
+            // bases stay as they were read before: an injected one is not read.
+            let inject = |code: &Code<'a>, path: &'a str, annotated: &'a Annotated| {
+                let configs =
+                    configs.get_or_init(|| Configs::read(indexed.configs, indexed.manifests));
+                spring::inject(configs, code, path, annotated)
+            };
+            let inject: Option<&Inject> = kotlin(path).then_some(&inject);
             let client = code.receiver(path, n);
             if class != "class" || !client.is_some_and(|c| is_retrofit(code, path, &call.scope, c))
             {
                 continue;
             }
+            // A Retrofit held by a local with no written type: its value, where it is made.
+            let held = client.and_then(|c| folded_local(code, (path, &call.scope), c, inject));
             // A base a wrapper's caller passes is read at each caller (`None` climbs).
             let read = |values: &[Value], _: &[(String, Value)]| match values {
-                [Value::Call(create)] => Some(base(create)).filter(|b| !has_ref(b)),
+                [Value::Call(create)] => Some(base(create, held.as_ref())).filter(|b| !has_ref(b)),
                 _ => None,
             };
             let entry = bases.entry(key).or_default();
-            for base in code.expand(Expand::Chain(path, n), &read) {
+            for base in code.expand_with(Expand::Chain(path, n), inject, &read) {
                 if !entry.contains(&base.found) {
                     entry.push(base.found);
                 }
@@ -375,7 +400,7 @@ fn is_retrofit<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, client: &'a V
 }
 
 /// Whether the call at `index` of `path` is the `build()` of a chain that starts at
-/// `new Retrofit.Builder()`.
+/// `new Retrofit.Builder()` (Kotlin: `Retrofit.Builder()`).
 fn builds<'a>(code: &Code<'a>, path: &'a str, index: usize) -> bool {
     let Some(chain) = code.chain(path, index) else {
         return false;
@@ -386,11 +411,13 @@ fn builds<'a>(code: &Code<'a>, path: &'a str, index: usize) -> bool {
     let Some(first) = code.call(path, start) else {
         return false;
     };
-    let Some(Value::New(ty, _)) = code.receiver(path, start) else {
-        return false;
+    // Java writes `new Retrofit.Builder()`; Kotlin calls the constructor, the chain's first call.
+    let written = match code.receiver(path, start) {
+        Some(Value::New(ty, _)) => ty,
+        _ => &first.callee,
     };
     member(&top.callee) == "build"
-        && one(&spellings(code, path, &first.scope, ty), |s| {
+        && one(&spellings(code, path, &first.scope, written), |s| {
             s == RETROFIT_BUILDER
         })
         .is_some()
@@ -403,13 +430,22 @@ fn has_ref(parts: &[Part]) -> bool {
 /// The base URL of a folded `create(..)`: the outermost `baseUrl(base)` of the builder chain
 /// its Retrofit is made by; a parameter a wrapper's caller passes stays one, and a chain not
 /// read has an unknown base.
-fn base(create: &Invocation) -> Vec<Part> {
-    let (mut set, mut at) = (None, create.receiver.as_deref());
+fn base(create: &Invocation, held: Option<&Value>) -> Vec<Part> {
+    // A Retrofit held by a local: the value it is bound to stands for it.
+    let receiver = match (create.receiver.as_deref(), held) {
+        (Some(Value::Unknown), Some(held)) => Some(held),
+        (receiver, _) => receiver,
+    };
+    let (mut set, mut at) = (None, receiver);
     while let Some(Value::Call(step)) = at {
         if set.is_none() && member(&step.callee) == "baseUrl" {
             set = step.args.first();
         }
-        at = step.receiver.as_deref();
+        // Kotlin's `Retrofit.Builder()` starts the chain: its receiver is the class.
+        at = match member(&step.callee) {
+            "Builder" => None,
+            _ => step.receiver.as_deref(),
+        };
     }
     match (set, at) {
         (Some(Value::Str(parts)), _) => parts.clone(),

@@ -28,6 +28,93 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Kotlin source indexing (issue #95): `.kt` and `.kts` files (Gradle's `build.gradle.kts` and
+  `settings.gradle.kts` stay manifests) yield package-qualified classes, interfaces, objects,
+  companions (`Class.Companion` when unnamed), top-level and extension functions, properties
+  with getters and methods, with written parameter types. Single, aliased and star imports
+  resolve through package declarations; bare, `this`, object and companion calls are `exact`
+  when the argument count, counting default values and `vararg`, leaves one function. An
+  extension function is never a member of the class it extends, even written in that class's
+  file: a member of the class or of a base wins, and a Java call never reaches it. A call on a
+  class's name reaches its companion's member before an instance member of the same name. A call on
+  `x!!` or `x?.` is a call on `x`, of the type `x` is declared with. Kotlin and
+  Java files of one repository call each other by fully qualified name. No Kotlin compiler, JDK
+  or Gradle is involved.
+
+- Ktor server providers (issue #98): routes inside `routing { }` (`get`, `post`, `put`, `patch`,
+  `delete`, `head`, `options`, with a path or none, and `route(path, HttpMethod.X)`) serve the
+  prefix of every enclosing `route(prefix) { }` block, through extension functions on `Route` or
+  `Routing` called inside a block, in any file and once per prefix they are called under. Each
+  route's lambda is its handler, named for the route. Ktor names count only with Ktor's import;
+  type-safe routing is not read. A Kotlin lambda passed as an argument, and a function declared
+  inside one, is now a scope of its own.
+- Ktor client consumers (issue #99): `get`, `post`, `put`, `patch`, `delete`, `head`, `options`
+  and `request(url) { method = HttpMethod.X }` on an `HttpClient` are HTTP consumers, with a
+  `defaultRequest { url(base) }` of the client as the base of its relative URLs. String
+  templates (`"$base/users/${id}"`), `+`, `const val` and properties fold, also from other
+  files, and a hole that does not fold is a parameter; a function that wraps the client is read
+  at each of its call sites, the URL and the method (`method = m`, `this.method = m`) it takes
+  from its parameters substituted there, and a call whose URL or method cannot be evaluated is an
+  unresolved consumer, never a `GET` guessed. The client may be imported by `*` or held by an
+  untyped local `val` (`HttpClient(CIO).use { it.get(..) }` too). `url { path(..) }` builders are
+  not read.
+- Kotlin imports into provider sources (issue #106): an import of a class, a top-level function
+  or an extension function from a workspace artifact the repository depends on reaches the
+  declaration in the provider by its `package` declaration, so `context` on a public declaration
+  lists its consumers in other repositories and `trace` follows the hop. `exact` when one
+  provider declares the package and declaration, `ambiguous` when several do or overloads of the
+  argument count remain; the reason ends `; import package`. A class name called constructs the
+  class, a call on a class's name reaches its companion before its members (an instance's call,
+  the member first), and an extension function crosses only through the import of its name,
+  never as a member of the class it extends: a member of the receiver's type with the name wins,
+  and the link is `exact` when the type the source writes for the receiver is a class of the
+  provider's package whose members are all known and one extension of that class fits,
+  `inferred` on any other receiver. A call that may leave a default argument out or fills a
+  `vararg` reaches every overload it could, so the index stores the functions with a variable
+  argument count (the `flexible` table, a new stored format). The source roots gain
+  `src/main/kotlin` and `src/test/kotlin`, and the Gradle scanner reads the `kotlin` directory
+  set, `sourceSets["main"]` and `getByName("test")` alongside the `java` forms: a Kotlin set is
+  main when named `main` or `*Main`, test when named `test` or `*Test`, and any other is not
+  read. A named companion and `setSrcDirs` are not followed.
+- Kotlin base URLs from Spring configuration and the environment (issue #100): the Ktor client
+  reads a base a property or a constructor property gets from Spring's `@Value("\${key}")` (the
+  `$` escaped in a Kotlin string) in the `application.properties` or `application.yml` of its
+  module, also in a repository with no Java file, with the Java rules: a literal URL links by
+  host, a `${VAR}` placeholder maps through `base_url_env`, and a default whose host a peer
+  serves links by host. `System.getenv("X")` and `System.getenv()["X"]`, through `?:`
+  fallbacks, `!!` and string methods such as `trimEnd` and `removeSuffix`, are the base URL
+  variable `X`, also through a local `val` of the function (`val base = System.getenv("X") ?:
+  ".."`), which folds where it is written as TypeScript's `const` does. A cross-language fixture links TypeScript and Ktor in both directions.
+- Kotlin HTTP consumers (issue #101): `RestTemplate`, `WebClient`, OkHttp and Retrofit are read
+  in Kotlin files with the Java rules, written the Kotlin way: no `new`, a `RestTemplate()` or
+  `Request.Builder()` constructor call, `HttpMethod` and `HttpUrl` imports by `*`, and
+  `Api::class.java` as the Retrofit service. A Retrofit interface with annotated `fun`s links
+  each function to its provider, and a Kotlin base comes from a literal, `@Value` or
+  `System.getenv` with the rules of issue #100. A client held by a property, a constructor
+  property or a local `val` is followed (`val x = RestTemplate()`, `val web =
+  WebClient.create(..)`, `val retrofit = Retrofit.Builder()...build()`), and the base comes from
+  the call that made it. The extension `retrofit.create<Api>()` (with `import retrofit2.create`)
+  creates the interface as `create(Api::class.java)` does. A named argument on a nested builder
+  step and an OkHttp builder held by a local are not read. A cross-language fixture calls the
+  TypeScript provider through a Retrofit interface.
+- Kotlin channels (issue #104): Spring Kafka, Spring AMQP, JMS, AWS SDK v2 SQS, jnats, Jedis
+  and Lettuce clients are read in Kotlin files with the Java rules, written the Kotlin way:
+  named arguments (`topics = [..]`, `queues = arrayOf(..)`), a nested annotation written without
+  `@` (`QueueBinding(..)`, `TopicPartition(..)`), `Queue("q")` without `new`, `const val` and
+  companion constants, a constructor-injected template, `@Value` and `${key}` placeholders
+  through Spring configuration, and `mapOf("id" to id)` as a Redis stream map. The default
+  exchange reaches the queue named by its key (`exact`) and a wildcard NATS subject is
+  `inferred`. A name that cannot be evaluated is an unresolved producer or consumer. A
+  trailing-lambda post-processor (`convertAndSend("x") { m -> m }`) is an untold overload, as
+  Java's lambda: its producer is unresolved. A message built in the call (`Order("1")`) picks
+  the overload as Java's `new` does. In `with`, `run`, `apply` and extension function blocks, a
+  member of the implicit receiver hides the property of the class around and a top-level
+  property, after the parameters and locals of the code around, for channel and HTTP clients,
+  call resolution and folded values alike; a client read in the block of a receiver whose type is
+  outside the repository is unknown. A call on the receiver itself (an extension function on the client, `apply`,
+  `with`) is not read. A cross-language fixture produces a topic in TypeScript
+  and consumes it in a Kotlin `@KafkaListener`, and `trace` down from the producer reaches the
+  handler.
 - Java OpenFeign and Retrofit clients (issue #90): each method of an `@FeignClient(name, url)`
   interface with Spring mapping annotations, or of a Retrofit interface with `retrofit2.http`
   verbs, is an HTTP consumer sited at the interface method, so a caller of the method reaches

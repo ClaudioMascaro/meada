@@ -1,0 +1,16 @@
+group = "dev.kt.core"
+version = "3.1"
+
+dependencies {
+    api(project(":util"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+}
+
+sourceSets {
+    named("test") {
+        kotlin.srcDir("src/check/kotlin")
+    }
+}
+
+// A main source set nested in the test root: its files are not test sources.
+sourceSets["main"].kotlin.srcDir("src/test/kotlin/shared")

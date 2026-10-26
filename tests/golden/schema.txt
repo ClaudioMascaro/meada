@@ -27,6 +27,7 @@ CREATE TABLE manifests (
 );
 CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
 CREATE TABLE families (path TEXT NOT NULL, class TEXT NOT NULL, ancestors TEXT);
+CREATE TABLE flexible (path TEXT NOT NULL, name TEXT NOT NULL, least INTEGER NOT NULL, most INTEGER);
 CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL, site TEXT NOT NULL);
 CREATE TABLE communities (name TEXT NOT NULL, member TEXT NOT NULL);
 
@@ -1549,6 +1550,380 @@ sample.java
   "package": "example"
 }
 
+sample.kt
+{
+  "defs": [
+    {
+      "name": "example.Store",
+      "kind": "Class",
+      "range": {
+        "start": 49,
+        "end": 215
+      },
+      "params": [
+        {
+          "name": "name",
+          "binds": "Optional"
+        }
+      ],
+      "bases": [
+        "Store.Companion"
+      ]
+    },
+    {
+      "name": "example.Store.save(Int,vararg String)",
+      "kind": "Method",
+      "range": {
+        "start": 95,
+        "end": 147
+      },
+      "params": [
+        {
+          "name": "id",
+          "binds": "Any"
+        },
+        {
+          "name": "tags",
+          "binds": "Rest"
+        }
+      ]
+    },
+    {
+      "name": "example.Store.Companion",
+      "kind": "Class",
+      "range": {
+        "start": 153,
+        "end": 213
+      },
+      "params": []
+    },
+    {
+      "name": "example.Store.Companion.open()",
+      "kind": "Method",
+      "range": {
+        "start": 180,
+        "end": 207
+      },
+      "params": []
+    },
+    {
+      "name": "example.helper()",
+      "kind": "Function",
+      "range": {
+        "start": 217,
+        "end": 260
+      },
+      "params": []
+    }
+  ],
+  "overloads": {
+    "example.Store": [
+      "example.Store"
+    ],
+    "example.Store.Companion.open": [
+      "example.Store.Companion.open()"
+    ],
+    "example.Store.save": [
+      "example.Store.save(Int,vararg String)"
+    ],
+    "example.helper": [
+      "example.helper()"
+    ]
+  },
+  "imports": [
+    {
+      "local": "@glob0",
+      "source": "java.lang",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob0",
+          "inside": false,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "@glob2",
+      "source": "kotlin",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob2",
+          "inside": false,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "@glob4",
+      "source": "kotlin.annotation",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob4",
+          "inside": false,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "@glob6",
+      "source": "kotlin.collections",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob6",
+          "inside": false,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "@glob8",
+      "source": "kotlin.comparisons",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob8",
+          "inside": false,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "@glob10",
+      "source": "kotlin.io",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob10",
+          "inside": false,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "@glob12",
+      "source": "kotlin.jvm",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob12",
+          "inside": false,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "@glob14",
+      "source": "kotlin.ranges",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob14",
+          "inside": false,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "@glob16",
+      "source": "kotlin.sequences",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob16",
+          "inside": false,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "@glob18",
+      "source": "kotlin.text",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob18",
+          "inside": false,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "T",
+      "source": "example.util.Tools",
+      "name": "Qualified"
+    },
+    {
+      "local": "@glob21",
+      "source": "example",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob21",
+          "inside": true,
+          "public": false
+        }
+      }
+    }
+  ],
+  "exports": [
+    {
+      "Local": {
+        "exported": "Store",
+        "local": "example.Store"
+      }
+    },
+    {
+      "Local": {
+        "exported": "example.Store",
+        "local": "example.Store"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Store.Companion",
+        "local": "example.Store.Companion"
+      }
+    },
+    {
+      "Local": {
+        "exported": "example.Store.Companion",
+        "local": "example.Store.Companion"
+      }
+    },
+    {
+      "Local": {
+        "exported": "helper",
+        "local": "example.helper"
+      }
+    },
+    {
+      "Local": {
+        "exported": "example.helper",
+        "local": "example.helper"
+      }
+    }
+  ],
+  "star": {
+    "Only": [
+      "Store",
+      "example.Store",
+      "Store.Companion",
+      "example.Store.Companion"
+    ]
+  },
+  "calls": [
+    {
+      "scope": "example.Store.save(Int,vararg String)",
+      "callee": "T.check",
+      "arity": 1,
+      "range": {
+        "start": 136,
+        "end": 147
+      }
+    },
+    {
+      "scope": "example.Store.Companion.open()",
+      "callee": "Store",
+      "arity": 0,
+      "range": {
+        "start": 200,
+        "end": 207
+      },
+      "by_path": true
+    },
+    {
+      "scope": "example.helper()",
+      "callee": "Store.open",
+      "arity": 0,
+      "range": {
+        "start": 248,
+        "end": 260
+      }
+    }
+  ],
+  "consts": [
+    {
+      "name": "example.Store.name"
+    }
+  ],
+  "receivers": [
+    {
+      "scope": "example.Store",
+      "name": "name",
+      "class": {
+        "Type": "String"
+      }
+    },
+    {
+      "scope": "example.Store.save(Int,vararg String)",
+      "name": "id",
+      "class": {
+        "Type": "Int"
+      }
+    }
+  ],
+  "externs": [
+    "Int",
+    "String"
+  ],
+  "private": [
+    "helper",
+    "example.helper"
+  ],
+  "hidden": [
+    "example.helper"
+  ],
+  "package": "example"
+}
+
 sample.openapi.yaml
 {
   "format": "openapi",
@@ -1810,10 +2185,13 @@ sample.pom.xml
   ],
   "roots": [
     "src/main/java",
-    "src/test/java"
+    "src/main/kotlin",
+    "src/test/java",
+    "src/test/kotlin"
   ],
   "test_roots": [
-    "src/test/java"
+    "src/test/java",
+    "src/test/kotlin"
   ]
 }
 
@@ -1838,10 +2216,13 @@ sample.build.gradle.kts
   ],
   "roots": [
     "src/main/java",
-    "src/test/java"
+    "src/main/kotlin",
+    "src/test/java",
+    "src/test/kotlin"
   ],
   "test_roots": [
-    "src/test/java"
+    "src/test/java",
+    "src/test/kotlin"
   ]
 }
 

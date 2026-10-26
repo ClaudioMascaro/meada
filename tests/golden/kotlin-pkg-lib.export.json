@@ -1,0 +1,1136 @@
+{
+  "repository": "example.com/kotlin/lib",
+  "files": [
+    {
+      "path": "core/loose/dev/kt/core/Loose.kt",
+      "hash": "e478d4bb426ca56f131d916ceb7f63162bc716939a6c222198af0036375f7476"
+    },
+    {
+      "path": "core/src/check/kotlin/dev/kt/core/Checks.kt",
+      "hash": "dc290608819f934a19098cfa7144795a2b9b8ce4177c359853da74dc3677168b"
+    },
+    {
+      "path": "core/src/main/kotlin/dev/kt/core/Box.kt",
+      "hash": "83c765dee4819a956ce354eb10a7da5663d235ee4f93093c2695928b3caab662"
+    },
+    {
+      "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
+      "hash": "ad522280191977f87506c66fbbaec5021f703a92577358566d8f89759b8e204c"
+    },
+    {
+      "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
+      "hash": "45f933771543eb5dc48bff86e06ceb55b38c0cf1d2629179a8f3656850571da2"
+    },
+    {
+      "path": "core/src/main/kotlin/dev/kt/core/MoneyExt.kt",
+      "hash": "4d1694521cc0ce072153c5215f3f9f5a301e58fa4b7ade766fa1589bdf952c90"
+    },
+    {
+      "path": "core/src/main/kotlin/dev/kt/other/Other.kt",
+      "hash": "87a1215ecb0d6b7bfed0352d4b373d17b210c57e3734481da17b2e28139e10da"
+    },
+    {
+      "path": "core/src/test/kotlin/dev/kt/core/Samples.kt",
+      "hash": "c1e9f28c17b98851f8973922ad7fedee0f77dfb22777b430b7407115505e667b"
+    },
+    {
+      "path": "core/src/test/kotlin/shared/dev/kt/core/Extras.kt",
+      "hash": "f6a15d704123f28e16692675758193cb51ef713e7fb23dad7d70b6155b4a43d0"
+    },
+    {
+      "path": "src/main/kotlin/dev/kt/shared/Shared.kt",
+      "hash": "15540c266f1762282574bd2d5d2f8296be56ba0f5ca8d9fc6e4803c2b111e08d"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/kotlin/lib::core/loose/dev/kt/core/Loose.kt::dev.kt.core.loose()",
+      "span": {
+        "path": "core/loose/dev/kt/core/Loose.kt",
+        "start": 21,
+        "end": 50
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/check/kotlin/dev/kt/core/Checks.kt::dev.kt.core.checked()",
+      "span": {
+        "path": "core/src/check/kotlin/dev/kt/core/Checks.kt",
+        "start": 21,
+        "end": 52
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Box.kt",
+        "start": 21,
+        "end": 146
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.Companion",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Box.kt",
+        "start": 83,
+        "end": 144
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.Companion.of(Int)",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Box.kt",
+        "start": 110,
+        "end": 138
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.of(Int)",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Box.kt",
+        "start": 49,
+        "end": 77
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.String.shout()",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
+        "start": 164,
+        "end": 210
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String)",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
+        "start": 21,
+        "end": 70
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String,Int)",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
+        "start": 72,
+        "end": 162
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.hidden()",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
+        "start": 241,
+        "end": 283
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.many(vararg String)",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
+        "start": 446,
+        "end": 494
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.pick(Int,Int)",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
+        "start": 360,
+        "end": 401
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.pick(String)",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
+        "start": 403,
+        "end": 444
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.probe()",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
+        "start": 212,
+        "end": 239
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
+        "start": 21,
+        "end": 224
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.Companion",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
+        "start": 149,
+        "end": 222
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.Companion.of(Int)",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
+        "start": 176,
+        "end": 216
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.format()",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
+        "start": 226,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.plus(Money)",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
+        "start": 55,
+        "end": 113
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.stamp()",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
+        "start": 277,
+        "end": 310
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.total()",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
+        "start": 119,
+        "end": 143
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Money.label()",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/MoneyExt.kt",
+        "start": 208,
+        "end": 243
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Money.total()",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/MoneyExt.kt",
+        "start": 284,
+        "end": 310
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Thing.render()",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/MoneyExt.kt",
+        "start": 245,
+        "end": 282
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/other/Other.kt::dev.kt.other.String.shout()",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/other/Other.kt",
+        "start": 22,
+        "end": 55
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/test/kotlin/dev/kt/core/Samples.kt::dev.kt.core.sample()",
+      "span": {
+        "path": "core/src/test/kotlin/dev/kt/core/Samples.kt",
+        "start": 21,
+        "end": 51
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/test/kotlin/shared/dev/kt/core/Extras.kt::dev.kt.core.extras()",
+      "span": {
+        "path": "core/src/test/kotlin/shared/dev/kt/core/Extras.kt",
+        "start": 21,
+        "end": 51
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp",
+      "span": {
+        "path": "src/main/kotlin/dev/kt/shared/Shared.kt",
+        "start": 23,
+        "end": 73
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()",
+      "span": {
+        "path": "src/main/kotlin/dev/kt/shared/Shared.kt",
+        "start": 42,
+        "end": 71
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()",
+      "span": {
+        "path": "src/main/kotlin/dev/kt/shared/Shared.kt",
+        "start": 75,
+        "end": 110
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/kotlin/lib::core/loose/dev/kt/core/Loose.kt::dev.kt.core.loose()::Money#0",
+      "caller": "example.com/kotlin/lib::core/loose/dev/kt/core/Loose.kt::dev.kt.core.loose()",
+      "target": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money",
+      "level": "exact",
+      "span": {
+        "path": "core/loose/dev/kt/core/Loose.kt",
+        "start": 42,
+        "end": 50
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/check/kotlin/dev/kt/core/Checks.kt::dev.kt.core.checked()::Money#0",
+      "caller": "example.com/kotlin/lib::core/src/check/kotlin/dev/kt/core/Checks.kt::dev.kt.core.checked()",
+      "target": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money",
+      "level": "exact",
+      "span": {
+        "path": "core/src/check/kotlin/dev/kt/core/Checks.kt",
+        "start": 44,
+        "end": 52
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.Companion.of(Int)::Box#0",
+      "caller": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.Companion.of(Int)",
+      "target": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box",
+      "level": "exact",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Box.kt",
+        "start": 132,
+        "end": 138
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.of(Int)::Box#0",
+      "caller": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.of(Int)",
+      "target": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box",
+      "level": "exact",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Box.kt",
+        "start": 71,
+        "end": 77
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.String.shout()::uppercase#0",
+      "caller": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.String.shout()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
+        "start": 193,
+        "end": 204
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String,Int)::(anonymous).greet#0",
+      "caller": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String,Int)",
+      "target": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String)",
+      "level": "inferred",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
+        "start": 149,
+        "end": 160
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String,Int)::(expression).joinToString#0",
+      "caller": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String,Int)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
+        "start": 118,
+        "end": 162
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.Companion.of(Int)::Money#0",
+      "caller": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.Companion.of(Int)",
+      "target": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money",
+      "level": "exact",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
+        "start": 204,
+        "end": 216
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.format()::greet#0",
+      "caller": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.format()",
+      "target": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String)",
+      "level": "exact",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
+        "start": 255,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.format()::total#0",
+      "caller": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.format()",
+      "target": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.total()",
+      "level": "exact",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
+        "start": 267,
+        "end": 274
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.plus(Money)::Money#0",
+      "caller": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.plus(Money)",
+      "target": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money",
+      "level": "exact",
+      "span": {
+        "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
+        "start": 87,
+        "end": 113
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/test/kotlin/dev/kt/core/Samples.kt::dev.kt.core.sample()::Money#0",
+      "caller": "example.com/kotlin/lib::core/src/test/kotlin/dev/kt/core/Samples.kt::dev.kt.core.sample()",
+      "target": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money",
+      "level": "exact",
+      "span": {
+        "path": "core/src/test/kotlin/dev/kt/core/Samples.kt",
+        "start": 43,
+        "end": 51
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::core/src/test/kotlin/shared/dev/kt/core/Extras.kt::dev.kt.core.extras()::Money#0",
+      "caller": "example.com/kotlin/lib::core/src/test/kotlin/shared/dev/kt/core/Extras.kt::dev.kt.core.extras()",
+      "target": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money",
+      "level": "exact",
+      "span": {
+        "path": "core/src/test/kotlin/shared/dev/kt/core/Extras.kt",
+        "start": 43,
+        "end": 51
+      }
+    },
+    {
+      "id": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()::Stamp.now#0",
+      "caller": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()",
+      "target": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/dev/kt/shared/Shared.kt",
+        "start": 99,
+        "end": 110
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::maven::dev.kt.core:core",
+      "site": "example.com/kotlin/lib::core/build.gradle.kts"
+    },
+    {
+      "contract": "package::maven::dev.kt.http:client",
+      "site": "example.com/kotlin/lib::http/client/build.gradle.kts"
+    },
+    {
+      "contract": "package::maven::dev.kt:toolbox",
+      "site": "example.com/kotlin/lib::build.gradle.kts"
+    },
+    {
+      "contract": "package::maven::dev.kt:util",
+      "site": "example.com/kotlin/lib::util/build.gradle.kts"
+    }
+  ],
+  "consumers": [],
+  "packages": [
+    {
+      "name": "dev.kt.core:core",
+      "version": "3.1",
+      "repository": "example.com/kotlin/lib",
+      "directory": "core",
+      "ecosystem": "maven"
+    },
+    {
+      "name": "dev.kt.http:client",
+      "version": "3.1",
+      "repository": "example.com/kotlin/lib",
+      "directory": "http/client",
+      "ecosystem": "maven"
+    },
+    {
+      "name": "dev.kt:toolbox",
+      "version": "3.1",
+      "repository": "example.com/kotlin/lib",
+      "directory": ".",
+      "ecosystem": "maven"
+    },
+    {
+      "name": "dev.kt:util",
+      "version": "3.1",
+      "repository": "example.com/kotlin/lib",
+      "directory": "util",
+      "ecosystem": "maven"
+    }
+  ],
+  "communities": [
+    {
+      "name": "core/src/main/kotlin/dev/kt/core",
+      "members": [
+        "example.com/kotlin/lib::core/loose/dev/kt/core/Loose.kt::dev.kt.core.loose()",
+        "example.com/kotlin/lib::core/src/check/kotlin/dev/kt/core/Checks.kt::dev.kt.core.checked()",
+        "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money",
+        "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.Companion.of(Int)",
+        "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.plus(Money)",
+        "example.com/kotlin/lib::core/src/test/kotlin/dev/kt/core/Samples.kt::dev.kt.core.sample()",
+        "example.com/kotlin/lib::core/src/test/kotlin/shared/dev/kt/core/Extras.kt::dev.kt.core.extras()"
+      ]
+    },
+    {
+      "name": "core/src/main/kotlin/dev/kt/core#2",
+      "members": [
+        "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box",
+        "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.Companion.of(Int)",
+        "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.of(Int)"
+      ]
+    },
+    {
+      "name": "core/src/main/kotlin/dev/kt/core#3",
+      "members": [
+        "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String)",
+        "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String,Int)",
+        "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.format()",
+        "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.total()"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/dev/kt/shared",
+      "members": [
+        "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()",
+        "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::api::dev.kt.core:core",
+      "provider": "example.com/kotlin/lib::core/build.gradle.kts",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::api::dev.kt:toolbox",
+      "provider": "example.com/kotlin/lib::build.gradle.kts",
+      "contract": "package::maven::dev.kt:toolbox",
+      "level": "exact",
+      "reason": "package::maven::dev.kt:toolbox 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::compileOnly::dev.kt.http:client",
+      "provider": "example.com/kotlin/lib::http/client/build.gradle.kts",
+      "contract": "package::maven::dev.kt.http:client",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.http:client 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::implementation::dev.kt:*",
+      "provider": "example.com/kotlin/lib::build.gradle.kts",
+      "contract": "package::maven::dev.kt:*",
+      "level": "ambiguous",
+      "reason": "2 providers fit; computed coordinate; package::maven::dev.kt:* 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::implementation::dev.kt:*",
+      "provider": "example.com/kotlin/lib::util/build.gradle.kts",
+      "contract": "package::maven::dev.kt:*",
+      "level": "ambiguous",
+      "reason": "2 providers fit; computed coordinate; package::maven::dev.kt:* 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::implementation::dev.kt:toolbox",
+      "provider": "example.com/kotlin/lib::build.gradle.kts",
+      "contract": "package::maven::dev.kt:toolbox",
+      "level": "exact",
+      "reason": "package::maven::dev.kt:toolbox 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::runtimeOnly::dev.kt:util",
+      "provider": "example.com/kotlin/lib::util/build.gradle.kts",
+      "contract": "package::maven::dev.kt:util",
+      "level": "exact",
+      "reason": "package::maven::dev.kt:util none (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::testCompileOnly::dev.kt.core:core",
+      "provider": "example.com/kotlin/lib::core/build.gradle.kts",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::testImplementation::dev.kt:toolbox",
+      "provider": "example.com/kotlin/lib::build.gradle.kts",
+      "contract": "package::maven::dev.kt:toolbox",
+      "level": "exact",
+      "reason": "package::maven::dev.kt:toolbox 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::testRuntimeOnly::dev.kt.http:client",
+      "provider": "example.com/kotlin/lib::http/client/build.gradle.kts",
+      "contract": "package::maven::dev.kt.http:client",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.http:client 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Bulk.kt::dev.shop.bulk()::Money.of#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.Companion.of(Int)",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Bulk.kt::dev.shop.bulk()::greet#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String)",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Bulk.kt::dev.shop.loudly(String)::name.shout#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.String.shout()",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "inferred",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Ext.kt::dev.shop.counted(Money)::money.total#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.total()",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Ext.kt::dev.shop.defaults()::pick#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.pick(Int,Int)",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "ambiguous",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Ext.kt::dev.shop.defaults()::pick#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.pick(String)",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "ambiguous",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Ext.kt::dev.shop.drawn(Thing)::thing.render#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Thing.render()",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "inferred",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Ext.kt::dev.shop.every()::pick#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.pick(Int,Int)",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Ext.kt::dev.shop.labelled(Money)::money.label#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Money.label()",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Ext.kt::dev.shop.shouted(String)::text.shout#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.String.shout()",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "inferred",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Ext.kt::dev.shop.varargs()::many#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.many(vararg String)",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Ext.kt::dev.shop.viaClass()::Box.of#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.Companion.of(Int)",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Ext.kt::dev.shop.viaInstance(Box)::box.of#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.of(Int)",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.aliased()::Cash.of#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.Companion.of(Int)",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.hello()::greet#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String)",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.hello()::greet#1",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String,Int)",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.loosely()::loose#0",
+      "provider": "example.com/kotlin/lib::core/loose/dev/kt/core/Loose.kt::dev.kt.core.loose()",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.loud(String)::name.shout#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.String.shout()",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "inferred",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.pay(Int)::Money#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.pay(Int)::Money.of#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.Companion.of(Int)",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.pay(Int)::doubled.format#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.format()",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.pay(Int)::order.plus#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.plus(Money)",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.pay(Int)::order.total#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.total()",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.reached()::extras#0",
+      "provider": "example.com/kotlin/lib::core/src/test/kotlin/shared/dev/kt/core/Extras.kt::dev.kt.core.extras()",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.stamp()::Stamp.now#0",
+      "provider": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()",
+      "contract": "package::maven::dev.kt:*",
+      "level": "ambiguous",
+      "reason": "2 providers fit; computed coordinate; package::maven::dev.kt:* 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.stamp()::Stamp.now#0",
+      "provider": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()",
+      "contract": "package::maven::dev.kt:toolbox",
+      "level": "ambiguous",
+      "reason": "package::maven::dev.kt:toolbox 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.stamp()::stamped#0",
+      "provider": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()",
+      "contract": "package::maven::dev.kt:*",
+      "level": "ambiguous",
+      "reason": "2 providers fit; computed coordinate; package::maven::dev.kt:* 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.stamp()::stamped#0",
+      "provider": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()",
+      "contract": "package::maven::dev.kt:toolbox",
+      "level": "ambiguous",
+      "reason": "package::maven::dev.kt:toolbox 3.1 (local 3.1), range unchecked; import package"
+    },
+    {
+      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/probes/Hidden.kt::dev.shop.probes.real()::greet#0",
+      "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String)",
+      "contract": "package::maven::dev.kt.core:core",
+      "level": "exact",
+      "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/kotlin/lib::core/loose/dev/kt/core/Loose.kt::dev.kt.core.loose()",
+      "kind": "export",
+      "label": "dev.kt.core.loose()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/loose/dev/kt/core/Loose.kt::dev.kt.core.loose()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/kotlin/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/check/kotlin/dev/kt/core/Checks.kt::dev.kt.core.checked()",
+      "kind": "export",
+      "label": "dev.kt.core.checked()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/check/kotlin/dev/kt/core/Checks.kt::dev.kt.core.checked()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/kotlin/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.Companion.of(Int)",
+      "kind": "export",
+      "label": "dev.kt.core.Box.Companion.of(Int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.Companion.of(Int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/kotlin/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.of(Int)",
+      "kind": "export",
+      "label": "dev.kt.core.Box.of(Int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.of(Int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/kotlin/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.String.shout()",
+      "kind": "export",
+      "label": "dev.kt.core.String.shout()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.String.shout()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.many(vararg String)",
+      "kind": "export",
+      "label": "dev.kt.core.many(vararg String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.many(vararg String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.probe()",
+      "kind": "export",
+      "label": "dev.kt.core.probe()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.probe()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.Companion.of(Int)",
+      "kind": "export",
+      "label": "dev.kt.core.Money.Companion.of(Int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.Companion.of(Int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/kotlin/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.format()",
+      "kind": "export",
+      "label": "dev.kt.core.Money.format()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.format()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/kotlin/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/kotlin/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.total()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.plus(Money)",
+      "kind": "export",
+      "label": "dev.kt.core.Money.plus(Money)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.plus(Money)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/kotlin/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.stamp()",
+      "kind": "export",
+      "label": "dev.kt.core.Money.stamp()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.stamp()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Money.label()",
+      "kind": "export",
+      "label": "dev.kt.core.Money.label()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Money.label()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Money.total()",
+      "kind": "export",
+      "label": "dev.kt.core.Money.total()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Money.total()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Thing.render()",
+      "kind": "export",
+      "label": "dev.kt.core.Thing.render()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Thing.render()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/other/Other.kt::dev.kt.other.String.shout()",
+      "kind": "export",
+      "label": "dev.kt.other.String.shout()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/other/Other.kt::dev.kt.other.String.shout()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/test/kotlin/dev/kt/core/Samples.kt::dev.kt.core.sample()",
+      "kind": "export",
+      "label": "dev.kt.core.sample()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/test/kotlin/dev/kt/core/Samples.kt::dev.kt.core.sample()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/kotlin/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::core/src/test/kotlin/shared/dev/kt/core/Extras.kt::dev.kt.core.extras()",
+      "kind": "export",
+      "label": "dev.kt.core.extras()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::core/src/test/kotlin/shared/dev/kt/core/Extras.kt::dev.kt.core.extras()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/kotlin/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()",
+      "kind": "export",
+      "label": "dev.kt.shared.stamped()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/kotlin/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/kotlin/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()"
+        }
+      ]
+    }
+  ]
+}

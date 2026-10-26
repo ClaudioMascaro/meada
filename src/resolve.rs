@@ -12,8 +12,8 @@ use std::cell::{OnceCell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Annotated, Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
-    LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker, Ty, Value,
+    Annotated, Binds, Bound, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation,
+    Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker, Ty, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -206,11 +206,21 @@ enum Reading {
     Method,
     /// A name read, not called: `Value` but that, where class members are in scope (Java), a
     /// method does not bind it, since fields and methods are separate namespaces (`repo` in
-    /// `repo.save()` is the field `repo`, never a method `repo()`).
+    /// `repo.save()` is the field `repo`, never a method `repo()`). In Kotlin the members of a
+    /// class of the repository that receives a block around it (`apply`, `run`, `with`, an
+    /// extension function) come before the names outside the block, after its locals.
     Read,
+    /// `Read`, asked for the object a name holds (`Code::declared`, the flow of `Follow::Values`):
+    /// a receiver of a block whose type is not the repository's may hold one of any name, so
+    /// the name is unknown there.
+    Member,
 }
 
 impl Reading {
+    fn read(self) -> bool {
+        matches!(self, Reading::Read | Reading::Member)
+    }
+
     fn types(self) -> bool {
         matches!(
             self,
@@ -221,7 +231,7 @@ impl Reading {
     fn value(self) -> bool {
         matches!(
             self,
-            Reading::Value | Reading::Path | Reading::Method | Reading::Read
+            Reading::Value | Reading::Path | Reading::Method | Reading::Read | Reading::Member
         )
     }
 }
@@ -293,7 +303,8 @@ pub struct Resolver<'a> {
     defs: HashMap<&'a str, HashMap<&'a str, &'a Def>>,
     overloads: HashMap<&'a str, HashMap<&'a str, Vec<Target<'a>>>>,
     constructors: HashMap<&'a str, HashMap<&'a str, Vec<Target<'a>>>>,
-    arities: HashMap<Target<'a>, usize>,
+    /// The argument counts each overload takes, fewest to most (`Arity`).
+    arities: HashMap<Target<'a>, Arity>,
     statics: HashSet<Target<'a>>,
     members_in_scope: bool,
     unordered_globs: bool,
@@ -320,6 +331,8 @@ pub struct Resolver<'a> {
     takers: HashMap<&'a str, Taker<'a>>,
     /// Every class's family, linearized once.
     families: HashMap<Target<'a>, Family<'a>>,
+    /// Each class's Kotlin companion (`Resolver::companion`), read once.
+    companions: HashMap<Target<'a>, Target<'a>>,
     /// The pack's keyword for the instance of the enclosing class (`LanguagePack::receiver`).
     receiver: Option<&'static str>,
     /// The pack's keyword for the base of the enclosing class (`LanguagePack::base_receiver`).
@@ -346,6 +359,14 @@ pub struct Resolver<'a> {
     /// The blocks that add members to a type from outside the repository, by file and scope
     /// (`impl Trait for reqwest::Client`): what `self` and `Self` name in them is opaque.
     outside: HashSet<(&'a str, &'a str)>,
+    /// The blocks whose type is no class of the repository, by file and scope: what a bare call
+    /// in one reaches is not known (Kotlin's `apply` on a value of an unread type).
+    unread: HashSet<(&'a str, &'a str)>,
+    /// The extension functions (`Facts::extensions`), by name.
+    extensions: HashMap<&'a str, Vec<Extension<'a>>>,
+    /// The files whose member calls may reach an extension function
+    /// (`LanguagePack::extension_functions`).
+    extending: HashSet<&'a str>,
     /// The files whose exports other packages can import, when the pack says which
     /// (`Layout::published`).
     published: Option<BTreeSet<String>>,
@@ -366,6 +387,33 @@ pub struct Resolver<'a> {
     groups: Vec<Group<'a>>,
 }
 
+/// Whether `inner` is a class nested directly in the class `outer`.
+fn nested_in(inner: Target, outer: Target) -> bool {
+    inner.path == outer.path && crate::parent(inner.name) == outer.name
+}
+
+/// The argument counts a function takes: one per parameter, fewer for the ones a call may leave
+/// out (`Binds::Optional`), and any number more for a `Binds::Rest` one (Kotlin's `vararg`).
+#[derive(Clone, Copy)]
+struct Arity {
+    least: usize,
+    most: Option<usize>,
+}
+
+impl Arity {
+    fn of(params: &[Param]) -> Self {
+        let required = |p: &&Param| !matches!(p.binds, Binds::Optional | Binds::Rest);
+        Arity {
+            least: params.iter().filter(required).count(),
+            most: (!params.iter().any(|p| p.binds == Binds::Rest)).then_some(params.len()),
+        }
+    }
+
+    fn fits(self, arity: usize) -> bool {
+        self.least <= arity && self.most.is_none_or(|most| arity <= most)
+    }
+}
+
 /// Files that share one top-level scope (`Layout::shared`), sorted, and the files whose top
 /// level binds each name: a definition that is no method, or a constant.
 struct Group<'a> {
@@ -376,6 +424,16 @@ struct Group<'a> {
     /// Where in `files` sit the files that name each name in their exports, and those with a
     /// star export.
     exporting: Named<'a>,
+}
+
+/// An extension function (`Facts::extensions`): the scope it is written in (its file's package
+/// at the top level), the class of the repository it extends (none for a type from outside the
+/// repository or a type parameter), and whether its file alone sees it (`private`).
+struct Extension<'a> {
+    target: Target<'a>,
+    within: &'a str,
+    class: Option<Target<'a>>,
+    private: bool,
 }
 
 /// A block of members of a class (`lang::Impl`): its file and scope, and for a trait's block,
@@ -427,7 +485,7 @@ impl<'a> Resolver<'a> {
                                 .filter_map(|name| {
                                     let (&name, def) = defs[path].get_key_value(name.as_str())?;
                                     let target = Target { path, name };
-                                    arities.insert(target, def.params.len());
+                                    arities.insert(target, Arity::of(&def.params));
                                     Some(target)
                                 })
                                 .collect();
@@ -631,6 +689,7 @@ impl<'a> Resolver<'a> {
             pathed,
             takers,
             families: HashMap::new(),
+            companions: HashMap::new(),
             receiver: language.receiver(),
             base_receiver: language.base_receiver(),
             unordered_bases: language.unordered_bases(),
@@ -642,6 +701,14 @@ impl<'a> Resolver<'a> {
             impls: HashMap::new(),
             blocks: HashMap::new(),
             outside: HashSet::new(),
+            unread: HashSet::new(),
+            extensions: HashMap::new(),
+            extending: (files.keys().copied())
+                .filter(|p| {
+                    crate::lang::pack_for(p)
+                        .is_some_and(|n| crate::lang::pack(n).extension_functions())
+                })
+                .collect(),
             published: None,
             reaches: None,
             stars_bind,
@@ -663,9 +730,25 @@ impl<'a> Resolver<'a> {
             }
         }
         resolver.families = work.families;
+        // Each class's Kotlin companion, read once: a call on the class's name reaches it first.
+        let mut companions = HashMap::new();
+        for (path, facts) in files {
+            for def in facts.defs.iter().filter(|d| d.kind == Kind::Class) {
+                let class = Target {
+                    path,
+                    name: &def.name,
+                };
+                if let Some(companion) = resolver.companion(class, &mut Work::default()) {
+                    companions.insert(class, companion);
+                }
+            }
+        }
+        resolver.companions = companions;
         let mut impls: HashMap<Target, Vec<Block>> = HashMap::new();
         let mut blocks = HashMap::new();
         let mut outside = HashSet::new();
+        let mut unread = HashSet::new();
+        let mut extensions: HashMap<&str, Vec<Extension>> = HashMap::new();
         for (path, facts) in files {
             for block in &facts.impls {
                 let class = |name: &'a str| match resolver.path_binding(path, &block.within, name) {
@@ -677,9 +760,17 @@ impl<'a> Resolver<'a> {
                     if matches!(ty, Binding::External(..)) {
                         outside.insert((*path, block.scope.as_str()));
                     }
+                    unread.insert((*path, block.scope.as_str()));
                     continue;
                 };
                 blocks.insert((*path, block.scope.as_str()), ty);
+                // A block that is a definition itself (Kotlin's lambda with a receiver) says
+                // what `this` is in it, and declares no member.
+                if (resolver.defs[path].get(block.scope.as_str()))
+                    .is_some_and(|d| d.kind == Kind::Inline)
+                {
+                    continue;
+                }
                 impls.entry(ty).or_default().push(Block {
                     path,
                     scope: &block.scope,
@@ -687,11 +778,67 @@ impl<'a> Resolver<'a> {
                     of: block.of.as_deref().and_then(class),
                 });
             }
+            // An extension's block says what `this` is in it too; the functions it declares are
+            // found by name, never as the type's members.
+            let mut extended = HashMap::new();
+            for block in &facts.extensions {
+                let class = match resolver.path_binding(path, &block.within, &block.ty) {
+                    Binding::Def(t) if resolver.is_class(t) => Some(t),
+                    Binding::External(..) => {
+                        outside.insert((*path, block.scope.as_str()));
+                        None
+                    }
+                    _ => None,
+                };
+                let at = (*path, block.scope.as_str());
+                if let Some(t) = class {
+                    blocks.insert(at, t);
+                } else {
+                    unread.insert(at);
+                }
+                extended.insert(block.scope.as_str(), (class, block.within.as_str()));
+            }
+            if extended.is_empty() {
+                continue;
+            }
+            let exported: HashSet<&str> = (facts.exports.iter())
+                .filter_map(|e| match e {
+                    Export::Local { local, .. } => Some(local.as_str()),
+                    _ => None,
+                })
+                .collect();
+            let defs = &resolver.defs[path];
+            for (alias, targets) in &resolver.overloads[path] {
+                let Some((scope, name)) = alias.rsplit_once('.') else {
+                    continue;
+                };
+                let Some(&(class, within)) = extended.get(scope) else {
+                    continue;
+                };
+                // A method of a class of the file the block is named like (`class Foo` beside
+                // `fun Foo.x()`) is a member, no extension.
+                let class_scope = defs.get(scope).is_some_and(|d| d.kind == Kind::Class);
+                for &target in targets {
+                    if class_scope && defs[target.name].kind == Kind::Method {
+                        continue;
+                    }
+                    extensions.entry(name).or_default().push(Extension {
+                        target,
+                        within,
+                        class,
+                        private: !exported.contains(alias),
+                    });
+                }
+            }
         }
+        extensions
+            .values_mut()
+            .for_each(|e| e.sort_by_key(|e| e.target));
         impls
             .values_mut()
             .for_each(|b| b.sort_by_key(|b| b.of_trait));
         (resolver.impls, resolver.blocks, resolver.outside) = (impls, blocks, outside);
+        (resolver.unread, resolver.extensions) = (unread, extensions);
         let mut callers: HashMap<Target, Vec<Caller>> = HashMap::new();
         for (path, facts) in files {
             for (index, call) in facts.calls.iter().enumerate() {
@@ -778,6 +925,12 @@ impl<'a> Resolver<'a> {
         };
         let known = matches!(binding, Binding::Def(_) | Binding::Several(_));
         let binding = self.narrow(binding, call.arity);
+        // No member fits: an extension function in scope may.
+        if matches!(binding, Binding::Unknown | Binding::External(..))
+            && let Some(found) = self.extended(path, call, on.clone(), work)
+        {
+            return found;
+        }
         if known && matches!(binding, Binding::Unknown) {
             return Resolution::Unresolved;
         }
@@ -939,7 +1092,7 @@ impl<'a> Resolver<'a> {
 
     fn narrow(&self, binding: Binding<'a>, arity: Option<usize>) -> Binding<'a> {
         let Some(arity) = arity else { return binding };
-        let fits = |t: &Target<'a>| self.arities.get(t).is_none_or(|n| *n == arity);
+        let fits = |t: &Target<'a>| self.arities.get(t).is_none_or(|n| n.fits(arity));
         match binding {
             Binding::Def(t) if !fits(&t) => Binding::Unknown,
             Binding::Several(all) => match all.into_iter().filter(fits).collect::<Vec<_>>()[..] {
@@ -949,6 +1102,127 @@ impl<'a> Resolver<'a> {
             },
             found => found,
         }
+    }
+
+    /// A call of a pack with extension functions (`LanguagePack::extension_functions`) that no
+    /// member answers: the extensions in scope (`visible`) that may apply to its receiver, as
+    /// Kotlin picks one. On a class of the repository whose family is all known, the first scope
+    /// that holds one the family may take gives the one its nearest class extends, `exact`. One of
+    /// a type from outside the repository or of a type parameter may apply to any receiver
+    /// (`Any`, `T`), and an outside receiver's members are unknown (Opaque outside): those are
+    /// name matches. `None` when no extension in scope may apply, or the receiver is unknown or
+    /// no instance (a type's name, `Outside.create()`): the name match reads it as any other.
+    fn extended(
+        &self,
+        path: &'a str,
+        call: &'a Call,
+        on: Option<Binding<'a>>,
+        work: &mut Work<'a>,
+    ) -> Option<Resolution<'a>> {
+        if !self.extending.contains(path) || call.constructs {
+            return None;
+        }
+        let scope = call.scope.as_str();
+        let (head, name) = match call.callee.rsplit_once('.') {
+            Some((head, name)) => (Some(head), name),
+            None => (None, call.callee.as_str()),
+        };
+        let fits = |t: Target<'a>| {
+            (call.arity).is_none_or(|n| self.arities.get(&t).is_none_or(|a| a.fits(n)))
+        };
+        let found: Vec<(u8, &Extension<'a>)> = (self.extensions.get(name)?.iter())
+            .filter(|e| fits(e.target))
+            .filter_map(|e| Some((self.visible(path, scope, name, e)?, e)))
+            .collect();
+        if found.is_empty() {
+            return None;
+        }
+        let receiver = match head {
+            None => self.class(path, scope),
+            Some(head) if Some(head) == self.receiver => self.class(path, scope),
+            Some(head) if Some(head) == self.base_receiver => return None,
+            Some(head) => match (on, call.on) {
+                (Some(known), _) => known,
+                (None, Some(inner)) => self.result_of(path, inner, work),
+                (None, None) => {
+                    let seen = &mut self.seen(path, scope);
+                    let found = self.resolve_as(path, scope, head, seen, work, Reading::Value);
+                    // A type's name calls its companion or its statics.
+                    self.holder(&found)?;
+                    self.instance(found, work)
+                }
+            },
+        };
+        let family = match receiver {
+            Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => self.family(t, work),
+            Binding::External(..) => None,
+            _ => return None,
+        };
+        // Where each may apply: the place of its class in the family (`None` for an outside type
+        // or a type parameter's), with the scope that holds it.
+        let applicable: Vec<(u8, Option<usize>, Target<'a>)> = (found.into_iter())
+            .filter_map(|(level, e)| {
+                let place = match e.class {
+                    None => None,
+                    Some(c) => Some(
+                        family
+                            .as_ref()?
+                            .iter()
+                            .position(|a| *a == Ancestor::Class(c))?,
+                    ),
+                };
+                Some((level, place, e.target))
+            })
+            .collect();
+        let known = (family.as_ref())
+            .is_some_and(|f| f.iter().all(|a| matches!(a, Ancestor::Class(_))))
+            && !self.implicit.contains(&name);
+        let first = applicable.iter().map(|a| a.0).min()?;
+        let nearest = (applicable.iter())
+            .filter(|a| a.0 == first)
+            .filter_map(|a| a.1)
+            .min()
+            .filter(|_| known);
+        let mut chosen: Vec<Target<'a>> = (applicable.iter())
+            .filter(|a| nearest.is_none() || (a.0 == first && a.1 == nearest))
+            .map(|a| a.2)
+            .collect();
+        chosen.sort();
+        chosen.dedup();
+        Some(match (nearest, &chosen[..]) {
+            (Some(_), [one]) => Resolution::Exact(*one),
+            (Some(_), _) => Resolution::Ambiguous(chosen),
+            (None, _) => one_of(chosen),
+        })
+    }
+
+    /// Where Kotlin finds the extension `e`, for a call of `name` written in `scope` of `path`,
+    /// first to last: a scope around the call that declares it (0), an explicit import (1), the
+    /// file's package (2), a star import (3); `None` out of scope.
+    fn visible(&self, path: &str, scope: &str, name: &str, e: &Extension) -> Option<u8> {
+        let package = self.files[e.target.path].package.as_str();
+        if e.within != package {
+            let inside = (scope.strip_prefix(e.within))
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('.'));
+            return (e.target.path == path && inside).then_some(0);
+        }
+        if e.private && e.target.path != path {
+            return None;
+        }
+        let imports = &self.files[path].imports;
+        let qualified = crate::qualify(package, name);
+        let explicit = (self.by_local[path].of(name).iter()).any(|&at| {
+            matches!(imports[at].name, Imported::Qualified) && imports[at].source == qualified
+        });
+        if explicit {
+            return Some(1);
+        }
+        if self.files[path].package == package {
+            return Some(2);
+        }
+        let star =
+            (imports.iter()).any(|i| matches!(i.name, Imported::Namespace) && i.source == package);
+        star.then_some(3)
     }
 
     /// Whether a method called on a call chain (`client.get(u).send()`) belongs to a type from
@@ -1036,6 +1310,12 @@ impl<'a> Resolver<'a> {
         self.resolve_as(path, scope, callee, seen, work, Reading::Value)
     }
 
+    /// `read`, for the object the name holds (`Reading::Member`).
+    fn read_member(&self, path: &'a str, scope: &'a str, name: &'a str) -> Binding<'a> {
+        let (seen, work) = (&mut self.seen(path, scope), &mut Work::default());
+        self.resolve_as(path, scope, name, seen, work, Reading::Member)
+    }
+
     /// `binding` of a name read, not called (`Reading::Read`).
     fn read(&self, path: &'a str, scope: &'a str, name: &'a str) -> Binding<'a> {
         let (seen, work) = (&mut self.seen(path, scope), &mut Work::default());
@@ -1089,7 +1369,11 @@ impl<'a> Resolver<'a> {
                 reading => reading,
             };
             let binding = match head {
-                _ if Some(head) == self.receiver => self.class(path, scope),
+                // `this.m()` is a call on an instance, never on the class's name.
+                _ if Some(head) == self.receiver => match self.class(path, scope) {
+                    Binding::Def(t) if !members.is_empty() => Binding::Instance(t),
+                    found => found,
+                },
                 _ if Some(head) == self.base_receiver => Binding::Unknown,
                 _ if head.starts_with('(') => Binding::Unknown,
                 _ => self.lexical_as(path, scope, head, seen, head_reading),
@@ -1135,8 +1419,24 @@ impl<'a> Resolver<'a> {
             let value = reading.value() && last;
             // A member read on the way, or read last, is no method where fields and methods
             // are separate namespaces (`Reading::Read`).
-            let read = self.members_in_scope && (!last || reading == Reading::Read);
+            let read = self.members_in_scope && (!last || reading.read());
             binding = match self.instance(binding, work) {
+                // A class's name (`Type.m()`, `Type.X`) reaches a Kotlin companion's members
+                // before the class's, which only an instance reaches; past the companion, a
+                // nested class or a constant of the class (an enum entry).
+                Binding::Def(t)
+                    if self.is_class(t)
+                        && let Some(&c) = self.companions.get(&t) =>
+                {
+                    match self.member(c, member, read, work) {
+                        Binding::Unknown => match self.member(t, member, read, work) {
+                            found @ Binding::Def(d) if self.is_class(d) => found,
+                            found @ Binding::Const(..) => found,
+                            _ => Binding::Unknown,
+                        },
+                        found => found,
+                    }
+                }
                 Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => {
                     self.member(t, member, read, work)
                 }
@@ -1353,7 +1653,16 @@ impl<'a> Resolver<'a> {
         work: &mut Work<'a>,
     ) -> Binding<'a> {
         let Some(family) = self.family(class, work) else {
-            return Binding::Unknown;
+            // A class nested in the class is its own, whatever its bases: found while the family
+            // is being linearized too (a Kotlin companion, written as a base of its class).
+            let qualified = format!("{}.{member}", class.name);
+            return match self.defs[class.path].get_key_value(qualified.as_str()) {
+                Some((name, def)) if def.kind == Kind::Class => Binding::Def(Target {
+                    path: class.path,
+                    name,
+                }),
+                _ => Binding::Unknown,
+            };
         };
         if !read && let Some(found) = self.overloaded(&family, member) {
             return found;
@@ -1369,7 +1678,13 @@ impl<'a> Resolver<'a> {
             let found = match self.defs[c.path].get_key_value(qualified.as_str()) {
                 Some((name, _)) if read => Binding::Def(Target { path: c.path, name }),
                 _ if read => Binding::Unknown,
-                _ => self.def(c.path, &qualified),
+                _ => match self.def(c.path, &qualified) {
+                    Binding::Def(t) if self.extends(t) => Binding::Unknown,
+                    Binding::Several(all) if all.iter().all(|t| self.extends(*t)) => {
+                        Binding::Unknown
+                    }
+                    found => found,
+                },
             };
             if !matches!(found, Binding::Unknown) {
                 return found;
@@ -1384,7 +1699,10 @@ impl<'a> Resolver<'a> {
                 return Binding::Local(c.path, c.name, member);
             }
         }
-        Binding::Unknown
+        match self.companion(class, work) {
+            Some(companion) => self.member(companion, member, read, work),
+            None => Binding::Unknown,
+        }
     }
 
     /// The overloads of `member` a family declares (`Facts::overloads`), as `member` reads a
@@ -1393,7 +1711,9 @@ impl<'a> Resolver<'a> {
     /// class declares one; unknown when the family has a base whose members are not known
     /// anywhere, since overloads merge across the family and that base may declare or override
     /// any of them (Opaque outside, strict: #353 tracks a relaxation). Other bindings of the
-    /// name (a field) are not methods and do not join the family.
+    /// name (a field) are not methods and do not join the family, nor does a Kotlin extension
+    /// written in its class's file (`fun Foo.x()` beside `class Foo`, a function named under
+    /// the class): it is reached through `Resolver::extensions` alone, after the members.
     fn overloaded(&self, family: &[Ancestor<'a>], member: &str) -> Option<Binding<'a>> {
         let (mut found, mut signatures, mut opaque) = (Vec::new(), HashSet::new(), false);
         for ancestor in family {
@@ -1412,6 +1732,9 @@ impl<'a> Resolver<'a> {
                 continue;
             };
             for t in all {
+                if self.extends(*t) {
+                    continue;
+                }
                 if signatures.insert(t.name.strip_prefix(c.name).unwrap_or(t.name)) {
                     found.push(*t);
                 }
@@ -1467,7 +1790,11 @@ impl<'a> Resolver<'a> {
                 None => {}
             }
         }
-        None
+        // A Kotlin companion's own fields come after the family's, as its methods do; a base
+        // of the companion's that is not known hides nothing of the names outside.
+        let companion = self.companion(Target { path, name: class }, &mut Work::default())?;
+        (self.inherited_field(companion.path, companion.name, name))
+            .filter(|found| !matches!(found, Binding::Unknown))
     }
 
     /// What a bare method name written in the body of class `class` of `path` names
@@ -1487,8 +1814,41 @@ impl<'a> Resolver<'a> {
             {
                 Some(Binding::Unknown)
             }
+            None => {
+                let class = Target { path, name: class };
+                let companion = self.companion(class, &mut Work::default())?;
+                self.inherited(companion.path, companion.name, name)
+            }
             found => found,
         }
+    }
+
+    /// The class nested in `class` that `class` writes as a base: a Kotlin companion object,
+    /// whose members a call on the class's name and a bare call in it reach after the class's
+    /// own family. No other language can write one (a class extending its own nested class is a
+    /// cycle in Java), so the written bases are checked by name before any is resolved.
+    fn companion(&self, class: Target<'a>, work: &mut Work<'a>) -> Option<Target<'a>> {
+        let defs = &self.defs[class.path];
+        let nested = |b: &String| {
+            b.rsplit_once('.').is_some_and(|(_, last)| {
+                defs.contains_key(format!("{}.{last}", class.name).as_str())
+            })
+        };
+        if !defs[class.name].bases.iter().any(nested) {
+            return None;
+        }
+        (self.bases(class, work).into_iter()).find_map(|b| match b {
+            Ancestor::Class(b) if nested_in(b, class) => Some(b),
+            _ => None,
+        })
+    }
+
+    /// Whether `t` is a Kotlin extension function (`Resolver::extensions`): named under the
+    /// class it extends when written in that class's file, it is never one of its members.
+    fn extends(&self, t: Target<'a>) -> bool {
+        let name = t.name.split('(').next().unwrap_or(t.name);
+        let member = name.rsplit('.').next().unwrap_or(name);
+        (self.extensions.get(member)).is_some_and(|all| all.iter().any(|e| e.target == t))
     }
 
     /// The method `qualified` (`Type.method`) of `class` that another file of its package
@@ -1567,11 +1927,14 @@ impl<'a> Resolver<'a> {
             return Err(Cut);
         }
         work.busy.push(key);
-        let bases = self.bases(class, work);
+        let mut bases = self.bases(class, work);
         if work.cut {
             work.busy.pop();
             return Err(Cut);
         }
+        // A class nested in the class and written as its base (a Kotlin companion object) is
+        // no ancestor of its instances: `Resolver::companion` reads it after the family.
+        bases.retain(|b| !matches!(b, Ancestor::Class(b) if nested_in(*b, class)));
         let mut lists = Vec::new();
         for base in &bases {
             lists.push(match base {
@@ -1698,7 +2061,11 @@ impl<'a> Resolver<'a> {
             found.retain(|t| reaches(path, t.path));
         }
         if let Some(arity) = arity {
-            found.retain(|t| self.arities.get(t).is_none_or(|n| *n == arity));
+            found.retain(|t| self.arities.get(t).is_none_or(|n| n.fits(arity)));
+        }
+        // A file whose calls reach no extension function (Java's) matches none by name either.
+        if !self.extending.contains(path) {
+            found.retain(|t| !self.extends(*t));
         }
         found
     }
@@ -1817,6 +2184,24 @@ impl<'a> Resolver<'a> {
                         {
                             return found;
                         }
+                        // A block of a class reaches its members; one of an unread type, whatever.
+                        // A local function of the code around a block comes first.
+                        if reading == Reading::Method
+                            && (self.blocks.contains_key(&(path, s))
+                                || self.unread.contains(&(path, s)))
+                            && let Some(found) = self.local_function(path, s, name)
+                        {
+                            return found;
+                        }
+                        if reading == Reading::Method {
+                            if let Some(class) = self.blocks.get(&(path, s)) {
+                                if let Some(found) = self.inherited(class.path, class.name, name) {
+                                    return found;
+                                }
+                            } else if self.unread.contains(&(path, s)) {
+                                return Binding::Unknown;
+                            }
+                        }
                         if reading != Reading::Type
                             && let Some(overloads) = self.overloads[path].get(candidate.as_str())
                         {
@@ -1849,11 +2234,12 @@ impl<'a> Resolver<'a> {
             }
             if let Some((name, def)) = defs.get_key_value(candidate.as_str())
                 && def.kind != Kind::Method
-                && !(def.kind == Kind::Module && matches!(reading, Reading::Value | Reading::Read))
+                && !(def.kind == Kind::Module
+                    && matches!(reading, Reading::Value | Reading::Read | Reading::Member))
             {
                 return Binding::Def(Target { path, name });
             }
-            let read = reading == Reading::Read && self.members_in_scope;
+            let read = reading.read() && self.members_in_scope;
             if !read && let Some(overloads) = self.overloads[path].get(candidate.as_str()) {
                 return match overloads[..] {
                     [one] => Binding::Def(one),
@@ -1879,6 +2265,22 @@ impl<'a> Resolver<'a> {
                 Some(_) => return Binding::Local(path, s, name),
                 None => {}
             }
+            // The receiver of a block (a Kotlin `with`, `apply`, `run`, or an extension
+            // function) has its members before the names outside the block, after the locals
+            // of the code around it: a field of a class of the repository is that name. A
+            // receiver of another type may have one of any name, which only the object a name
+            // holds asks (`Reading::Member`): a constant's value and a call's receiver are read
+            // outside the block (a Ktor `Application` or `Route` declares no `V1`). A called
+            // name reads the block's methods (`Reading::Method`).
+            if self.members_in_scope && reading.read() && !self.local_around(path, s, name) {
+                if let Some(class) = self.blocks.get(&(path, s)) {
+                    if let Some(found) = self.inherited_field(class.path, class.name, name) {
+                        return found;
+                    }
+                } else if reading == Reading::Member && self.unread.contains(&(path, s)) {
+                    return Binding::Hidden;
+                }
+            }
             if let Some(found) = self.imported_at(path, s, name, seen) {
                 return found;
             }
@@ -1889,6 +2291,47 @@ impl<'a> Resolver<'a> {
             }
             found => found,
         }
+    }
+
+    /// Whether a function or lambda around the block `block`, up to a class or the top level,
+    /// binds `name` (a parameter, a local, a binding with a class): Kotlin reads a local before
+    /// a member of an implicit receiver.
+    fn local_around(&self, path: &'a str, block: &'a str, name: &'a str) -> bool {
+        let defs = &self.defs[path];
+        let mut s = crate::parent(block);
+        while (defs.get(s))
+            .is_some_and(|d| matches!(d.kind, Kind::Function | Kind::Method | Kind::Inline))
+        {
+            let qualified = crate::qualify(s, name);
+            if self.locals[path].contains(qualified.as_str())
+                || self.consts[path].contains(qualified.as_str())
+                || self.params[path].contains_key(&(s, name))
+                || self.receivers[path].contains_key(&(s, name))
+            {
+                return true;
+            }
+            s = crate::parent(s);
+        }
+        false
+    }
+
+    /// The local function `name` of the functions around the block `scope` (Kotlin's `fun size()`
+    /// declared where an `apply` lambda calls `size()`), up to a class or the top level.
+    fn local_function(&self, path: &'a str, scope: &str, name: &str) -> Option<Binding<'a>> {
+        let defs = &self.defs[path];
+        let mut s = crate::parent(scope);
+        while (defs.get(s))
+            .is_some_and(|d| matches!(d.kind, Kind::Function | Kind::Method | Kind::Inline))
+        {
+            if let Some(found) = self.overloads[path].get(format!("{s}.{name}").as_str()) {
+                return Some(match found[..] {
+                    [one] => Binding::Def(one),
+                    _ => Binding::Several(found.clone()),
+                });
+            }
+            s = crate::parent(s);
+        }
+        None
     }
 
     /// Whether the top-level name `name` of `path` is not the one thing its constant says (Go: a
@@ -2029,7 +2472,7 @@ impl<'a> Resolver<'a> {
         for &at in self.by_local[path].of(&crate::qualify("", "*")) {
             let Imported::Glob {
                 path: target,
-                inside: false,
+                inside,
                 ..
             } = &imports[at].name
             else {
@@ -2045,6 +2488,10 @@ impl<'a> Resolver<'a> {
                 Binding::External(source, Imported::Namespace | Imported::Qualified) => {
                     Some(source)
                 }
+                // An `inside` glob (the own package's; Kotlin's written ones, which see
+                // `internal` members) gives an outside source only, as the repository's names
+                // are bound before this is asked.
+                _ if *inside => None,
                 other => match self.through_glob(other, false, name, work, seen) {
                     Binding::Unknown => None,
                     _ => return Vec::new(),
@@ -2513,6 +2960,23 @@ impl<'a> Resolver<'a> {
         rows
     }
 
+    /// The functions that take more than one count of arguments: a default parameter, or a
+    /// vararg (`Arity`). A function with a fixed count has no row. For an import of the
+    /// repository as a package to tell which calls its overloads take. Sorted.
+    pub fn flexible(&self) -> Vec<Flexible> {
+        let mut rows: Vec<_> = (self.arities.iter())
+            .filter(|(_, a)| a.most != Some(a.least))
+            .map(|(t, a)| Flexible {
+                path: t.path.to_string(),
+                name: t.name.to_string(),
+                least: a.least,
+                most: a.most,
+            })
+            .collect();
+        rows.sort_by(|a, b| (&a.path, &a.name).cmp(&(&b.path, &b.name)));
+        rows
+    }
+
     /// What each file exports, for an import of the repository as a package (spec #22), as
     /// `export` reads it: for each name a file exports, the definition, the module-level
     /// constant or type (issue #175) or the whole file it names, or nothing when that is outside
@@ -2774,6 +3238,18 @@ pub struct Ancestry {
     pub ancestors: Option<Vec<Option<(String, String)>>>,
 }
 
+/// A function that takes more than one count of arguments (`Resolver::flexible`): from `least`
+/// to `most`, any number more when that is `None`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Flexible {
+    /// The file declaring it.
+    pub path: String,
+    /// Its qualified name, with its parameter types.
+    pub name: String,
+    pub least: usize,
+    pub most: Option<usize>,
+}
+
 /// A call whose arguments bind the parameters of `def`, the function it reaches.
 #[derive(Clone, Copy)]
 pub struct Frame<'a> {
@@ -2796,7 +3272,8 @@ pub enum Expand<'a> {
     /// The call at an index of a file, read as one `Value::Call`: the calls of the builder chain
     /// it is made on (its receivers) and every argument along it are folded, and a name an import
     /// from outside binds is a `Value::External` spelled where it is written, so an enum member
-    /// passed through a wrapper keeps the evidence of the caller's imports.
+    /// passed through a wrapper keeps the evidence of the caller's imports. The call's keyword
+    /// arguments are folded the same way and given to the reader.
     Chain(&'a str, usize),
 }
 
@@ -2964,6 +3441,8 @@ pub struct Code<'a> {
 struct ByName<'a> {
     defs: HashMap<&'a str, &'a Def>,
     consts: HashMap<&'a str, Vec<&'a Const>>,
+    /// The values the locals were given (`Facts::bound`), by scope and name.
+    bound: HashMap<(&'a str, &'a str), Vec<&'a Bound>>,
 }
 
 impl<'a> ByName<'a> {
@@ -2975,6 +3454,10 @@ impl<'a> ByName<'a> {
         for constant in &facts.consts {
             let named = by_name.consts.entry(constant.name.as_str()).or_default();
             named.push(constant);
+        }
+        for bound in &facts.bound {
+            let key = (bound.scope.as_str(), bound.name.as_str());
+            by_name.bound.entry(key).or_default().push(bound);
         }
         by_name
     }
@@ -3185,7 +3668,7 @@ impl<'a> Code<'a> {
                 let Some((form, outside, steps)) = self.declared(path, scope, name, 0) else {
                     return Vec::new();
                 };
-                let held = match self.resolver.read(path, scope, name) {
+                let held = match self.resolver.read_member(path, scope, name) {
                     Binding::Const(at, constant) => Some((at, constant)),
                     _ => None,
                 };
@@ -3407,6 +3890,40 @@ impl<'a> Code<'a> {
         self.call(path, index)?.receiver.as_ref()
     }
 
+    /// The value the nearest binding of `name` around `scope` of `path` holds (`Facts::bound`,
+    /// which only the Kotlin pack fills), when no other binding of the name is in the same scope
+    /// (a name declared twice, a loop variable, a parameter, a constant, a property). Each scope
+    /// is looked up by name (`ByName::bound` and the resolver's maps), so a file of many locals
+    /// and calls costs each lookup its depth, never the file's width.
+    pub fn local(&self, path: &'a str, scope: &'a str, name: &str) -> Option<&'a Bound> {
+        let by_name = self.by_name(path)?;
+        let r = self.resolver;
+        let mut at = Some(scope);
+        while let Some(s) = at {
+            let mut bound = (by_name.bound.get(&(s, name)).into_iter().flatten()).copied();
+            let held = bound.next();
+            let qualified = crate::qualify(s, name);
+            let receiver = r.receivers[path].get(&(s, name));
+            let others = bound.next().is_some()
+                // A `val` of unknown class has its own entry in `locals`: the pack drops its
+                // bound when another binding shares the name. A typed one has a receiver, and no
+                // entry.
+                || (r.locals[path].contains(qualified.as_str())
+                    && (held.is_none() || receiver.is_some()))
+                || r.consts[path].contains(qualified.as_str())
+                || r.defs[path].get(s).is_some_and(|d| d.params.iter().any(|p| p.name == name))
+                || receiver.is_some_and(|c| **c == Class::Unknown);
+            match (held, others) {
+                (Some(found), false) => return Some(found),
+                (None, false) if receiver.is_none() => {
+                    at = (!s.is_empty()).then(|| crate::parent(s))
+                }
+                _ => return None,
+            }
+        }
+        None
+    }
+
     /// The values the call at `index` of `path` may return, when a function of the repository
     /// answers it (`Exact`) or a name match does (`Inferred`, `Ambiguous`): the file and name
     /// of each function with each value it returns.
@@ -3602,7 +4119,7 @@ impl<'a> Code<'a> {
             return None;
         }
         let r = self.resolver;
-        let binding = r.read(path, scope, name);
+        let binding = r.read_member(path, scope, name);
         let (at, within, held) = r.holder(&binding)?;
         match r.receivers[at].get(&(within, held))? {
             Class::Type(written) => {
@@ -3742,7 +4259,7 @@ impl<'a> Code<'a> {
         match param.binds {
             Binds::Rest => None,
             Binds::Keyword => call.keyword(&param.name),
-            Binds::Any | Binds::Instance | Binds::Class => (position)
+            Binds::Any | Binds::Optional | Binds::Instance | Binds::Class => (position)
                 .and_then(|at| call.args.get(at))
                 .or_else(|| call.keyword(&param.name)),
         }
@@ -3941,7 +4458,7 @@ impl<'a> Code<'a> {
     }
 
     fn flow_name(&self, path: &'a str, scope: &'a str, name: &'a str, trail: &mut Trail<'a>) {
-        let binding = self.resolver.read(path, scope, name);
+        let binding = self.resolver.read_member(path, scope, name);
         // An attribute assigned a call once in its class (`self.client = Client()`) is a
         // constant of the class.
         let binding = match binding {
@@ -4220,6 +4737,55 @@ impl<'a> Code<'a> {
         }
     }
 
+    /// The extension functions named `name` that a call of it with `arity` arguments, written in
+    /// `scope` of `path`, has in scope, whatever type they extend, sorted: each with where Kotlin
+    /// finds it, the nearest first (`Resolver::visible`). A local or a parameter of the name in a
+    /// scope around the call hides those declared outside that scope, as Kotlin calls it first.
+    /// A kind that knows the implicit receiver keeps the nearest of those that extend it.
+    pub fn extensions(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &str,
+        arity: Option<usize>,
+    ) -> Vec<(u8, Target<'a>)> {
+        let r = self.resolver;
+        let defs = &r.defs[path];
+        // The nearest scope around the call that binds the name to a value of its own.
+        let mut hiding = None;
+        let mut at = Some(scope);
+        while let Some(s) = at.filter(|s| !s.is_empty()) {
+            let class = defs.get(s).is_some_and(|d| d.kind == Kind::Class);
+            let param = defs
+                .get(s)
+                .is_some_and(|d| d.params.iter().any(|p| p.name == name));
+            if !class
+                && (param
+                    || r.locals[path].contains(crate::qualify(s, name).as_str())
+                    || r.receivers[path].contains_key(&(s, name)))
+            {
+                hiding = Some(s);
+                break;
+            }
+            at = Some(crate::parent(s));
+        }
+        // Whether the binding is inside the scope an extension is declared in.
+        let hidden = |within: &str| {
+            hiding.is_some_and(|h: &str| {
+                within.is_empty() || h.strip_prefix(within).is_some_and(|r| r.starts_with('.'))
+            })
+        };
+        let fits =
+            |t: &Target<'a>| arity.is_none_or(|n| r.arities.get(t).is_none_or(|a| a.fits(n)));
+        let mut found: Vec<(u8, Target<'a>)> = (r.extensions.get(name).into_iter().flatten())
+            .filter(|e| fits(&e.target) && !hidden(e.within))
+            .filter_map(|e| Some((r.visible(path, scope, name, e)?, e.target)))
+            .collect();
+        found.sort();
+        found.dedup();
+        found
+    }
+
     /// The method `method` of the class that `name` (a type, or a name whose class the source
     /// writes), written in `scope` of `path`, is an instance of: looked up through its family and
     /// the other files of its package.
@@ -4389,7 +4955,8 @@ impl<'a> Code<'a> {
                     args: call.args.iter().map(&mut eval).collect(),
                     range: call.range.clone(),
                 };
-                (vec![Value::Call(invocation)], Vec::new())
+                let kwargs = (call.kwargs.iter()).map(|(k, v)| (k.clone(), eval(v)));
+                (vec![Value::Call(invocation)], kwargs.collect())
             }
             None => (
                 args.iter().map(&mut eval).collect(),
@@ -4663,6 +5230,28 @@ impl<'a> Code<'a> {
                     Value::Ref(name.to_string())
                 }
             },
+            // A local the pack bound to one value (Kotlin's `val`, `Facts::bound`) holds it, read
+            // where it is written.
+            Binding::Hidden | Binding::Local(..)
+                if let Some(bound) = self.local(path, scope, name) =>
+            {
+                let held = (bound.within.as_str(), bound.name.as_str());
+                if fold.held.contains(&held) {
+                    return Value::Unknown;
+                }
+                fold.held.push(held);
+                let folded = self.eval(
+                    path,
+                    &bound.within,
+                    &bound.value,
+                    frames,
+                    depth,
+                    fold,
+                    wants,
+                );
+                fold.held.pop();
+                folded
+            }
             // A field no file assigns holds what an annotation on it injects.
             Binding::Local(at, class, field) => match fold.inject {
                 Some(inject) if !self.field_written(field) => {

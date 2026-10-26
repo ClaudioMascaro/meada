@@ -8,7 +8,8 @@ use crate::common;
 use std::fs;
 
 use common::{
-    assert_golden, without_processes, xlang, xlang_go, xlang_java, xlang_java_mirror, xlang_rust,
+    assert_golden, without_processes, xlang, xlang_go, xlang_java, xlang_java_mirror, xlang_kotlin,
+    xlang_rust,
 };
 use meada::engine::{Direction, Engine, Start};
 
@@ -497,6 +498,105 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_java_file() {
         .unwrap();
 
     assert_golden("xlang-java.trace-uncommitted.txt", &answer);
+}
+
+/// The same chain with a Kotlin service (spec #27): the web app (TypeScript, Next.js) reaches the
+/// api (Ktor) through `API_URL` and through the api's declared host; the api reaches the web app
+/// with the Ktor client through bases its Spring configuration gives `@Value` properties and a
+/// constructor property (a placeholder, a literal URL, a placeholder with a default a peer
+/// serves and one no peer serves) and through `System.getenv`, read both ways.
+#[test]
+fn kotlin_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_host() {
+    let (web, api) = xlang_kotlin("xlang_kotlin_export");
+
+    for (repo, name) in [(web, "web"), (api, "api")] {
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        assert_golden(
+            &format!("xlang-kotlin-{name}.export.json"),
+            &without_processes(&export),
+        );
+    }
+}
+
+#[test]
+fn two_exports_of_the_kotlin_cross_language_fixture_are_byte_identical() {
+    let export = |case| {
+        let (web, api) = xlang_kotlin(case);
+        [web, api].map(|r| Engine::open(&r).unwrap().export().unwrap())
+    };
+
+    assert_eq!(
+        export("xlang_kotlin_twice_a"),
+        export("xlang_kotlin_twice_b")
+    );
+}
+
+#[test]
+fn trace_down_crosses_into_kotlin_and_back_to_typescript() {
+    let (web, _) = xlang_kotlin("xlang_kotlin_down");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("syncOrders"), Direction::Down, None)
+        .unwrap();
+
+    assert_golden("xlang-kotlin.trace-down.txt", &answer);
+}
+
+/// The web app produces the Kafka topic `orders.shipped` in TypeScript (kafkajs); the api
+/// service consumes it with a Spring `@KafkaListener` written in Kotlin whose topic its
+/// configuration names, the annotated function being the handler (spec #27, #104).
+#[test]
+fn trace_down_from_a_typescript_producer_reaches_the_kotlin_kafka_listener() {
+    let (web, _) = xlang_kotlin("xlang_kotlin_channel_down");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("announceShipment"), Direction::Down, None)
+        .unwrap();
+
+    assert!(
+        answer.contains(
+            "→[exact: channel::kafka::orders.shipped] example.com/xlang-kotlin/api \
+             src/main/kotlin/com/example/api/ShipmentListener.kt:7 \
+             com.example.api.ShipmentListener.onShipment(String)"
+        ),
+        "{answer}"
+    );
+    assert_golden("xlang-kotlin.trace-channel-down.txt", &answer);
+}
+
+#[test]
+fn trace_up_crosses_into_kotlin_and_back_to_typescript() {
+    let (web, _) = xlang_kotlin("xlang_kotlin_up");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(
+            Start::From("http::GET::/api/prices/{}"),
+            Direction::Up,
+            None,
+        )
+        .unwrap();
+
+    assert_golden("xlang-kotlin.trace-up.txt", &answer);
+}
+
+#[test]
+fn trace_from_uncommitted_changes_starts_at_an_edited_kotlin_file() {
+    let (_, api) = xlang_kotlin("xlang_kotlin_uncommitted");
+    let server = api.join("src/main/kotlin/com/example/api/Server.kt");
+    let edited = fs::read_to_string(&server)
+        .unwrap()
+        .replace("stock.level()", "stock.level(); println(id)");
+    fs::write(&server, edited).unwrap();
+
+    let answer = Engine::open(&api)
+        .unwrap()
+        .trace(Start::Uncommitted, Direction::Up, None)
+        .unwrap();
+
+    assert_golden("xlang-kotlin.trace-uncommitted.txt", &answer);
 }
 
 /// The default's host two repositories serve (a mirror of the web app beside it): the one

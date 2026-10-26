@@ -28,4 +28,4 @@ versão e informa as duas versões. A imagem `-cloud` já contém esses arquivos
 necessário para compilar o frontend a partir dos fontes, nunca para instalar pelo Cargo ou
 executar a console.
 
-Para indexar Java, basta o binário do Meada e o git. JDK, Maven e Gradle não são necessários; a análise lê os arquivos `.java` sem compilar ou executar o projeto.
+Para indexar Java e Kotlin, basta o binário do Meada e o git. JDK, compilador Kotlin, Maven e Gradle não são necessários; a análise lê os arquivos `.java`, `.kt` e `.kts` sem compilar ou executar o projeto.

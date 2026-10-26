@@ -2,6 +2,10 @@
 !Cargo.toml
 !Cargo.lock
 !rust-toolchain.toml
+!build.rs
+!vendor/
+!vendor/tree-sitter-kotlin-ng/
+!vendor/tree-sitter-kotlin-ng/**
 !src/
 !src/**
 !examples/
