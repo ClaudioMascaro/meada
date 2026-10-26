@@ -1896,6 +1896,9 @@ one for the area a change touches.
 
 ## Known ceilings
 
+- `jvm/spring.rs` (`read_yaml`): the dotted keys a YAML file flattens to are charged to
+  `YAML_KEY_BUDGET` (1 MiB); a file past it (a long key over thousands of children) reads as
+  empty, so its `${key}` placeholders name environment variables.
 - `lang/java.rs`: `DEFINITION_DEPTH` (128) bounds nested named types; deeper definitions and
   their bindings stay with the enclosing symbol. `VALUE_DEPTH` (64) bounds nested values and
   `PATH_DEPTH` (256) bounds callee segments; deeper values or callees are unknown.

@@ -51,6 +51,11 @@ const PLACEHOLDER_DEPTH: usize = 32;
 /// expand a small file into a huge value.
 // ponytail: a flat 64 KiB per value; a base URL is a few dozen bytes.
 const PLACEHOLDER_BUDGET: usize = 1 << 16;
+/// The bytes of joined keys one YAML file may allocate. Past it the file is not read, since
+/// a long key over many children would otherwise cost its length per child.
+// ponytail: flattening stays; real files join a few KB of keys, so 1 MiB (`lang::MAX_BYTES`)
+// is loose, and a hostile one stops at about twice that.
+const YAML_KEY_BUDGET: usize = crate::lang::MAX_BYTES;
 
 /// The configurations of a repository's modules, by the module's directory (`api/`, or empty
 /// for the repository root), and the main source roots the builds declare, as
@@ -172,7 +177,8 @@ fn read_properties(src: &str) -> Properties {
 }
 
 /// The scalars of a YAML file's first document, by their keys joined with dots (`api.url`);
-/// a list, a null and anything the reader cannot read are left out, and so is a document
+/// a list, a null and anything the reader cannot read are left out (and the whole file,
+/// when its joined keys pass `YAML_KEY_BUDGET`), and so is a document
 /// that activates on a profile.
 fn read_yaml(src: &str) -> Properties {
     let Ok(root) = crate::document::yaml::parse(src) else {
@@ -180,11 +186,15 @@ fn read_yaml(src: &str) -> Properties {
     };
     let mut out = Properties::new();
     // The YAML reader bounds the nesting; the walk is an explicit stack.
+    let mut budget = YAML_KEY_BUDGET;
     let mut pending = vec![(String::new(), &root)];
     while let Some((key, value)) = pending.pop() {
         let scalar = match value {
             serde_json::Value::Object(map) => {
                 for (k, v) in map {
+                    if !charge(&mut budget, key.len() + 1 + k.len()) {
+                        return Properties::new();
+                    }
                     let joined = if key.is_empty() {
                         k.clone()
                     } else {
@@ -447,6 +457,21 @@ mod tests {
         let profile = "spring:\n  config:\n    activate:\n      on-profile: dev\napi.url: x\n";
         assert!(read_yaml(profile).is_empty());
         assert!(read_yaml("a: [unclosed\n").is_empty());
+    }
+
+    #[test]
+    fn a_hostile_yaml_key_prefix_is_stopped_by_the_key_budget() {
+        // One 200 KB key (explicit, as a simple key stops at 1024) holding thousands of children: joined, the keys would weigh gigabytes.
+        let mut src = format!("? {}\n:\n", "k".repeat(200_000));
+        for n in 0..3000 {
+            src += &format!("  c{n}: v\n");
+        }
+        assert!(src.len() < crate::lang::MAX_BYTES);
+        let start = std::time::Instant::now();
+        assert!(read_yaml(&src).is_empty());
+        assert!(start.elapsed() < std::time::Duration::from_secs(1));
+        // Keys within the budget still join.
+        assert_eq!(read_yaml("a:\n  b: c\n"), props(&[("a.b", "c")]));
     }
 
     #[test]
