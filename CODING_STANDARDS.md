@@ -42,7 +42,10 @@ a review finding.
 - **Name-matched hops.** A call resolved only by a name match (`inferred` or `ambiguous`) never
   feeds a contract, since it may be on any object or reach another function: wrapper expansion
   and the value flow that finds routers and clients (through constants, arguments and return
-  values) climb `exact` hops alone.
+  values) climb `exact` hops alone. The one exception is a C# extension method called on a
+  receiver (`x.M()`), which the resolver keeps a name match only because it does not look the
+  extensions up: the value flow takes it when the static class declaring it is in scope of the
+  call by its name, as the compiler binds it (`Resolver::extension_callers`).
 - **Unreadable parts.** A path or prefix with a part that cannot be read (an unfolded template or
   f-string hole, a parameter, an environment read) yields no provider, never a `{}` segment. A
   parameter written in the literal (`:id`, `{id}`, `<int:id>`) stays one.

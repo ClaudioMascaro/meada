@@ -334,6 +334,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // in `facts.calls`), linked to the calls they name once every call is read.
     let mut results: Vec<Range<usize>> = Vec::new();
     let mut chains: Vec<(usize, Range<usize>)> = Vec::new();
+    // What each method, local function and lambda returns, by its qualified name.
+    let mut returned: BTreeMap<String, Vec<Value>> = BTreeMap::new();
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
         node,
@@ -565,7 +567,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         node.byte_range(),
                     );
                     at.by_path = bare;
-                    (at.args, at.kwargs) = arguments(node.child_by_field_name("arguments"), src, 0);
+                    let list = node.child_by_field_name("arguments");
+                    (at.args, at.kwargs) = arguments(list, src, 0);
+                    if inline(defining, &scope, &classes) {
+                        lambdas(list, &scope, &mut at.args, &mut at.kwargs);
+                    }
                     at.arity = Some(at.args.len() + at.kwargs.len());
                     let object = match function {
                         Some(f) if f.kind() == "member_access_expression" => {
@@ -852,8 +858,28 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 }
             }
             "lambda_expression" | "anonymous_method_expression" => {
+                // A lambda in a definition is a scope of its own, which a call's argument names
+                // (`lambdas`): a kind may claim it as a handler, and it folds into the symbol
+                // around it otherwise. Its parameters hide outer names in it, and what it
+                // returns is its own.
+                if inline(defining, &scope, &classes) {
+                    inner = Rc::new(qualify(&scope, &format!("@{}", node.start_byte())));
+                    facts.defs.push(Def {
+                        name: inner.as_ref().clone(),
+                        kind: Kind::Inline,
+                        range: node.byte_range(),
+                        params: Vec::new(),
+                        bases: Vec::new(),
+                        decorators: Vec::new(),
+                        return_values: Vec::new(),
+                        returns: None,
+                        type_params: Vec::new(),
+                        result: None,
+                    });
+                    nested += 1;
+                }
                 let unknown = |name: &str| Receiver {
-                    scope: scope.as_ref().clone(),
+                    scope: inner.as_ref().clone(),
                     name: name.to_string(),
                     class: Class::Unknown,
                 };
@@ -868,6 +894,24 @@ fn parse(src: &[u8]) -> Result<Facts> {
                             locals.push(unknown(&name));
                         }
                     }
+                }
+            }
+            // `return x;` in its definition or lambda, and a method's `=> x`.
+            "return_statement" if defining => {
+                if let Some(v) = named(node).next() {
+                    let values = returned.entry(scope.as_ref().clone()).or_default();
+                    values.push(value(v, src, 0));
+                }
+            }
+            "arrow_expression_clause"
+                if defining
+                    && node.parent().is_some_and(|p| {
+                        matches!(p.kind(), "method_declaration" | "local_function_statement")
+                    }) =>
+            {
+                if let Some(v) = named(node).next() {
+                    let values = returned.entry(scope.as_ref().clone()).or_default();
+                    values.push(value(v, src, 0));
                 }
             }
             _ => {}
@@ -977,6 +1021,13 @@ fn parse(src: &[u8]) -> Result<Facts> {
         }
     }
     facts.receivers = receivers;
+    for def in &mut facts.defs {
+        if def.kind != Kind::Class
+            && let Some(values) = returned.remove(&def.name)
+        {
+            def.return_values = values;
+        }
+    }
     // A name assigned through a field (`_c.BaseAddress = v`, `this.c.BaseAddress = v`, `_c = v`) is
     // bound in the type that declares the field, so any method of it reads the value; through a
     // local or a parameter, in the scope that declares it.
@@ -1046,6 +1097,39 @@ fn parse(src: &[u8]) -> Result<Facts> {
         names.sort();
     }
     Ok(facts)
+}
+
+/// Whether a lambda written as an argument in `scope` is a `Kind::Inline` definition: inside
+/// a definition the walk names (`defining`), not in a type's initializer.
+fn inline(defining: bool, scope: &str, classes: &BTreeSet<String>) -> bool {
+    defining && !classes.contains(scope)
+}
+
+/// Gives each lambda written as an argument of `list` (`args` its positional arguments and
+/// `kwargs` its named ones, as `arguments` read them) as the `Kind::Inline` definition the walk
+/// makes of it under `scope`.
+fn lambdas(list: Option<Node>, scope: &str, args: &mut [Value], kwargs: &mut [(String, Value)]) {
+    let (mut positional, mut keyword) = (0, 0);
+    for argument in (list.into_iter().flat_map(named)).filter(|n| n.kind() == "argument") {
+        let name = argument.child_by_field_name("name");
+        let expression = named(argument).find(|n| Some(n.id()) != name.map(|m| m.id()));
+        let slot = match name {
+            Some(_) => kwargs.get_mut(keyword).map(|(_, v)| v),
+            None => args.get_mut(positional),
+        };
+        match name {
+            Some(_) => keyword += 1,
+            None => positional += 1,
+        }
+        if let (Some(slot), Some(e)) = (slot, expression)
+            && matches!(
+                e.kind(),
+                "lambda_expression" | "anonymous_method_expression"
+            )
+        {
+            *slot = Value::Function(qualify(scope, &format!("@{}", e.start_byte())));
+        }
+    }
 }
 
 /// A name bound in `scope` to no value the source gives (a loop variable, a pattern, a lambda
@@ -1505,6 +1589,28 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             }
             Value::New(ty, args)
         }
+        // `new[] { a, b }`, `new T[] { a, b }` and `[a, b]`.
+        "implicit_array_creation_expression" | "array_creation_expression" => {
+            match named(node).find(|n| n.kind() == "initializer_expression") {
+                Some(items) => {
+                    Value::List(named(items).map(|n| value(n, src, depth + 1)).collect())
+                }
+                None => Value::Unknown,
+            }
+        }
+        "collection_expression" => Value::List(
+            named(node)
+                .map(|mut n| {
+                    while matches!(n.kind(), "collection_element" | "expression_element") {
+                        match named(n).next() {
+                            Some(inner) => n = inner,
+                            None => return Value::Unknown,
+                        }
+                    }
+                    value(n, src, depth + 1)
+                })
+                .collect(),
+        ),
         "integer_literal" => Value::Scalar(text(node, src).parse().ok()),
         "boolean_literal" => Value::Scalar(None),
         "null_literal" => Value::Undefined,

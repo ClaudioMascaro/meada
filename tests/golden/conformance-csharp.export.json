@@ -124,6 +124,22 @@
     {
       "path": "src/Acme.Core/Text/Nested.cs",
       "hash": "85de0bac38f4a2e8f3a2037b21a90373d2833281102e70905b42434e99661cf2"
+    },
+    {
+      "path": "src/Acme.Web/Program.cs",
+      "hash": "46b69c3c6b8ccf7c447ac218a571248a5700d459f13a24a3461d96c7c91e8762"
+    },
+    {
+      "path": "src/Acme.Web/Routes/Admin.cs",
+      "hash": "071f3ea8a0f8a3e18c41c70cc1d144faa57e2a6069cd70a41132a435ea3c7ac6"
+    },
+    {
+      "path": "src/Acme.Web/Routes/Handlers.cs",
+      "hash": "494aca93cf3add1ae19b41c511c65cbd8d335f2d9c9c6361d4b5e4e72ff50861"
+    },
+    {
+      "path": "src/Acme.Web/Routes/OrderRoutes.cs",
+      "hash": "8270836747c3fd9689031ca9d38d093117ef33efafe1ea0d6a5a7325c55630fa"
     }
   ],
   "symbols": [
@@ -1805,6 +1821,206 @@
         "path": "src/Acme.Core/Text/Nested.cs",
         "start": 194,
         "end": 223
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 376,
+        "end": 1558
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main.GET /health",
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 476,
+        "end": 486
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Admin",
+      "span": {
+        "path": "src/Acme.Web/Routes/Admin.cs",
+        "start": 80,
+        "end": 227
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Admin.Map(RouteGroupBuilder)",
+      "span": {
+        "path": "src/Acme.Web/Routes/Admin.cs",
+        "start": 112,
+        "end": 225
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Reports",
+      "span": {
+        "path": "src/Acme.Web/Routes/Admin.cs",
+        "start": 229,
+        "end": 351
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Reports.Group(WebApplication)",
+      "span": {
+        "path": "src/Acme.Web/Routes/Admin.cs",
+        "start": 263,
+        "end": 349
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate",
+      "span": {
+        "path": "src/Acme.Web/Routes/Handlers.cs",
+        "start": 450,
+        "end": 500
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate.Stock()",
+      "span": {
+        "path": "src/Acme.Web/Routes/Handlers.cs",
+        "start": 475,
+        "end": 498
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers",
+      "span": {
+        "path": "src/Acme.Web/Routes/Handlers.cs",
+        "start": 28,
+        "end": 288
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Ban(int)",
+      "span": {
+        "path": "src/Acme.Web/Routes/Handlers.cs",
+        "start": 252,
+        "end": 286
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Daily()",
+      "span": {
+        "path": "src/Acme.Web/Routes/Handlers.cs",
+        "start": 151,
+        "end": 191
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Echo(string)",
+      "span": {
+        "path": "src/Acme.Web/Routes/Handlers.cs",
+        "start": 63,
+        "end": 110
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Find(int)",
+      "span": {
+        "path": "src/Acme.Web/Routes/Handlers.cs",
+        "start": 197,
+        "end": 246
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Sync()",
+      "span": {
+        "path": "src/Acme.Web/Routes/Handlers.cs",
+        "start": 116,
+        "end": 145
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf",
+      "span": {
+        "path": "src/Acme.Web/Routes/Handlers.cs",
+        "start": 398,
+        "end": 448
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf.Stock()",
+      "span": {
+        "path": "src/Acme.Web/Routes/Handlers.cs",
+        "start": 423,
+        "end": 446
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store",
+      "span": {
+        "path": "src/Acme.Web/Routes/Handlers.cs",
+        "start": 290,
+        "end": 396
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store.All()",
+      "span": {
+        "path": "src/Acme.Web/Routes/Handlers.cs",
+        "start": 315,
+        "end": 351
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store.Remove(int)",
+      "span": {
+        "path": "src/Acme.Web/Routes/Handlers.cs",
+        "start": 357,
+        "end": 394
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes",
+      "span": {
+        "path": "src/Acme.Web/Routes/OrderRoutes.cs",
+        "start": 118,
+        "end": 662
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder)",
+      "span": {
+        "path": "src/Acme.Web/Routes/OrderRoutes.cs",
+        "start": 156,
+        "end": 421
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).DELETE /api/v1/orders/{}",
+      "span": {
+        "path": "src/Acme.Web/Routes/OrderRoutes.cs",
+        "start": 363,
+        "end": 391
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders",
+      "span": {
+        "path": "src/Acme.Web/Routes/OrderRoutes.cs",
+        "start": 260,
+        "end": 277
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder)",
+      "span": {
+        "path": "src/Acme.Web/Routes/OrderRoutes.cs",
+        "start": 509,
+        "end": 660
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder).GET /loop/leaf",
+      "span": {
+        "path": "src/Acme.Web/Routes/OrderRoutes.cs",
+        "start": 599,
+        "end": 611
       }
     }
   ],
@@ -4483,6 +4699,417 @@
         "start": 916,
         "end": 921
       }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::(invocation_expression).MapGroup#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 701,
+        "end": 740
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::(invocation_expression).MapOrders#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 665,
+        "end": 699
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::(invocation_expression).MapOrders#1",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 701,
+        "end": 752
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::(invocation_expression).Nest#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 865,
+        "end": 893
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::Admin.Map#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Admin.Map(RouteGroupBuilder)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 754,
+        "end": 787
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::Reports.Group#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Reports.Group(WebApplication)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 803,
+        "end": 821
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::Shelf#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 1134,
+        "end": 1145
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::System.Text.Json.JsonSerializer.Deserialize#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 1378,
+        "end": 1434
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::WebApplication.CreateBuilder#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 390,
+        "end": 424
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::api.MapGroup#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 644,
+        "end": 663
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::api.MapGroup#1",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 701,
+        "end": 720
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::api.MapGroup#2",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 764,
+        "end": 786
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::app.MapGet#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 454,
+        "end": 487
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::app.MapGroup#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 613,
+        "end": 633
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::app.MapGroup#1",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 865,
+        "end": 886
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::app.MapMethods#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 526,
+        "end": 600
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::app.MapPost#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 489,
+        "end": 524
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::app.Run#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 1548,
+        "end": 1557
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::app.UseEndpoints#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 974,
+        "end": 1045
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::builder.Build#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 436,
+        "end": 451
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::endpoints.MapGet#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 1004,
+        "end": 1044
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::reports.MapGet#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 823,
+        "end": 863
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::shelf.Stock#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf.Stock()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 1147,
+        "end": 1160
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::shelf.Stock#1",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate.Stock()",
+        "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf.Stock()"
+      ],
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 1193,
+        "end": 1206
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::stocked.Stock#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 1436,
+        "end": 1451
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::v1.MapGroup#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 665,
+        "end": 687
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Admin.Map(RouteGroupBuilder)::admin.MapDelete#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Admin.Map(RouteGroupBuilder)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Routes/Admin.cs",
+        "start": 174,
+        "end": 218
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Reports.Group(WebApplication)::app.MapGroup#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Reports.Group(WebApplication)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Routes/Admin.cs",
+        "start": 324,
+        "end": 348
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Find(int)::Store.All#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Find(int)",
+      "target": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store.All()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Web/Routes/Handlers.cs",
+        "start": 234,
+        "end": 245
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).DELETE /api/v1/orders/{}::Store.Remove#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).DELETE /api/v1/orders/{}",
+      "target": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store.Remove(int)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Web/Routes/OrderRoutes.cs",
+        "start": 375,
+        "end": 391
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders::Store.All#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders",
+      "target": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store.All()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Web/Routes/OrderRoutes.cs",
+        "start": 266,
+        "end": 277
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder)::group.MapDelete#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Routes/OrderRoutes.cs",
+        "start": 338,
+        "end": 392
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder)::group.MapGet#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Routes/OrderRoutes.cs",
+        "start": 242,
+        "end": 278
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder)::group.MapGet#1",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Routes/OrderRoutes.cs",
+        "start": 288,
+        "end": 328
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder)::(invocation_expression).Nest#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder)",
+      "target": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Web/Routes/OrderRoutes.cs",
+        "start": 622,
+        "end": 653
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder)::group.MapGet#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Routes/OrderRoutes.cs",
+        "start": 577,
+        "end": 612
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder)::group.MapGroup#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Routes/OrderRoutes.cs",
+        "start": 622,
+        "end": 646
+      }
     }
   ],
   "providers": [
@@ -4493,6 +5120,18 @@
     {
       "contract": "http::DELETE::/api/Orders/{}",
       "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Remove(int?)"
+    },
+    {
+      "contract": "http::DELETE::/api/admin/users/{}",
+      "site": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Ban(int)"
+    },
+    {
+      "contract": "http::DELETE::/api/v1/orders/{}",
+      "site": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).DELETE /api/v1/orders/{}"
+    },
+    {
+      "contract": "http::DELETE::/api/v2/orders/{}",
+      "site": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).DELETE /api/v1/orders/{}"
     },
     {
       "contract": "http::GET::/",
@@ -4507,6 +5146,22 @@
       "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Get(int)"
     },
     {
+      "contract": "http::GET::/api/v1/orders",
+      "site": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders"
+    },
+    {
+      "contract": "http::GET::/api/v1/orders/{}",
+      "site": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Find(int)"
+    },
+    {
+      "contract": "http::GET::/api/v2/orders",
+      "site": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders"
+    },
+    {
+      "contract": "http::GET::/api/v2/orders/{}",
+      "site": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Find(int)"
+    },
+    {
       "contract": "http::GET::/edges/Jobs/List",
       "site": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.ListAsync()"
     },
@@ -4519,8 +5174,24 @@
       "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Health()"
     },
     {
+      "contract": "http::GET::/health",
+      "site": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main.GET /health"
+    },
+    {
+      "contract": "http::GET::/loop/again/leaf",
+      "site": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder).GET /loop/leaf"
+    },
+    {
+      "contract": "http::GET::/loop/leaf",
+      "site": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder).GET /loop/leaf"
+    },
+    {
       "contract": "http::GET::/ping",
       "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.PingController.Pong()"
+    },
+    {
+      "contract": "http::GET::/reports/daily",
+      "site": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Daily()"
     },
     {
       "contract": "http::GET::/status/{}",
@@ -4539,12 +5210,24 @@
       "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Touch(int)"
     },
     {
+      "contract": "http::PATCH::/sync",
+      "site": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Sync()"
+    },
+    {
       "contract": "http::POST::/api/Orders",
       "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Create()"
     },
     {
+      "contract": "http::POST::/echo",
+      "site": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Echo(string)"
+    },
+    {
       "contract": "http::PUT::/api/Orders/{}",
       "site": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Replace(int)"
+    },
+    {
+      "contract": "http::PUT::/sync",
+      "site": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Sync()"
     }
   ],
   "consumers": [
@@ -4955,6 +5638,33 @@
       "members": [
         "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock",
         "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock.Now()"
+      ]
+    },
+    {
+      "name": "src/Acme.Web/Routes",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+        "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Admin.Map(RouteGroupBuilder)",
+        "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Reports.Group(WebApplication)",
+        "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf",
+        "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf.Stock()",
+        "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder)",
+        "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder)"
+      ]
+    },
+    {
+      "name": "src/Acme.Web/Routes#2",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Find(int)",
+        "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store.All()",
+        "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders"
+      ]
+    },
+    {
+      "name": "src/Acme.Web/Routes#3",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store.Remove(int)",
+        "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).DELETE /api/v1/orders/{}"
       ]
     }
   ],
@@ -7125,6 +7835,320 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Double(int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "kind": "program",
+      "label": "Main",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Admin.Map(RouteGroupBuilder)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Reports.Group(WebApplication)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder)",
+          "mark": "cycle"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf.Stock()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::shelf.Stock#1",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate.Stock()",
+            "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf.Stock()"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main.GET /health::http::GET::/health",
+      "kind": "route",
+      "label": "GET /health",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main.GET /health"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Ban(int)::http::DELETE::/api/admin/users/{}",
+      "kind": "route",
+      "label": "DELETE /api/admin/users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Ban(int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Daily()::http::GET::/reports/daily",
+      "kind": "route",
+      "label": "GET /reports/daily",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Daily()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Echo(string)::http::POST::/echo",
+      "kind": "route",
+      "label": "POST /echo",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Echo(string)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Find(int)::http::GET::/api/v1/orders/{}",
+      "kind": "route",
+      "label": "GET /api/v1/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Find(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store.All()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Find(int)::http::GET::/api/v2/orders/{}",
+      "kind": "route",
+      "label": "GET /api/v2/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Find(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store.All()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Sync()::http::PATCH::/sync",
+      "kind": "route",
+      "label": "PATCH /sync",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Sync()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Sync()::http::PUT::/sync",
+      "kind": "route",
+      "label": "PUT /sync",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Sync()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).DELETE /api/v1/orders/{}::http::DELETE::/api/v1/orders/{}",
+      "kind": "route",
+      "label": "DELETE /api/v1/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).DELETE /api/v1/orders/{}"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store.Remove(int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).DELETE /api/v1/orders/{}::http::DELETE::/api/v2/orders/{}",
+      "kind": "route",
+      "label": "DELETE /api/v2/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).DELETE /api/v1/orders/{}"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store.Remove(int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders::http::GET::/api/v1/orders",
+      "kind": "route",
+      "label": "GET /api/v1/orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store.All()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders::http::GET::/api/v2/orders",
+      "kind": "route",
+      "label": "GET /api/v2/orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store.All()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder).GET /loop/leaf::http::GET::/loop/again/leaf",
+      "kind": "route",
+      "label": "GET /loop/again/leaf",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder).GET /loop/leaf"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder).GET /loop/leaf::http::GET::/loop/leaf",
+      "kind": "route",
+      "label": "GET /loop/leaf",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder).GET /loop/leaf"
         }
       ]
     }

@@ -3482,6 +3482,7 @@ fn csharp() {
     ]
     .into_iter()
     .chain(billing_symbols())
+    .chain(web_symbols())
     .collect::<Vec<_>>();
     let place = |callee: &str| format!("{}::{callee}", service(".Place(string,int)"));
     let run = |callee: &str| {
@@ -3735,6 +3736,7 @@ fn csharp() {
         calls.push((id, INFERRED, vec![upper.clone()]));
     }
     calls.extend(billing_calls());
+    calls.extend(web_calls());
     let symbols: Vec<&str> = symbols.iter().map(String::as_str).collect();
     let targets: Vec<Vec<&str>> = (calls.iter())
         .map(|(_, _, t)| t.iter().map(String::as_str).collect())
@@ -3748,6 +3750,7 @@ fn csharp() {
         &[
             "legacy/Top.cs::Main",
             "src/Acme.Api/Cli.cs::Acme.Api.Cli.Main(string[])",
+            "src/Acme.Web/Program.cs::Main",
         ],
         &calls,
     );
@@ -3808,6 +3811,134 @@ fn csharp_controllers_are_providers_with_their_full_paths() {
         .collect();
     let expected: Vec<(&str, &str)> = contracts
         .iter()
+        .map(|(c, s)| (c.as_str(), s.as_str()))
+        .collect();
+    assert_eq!(actual, pairs(&expected));
+}
+
+const WEB: &str = "src/Acme.Web";
+
+/// A definition of the minimal API's routes (`Routes/<file>`, namespace `Acme.Web.Routes`).
+fn web(file: &str, name: &str) -> String {
+    format!("{WEB}/Routes/{file}::Acme.Web.Routes.{name}")
+}
+
+/// The symbols of the minimal API project: the route handlers a kind claims are named for
+/// their route (the first one, when a handler serves several).
+fn web_symbols() -> Vec<String> {
+    let mut symbols: Vec<String> = ["Main", "Main.GET /health"]
+        .iter()
+        .map(|s| format!("{WEB}/Program.cs::{s}"))
+        .collect();
+    let routes = [
+        ("Admin.cs", "Admin"),
+        ("Admin.cs", "Admin.Map(RouteGroupBuilder)"),
+        ("Admin.cs", "Reports"),
+        ("Admin.cs", "Reports.Group(WebApplication)"),
+        ("Handlers.cs", "Handlers"),
+        ("Handlers.cs", "Handlers.Ban(int)"),
+        ("Handlers.cs", "Handlers.Daily()"),
+        ("Handlers.cs", "Handlers.Echo(string)"),
+        ("Handlers.cs", "Handlers.Find(int)"),
+        ("Handlers.cs", "Handlers.Sync()"),
+        ("Handlers.cs", "Store"),
+        ("Handlers.cs", "Store.All()"),
+        ("Handlers.cs", "Store.Remove(int)"),
+        ("Handlers.cs", "Shelf"),
+        ("Handlers.cs", "Shelf.Stock()"),
+        ("Handlers.cs", "Crate"),
+        ("Handlers.cs", "Crate.Stock()"),
+        ("OrderRoutes.cs", "OrderRoutes"),
+        ("OrderRoutes.cs", "OrderRoutes.MapOrders(RouteGroupBuilder)"),
+        (
+            "OrderRoutes.cs",
+            "OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders",
+        ),
+        (
+            "OrderRoutes.cs",
+            "OrderRoutes.MapOrders(RouteGroupBuilder).DELETE /api/v1/orders/{}",
+        ),
+        ("OrderRoutes.cs", "OrderRoutes.Nest(RouteGroupBuilder)"),
+        (
+            "OrderRoutes.cs",
+            "OrderRoutes.Nest(RouteGroupBuilder).GET /loop/leaf",
+        ),
+    ];
+    symbols.extend(routes.iter().map(|(f, n)| web(f, n)));
+    symbols
+}
+
+/// The calls of the minimal API project: an extension method called on a group is a name
+/// match, a lambda's parameter hides a local of its name only inside the lambda, and the
+/// application an outside call made reaches no method of the repository.
+fn web_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
+    let main = |callee: &str| format!("{WEB}/Program.cs::Main::{callee}");
+    let orders = web("OrderRoutes.cs", "OrderRoutes.MapOrders(RouteGroupBuilder)");
+    let stock = |class: &str| web("Handlers.cs", &format!("{class}.Stock()"));
+    vec![
+        (
+            main("(invocation_expression).MapOrders#0"),
+            INFERRED,
+            vec![orders.clone()],
+        ),
+        (
+            main("(invocation_expression).MapOrders#1"),
+            INFERRED,
+            vec![orders],
+        ),
+        (
+            main("Admin.Map#0"),
+            EXACT,
+            vec![web("Admin.cs", "Admin.Map(RouteGroupBuilder)")],
+        ),
+        (main("shelf.Stock#0"), EXACT, vec![stock("Shelf")]),
+        // A local an outside call made is from outside: only an extension method answers it.
+        (main("app.Run#0"), None, vec![]),
+        (main("stocked.Stock#0"), None, vec![]),
+        (
+            main("shelf.Stock#1"),
+            AMBIGUOUS,
+            vec![stock("Crate"), stock("Shelf")],
+        ),
+    ]
+}
+
+/// Minimal APIs are providers (spec #28, #110): routes on the application and on nested
+/// groups, through locals, chains, a method argument, a return value and an extension method
+/// called on two groups (one provider per prefix), a group mounted inside itself, `MapMethods`
+/// and both handler forms; a builder in a lambda's parameter serves nothing.
+#[test]
+fn csharp_minimal_apis_are_providers_with_their_full_paths() {
+    let (_, actual) = providers("csharp_minimal", "conformance-csharp", WEB);
+    let handler = |name: &str| web("Handlers.cs", &format!("Handlers.{name}"));
+    let orders = |name: &str| web("OrderRoutes.cs", name);
+    let all = orders("OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders");
+    let remove = orders("OrderRoutes.MapOrders(RouteGroupBuilder).DELETE /api/v1/orders/{}");
+    let leaf = orders("OrderRoutes.Nest(RouteGroupBuilder).GET /loop/leaf");
+    let routes = [
+        (
+            "GET",
+            "/health",
+            format!("{WEB}/Program.cs::Main.GET /health"),
+        ),
+        ("POST", "/echo", handler("Echo(string)")),
+        ("PUT", "/sync", handler("Sync()")),
+        ("PATCH", "/sync", handler("Sync()")),
+        ("GET", "/api/v1/orders", all.clone()),
+        ("GET", "/api/v2/orders", all),
+        ("GET", "/api/v1/orders/{}", handler("Find(int)")),
+        ("GET", "/api/v2/orders/{}", handler("Find(int)")),
+        ("DELETE", "/api/v1/orders/{}", remove.clone()),
+        ("DELETE", "/api/v2/orders/{}", remove),
+        ("DELETE", "/api/admin/users/{}", handler("Ban(int)")),
+        ("GET", "/reports/daily", handler("Daily()")),
+        ("GET", "/loop/leaf", leaf.clone()),
+        ("GET", "/loop/again/leaf", leaf),
+    ];
+    let contracts: Vec<(String, String)> = (routes.iter())
+        .map(|(m, path, site)| (format!("http::{m}::{path}"), site.clone()))
+        .collect();
+    let expected: Vec<(&str, &str)> = (contracts.iter())
         .map(|(c, s)| (c.as_str(), s.as_str()))
         .collect();
     assert_eq!(actual, pairs(&expected));
