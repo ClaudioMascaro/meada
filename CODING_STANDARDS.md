@@ -98,7 +98,10 @@ in the same change:
   finding.
 - `jvm/` holds what the JVM ecosystems and kinds share (spec #26, user story 28): the build
   readers (`jvm/maven.rs`, `jvm/gradle.rs`), the Spring configuration reader with its injector
-  (`jvm/spring.rs`) and the name questions of the JVM forms (`jvm/names.rs`). An ecosystem's
+  (`jvm/spring.rs`) and the file readers of the JVM forms (`jvm/names.rs`). The name questions
+  every kind asks of a library name (`one`, `known`, `typed`, `spellings`, `declared`, `is_method`)
+  live in `names.rs`, shared with the C# kind; one a second ecosystem needs moves there, not into
+  `jvm/`. An ecosystem's
   rule stays in `package/maven.rs` and a library form in its kind (`http/java*`,
   `channel/java.rs`); either one in `jvm/` is a finding, and so is a JVM reader a second
   module copies instead of sharing.

@@ -13,6 +13,7 @@ use crate::resolve::Code;
 use crate::shape::{self, Shape};
 use crate::workspace::Repository;
 
+mod csharp;
 mod go;
 mod java;
 mod kotlin;
@@ -439,6 +440,25 @@ fn join(prefix: &str, path: &str) -> String {
     }
 }
 
+/// Whether every `{` of `path` closes within its segment, as `{id:[0-9]{3}}` does: a pattern
+/// with a `/` inside braces is not read.
+fn balanced(path: &str) -> bool {
+    path.split('/').all(|segment| {
+        let mut depth = 0usize;
+        for c in segment.chars() {
+            match c {
+                '{' => depth += 1,
+                '}' => match depth.checked_sub(1) {
+                    Some(d) => depth = d,
+                    None => return false,
+                },
+                _ => {}
+            }
+        }
+        depth == 0
+    })
+}
+
 /// How many mounts deep a router's prefixes are read.
 // ponytail: a router nested deeper than this is served nowhere; the stack is not Meada's to spend.
 const PREFIX_DEPTH: usize = 64;
@@ -567,6 +587,7 @@ impl ContractKind for Http {
         found.extend(go::consumers(code));
         found.extend(python::providers(code));
         found.extend(java::providers(code));
+        found.extend(csharp::providers(code));
         found.extend(kotlin::providers(code));
         found.extend(kotlin::consumers(code, indexed));
         found.extend(java::consumers(code, indexed));

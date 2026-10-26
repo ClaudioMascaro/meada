@@ -23,8 +23,9 @@ use super::rust::actix_path;
 use super::{METHODS, Mounts, contract, handler_site, join, normalize_path, path_literal};
 use super::{prefixes, provider};
 use crate::contract::Found;
-use crate::jvm::names::{kotlin, one, spellings};
+use crate::jvm::names::kotlin;
 use crate::lang::{Call, Facts, Kind, Value};
+use crate::names::{one, spellings};
 use crate::resolve::Code;
 
 /// The packages of Ktor's routing functions and types: Ktor 2 and 3, then Ktor 1.

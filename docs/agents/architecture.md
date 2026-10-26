@@ -781,7 +781,8 @@ one for the area a change touches.
   with resty; `http/java.rs` and `http/java/clients.rs`, Spring MVC providers and the
   RestTemplate, WebClient, `java.net.http` and OkHttp consumers, whose bases come from the
   Spring configuration `jvm/spring.rs` reads for the JVM packs' kinds; `http/kotlin.rs`, Ktor
-  providers, and `http/kotlin/client.rs`, Ktor client consumers), resource and channel
+  providers, and `http/kotlin/client.rs`, Ktor client consumers; `http/csharp.rs`, ASP.NET Core
+  controller providers), resource and channel
   kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
   contracts (specs #22, #24, #30, #25 and #26), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
@@ -1004,11 +1005,12 @@ one for the area a change touches.
   rule for an annotation's text Spring resolves (`@Value`, a Feign `url` or `path`, a listener's
   topic or queue): literal text with its placeholders resolved, an environment read kept, any
   other part unknown. The list of Spring's config files is the reader's too
-  (`spring::CONFIG_FILES`), which the Java pack returns as its `config_files`. `jvm/names.rs`
-  holds the name questions the JVM kinds share: `one` (exactly one spelling in the kind's
-  table), `known` (a name an import binds), `spellings` and `typed` (the outside type the source
-  writes for a name), and the Java readers' shared filters `java_files`, `jvm_files` (Java and
-  Kotlin files) and `is_method` (an annotation on a method of the file).
+  (`spring::CONFIG_FILES`), which the Java pack returns as its `config_files`. `names.rs`
+  holds the name questions the JVM and C# kinds share: `one` (exactly one spelling in the kind's
+  table), `known` (a name an import binds), `spellings`, `typed` and `declared` (the outside type
+  the source writes for a name) and `is_method` (an annotation on a method of the file);
+  `jvm/names.rs` keeps the Java readers' filters `java_files` and `jvm_files` (Java and Kotlin
+  files), `kotlin` and `array_of`.
 - `dotnet/` holds what the .NET pack and ecosystems share (spec #28), as `jvm/` does for the
   JVM: `dotnet/msbuild.rs` reads an SDK-style project file (`msbuild::read`: whether it is a
   project, and its `Using`s, the SDK's implicit usings among them), which the C# pack's `join`
@@ -1089,8 +1091,8 @@ one for the area a change touches.
 - **Java channels** (spec #26, #92): `channel/java.rs` lists each client by the outside types
   the source may write for its receiver (`CLIENTS`: `KafkaTemplate`, `RabbitTemplate`,
   `JmsTemplate`, the SQS clients, jnats `Connection` and `Dispatcher`, the Jedis clients and
-  Lettuce's `RedisCommands`), read through `jvm::names::typed` and `one`, and the listener
-  annotations (`@KafkaListener`, `@RabbitListener`, `@JmsListener`) through `jvm::names::known`
+  Lettuce's `RedisCommands`), read through `names::typed` and `one`, and the listener
+  annotations (`@KafkaListener`, `@RabbitListener`, `@JmsListener`) through `names::known`
   on a method's `Call::decorates`. Names fold through `Code::expand_with` with
   `jvm::spring::inject` (`Expand::Chain` for an SQS request, a Redis group read and a
   `BindingBuilder` chain); an annotation's values fold through `Code::value` and its placeholders
@@ -1099,7 +1101,7 @@ one for the area a change touches.
   that names the topic or queue (the Java pack keeps a lambda's calls in the method that writes
   it, so a jnats callback is that method too). The overload of `RabbitTemplate.convertAndSend`
   and `JmsTemplate.convertAndSend` is told by the type of the argument a `MessagePostProcessor`
-  would take (`of`, through `jvm::names::declared`): a name the source types as one, or a `new`
+  would take (`of`, through `names::declared`): a name the source types as one, or a `new`
   of one, picks the routing-key form, and so does a `CorrelationData` there
   (`(routingKey, message, correlation)`) unless a `MessagePostProcessor` before it makes it
   `(message, postProcessor, correlation)`; an argument whose type the source does not tell (a
@@ -1111,7 +1113,7 @@ one for the area a change touches.
   otherwise: a direct or fanout exchange keeps only the keys with no wildcard word, a headers or
   custom one none, a topic one, or one whose type is not read, every key; a `DirectExchange` in
   `BindingBuilder` keeps only a key with no wildcard. The listener annotation is asked first
-  (`jvm::names::known`), and only then whether it is on a method (a set of the file's methods,
+  (`names::known`), and only then whether it is on a method (a set of the file's methods,
   built once), so a file of many `@Override` methods is read in linear time. The Java pack reads an
   annotation written as an element value as `Value::New(name, [Object(elements)])`, its unnamed
   element as `value` (the shape of a Go composite literal; `Code::eval` folds it), only inside
@@ -1256,7 +1258,7 @@ one for the area a change touches.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the
   channel kind's module for that language (TS/JS: `channel/ts.rs`; Python: `channel/python.rs`; Rust: `channel/rust.rs`; Go: `channel/go.rs`; Java: `channel/java.rs`), never in the pack, matching a call's
   method and the `Code::origins` of its receiver, asked with the policy its language needs (TS/JS:
-  `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Java: the written type, `jvm::names::typed`; Python and Rust:
+  `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Java: the written type, `names::typed`; Python and Rust:
   `Values`, the constructors named by the file's imports), reading the name through `Code::expand` (a reader that
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
   and giving the handler. A wildcard match (`inferred`, reason `<producer contract> wildcard
@@ -2107,6 +2109,37 @@ qualification budget does (ADR 0017).
   (#354), since its annotations are read in the class scope, where an inherited member type
   could shadow the import. A fully qualified annotation without an import (`@javax.ws.rs.GET`)
   and annotations an implementation inherits from an interface are not read.
+- `http/csharp.rs` (spec #28, #109): an ASP.NET Core controller route is read from `Call::decorates`
+  on a method of a class that is a controller: `[ApiController]`, or a base that `Code::outside`
+  says is `Microsoft.AspNetCore.Mvc.ControllerBase` or `Controller`. The pack ships syntax only,
+  so the attribute names live here: `Route`, `ApiController`, `ActionName`, `NonAction` and `Http<Method>`, with or without
+  the `Attribute` suffix, count when a `using` of `Microsoft.AspNetCore.Mvc` binds them (the one
+  on-demand candidate in the kind's table, through `names::known`)
+  or when written in full, and a class of the repository that the attribute's scope reaches
+  (`Code::definition`, named `<Name>` or `<Name>Attribute`) hides the framework's. A decorator
+  named `Route` that is not confirmed as MVC's leaves its class or method unread (never a route
+  without the prefix it would add). The class `[Route]` templates are the prefixes; each method
+  attribute with a template is a route of its method, a method `[Route]` is one of every method
+  the action's method attributes name, or of `ANY` (`http::ANY::<path>`, whose link reason says
+  "any method" in `http.rs`) without any, and a method attribute without template gives the
+  prefix alone when the class has a `[Route]` and no attribute has a template: with no class
+  `[Route]` it is conventional routing, which is not read (`[Route("")]` is the root). A
+  template starting with `/` or `~/` replaces the prefix; `[controller]` and `[action]` are
+  replaced on the joined path (`[action]` is the method name without a trailing `Async`, as
+  ASP.NET Core does by default, or the literal of `[ActionName]`; a non-literal one serves
+  nothing), `[[` and `]]` escape the brackets, any other token or a pattern with a `/` inside
+  braces (`balanced`, shared with `http/java.rs`) serves nothing, and `?` of `{id?}` is dropped
+  before the trunk's normalization, which reads it as a query. Case is kept, so `[controller]`
+  on `OrdersController` is `/api/Orders` (ASP.NET Core matches case-insensitively; the trunk
+  does not). A method serves nothing when `[NonAction]` marks it or `Facts::hidden` says it is
+  not public. Ceilings: a template that is not a string literal serves nothing (the pack folds
+  no constants or `+`); a class with a base class of the repository (an interface is fine), a
+  class that is the base of another one of the repository, and a class declared in parts
+  (`Facts::partial` in several files) serve nothing, since the attributes they have or pass
+  down are not followed or joined; `[Area]` and `Name=` route names are not applied;
+  `SuppressAsyncSuffixInActionNames` turned off is not read; `[HttpGet("a")] [Route("b")]`
+  serves `GET /b` (ASP.NET Core may serve it for every method), and a method attribute without
+  template beside a templated one gives no route.
 - `http/kotlin.rs` (spec #27, #98): Ktor routes, through the same `Mounts` and `prefixes` as
   the other routers, whose nodes are definitions (file, qualified name): the lambda of each
   `routing { }` call (a root), the lambda of each `route(prefix) { }` call (mounted under its
@@ -2133,13 +2166,13 @@ qualification budget does (ADR 0017).
   `delete`, `head`, `options` and `request` of `io.ktor.client.request`, counted by the import
   `Code::outside` says binds the verb) on a receiver that is an `io.ktor.client.HttpClient`: one
   `Code::origins` (`Follow::Values`) traces to a call to it (counted by the import of its
-  callee as `jvm::names::spellings` reads it, so `import io.ktor.client.*` counts), a local the
+  callee as `names::spellings` reads it, so `import io.ktor.client.*` counts), a local the
   pack recorded (`Facts::bound`: a `val x = Callee(..)` with no written type, and the parameter
   of a `let`, `also` or `use` lambda, whose value is the receiver; `Code::local` takes the
   nearest binding of the name and none when another binding of it shares its scope, so a
   parameter, a loop variable, a `var`, a local named like a property of the file or one declared
   twice hides it) followed through `origins` again, or one whose written type is it
-  (`jvm::names::typed`); a map, another library's client and a name a local hides are none. The
+  (`names::typed`); a map, another library's client and a name a local hides are none. The
   call is read whole (`Expand::Chain`, which also gives the reader the call's keyword arguments),
   so an enum member a wrapper passes keeps the evidence of the caller's imports. The URL (first
   argument, or `urlString`) goes through `Code::expand`, as the Go clients do, so a wrapper is

@@ -25,9 +25,10 @@ use super::super::{based, consumer, fetches};
 use super::{folded_local, made, member_of};
 use crate::contract::Found;
 use crate::index::Indexed;
-use crate::jvm::names::{jvm_files, one, spellings, typed};
+use crate::jvm::names::jvm_files;
 use crate::jvm::spring::{self, Configs};
 use crate::lang::{Annotated, Call, Invocation, Part, Value};
+use crate::names::{one, spellings, typed};
 use crate::resolve::{Code, Expand, Expanded, FLUENT_CHAIN, method as member};
 
 const REST_TEMPLATE: &str = "org.springframework.web.client.RestTemplate";

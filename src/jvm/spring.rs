@@ -19,8 +19,8 @@
 
 use std::collections::BTreeMap;
 
-use crate::jvm::names::known;
 use crate::lang::{Annotated, Marked, Part, Value};
+use crate::names::known;
 use crate::package::Manifest;
 use crate::resolve::Code;
 
