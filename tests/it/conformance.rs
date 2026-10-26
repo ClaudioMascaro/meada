@@ -3501,6 +3501,82 @@ fn csharp() {
             "Acme.Api.Channels.NatsDelivery.Watch().nats delivery.*.tracked",
         ),
         api("Channels.Nats.cs", "Acme.Api.Channels.NatsDelivery.Poll()"),
+        api("Channels.Writes.cs", "Acme.Api.Channels.BusRewritten"),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.BusRewritten(ServiceBusClient)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.BusRewritten(ServiceBusSender)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.Use(ServiceBusSender)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.Reset()",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.Constructed(ServiceBusMessage)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.Swapped(ServiceBusMessage)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.Replaced(ServiceBusMessage)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)",
+        ),
+        api("Channels.Writes.cs", "Acme.Api.Channels.BusWrapped"),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusWrapped.BusWrapped(ServiceBusClient)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusWrapped.Send(string,ServiceBusMessage)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusWrapped.Order(ServiceBusMessage)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusWrapped.Audit(ServiceBusMessage)",
+        ),
+        api("Channels.Writes.cs", "Acme.Api.Channels.BusWrapped.Work()"),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.BusWrapped.OnOrder(ProcessMessageEventArgs)",
+        ),
+        api("Channels.Writes.cs", "Acme.Api.Channels.RabbitFanOut"),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.RabbitFanOut.RabbitFanOut(ConnectionFactory)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.RabbitFanOut.Announce()",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.RabbitFanOut.Attend(IChannel)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.RabbitFanOut.OnFirst(object,BasicDeliverEventArgs)",
+        ),
+        api(
+            "Channels.Writes.cs",
+            "Acme.Api.Channels.RabbitFanOut.OnSecond(object,BasicDeliverEventArgs)",
+        ),
         api("Clients.cs", "Acme.Api.Clients.Hosts"),
         api("Clients.cs", "Acme.Api.Clients.Verbs"),
         api("Clients.cs", "Acme.Api.Clients.Verbs.Verbs(HttpClient)"),
@@ -4136,20 +4212,27 @@ fn csharp_channel_clients_link_their_producers_to_their_handlers() {
         "exact channel::servicebus::dispatch BusDispatch.Send(ServiceBusMessage)::sender.SendMessageAsync#0 -> BusDispatch.OnDispatch(ProcessMessageEventArgs)",
         "exact channel::servicebus::dispatch.events BusDispatch.Send(ServiceBusMessage)::(invocation_expression).SendMessageAsync#0 -> BusDispatch.OnDispatch(ProcessMessageEventArgs)",
         "exact channel::servicebus::dispatch.events BusDispatch.Send(ServiceBusMessage)::(invocation_expression).SendMessageAsync#0 -> BusDispatch.Watch().servicebus dispatch.events",
+        // A sender made for a parameter is named by the callers of the method that makes it.
+        "exact channel::servicebus::wrapped.orders BusWrapped.Order(ServiceBusMessage)::Send#0 -> BusWrapped.OnOrder(ProcessMessageEventArgs)",
+        // `String.Empty` is the default exchange, and each handler of the event is a consumer.
+        "exact channel::amqp::fanout RabbitFanOut.Announce()::channel.BasicPublishAsync#0 -> RabbitFanOut.OnFirst(object,BasicDeliverEventArgs)",
+        "exact channel::amqp::fanout RabbitFanOut.Announce()::channel.BasicPublishAsync#0 -> RabbitFanOut.OnSecond(object,BasicDeliverEventArgs)",
     ] {
         assert!(
             links.contains(&wanted.to_string()),
             "{wanted} in {links:#?}"
         );
     }
-    assert_eq!(links.len(), 10, "{links:#?}");
+    assert_eq!(links.len(), 13, "{links:#?}");
     // A name read from the environment is unresolved on both sides, and so is a sender made for
     // one; a subject no publish names has no producer to link to.
     let unresolved = |side: &str, kind: &str| -> Vec<String> {
-        (json[side].as_array().unwrap().iter())
+        let mut sites: Vec<String> = (json[side].as_array().unwrap().iter())
             .filter(|s| s["contract"] == kind)
             .map(|s| short(s["site"].as_str().unwrap()))
-            .collect()
+            .collect();
+        sites.sort();
+        sites
     };
     assert_eq!(
         unresolved("providers", "channel::kafka"),
@@ -4159,9 +4242,19 @@ fn csharp_channel_clients_link_their_producers_to_their_handlers() {
         unresolved("consumers", "channel::kafka"),
         ["KafkaFeed.OnMissing(IConsumer<string,string>)"]
     );
+    // A sender written more than once is unknown, never the one write that makes it: one made
+    // by a constructor and handed in by another, replaced by a setter, written by its initializer
+    // and again, and a local made twice (both sends).
     assert_eq!(
         unresolved("providers", "channel::servicebus"),
-        ["BusDispatch.Dynamic(ServiceBusMessage)::sender.SendMessageAsync#0"]
+        [
+            "BusDispatch.Dynamic(ServiceBusMessage)::sender.SendMessageAsync#0",
+            "BusRewritten.Constructed(ServiceBusMessage)::_constructed.SendMessageAsync#0",
+            "BusRewritten.Replaced(ServiceBusMessage)::_replaced.SendMessageAsync#0",
+            "BusRewritten.Swapped(ServiceBusMessage)::_swapped.SendMessageAsync#0",
+            "BusRewritten.Twice(ServiceBusMessage)::outbox.SendMessageAsync#0",
+            "BusRewritten.Twice(ServiceBusMessage)::outbox.SendMessageAsync#1",
+        ]
     );
     assert_eq!(
         unresolved("consumers", "channel::nats::delivery.polled"),

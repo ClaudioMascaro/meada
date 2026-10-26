@@ -109,10 +109,12 @@ All notable changes to Meada are recorded here. The format follows
   `StreamReadGroup`) and Azure Service Bus (`CreateSender`, `CreateProcessor`) are producers and
   consumers of channel contracts, with the new broker kind `servicebus` (a processor on a topic
   consumes every message sent to it, whatever the subscription). A client counts by its written
-  type or its construction, resolved through the usings. Handlers are the callback (a lambda, a
-  method group or one attached with `+=`) or, for a polling client, the method holding the call.
-  Names fold like URLs; an environment or configuration read is an unresolved side. MassTransit
-  is not read.
+  type or its construction, resolved through the usings. Handlers are the callback (a lambda or a
+  method group) or each one attached with `+=` (a consumer per handler) or, for a polling
+  client, the method holding the call. Names fold like URLs, a Service Bus sender made for a
+  parameter is named by the callers of its method, and `String.Empty` is the default exchange;
+  an environment or configuration read is an unresolved side, and so is a sender written more
+  than once. MassTransit is not read.
 - Kotlin source indexing (issue #95): `.kt` and `.kts` files (Gradle's `build.gradle.kts` and
   `settings.gradle.kts` stay manifests) yield package-qualified classes, interfaces, objects,
   companions (`Class.Companion` when unnamed), top-level and extension functions, properties

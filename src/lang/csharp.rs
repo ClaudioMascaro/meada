@@ -2,7 +2,7 @@
 //! SDK-style project files say which files form a project, for the usings that apply to all of
 //! them (`join`).
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ops::Range;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -783,28 +783,37 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         .entry(text(name, src).to_string())
                         .or_default()
                         .push(at);
+                    // Every write is a `name=` of its own (`Facts::bound`): the value of a call
+                    // or a construction, unknown for any other.
+                    if definitions {
+                        let held = given.clone().filter(|_| right.is_some_and(|r| held(&r)));
+                        members.push((
+                            scope.as_ref().clone(),
+                            format!("{}=", text(name, src)),
+                            this,
+                            held.unwrap_or(Value::Unknown),
+                        ));
+                    }
                 }
                 if let (Some(left), Some(right), true) = (left, right, definitions)
                     && matches!(left.kind(), "member_access_expression" | "identifier")
                 {
                     let path = callee(left, src);
                     let rooted = path.strip_prefix("this.");
-                    // A name assigned from a call or a construction is also recorded as
-                    // `name=`: the kinds tell what it was made from (a factory's client).
                     let rest = rooted.unwrap_or(&path);
-                    let member = rest.contains('.');
-                    if !path.contains('(') && (member || (plain && held(&right))) {
-                        let name = match member {
-                            true => rest.to_string(),
-                            false => format!("{rest}="),
-                        };
+                    if !path.contains('(') && rest.contains('.') {
                         // A member set by `??=` or `+=`, or by an assignment that may not run,
                         // holds no one value.
-                        let value = match member && (!plain || conditional) {
+                        let value = match !plain || conditional {
                             true => Value::Unknown,
                             false => value(right, src, 0),
                         };
-                        members.push((scope.as_ref().clone(), name, rooted.is_some(), value));
+                        members.push((
+                            scope.as_ref().clone(),
+                            rest.to_string(),
+                            rooted.is_some(),
+                            value,
+                        ));
                     }
                 }
                 // `x.Event += handler` attaches a handler to an event of the name: a bound of
@@ -850,6 +859,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         .entry(text(target, src).to_string())
                         .or_default()
                         .push(at);
+                    if definitions {
+                        let name = format!("{}=", text(target, src));
+                        members.push((scope.as_ref().clone(), name, false, Value::Unknown));
+                    }
                 }
             }
             "argument" if children(node).any(|c| matches!(c.kind(), "out" | "ref")) => {
@@ -871,6 +884,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         .entry(text(target, src).to_string())
                         .or_default()
                         .push(at);
+                    if definitions {
+                        let name = format!("{}=", text(target, src));
+                        members.push((scope.as_ref().clone(), name, this, Value::Unknown));
+                    }
                 }
             }
             "property_declaration" | "event_declaration" => {
@@ -1176,6 +1193,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         .map(|r| (r.scope.as_str(), r.name.as_str()))
         .collect();
     let mut through: Vec<Bound> = Vec::new();
+    let mut member_at: HashMap<(String, String), usize> = HashMap::new();
     for (scope, path, this, value) in members {
         let head = path
             .split('.')
@@ -1204,21 +1222,37 @@ fn parse(src: &[u8]) -> Result<Facts> {
             }
             (false, None) => scope.clone(),
         };
-        // A member written twice holds no one value.
-        match through
-            .iter_mut()
-            .find(|b| b.scope == at && b.name == path && !path.ends_with('='))
-        {
-            Some(twice) => twice.value = Value::Unknown,
-            None => through.push(Bound {
-                scope: at,
-                within: scope,
-                name: path,
-                value,
-            }),
+        // A member written twice holds no one value; a `name=` is one write, each kept.
+        let written = match path.ends_with('=') {
+            true => None,
+            false => member_at.get(&(at.clone(), path.clone())).copied(),
+        };
+        match written {
+            Some(twice) => through[twice].value = Value::Unknown,
+            None => {
+                member_at.insert((at.clone(), path.clone()), through.len());
+                through.push(Bound {
+                    scope: at,
+                    within: scope,
+                    name: path,
+                    value,
+                });
+            }
         }
     }
-    bound.retain(|b| !assigned.contains(&b.name));
+    // A name assigned anywhere holds no one value, and its initializer is one more write of it
+    // (`name=`, the first): the kinds that read a name's only write count them.
+    let (kept, initial): (Vec<Bound>, Vec<Bound>) =
+        bound.into_iter().partition(|b| !assigned.contains(&b.name));
+    let bound = kept;
+    let mut all: Vec<Bound> = (initial.into_iter())
+        .map(|b| Bound {
+            name: format!("{}=", b.name),
+            ..b
+        })
+        .collect();
+    all.append(&mut through);
+    let through = all;
     // An instance `readonly` field written once in the file, by a plain `=` in a constructor of
     // its class (as `this.f`, or as `f` where no parameter or local of the constructor is `f`),
     // holds that value, written in the constructor: a constant of the class, as Java's `final`
@@ -2164,6 +2198,52 @@ mod tests {
         assert_eq!(held("b"), ["Task.Delay"]);
         // A parenthesized await is the value of the expression inside.
         assert_eq!(held("n"), ["c.Count"]);
+    }
+
+    /// Every write of a name is a `name=` of its own, a call or a construction by its value and
+    /// any other by none, and the initializer of a name written again is one of them; a name
+    /// written once through its initializer keeps the plain name.
+    #[test]
+    fn every_write_of_a_name_is_a_bound_of_its_own() {
+        let source = "class C { ServiceBusSender _s = Make(); ServiceBusSender _t = Make();\n\
+            C(X x, ServiceBusSender given) { _s = x.Create(\"a\"); this._t = given; }\n\
+            void M(X x) { var l = x.Create(\"b\"); l = x.Create(\"c\"); int n = 0; n++; var k = x.Create(\"d\"); }\n\
+            }";
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        let writes = |name: &str| -> Vec<&str> {
+            (facts.bound.iter().filter(|b| b.name == name))
+                .map(|b| match &b.value {
+                    Value::Call(call) => call.callee.as_str(),
+                    _ => "other",
+                })
+                .collect()
+        };
+        // The initializer is the first write; the constructor's is the second.
+        assert_eq!(writes("_s="), ["Make", "x.Create"]);
+        assert_eq!(writes("_t="), ["Make", "other"]);
+        assert_eq!(writes("l="), ["x.Create", "x.Create"]);
+        assert_eq!(writes("n="), ["other", "other"]);
+        assert!(writes("_s").is_empty() && writes("l").is_empty());
+        // Written once, it is bound by its plain name only.
+        assert_eq!(writes("k"), ["x.Create"]);
+        assert!(writes("k=").is_empty());
+    }
+
+    /// A file of thousands of writes is read in one pass: a write is looked up, never searched for.
+    #[test]
+    fn thousands_of_writes_of_a_name_are_read_in_linear_time() {
+        let mut source = String::from("class C { object _f; void M(X x) {\n");
+        for _ in 0..20_000 {
+            source += "_f = x.Make();\n";
+        }
+        source += "} }";
+        let start = std::time::Instant::now();
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        assert_eq!(
+            facts.bound.iter().filter(|b| b.name == "_f=").count(),
+            20_000
+        );
+        assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
     }
 
     /// Each handler attached to an event of a name with `+=` is a bound of its own, the lambda

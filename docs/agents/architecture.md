@@ -1363,24 +1363,32 @@ one for the area a change touches.
   hands the builder back). A type is accepted as the one spelling in the table the usings give
   it (`names::spellings`, `names::one`), so a type of the repository with the same name hides
   the library's, and `ConnectionFactory` or `IConnection` with RabbitMQ.Client and NATS.Client
-  both imported is none. The receiver is followed at most `RECEIVER_DEPTH` links. Names fold
+  both imported is none. The receiver is followed at most `CHANNEL_CLIENT_DEPTH` links. Names fold
   like a URL through `Code::expand` (a wrapper's parameter makes each caller a producer or a
-  consumer): `string.Empty` is `""` in the pack, an environment or configuration read is
+  consumer): the keyword `string.Empty` is `""` in the pack, and `String.Empty` or
+  `System.String.Empty` written in the exchange of a `BasicPublish` is `""` when the usings bind
+  `String` to `System.String` (`empty`); an environment or configuration read is
   `Part::Read`, so an unresolved name; the first argument names a Kafka topic (a list for
   `Subscribe`), an SQS queue (the last segment of the URL, or the `QueueUrl` of a request
   built in place or in a local), a NATS subject, a Redis stream key and a Service Bus queue or
   topic. A named argument is read by its parameter name. RabbitMQ: `BasicPublish(Async)` is a
   publish to an exchange (the empty one is a producer of the queue its key names), `QueueBind(Async)`
   a binding (spec #20's routing rules), `BasicConsume(Async)` takes its queue from the first
-  argument (the second after a consumer built in place). Service Bus: a send method on a
-  sender is a producer named by the first argument of the `CreateSender` call that made it
-  (in place, or held by a local, or by a field assigned once), `CreateProcessor(queue)` and
+  argument (the second when the first is a consumer by its type, a field and a parameter
+  included). `.ConfigureAwait(..)` hands the client back, as a builder's `Set*` does. Service
+  Bus: a send method on a sender is a producer named by the first argument of the `CreateSender`
+  call that made it (in place, or held by a local, a field or a property written once: every
+  write of a name is a `name=` bound of its own, an initializer that is written again
+  included, and `sender` accepts exactly one); when that argument is a parameter, the producers
+  are the callers of the method around the `CreateSender` call (`Code::expand` from it, once
+  for all the sends on the sender), at their call sites. `CreateProcessor(queue)` and
   `CreateProcessor(topic, subscription)` are consumers of the first argument alone, so a
   processor on a topic consumes every message sent to it whatever its subscription.
   Handlers: the pack records each `x.Event += handler` as a bound named `x.Event+=` (a lambda as
   its `Kind::Inline` definition, a method group as the name it writes), one per attachment, and
-  the reader takes the only one on the event (`Received`, `ReceivedAsync`, `MessageHandler`,
-  `ProcessMessageAsync`) of the consumer, subscription or processor the call's result is held by
+  the reader makes a consumer of each handler on the event (`Received`, `ReceivedAsync`,
+  `MessageHandler`, `ProcessMessageAsync`) of the consumer, subscription or processor the
+  call's result is held by, in the order attached
   (`Code::bindings`, read once per file into a map by the call's range); a NATS
   `SubscribeAsync` takes the callback it is given, a lambda or a method of the repository; every
   other client, and a callback not found, takes `consume`'s default, the method holding the call.
@@ -2153,23 +2161,24 @@ qualification budget does (ADR 0017).
   (`sendMessage(b -> b.queueUrl(..))`) or held in a local, and Redis streams held in a map
   variable, are unresolved. The same file reads Kotlin (see Kotlin channels above), with the
   same limits.
-- `channel/csharp.rs` (spec #28, #115): `RECEIVER_DEPTH` (32) bounds how many links a receiver
-  is followed through (a local bound to a call on a local bound to another); past it the call is
-  no form, and the unit test holds a client behind thousands of locals. A client counts by its
-  written type or its construction only: a value a repository method returns, a client built by
-  a factory the table does not list, one injected as `object` or an interface of the repository,
-  and a local assigned twice are no client. Left out: MassTransit; `SubscribeSync`,
-  `QueueSubscribe` and `Request` of NATS.Client, and NATS.Net v2 as a whole; `BasicGet`, a consumer class that
-  overrides `HandleBasicDeliver` and the two handlers attached to one event (the handler is the
-  method holding `BasicConsume`); `CreateReceiver`, `CreateSessionProcessor` and a sender made
-  elsewhere than where it is used (a Service Bus sender whose queue is a parameter of the method
-  that makes it is unresolved, its callers are not climbed); a stream read by an array of
+- `channel/csharp.rs` (spec #28, #115): `CHANNEL_CLIENT_DEPTH` (32) bounds how many links a
+  receiver is followed through (a local bound to a call on a local bound to another); past it
+  the call is no form, and the unit test holds a client behind thousands of locals. A client
+  counts by its written type or its construction only: a value a repository method returns, a
+  client built by a factory the table does not list, one injected as `object` or an interface of
+  the repository, and a local assigned twice are no client. The pack's `name=` bounds (one per
+  write, looked up by a map, never searched) are as many as the file's writes. Left out:
+  MassTransit; `SubscribeSync`, `QueueSubscribe` and `Request` of NATS.Client, and NATS.Net v2 as
+  a whole; `BasicGet` and a consumer class that overrides `HandleBasicDeliver` (the handler is
+  the method holding `BasicConsume`); `CreateReceiver` and `CreateSessionProcessor`; a Service
+  Bus sender made in another file than the one that sends; a stream read by an array of
   `StreamPosition` (unresolved); a `TopicPartition` as the Kafka target; a topic list built as
   `new List<string> { .. }` (unresolved); `request.QueueUrl = ..` set after the construction; a
   name read from `IConfiguration` or the environment (unresolved on both sides, so appsettings
-  are not read); `String.Empty` and `System.String.Empty` (only the keyword `string.Empty` is
-  folded). A `+=` handler is recorded only for a member target (`x.Event += h`), not for `Event
-  += h` on `this`, and for a lambda, an anonymous method, a name or a member access.
+  are not read); `String.Empty` passed by a wrapper's caller to the exchange of a `BasicPublish`
+  (unresolved: only the exchange the form's own call writes is read). A `+=` handler is recorded
+  only for a member target (`x.Event += h`), not for `Event += h` on `this`, and for a lambda, an
+  anonymous method, a name or a member access.
 - `http/java.rs` (spec #26, #86): a Spring MVC route is read from `Call::decorates` on a method
   of a `@RestController` or `@Controller` class, under the class's `@RequestMapping` prefix
   (nested classes do not inherit the outer prefix). An annotation or `RequestMethod.X` counts

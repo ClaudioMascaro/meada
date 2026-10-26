@@ -394,14 +394,18 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `Channels.Nats.cs` (a client of each library: Confluent.Kafka, RabbitMQ.Client with a
   default-exchange publish and a named one routed by a binding, AWSSDK.SQS, NATS.Client with a
   wildcard subject, StackExchange.Redis streams, Azure.Messaging.ServiceBus with a queue, a
-  topic and two processors on it, and names read from the environment on both sides), checked by
+  topic and two processors on it, and names read from the environment on both sides) and
+  `Channels.Writes.cs` (a sender written more than once, one made for a parameter,
+  `String.Empty`, `ConfigureAwait`, a consumer-first `BasicConsume` and two handlers on one
+  event), checked by
   `csharp` (the definitions and the golden) and `csharp_channel_clients_link_their_producers_to_their_handlers`
   (every link with its level, and the unresolved sides); `xlang-csharp-web` gains `src/events.ts`
   (`announceShipment`, kafkajs) and `xlang-csharp-api` `Messaging/ShipmentListener.cs`, and
   `trace_down_from_a_typescript_producer_reaches_the_csharp_kafka_consumer` holds
   `xlang-csharp.trace-channel-down.txt`. Unit tests in `channel/csharp.rs` (each library, a
   repository type that hides the library's, two namespaces for one name, a name assigned twice, a
-  wrapper, the receiver depth) and in `lang/csharp.rs` (`await`, `+=`).
+  wrapper, the client depth, every write of a sender) and in `lang/csharp.rs` (`await`, `+=`,
+  one `name=` per write, a linear pass over thousands of them).
 - **The loopback decider stub** (`tests/it/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500
