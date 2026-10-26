@@ -15,11 +15,16 @@ pub fn java_files<'a>(code: &Code<'a>) -> impl Iterator<Item = (&'a str, &'a Fac
 }
 
 /// The Java and Kotlin files of `code`, with their facts: what the readers of annotations that
-/// both languages write the same way read (Spring MVC).
+/// both languages write the same way read (Spring MVC, the channel clients).
 pub fn jvm_files<'a>(code: &Code<'a>) -> impl Iterator<Item = (&'a str, &'a Facts)> + use<'a> {
     (code.files().iter())
-        .filter(|(path, _)| [".java", ".kt", ".kts"].iter().any(|e| path.ends_with(e)))
+        .filter(|(path, _)| path.ends_with(".java") || kotlin(path))
         .map(|(&path, &facts)| (path, facts))
+}
+
+/// Whether `path` is a Kotlin file, which writes a `new` as a plain call.
+pub fn kotlin(path: &str) -> bool {
+    path.ends_with(".kt") || path.ends_with(".kts")
 }
 
 /// Whether `target`, what an annotation of `facts` decorates, is a method of the file: a

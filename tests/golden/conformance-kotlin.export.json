@@ -50,6 +50,22 @@
       "hash": "f37b52596fe8d745413d3158ae9e46bb74d0b961ea85783da90459380ef325d1"
     },
     {
+      "path": "src/main/kotlin/example/channels/Billing.kt",
+      "hash": "93cbb09ca1ff24b73ae37c10e405c7f5b20860037e99729b49c0c5fab3b14d5a"
+    },
+    {
+      "path": "src/main/kotlin/example/channels/Delivery.kt",
+      "hash": "3f0b28136a4b432523f5f00c20c1cf2c4d220186017e7672718ab6d670319d8a"
+    },
+    {
+      "path": "src/main/kotlin/example/channels/Sales.kt",
+      "hash": "2bc135b87cbbad93f5f76e4e9b5244eeafc3dac7444f22458ac0dd1edea966f1"
+    },
+    {
+      "path": "src/main/kotlin/example/channels/Streams.kt",
+      "hash": "176477a2d07df99e86fea9fae4a3bd00b0f34d0309bb535da6d926020f09aba0"
+    },
+    {
       "path": "src/main/kotlin/example/clients/Client.kt",
       "hash": "294bebbfa1e94db7021efe9bf85eef7fc62e084fe8de15bdf4a6a4263da84381"
     },
@@ -1249,6 +1265,254 @@
         "path": "src/main/kotlin/example/calls/Other.kt",
         "start": 111,
         "end": 131
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 645,
+        "end": 1440
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 883,
+        "end": 1003
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.invoice(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 701,
+        "end": 796
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 1009,
+        "end": 1349
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 1355,
+        "end": 1438
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.refund(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 802,
+        "end": 877
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 614,
+        "end": 1446
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.loop(Any)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 1219,
+        "end": 1245
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.notifyCustomer(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 738,
+        "end": 824
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.onNotification(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 830,
+        "end": 916
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 1050,
+        "end": 1155
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 922,
+        "end": 1044
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.shipments()",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 1161,
+        "end": 1213
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.track(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 1251,
+        "end": 1342
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.watch(Dispatcher)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 1348,
+        "end": 1444
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 454,
+        "end": 1663
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.Companion",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 1592,
+        "end": 1661
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.computed(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 878,
+        "end": 964
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.created(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 594,
+        "end": 657
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.emit(String,String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 1059,
+        "end": 1140
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.fromConfig(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 798,
+        "end": 872
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onEurope(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 1458,
+        "end": 1586
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onMissing(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 1262,
+        "end": 1349
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 1146,
+        "end": 1256
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onShipped(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 1355,
+        "end": 1452
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.paid(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 663,
+        "end": 729
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.shipped(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 735,
+        "end": 792
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.suffixed(String,String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 970,
+        "end": 1053
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Streams.kt",
+        "start": 259,
+        "end": 747
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Streams.kt",
+        "start": 533,
+        "end": 745
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Streams.kt",
+        "start": 374,
+        "end": 527
       }
     },
     {
@@ -4896,6 +5160,575 @@
         "path": "src/main/kotlin/example/calls/Imports.kt",
         "start": 770,
         "end": 779
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()::(call_expression).to#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 921,
+        "end": 985
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()::(call_expression).with#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 921,
+        "end": 1003
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()::BindingBuilder.bind#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 921,
+        "end": 956
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()::Queue#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 941,
+        "end": 955
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()::TopicExchange#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 960,
+        "end": 984
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.invoice(String)::rabbit.convertAndSend#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.invoice(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 735,
+        "end": 790
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)::Exchange#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 1186,
+        "end": 1241
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)::QueueBinding#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 1059,
+        "end": 1293
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)::org.springframework.amqp.rabbit.annotation.Queue#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 1097,
+        "end": 1157
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.refund(String)::rabbit.convertAndSend#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.refund(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 835,
+        "end": 871
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing::RabbitListener#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 1009,
+        "end": 1311
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing::RabbitListener#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 1355,
+        "end": 1401
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.notifyCustomer(String)::jms.convertAndSend#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.notifyCustomer(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 779,
+        "end": 818
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)::(call_expression).build#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.build()"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 1101,
+        "end": 1154
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)::(call_expression).queueUrl#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 1101,
+        "end": 1146
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)::ReceiveMessageRequest.builder#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 1101,
+        "end": 1132
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)::sqs.receiveMessage#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 1082,
+        "end": 1155
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)::(call_expression).build#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.build()"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 969,
+        "end": 1037
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)::(call_expression).messageBody#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 969,
+        "end": 1029
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)::(call_expression).queueUrl#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 969,
+        "end": 1013
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)::SendMessageRequest.builder#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 969,
+        "end": 997
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)::sqs.sendMessage#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 953,
+        "end": 1038
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.shipments()::loop#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.shipments()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.loop(Any)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 1187,
+        "end": 1207
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.shipments()::receive#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.shipments()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 1192,
+        "end": 1206
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.track(String)::id.toByteArray#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.track(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 1319,
+        "end": 1335
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.track(String)::nats.publish#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.track(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 1283,
+        "end": 1336
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.watch(Dispatcher)::dispatcher.subscribe#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.watch(Dispatcher)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 1392,
+        "end": 1438
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery::JmsListener#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Delivery.kt",
+        "start": 830,
+        "end": 873
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.computed(String)::System.getenv#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.computed(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 924,
+        "end": 953
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.computed(String)::kafka.send#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.computed(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 913,
+        "end": 958
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.created(String)::kafka.send#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.created(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 628,
+        "end": 651
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.emit(String,String)::kafka.send#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.emit(String,String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 1113,
+        "end": 1134
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.fromConfig(String)::this.kafka.send#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.fromConfig(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 835,
+        "end": 866
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onEurope(String)::TopicPartition#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onEurope(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 1492,
+        "end": 1547
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onShipped(String)::arrayOf#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onShipped(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 1379,
+        "end": 1413
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.paid(String)::kafka.send#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.paid(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 694,
+        "end": 723
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.shipped(String)::emit#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.shipped(String)",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.emit(String,String)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 769,
+        "end": 786
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.suffixed(String,String)::kafka.send#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.suffixed(String,String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 1018,
+        "end": 1047
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales::KafkaListener#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 1146,
+        "end": 1221
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales::KafkaListener#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 1262,
+        "end": 1311
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales::KafkaListener#2",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 1355,
+        "end": 1414
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales::KafkaListener#3",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Sales.kt",
+        "start": 1458,
+        "end": 1549
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()::Consumer.from#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Streams.kt",
+        "start": 668,
+        "end": 691
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()::XReadArgs.StreamOffset.lastConsumed#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Streams.kt",
+        "start": 693,
+        "end": 738
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()::jedis.xreadGroup#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Streams.kt",
+        "start": 557,
+        "end": 640
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()::lettuce.xreadgroup#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Streams.kt",
+        "start": 649,
+        "end": 739
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()::mapOf#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Streams.kt",
+        "start": 590,
+        "end": 639
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)::jedis.xadd#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Streams.kt",
+        "start": 407,
+        "end": 471
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)::lettuce.xadd#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Streams.kt",
+        "start": 480,
+        "end": 521
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)::mapOf#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Streams.kt",
+        "start": 453,
+        "end": 470
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)::mapOf#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Streams.kt",
+        "start": 503,
+        "end": 520
       }
     },
     {
@@ -8952,6 +9785,54 @@
   ],
   "providers": [
     {
+      "contract": "channel::amqp::refunds",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.refund(String)::rabbit.convertAndSend#0"
+    },
+    {
+      "contract": "channel::jms::notifications",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.notifyCustomer(String)::jms.convertAndSend#0"
+    },
+    {
+      "contract": "channel::kafka",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.computed(String)::kafka.send#0"
+    },
+    {
+      "contract": "channel::kafka",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.suffixed(String,String)::kafka.send#0"
+    },
+    {
+      "contract": "channel::kafka::orders.created",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.created(String)::kafka.send#0"
+    },
+    {
+      "contract": "channel::kafka::orders.paid",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.fromConfig(String)::this.kafka.send#0"
+    },
+    {
+      "contract": "channel::kafka::orders.paid",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.paid(String)::kafka.send#0"
+    },
+    {
+      "contract": "channel::kafka::orders.shipped",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.shipped(String)::emit#0"
+    },
+    {
+      "contract": "channel::nats::delivery.eu.tracked",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.track(String)::nats.publish#0"
+    },
+    {
+      "contract": "channel::redis::audits",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)::lettuce.xadd#0"
+    },
+    {
+      "contract": "channel::redis::events",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)::jedis.xadd#0"
+    },
+    {
+      "contract": "channel::sqs::shipments",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)::sqs.sendMessage#0"
+    },
+    {
       "contract": "http::ANY::/api/orders/any",
       "site": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.any()"
     },
@@ -9121,6 +10002,71 @@
     }
   ],
   "consumers": [
+    {
+      "contract": "channel::amqp::invoices",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::audit",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::refunds",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::jms::notifications",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.onNotification(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::sqs::shipments",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.shipments()",
+      "via": null
+    },
+    {
+      "contract": "channel::nats::delivery.*.tracked",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.watch(Dispatcher)",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::orders.eu",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onEurope(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onMissing(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::orders.created",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::orders.paid",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::orders.shipped",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onShipped(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::audits",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::events",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()",
+      "via": null
+    },
     {
       "contract": "http::GET::/health",
       "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway.health()::client.get#0",
@@ -9552,6 +10498,27 @@
       "via": "host:star.example.com"
     }
   ],
+  "bindings": [
+    {
+      "contract": "channel::amqp::audit",
+      "exchange": "billing",
+      "pattern": "invoice.#",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()::(call_expression).with#0"
+    },
+    {
+      "contract": "channel::amqp::invoices",
+      "exchange": "billing",
+      "pattern": "invoice.*",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing::RabbitListener#0"
+    }
+  ],
+  "publishes": [
+    {
+      "exchange": "billing",
+      "key": "invoice.created",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.invoice(String)::rabbit.convertAndSend#0"
+    }
+  ],
   "packages": [
     {
       "name": "example:conformance",
@@ -9718,6 +10685,21 @@
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.CharSequence.blankish()",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.T.logged()",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.general(Cache,String)"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/example/channels",
+      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.loop(Any)",
+        "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.shipments()"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/example/channels#2",
+      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.emit(String,String)",
+        "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.shipped(String)"
       ]
     },
     {
@@ -9899,7 +10881,92 @@
       ]
     }
   ],
-  "links": [],
+  "links": [
+    {
+      "consumer": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)",
+      "provider": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.invoice(String)::rabbit.convertAndSend#0",
+      "contract": "channel::amqp::invoices",
+      "level": "inferred",
+      "reason": "channel::amqp::invoices binding billing invoice.*"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)",
+      "provider": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.invoice(String)::rabbit.convertAndSend#0",
+      "contract": "channel::amqp::audit",
+      "level": "inferred",
+      "reason": "channel::amqp::audit binding billing invoice.#"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)",
+      "provider": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.refund(String)::rabbit.convertAndSend#0",
+      "contract": "channel::amqp::refunds",
+      "level": "exact",
+      "reason": "channel::amqp::refunds"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.onNotification(String)",
+      "provider": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.notifyCustomer(String)::jms.convertAndSend#0",
+      "contract": "channel::jms::notifications",
+      "level": "exact",
+      "reason": "channel::jms::notifications"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.shipments()",
+      "provider": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)::sqs.sendMessage#0",
+      "contract": "channel::sqs::shipments",
+      "level": "exact",
+      "reason": "channel::sqs::shipments"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.watch(Dispatcher)",
+      "provider": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.track(String)::nats.publish#0",
+      "contract": "channel::nats::delivery.*.tracked",
+      "level": "inferred",
+      "reason": "channel::nats::delivery.eu.tracked wildcard delivery.*.tracked"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)",
+      "provider": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.created(String)::kafka.send#0",
+      "contract": "channel::kafka::orders.created",
+      "level": "exact",
+      "reason": "channel::kafka::orders.created"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)",
+      "provider": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.fromConfig(String)::this.kafka.send#0",
+      "contract": "channel::kafka::orders.paid",
+      "level": "exact",
+      "reason": "channel::kafka::orders.paid"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)",
+      "provider": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.paid(String)::kafka.send#0",
+      "contract": "channel::kafka::orders.paid",
+      "level": "exact",
+      "reason": "channel::kafka::orders.paid"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onShipped(String)",
+      "provider": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.shipped(String)::emit#0",
+      "contract": "channel::kafka::orders.shipped",
+      "level": "exact",
+      "reason": "channel::kafka::orders.shipped"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()",
+      "provider": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)::jedis.xadd#0",
+      "contract": "channel::redis::events",
+      "level": "exact",
+      "reason": "channel::redis::events"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()",
+      "provider": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)::lettuce.xadd#0",
+      "contract": "channel::redis::audits",
+      "level": "exact",
+      "reason": "channel::redis::audits"
+    }
+  ],
   "processes": [
     {
       "entry_point": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.main(Array<String>)",
@@ -11463,6 +12530,556 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/main/kotlin/example/calls/Imports.kt::example.calls.unknown()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()",
+      "kind": "export",
+      "label": "example.channels.Billing.auditBinding()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.invoice(String)",
+      "kind": "export",
+      "label": "example.channels.Billing.invoice(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.invoice(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)",
+          "reason": "channel::amqp::invoices binding billing invoice.*"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)",
+          "reason": "channel::amqp::audit binding billing invoice.#"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)::channel::amqp::invoices",
+      "kind": "channel",
+      "label": "channel::amqp::invoices",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)::channel::amqp::audit",
+      "kind": "channel",
+      "label": "channel::amqp::audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)::channel::amqp::refunds",
+      "kind": "channel",
+      "label": "channel::amqp::refunds",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.refund(String)",
+      "kind": "export",
+      "label": "example.channels.Billing.refund(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.refund(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)",
+          "reason": "channel::amqp::refunds"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.notifyCustomer(String)",
+      "kind": "export",
+      "label": "example.channels.Delivery.notifyCustomer(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.notifyCustomer(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.onNotification(String)",
+          "reason": "channel::jms::notifications"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.onNotification(String)::channel::jms::notifications",
+      "kind": "channel",
+      "label": "channel::jms::notifications",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.onNotification(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)",
+      "kind": "export",
+      "label": "example.channels.Delivery.ship(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.shipments()",
+          "reason": "channel::sqs::shipments"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.loop(Any)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)::(call_expression).build#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.build()"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)::(call_expression).build#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.build()"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.shipments()::channel::sqs::shipments",
+      "kind": "channel",
+      "label": "channel::sqs::shipments",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.shipments()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.loop(Any)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)::(call_expression).build#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.build()"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.track(String)",
+      "kind": "export",
+      "label": "example.channels.Delivery.track(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.track(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.watch(Dispatcher)",
+          "reason": "channel::nats::delivery.eu.tracked wildcard delivery.*.tracked"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.watch(Dispatcher)::channel::nats::delivery.*.tracked",
+      "kind": "channel",
+      "label": "channel::nats::delivery.*.tracked",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.watch(Dispatcher)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.computed(String)",
+      "kind": "export",
+      "label": "example.channels.Sales.computed(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.computed(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.computed(String)::kafka.send#0",
+          "mark": "produces",
+          "contract": "channel::kafka"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.created(String)",
+      "kind": "export",
+      "label": "example.channels.Sales.created(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.created(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)",
+          "reason": "channel::kafka::orders.created"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.fromConfig(String)",
+      "kind": "export",
+      "label": "example.channels.Sales.fromConfig(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.fromConfig(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)",
+          "reason": "channel::kafka::orders.paid"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onEurope(String)::channel::kafka::orders.eu",
+      "kind": "channel",
+      "label": "channel::kafka::orders.eu",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onEurope(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onMissing(String)::channel::kafka",
+      "kind": "channel",
+      "label": "channel::kafka (unresolved)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onMissing(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onMissing(String)",
+          "mark": "consumes",
+          "contract": "channel::kafka"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)::channel::kafka::orders.created",
+      "kind": "channel",
+      "label": "channel::kafka::orders.created",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)::channel::kafka::orders.paid",
+      "kind": "channel",
+      "label": "channel::kafka::orders.paid",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onShipped(String)::channel::kafka::orders.shipped",
+      "kind": "channel",
+      "label": "channel::kafka::orders.shipped",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onShipped(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.paid(String)",
+      "kind": "export",
+      "label": "example.channels.Sales.paid(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.paid(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)",
+          "reason": "channel::kafka::orders.paid"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.shipped(String)",
+      "kind": "export",
+      "label": "example.channels.Sales.shipped(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.shipped(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.emit(String,String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onShipped(String)",
+          "reason": "channel::kafka::orders.shipped"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.suffixed(String,String)",
+      "kind": "export",
+      "label": "example.channels.Sales.suffixed(String,String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.suffixed(String,String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.suffixed(String,String)::kafka.send#0",
+          "mark": "produces",
+          "contract": "channel::kafka"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()::channel::redis::audits",
+      "kind": "channel",
+      "label": "channel::redis::audits",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()::channel::redis::events",
+      "kind": "channel",
+      "label": "channel::redis::events",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)",
+      "kind": "export",
+      "label": "example.channels.Streams.record(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()",
+          "reason": "channel::redis::events"
         }
       ]
     },

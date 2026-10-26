@@ -1112,6 +1112,20 @@ one for the area a change touches.
   `@QueueBinding`, `@Queue`, `@Exchange` or `@TopicPartition` by its element's key, since Java
   types an element by the annotation that declares it. `jms` is a broker kind of its own (also
   AsyncAPI's `jms` protocol), which the Kotlin pack reuses.
+- **Kotlin channels** (spec #27, issue #104): `channel/java.rs` reads `jvm_files` (`.java`,
+  `.kt`, `.kts`) with no pack gate, since both packs share one `Resolver` and one `Code`. The
+  Kotlin pack gives it the same shapes: `kotlin::element` reads an annotation element value
+  (a nested `QueueBinding(..)` as `Value::New`, `[..]` and a nested `arrayOf(..)` as
+  `Value::List`; a top-level `arrayOf(..)` stays a `Value::Call` that `channel::array` accepts
+  only when `known` binds `kotlin.arrayOf`), and an infix `a to b` is a `Call` on `a`. The
+  Kotlin `Call::on` is always empty, so a `BindingBuilder` chain is found by the callee shape
+  `(call_expression).with` and its start call by range in a map built once per file. A stream
+  map written `mapOf(key to id)` counts when `known` binds `kotlin.collections.mapOf`; a
+  constructor with no receiver (`Queue("q")`) counts as `new`. `of()` reads a lambda argument
+  as an untold post-processor overload, so `convertAndSend("x") { m -> m }` keeps `x` as the
+  destination. A call on an implicit receiver (an extension function on the client, `apply`,
+  `with`) is not read. The `conformance-kotlin` fixture holds each channel form and the
+  `xlang-kotlin` one a TypeScript producer reaching a Kotlin `@KafkaListener`.
 - New **package ecosystem** (spec #22 user story 26, spec #225; track B packs): implement the
   `Ecosystem` trait of `package.rs` in a module of its own under `package/` (`npm`, `pypi`,
   `cargo`, `go`, `maven` today) and add it to `ECOSYSTEMS`; the package kind, the index writer
@@ -1879,7 +1893,8 @@ qualification budget does (ADR 0017).
   method's parameter, `QueueBuilder`, `ExchangeBuilder` and a fanout `to(..)` bind nothing, and
   neither does a `@QueueBinding` without a key. An SQS request built in a lambda
   (`sendMessage(b -> b.queueUrl(..))`) or held in a local, and Redis streams held in a map
-  variable, are unresolved.
+  variable, are unresolved. The same file reads Kotlin (see Kotlin channels above), with the
+  same limits.
 - `http/java.rs` (spec #26, #86): a Spring MVC route is read from `Call::decorates` on a method
   of a `@RestController` or `@Controller` class, under the class's `@RequestMapping` prefix
   (nested classes do not inherit the outer prefix). An annotation or `RequestMethod.X` counts

@@ -491,6 +491,77 @@ fn java_channel_clients_link_their_producers_to_their_handlers() {
     assert_eq!(unresolved("consumers"), ["Sales.onMissing(String)"]);
 }
 
+/// Each Kotlin channel client links its producer to its handler (spec #27, #104), as the Java
+/// ones do (`java_channel_clients_link_their_producers_to_their_handlers`): a topic from a
+/// constant, a companion's constant, the module's Spring configuration and a wrapper's caller;
+/// named arguments and array literals; a publish to a named exchange routed by an annotation's
+/// and a configuration's bindings; the default exchange; a NATS wildcard as `inferred`; and the
+/// names that cannot be evaluated left unresolved on both sides.
+#[test]
+fn kotlin_channel_clients_link_their_producers_to_their_handlers() {
+    let repo = fixture_repo("kotlin_channels", "conformance-kotlin", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let short = |site: &str| {
+        let site = site.rsplit("example/channels/").next().unwrap_or(site);
+        site.split_once("::example.channels.")
+            .map_or(site, |(_, s)| s)
+            .to_string()
+    };
+    let links: Vec<String> = (json["links"].as_array().unwrap().iter())
+        .filter(|l| l["contract"].as_str().unwrap().starts_with("channel::"))
+        .map(|l| {
+            let (level, contract) = (
+                l["level"].as_str().unwrap(),
+                l["contract"].as_str().unwrap(),
+            );
+            let (provider, consumer) = (
+                l["provider"].as_str().unwrap(),
+                l["consumer"].as_str().unwrap(),
+            );
+            format!(
+                "{level} {contract} {} -> {}",
+                short(provider),
+                short(consumer)
+            )
+        })
+        .collect();
+    for wanted in [
+        "exact channel::kafka::orders.created Sales.created(String)::kafka.send#0 -> Sales.onSale(String)",
+        "exact channel::kafka::orders.paid Sales.paid(String)::kafka.send#0 -> Sales.onSale(String)",
+        "exact channel::kafka::orders.paid Sales.fromConfig(String)::this.kafka.send#0 -> Sales.onSale(String)",
+        "exact channel::kafka::orders.shipped Sales.shipped(String)::emit#0 -> Sales.onShipped(String)",
+        "inferred channel::amqp::invoices Billing.invoice(String)::rabbit.convertAndSend#0 -> Billing.onInvoice(String)",
+        "inferred channel::amqp::audit Billing.invoice(String)::rabbit.convertAndSend#0 -> Billing.onRefund(String)",
+        "exact channel::amqp::refunds Billing.refund(String)::rabbit.convertAndSend#0 -> Billing.onRefund(String)",
+        "exact channel::jms::notifications Delivery.notifyCustomer(String)::jms.convertAndSend#0 -> Delivery.onNotification(String)",
+        "exact channel::sqs::shipments Delivery.ship(String)::sqs.sendMessage#0 -> Delivery.shipments()",
+        "inferred channel::nats::delivery.*.tracked Delivery.track(String)::nats.publish#0 -> Delivery.watch(Dispatcher)",
+        "exact channel::redis::events Streams.record(String)::jedis.xadd#0 -> Streams.consume()",
+        "exact channel::redis::audits Streams.record(String)::lettuce.xadd#0 -> Streams.consume()",
+    ] {
+        assert!(
+            links.contains(&wanted.to_string()),
+            "{wanted} in {links:#?}"
+        );
+    }
+    assert_eq!(links.len(), 12, "{links:#?}");
+    let unresolved = |side: &str| -> Vec<String> {
+        (json[side].as_array().unwrap().iter())
+            .filter(|s| s["contract"] == "channel::kafka")
+            .map(|s| short(s["site"].as_str().unwrap()))
+            .collect()
+    };
+    assert_eq!(
+        unresolved("providers"),
+        [
+            "Sales.computed(String)::kafka.send#0",
+            "Sales.suffixed(String,String)::kafka.send#0"
+        ]
+    );
+    assert_eq!(unresolved("consumers"), ["Sales.onMissing(String)"]);
+}
+
 #[test]
 fn java_context_lists_callers_through_receivers_and_name_matches() {
     let repo = fixture_repo("java_receiver_context", "conformance-java", Some(ORIGIN));
@@ -1414,6 +1485,37 @@ fn kotlin() {
             "src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()",
             "src/main/kotlin/example/Same.kt::example.notSecret()",
             "src/main/kotlin/example/Same.kt::example.same()",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.invoice(String)",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.refund(String)",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.notifyCustomer(String)",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.onNotification(String)",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.shipments()",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.loop(Any)",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.track(String)",
+            "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.watch(Dispatcher)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.created(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.paid(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.shipped(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.fromConfig(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.computed(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.suffixed(String,String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.emit(String,String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onMissing(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onShipped(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onEurope(String)",
+            "src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.Companion",
+            "src/main/kotlin/example/channels/Streams.kt::example.channels.Streams",
+            "src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)",
+            "src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()",
             "src/main/kotlin/example/clients/Client.kt::example.clients.Gateway",
             "src/main/kotlin/example/clients/Client.kt::example.clients.Gateway.health()",
             "src/main/kotlin/example/clients/Client.kt::example.clients.based()",

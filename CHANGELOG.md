@@ -74,6 +74,19 @@ All notable changes to Meada are recorded here. The format follows
   creates the interface as `create(Api::class.java)` does. A named argument on a nested builder
   step and an OkHttp builder held by a local are not read. A cross-language fixture calls the
   TypeScript provider through a Retrofit interface.
+- Kotlin channels (issue #104): Spring Kafka, Spring AMQP, JMS, AWS SDK v2 SQS, jnats, Jedis
+  and Lettuce clients are read in Kotlin files with the Java rules, written the Kotlin way:
+  named arguments (`topics = [..]`, `queues = arrayOf(..)`), a nested annotation written without
+  `@` (`QueueBinding(..)`, `TopicPartition(..)`), `Queue("q")` without `new`, `const val` and
+  companion constants, a constructor-injected template, `@Value` and `${key}` placeholders
+  through Spring configuration, and `mapOf("id" to id)` as a Redis stream map. The default
+  exchange reaches the queue named by its key (`exact`) and a wildcard NATS subject is
+  `inferred`. A name that cannot be evaluated is an unresolved producer or consumer. A
+  trailing-lambda post-processor (`convertAndSend("x") { m -> m }`) no longer counts as the
+  destination in either language. A call on an implicit receiver (an extension function on the
+  client, `apply`, `with`) is not read. A cross-language fixture produces a topic in TypeScript
+  and consumes it in a Kotlin `@KafkaListener`, and `trace` down from the producer reaches the
+  handler.
 - Java OpenFeign and Retrofit clients (issue #90): each method of an `@FeignClient(name, url)`
   interface with Spring mapping annotations, or of a Retrofit interface with `retrofit2.http`
   verbs, is an HTTP consumer sited at the interface method, so a caller of the method reaches

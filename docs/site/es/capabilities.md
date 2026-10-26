@@ -92,18 +92,20 @@ Los recursos declarados en `meada.toml` también generan contratos. Con la tabla
 
 Cada productor se vincula con los handlers de sus consumidores, incluso dentro del mismo repositorio.
 
-| Canal | TypeScript / JavaScript | Python | Rust | Go | Java |
-| --- | --- | --- | --- | --- | --- |
-| Kafka | `kafkajs` | `confluent-kafka`, `kafka-python` | `rdkafka` | `segmentio/kafka-go`, `confluent-kafka-go`, `sarama` | Spring Kafka |
-| RabbitMQ | `amqplib` | `pika` | `lapin` | `amqp091-go` | Spring AMQP |
-| Amazon SQS | AWS SDK v3, `sqs-consumer` | `boto3` | `aws-sdk-sqs` | `aws-sdk-go-v2` | AWS SDK v2 |
-| NATS | `nats` | `nats-py` | `async-nats` | `nats.go` | jnats |
-| Redis streams | `ioredis`, `node-redis` | `redis-py` | crate `redis` | `go-redis` | Jedis, Lettuce |
-| JMS | | | | | Spring JMS |
+| Canal | TypeScript / JavaScript | Python | Rust | Go | Java | Kotlin |
+| --- | --- | --- | --- | --- | --- | --- |
+| Kafka | `kafkajs` | `confluent-kafka`, `kafka-python` | `rdkafka` | `segmentio/kafka-go`, `confluent-kafka-go`, `sarama` | Spring Kafka | Spring Kafka |
+| RabbitMQ | `amqplib` | `pika` | `lapin` | `amqp091-go` | Spring AMQP | Spring AMQP |
+| Amazon SQS | AWS SDK v3, `sqs-consumer` | `boto3` | `aws-sdk-sqs` | `aws-sdk-go-v2` | AWS SDK v2 | AWS SDK v2 |
+| NATS | `nats` | `nats-py` | `async-nats` | `nats.go` | jnats | jnats |
+| Redis streams | `ioredis`, `node-redis` | `redis-py` | crate `redis` | `go-redis` | Jedis, Lettuce | Jedis, Lettuce |
+| JMS | | | | | Spring JMS | Spring JMS |
 
 También se soportan jobs BullMQ. En RabbitMQ, un `publish` a una exchange alcanza las colas mediante sus bindings. NATS considera los comodines `*` y `>`. No se modelan clusters de broker: tópicos con el mismo nombre en clusters distintos pueden vincularse como si pertenecieran a uno solo.
 
 En Java, un cliente cuenta por el tipo que el código escribe para él (`KafkaTemplate`, `RabbitTemplate`, `JmsTemplate`, `SqsClient` o `SqsAsyncClient`, `Connection` o `Dispatcher` de jnats, `Jedis`, `JedisPooled`, `UnifiedJedis`, `JedisCluster` y los `RedisCommands`, `RedisAsyncCommands` y `RedisReactiveCommands` de Lettuce), y una anotación de listener por su import de Spring; un tipo del repositorio con el mismo nombre (una clase, una interfaz o una anotación `@interface`) la oculta. Producen `KafkaTemplate.send(tópico, ...)`, `RabbitTemplate.convertAndSend(exchange, routingKey, ...)` (con dos argumentos, o con un `MessagePostProcessor`, publica en la exchange por defecto y llega a la cola que nombra su clave, o en la `spring.rabbitmq.template.exchange` de la configuración), `JmsTemplate.send` y `convertAndSend` con el destino, `sendMessage` con el `queueUrl` de la petición (la cola es el último segmento de la URL), `publish(asunto, ...)` y `xadd(clave, ...)`. Consumen `@KafkaListener(topics = ...)`, también por `topicPartitions`, `@RabbitListener(queues = ...)`, `queuesToDeclare` y `bindings = @QueueBinding(...)`, cuyas claves se vuelven bindings (en una `@Exchange` `direct`, la predeterminada, o `fanout`, solo las claves sin comodín; en una `headers`, ninguna), `@JmsListener(destination = ...)`, `receiveMessage`, `subscribe(asunto)` y los streams de `xreadGroup` (Jedis, de un `Map.of`) y `xreadgroup` (Lettuce, de `StreamOffset`). `BindingBuilder.bind(new Queue(..)).to(new TopicExchange(..)).with(clave)` también vincula una cola. El handler de una anotación es el método anotado; el de un cliente que hace polling es el método con la llamada que nombra el tópico o la cola, aunque el bucle de recepción esté en otro. Los nombres se evalúan como las URLs: constantes, campos `final`, los argumentos de un wrapper, un campo con `@Value("${clave}")` y los placeholders `${clave}` de las anotaciones, leídos de la configuración Spring del módulo. Un nombre que no se evalúa (una variable de entorno, SpEL, una sobrecarga que los argumentos no distinguen) es un lado no resuelto.
+
+En Kotlin, los mismos clientes, anotaciones y bindings valen escritos a la manera de Kotlin, con las reglas de Java para handlers y nombres: argumentos con nombre y arrays (`@KafkaListener(topics = ["a", "b"])`, `arrayOf(..)`), anotaciones anidadas sin `@` (`QueueBinding(value = Queue("q"), exchange = Exchange(value = "x"), key = ["k"])`), `Queue("q")` sin `new` en `BindingBuilder`, `const val` de nivel superior o de un `companion object`, plantillas (`"orders-$env"` es un lado sin resolver mientras `env` no se evalúa), un cliente recibido por el constructor (`private val kafka: KafkaTemplate<String, String>`), `@Value("\${clave}")` y `mapOf(clave to id)` en los streams de Jedis y Lettuce. Una llamada sobre un receptor implícito (función de extensión del cliente, bloques `apply` y `with`) no se lee.
 
 ## Paquetes npm
 

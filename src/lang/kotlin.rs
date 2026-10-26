@@ -1529,7 +1529,7 @@ fn call(node: Node, src: &[u8], scope: &str, implicit: Implicit, lambdas: bool) 
         arg_types: Vec::new(),
         uses: Vec::new(),
     };
-    (at.args, at.kwargs) = arguments(&args, src, 0, lambdas.then_some(scope));
+    (at.args, at.kwargs) = arguments(&args, src, 0, lambdas.then_some(scope), None);
     if let Some(ty) = type_argument(node, src) {
         at.kwargs
             .push((TYPE_ARGUMENT.into(), Value::Member(ty, "class".into())));
@@ -1541,18 +1541,21 @@ fn call(node: Node, src: &[u8], scope: &str, implicit: Implicit, lambdas: bool) 
 }
 
 /// The arguments as written: positional ones, then named ones (`key = value`). A lambda is the
-/// `Kind::Inline` definition it is under `scope`, when given, and `Unknown` otherwise.
+/// `Kind::Inline` definition it is under `scope`, when given, and `Unknown` otherwise. With
+/// `elements`, they are an annotation's, `Some(nested)` as `element` reads them.
 fn arguments(
     nodes: &[Node],
     src: &[u8],
     depth: usize,
     scope: Option<&str>,
+    elements: Option<bool>,
 ) -> (Vec<Value>, Vec<(String, Value)>) {
     let (mut args, mut kwargs) = (Vec::new(), Vec::new());
-    let read = |v: Node| match (v.kind(), scope) {
-        ("lambda_literal", Some(scope)) => {
+    let read = |v: Node| match (v.kind(), scope, elements) {
+        ("lambda_literal", Some(scope), _) => {
             Value::Function(qualify(scope, &format!("@{}", v.start_byte())))
         }
+        (_, _, Some(nested)) => element(v, src, depth + 1, nested),
         _ => value(v, src, depth + 1),
     };
     for &node in nodes {
@@ -1803,7 +1806,7 @@ fn annotations_of<'s>(modifiers: Node, src: &'s [u8], scope: &str) -> Vec<(Call,
         let Some(name) = ty.and_then(|t| type_name(t, src)) else {
             continue;
         };
-        let (positional, keywords) = arguments(&args, src, 0, None);
+        let (positional, keywords) = arguments(&args, src, 0, None, Some(false));
         let target = (named(annotation).find(|n| n.kind() == "use_site_target"))
             .map_or("", |t| text(t, src).trim_end_matches(':').trim());
         let call = Call {
@@ -1825,6 +1828,54 @@ fn annotations_of<'s>(modifiers: Node, src: &'s [u8], scope: &str) -> Vec<(Call,
         found.push((call, target));
     }
     found
+}
+
+/// A value in an annotation's arguments. Kotlin writes an annotation as an element value without
+/// its `@` (`Queue("q")`, `Exchange(value = "x", type = T)`): the call is `Value::New(name,
+/// [Object(elements)])`, its unnamed element as `value`, as Java's pack reads `@Queue("q")`.
+/// An annotation's argument is a constant, so `arrayOf(..)` there is the compiler's: nested in an
+/// annotation it is the list of its elements, and at the top level `Value::Call` still, which the
+/// Spring MVC reader checks against the standard library's name (`nested`).
+fn element(node: Node, src: &[u8], depth: usize, nested: bool) -> Value {
+    if depth >= VALUE_DEPTH {
+        return Value::Unknown;
+    }
+    match node.kind() {
+        "collection_literal" => Value::List(
+            named(node)
+                .map(|n| element(n, src, depth + 1, nested))
+                .collect(),
+        ),
+        "call_expression" => {
+            let (function, args) = parts(node);
+            let Some(function) = function.filter(|f| {
+                matches!(f.kind(), "identifier" | "navigation_expression")
+                    && args.iter().all(|a| a.kind() == "value_argument")
+            }) else {
+                return value(node, src, depth);
+            };
+            let callee = callee(function, src);
+            if callee == "arrayOf" {
+                let (items, keywords) = arguments(&args, src, depth + 1, None, Some(nested));
+                return match (nested, keywords.is_empty()) {
+                    (true, true) => Value::List(items),
+                    (false, true) => Value::Call(Invocation {
+                        callee,
+                        receiver: None,
+                        args: items,
+                        range: node.byte_range(),
+                    }),
+                    _ => Value::Unknown,
+                };
+            }
+            let (positional, keywords) = arguments(&args, src, depth + 1, None, Some(true));
+            let mut elements: Vec<(String, Value)> = Vec::new();
+            elements.extend(positional.into_iter().take(1).map(|v| ("value".into(), v)));
+            elements.extend(keywords);
+            Value::New(callee, vec![Value::Object(elements)])
+        }
+        _ => value(node, src, depth),
+    }
 }
 
 /// The normalized callee of an expression: `a.b.c` for names and navigation, `this` and `super`
@@ -2057,7 +2108,7 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 return Value::Unknown;
             };
             let callee = callee(function, src);
-            let (args, keywords) = arguments(&args, src, depth + 1, None);
+            let (args, keywords) = arguments(&args, src, depth + 1, None, None);
             let navigation = function.kind() == "navigation_expression";
             // `System.getenv("X")`.
             if navigation
@@ -2144,6 +2195,19 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
         "parenthesized_expression" => named(node)
             .next()
             .map_or(Value::Unknown, |n| value(n, src, depth + 1)),
+        // `k to v`, the call `k.to(v)`.
+        "infix_expression" => {
+            let parts: Vec<Node> = named(node).collect();
+            match parts[..] {
+                [left, name, right] if name.kind() == "identifier" => Value::Call(Invocation {
+                    callee: text(name, src).to_string(),
+                    receiver: Some(Box::new(value(left, src, depth + 1))),
+                    args: vec![value(right, src, depth + 1)],
+                    range: node.byte_range(),
+                }),
+                _ => Value::Unknown,
+            }
+        }
         "binary_expression"
             if node
                 .child_by_field_name("operator")
@@ -2282,6 +2346,64 @@ mod tests {
         );
         // Two `val`s keep both, which `jvm::names::local` reads as a name declared twice.
         assert_eq!(bound("val a = xs.make(); val a = xs.other()"), ["a", "a"]);
+    }
+
+    /// A value as a line, for the tests that compare shapes.
+    fn show(v: &Value) -> String {
+        let all = |vs: &[Value]| vs.iter().map(show).collect::<Vec<_>>().join(", ");
+        match v {
+            Value::Str(parts) => {
+                let text: Vec<String> = (parts.iter())
+                    .map(|p| match p {
+                        Part::Text(t) => t.clone(),
+                        _ => "?".into(),
+                    })
+                    .collect();
+                format!("{:?}", text.concat())
+            }
+            Value::Ref(name) => name.clone(),
+            Value::List(items) => format!("[{}]", all(items)),
+            Value::New(name, args) => format!("new {name}({})", all(args)),
+            Value::Object(entries) => {
+                let entries: Vec<String> = (entries.iter())
+                    .map(|(k, v)| format!("{k}: {}", show(v)))
+                    .collect();
+                format!("{{{}}}", entries.join(", "))
+            }
+            Value::Call(c) => {
+                let receiver = c.receiver.as_deref().map(show).unwrap_or_default();
+                format!("{receiver}.{}({})", c.callee, all(&c.args))
+            }
+            _ => "?".into(),
+        }
+    }
+
+    /// An annotation written as an element value is the `New` of its name with its elements, the
+    /// unnamed one as `value`; `arrayOf(..)` nested in one is a list, and at the top level the
+    /// call the Spring MVC reader checks.
+    #[test]
+    fn an_annotation_element_value_is_a_new_with_its_elements() {
+        let src = "package a\nclass C {\n\
+            @Outer(items = [Inner(\"x\", n = arrayOf(\"p\", \"q\")), p.Inner(value = \"y\")],\n\
+            list = arrayOf(Inner(\"z\")), plain = [\"a\"], one = Inner())\n\
+            fun f() {}\n}\n";
+        let facts = parse(src.as_bytes(), false).unwrap();
+        let outer = facts.calls.iter().find(|c| c.callee == "Outer").unwrap();
+        let of = |key: &str| show(outer.keyword(key).unwrap());
+        assert_eq!(
+            of("items"),
+            "[new Inner({value: \"x\", n: [\"p\", \"q\"]}), new p.Inner({value: \"y\"})]"
+        );
+        assert_eq!(of("plain"), "[\"a\"]");
+        assert_eq!(of("one"), "new Inner({})");
+        assert_eq!(of("list"), ".arrayOf(new Inner({value: \"z\"}))");
+    }
+
+    /// An infix call is the call of the function named on its left operand.
+    #[test]
+    fn an_infix_call_is_a_call_on_its_left_operand() {
+        let facts = parse(b"package a\nval x = \"k\" to v\n", false).unwrap();
+        assert_eq!(show(&facts.consts[0].value), "\"k\".to(v)");
     }
 
     /// `\$` is a `$` that starts no template: Spring's `@Value("\${key}")` is the text `${key}`.
