@@ -279,6 +279,9 @@ fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
     });
 }
 
+/// The symbol of a file's top-level statements.
+const MAIN: &str = "Main";
+
 struct Visit<'t> {
     node: Node<'t>,
     scope: Rc<String>,
@@ -449,6 +452,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         .push(inner.as_ref().clone());
                     if modifiers.contains(&"static") {
                         facts.statics.push(inner.as_ref().clone());
+                        // A `static Main` method starts a program, whatever its signature.
+                        if !constructor && name == "Main" {
+                            facts.programs.push(inner.as_ref().clone());
+                        }
                     }
                 }
                 Kind::Class => {
@@ -735,6 +742,26 @@ fn parse(src: &[u8]) -> Result<Facts> {
         // A file-scoped namespace holds the declarations after it, its siblings.
         let mut child_scope = (inner.clone(), inner_namespace.clone());
         let mut visits = Vec::new();
+        // The top-level statements of a file are the body of a synthetic `Main`, a program.
+        let top = (named(node).filter(|c| c.kind() == "global_statement"))
+            .map(|c| c.byte_range())
+            .reduce(|a, b| a.start.min(b.start)..a.end.max(b.end))
+            .filter(|_| node.kind() == "compilation_unit" && definitions);
+        if let Some(range) = &top {
+            facts.defs.push(Def {
+                name: MAIN.to_string(),
+                kind: Kind::Function,
+                range: range.clone(),
+                params: Vec::new(),
+                bases: Vec::new(),
+                decorators: Vec::new(),
+                return_values: Vec::new(),
+                returns: None,
+                type_params: Vec::new(),
+                result: None,
+            });
+            facts.programs.push(MAIN.to_string());
+        }
         for child in named(node) {
             // Attributes are read as calls on the definition they decorate (`attributes`).
             if child.kind() == "attribute_list" {
@@ -746,9 +773,13 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 let ns = Rc::new(qualify(&inner, &callee(name, src)));
                 child_scope = (ns.clone(), ns);
             }
+            let main = top.is_some() && child.kind() == "global_statement";
             visits.push(Visit {
                 node: child,
-                scope: child_scope.0.clone(),
+                scope: match main {
+                    true => Rc::new(MAIN.to_string()),
+                    false => child_scope.0.clone(),
+                },
                 namespace: child_scope.1.clone(),
                 interface: in_interface,
                 visible: public,
