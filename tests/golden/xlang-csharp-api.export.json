@@ -6,6 +6,10 @@
       "hash": "bd439d31b70752f01418b0875138449b2f2c8259b7ecfc5dcaee9f845cf8c97c"
     },
     {
+      "path": "Clients/CatalogClient.cs",
+      "hash": "37cef88830fe698d7e2cd6e74fa982c3d8197a33b2abb9759213693d6d035ab9"
+    },
+    {
       "path": "Clients/PriceClient.cs",
       "hash": "01d5ec63bbe7be8d64373e01130ad132b3cf36b86ae5e4f2483ee943f81f4cdc"
     },
@@ -23,7 +27,7 @@
     },
     {
       "path": "Program.cs",
-      "hash": "c6085b5784c3f2a798334205c7c763620ba382c656d413ce284a2b0f89c47c37"
+      "hash": "ef4cf20f2a3ebd26481aa127e4fd9df0084b95e771a3ab60e99c5d96f2db34a7"
     }
   ],
   "symbols": [
@@ -48,6 +52,30 @@
       "span": {
         "path": "Clients/AuditClient.cs",
         "start": 341,
+        "end": 448
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/api::Clients/CatalogClient.cs::Api.Clients.CatalogClient",
+      "span": {
+        "path": "Clients/CatalogClient.cs",
+        "start": 232,
+        "end": 450
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/api::Clients/CatalogClient.cs::Api.Clients.CatalogClient.CatalogClient(HttpClient)",
+      "span": {
+        "path": "Clients/CatalogClient.cs",
+        "start": 305,
+        "end": 376
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/api::Clients/CatalogClient.cs::Api.Clients.CatalogClient.Products()",
+      "span": {
+        "path": "Clients/CatalogClient.cs",
+        "start": 382,
         "end": 448
       }
     },
@@ -144,7 +172,7 @@
       "span": {
         "path": "Program.cs",
         "start": 0,
-        "end": 570
+        "end": 781
       }
     }
   ],
@@ -169,6 +197,17 @@
         "path": "Clients/AuditClient.cs",
         "start": 233,
         "end": 249
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/api::Clients/CatalogClient.cs::Api.Clients.CatalogClient.Products()::_http.GetStringAsync#0",
+      "caller": "example.com/xlang-csharp/api::Clients/CatalogClient.cs::Api.Clients.CatalogClient.Products()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Clients/CatalogClient.cs",
+        "start": 416,
+        "end": 447
       }
     },
     {
@@ -376,8 +415,8 @@
       "level": null,
       "span": {
         "path": "Program.cs",
-        "start": 379,
-        "end": 456
+        "start": 590,
+        "end": 667
       }
     },
     {
@@ -387,8 +426,19 @@
       "level": null,
       "span": {
         "path": "Program.cs",
-        "start": 410,
-        "end": 454
+        "start": 421,
+        "end": 467
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/api::Program.cs::Main::Uri#1",
+      "caller": "example.com/xlang-csharp/api::Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Program.cs",
+        "start": 621,
+        "end": 665
       }
     },
     {
@@ -409,8 +459,8 @@
       "level": null,
       "span": {
         "path": "Program.cs",
-        "start": 538,
-        "end": 558
+        "start": 749,
+        "end": 769
       }
     },
     {
@@ -420,8 +470,8 @@
       "level": null,
       "span": {
         "path": "Program.cs",
-        "start": 560,
-        "end": 569
+        "start": 771,
+        "end": 780
       }
     },
     {
@@ -431,8 +481,8 @@
       "level": null,
       "span": {
         "path": "Program.cs",
-        "start": 521,
-        "end": 536
+        "start": 732,
+        "end": 747
       }
     },
     {
@@ -444,6 +494,17 @@
         "path": "Program.cs",
         "start": 50,
         "end": 83
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/api::Program.cs::Main::builder.Services.AddHttpClient#0",
+      "caller": "example.com/xlang-csharp/api::Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Program.cs",
+        "start": 342,
+        "end": 468
       }
     },
     {
@@ -486,8 +547,8 @@
       "level": null,
       "span": {
         "path": "Program.cs",
-        "start": 464,
-        "end": 508
+        "start": 675,
+        "end": 719
       }
     }
   ],
@@ -509,6 +570,11 @@
     {
       "contract": "http::POST::/api/audit",
       "site": "example.com/xlang-csharp/api::Clients/AuditClient.cs::Api.Clients.AuditClient.Record()::_http.PostAsync#0",
+      "via": "host:web.example.com"
+    },
+    {
+      "contract": "http::GET::/api/catalog",
+      "site": "example.com/xlang-csharp/api::Clients/CatalogClient.cs::Api.Clients.CatalogClient.Products()::_http.GetStringAsync#0",
       "via": "host:web.example.com"
     },
     {
@@ -567,6 +633,13 @@
       "consumer": "example.com/xlang-csharp/api::Clients/AuditClient.cs::Api.Clients.AuditClient.Record()::_http.PostAsync#0",
       "provider": "example.com/xlang-csharp/web::app/api/audit/route.ts::POST",
       "contract": "http::POST::/api/audit",
+      "level": "exact",
+      "reason": "host web.example.com is served by example.com/xlang-csharp/web"
+    },
+    {
+      "consumer": "example.com/xlang-csharp/api::Clients/CatalogClient.cs::Api.Clients.CatalogClient.Products()::_http.GetStringAsync#0",
+      "provider": "example.com/xlang-csharp/web::app/api/catalog/route.ts::GET",
+      "contract": "http::GET::/api/catalog",
       "level": "exact",
       "reason": "host web.example.com is served by example.com/xlang-csharp/web"
     },

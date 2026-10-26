@@ -23,9 +23,9 @@ use crate::index::Indexed;
 use crate::jvm::names::{LOCAL_DEPTH, kotlin};
 use crate::jvm::spring::{self, Configs};
 use crate::lang::kotlin::TYPE_ARGUMENT;
-use crate::lang::{Annotated, Bound, Call, Part, Value};
+use crate::lang::{Bound, Call, Part, Value};
 use crate::names::{one, spellings, typed};
-use crate::resolve::{Code, Expand, Expanded, Follow, Of, passes_nothing};
+use crate::resolve::{Code, Expand, Expanded, Follow, Injected, Of, passes_nothing};
 
 use super::super::{based, consumer, fetches};
 
@@ -206,9 +206,9 @@ fn text(method: String) -> Value {
 pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
     // Read the first time an annotation is injected: a repository without one parses none.
     let configs = std::cell::OnceCell::new();
-    let inject = |code: &Code<'a>, path: &'a str, annotated: &'a Annotated| {
+    let inject = |code: &Code<'a>, path: &'a str, on: Injected<'a>| {
         let configs = configs.get_or_init(|| Configs::read(indexed.configs, indexed.manifests));
-        spring::inject(configs, code, path, annotated)
+        spring::inject(configs, code, path, on.annotated()?)
     };
     let clients = Clients { code };
     let mut found = Vec::new();

@@ -655,6 +655,27 @@ fn trace_down_crosses_into_csharp_and_back_to_typescript() {
     assert_golden("xlang-csharp.trace-down.txt", &answer);
 }
 
+/// A typed client (spec #28, #113): the call inside it takes the base `AddHttpClient` gives the
+/// client its constructor takes, read from configuration, and reaches the web app's route.
+#[test]
+fn trace_down_from_a_csharp_typed_client_reaches_the_typescript_provider() {
+    let (_, api) = xlang_csharp("xlang_csharp_typed");
+
+    let answer = Engine::open(&api)
+        .unwrap()
+        .trace(
+            Start::From("Api.Clients.CatalogClient.Products()"),
+            Direction::Down,
+            None,
+        )
+        .unwrap();
+
+    let link = "→[exact: host web.example.com is served by example.com/xlang-csharp/web] \
+                example.com/xlang-csharp/web app/api/catalog/route.ts:1 GET";
+    assert!(answer.contains(link), "{answer}");
+    assert_golden("xlang-csharp.trace-typed-client.txt", &answer);
+}
+
 #[test]
 fn trace_up_crosses_into_csharp_and_back_to_typescript() {
     let (web, _) = xlang_csharp("xlang_csharp_up");

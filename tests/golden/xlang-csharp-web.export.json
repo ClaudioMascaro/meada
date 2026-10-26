@@ -6,6 +6,10 @@
       "hash": "646000f05a54a28b0fb8c1e897114cc25c059a12b6198b4cdb34ece09d6830d4"
     },
     {
+      "path": "app/api/catalog/route.ts",
+      "hash": "e4dcd4a1eac15dcb79254b7175ad12eebdfcb0889c88de5852ab456e118e0b08"
+    },
+    {
       "path": "app/api/prices/[sku]/route.ts",
       "hash": "864cec176aff35f6914c56db5d229d7318eeb37dc5b6e5c84930d8d1ee37ed67"
     },
@@ -33,6 +37,14 @@
         "path": "app/api/audit/route.ts",
         "start": 7,
         "end": 78
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/web::app/api/catalog/route.ts::GET",
+      "span": {
+        "path": "app/api/catalog/route.ts",
+        "start": 7,
+        "end": 59
       }
     },
     {
@@ -94,6 +106,17 @@
         "path": "app/api/audit/route.ts",
         "start": 40,
         "end": 75
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/web::app/api/catalog/route.ts::GET::Response.json#0",
+      "caller": "example.com/xlang-csharp/web::app/api/catalog/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/catalog/route.ts",
+        "start": 39,
+        "end": 56
       }
     },
     {
@@ -176,6 +199,21 @@
   ],
   "providers": [
     {
+      "contract": "http::GET::/api/catalog",
+      "site": "example.com/xlang-csharp/web::app/api/catalog/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/catalog/route.ts"
+        },
+        "fields": [
+          "[]"
+        ],
+        "open": [
+          "[]"
+        ]
+      }
+    },
+    {
       "contract": "http::GET::/api/prices/{}",
       "site": "example.com/xlang-csharp/web::app/api/prices/[sku]/route.ts::GET",
       "shape": {
@@ -256,6 +294,13 @@
       "consumer": "example.com/xlang-csharp/api::Clients/AuditClient.cs::Api.Clients.AuditClient.Record()::_http.PostAsync#0",
       "provider": "example.com/xlang-csharp/web::app/api/audit/route.ts::POST",
       "contract": "http::POST::/api/audit",
+      "level": "exact",
+      "reason": "host web.example.com is served by example.com/xlang-csharp/web"
+    },
+    {
+      "consumer": "example.com/xlang-csharp/api::Clients/CatalogClient.cs::Api.Clients.CatalogClient.Products()::_http.GetStringAsync#0",
+      "provider": "example.com/xlang-csharp/web::app/api/catalog/route.ts::GET",
+      "contract": "http::GET::/api/catalog",
       "level": "exact",
       "reason": "host web.example.com is served by example.com/xlang-csharp/web"
     },

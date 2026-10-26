@@ -3,6 +3,8 @@ builder.Services.AddControllers();
 builder.Services.AddSingleton<Api.Clients.PriceClient>();
 builder.Services.AddSingleton<Api.Clients.StockClient>();
 builder.Services.AddSingleton<Api.Clients.AuditClient>();
+// A typed client: its base comes from configuration, read where it is registered.
+builder.Services.AddHttpClient<Api.Clients.CatalogClient>(c => c.BaseAddress = new Uri(builder.Configuration["Catalog:Url"]!));
 
 // `builder.Configuration[...]` names a key too; `Promo:Url` is in no file, so it maps to Promo__Url.
 var promotions = new HttpClient { BaseAddress = new Uri(builder.Configuration["Promo:Url"]!) };

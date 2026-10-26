@@ -16,6 +16,7 @@
 
 mod clients;
 mod reads;
+mod refit;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -50,24 +51,93 @@ fn base(spelled: &str) -> bool {
         .is_some_and(|n| BASES.contains(&n))
 }
 
-/// The name `name`, written in `scope` of `file`, as a name of the framework `is_known`
-/// accepts: bound by a `using`, or written in full (`Microsoft.AspNetCore.Mvc.Route`), which no
-/// `using` has to bind unless the repository declares a namespace `Microsoft` (`hidden`).
+/// The name `name`, written in `scope` of `file`, as a name of the framework (the namespace
+/// `ns`) `is_known` accepts: bound by a `using`, or written in full
+/// (`Microsoft.AspNetCore.Mvc.Route`), which no `using` has to bind unless the repository
+/// declares a namespace of the framework's root (`Microsoft`, `hidden`).
 fn spelled<'a>(
     code: &Code<'a>,
-    file: &'a str,
-    scope: &'a str,
+    (file, scope): (&'a str, &'a str),
     name: &'a str,
-    hidden: bool,
+    (ns, hidden): (&str, bool),
     is_known: impl Fn(&str) -> bool,
 ) -> Option<String> {
-    let full = || (name.starts_with(MVC) && !hidden && is_known(name)).then(|| name.to_string());
+    let full = || (name.starts_with(ns) && !hidden && is_known(name)).then(|| name.to_string());
     known(code, file, scope, name, &is_known).or_else(full)
 }
 
-/// The consumers of the `HttpClient` (`clients.rs`).
+/// Whether `target` is a class (a type, which an attribute names).
+fn class(code: &Code, target: Target) -> bool {
+    let defs = &code.files()[target.path].defs;
+    (defs.iter()).any(|d| d.name == target.name && d.kind == Kind::Class)
+}
+
+/// What may hide a framework's attribute in the repository: the attribute classes it declares,
+/// by name, and whether it declares a namespace of the framework's root (`spelled`).
+struct Hiding<'a> {
+    declared: BTreeSet<&'a str>,
+    hidden: bool,
+}
+
+impl<'a> Hiding<'a> {
+    /// What hides the attributes of the namespace `ns` in `files`.
+    fn of(files: &[(&'a str, &'a Facts)], ns: &str) -> Self {
+        let defs = || files.iter().flat_map(|(_, f)| f.defs.iter());
+        let declared = (defs().filter(|d| d.kind == Kind::Class))
+            .filter_map(|d| d.name.rsplit('.').next())
+            .filter(|n| n.ends_with("Attribute"))
+            .collect();
+        let root = format!("{}.", ns.split('.').next().unwrap_or(ns));
+        let hidden = defs().any(|d| d.name.starts_with(&root));
+        Hiding { declared, hidden }
+    }
+
+    /// The attribute `c` of `path`, read in `scope`, as the framework (the namespace `ns`)
+    /// spells it, when `is_attribute` accepts it and no class of the repository the file reaches
+    /// hides it: `[Get]` may be a class named `GetAttribute`. The class is looked up from the
+    /// scope around the attribute's target (a class's attribute is written in its namespace, a
+    /// method's in its class) and the one around that.
+    fn spelled(
+        &self,
+        code: &Code<'a>,
+        (path, scope): (&'a str, &'a str),
+        c: &'a Call,
+        ns: &str,
+        is_attribute: impl Fn(&str) -> bool,
+    ) -> Option<String> {
+        let simple = c.callee.rsplit('.').next().unwrap_or(&c.callee);
+        let own = [
+            Some(c.callee.as_str()),
+            self.declared
+                .get(format!("{simple}Attribute").as_str())
+                .copied(),
+        ]
+        .into_iter()
+        .flatten()
+        .any(|own| {
+            [c.scope.as_str(), crate::parent(&c.scope)]
+                .into_iter()
+                .any(|scope| {
+                    code.definition(path, scope, own)
+                        .is_some_and(|t| class(code, t))
+                })
+        });
+        let spelled = spelled(
+            code,
+            (path, scope),
+            &c.callee,
+            (ns, self.hidden),
+            is_attribute,
+        );
+        spelled.filter(|_| !own)
+    }
+}
+
+/// The consumers of the `HttpClient` (`clients.rs`) and of Refit's interfaces (`refit.rs`).
 pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
-    clients::consumers(code, indexed)
+    let mut found = clients::consumers(code, indexed);
+    found.extend(refit::consumers(code, indexed));
+    found
 }
 
 /// ASP.NET Core controller providers: see the module.
@@ -77,16 +147,9 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
         .filter(|(p, _)| p.ends_with(".cs"))
         .map(|(p, f)| (*p, *f))
         .collect();
-    // The attribute classes the repository declares, by name: one the file reaches hides MVC's.
-    let declared: BTreeSet<&'a str> = (files.iter())
-        .flat_map(|(_, f)| f.defs.iter())
-        .filter(|d| d.kind == Kind::Class)
-        .filter_map(|d| d.name.rsplit('.').next())
-        .filter(|n| n.ends_with("Attribute"))
-        .collect();
-    // A namespace `Microsoft` of the repository could hide the framework's in a qualified name.
-    let hidden =
-        (files.iter()).any(|(_, f)| f.defs.iter().any(|d| d.name.starts_with("Microsoft.")));
+    // The attribute classes the repository declares, and a namespace `Microsoft` of its own,
+    // hide MVC's.
+    let hiding = Hiding::of(&files, MVC);
     // A class with a class of the repository as a base inherits its attributes, and that base
     // passes them down: neither is read.
     let (mut inheriting, mut based) = (BTreeSet::new(), BTreeSet::new());
@@ -120,22 +183,8 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
         for (n, c) in (facts.calls.iter().enumerate()).filter(|(_, c)| c.decorates.is_some()) {
             let simple = c.callee.rsplit('.').next().unwrap_or(&c.callee);
             let is_attribute = |s: &str| attribute(s).is_some();
-            let spelled = spelled(code, path, &c.scope, &c.callee, hidden, is_attribute);
-            // `[HttpGet]` may be a class of the repository named `HttpGetAttribute`.
-            // The attribute is read from the scope around its target (a class's attribute is
-            // written in its namespace, a method's in its class).
-            let own = [
-                Some(c.callee.as_str()),
-                declared.get(format!("{simple}Attribute").as_str()).copied(),
-            ]
-            .into_iter()
-            .flatten()
-            .any(|own| {
-                [c.scope.as_str(), crate::parent(&c.scope)]
-                    .into_iter()
-                    .any(|scope| code.definition(path, scope, own).is_some())
-            });
-            match spelled.as_deref().and_then(attribute).filter(|_| !own) {
+            let spelled = hiding.spelled(code, (path, &c.scope), c, MVC, is_attribute);
+            match spelled.as_deref().and_then(attribute) {
                 Some(name) => attributes.push((n, c, name.to_string())),
                 None if simple.strip_suffix("Attribute").unwrap_or(simple) == "Route" => {
                     unread.extend(c.decorates.as_deref());
@@ -151,7 +200,7 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
             let scope = crate::parent(&class.name);
             let controller = on_class("ApiController").next().is_some()
                 || (class.bases.iter())
-                    .any(|b| spelled(code, path, scope, b, hidden, base).is_some());
+                    .any(|b| spelled(code, (path, scope), b, (MVC, hiding.hidden), base).is_some());
             let here = Target {
                 path,
                 name: &class.name,

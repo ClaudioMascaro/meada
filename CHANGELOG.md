@@ -91,6 +91,17 @@ All notable changes to Meada are recorded here. The format follows
   through `base_url_env`. `appsettings.<Environment>.json`, `GetValue`, `GetSection` and options
   binding are not read. New neutral fixtures `xlang-csharp-{web,api}` cover the TypeScript to C#
   and C# to TypeScript chain.
+- C# typed clients and Refit interfaces as HTTP consumers (issue #113): `AddHttpClient<T>(c =>
+  c.BaseAddress = ...)` gives its base, folded and read from the environment or configuration, to
+  the `HttpClient` the container passes to `T`'s constructor and to every call on it in `T`,
+  through a `readonly` field the constructor assigns; two registrations with different bases, a
+  registration Meada cannot read, or a constructor the code calls (a typed `T t = new(..)`
+  included) leave it unknown. A `BaseAddress` assigned conditionally, or one that differs from
+  the client's initializer, is unknown. Each method of a Refit interface (`[Get]`, `[Post]`, `[Put]`, `[Patch]`,
+  `[Delete]`, `[Head]`) is a consumer with the base of each `RestService.For<T>(url)`, and its
+  callers reach it, so `trace` crosses it; `AddRefitClient` is not read. The shared injector
+  (`resolve::Inject`) is now also asked about a parameter no annotation marks
+  (`Injected::Param`).
 - Kotlin source indexing (issue #95): `.kt` and `.kts` files (Gradle's `build.gradle.kts` and
   `settings.gradle.kts` stay manifests) yield package-qualified classes, interfaces, objects,
   companions (`Class.Companion` when unnamed), top-level and extension functions, properties
