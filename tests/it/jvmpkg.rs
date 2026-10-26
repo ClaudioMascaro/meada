@@ -74,6 +74,26 @@ fn literal_maven_and_gradle_artifacts_link_to_workspace_dependencies() {
 }
 
 #[test]
+fn a_csharp_file_under_a_pom_is_no_class_an_import_brings() {
+    let [maven, _, client, _] = workspace("jvm_packages_csharp_under_pom");
+    let gadget = "namespace example.models;\n\npublic class Gadget\n{\n    public static int make() => 1;\n}\n";
+    let dir = maven.join("models/src/main/java/example/models");
+    fs::write(dir.join("Gadget.cs"), gadget).unwrap();
+    let user = "package example.web;\n\nimport example.models.Gadget;\n\npublic class Uses {\n    public int run() {\n        return Gadget.make();\n    }\n}\n";
+    fs::write(client.join("src/main/java/example/web/Uses.java"), user).unwrap();
+    let export = Engine::open(&client).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let uses = |l: &&Value| l["consumer"].as_str().unwrap().contains("Uses.java");
+    assert_eq!(
+        (json["links"].as_array().unwrap().iter())
+            .filter(uses)
+            .count(),
+        0,
+        "{export}"
+    );
+}
+
+#[test]
 fn computed_coordinates_keep_literal_parts_and_stay_ambiguous_with_one_provider() {
     let [_, _, client, gradle_client] = workspace("jvm_packages_computed");
     fs::copy(client.join("computed.xml"), client.join("pom.xml")).unwrap();

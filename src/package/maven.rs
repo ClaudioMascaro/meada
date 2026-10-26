@@ -26,7 +26,8 @@ use crate::resolve::{Code, Follow, Form, Of, Outside};
 /// A class's ancestors past it, as the `families` rows give them (`Ancestry::ancestors`).
 type Ancestors<'e> = &'e [Option<(String, String)>];
 
-/// The public classes and the methods of a Java provider, built the first time an import asks.
+/// The public classes and the methods of a provider's Java, Kotlin or C# sources, built the first
+/// time an import asks.
 pub struct Classes<'e> {
     /// The files declaring a type, as `(file, qualified name)`, by qualified name.
     types: HashMap<&'e str, Vec<(&'e str, &'e str)>>,
@@ -48,12 +49,11 @@ pub struct Classes<'e> {
 
 impl<'e> Classes<'e> {
     fn new(at: &Provided<'e>) -> Self {
-        let source = |path: &str| [".java", ".kt", ".cs"].iter().any(|e| path.ends_with(e));
         let mut types: HashMap<&str, Vec<(&str, &str)>> = HashMap::new();
         for rows in at
             .exported
             .iter()
-            .filter(|(path, _)| source(path))
+            .filter(|(path, _)| of_source(path).is_some())
             .map(|(_, r)| r)
         {
             for e in rows {
@@ -94,10 +94,11 @@ impl<'e> Classes<'e> {
         }
         named.values_mut().for_each(|all| all.sort());
         let mut methods: HashMap<&str, Vec<&str>> = HashMap::new();
+        // `<repository>::<file>::<name>[(<parameters>)]`: a source file of an ecosystem.
         for &id in at
             .symbols
             .iter()
-            .filter(|id| [".java::", ".kt::", ".cs::"].iter().any(|e| id.contains(e)))
+            .filter(|id| id.split("::").nth(1).and_then(of_source).is_some())
         {
             if let Some(open) = id.find('(') {
                 methods.entry(&id[..open]).or_default().push(id);
@@ -361,7 +362,7 @@ impl Ecosystem for Maven {
         name.split('.').all(jvm::literal)
     }
     fn imports<'a>(&self, code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
-        imports(code, path, call)
+        imports(code, path, call, &["java.", "kotlin."])
     }
     /// Every artifact the manifests holding the file depend on, nearest first, once each; the
     /// import's class stands for the subpath.
@@ -465,13 +466,18 @@ impl Ecosystem for Maven {
 
 /// The class and the method a call names through an import, as `(class, name(arity))`: a
 /// type the call's head names (`Order.of(1)`, `new Order(1)`, an on-demand import's), else
-/// the type the source writes for its receiver (`order.total()`). A JDK class is none. Kotlin
+/// the type the source writes for its receiver (`order.total()`). A class under one of the ecosystem's `platform` prefixes (the JDK's) is none. Kotlin
 /// adds the top-level function or class a bare name imports (`greet(..)`: the package, then
 /// the name), and for a call on a receiver of no class of the repository the extension
 /// function its name imports, as `(package, .name(arity))` and, when the type the source
 /// writes for the receiver is one class, `@` and that class after it. A call on a class's
 /// name (`Money.of(1)`) says so in its chain (`Companion.of(1)`).
-pub(super) fn imports<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
+pub(super) fn imports<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    call: &'a Call,
+    platform: &[&str],
+) -> Vec<(String, String)> {
     let callee = call.callee.as_str();
     // `(class, method, receiver)`: the receiver is the `@` an extension's chain ends with.
     let mut found: Vec<(String, String, String)> = Vec::new();
@@ -515,10 +521,7 @@ pub(super) fn imports<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec
     found.retain(|(class, ..)| {
         class.contains('.')
             && !class.contains('(')
-            && !class.starts_with("java.")
-            && !class.starts_with("kotlin.")
-            // ponytail: a workspace type in `System.*` (a polyfill) is not followed.
-            && !(path.ends_with(".cs") && class.starts_with("System."))
+            && !platform.iter().any(|p| class.starts_with(p))
     });
     // An extension function is called on a receiver, and imported by its name alone. It
     // names the receiver's type when that is the one the source writes, for a member of the
@@ -546,6 +549,24 @@ pub(super) fn imports<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec
         .map(|(class, method, receiver)| match call.arity {
             Some(arity) => (class, format!("{method}({arity}){receiver}")),
             None => (class, format!("{method}{receiver}")),
+        })
+        .collect()
+}
+
+/// The providers of the entry's package that the entry may name: the ones its `reaches` lets
+/// through (a `path` source pins one project), as `(repository, manifest)` indexes.
+fn reachable(
+    eco: &dyn Ecosystem,
+    exports: &[Export],
+    providers: &Providers,
+    from: usize,
+    entry: &Entry,
+) -> Vec<(usize, usize)> {
+    let source = (entry.via.as_deref(), entry.range.as_deref());
+    (providers.matching(eco, entry).into_iter())
+        .filter(|&(m, i)| {
+            let to = (exports[m].place(), exports[m].manifests[i].path.as_str());
+            eco.reaches(source, exports[from].place(), to)
         })
         .collect()
 }
@@ -579,7 +600,7 @@ pub(super) fn resolutions<'e>(
     if let Some(class) = receiver {
         let (mut hidden, mut declared, mut opaque) = (false, false, false);
         let matching = (eco.entries(exports, providers, from, specifier).into_iter())
-            .flat_map(|(entry, _)| providers.matching(eco, entry));
+            .flat_map(|(entry, _)| reachable(eco, exports, providers, from.0, entry));
         for (m, i) in matching {
             let (at, manifest) = (at(m), &exports[m].manifests[i]);
             let known = |id: &str| known(at, id);
@@ -596,7 +617,7 @@ pub(super) fn resolutions<'e>(
     let (mut out, mut reached) = (Vec::new(), HashSet::new());
     for (entry, _) in eco.entries(exports, providers, from, specifier) {
         let mut resolved = Vec::new();
-        for (m, i) in providers.matching(eco, entry) {
+        for (m, i) in reachable(eco, exports, providers, from.0, entry) {
             let (at, manifest) = (at(m), &exports[m].manifests[i]);
             let repository = &exports[m].repository;
             let known = |id: &str| known(at, id);
@@ -691,7 +712,7 @@ pub(super) fn declares<'e>(
         return false;
     }
     (eco.entries(exports, providers, from, specifier).into_iter())
-        .flat_map(|(entry, _)| providers.matching(eco, entry))
+        .flat_map(|(entry, _)| reachable(eco, exports, providers, from.0, entry))
         .any(|(m, i)| {
             let (at, manifest) = (at(m), &exports[m].manifests[i]);
             !extension && !declaring(at, manifest, specifier).is_empty()

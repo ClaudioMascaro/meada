@@ -1023,9 +1023,10 @@ one for the area a change touches.
   files), `kotlin` and `array_of`.
 - `dotnet/` holds what the .NET pack and ecosystems share (spec #28), as `jvm/` does for the
   JVM: `dotnet/msbuild.rs` reads an SDK-style project file (`msbuild::read`: whether it is a
-  project, and its `Using`s, the SDK's implicit usings among them), which the C# pack's `join`
-  reads and the NuGet ecosystem (#116) is to read manifests with; a second reader of project
-  files is a finding. `xml.rs` holds the bounds every XML build file reader shares
+  project and, if so, its `Using`s (the SDK's implicit usings among them), its `PackageId`,
+  `AssemblyName` and version, and its `PackageReference` and `ProjectReference` items), which the
+  C# pack's `join` and the NuGet ecosystem (#116) both read; a second reader of project files is
+  a finding. `xml.rs` holds the bounds every XML build file reader shares
   (`within_limits`, `XML_NODES`), owned by neither ecosystem: `jvm/maven.rs` and
   `dotnet/msbuild.rs` both check them before roxmltree parses.
 - New **Go router** (spec #25; net/http, gin, echo, chi and gorilla): a row of `ROUTERS` in
@@ -1192,7 +1193,9 @@ one for the area a change touches.
     ecosystem with several pairs per call answers it. `settle(..)` (default: nothing) runs at the
     start of the workspace step, over every repository's manifests, for an ecosystem whose
     entries name a provider by location: NuGet gives a `ProjectReference` entry the id of the
-    project at its path (a project file's name need not be its id) before `consume` reads it.
+    project at its path (a project file's name need not be its id), and a `PackageReference` the
+    spelling of the one provider whose id differs by case only, before `consume` reads them,
+    each by one folded-location map (linear in the manifests).
   - `fits`: literal package-name equality; Maven matches the literal fragments of a computed
     coordinate. `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
   - `flag`: the range is unchecked (`range unchecked`); npm checks semver.
@@ -1234,9 +1237,17 @@ one for the area a change touches.
     `; import namespace`): C# exports its types as Java does, under the qualified name, so the
     class lookup, the family walk and the argument-count pick are the same code; `declaring`
     counts a file only for the ecosystem whose `sources()` has its extension; `entries` is the
-    references of the nearest `.csproj` above the file (`owner`); a `System.` class is none.
-    Ceilings: package ids are matched as written (NuGet's are case-insensitive), extension methods
-    and a name written fully qualified with no `using` are not followed, and two projects in one
+    references of the nearest SDK-style `.csproj` above the file (`owner`, `Summary::project`,
+    as the pack's `join`); the three provider loops keep the providers an entry's `reaches`
+    lets through, as the default `resolutions` does, so a `ProjectReference` pins its project;
+    the shared code names no ecosystem: each passes its platform prefixes (`java.`, `kotlin.`
+    for Maven, `System.` for NuGet) to `imports`, and the class tables take every ecosystem's
+    source extensions.
+    Ceilings: a `ProjectReference` path written in another case than the file system's does not
+    match (ids match case-insensitively, paths do not), extension methods and a name written
+    fully qualified with no `using` are not followed, a receiver typed by a `var` whose value is
+    a call through a package (`var o = Order.Of(1); o.Total()`) is not followed (the return
+    type lives in the provider's index; Java has the same gap), and two projects in one
     directory share it (the first by path owns the files).
     `member_of`: none; Maven's and NuGet's
     constructors and methods of a class (a companion's too), so `context` on a public class

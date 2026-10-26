@@ -211,6 +211,217 @@ fn several_providers_declaring_the_type_make_the_hop_ambiguous() {
     );
 }
 
+fn edit(path: PathBuf, old: &str, new: &str) {
+    let text = fs::read_to_string(&path).unwrap();
+    assert!(text.contains(old), "{} lacks {old}", path.display());
+    fs::write(&path, text.replace(old, new)).unwrap();
+}
+
+fn write(root: &Path, path: &str, text: &str) {
+    let file = root.join(path);
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(file, text).unwrap();
+}
+
+/// The twin repository, a peer of `app`.
+fn twin(case: &str, app: &Path) -> PathBuf {
+    let twin = fixture_repo(
+        case,
+        "dotnet-twin",
+        Some("https://example.com/dotnet/twin.git"),
+    );
+    let toml = app.join("meada.toml");
+    let peers = fs::read_to_string(&toml).unwrap();
+    let peer = "[[peer]]\nrepo = \"example.com/dotnet/twin\"\npath = \"../dotnet-twin\"\n";
+    fs::write(&toml, format!("{peers}{peer}")).unwrap();
+    twin
+}
+
+/// The `(provider, level)` of each link whose consumer ends with `suffix`.
+fn calls<'a>(json: &'a Value, suffix: &str) -> Vec<(&'a str, &'a str)> {
+    (json["links"].as_array().unwrap().iter())
+        .filter(|l| l["consumer"].as_str().unwrap().ends_with(suffix))
+        .map(|l| {
+            (
+                l["provider"].as_str().unwrap(),
+                l["level"].as_str().unwrap(),
+            )
+        })
+        .collect()
+}
+
+const KIT_ORDER: &str =
+    "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order";
+
+#[test]
+fn a_project_reference_pins_its_project_over_a_twin_with_the_same_package_id() {
+    let [_, app] = workspace("nuget_packages_pinned");
+    let twin = twin("nuget_packages_pinned", &app);
+    edit(twin.join("src/Twin.csproj"), "Example.Twin", "Example.Kit");
+    let web = app.join("src/Web/Web.csproj");
+    let old = "<PackageReference Include=\"Example.Kit\" Version=\"[1.0,2.0)\" />";
+    let new = "<ProjectReference Include=\"..\\..\\..\\dotnet-lib\\src\\Kit\\Kit.csproj\" />";
+    edit(web, old, new);
+    let (export, json) = export(&app);
+    for (suffix, member) in [
+        ("Order.Of#0", "Of(int)"),
+        ("order.Total#0", "Total()"),
+        ("Create()::Order#0", "Order(int)"),
+    ] {
+        let member = format!("{KIT_ORDER}.{member}");
+        assert_eq!(calls(&json, suffix), [(&member[..], "exact")], "{export}");
+    }
+    let imports = json["imports"].as_array().unwrap();
+    assert!(
+        !imports
+            .iter()
+            .any(|i| i["target"].as_str().unwrap().contains("dotnet/twin")),
+        "{export}"
+    );
+}
+
+#[test]
+fn a_project_of_the_same_repository_is_ambiguous_with_no_project_of_another() {
+    let [_, app] = workspace("nuget_packages_own_project");
+    let twin = twin("nuget_packages_own_project", &app);
+    // Another repository's project is named like the app's own `Shared` and declares a type the
+    // app's `using` also reaches in the project it really references.
+    edit(twin.join("src/Twin.csproj"), "Example.Twin", "Shared");
+    let order = twin.join("src/Order.cs");
+    fs::write(&order, "namespace Example.Money;\n\npublic class Currency\n{\n    public static string Cents(int amount) => \"\";\n}\n").unwrap();
+    let (export, json) = export(&app);
+    let money = "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)";
+    for suffix in ["Currency.Cents#0", "Short(int)::Cents#0"] {
+        assert_eq!(calls(&json, suffix), [(money, "exact")], "{export}");
+    }
+    let imports = json["imports"].as_array().unwrap();
+    assert!(
+        !imports
+            .iter()
+            .any(|i| i["target"].as_str().unwrap().contains("dotnet/twin")),
+        "{export}"
+    );
+}
+
+#[test]
+fn a_project_with_a_name_a_package_id_cannot_have_is_still_referenced() {
+    let [lib, app] = workspace("nuget_packages_spaced");
+    let (from, to) = (lib.join("src/Money"), lib.join("src/My Lib"));
+    fs::rename(from, &to).unwrap();
+    fs::rename(to.join("Money.csproj"), to.join("My Lib.csproj")).unwrap();
+    edit(
+        app.join("src/Jobs/Jobs.csproj"),
+        "Money\\Money.csproj",
+        "My Lib\\My Lib.csproj",
+    );
+    let (export, json) = export(&app);
+    let links: Vec<_> = declared(&json)
+        .iter()
+        .map(|l| l["contract"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        links,
+        [
+            "package::nuget::Example.Money",
+            "package::nuget::Example.Kit"
+        ],
+        "{export}"
+    );
+}
+
+#[test]
+fn a_package_id_written_in_another_case_names_the_provider() {
+    let [_, app] = workspace("nuget_packages_cased");
+    edit(
+        app.join("src/Web/Web.csproj"),
+        "Include=\"Example.Kit\"",
+        "Include=\"example.KIT\"",
+    );
+    let (export, json) = export(&app);
+    let kit = declared(&json)
+        .into_iter()
+        .find(|l| l["contract"] == "package::nuget::Example.Kit");
+    assert_eq!(
+        kit.map(|l| l["level"].as_str().unwrap()),
+        Some("exact"),
+        "{export}"
+    );
+    let member = format!("{KIT_ORDER}.Total()");
+    assert_eq!(
+        calls(&json, "order.Total#0"),
+        [(&member[..], "exact")],
+        "{export}"
+    );
+}
+
+#[test]
+fn a_file_under_a_project_with_no_sdk_belongs_to_the_project_above() {
+    let [lib, app] = workspace("nuget_packages_legacy");
+    let legacy = "<Project><PropertyGroup><TargetFramework>net48</TargetFramework></PropertyGroup></Project>";
+    write(&lib, "src/Kit/Legacy/Legacy.csproj", legacy);
+    let extra = "namespace Example.Kit.Legacy;\n\npublic class Extra\n{\n    public static int Go() => 1;\n}\n";
+    write(&lib, "src/Kit/Legacy/Extra.cs", extra);
+    let user = "using Example.Kit.Legacy;\n\nnamespace Example.App.Web;\n\npublic class Uses\n{\n    public int Run() => Extra.Go();\n}\n";
+    write(&app, "src/Web/Uses.cs", user);
+    let (export, json) = export(&app);
+    let go = "example.com/dotnet/lib::src/Kit/Legacy/Extra.cs::Example.Kit.Legacy.Extra.Go()";
+    assert_eq!(calls(&json, "Extra.Go#0"), [(go, "exact")], "{export}");
+}
+
+#[test]
+fn a_project_reference_beyond_the_workspace_links_nothing() {
+    let [_, app] = workspace("nuget_packages_beyond");
+    let more =
+        "<ProjectReference Include=\"..\\..\\..\\elsewhere\\Gone\\Gone.csproj\" />\n  </ItemGroup>";
+    edit(app.join("src/Web/Web.csproj"), "</ItemGroup>", more);
+    let (export, json) = export(&app);
+    let links: Vec<_> = declared(&json)
+        .iter()
+        .map(|l| l["contract"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        links,
+        [
+            "package::nuget::Example.Money",
+            "package::nuget::Example.Kit"
+        ],
+        "{export}"
+    );
+}
+
+#[test]
+fn a_file_counts_for_the_ecosystem_that_imports_its_extension_only() {
+    let [lib, app] = workspace("nuget_packages_extensions");
+    // A Java class under a `.csproj` and a polyfill in `System.*` are no types a `using` brings.
+    let gizmo = "package Example.Kit.Pricing;\n\npublic class Gizmo {\n    public static int make() { return 1; }\n}\n";
+    write(&lib, "src/Kit/Pricing/Gizmo.java", gizmo);
+    let poly =
+        "namespace System.Kit;\n\npublic class Poly\n{\n    public static int Make() => 1;\n}\n";
+    write(&lib, "src/Kit/Poly.cs", poly);
+    let user = "using Example.Kit.Pricing;\nusing System.Kit;\n\nnamespace Example.App.Web;\n\npublic class Uses\n{\n    public int Run() => Gizmo.make() + Poly.Make();\n}\n";
+    write(&app, "src/Web/Uses.cs", user);
+    let (export, json) = export(&app);
+    assert!(calls(&json, "Gizmo.make#0").is_empty(), "{export}");
+    assert!(calls(&json, "Poly.Make#0").is_empty(), "{export}");
+}
+
+#[test]
+fn a_type_with_a_base_the_workspace_does_not_hold_is_inferred() {
+    let [lib, app] = workspace("nuget_packages_opaque");
+    let bundle = "namespace Example.Kit.Pricing;\n\npublic class Bundle : Outside.Base\n{\n    public static Bundle Of(int n) => new Bundle();\n\n    public int Total() => 1;\n}\n";
+    write(&lib, "src/Kit/Pricing/Bundle.cs", bundle);
+    let user = "using Example.Kit.Pricing;\n\nnamespace Example.App.Web;\n\npublic class Uses\n{\n    public int Run()\n    {\n        Bundle bundle = Bundle.Of(1);\n        return bundle.Total();\n    }\n}\n";
+    write(&app, "src/Web/Uses.cs", user);
+    let (export, json) = export(&app);
+    let total =
+        "example.com/dotnet/lib::src/Kit/Pricing/Bundle.cs::Example.Kit.Pricing.Bundle.Total()";
+    assert_eq!(
+        calls(&json, "bundle.Total#0"),
+        [(total, "inferred")],
+        "{export}"
+    );
+}
+
 /// Edits the `.csproj` files of the workspace: a package renamed, a reference dropped and a
 /// project added.
 fn change_projects([lib, app]: &[PathBuf; 2]) {

@@ -35,6 +35,9 @@ All notable changes to Meada are recorded here. The format follows
   types, so `context` on a public type lists the calls in other repositories and `trace` crosses
   the hop, with `; import namespace` in the reason. The exported import's `how` can now be
   `namespace`.
+  A `ProjectReference` pins its project (a twin package id elsewhere never makes the link
+  `ambiguous`), only an SDK-style project owns files (the stored manifest summary gains a
+  `project` marker, so existing indexes are rebuilt), and package ids match without regard to case.
 - C# source indexing (issue #107): `.cs` files, grouped into projects by SDK-style `.csproj`
   files (an old-style one, with no `Sdk`, is none; `.sln` files change nothing), yield
   namespace-qualified classes, records, structs and interfaces, nested and `partial` ones

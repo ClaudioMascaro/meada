@@ -9,25 +9,27 @@
 //!   at that path, and only in another repository: inside its own repository it stays inside it,
 //!   where the pack resolves it. A `PackageReference` reaches every provider of the id.
 //! - `settle`: a `ProjectReference` names the project's file, so the workspace step first gives
-//!   the entry the id of the project at that path.
+//!   the entry the id of the project at that path, and a `PackageReference` the provider's own
+//!   spelling of an id that differs by case only.
+//! - `owns`: an SDK-style project only (`Summary::project`), as the pack's `join`.
 //! - `resolutions` and `declares`: Java's rule (`maven`), with a namespace as the package: a type
 //!   a `using` or a written name brings is looked up under the qualified name the provider's
 //!   `exports` rows give its public types, among the files of the projects the file depends on,
 //!   and the method is picked by name and argument count. `import namespace` is the reason.
 //!
-//! Package ids are matched as written, and neither `Directory.Packages.props` nor a feed is read.
+//! Package ids are matched without case; neither `Directory.Packages.props` nor a feed is read.
 
 use super::maven;
 use super::{
     Ecosystem, Entry, Export, How, Manifest, Provided, Providers, Resolution, Summary,
-    bare_directory, owner, sourced, valid_name,
+    bare_directory, folded, owner, sourced, valid_name,
 };
 use crate::dotnet::msbuild;
 use crate::lang::Call;
 use crate::repo::relative;
 use crate::resolve::Code;
-use std::collections::HashSet;
-use std::path::Path;
+use std::collections::{BTreeSet, HashMap, HashSet};
+use std::path::{Path, PathBuf};
 
 /// The field a `PackageReference` is kept under in `Summary::dependencies`.
 const PACKAGE: &str = "PackageReference";
@@ -53,7 +55,7 @@ fn project(dir: &str, include: &str) -> Option<Entry> {
     let path = include.replace('\\', "/");
     let at = relative(dir, &path)?;
     let written = !include.contains("$(") && !include.contains(':');
-    (written && at.ends_with(EXTENSION) && literal(stem(&at))).then(|| Entry {
+    (written && at.ends_with(EXTENSION)).then(|| Entry {
         field: PROJECT.to_string(),
         name: stem(&at).to_string(),
         via: Some(format!("path {at}")),
@@ -61,10 +63,10 @@ fn project(dir: &str, include: &str) -> Option<Entry> {
     })
 }
 
-// ponytail: package ids are matched as written (NuGet's are case-insensitive), a project's
-// files are those of its directory (two projects in one share it), and an extension method or a
-// fully qualified name with no `using` is not followed; a case-folded key and the pack's
-// project globs lift them.
+// ponytail: a `ProjectReference` path is matched in the case written (ids are case-folded), a
+// project's files are those of its directory (two projects in one share it), and an extension
+// method, a `var` holding a call's result and a fully qualified name with no `using` are not
+// followed; a case-folded path key and the pack's project globs lift them.
 pub struct Nuget;
 
 impl Ecosystem for Nuget {
@@ -102,6 +104,7 @@ impl Ecosystem for Nuget {
             name: literal(&id).then_some(id),
             version: project_file.version.filter(|v| !v.contains("$(")),
             dependencies,
+            project: true,
             ..Summary::default()
         }
     }
@@ -110,13 +113,19 @@ impl Ecosystem for Nuget {
         &["cs"]
     }
 
+    /// Only an SDK-style project bounds a package, as the pack's `join` has it.
+    fn owns(&self, manifest: &Manifest) -> bool {
+        manifest.summary.project
+    }
+
     fn names_package(&self, name: &str) -> bool {
         name.split('.')
             .all(|s| !s.is_empty() && s.chars().all(|c| c.is_alphanumeric() || c == '_'))
     }
 
     fn imports<'a>(&self, code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
-        maven::imports(code, path, call)
+        // ponytail: a workspace type in `System.*` (a polyfill) is not followed.
+        maven::imports(code, path, call, &["System."])
     }
 
     /// A constructor or a method of the class itself, by its id: the class's id, a dot, then a
@@ -186,38 +195,50 @@ impl Ecosystem for Nuget {
     }
 
     /// Each `ProjectReference` to a project of another repository takes that project's id, which
-    /// its file name does not always say.
+    /// its file name does not always say, and each `PackageReference` the spelling of the one
+    /// provider whose id differs from it by case only (ids are case-insensitive).
     fn settle(&self, exports: &mut [Export]) {
-        let projects: Vec<(usize, usize, usize, String)> = (exports.iter().enumerate())
-            .flat_map(|(n, export)| {
-                export
-                    .manifests
-                    .iter()
-                    .enumerate()
-                    .map(move |(i, m)| (n, i, m))
-            })
-            .filter(|(_, _, m)| self.is_manifest(m.path.rsplit('/').next().unwrap_or("")))
-            .flat_map(|(n, i, m)| {
-                let entries = m.summary.dependencies.iter().enumerate();
-                entries
-                    .filter(|(_, e)| e.field == PROJECT)
-                    .map(move |(k, e)| (n, i, k, e))
-            })
-            .filter_map(|(n, i, k, e)| {
-                let from = exports[n].place();
-                let named =
-                    |m: &Manifest| m.summary.name.clone().filter(|_| self.is_manifest(&m.path));
-                let id = (exports.iter()).find_map(|x| {
-                    let mut found = x.manifests.iter().filter(|m| {
-                        self.reaches((e.via.as_deref(), None), from, (x.place(), &m.path))
-                    });
-                    found.find_map(named)
-                })?;
-                Some((n, i, k, id))
-            })
-            .collect();
-        for (n, i, k, id) in projects {
-            exports[n].manifests[i].summary.dependencies[k].name = id;
+        let nuget = |m: &Manifest| self.is_manifest(m.path.rsplit('/').next().unwrap_or(""));
+        // Each named project by its folded location, with its repository, and each id by its
+        // lowercase spelling.
+        let mut located: HashMap<PathBuf, (String, String)> = HashMap::new();
+        let mut spellings: HashMap<String, BTreeSet<String>> = HashMap::new();
+        for export in exports.iter() {
+            let (repository, root) = export.place();
+            for m in export.manifests.iter().filter(|m| nuget(m)) {
+                let Some(name) = &m.summary.name else {
+                    continue;
+                };
+                let at = folded(&root.join(&m.path));
+                located
+                    .entry(at)
+                    .or_insert((repository.to_string(), name.clone()));
+                spellings
+                    .entry(name.to_lowercase())
+                    .or_default()
+                    .insert(name.clone());
+            }
+        }
+        for export in exports.iter_mut() {
+            let (repository, root) = (export.repository.clone(), export.root.clone());
+            let manifests = export.manifests.iter_mut().filter(|m| nuget(m));
+            for entry in manifests.flat_map(|m| &mut m.summary.dependencies) {
+                if entry.field == PROJECT {
+                    // Only a path that leaves its repository names another one's project.
+                    let path = (entry.via.as_deref())
+                        .and_then(|v| v.strip_prefix("path "))
+                        .filter(|p| p.starts_with("../"));
+                    let found = path.and_then(|p| located.get(&folded(&root.join(p))));
+                    if let Some((_, name)) = found.filter(|(other, _)| *other != repository) {
+                        entry.name = name.clone();
+                    }
+                } else if let Some(ids) = spellings.get(&entry.name.to_lowercase())
+                    && !ids.contains(&entry.name)
+                    && let [only] = ids.iter().collect::<Vec<_>>()[..]
+                {
+                    entry.name = only.clone();
+                }
+            }
         }
     }
 }
@@ -247,7 +268,39 @@ mod tests {
         // A computed or invalid id makes no provider, and does not fall back to another name.
         assert_eq!(named("<PackageId>$(Id)</PackageId>"), None);
         assert_eq!(named("<AssemblyName>a b</AssemblyName>"), None);
+        assert_eq!(
+            named(&format!("<PackageId>{}</PackageId>", "a".repeat(300))),
+            None
+        );
         assert_eq!(read("Kit.csproj", "<Project/>").name, None);
+    }
+
+    #[test]
+    fn only_a_project_with_an_sdk_owns_the_files_under_it() {
+        let owns = |src: &str| {
+            let summary = read("src/Kit/Kit.csproj", src);
+            Nuget.owns(&Manifest {
+                path: "src/Kit/Kit.csproj".to_string(),
+                summary,
+            })
+        };
+        assert!(owns("<Project Sdk=\"Microsoft.NET.Sdk\"/>"));
+        assert!(!owns("<Project><PropertyGroup/></Project>"));
+        assert!(!owns("not xml"));
+    }
+
+    #[test]
+    fn a_project_reference_keeps_an_entry_whatever_its_file_is_called() {
+        let src = r#"<Project Sdk="S"><ItemGroup>
+            <ProjectReference Include="..\My Lib\My Lib.csproj" />
+          </ItemGroup></Project>"#;
+        let entries = read("src/App/App.csproj", src).dependencies;
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "My Lib");
+        assert_eq!(
+            entries[0].via.as_deref(),
+            Some("path src/My Lib/My Lib.csproj")
+        );
     }
 
     #[test]
@@ -258,11 +311,7 @@ mod tests {
             "<a>".repeat(100),
             "</a>".repeat(100)
         );
-        let long = format!(
-            "<Project Sdk=\"S\"><PropertyGroup><PackageId>{}</PackageId></PropertyGroup></Project>",
-            "a".repeat(300)
-        );
-        let hostile: [&str; 5] = [dtd, "<Project Sdk=\"S\">", "not xml", &deep, &long];
+        let hostile: [&str; 4] = [dtd, "<Project Sdk=\"S\">", "not xml", &deep];
         for src in hostile {
             assert_eq!(read("Kit.csproj", src), Summary::default(), "{src}");
         }

@@ -2470,7 +2470,8 @@ sample.csproj
       "name": "Core",
       "via": "path src/Core/Core.csproj"
     }
-  ]
+  ],
+  "project": true
 }
 
 sample.tsconfig.json

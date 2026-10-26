@@ -395,6 +395,9 @@ pub struct Summary {
     /// Cargo only: the `[workspace.package] version` a member may inherit.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace_version: Option<String>,
+    /// NuGet only: the `.csproj` is an SDK-style project, the only kind that bounds a package.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub project: bool,
 }
 
 /// One dependency entry of a manifest. `name` is the package the entry names.
@@ -782,8 +785,8 @@ struct Provided<'e> {
     /// The Go source files that are no tests, by directory. Built the first time a Go import
     /// asks (`Go::resolve`), once for all.
     go_dirs: OnceCell<HashMap<&'e str, Vec<&'e str>>>,
-    /// The public classes and methods of the Java files. Built the first time a Java import asks
-    /// (`Maven::resolutions`), once for all.
+    /// The public classes and methods of the Java, Kotlin and C# files. Built the first time one
+    /// of their imports asks (`maven::resolutions`), once for all.
     classes: OnceCell<maven::Classes<'e>>,
     /// The families of the public classes (`Ancestry`), for `Classes`.
     ancestries: &'e [Ancestry],
