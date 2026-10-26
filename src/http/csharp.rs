@@ -27,7 +27,7 @@ use super::{ANY, METHODS, balanced, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
 use crate::lang::{Call, Facts, Kind};
-use crate::names::{is_method, known};
+use crate::names::{in_full, is_method, known};
 use crate::resolve::{Code, Target};
 
 const MVC: &str = "Microsoft.AspNetCore.Mvc.";
@@ -53,16 +53,18 @@ fn base(spelled: &str) -> bool {
 
 /// The name `name`, written in `scope` of `file`, as a name of the framework (the namespace
 /// `ns`) `is_known` accepts: bound by a `using`, or written in full
-/// (`Microsoft.AspNetCore.Mvc.Route`), which no `using` has to bind unless the repository
-/// declares a namespace of the framework's root (`Microsoft`, `hidden`).
+/// (`Microsoft.AspNetCore.Mvc.Route`, `in_full`).
 fn spelled<'a>(
     code: &Code<'a>,
     (file, scope): (&'a str, &'a str),
     name: &'a str,
-    (ns, hidden): (&str, bool),
+    ns: &str,
     is_known: impl Fn(&str) -> bool,
 ) -> Option<String> {
-    let full = || (name.starts_with(ns) && !hidden && is_known(name)).then(|| name.to_string());
+    let full = || {
+        (name.starts_with(ns) && in_full(code, file, scope, name, &is_known))
+            .then(|| name.to_string())
+    };
     known(code, file, scope, name, &is_known).or_else(full)
 }
 
@@ -73,23 +75,22 @@ fn class(code: &Code, target: Target) -> bool {
 }
 
 /// What may hide a framework's attribute in the repository: the attribute classes it declares,
-/// by name, and whether it declares a namespace of the framework's root (`spelled`).
+/// by their simple and their full names.
 struct Hiding<'a> {
     declared: BTreeSet<&'a str>,
-    hidden: bool,
+    full: BTreeSet<&'a str>,
 }
 
 impl<'a> Hiding<'a> {
-    /// What hides the attributes of the namespace `ns` in `files`.
-    fn of(files: &[(&'a str, &'a Facts)], ns: &str) -> Self {
+    /// What hides the attributes of a framework in `files`.
+    fn of(files: &[(&'a str, &'a Facts)]) -> Self {
         let defs = || files.iter().flat_map(|(_, f)| f.defs.iter());
-        let declared = (defs().filter(|d| d.kind == Kind::Class))
-            .filter_map(|d| d.name.rsplit('.').next())
+        let full: BTreeSet<&'a str> = (defs().filter(|d| d.kind == Kind::Class))
+            .map(|d| d.name.as_str())
             .filter(|n| n.ends_with("Attribute"))
             .collect();
-        let root = format!("{}.", ns.split('.').next().unwrap_or(ns));
-        let hidden = defs().any(|d| d.name.starts_with(&root));
-        Hiding { declared, hidden }
+        let declared = (full.iter()).filter_map(|n| n.rsplit('.').next()).collect();
+        Hiding { declared, full }
     }
 
     /// The attribute `c` of `path`, read in `scope`, as the framework (the namespace `ns`)
@@ -122,13 +123,12 @@ impl<'a> Hiding<'a> {
                         .is_some_and(|t| class(code, t))
                 })
         });
-        let spelled = spelled(
-            code,
-            (path, scope),
-            &c.callee,
-            (ns, self.hidden),
-            is_attribute,
-        );
+        // `[N.Get]` written in full may be the repository's `N.GetAttribute`.
+        let own = own
+            || self
+                .full
+                .contains(format!("{}Attribute", c.callee).as_str());
+        let spelled = spelled(code, (path, scope), &c.callee, ns, is_attribute);
         spelled.filter(|_| !own)
     }
 }
@@ -149,7 +149,7 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
         .collect();
     // The attribute classes the repository declares, and a namespace `Microsoft` of its own,
     // hide MVC's.
-    let hiding = Hiding::of(&files, MVC);
+    let hiding = Hiding::of(&files);
     // A class with a class of the repository as a base inherits its attributes, and that base
     // passes them down: neither is read.
     let (mut inheriting, mut based) = (BTreeSet::new(), BTreeSet::new());
@@ -200,7 +200,7 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
             let scope = crate::parent(&class.name);
             let controller = on_class("ApiController").next().is_some()
                 || (class.bases.iter())
-                    .any(|b| spelled(code, (path, scope), b, (MVC, hiding.hidden), base).is_some());
+                    .any(|b| spelled(code, (path, scope), b, MVC, base).is_some());
             let here = Target {
                 path,
                 name: &class.name,
@@ -491,6 +491,24 @@ mod tests {
         let qualified = "[Microsoft.AspNetCore.Mvc.ApiController] public class C { \
             [Microsoft.AspNetCore.Mvc.HttpGetAttribute(\"q\")] public void A() {} }";
         assert_eq!(served("", qualified), ["http::GET::/q"]);
+        // Another namespace under the framework's root hides no name written in full; the
+        // repository's own class of that very name does (`names::in_full`).
+        let root = "namespace Microsoft.Acme { public class Tool { } }";
+        let full = format!("namespace A {{ {qualified} }}");
+        assert_eq!(
+            served_in(&[("A/C.cs", &full), ("M/Tool.cs", root)]),
+            ["http::GET::/q"]
+        );
+        let own = "namespace Microsoft.AspNetCore.Mvc { \
+                   public class ApiController : System.Attribute { } }";
+        assert!(served_in(&[("A/C.cs", &full), ("M/Own.cs", own)]).is_empty());
+        let suffixed = own.replace("ApiController", "ApiControllerAttribute");
+        assert!(served_in(&[("A/C.cs", &full), ("M/Own.cs", &suffixed)]).is_empty());
+        let based = "namespace A { public class C : Microsoft.AspNetCore.Mvc.ControllerBase { \
+                     [Microsoft.AspNetCore.Mvc.HttpGet(\"b\")] public void B() {} } }";
+        let base = "namespace Microsoft.AspNetCore.Mvc { public class ControllerBase { } }";
+        assert_eq!(served_in(&[("A/C.cs", based)]), ["http::GET::/b"]);
+        assert!(served_in(&[("A/C.cs", based), ("M/Base.cs", base)]).is_empty());
         assert!(plain("", "", USINGS).is_empty());
         assert!(plain("", ": Other", USINGS).is_empty());
     }

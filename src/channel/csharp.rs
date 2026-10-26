@@ -30,7 +30,7 @@ use super::message::{
     topics,
 };
 use crate::lang::{Bound, Invocation, Value, property};
-use crate::names::{one, spellings};
+use crate::names::{in_full, one, spellings};
 use crate::resolve::{Code, Keywords, method as member};
 use std::cell::OnceCell;
 use std::collections::HashMap;
@@ -524,12 +524,12 @@ fn setter(made: Obj, method: &str) -> Option<Obj> {
     (builder && method.starts_with(SETTER)).then_some(made)
 }
 
-/// The library type `ty`, written in `scope` of `path`, is: in full, or the one spelling in the
-/// table the usings give it.
+/// The library type `ty`, written in `scope` of `path`, is: in full (`in_full`), or the one
+/// spelling in the table the usings give it.
 fn type_of<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, ty: &'a str) -> Option<Obj> {
     let found = |full: &str| TYPES.iter().find(|(t, _)| *t == full).map(|(_, o)| *o);
-    if let Some(obj) = found(ty) {
-        return Some(obj);
+    if in_full(code, path, scope, ty, |t| found(t).is_some()) {
+        return found(ty);
     }
     found(one(&spellings(code, path, scope, ty), |t| {
         found(t).is_some()

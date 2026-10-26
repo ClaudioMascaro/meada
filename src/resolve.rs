@@ -3616,7 +3616,7 @@ pub(crate) const EVAL_BUDGET: usize = 1 << 16;
 /// the next (`Follow::Values`), and the constants it follows for `Follow::Constants`.
 // ponytail: real values nest a few levels; the limit keeps a crafted chain of thousands of
 // constants from overflowing the stack.
-const EVAL_DEPTH: usize = 256;
+pub(crate) const EVAL_DEPTH: usize = 256;
 
 /// How many wrapper calls `Code::expand` climbs from a call; at the limit, the site is read
 /// where the climb stops, its parameters unknown.
@@ -5828,12 +5828,17 @@ mod tests {
             "{} calls",
             facts.calls.len()
         );
+        let start = std::time::Instant::now();
         for call in &facts.calls {
             assert!(!matches!(
                 resolver.call("a/C.java", call),
                 Resolution::Exact(_)
             ));
         }
+        // Reading each result twice, through the walk and the name match, doubled the cost per
+        // link: past twenty links, minutes.
+        let took = start.elapsed();
+        assert!(took.as_secs() < 10, "{took:?}");
     }
 
     #[test]

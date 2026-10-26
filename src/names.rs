@@ -65,3 +65,29 @@ pub fn declared<'a>(
         _ => None,
     }
 }
+
+/// Whether `name`, written in full in `scope` of `path` (`System.Net.Http.HttpClient`), is a
+/// library's name `is_known` accepts: no definition of the repository binds it there, since the
+/// compiler prefers a type the source declares under a library's name.
+pub fn in_full<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    name: &'a str,
+    is_known: impl Fn(&str) -> bool,
+) -> bool {
+    is_known(name) && code.definition(path, scope, name).is_none()
+}
+
+/// Whether the type `ty`, written in `scope` of `path`, is the library type `full`: written in
+/// full (`in_full`), or the one spelling the imports give it.
+pub fn is_type<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    ty: &'a str,
+    full: &str,
+) -> bool {
+    in_full(code, path, scope, ty, |n| n == full)
+        || one(&spellings(code, path, scope, ty), |s| s == full).is_some()
+}

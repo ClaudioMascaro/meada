@@ -27,7 +27,7 @@ use std::cell::OnceCell;
 use super::minimal::{APP, BUILDERS};
 use crate::dotnet::appsettings::Settings;
 use crate::lang::{Facts, Part, Value};
-use crate::names::{one, spellings};
+use crate::names::{is_type, one, spellings};
 use crate::resolve::Code;
 
 const ENVIRONMENT: &str = "System.Environment";
@@ -156,7 +156,7 @@ fn declared<'a>(
     let Some((at, within, ty)) = code.written(path, scope, name) else {
         return false;
     };
-    ty == full || one(&spellings(code, at, within, ty), |s| s == full).is_some()
+    is_type(code, at, within, ty, full)
 }
 
 /// Whether `name` is a web application builder: declared as one, or a local made by

@@ -281,7 +281,7 @@ mod tests {
     use crate::lang::LanguagePack;
     use crate::lang::java::Java;
     use crate::lang::kotlin::Kotlin;
-    use crate::resolve::Resolver;
+    use crate::resolve::{EVAL_DEPTH, Resolver};
     use std::collections::BTreeMap;
 
     const KOTLIN: &str = "src/main/kotlin/a/C.kt";
@@ -326,7 +326,9 @@ mod tests {
             )
         };
         assert_eq!(read(&chain(LOCAL_DEPTH + 1)).0, 1);
-        assert_eq!(read(&chain(1024)).0, 0);
+        // The pack's own `LOCAL_DEPTH` locals, then the value flow's `EVAL_DEPTH`.
+        assert_eq!(read(&chain(EVAL_DEPTH + LOCAL_DEPTH)).0, 1);
+        assert_eq!(read(&chain(EVAL_DEPTH + LOCAL_DEPTH + 1)).0, 0);
     }
 
     /// A file of many functions, each with a client local and a call, is read in time linear
