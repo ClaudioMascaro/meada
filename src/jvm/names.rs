@@ -3,7 +3,7 @@
 //! candidate, not a fact, so a kind accepts a name when exactly one of its spellings is in the
 //! kind's own table (`one`).
 
-use crate::lang::{Bound, Class, Facts, Kind};
+use crate::lang::{Bound, Class, Facts, Kind, Value};
 use crate::qualify;
 use crate::resolve::{Code, Follow, Form, Of, Outside};
 
@@ -15,11 +15,16 @@ pub fn java_files<'a>(code: &Code<'a>) -> impl Iterator<Item = (&'a str, &'a Fac
 }
 
 /// The Java and Kotlin files of `code`, with their facts: what the readers of annotations that
-/// both languages write the same way read (Spring MVC).
+/// both languages write the same way read (Spring MVC, the channel clients).
 pub fn jvm_files<'a>(code: &Code<'a>) -> impl Iterator<Item = (&'a str, &'a Facts)> + use<'a> {
     (code.files().iter())
-        .filter(|(path, _)| [".java", ".kt", ".kts"].iter().any(|e| path.ends_with(e)))
+        .filter(|(path, _)| path.ends_with(".java") || kotlin(path))
         .map(|(&path, &facts)| (path, facts))
+}
+
+/// Whether `path` is a Kotlin file, which writes a `new` as a plain call.
+pub fn kotlin(path: &str) -> bool {
+    path.ends_with(".kt") || path.ends_with(".kts")
 }
 
 /// Whether `target`, what an annotation of `facts` decorates, is a method of the file: a
@@ -52,6 +57,20 @@ pub fn known<'a>(
         false => outside.candidates,
     };
     one(&spellings, is_known).map(str::to_string)
+}
+
+/// The elements of Kotlin's `arrayOf(..)` written as an annotation's array, when the name is
+/// the standard library's (a function of the repository by that name is none).
+pub fn array_of<'a>(
+    code: &Code<'a>,
+    file: &'a str,
+    scope: &'a str,
+    v: &'a Value,
+) -> Option<&'a [Value]> {
+    let Value::Call(call) = v else { return None };
+    (call.receiver.is_none() && call.callee == "arrayOf").then_some(())?;
+    known(code, file, scope, &call.callee, |s| s == "kotlin.arrayOf")?;
+    Some(&call.args)
 }
 
 /// How the imports of `path` may spell `name`, written in `scope` (`Outside::spellings`).

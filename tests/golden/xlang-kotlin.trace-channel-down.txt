@@ -1,0 +1,4 @@
+example.com/xlang-kotlin/web src/events.ts:7 announceShipment
+  →[exact: channel::kafka::orders.shipped] example.com/xlang-kotlin/api src/main/kotlin/com/example/api/ShipmentListener.kt:7 com.example.api.ShipmentListener.onShipment(String)
+    example.com/xlang-kotlin/api src/main/kotlin/com/example/api/ShipmentListener.kt:12 com.example.api.ShipmentListener.apply(String)
+chain: exact · 1 hops · 2 repos · 107 tokens

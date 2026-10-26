@@ -208,9 +208,17 @@ enum Reading {
     /// method does not bind it, since fields and methods are separate namespaces (`repo` in
     /// `repo.save()` is the field `repo`, never a method `repo()`).
     Read,
+    /// `Read`, asked for the type a name is declared with (`Code::declared`): where class
+    /// members are in scope (Kotlin), the members of the receiver of a block around it
+    /// (`apply`, `run`, `with`, an extension function) come before the names outside the block.
+    Member,
 }
 
 impl Reading {
+    fn read(self) -> bool {
+        matches!(self, Reading::Read | Reading::Member)
+    }
+
     fn types(self) -> bool {
         matches!(
             self,
@@ -221,7 +229,7 @@ impl Reading {
     fn value(self) -> bool {
         matches!(
             self,
-            Reading::Value | Reading::Path | Reading::Method | Reading::Read
+            Reading::Value | Reading::Path | Reading::Method | Reading::Read | Reading::Member
         )
     }
 }
@@ -1283,6 +1291,12 @@ impl<'a> Resolver<'a> {
         self.resolve_as(path, scope, callee, seen, work, Reading::Value)
     }
 
+    /// `read`, for the type the name is declared with (`Reading::Member`).
+    fn read_member(&self, path: &'a str, scope: &'a str, name: &'a str) -> Binding<'a> {
+        let (seen, work) = (&mut self.seen(path, scope), &mut Work::default());
+        self.resolve_as(path, scope, name, seen, work, Reading::Member)
+    }
+
     /// `binding` of a name read, not called (`Reading::Read`).
     fn read(&self, path: &'a str, scope: &'a str, name: &'a str) -> Binding<'a> {
         let (seen, work) = (&mut self.seen(path, scope), &mut Work::default());
@@ -1382,7 +1396,7 @@ impl<'a> Resolver<'a> {
             let value = reading.value() && last;
             // A member read on the way, or read last, is no method where fields and methods
             // are separate namespaces (`Reading::Read`).
-            let read = self.members_in_scope && (!last || reading == Reading::Read);
+            let read = self.members_in_scope && (!last || reading.read());
             binding = match self.instance(binding, work) {
                 Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => {
                     self.member(t, member, read, work)
@@ -2158,11 +2172,12 @@ impl<'a> Resolver<'a> {
             }
             if let Some((name, def)) = defs.get_key_value(candidate.as_str())
                 && def.kind != Kind::Method
-                && !(def.kind == Kind::Module && matches!(reading, Reading::Value | Reading::Read))
+                && !(def.kind == Kind::Module
+                    && matches!(reading, Reading::Value | Reading::Read | Reading::Member))
             {
                 return Binding::Def(Target { path, name });
             }
-            let read = reading == Reading::Read && self.members_in_scope;
+            let read = reading.read() && self.members_in_scope;
             if !read && let Some(overloads) = self.overloads[path].get(candidate.as_str()) {
                 return match overloads[..] {
                     [one] => Binding::Def(one),
@@ -2187,6 +2202,20 @@ impl<'a> Resolver<'a> {
                 Some(Class::Imported) => return self.imported_in(path, name, seen, true),
                 Some(_) => return Binding::Local(path, s, name),
                 None => {}
+            }
+            // The receiver of a block (a Kotlin `with`, `apply`, `run`, or an extension
+            // function) has its members first: a field of a class of the repository is that
+            // name, and a receiver of another type may have one of any name. Only where the
+            // type of the name is asked (`Reading::Member`): the value of a constant, or a
+            // called name, may be one of the file's or an imported extension.
+            if self.members_in_scope && reading == Reading::Member {
+                if let Some(class) = self.blocks.get(&(path, s)) {
+                    if let Some(found) = self.inherited_field(class.path, class.name, name) {
+                        return found;
+                    }
+                } else if self.unread.contains(&(path, s)) {
+                    return Binding::Hidden;
+                }
             }
             if let Some(found) = self.imported_at(path, s, name, seen) {
                 return found;
@@ -3969,7 +3998,7 @@ impl<'a> Code<'a> {
             return None;
         }
         let r = self.resolver;
-        let binding = r.read(path, scope, name);
+        let binding = r.read_member(path, scope, name);
         let (at, within, held) = r.holder(&binding)?;
         match r.receivers[at].get(&(within, held))? {
             Class::Type(written) => {
