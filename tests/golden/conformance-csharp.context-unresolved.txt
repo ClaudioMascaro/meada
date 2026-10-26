@@ -1,0 +1,17 @@
+example.com/acme/conformance src/Acme.Api/Clients.cs:113-118 Acme.Api.Clients.Unread.Run()
+community: src/Acme.Api#4
+processes: 1 (1 export; 1 repository): Acme.Api.Clients.Unread.Run() (example.com/acme/conformance)
+public async Task Run()
+        {
+            await http.GetAsync(Lookup());
+            HttpClient named = factory.CreateClient("orders");
+            await named.GetAsync("/named");
+        }
+callers: none
+callees:
+example.com/acme/conformance src/Acme.Api/Clients.cs:111 Acme.Api.Clients.Unread.Lookup()
+example.com/acme/conformance src/Acme.Api/Clients.cs:116 (unresolved) factory.CreateClient
+example.com/acme/conformance src/Acme.Api/Clients.cs:115 (unresolved) http.GetAsync
+example.com/acme/conformance src/Acme.Api/Clients.cs:117 (unresolved) named.GetAsync
+contracts:
+example.com/acme/conformance src/Acme.Api/Clients.cs:115 consumes (unresolved) http.GetAsync

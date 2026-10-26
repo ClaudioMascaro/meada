@@ -14,6 +14,8 @@
 //! Conventional routing (`MapControllerRoute`) is not read. A class deriving from a class of the
 //! repository is not read either, since it inherits that class's attributes.
 
+mod clients;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 mod minimal;
@@ -59,6 +61,11 @@ fn spelled<'a>(
 ) -> Option<String> {
     let full = || (name.starts_with(MVC) && !hidden && is_known(name)).then(|| name.to_string());
     known(code, file, scope, name, &is_known).or_else(full)
+}
+
+/// The consumers of the `HttpClient` (`clients.rs`).
+pub(super) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
+    clients::consumers(code)
 }
 
 /// ASP.NET Core controller providers: see the module.

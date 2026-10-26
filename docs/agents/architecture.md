@@ -782,7 +782,8 @@ one for the area a change touches.
   RestTemplate, WebClient, `java.net.http` and OkHttp consumers, whose bases come from the
   Spring configuration `jvm/spring.rs` reads for the JVM packs' kinds; `http/kotlin.rs`, Ktor
   providers, and `http/kotlin/client.rs`, Ktor client consumers; `http/csharp.rs`, ASP.NET Core
-  controller providers, and `http/csharp/minimal.rs`, minimal API providers), resource and channel
+  controller providers, `http/csharp/minimal.rs`, minimal API providers, and
+  `http/csharp/clients.rs`, HttpClient consumers), resource and channel
   kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go and Maven packages as
   contracts (specs #22, #24, #30, #25 and #26), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
@@ -2154,8 +2155,7 @@ qualification budget does (ADR 0017).
   before the trunk's normalization, which reads it as a query. Case is kept, so `[controller]`
   on `OrdersController` is `/api/Orders` (ASP.NET Core matches case-insensitively; the trunk
   does not). A method serves nothing when `[NonAction]` marks it or `Facts::hidden` says it is
-  not public. Ceilings: a template that is not a string literal serves nothing (the pack folds
-  no constants or `+`); a class with a base class of the repository (an interface is fine), a
+  not public. Ceilings: a template that does not fold to a literal serves nothing; a class with a base class of the repository (an interface is fine), a
   class that is the base of another one of the repository, and a class declared in parts
   (`Facts::partial` in several files) serve nothing, since the attributes they have or pass
   down are not followed or joined; `[Area]` and `Name=` route names are not applied;
@@ -2183,6 +2183,47 @@ qualification budget does (ADR 0017).
   does a group configured through a call outside `CONVENTIONS`; `Map(pattern, handler)`,
   `MapFallback`, `MapHub`, `MapControllers` and `MapRazorPages` are not read, and neither is a
   pattern that does not fold to a literal.
+- `http/csharp/clients.rs` (spec #28, #111): an `HttpClient` call is a consumer when its method
+  is in `CLIENT_METHODS` (`GetAsync` to `PutAsJsonAsync`) or is `SendAsync`, and its receiver is
+  an `HttpClient`: `Code::written` gives the type text written for a field, a parameter or a
+  typed local, `names::spellings` confirms it through the usings (an alias counts, a class of
+  the repository named `HttpClient` hides the framework's), and a construction in place or a
+  local made by `new HttpClient()` counts without a written type. The pack ships syntax only and
+  adds no externs: C# types are not in `Facts::externs`, since `Binding::External` would turn
+  the calls on them from inferred to unresolved. The call is read whole by `Expand::Chain`, so a
+  wrapper (the URL, the method, the `HttpRequestMessage` or the client a parameter) is a consumer
+  at each caller with the trunk's depth bound and cycle check; `SendAsync(new
+  HttpRequestMessage(HttpMethod.X, url))` takes its method and URL from the request, and
+  `new Uri(x)` is `x`. The pack folds string literals, verbatim, raw (one line) and interpolated
+  strings (`{{` and `}}` unescaped, a hole with an alignment or format clause is a parameter),
+  `+`, and `const` and `static readonly` fields, of other types too (`Facts::consts` and
+  `Facts::statics`, as Java's `static final`). The pack binds every local to its initializer
+  (`Facts::bound`, an `Unknown` bound for a loop variable, a pattern or a lambda parameter, so
+  that a second binding of the name leaves none), and a field or property that holds a
+  construction or a call. A name assigned anywhere in its file (`=`, `+=`, `++`, `out`,
+  `ref`, `this.x = v`) loses its bound: it holds no one value (the rule of the minimal API
+  reader, spec #28, #110), so a reassigned local, request or client is unknown, and
+  `Code::local` follows a local of unknown class when the pack bound it once. A base is the
+  `BaseAddress = new Uri(x)` of the client's initializer (the pack gives an initializer as the
+  last argument of the creation, a `Value::Object`) or an assignment on the name the call is
+  made on (a `Bound` named `<name>.BaseAddress`, in the scope that declares `<name>`, which
+  `clients.rs` checks against `Code::written` so that a parameter that hides a field, or a
+  nested type's own field, keeps its own); two assignments leave an `Unknown` bound, which is
+  an unknown base. The assignment wins over the initializer. A relative URL joins the base as
+  RFC 3986 does (`https://c/v1` and `orders` give `/orders`, `https://c/v1/` gives
+  `/v1/orders`) and one starting with `/` keeps the origin; a base with no literal scheme is
+  cut at the first text after its non-literal parts. `request.Method = HttpMethod.X`, set
+  after the construction, is read the same way (a `Bound` named `<name>.Method`). A client with
+  no readable base is a path-only contract. Named clients (`CreateClient(name)`) held by a
+  local or by a field assigned from it (a `Bound` named `<field>=`, read with `Code::bounds`)
+  are not consumers. `a?.M()` is a call of `M` on `a` (the grammar parses `await a?.M()` with
+  the `await` around `a`; `condition` reads through it). Ceilings: a field is followed only
+  when it holds a construction or a call (an instance `readonly` string is not folded, only
+  `const` and `static readonly`); a name assigned anywhere in the file is unknown in all of
+  it, even in another method; a client set by a typed client's constructor parameter
+  (spec #28, #113), `new Uri(base, relative)` with two arguments, a `HttpRequestMessage` built
+  with an object initializer, a raw string of several lines and `AddHttpClient<T>` bases are
+  not read.
 - `http/kotlin.rs` (spec #27, #98): Ktor routes, through the same `Mounts` and `prefixes` as
   the other routers, whose nodes are definitions (file, qualified name): the lambda of each
   `routing { }` call (a root), the lambda of each `route(prefix) { }` call (mounted under its
