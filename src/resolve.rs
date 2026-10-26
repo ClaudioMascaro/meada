@@ -905,12 +905,18 @@ impl<'a> Resolver<'a> {
     }
 
     pub fn call(&self, path: &'a str, call: &'a Call) -> Resolution<'a> {
-        self.resolved(path, call, &mut Work::default())
+        self.resolved(path, call, true, &mut Work::default())
     }
 
     /// `call`, with what resolving it carries along (a chain of calls on call results is
     /// bounded by `RECEIVER_DEPTH`).
-    fn resolved(&self, path: &'a str, call: &'a Call, work: &mut Work<'a>) -> Resolution<'a> {
+    fn resolved(
+        &self,
+        path: &'a str,
+        call: &'a Call,
+        matching: bool,
+        work: &mut Work<'a>,
+    ) -> Resolution<'a> {
         if self.strict && call.decorates.is_some() {
             return Resolution::Unresolved;
         }
@@ -980,6 +986,8 @@ impl<'a> Resolver<'a> {
         }
         match binding {
             Binding::Def(t) => Resolution::Exact(t),
+            // A call's result is read from an exact target alone (`result_of`): no name match.
+            _ if !matching => Resolution::Unresolved,
             Binding::Several(all) => Resolution::Ambiguous(all),
             Binding::External(..) => Resolution::Unresolved,
             Binding::Unknown if self.owned_outside(path, call) || self.lacks(path, call) => {
@@ -1165,7 +1173,7 @@ impl<'a> Resolver<'a> {
             return Binding::Unknown;
         }
         work.busy.push(key);
-        let found = match self.resolved(path, call, work) {
+        let found = match self.resolved(path, call, false, work) {
             Resolution::Exact(t) => match &self.defs[t.path][t.name].result {
                 Some(Class::Type(class)) => {
                     let seen = &mut self.seen(t.path, t.name);
@@ -5566,6 +5574,36 @@ mod tests {
         let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
         let chained = facts.calls.iter().filter(|c| c.on.is_some()).count();
         assert!(chained > RECEIVER_DEPTH, "{chained} calls on calls");
+        for call in &facts.calls {
+            assert!(!matches!(
+                resolver.call("a/C.java", call),
+                Resolution::Exact(_)
+            ));
+        }
+    }
+
+    #[test]
+    fn a_chain_of_locals_on_call_results_resolves_each_call_once() {
+        use crate::lang::java::Java;
+        // `var a1 = a0.m(); var a2 = a1.m(); ..`: each local takes its class from the result of
+        // a call on the one before, and no definition answers. Each result is read once, through
+        // exact targets alone, so the chain costs its length, not two to the power of it.
+        let n = RECEIVER_DEPTH + 16;
+        let locals: String = (1..=n)
+            .map(|i| format!("var a{i} = a{}.m(); ", i - 1))
+            .collect();
+        let src = format!(
+            "package a;\nimport b.Outside;\nclass C {{ void f(Outside a0) {{ {locals}a{n}.m(); }} }}\n"
+        );
+        let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("a/C.java", &facts)]);
+        let layout = Java.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
+        assert!(
+            facts.calls.len() > RECEIVER_DEPTH,
+            "{} calls",
+            facts.calls.len()
+        );
         for call in &facts.calls {
             assert!(!matches!(
                 resolver.call("a/C.java", call),
