@@ -3,3 +3,5 @@ tests/fixtures/** -text
 tests/golden/** -text
 # The vendored Kotlin grammar is compiled byte for byte as upstream wrote it (PROVENANCE.md).
 vendor/tree-sitter-kotlin-ng/** -text
+# Generated grammar sources: GitHub collapses them in diffs and leaves them out of language stats.
+vendor/tree-sitter-kotlin-ng/src/** linguist-generated=true
