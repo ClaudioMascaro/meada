@@ -2373,7 +2373,7 @@ mod tests {
             bound("val a = xs.make(); for (a in xs) { use(a) }"),
             [] as [&str; 0]
         );
-        // Two `val`s keep both, which `jvm::names::local` reads as a name declared twice.
+        // Two `val`s keep both, which `Code::local` reads as a name declared twice.
         assert_eq!(bound("val a = xs.make(); val a = xs.other()"), ["a", "a"]);
     }
 

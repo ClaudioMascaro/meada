@@ -83,7 +83,8 @@ All notable changes to Meada are recorded here. The format follows
   host, a `${VAR}` placeholder maps through `base_url_env`, and a default whose host a peer
   serves links by host. `System.getenv("X")` and `System.getenv()["X"]`, through `?:`
   fallbacks, `!!` and string methods such as `trimEnd` and `removeSuffix`, are the base URL
-  variable `X`. A cross-language fixture links TypeScript and Ktor in both directions.
+  variable `X`, also through a local `val` of the function (`val base = System.getenv("X") ?:
+  ".."`), which folds where it is written as TypeScript's `const` does. A cross-language fixture links TypeScript and Ktor in both directions.
 - Kotlin HTTP consumers (issue #101): `RestTemplate`, `WebClient`, OkHttp and Retrofit are read
   in Kotlin files with the Java rules, written the Kotlin way: no `new`, a `RestTemplate()` or
   `Request.Builder()` constructor call, `HttpMethod` and `HttpUrl` imports by `*`, and

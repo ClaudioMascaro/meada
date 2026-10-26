@@ -1731,6 +1731,10 @@ one for the area a change touches.
   family cannot produce an exact link; other files still index. The Java hostile-depth and
   long-prefix engine fixtures exceed these limits.
 
+- `jvm/names.rs`: `LOCAL_DEPTH` (8) bounds how many locals a JVM client reader (Ktor,
+  `RestTemplate`, `WebClient`, Retrofit) follows a client through (`val b = a`, `val a =
+  HttpClient(..)`); past it the client is not followed and its calls are no consumers.
+
 - `lang/kotlin.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the Kotlin pack as they bound the Java pack's, with the same
   outcome past each; the Kotlin hostile-depth and long-prefix engine fixtures exceed them. The
@@ -1979,8 +1983,12 @@ qualification budget does (ADR 0017).
   (`RestTemplate()`, `Request.Builder()`, a `Call::receiver` of `Retrofit` and no `Call::on`),
   so the `uri` and `build` steps of `clients.rs` match a chain step spelled
   `(call_expression).name`, `constructs` takes a `RestTemplate(..)` call for the written type, and
-  `made` falls back, after typed and origin lookups, to `jvm::names::local` (Kotlin's
-  `Facts::bound`, shared with the Ktor reader) up to `LOCAL_DEPTH`. The pack binds every local
+  `made` falls back, after typed and origin lookups, to `Code::local` (Kotlin's
+  `Facts::bound`, shared with the Ktor reader and indexed by scope and name in `ByName`, so a
+  lookup costs its scope depth) up to `jvm::names::LOCAL_DEPTH`. The value evaluation reads the
+  same local (`Code::eval`, a `Binding::Hidden` or `Binding::Local` with a bound): a URL or a
+  topic written through a local `val` of a function folds where the `val` is written, an
+  environment read through `?:` included, as TypeScript folds a function's `const`. The pack binds every local
   `val` with an initializer, whatever its class (a factory call `WebClient.create(..)` or a
   `.build()` has none), and drops the bound of one whose name a loop variable or a `catch`
   parameter also declares in the scope; `local` then does not take the `val`'s own entry in

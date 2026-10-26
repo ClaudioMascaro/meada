@@ -1556,6 +1556,8 @@ fn kotlin() {
             "src/main/kotlin/example/clients/Local.kt::example.clients.variable()",
             "src/main/kotlin/example/clients/Local.kt::example.clients.Rack",
             "src/main/kotlin/example/clients/Local.kt::example.clients.implicitClient(Rack)",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.localBase()",
+            "src/main/kotlin/example/clients/Local.kt::example.clients.varBase()",
             "src/main/kotlin/example/clients/Methods.kt::example.clients.send(HttpMethod,String)",
             "src/main/kotlin/example/clients/Methods.kt::example.clients.sends()",
             "src/main/kotlin/example/clients/Methods.kt::example.clients.sendFrom(HttpMethod,String)",
@@ -2849,6 +2851,17 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
             "http::GET::/v9/x",
             shadow,
             &file("Local", "shadows()", "billing.get#0"),
+        ),
+        // A local `val` folds, an environment read through a fallback too; a `var` does not.
+        (
+            "http::GET::/env",
+            "env:LOCAL_URL",
+            &file("Local", "localBase()", "client.get#0"),
+        ),
+        (
+            "http::GET::/var-base",
+            "",
+            &file("Local", "varBase()", "(call_expression).get#0"),
         ),
         // A client read in a receiver's block is the receiver's, with no base.
         (

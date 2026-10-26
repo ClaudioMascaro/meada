@@ -83,7 +83,7 @@
     },
     {
       "path": "src/main/kotlin/example/clients/Local.kt",
-      "hash": "ddea6ee112022b0d895949c74b14e824606ffed57e7e8272e7a431ea8d0df7b2"
+      "hash": "8a2104a9fea161e772acc2b98f8f77e7dcae0400c40760f2a10d3ae7816c3c1e"
     },
     {
       "path": "src/main/kotlin/example/clients/Methods.kt",
@@ -1832,6 +1832,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.localBase()",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Local.kt",
+        "start": 1851,
+        "end": 2015
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.shadows()",
       "span": {
         "path": "src/main/kotlin/example/clients/Local.kt",
@@ -1853,6 +1861,14 @@
         "path": "src/main/kotlin/example/clients/Local.kt",
         "start": 260,
         "end": 370
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.varBase()",
+      "span": {
+        "path": "src/main/kotlin/example/clients/Local.kt",
+        "start": 2017,
+        "end": 2166
       }
     },
     {
@@ -6899,6 +6915,39 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.localBase()::HttpClient#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.localBase()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Local.kt",
+        "start": 1970,
+        "end": 1985
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.localBase()::System.getenv#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.localBase()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Local.kt",
+        "start": 1892,
+        "end": 1918
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.localBase()::client.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.localBase()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Local.kt",
+        "start": 1990,
+        "end": 2013
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.shadows()::(anonymous).defaultRequest#0",
       "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.shadows()",
       "target": null,
@@ -7028,6 +7077,33 @@
         "path": "src/main/kotlin/example/clients/Local.kt",
         "start": 321,
         "end": 368
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.varBase()::(call_expression).get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.varBase()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.get(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Mixed.get(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Store.get(String)"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/clients/Local.kt",
+        "start": 2127,
+        "end": 2164
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.varBase()::HttpClient#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.varBase()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/clients/Local.kt",
+        "start": 2127,
+        "end": 2142
       }
     },
     {
@@ -11054,6 +11130,11 @@
       "via": null
     },
     {
+      "contract": "http::GET::/env",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.localBase()::client.get#0",
+      "via": "env:LOCAL_URL"
+    },
+    {
       "contract": "http::GET::/v9/x",
       "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.shadows()::billing.get#0",
       "via": "host:shadow.example.com"
@@ -11072,6 +11153,11 @@
       "contract": "http::GET::/untyped",
       "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.untyped()::client.get#0",
       "via": "host:local.example.com"
+    },
+    {
+      "contract": "http::GET::/var-base",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.varBase()::(call_expression).get#0",
+      "via": null
     },
     {
       "contract": "http::PUT::/block-named",
@@ -14584,6 +14670,29 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.localBase()",
+      "kind": "export",
+      "label": "example.clients.localBase()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.localBase()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.localBase()::client.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/env"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.shadows()",
       "kind": "export",
       "label": "example.clients.shadows()",
@@ -14658,6 +14767,42 @@
           "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.untyped()::client.get#0",
           "mark": "no-provider",
           "contract": "http::GET::/untyped"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.varBase()",
+      "kind": "export",
+      "label": "example.clients.varBase()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.varBase()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.varBase()::(call_expression).get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.get(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Mixed.get(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Store.get(String)"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.varBase()::(call_expression).get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/var-base"
         }
       ]
     },

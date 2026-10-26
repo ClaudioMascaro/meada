@@ -3441,6 +3441,8 @@ pub struct Code<'a> {
 struct ByName<'a> {
     defs: HashMap<&'a str, &'a Def>,
     consts: HashMap<&'a str, Vec<&'a Const>>,
+    /// The values the locals were given (`Facts::bound`), by scope and name.
+    bound: HashMap<(&'a str, &'a str), Vec<&'a Bound>>,
 }
 
 impl<'a> ByName<'a> {
@@ -3452,6 +3454,10 @@ impl<'a> ByName<'a> {
         for constant in &facts.consts {
             let named = by_name.consts.entry(constant.name.as_str()).or_default();
             named.push(constant);
+        }
+        for bound in &facts.bound {
+            let key = (bound.scope.as_str(), bound.name.as_str());
+            by_name.bound.entry(key).or_default().push(bound);
         }
         by_name
     }
@@ -3884,9 +3890,38 @@ impl<'a> Code<'a> {
         self.call(path, index)?.receiver.as_ref()
     }
 
-    /// The values the locals of `path` were given (`Facts::bound`).
-    pub fn bound(&self, path: &'a str) -> &'a [Bound] {
-        self.full(path).map_or(&[], |f| f.bound.as_slice())
+    /// The value the nearest binding of `name` around `scope` of `path` holds (`Facts::bound`,
+    /// which only the Kotlin pack fills), when no other binding of the name is in the same scope
+    /// (a name declared twice, a loop variable, a parameter, a constant, a property). Each scope
+    /// is looked up by name (`ByName::bound` and the resolver's maps), so a file of many locals
+    /// and calls costs each lookup its depth, never the file's width.
+    pub fn local(&self, path: &'a str, scope: &'a str, name: &str) -> Option<&'a Bound> {
+        let by_name = self.by_name(path)?;
+        let r = self.resolver;
+        let mut at = Some(scope);
+        while let Some(s) = at {
+            let mut bound = (by_name.bound.get(&(s, name)).into_iter().flatten()).copied();
+            let held = bound.next();
+            let qualified = crate::qualify(s, name);
+            let receiver = r.receivers[path].get(&(s, name));
+            let others = bound.next().is_some()
+                // A `val` of unknown class has its own entry in `locals`: the pack drops its
+                // bound when another binding shares the name. A typed one has a receiver, and no
+                // entry.
+                || (r.locals[path].contains(qualified.as_str())
+                    && (held.is_none() || receiver.is_some()))
+                || r.consts[path].contains(qualified.as_str())
+                || r.defs[path].get(s).is_some_and(|d| d.params.iter().any(|p| p.name == name))
+                || receiver.is_some_and(|c| **c == Class::Unknown);
+            match (held, others) {
+                (Some(found), false) => return Some(found),
+                (None, false) if receiver.is_none() => {
+                    at = (!s.is_empty()).then(|| crate::parent(s))
+                }
+                _ => return None,
+            }
+        }
+        None
     }
 
     /// The values the call at `index` of `path` may return, when a function of the repository
@@ -5195,6 +5230,28 @@ impl<'a> Code<'a> {
                     Value::Ref(name.to_string())
                 }
             },
+            // A local the pack bound to one value (Kotlin's `val`, `Facts::bound`) holds it, read
+            // where it is written.
+            Binding::Hidden | Binding::Local(..)
+                if let Some(bound) = self.local(path, scope, name) =>
+            {
+                let held = (bound.within.as_str(), bound.name.as_str());
+                if fold.held.contains(&held) {
+                    return Value::Unknown;
+                }
+                fold.held.push(held);
+                let folded = self.eval(
+                    path,
+                    &bound.within,
+                    &bound.value,
+                    frames,
+                    depth,
+                    fold,
+                    wants,
+                );
+                fold.held.pop();
+                folded
+            }
             // A field no file assigns holds what an annotation on it injects.
             Binding::Local(at, class, field) => match fold.inject {
                 Some(inject) if !self.field_written(field) => {
