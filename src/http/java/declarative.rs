@@ -28,10 +28,11 @@ use super::{
 };
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
-use crate::jvm::names::{is_method, java_files, jvm_files, known, kotlin, one, spellings};
+use crate::jvm::names::{java_files, jvm_files, kotlin};
 use crate::jvm::spring::{self, Configs};
 use crate::lang::kotlin::TYPE_ARGUMENT;
 use crate::lang::{Annotated, Call, Facts, Invocation, Part, Value, literal};
+use crate::names::{is_method, known, one, spellings};
 use crate::resolve::Code;
 use crate::resolve::{Expand, Inject, method as member};
 use std::cell::OnceCell;

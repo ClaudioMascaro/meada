@@ -20,10 +20,11 @@
 use super::{VERBS, external, implicit};
 use crate::contract::Found;
 use crate::index::Indexed;
-use crate::jvm::names::{LOCAL_DEPTH, kotlin, one, spellings, typed};
+use crate::jvm::names::{LOCAL_DEPTH, kotlin};
 use crate::jvm::spring::{self, Configs};
 use crate::lang::kotlin::TYPE_ARGUMENT;
 use crate::lang::{Annotated, Bound, Call, Part, Value};
+use crate::names::{one, spellings, typed};
 use crate::resolve::{Code, Expand, Expanded, Follow, Of, passes_nothing};
 
 use super::super::{based, consumer, fetches};

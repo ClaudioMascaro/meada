@@ -18,8 +18,8 @@ use std::collections::BTreeSet;
 
 use super::{ANY, METHODS, balanced, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
-use crate::jvm::names::{is_method, known};
 use crate::lang::{Call, Kind};
+use crate::names::{is_method, known};
 use crate::resolve::Code;
 
 const MVC: &str = "Microsoft.AspNetCore.Mvc.";

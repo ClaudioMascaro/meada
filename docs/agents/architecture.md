@@ -1005,11 +1005,12 @@ one for the area a change touches.
   rule for an annotation's text Spring resolves (`@Value`, a Feign `url` or `path`, a listener's
   topic or queue): literal text with its placeholders resolved, an environment read kept, any
   other part unknown. The list of Spring's config files is the reader's too
-  (`spring::CONFIG_FILES`), which the Java pack returns as its `config_files`. `jvm/names.rs`
-  holds the name questions the JVM kinds share: `one` (exactly one spelling in the kind's
-  table), `known` (a name an import binds), `spellings` and `typed` (the outside type the source
-  writes for a name), and the Java readers' shared filters `java_files`, `jvm_files` (Java and
-  Kotlin files) and `is_method` (an annotation on a method of the file).
+  (`spring::CONFIG_FILES`), which the Java pack returns as its `config_files`. `names.rs`
+  holds the name questions the JVM and C# kinds share: `one` (exactly one spelling in the kind's
+  table), `known` (a name an import binds), `spellings`, `typed` and `declared` (the outside type
+  the source writes for a name) and `is_method` (an annotation on a method of the file);
+  `jvm/names.rs` keeps the Java readers' filters `java_files` and `jvm_files` (Java and Kotlin
+  files), `kotlin` and `array_of`.
 - `dotnet/` holds what the .NET pack and ecosystems share (spec #28), as `jvm/` does for the
   JVM: `dotnet/msbuild.rs` reads an SDK-style project file (`msbuild::read`: whether it is a
   project, and its `Using`s, the SDK's implicit usings among them), which the C# pack's `join`
@@ -1090,8 +1091,8 @@ one for the area a change touches.
 - **Java channels** (spec #26, #92): `channel/java.rs` lists each client by the outside types
   the source may write for its receiver (`CLIENTS`: `KafkaTemplate`, `RabbitTemplate`,
   `JmsTemplate`, the SQS clients, jnats `Connection` and `Dispatcher`, the Jedis clients and
-  Lettuce's `RedisCommands`), read through `jvm::names::typed` and `one`, and the listener
-  annotations (`@KafkaListener`, `@RabbitListener`, `@JmsListener`) through `jvm::names::known`
+  Lettuce's `RedisCommands`), read through `names::typed` and `one`, and the listener
+  annotations (`@KafkaListener`, `@RabbitListener`, `@JmsListener`) through `names::known`
   on a method's `Call::decorates`. Names fold through `Code::expand_with` with
   `jvm::spring::inject` (`Expand::Chain` for an SQS request, a Redis group read and a
   `BindingBuilder` chain); an annotation's values fold through `Code::value` and its placeholders
@@ -1100,7 +1101,7 @@ one for the area a change touches.
   that names the topic or queue (the Java pack keeps a lambda's calls in the method that writes
   it, so a jnats callback is that method too). The overload of `RabbitTemplate.convertAndSend`
   and `JmsTemplate.convertAndSend` is told by the type of the argument a `MessagePostProcessor`
-  would take (`of`, through `jvm::names::declared`): a name the source types as one, or a `new`
+  would take (`of`, through `names::declared`): a name the source types as one, or a `new`
   of one, picks the routing-key form, and so does a `CorrelationData` there
   (`(routingKey, message, correlation)`) unless a `MessagePostProcessor` before it makes it
   `(message, postProcessor, correlation)`; an argument whose type the source does not tell (a
@@ -1112,7 +1113,7 @@ one for the area a change touches.
   otherwise: a direct or fanout exchange keeps only the keys with no wildcard word, a headers or
   custom one none, a topic one, or one whose type is not read, every key; a `DirectExchange` in
   `BindingBuilder` keeps only a key with no wildcard. The listener annotation is asked first
-  (`jvm::names::known`), and only then whether it is on a method (a set of the file's methods,
+  (`names::known`), and only then whether it is on a method (a set of the file's methods,
   built once), so a file of many `@Override` methods is read in linear time. The Java pack reads an
   annotation written as an element value as `Value::New(name, [Object(elements)])`, its unnamed
   element as `value` (the shape of a Go composite literal; `Code::eval` folds it), only inside
@@ -1257,7 +1258,7 @@ one for the area a change touches.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the
   channel kind's module for that language (TS/JS: `channel/ts.rs`; Python: `channel/python.rs`; Rust: `channel/rust.rs`; Go: `channel/go.rs`; Java: `channel/java.rs`), never in the pack, matching a call's
   method and the `Code::origins` of its receiver, asked with the policy its language needs (TS/JS:
-  `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Java: the written type, `jvm::names::typed`; Python and Rust:
+  `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Java: the written type, `names::typed`; Python and Rust:
   `Values`, the constructors named by the file's imports), reading the name through `Code::expand` (a reader that
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
   and giving the handler. A wildcard match (`inferred`, reason `<producer contract> wildcard
@@ -2113,7 +2114,7 @@ qualification budget does (ADR 0017).
   says is `Microsoft.AspNetCore.Mvc.ControllerBase` or `Controller`. The pack ships syntax only,
   so the attribute names live here: `Route`, `ApiController` and `Http<Method>`, with or without
   the `Attribute` suffix, count when a `using` of `Microsoft.AspNetCore.Mvc` binds them (the one
-  on-demand candidate in the kind's table, through `jvm::names::known`, which is not JVM-specific)
+  on-demand candidate in the kind's table, through `names::known`)
   or when written in full, and a class of the repository named `<Name>Attribute` hides the
   framework's. The class `[Route]` templates are the prefixes; each method attribute with a
   template is a route of its method, a method `[Route]` is one of every method the action's
@@ -2155,13 +2156,13 @@ qualification budget does (ADR 0017).
   `delete`, `head`, `options` and `request` of `io.ktor.client.request`, counted by the import
   `Code::outside` says binds the verb) on a receiver that is an `io.ktor.client.HttpClient`: one
   `Code::origins` (`Follow::Values`) traces to a call to it (counted by the import of its
-  callee as `jvm::names::spellings` reads it, so `import io.ktor.client.*` counts), a local the
+  callee as `names::spellings` reads it, so `import io.ktor.client.*` counts), a local the
   pack recorded (`Facts::bound`: a `val x = Callee(..)` with no written type, and the parameter
   of a `let`, `also` or `use` lambda, whose value is the receiver; `Code::local` takes the
   nearest binding of the name and none when another binding of it shares its scope, so a
   parameter, a loop variable, a `var`, a local named like a property of the file or one declared
   twice hides it) followed through `origins` again, or one whose written type is it
-  (`jvm::names::typed`); a map, another library's client and a name a local hides are none. The
+  (`names::typed`); a map, another library's client and a name a local hides are none. The
   call is read whole (`Expand::Chain`, which also gives the reader the call's keyword arguments),
   so an enum member a wrapper passes keeps the evidence of the caller's imports. The URL (first
   argument, or `urlString`) goes through `Code::expand`, as the Go clients do, so a wrapper is

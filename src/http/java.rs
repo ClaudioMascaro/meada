@@ -16,10 +16,9 @@ mod declarative;
 use super::{ANY, METHODS, balanced, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
-use crate::jvm::names::{
-    LOCAL_DEPTH, array_of, is_method, java_files, jvm_files, known, one, typed,
-};
+use crate::jvm::names::{LOCAL_DEPTH, array_of, java_files, jvm_files};
 use crate::lang::{Bound, Call, Value};
+use crate::names::{is_method, known, one, typed};
 use crate::resolve::{Code, Expand, Follow, Inject, Of, passes_nothing};
 
 const WEB: &str = "org.springframework.web.bind.annotation.";

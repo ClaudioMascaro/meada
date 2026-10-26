@@ -5,7 +5,7 @@
 //! A client counts by the type the source writes for its receiver (a field, a parameter, a
 //! local: `Follow::Declarations`, as the HTTP kind reads a RestTemplate), and a listener
 //! annotation by `Code::outside`: each through the one spelling in this module's table
-//! (`jvm::names::one`), so a class of the repository with the same name, or a name two on-demand
+//! (`names::one`), so a class of the repository with the same name, or a name two on-demand
 //! imports may bind, is none. A name is evaluated like a URL: constants, `final` fields and the
 //! arguments of a wrapper's callers fold (`Code::expand`), a field or a constructor parameter
 //! with Spring's `@Value("${key}")` holds the key from the module's configuration
@@ -32,9 +32,10 @@ use super::message::{
     queue_name,
 };
 use crate::index::Indexed;
-use crate::jvm::names::{array_of, declared, jvm_files, known, kotlin, one, spellings, typed};
+use crate::jvm::names::{array_of, jvm_files, kotlin};
 use crate::jvm::spring::{self, Configs, Properties};
 use crate::lang::{Annotated, Call, Invocation, Kind, Part, Value};
+use crate::names::{declared, known, one, spellings, typed};
 use crate::resolve::{Code, Expand, Inject, Keywords, Target, method as member};
 
 const KAFKA_LISTENER: &str = "org.springframework.kafka.annotation.KafkaListener";
