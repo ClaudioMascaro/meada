@@ -1,0 +1,9 @@
+example.com/acme/conformance src/Acme.Core/Billing/Accounts.cs:5-5 Acme.Core.Billing.IAuditor.Review()
+community: src/Acme.Core/Billing
+processes: 1 (1 export; 1 repository): Acme.Api.Desk.Serve(Account) (example.com/acme/conformance)
+void Review();
+callers:
+example.com/acme/conformance src/Acme.Core/Billing/Teller.cs:38 Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)
+example.com/acme/conformance src/Acme.Core/Billing/Teller.cs:39 Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)
+example.com/acme/conformance src/Acme.Core/Billing/Teller.cs:48 Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>) [ambiguous: 2 methods named Review]
+callees: none

@@ -1557,6 +1557,27 @@ one for the area a change touches.
   classes declared in that namespace alone (`Binding::of_namespace`), since a C# file's group
   is its first namespace's and it may declare types in another; the C# layout names such a file
   for each other namespace it declares types in, when no file has that namespace as package.
+  C# method calls (spec #28, #108) use the seams Java's do and add none but one flag. The pack
+  writes `Facts::receivers` from the declared type of a field, a property, a parameter
+  (primary constructors' too), a local with an explicit type, a `foreach`, `out` or pattern
+  variable, and a `var` initialized with `new T(..)` (`Class::Type`), or with a call
+  (`Class::Result`); a target-typed `new()` takes the declared type. `Def::result` is a
+  method's or local function's written return type, so `Make().Save()`, `Make()?.Save()` and
+  `var x = Make()` follow it (`Call::on`). A type is read as written, without its type
+  arguments or a nullable mark; a predefined type, an array, a tuple, `var` and a type
+  parameter are no class. A name bound twice in a scope with two classes, or by a local named
+  like a field of the file, is unknown. A class's written bases (`Def::bases`) serve
+  unqualified, `this.` and receiver calls, an interface receiver reaches the interface's
+  member alone, and overloads are narrowed by `Call::arity`, a tie `ambiguous`. The `this`
+  parameter of an extension method is `Binds::Optional`, so `x.Method()` fits it.
+  `LanguagePack::extension_methods` (C# only) makes a call on a receiver the repository
+  declares, whose family lacks the method, a name match (`inferred`, or `ambiguous` with
+  every candidate), since an extension method may declare it; an unqualified call stays
+  unresolved, as `base.` does. The extension is not looked up: an extension method is
+  never `exact`, and a typed receiver from outside the repository (`List<T>.Archive()`)
+  is a name match too. Ceilings: no generic type argument is read (`Result` and `Result<T>`
+  are one type), a `var` takes a type from `new` and a call alone (no cast, `await` or
+  conditional), and a target-typed `new()` records no constructor call.
 - New **config key**: add the field to `Config`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
 - New **MCP tool**: `mcp.rs`, one `Engine` method that builds the tool's result, its result

@@ -144,6 +144,14 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether the members of a class may be extended from outside it (C#'s `this` parameter),
+    /// where the pack does not read the extensions (`extension_functions`): a call on a receiver
+    /// of a class of the repository, whose family does not declare the method, is a name match,
+    /// as one on a receiver of unknown type is. Otherwise it resolves to nothing.
+    fn extension_methods(&self) -> bool {
+        false
+    }
+
     /// Whether a method call that no function of the repository answers may hand back the
     /// value it was called on, as a builder does (`Router::new().route(..)` in Rust):
     /// `Code::origins` then follows the call's `receiver`, to a constructor whose outside name

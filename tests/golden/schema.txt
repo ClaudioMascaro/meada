@@ -1989,7 +1989,10 @@ sample.cs
         "start": 280,
         "end": 329
       },
-      "params": []
+      "params": [],
+      "result": {
+        "Type": "Store"
+      }
     }
   ],
   "overloads": {
@@ -2099,7 +2102,23 @@ sample.cs
     }
   ],
   "consts": [],
-  "receivers": [],
+  "receivers": [
+    {
+      "scope": "Example.Store.Store(string)",
+      "name": "name",
+      "class": "Unknown"
+    },
+    {
+      "scope": "Example.Store.Save(int,string[])",
+      "name": "id",
+      "class": "Unknown"
+    },
+    {
+      "scope": "Example.Store.Save(int,string[]).Twice",
+      "name": "n",
+      "class": "Unknown"
+    }
+  ],
   "hidden": [
     "Example.Store.Save(int,string[]).Twice"
   ],

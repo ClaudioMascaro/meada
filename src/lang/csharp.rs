@@ -68,6 +68,10 @@ impl LanguagePack for CSharp {
         true
     }
 
+    fn extension_methods(&self) -> bool {
+        true
+    }
+
     fn implicit_members(&self) -> &'static [&'static str] {
         &[
             "Equals",
@@ -310,6 +314,16 @@ fn parse(src: &[u8]) -> Result<Facts> {
     let mut usings = Vec::new();
     let mut namespaces = BTreeSet::new();
     let mut outside = BTreeSet::new();
+    // The names fields and properties bind, and the locals (and other bindings inside a
+    // definition) with the class their declaration writes.
+    let mut fields = BTreeSet::new();
+    let mut locals: Vec<Receiver> = Vec::new();
+    // The types declared so far: a local whose scope is one sits in an initializer.
+    let mut classes = BTreeSet::new();
+    // Initializer calls of `var` locals (by `Class::Result` place) and chained calls (by place
+    // in `facts.calls`), linked to the calls they name once every call is read.
+    let mut results: Vec<Range<usize>> = Vec::new();
+    let mut chains: Vec<(usize, Range<usize>)> = Vec::new();
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
         node,
@@ -404,8 +418,25 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 return_values: Vec::new(),
                 returns: None,
                 type_params: Vec::new(),
-                result: None,
+                // The declared return type of a method or a local function.
+                result: match (kind, constructor) {
+                    (Kind::Method | Kind::Function, false) => (node.child_by_field_name("returns"))
+                        .or_else(|| node.child_by_field_name("type"))
+                        .map(|t| class_of(t, src, &generics)),
+                    _ => None,
+                }
+                .filter(|c| matches!(c, Class::Type(_))),
             });
+            if kind != Kind::Class {
+                let list = node.child_by_field_name("parameters");
+                for (name, class) in parameter_classes(list, src, &generics) {
+                    facts.receivers.push(Receiver {
+                        scope: inner.as_ref().clone(),
+                        name,
+                        class,
+                    });
+                }
+            }
             match kind {
                 Kind::Method => {
                     let (families, callable) = match constructor {
@@ -421,6 +452,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     }
                 }
                 Kind::Class => {
+                    classes.insert(inner.as_ref().clone());
                     // A nested type is a static member of its type (`using static` takes it).
                     if scope != namespace {
                         facts.statics.push(inner.as_ref().clone());
@@ -448,14 +480,20 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         facts.interfaces.push(inner.as_ref().clone());
                     }
                     // A primary constructor's parameters are in scope in every member.
-                    for (name, _, _) in parameters_of(node.child_by_field_name("parameters"), src)
+                    let lists = [
+                        node.child_by_field_name("parameters"),
+                        named(node).find(|n| n.kind() == "parameter_list"),
+                    ];
+                    for (name, class) in lists
                         .into_iter()
-                        .chain(parameters_of(
-                            named(node).find(|n| n.kind() == "parameter_list"),
-                            src,
-                        ))
+                        .flat_map(|list| parameter_classes(list, src, &generics))
                     {
-                        facts.receivers.push(receiver(&inner, &name));
+                        fields.insert(name.clone());
+                        facts.receivers.push(Receiver {
+                            scope: inner.as_ref().clone(),
+                            name,
+                            class,
+                        });
                     }
                 }
                 // A local function is a family of its own, which a bare call in its method
@@ -519,6 +557,18 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         .filter(|f| f.kind() == "member_access_expression")
                         .and_then(|f| f.child_by_field_name("expression"));
                     at.receiver = object.map(|n| value(n, src, 0));
+                    // `Make().Save()`, `Make().x.Save()`, `Make()?.Save()`: the call the chain
+                    // is made on.
+                    let mut inner = function.and_then(receiver_of);
+                    while let Some(n) = inner.filter(|n| receiver_of(*n).is_some()) {
+                        inner = receiver_of(n);
+                    }
+                    if let Some(inner) = inner.filter(|n| n.kind() == "invocation_expression")
+                        && definitions
+                        && at.callee.starts_with("(invocation_expression).")
+                    {
+                        chains.push((facts.calls.len(), inner.byte_range()));
+                    }
                     match object {
                         Some(o)
                             if o.kind() == "identifier"
@@ -568,13 +618,38 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     .filter(|n| n.kind() == "variable_declaration")
                     .flat_map(named)
                     .filter(|n| n.kind() == "variable_declarator");
+                // An event holds a delegate, no type of the repository's.
+                let declared = (node.kind() == "field_declaration").then(|| {
+                    (named(node).find(|n| n.kind() == "variable_declaration"))
+                        .and_then(|d| d.child_by_field_name("type"))
+                });
+                let class = match declared.flatten() {
+                    Some(ty) if definitions => class_of(ty, src, &generics),
+                    _ => Class::Unknown,
+                };
                 for name in declarators.filter_map(|d| d.child_by_field_name("name")) {
-                    facts.receivers.push(receiver(&scope, text(name, src)));
+                    fields.insert(text(name, src).to_string());
+                    facts.receivers.push(Receiver {
+                        scope: scope.as_ref().clone(),
+                        name: text(name, src).to_string(),
+                        class: class.clone(),
+                    });
                 }
             }
             "property_declaration" | "event_declaration" => {
                 if let Some(name) = node.child_by_field_name("name") {
-                    facts.receivers.push(receiver(&scope, text(name, src)));
+                    let class = match node.child_by_field_name("type") {
+                        Some(ty) if definitions && node.kind() == "property_declaration" => {
+                            class_of(ty, src, &generics)
+                        }
+                        _ => Class::Unknown,
+                    };
+                    fields.insert(text(name, src).to_string());
+                    facts.receivers.push(Receiver {
+                        scope: scope.as_ref().clone(),
+                        name: text(name, src).to_string(),
+                        class,
+                    });
                 }
             }
             // The other bindings hide an outer name in the whole definition around them.
@@ -583,10 +658,35 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     matches!(p.kind(), "field_declaration" | "event_field_declaration")
                 }) =>
             {
+                // A declared type, or the class a `var` takes from `new T(..)` or a call. An
+                // initializer lambda's local is no field of the class.
+                let declared = node.child_by_field_name("type");
+                let initializer = classes.contains(scope.as_str());
                 for declarator in named(node).filter(|n| n.kind() == "variable_declarator") {
-                    if let Some(name) = declarator.child_by_field_name("name") {
-                        facts.locals.push(qualify(&scope, text(name, src)));
-                    }
+                    let Some(name) = declarator.child_by_field_name("name") else {
+                        continue;
+                    };
+                    let value = named(declarator).find(|n| n.id() != name.id());
+                    let class = match declared {
+                        _ if initializer || !definitions => Class::Unknown,
+                        Some(ty) if ty.kind() == "implicit_type" => match value {
+                            Some(v) if v.kind() == "object_creation_expression" => v
+                                .child_by_field_name("type")
+                                .map_or(Class::Unknown, |t| class_of(t, src, &generics)),
+                            Some(v) if v.kind() == "invocation_expression" => {
+                                results.push(v.byte_range());
+                                Class::Result(results.len() - 1)
+                            }
+                            _ => Class::Unknown,
+                        },
+                        Some(ty) => class_of(ty, src, &generics),
+                        None => Class::Unknown,
+                    };
+                    locals.push(Receiver {
+                        scope: scope.as_ref().clone(),
+                        name: text(name, src).to_string(),
+                        class,
+                    });
                 }
             }
             "foreach_statement"
@@ -599,18 +699,33 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     .chain(node.child_by_field_name("left"))
                     .filter(|n| n.kind() == "identifier")
                     .collect();
+                let class = match node.child_by_field_name("type") {
+                    Some(ty) if definitions && !classes.contains(scope.as_str()) => {
+                        class_of(ty, src, &generics)
+                    }
+                    _ => Class::Unknown,
+                };
                 for name in names {
-                    facts.locals.push(qualify(&scope, text(name, src)));
+                    locals.push(Receiver {
+                        scope: scope.as_ref().clone(),
+                        name: text(name, src).to_string(),
+                        class: class.clone(),
+                    });
                 }
             }
             "lambda_expression" | "anonymous_method_expression" => {
+                let unknown = |name: &str| Receiver {
+                    scope: scope.as_ref().clone(),
+                    name: name.to_string(),
+                    class: Class::Unknown,
+                };
                 match node.child_by_field_name("parameters") {
                     Some(p) if p.kind() == "implicit_parameter" => {
-                        facts.locals.push(qualify(&scope, text(p, src)));
+                        locals.push(unknown(text(p, src)));
                     }
                     list => {
                         for (name, _, _) in parameters_of(list, src) {
-                            facts.locals.push(qualify(&scope, &name));
+                            locals.push(unknown(&name));
                         }
                     }
                 }
@@ -659,12 +774,45 @@ fn parse(src: &[u8]) -> Result<Facts> {
     for using in usings {
         apply(&using, &mut facts);
     }
-    let mut at = BTreeMap::new();
-    for receiver in std::mem::take(&mut facts.receivers) {
-        at.entry((receiver.scope.clone(), receiver.name.clone()))
-            .or_insert(receiver);
+    // A local is typed only where it is the one binding of its name in its scope; one named
+    // like a field may be read as the field outside its block, so its class is unknown.
+    let called: BTreeMap<(usize, usize), usize> = (facts.calls.iter().enumerate())
+        .filter(|(_, c)| c.decorates.is_none())
+        .map(|(n, c)| ((c.range.start, c.range.end), n))
+        .collect();
+    let call_at = |r: &Range<usize>| called.get(&(r.start, r.end)).copied();
+    for (outer, inner) in chains {
+        facts.calls[outer].on = call_at(&inner);
     }
-    facts.receivers = at.into_values().collect();
+    for mut local in locals {
+        if let Class::Result(n) = local.class {
+            local.class = call_at(&results[n]).map_or(Class::Unknown, Class::Result);
+        }
+        if fields.contains(&local.name) {
+            local.class = Class::Unknown;
+        }
+        facts.receivers.push(local);
+    }
+    let mut at = BTreeMap::new();
+    let mut receivers: Vec<Receiver> = Vec::new();
+    for receiver in std::mem::take(&mut facts.receivers) {
+        match at.get(&(receiver.scope.clone(), receiver.name.clone())) {
+            Some(&n) => {
+                let kept: &mut Receiver = &mut receivers[n];
+                if kept.class != receiver.class {
+                    kept.class = Class::Unknown;
+                }
+            }
+            None => {
+                at.insert(
+                    (receiver.scope.clone(), receiver.name.clone()),
+                    receivers.len(),
+                );
+                receivers.push(receiver);
+            }
+        }
+    }
+    facts.receivers = receivers;
     facts.externs = outside.into_iter().collect();
     // A using of the namespace takes its types, internal ones too (they are the assembly's),
     // never the names the file's own usings bind.
@@ -691,15 +839,6 @@ fn opaque(mut at: Call, definitions: bool) -> Call {
         at.by_path = false;
     }
     at
-}
-
-/// A name bound in `scope` whose class is not read here.
-fn receiver(scope: &str, name: &str) -> Receiver {
-    Receiver {
-        scope: scope.to_string(),
-        name: name.to_string(),
-        class: Class::Unknown,
-    }
 }
 
 /// The using directive `node` writes, without its `global`.
@@ -750,7 +889,9 @@ fn parameters_of(list: Option<Node>, src: &[u8]) -> Vec<(String, String, Binds)>
             (
                 name.map_or("", |n| text(n, src)).to_string(),
                 ty.map_or_else(String::new, |t| type_spelling(t, src)),
-                if defaulted {
+                // The `this` parameter of an extension method is the receiver of a call written
+                // `x.Method(..)`: a call may leave it out.
+                if defaulted || named(p).any(|m| m.kind() == "modifier" && text(m, src) == "this") {
                     Binds::Optional
                 } else {
                     Binds::Any
@@ -766,6 +907,54 @@ fn parameters_of(list: Option<Node>, src: &[u8]) -> Vec<(String, String, Binds)>
         out.push((text(name, src).to_string(), ty, Binds::Rest));
     }
     out
+}
+
+/// Each typed parameter of `list`: its name and the class its type names. A `params` array is
+/// no class.
+fn parameter_classes(list: Option<Node>, src: &[u8], generics: &[String]) -> Vec<(String, Class)> {
+    let Some(list) = list.filter(|l| l.kind() == "parameter_list") else {
+        return Vec::new();
+    };
+    (named(list).filter(|p| p.kind() == "parameter"))
+        .filter_map(|p| {
+            let name = text(p.child_by_field_name("name")?, src).to_string();
+            let class = (p.child_by_field_name("type"))
+                .map_or(Class::Unknown, |t| class_of(t, src, generics));
+            Some((name, class))
+        })
+        .collect()
+}
+
+/// The class a written type names, as a callee-like name: unknown for a predefined type, an
+/// array, a tuple, `var`, a type parameter or a name with a call in it. A nullable type names
+/// its underlying one.
+fn class_of(ty: Node, src: &[u8], generics: &[String]) -> Class {
+    let ty = match ty.kind() {
+        "nullable_type" => ty.child_by_field_name("type").unwrap_or(ty),
+        _ => ty,
+    };
+    if !matches!(
+        ty.kind(),
+        "identifier" | "qualified_name" | "generic_name" | "alias_qualified_name"
+    ) {
+        return Class::Unknown;
+    }
+    let name = type_name(ty, src);
+    let head = name.split('.').next().unwrap_or(&name);
+    if name.contains('(') || generics.iter().any(|g| g == head) {
+        return Class::Unknown;
+    }
+    Class::Type(name)
+}
+
+/// What a receiver is written on: the expression a member access or a conditional access reads
+/// its member from.
+fn receiver_of(node: Node) -> Option<Node> {
+    match node.kind() {
+        "member_access_expression" => node.child_by_field_name("expression"),
+        "conditional_access_expression" => node.child_by_field_name("condition"),
+        _ => None,
+    }
 }
 
 /// The attributes of the declaration `node`, each as a call written in `scope`: its name the
@@ -904,6 +1093,19 @@ fn callee(node: Node, src: &[u8]) -> String {
             "qualified_name" => {
                 pending.extend(n.child_by_field_name("name"));
                 pending.extend(n.child_by_field_name("qualifier"));
+            }
+            // `a?.B` reads as `a.B`.
+            "conditional_access_expression" => {
+                let member = (named(n).find(|c| c.kind() == "member_binding_expression"))
+                    .and_then(|b| b.child_by_field_name("name"));
+                match member {
+                    Some(member) => {
+                        pending.push(member);
+                        pending.extend(n.child_by_field_name("condition"));
+                    }
+                    // `a?[0]` is no name.
+                    None => parts.push("(expression)"),
+                }
             }
             // `global::A.B` names `A.B` from the root namespace.
             "alias_qualified_name" => {

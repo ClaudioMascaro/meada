@@ -3360,7 +3360,10 @@ fn csharp() {
         shadows("FieldShadow.Run()"),
         "legacy/Old.cs::Legacy.Old".to_string(),
         "legacy/Old.cs::Legacy.Old.Run()".to_string(),
-    ];
+    ]
+    .into_iter()
+    .chain(billing_symbols())
+    .collect::<Vec<_>>();
     let place = |callee: &str| format!("{}::{callee}", service(".Place(string,int)"));
     let run = |callee: &str| {
         format!(
@@ -3601,6 +3604,7 @@ fn csharp() {
         let id = format!("{}::Format.Upper#0", shadows(scope));
         calls.push((id, INFERRED, vec![upper.clone()]));
     }
+    calls.extend(billing_calls());
     let symbols: Vec<&str> = symbols.iter().map(String::as_str).collect();
     let targets: Vec<Vec<&str>> = (calls.iter())
         .map(|(_, _, t)| t.iter().map(String::as_str).collect())
@@ -3609,6 +3613,268 @@ fn csharp() {
         .map(|((id, level, _), targets)| (id.as_str(), *level, targets.as_slice()))
         .collect();
     conform("conformance-csharp", &symbols, &[], &calls);
+}
+
+fn billing(file: &str, name: &str) -> String {
+    format!("{CORE}/Billing/{file}::Acme.Core.Billing.{name}")
+}
+
+fn billing_symbols() -> Vec<String> {
+    let accounts = |name: &str| billing("Accounts.cs", name);
+    let mut symbols: Vec<String> = [
+        "IAuditor",
+        "IAuditor.Review()",
+        "Auditor",
+        "Auditor.Review()",
+        "Account",
+        "Account.Deposit(int)",
+        "Account.Deposit(int,string)",
+        "Account.Close(int)",
+        "Account.Close(string)",
+        "Account.Freeze()",
+        "Account.Thaw()",
+        "Savings",
+        "Savings.Accrue()",
+        "Savings.Sweep()",
+        "AccountExtensions",
+        "AccountExtensions.Summarize(Account)",
+        "AccountExtensions.Archive(IEnumerable<Account>)",
+        "Ledger",
+        "Ledger.Post(T)",
+    ]
+    .iter()
+    .map(|name| accounts(name))
+    .collect();
+    symbols.extend(
+        [
+            "Teller",
+            "Teller.Teller(IAuditor)",
+            "Teller.Open()",
+            "Teller.Current()",
+        ]
+        .iter()
+        .map(|name| billing("Teller.cs", name)),
+    );
+    symbols.push(billing(
+        "Teller.cs",
+        "Teller.Run(Account,IAuditor,List<Account>)",
+    ));
+    symbols.extend(
+        [
+            "Pane",
+            "Pane.Touch()",
+            "Probes",
+            "Probes.Written(Ledger<Account>,Account?,global::Acme.Core.Billing.Account,Pane)",
+            "Probes.Blocks(bool)",
+            "Probes.Generic(T)",
+            "Probes.Hides(List<Savings>,object)",
+            "Probes.Field()",
+        ]
+        .iter()
+        .map(|name| billing("Probes.cs", name)),
+    );
+    symbols.extend(
+        [
+            "Acme.Api.Desk",
+            "Acme.Api.Desk.Desk(Teller)",
+            "Acme.Api.Desk.Serve(Account)",
+        ]
+        .iter()
+        .map(|name| format!("{API}/Desk.cs::{name}")),
+    );
+    symbols.extend(
+        ["Acme.Api.Booth", "Acme.Api.Booth.Open()"]
+            .iter()
+            .map(|name| format!("{API}/Desk.cs::{name}")),
+    );
+    symbols
+}
+
+/// Calls through the types the source declares (#108): each form of receiver, the base types
+/// written in a declaration, and the name rule for what no declared type answers.
+fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
+    let accounts = |name: &str| billing("Accounts.cs", name);
+    let run = |callee: &str| {
+        format!(
+            "{}::{callee}",
+            billing("Teller.cs", "Teller.Run(Account,IAuditor,List<Account>)")
+        )
+    };
+    let freeze = accounts("Account.Freeze()");
+    let thaw = accounts("Account.Thaw()");
+    let accrue = accounts("Savings.Accrue()");
+    let review = accounts("IAuditor.Review()");
+    let probe = |method: &str, callee: &str| {
+        let signature = match method {
+            "Written" => "Written(Ledger<Account>,Account?,global::Acme.Core.Billing.Account,Pane)",
+            "Blocks" => "Blocks(bool)",
+            "Generic" => "Generic(T)",
+            "Hides" => "Hides(List<Savings>,object)",
+            _ => "Field()",
+        };
+        format!(
+            "{}::{callee}",
+            billing("Probes.cs", &format!("Probes.{signature}"))
+        )
+    };
+    vec![
+        // A field, a property and a parameter; overloads narrowed by argument count.
+        (run("vault.Freeze#0"), EXACT, vec![freeze.clone()]),
+        (run("Primary.Accrue#0"), EXACT, vec![accrue.clone()]),
+        (
+            run("given.Deposit#0"),
+            EXACT,
+            vec![accounts("Account.Deposit(int)")],
+        ),
+        (
+            run("given.Deposit#1"),
+            EXACT,
+            vec![accounts("Account.Deposit(int,string)")],
+        ),
+        (
+            run("given.Close#0"),
+            AMBIGUOUS,
+            vec![
+                accounts("Account.Close(int)"),
+                accounts("Account.Close(string)"),
+            ],
+        ),
+        // A local with its type written, `var` with `new`, a target-typed `new()`.
+        (run("explicitly.Thaw#0"), EXACT, vec![thaw.clone()]),
+        (run("made.Accrue#0"), EXACT, vec![accrue.clone()]),
+        (run("made.Freeze#0"), EXACT, vec![freeze.clone()]),
+        (run("targeted.Thaw#0"), EXACT, vec![thaw.clone()]),
+        // A method's declared return type, through a `var` and in a chain.
+        (run("opened.Accrue#0"), EXACT, vec![accrue.clone()]),
+        (
+            run("(invocation_expression).Sweep#0"),
+            EXACT,
+            vec![accounts("Savings.Sweep()")],
+        ),
+        (
+            run("(invocation_expression).Freeze#0"),
+            EXACT,
+            vec![freeze.clone()],
+        ),
+        // An interface receiver reaches the interface member, `?.` too.
+        (run("reviewer.Review#0"), EXACT, vec![review.clone()]),
+        (run("auditor.Review#0"), EXACT, vec![review.clone()]),
+        // Unqualified and `this.` calls look in the written base.
+        (
+            format!("{}::Freeze#0", accounts("Savings.Sweep()")),
+            EXACT,
+            vec![freeze.clone()],
+        ),
+        (
+            format!("{}::this.Thaw#0", accounts("Savings.Sweep()")),
+            EXACT,
+            vec![thaw.clone()],
+        ),
+        // An extension method, on a type of the repository and on one outside it, and a method
+        // the known type lacks: name matches.
+        (
+            run("given.Summarize#0"),
+            INFERRED,
+            vec![accounts("AccountExtensions.Summarize(Account)")],
+        ),
+        (
+            run("queue.Archive#0"),
+            INFERRED,
+            vec![accounts("AccountExtensions.Archive(IEnumerable<Account>)")],
+        ),
+        (run("given.Accrue#0"), INFERRED, vec![accrue]),
+        // A receiver of unknown type, or a type parameter's.
+        (
+            run("unknown.Sweep#0"),
+            INFERRED,
+            vec![accounts("Savings.Sweep()")],
+        ),
+        (
+            run("unknown.Review#0"),
+            AMBIGUOUS,
+            vec![accounts("Auditor.Review()"), review],
+        ),
+        (run("unknown.Missing#0"), None, vec![]),
+        (
+            format!("{}::entry.Freeze#0", accounts("Ledger.Post(T)")),
+            INFERRED,
+            vec![freeze.clone()],
+        ),
+        // Probes: the type through a generic, a nullable and a qualified name; a base from
+        // outside; names two blocks bind differently; every binding hides the field.
+        (
+            probe("Written", "ledger.Post#0"),
+            EXACT,
+            vec![accounts("Ledger.Post(T)")],
+        ),
+        (
+            probe("Written", "maybe.Freeze#0"),
+            EXACT,
+            vec![freeze.clone()],
+        ),
+        (probe("Written", "full.Thaw#0"), EXACT, vec![thaw.clone()]),
+        (
+            probe("Written", "pane.Freeze#0"),
+            INFERRED,
+            vec![freeze.clone()],
+        ),
+        (
+            format!("{}::this.Thaw#0", billing("Probes.cs", "Pane.Touch()")),
+            INFERRED,
+            vec![thaw.clone()],
+        ),
+        (
+            format!("{}::Freeze#0", billing("Probes.cs", "Pane.Touch()")),
+            None,
+            vec![],
+        ),
+        (
+            probe("Blocks", "item.Freeze#0"),
+            INFERRED,
+            vec![freeze.clone()],
+        ),
+        (probe("Blocks", "item.Thaw#0"), INFERRED, vec![thaw.clone()]),
+        (
+            probe("Generic", "value.Freeze#0"),
+            INFERRED,
+            vec![freeze.clone()],
+        ),
+        (
+            probe("Hides", "slot.Freeze#0"),
+            INFERRED,
+            vec![freeze.clone()],
+        ),
+        (
+            probe("Hides", "slot.Freeze#1"),
+            INFERRED,
+            vec![freeze.clone()],
+        ),
+        (
+            probe("Hides", "slot.Freeze#2"),
+            INFERRED,
+            vec![freeze.clone()],
+        ),
+        (
+            probe("Hides", "slot.Freeze#3"),
+            INFERRED,
+            vec![freeze.clone()],
+        ),
+        (probe("Field", "slot.Freeze#0"), EXACT, vec![freeze.clone()]),
+        // Another project: a field and a primary constructor's parameter.
+        (
+            format!("{API}/Desk.cs::Acme.Api.Desk.Serve(Account)::teller.Run#0"),
+            EXACT,
+            vec![billing(
+                "Teller.cs",
+                "Teller.Run(Account,IAuditor,List<Account>)",
+            )],
+        ),
+        (
+            format!("{API}/Desk.cs::Acme.Api.Booth.Open()::teller.Current#0"),
+            EXACT,
+            vec![billing("Teller.cs", "Teller.Current()")],
+        ),
+    ]
 }
 
 /// Public and protected members of public types are export doors when uncalled; private and
@@ -3652,6 +3918,23 @@ fn csharp_search_finds_a_type_and_context_lists_callers_and_callees() {
             .context("Acme.Core.Orders.OrderService.Default()", None)
             .unwrap(),
     );
+}
+
+/// A method's callers, each with its level and why: a field, a parameter, a base type, a
+/// chain, a name match and a tie.
+#[test]
+fn csharp_context_lists_the_callers_of_a_method_with_levels_and_reasons() {
+    let repo = fixture_repo("csharp_callers", "conformance-csharp", Some(ORIGIN));
+    let engine = Engine::open(&repo).unwrap();
+    for (golden, method) in [
+        ("freeze", "Acme.Core.Billing.Account.Freeze()"),
+        ("review", "Acme.Core.Billing.IAuditor.Review()"),
+    ] {
+        assert_golden(
+            &format!("conformance-csharp.context-{golden}.txt"),
+            &engine.context(method, None).unwrap(),
+        );
+    }
 }
 
 #[test]

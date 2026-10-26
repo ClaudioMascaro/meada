@@ -346,6 +346,8 @@ pub struct Resolver<'a> {
     base_receiver: Option<&'static str>,
     /// The pack's `LanguagePack::unordered_bases`.
     unordered_bases: bool,
+    /// The pack's `LanguagePack::extension_methods`.
+    extension_methods: bool,
     /// The pack's `LanguagePack::implicit_members`.
     implicit: &'static [&'static str],
     /// The pack's names bound everywhere (`LanguagePack::globals`).
@@ -715,6 +717,7 @@ impl<'a> Resolver<'a> {
             receiver: language.receiver(),
             base_receiver: language.base_receiver(),
             unordered_bases: language.unordered_bases(),
+            extension_methods: language.extension_methods(),
             implicit: language.implicit_members(),
             globals: language.globals(),
             callers: HashMap::new(),
@@ -1079,6 +1082,7 @@ impl<'a> Resolver<'a> {
                     _ => Resolution::Unresolved,
                 }
             }
+            [] if self.extension_methods && !bare => one_of(all),
             [] => Resolution::Unresolved,
         }
     }
