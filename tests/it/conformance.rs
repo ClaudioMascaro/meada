@@ -3342,8 +3342,8 @@ fn csharp() {
         api("Cli.cs", "Acme.Api.Cli.Main(string[])"),
         api("Cli.cs", "Acme.Api.Cli.Main(int)"),
         api("Cli.cs", "Acme.Api.Cli.Start()"),
-        "legacy/Top.cs::Main".to_string(),
-        "legacy/Top.cs::Main.Shout".to_string(),
+        "src/Acme.Api/Top.cs::Main".to_string(),
+        "src/Acme.Api/Top.cs::Main.Shout".to_string(),
         api("Opaque.cs", "Acme.Api.Home"),
         api("Opaque.cs", "Acme.Api.Home.Index()"),
         api("Opaque.cs", "Acme.Api.Board"),
@@ -3623,6 +3623,12 @@ fn csharp() {
         ),
         api("Clients.cs", "Acme.Api.Clients.Reads.Config()"),
         api("Clients.cs", "Acme.Api.Clients.Reads.Run(int)"),
+        api("Clients.cs", "Acme.Api.Clients.Settings"),
+        api(
+            "Clients.cs",
+            "Acme.Api.Clients.Settings.Settings(HttpClient,IConfiguration)",
+        ),
+        api("Clients.cs", "Acme.Api.Clients.Settings.Run()"),
         api("Clients.cs", "Acme.Api.Clients.Repo"),
         api("Clients.cs", "Acme.Api.Clients.Repo.GetAsync(string)"),
         api("Typed.cs", "Acme.Api.Typed.CatalogClient"),
@@ -3905,14 +3911,20 @@ fn csharp() {
         (run("Lower#0"), None, vec![]),
         // The top-level statements of a file are the calls of its `Main`.
         (
-            "legacy/Top.cs::Main::Shout#1".to_string(),
+            "src/Acme.Api/Top.cs::Main::Shout#1".to_string(),
             EXACT,
-            vec!["legacy/Top.cs::Main.Shout".to_string()],
+            vec!["src/Acme.Api/Top.cs::Main.Shout".to_string()],
         ),
         (
-            "legacy/Top.cs::Main::Shout#0".to_string(),
+            "src/Acme.Api/Top.cs::Main::Shout#0".to_string(),
             EXACT,
-            vec!["legacy/Top.cs::Main.Shout".to_string()],
+            vec!["src/Acme.Api/Top.cs::Main.Shout".to_string()],
+        ),
+        // The project's `<Using>` binds a type for the top-level statements too.
+        (
+            "src/Acme.Api/Top.cs::Main::Order.Create#0".to_string(),
+            EXACT,
+            vec![orders("Order.Lines.cs", "Order.Create()")],
         ),
         (run("Fmt.Upper#0"), None, vec![]),
         // A caller of a Refit interface's method reaches it through the field's declared type.
@@ -3962,8 +3974,8 @@ fn csharp() {
         "conformance-csharp",
         &symbols,
         &[
-            "legacy/Top.cs::Main",
             "src/Acme.Api/Cli.cs::Acme.Api.Cli.Main(string[])",
+            "src/Acme.Api/Top.cs::Main",
             "src/Acme.Web/Program.cs::Main",
         ],
         &calls,
@@ -4418,6 +4430,19 @@ fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
             "http::GET::/hidden",
             "host:arg.example.com",
             &at("Reassigned.Use()", "Hidden#0"),
+        ),
+        // Settings.Run(): an environment variable, and a key of appsettings.json as its variable
+        // (its literal host is served by no provider of the workspace, so only that reading
+        // stays).
+        (
+            "http::GET::/api/invoices",
+            "env:BILLING_URL",
+            &at("Settings.Run()", "http.GetAsync#0"),
+        ),
+        (
+            "http::GET::/levels",
+            "env:Services__Stock",
+            &at("Settings.Run()", "http.GetAsync#1"),
         ),
         // Unread.Run()
         ("unresolved", "", &at("Unread.Run()", "http.GetAsync#0")),

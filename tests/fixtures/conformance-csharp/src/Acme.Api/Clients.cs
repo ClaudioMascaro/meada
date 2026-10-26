@@ -2,6 +2,7 @@ using System;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 
 namespace Acme.Api.Clients
 {
@@ -211,6 +212,25 @@ namespace Acme.Api.Clients
 
             var unknown = new HttpClient { BaseAddress = new Uri(Config() + "/api/") };
             await unknown.GetAsync("/rooted");
+        }
+    }
+
+    // An environment read, and a key of the project's appsettings.json, in a URL.
+    public class Settings
+    {
+        private readonly HttpClient http;
+        private readonly IConfiguration config;
+
+        public Settings(HttpClient http, IConfiguration config)
+        {
+            this.http = http;
+            this.config = config;
+        }
+
+        public async Task Run()
+        {
+            await http.GetAsync(Environment.GetEnvironmentVariable("BILLING_URL") + "/api/invoices");
+            await http.GetAsync(config["Services:Stock"] + "/levels");
         }
     }
 

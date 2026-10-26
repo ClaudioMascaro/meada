@@ -1522,6 +1522,36 @@ fn an_edited_appsettings_alone_refreshes_the_csharp_consumers() {
     assert!(!refreshed.contains("\"via\": \"env:Prices__BaseUrl\""));
 }
 
+/// An `appsettings.json` deleted, and then added back, refreshes the C# consumers as a cold
+/// export of the same files does: without it, a key whose literal the web app serves is its
+/// variable alone, and with it back the key links by that host again.
+#[test]
+fn a_deleted_then_added_appsettings_refreshes_like_a_cold_export() {
+    let settings = "appsettings.json";
+    let export = |repo: &Path| Engine::open(repo).unwrap().export().unwrap();
+    let (_, api) = common::xlang_csharp("fresh_xlang_csharp_settings");
+    age(&api);
+    let before = export(&api);
+    let kept = fs::read(api.join(settings)).unwrap();
+    fs::remove_file(api.join(settings)).unwrap();
+
+    let deleted = export(&api);
+
+    let (_, cold) = common::xlang_csharp("fresh_xlang_csharp_settings_cold");
+    fs::remove_file(cold.join(settings)).unwrap();
+    assert_eq!(deleted, export(&cold));
+    let audit = "\"contract\": \"http::POST::/api/audit\"";
+    assert!(before.contains(audit) && !deleted.contains(audit));
+    assert!(deleted.contains("\"via\": \"env:Audit__Url\""));
+
+    fs::write(api.join(settings), &kept).unwrap();
+    let added = export(&api);
+
+    fs::write(cold.join(settings), &kept).unwrap();
+    assert_eq!(added, export(&cold));
+    assert_eq!(added, before);
+}
+
 #[test]
 fn an_edited_meada_toml_relinks_resources_like_a_cold_chain() {
     let exports = |gateway: &Path| -> Vec<String> {
