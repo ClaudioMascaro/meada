@@ -112,6 +112,10 @@ in the same change:
   forms of the libraries a kind reads (web frameworks and HTTP clients, message brokers) live
   under the kind, one module per language (`http/<language>.rs`, `channel/<language>.rs`); a
   form may live in a submodule of that module (`http/rust/frameworks.rs`). A table or a form of
-  a library in a pack is a finding, and the kind owns it. The one exception is decided: the Rust
+  a library in a pack is a finding, and the kind owns it. Two exceptions are decided. The Rust
   pack folds `Method::GET` constants at parse time (`METHOD_CRATES` and `VERBS`) and keeps them,
-  `VERBS` being the one pack constant a kind reads. A table anywhere else in a pack is a finding.
+  `VERBS` being the one pack constant a kind reads. A pack may recognise the one call that reads
+  the platform's environment, as a form and not a table: Java's and Kotlin's `System.getenv`
+  (`getenv` in `lang/java.rs` and `lang/kotlin.rs`) and C#'s `GetEnvironmentVariable`
+  (`ENVIRONMENT_READ` in `lang/csharp.rs`, which leaves the kind to decide whether the
+  `Environment` is the framework's). A table anywhere else in a pack is a finding.

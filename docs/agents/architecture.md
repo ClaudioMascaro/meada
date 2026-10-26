@@ -1365,9 +1365,9 @@ one for the area a change touches.
   the library's, and `ConnectionFactory` or `IConnection` with RabbitMQ.Client and NATS.Client
   both imported is none. The receiver is followed at most `CHANNEL_CLIENT_DEPTH` links. Names fold
   like a URL through `Code::expand` (a wrapper's parameter makes each caller a producer or a
-  consumer): the keyword `string.Empty` is `""` in the pack, and `String.Empty` or
-  `System.String.Empty` written in the exchange of a `BasicPublish` is `""` when the usings bind
-  `String` to `System.String` (`empty`); an environment or configuration read is
+  consumer): `string.Empty`, and `String.Empty` or `System.String.Empty` that bind
+  `System.String` (`names::is_type`), written in the exchange of a `BasicPublish`, is `""`
+  (`empty`), the pack folding none of them; an environment or configuration read is
   `Part::Read`, so an unresolved name; the first argument names a Kafka topic (a list for
   `Subscribe`), an SQS queue (the last segment of the URL, or the `QueueUrl` of a request
   built in place or in a local), a NATS subject, a Redis stream key and a Service Bus queue or
@@ -2380,15 +2380,17 @@ qualification budget does (ADR 0017).
   resolver reads no library's result (the kinds run after it), so its calls stay name matches.
 - `http/csharp/reads.rs` and `dotnet/appsettings.rs` (spec #28, #112): environment and
   configuration reads in a consumer's URL. The pack records what looks like a read without
-  deciding what it reads: a subscript with one string literal, and a call of a member in `READS`
-  (`GetEnvironmentVariable`) with one, is `Value::Str([Part::Read { scope, callee, key }])` (a
+  deciding what it reads: a subscript with one string literal, and a call of
+  `GetEnvironmentVariable` (`ENVIRONMENT_READ`, the pack's one library form, on the precedent of
+  Java's and Kotlin's `getenv`) with one, is `Value::Str([Part::Read { .. }])` (a
   neutral carrier, since only `Env` and `EnvOr` survive `unbind`; a call of any other member, as
   `MapGroup("/api")`, stays a call). Being a string, a local or a field bound to a read folds
   into the URL like any other. The reads of one node share one `Arc` of their scope. The pack
   folds `??` chains (the first operand a read and no other operand a read, so the reads count
-  across the whole chain; past `VALUE_DEPTH` operands it is unknown), `!` and `Trim`,
-  `TrimStart`, `TrimEnd` around it (`TRIMS`). `Reads::value` in the kind turns the part into
-  `Env`, `EnvOr` or `Hole` with the resolver: `Environment.GetEnvironmentVariable` is the
+  across the whole chain; past `VALUE_DEPTH` operands it is unknown), `!` around it, and keeps
+  the members called on it in `then`. `Reads::value` in the kind turns the part into `Env`,
+  `EnvOr` or `Hole` with the resolver: a read whose `then` holds a member other than `Trim`,
+  `TrimStart` and `TrimEnd` (`TRIMS`) is a hole, `Environment.GetEnvironmentVariable` is the
   framework's `System.Environment` (a repository type of that name hides it, through
   `names::spellings`), and `x[".."]` is a configuration when `x` is declared `IConfiguration`
   (`Code::written`, confirmed through the usings) or is `builder.Configuration` of a

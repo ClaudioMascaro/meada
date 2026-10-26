@@ -1716,20 +1716,24 @@ thread_local! {
         std::cell::RefCell::new((Rc::new(String::new()), None));
 }
 
-/// The methods of a string that trim it: on a read, they leave it the read.
-const TRIMS: &[&str] = &["Trim", "TrimEnd", "TrimStart"];
-
-/// The members whose call with one string literal is a read of the environment the kind decides
+/// The member whose call with one string literal is a read of the environment the kind decides
 /// on (`Environment.GetEnvironmentVariable("X")`): any other call with a literal
 /// (`MapGroup("/api")`, `CreateClient("x")`) stays a call.
-const READS: &[&str] = &["GetEnvironmentVariable"];
+// ponytail: the one library form of this pack, as Java's and Kotlin's `getenv` are of theirs
+// (`CODING_STANDARDS.md`): the kind decides whether the `Environment` is the framework's.
+const ENVIRONMENT_READ: &str = "GetEnvironmentVariable";
 
 /// `callee` and `key` as a read in the scope `parse` is reading.
 fn read(callee: String, key: String) -> Part {
     let scope = SCOPE.with_borrow_mut(|(scope, shared)| {
         (shared.get_or_insert_with(|| Arc::from(scope.as_str()))).clone()
     });
-    Part::Read { scope, callee, key }
+    Part::Read {
+        scope,
+        callee,
+        key,
+        then: Vec::new(),
+    }
 }
 
 /// The read a value is: a subscript or a call already written as one.
@@ -1870,17 +1874,6 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 _ => Value::Unknown,
             }
         }
-        // The keyword `string` is `System.String` whatever the repository declares.
-        "member_access_expression"
-            if node
-                .child_by_field_name("expression")
-                .is_some_and(|e| e.kind() == "predefined_type" && text(e, src) == "string")
-                && node
-                    .child_by_field_name("name")
-                    .is_some_and(|n| text(n, src) == "Empty") =>
-        {
-            Value::Str(Vec::new())
-        }
         "identifier" | "member_access_expression" | "qualified_name" => {
             Value::Ref(callee(node, src))
         }
@@ -1892,16 +1885,30 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 .and_then(|f| f.child_by_field_name("expression"));
             let receiver = object.map(|n| value(n, src, depth + 1));
             let member = function.and_then(|f| f.child_by_field_name("name"));
-            // A trimmed read is still the read.
-            let trimmed = member.is_some_and(|n| TRIMS.contains(&text(n, src)));
-            if let Some(read) = receiver.as_ref().filter(|_| trimmed).and_then(read_of) {
-                return Value::Str(vec![read]);
+            // A member called on a read is the read with the member, for the kind to judge.
+            if let (
+                Some(member),
+                Some(Part::Read {
+                    mut then,
+                    scope,
+                    callee,
+                    key,
+                }),
+            ) = (member, receiver.as_ref().and_then(read_of))
+            {
+                then.push(text(member, src).to_string());
+                return Value::Str(vec![Part::Read {
+                    scope,
+                    callee,
+                    key,
+                    then,
+                }]);
             }
             let callee = function.map_or_else(String::new, |f| callee(f, src));
             let args = arguments(node.child_by_field_name("arguments"), src, depth).0;
             if let ([Value::Str(key)], Some(member)) = (&args[..], member)
                 && let [Part::Text(key)] = &key[..]
-                && READS.contains(&text(member, src))
+                && text(member, src) == ENVIRONMENT_READ
                 && !callee.contains('(')
             {
                 return Value::Str(vec![read(callee, key.clone())]);
@@ -2148,6 +2155,36 @@ mod tests {
         assert!(!is_read(format!("({} ?? \"d\") ?? {}", get("X"), get("Y"))));
         // A call with a literal of another member stays a call, as `MapGroup("/api")` does.
         assert!(!is_read("Other.Get(\"X\")".into()));
+    }
+
+    /// The pack reads no library: a member called on a read is the read with the members it
+    /// calls, which the kind judges, and `string.Empty` is a name like `String.Empty`.
+    #[test]
+    fn a_member_called_on_a_read_and_string_empty_are_left_to_the_kind() {
+        let source = "class C { void M() { \
+                      H.Get(Environment.GetEnvironmentVariable(\"X\").TrimEnd('/').ToLower()); \
+                      H.Get(string.Empty); } }";
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        let args: Vec<_> = (facts.calls.iter().filter(|c| c.callee == "H.Get"))
+            .flat_map(|c| &c.args)
+            .collect();
+        let [Value::Str(read), Value::Ref(empty)] = &args[..] else {
+            panic!("{}", args.len())
+        };
+        let [
+            Part::Read {
+                callee, key, then, ..
+            },
+        ] = &read[..]
+        else {
+            panic!("{read:?}")
+        };
+        assert_eq!(
+            (callee.as_str(), key.as_str()),
+            ("Environment.GetEnvironmentVariable", "X")
+        );
+        assert_eq!(then, &["TrimEnd", "ToLower"]);
+        assert_eq!(empty, "string.Empty");
     }
 
     /// The reads of one node share one allocation of their scope, however long it is.

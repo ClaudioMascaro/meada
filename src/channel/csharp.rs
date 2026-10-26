@@ -30,7 +30,7 @@ use super::message::{
     topics,
 };
 use crate::lang::{Bound, Invocation, Value, property};
-use crate::names::{in_full, one, spellings};
+use crate::names::{in_full, is_type, one, spellings};
 use crate::resolve::{Code, Keywords, method as member};
 use std::cell::OnceCell;
 use std::collections::HashMap;
@@ -136,6 +136,9 @@ const SETTER: &str = "Set";
 /// The method of a task that hands back what it is awaited for.
 const CONFIGURE: &str = "ConfigureAwait";
 
+/// `System.String`, whose `Empty` is the default exchange.
+const STRING: &str = "System.String";
+
 /// The methods a form is made of.
 const METHODS: &[&str] = &[
     "Produce",
@@ -224,7 +227,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                     out.extend(consume(code, path, n, "kafka", &read, None));
                 }
                 (Obj::RabbitChannel, "BasicPublish" | "BasicPublishAsync") => {
-                    // `String.Empty` is read as the call writes it: folded, it is unknown.
+                    // `string.Empty` is read as the call writes it: folded, it is unknown.
                     let blank = Value::Str(Vec::new());
                     let default = code.call(path, n).is_some_and(|call| {
                         let exchange = arg(&call.args, &call.kwargs, 0, &["exchange"]);
@@ -536,8 +539,8 @@ fn type_of<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, ty: &'a str) -> O
     })?)
 }
 
-/// Whether `value`, written in `scope` of `path`, is `String.Empty` of `System.String`, as the
-/// usings bind the name (`string.Empty` is folded by the pack).
+/// Whether `value`, written in `scope` of `path`, is `string.Empty`, or `String.Empty` of
+/// `System.String` as the usings bind the name.
 // ponytail: only an exchange the form's call writes is read; one a wrapper's caller passes folds
 // to unknown, so it is an unresolved producer.
 fn empty<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, value: &Value) -> bool {
@@ -545,11 +548,10 @@ fn empty<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, value: &Value) -> b
         return false;
     };
     match spelled.strip_suffix(".Empty") {
-        Some("System.String") => true,
-        Some("String") => one(&spellings(code, path, scope, "String"), |t| {
-            t == "System.String"
-        })
-        .is_some(),
+        // The keyword `string` is `System.String` whatever the repository declares.
+        Some("string") => true,
+        Some("System.String") => is_type(code, path, scope, "System.String", STRING),
+        Some("String") => is_type(code, path, scope, "String", STRING),
         _ => false,
     }
 }
