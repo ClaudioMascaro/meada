@@ -331,6 +331,8 @@ pub struct Resolver<'a> {
     takers: HashMap<&'a str, Taker<'a>>,
     /// Every class's family, linearized once.
     families: HashMap<Target<'a>, Family<'a>>,
+    /// Each class's Kotlin companion (`Resolver::companion`), read once.
+    companions: HashMap<Target<'a>, Target<'a>>,
     /// The pack's keyword for the instance of the enclosing class (`LanguagePack::receiver`).
     receiver: Option<&'static str>,
     /// The pack's keyword for the base of the enclosing class (`LanguagePack::base_receiver`).
@@ -687,6 +689,7 @@ impl<'a> Resolver<'a> {
             pathed,
             takers,
             families: HashMap::new(),
+            companions: HashMap::new(),
             receiver: language.receiver(),
             base_receiver: language.base_receiver(),
             unordered_bases: language.unordered_bases(),
@@ -727,6 +730,20 @@ impl<'a> Resolver<'a> {
             }
         }
         resolver.families = work.families;
+        // Each class's Kotlin companion, read once: a call on the class's name reaches it first.
+        let mut companions = HashMap::new();
+        for (path, facts) in files {
+            for def in facts.defs.iter().filter(|d| d.kind == Kind::Class) {
+                let class = Target {
+                    path,
+                    name: &def.name,
+                };
+                if let Some(companion) = resolver.companion(class, &mut Work::default()) {
+                    companions.insert(class, companion);
+                }
+            }
+        }
+        resolver.companions = companions;
         let mut impls: HashMap<Target, Vec<Block>> = HashMap::new();
         let mut blocks = HashMap::new();
         let mut outside = HashSet::new();
@@ -1352,7 +1369,11 @@ impl<'a> Resolver<'a> {
                 reading => reading,
             };
             let binding = match head {
-                _ if Some(head) == self.receiver => self.class(path, scope),
+                // `this.m()` is a call on an instance, never on the class's name.
+                _ if Some(head) == self.receiver => match self.class(path, scope) {
+                    Binding::Def(t) if !members.is_empty() => Binding::Instance(t),
+                    found => found,
+                },
                 _ if Some(head) == self.base_receiver => Binding::Unknown,
                 _ if head.starts_with('(') => Binding::Unknown,
                 _ => self.lexical_as(path, scope, head, seen, head_reading),
@@ -1400,6 +1421,22 @@ impl<'a> Resolver<'a> {
             // are separate namespaces (`Reading::Read`).
             let read = self.members_in_scope && (!last || reading.read());
             binding = match self.instance(binding, work) {
+                // A class's name (`Type.m()`, `Type.X`) reaches a Kotlin companion's members
+                // before the class's, which only an instance reaches; past the companion, a
+                // nested class or a constant of the class (an enum entry).
+                Binding::Def(t)
+                    if self.is_class(t)
+                        && let Some(&c) = self.companions.get(&t) =>
+                {
+                    match self.member(c, member, read, work) {
+                        Binding::Unknown => match self.member(t, member, read, work) {
+                            found @ Binding::Def(d) if self.is_class(d) => found,
+                            found @ Binding::Const(..) => found,
+                            _ => Binding::Unknown,
+                        },
+                        found => found,
+                    }
+                }
                 Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => {
                     self.member(t, member, read, work)
                 }

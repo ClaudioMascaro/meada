@@ -1381,7 +1381,11 @@ one for the area a change touches.
   class constructs it. A companion object is written as its class's last base: `Resolver::lineage`
   keeps a class's own nested class out of its family, so the companion's bases lend nothing to
   instances, and `Resolver::companion` reads it after the family, for a bare call in the class
-  (`inherited`) and a member of the class (`member`, so `Type.create()`); `Resolver::member` finds
+  (`inherited`) and a member of an instance (`member`). A call or a read on the class's name
+  (`Type.create()`, `Type.X`) reads the companion first (`Resolver::walk` through
+  `Resolver::companions`, each class's companion read once after the families), then a nested
+  class or a constant of the class, never an instance member, so `Type.m()` is the companion's
+  when the class declares an `m` too; `this.m()` is a call on an instance. `Resolver::member` finds
   a class nested in a class while that class's family is still being linearized, which resolving
   such a base needs. A bare Kotlin call is `Call::by_path`, as Java's, so it reads the class family
   first, unless a local, parameter, property or constant of its name in a scope around it holds
@@ -1743,10 +1747,7 @@ one for the area a change touches.
   scope with different types, or named like a property, holds an unknown type. A call `X.f(..)`
   is read as a constructor only when `f` is capitalized, as Kotlin names classes. An import alias
   of an extension (`import a.slug as s`) brings nothing in scope for it. A bare call a top-level function of its name answers is
-  exact to that function, though Kotlin prefers an extension of the implicit receiver. A
-  companion is
-  its class's last base, so `Type.m()` reads the class's own instance member first when both
-  declare `m` with one signature. A star import of a class (`import a.C.*`) reads every export of
+  exact to that function, though Kotlin prefers an extension of the implicit receiver. A star import of a class (`import a.C.*`) reads every export of
   the class's file. In the block of a receiver whose type is outside the repository (a Ktor
   `Application` or `Route` extension function), a constant's value and a call's receiver are
   the names outside the block, though that type may declare a member of the name; the object a

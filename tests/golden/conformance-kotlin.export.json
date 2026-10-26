@@ -27,7 +27,7 @@
     },
     {
       "path": "src/main/kotlin/example/Members.kt",
-      "hash": "277db288e33ec85c8e0a50a647f8fc6600aaa932f696daaa931a69dea660446a"
+      "hash": "ce6cdba7522ad0b811108f23322ec3d97cc461a5fef532081ca45b3d2c179901"
     },
     {
       "path": "src/main/kotlin/example/OneLine.kt",
@@ -512,6 +512,46 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin",
+      "span": {
+        "path": "src/main/kotlin/example/Members.kt",
+        "start": 1689,
+        "end": 1810
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.Companion",
+      "span": {
+        "path": "src/main/kotlin/example/Members.kt",
+        "start": 1759,
+        "end": 1808
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.Companion.m()",
+      "span": {
+        "path": "src/main/kotlin/example/Members.kt",
+        "start": 1786,
+        "end": 1802
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.m()",
+      "span": {
+        "path": "src/main/kotlin/example/Members.kt",
+        "start": 1706,
+        "end": 1722
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.own()",
+      "span": {
+        "path": "src/main/kotlin/example/Members.kt",
+        "start": 1728,
+        "end": 1753
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.log(String)",
       "span": {
         "path": "src/main/kotlin/example/Members.kt",
@@ -525,6 +565,14 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 307,
         "end": 328
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.twins(Twin)",
+      "span": {
+        "path": "src/main/kotlin/example/Members.kt",
+        "start": 1812,
+        "end": 1860
       }
     },
     {
@@ -3796,6 +3844,39 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 840,
         "end": 853
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.own()::this.m#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.own()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.m()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/Members.kt",
+        "start": 1745,
+        "end": 1753
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.twins(Twin)::Twin.m#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.twins(Twin)",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.Companion.m()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/Members.kt",
+        "start": 1841,
+        "end": 1849
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.twins(Twin)::twin.m#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.twins(Twin)",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.m()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/Members.kt",
+        "start": 1852,
+        "end": 1860
       }
     },
     {
@@ -11337,6 +11418,15 @@
     {
       "name": "src/main/kotlin/example#10",
       "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Any.toJson()",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.CharSequence.blankish()",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.T.logged()",
+        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.general(Cache,String)"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/example#11",
+      "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.clear()",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.get(String)",
@@ -11359,7 +11449,7 @@
       ]
     },
     {
-      "name": "src/main/kotlin/example#11",
+      "name": "src/main/kotlin/example#12",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Map.Entry.entryLabel()",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Outside.items()",
@@ -11368,7 +11458,7 @@
       ]
     },
     {
-      "name": "src/main/kotlin/example#12",
+      "name": "src/main/kotlin/example#13",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.String.loud()",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)",
@@ -11381,14 +11471,14 @@
       ]
     },
     {
-      "name": "src/main/kotlin/example#13",
+      "name": "src/main/kotlin/example#14",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.localFirst(Cache)",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.localFirst(Cache).size()"
       ]
     },
     {
-      "name": "src/main/kotlin/example#14",
+      "name": "src/main/kotlin/example#15",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Marker"
       ]
@@ -11462,10 +11552,10 @@
     {
       "name": "src/main/kotlin/example#9",
       "members": [
-        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Any.toJson()",
-        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.CharSequence.blankish()",
-        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.T.logged()",
-        "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.general(Cache,String)"
+        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.Companion.m()",
+        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.m()",
+        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.own()",
+        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.twins(Twin)"
       ]
     },
     {
@@ -11926,6 +12016,27 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.own()",
+      "kind": "export",
+      "label": "example.Twin.own()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.own()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.m()"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.origin()",
       "kind": "export",
       "label": "example.origin()",
@@ -11936,6 +12047,34 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.origin()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.twins(Twin)",
+      "kind": "export",
+      "label": "example.twins(Twin)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.twins(Twin)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.Companion.m()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.m()"
         }
       ]
     },

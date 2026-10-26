@@ -68,3 +68,17 @@ enum class Level(val weight: Int) {
 
     fun label(): String = "level"
 }
+
+// A class and its companion both declare `m()`: a call on the class's name reaches the
+// companion's, a call on an instance (`this` too) the class's.
+class Twin {
+    fun m(): Int = 1
+
+    fun own(): Int = this.m()
+
+    companion object {
+        fun m(): Int = 2
+    }
+}
+
+fun twins(twin: Twin): Int = Twin.m() + twin.m()

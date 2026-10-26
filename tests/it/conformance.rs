@@ -1471,6 +1471,12 @@ fn kotlin() {
             "src/main/kotlin/example/Members.kt::example.Init",
             "src/main/kotlin/example/Members.kt::example.Level",
             "src/main/kotlin/example/Members.kt::example.Level.label()",
+            "src/main/kotlin/example/Members.kt::example.Twin",
+            "src/main/kotlin/example/Members.kt::example.Twin.m()",
+            "src/main/kotlin/example/Members.kt::example.Twin.own()",
+            "src/main/kotlin/example/Members.kt::example.Twin.Companion",
+            "src/main/kotlin/example/Members.kt::example.Twin.Companion.m()",
+            "src/main/kotlin/example/Members.kt::example.twins(Twin)",
             "src/main/kotlin/example/Main.kt::example.main(Array<String>)",
             "src/main/kotlin/example/Main.kt::example.Runner",
             "src/main/kotlin/example/Main.kt::example.Runner.main()",
@@ -2469,6 +2475,22 @@ fn kotlin() {
                 "src/main/kotlin/example/Receivers.kt::example.unknownReceiver()::(call_expression).loud#0",
                 INFERRED,
                 &["src/main/kotlin/example/Receivers.kt::example.String.loud()"],
+            ),
+            // A call on the class's name reaches the companion, one on an instance the class.
+            (
+                "src/main/kotlin/example/Members.kt::example.twins(Twin)::Twin.m#0",
+                EXACT,
+                &["src/main/kotlin/example/Members.kt::example.Twin.Companion.m()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.twins(Twin)::twin.m#0",
+                EXACT,
+                &["src/main/kotlin/example/Members.kt::example.Twin.m()"],
+            ),
+            (
+                "src/main/kotlin/example/Members.kt::example.Twin.own()::this.m#0",
+                EXACT,
+                &["src/main/kotlin/example/Members.kt::example.Twin.m()"],
             ),
             // An extension in its class's file is no member: Java never reaches it, and a member
             // of a Java base wins over it.
