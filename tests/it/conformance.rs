@@ -3869,7 +3869,8 @@ fn web_symbols() -> Vec<String> {
 }
 
 /// The calls of the minimal API project: an extension method called on a group is a name
-/// match, and a lambda's parameter hides a local of its name only inside the lambda.
+/// match, a lambda's parameter hides a local of its name only inside the lambda, and the
+/// application an outside call made reaches no method of the repository.
 fn web_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
     let main = |callee: &str| format!("{WEB}/Program.cs::Main::{callee}");
     let orders = web("OrderRoutes.cs", "OrderRoutes.MapOrders(RouteGroupBuilder)");
@@ -3891,6 +3892,9 @@ fn web_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
             vec![web("Admin.cs", "Admin.Map(RouteGroupBuilder)")],
         ),
         (main("shelf.Stock#0"), EXACT, vec![stock("Shelf")]),
+        // A local an outside call made is from outside: only an extension method answers it.
+        (main("app.Run#0"), None, vec![]),
+        (main("stocked.Stock#0"), None, vec![]),
         (
             main("shelf.Stock#1"),
             AMBIGUOUS,

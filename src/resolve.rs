@@ -1102,6 +1102,15 @@ impl<'a> Resolver<'a> {
                 written = (self.holder(&receiver)).is_some_and(|(p, s, n)| {
                     matches!(self.receivers[p].get(&(s, n)), Some(Class::Type(_)))
                 });
+                // A local a call from outside initialized (`var app = builder.Build()`) holds
+                // something from outside as well.
+                if self.extension_methods
+                    && !written
+                    && let Some((p, s, n)) = self.holder(&receiver)
+                    && let Some(Class::Result(made)) = self.receivers[p].get(&(s, n))
+                {
+                    written = self.outside_result(p, *made, work);
+                }
                 self.instance(receiver, work)
             }
         };
@@ -1227,6 +1236,61 @@ impl<'a> Resolver<'a> {
         };
         work.busy.pop();
         found
+    }
+
+    /// Whether the call at `index` of `path` gives something from outside the repository, as
+    /// a pack whose members may be extended (C#) writes it: no function of the repository
+    /// answers it, and it is made on what is outside too: a name that binds nothing of the
+    /// repository (`WebApplication.CreateBuilder(..)`), a receiver whose written type is
+    /// outside, or a local such a call initialized (`builder.Build()`). At most
+    /// `RECEIVER_DEPTH` calls deep.
+    // ponytail: the callee keeps no type argument, so `Deserialize<Order>(..)` counts as from
+    // outside although it may give a type of the repository: a call on it takes extension
+    // methods alone, a name match lost rather than one guessed.
+    fn outside_result(&self, path: &'a str, index: usize, work: &mut Work<'a>) -> bool {
+        let Some(call) = self.files[path].calls.get(index) else {
+            return false;
+        };
+        let Some((head, _)) = call.callee.rsplit_once('.') else {
+            return false;
+        };
+        let key = Busy::Call(path, index);
+        let depth = (work.busy.iter())
+            .filter(|b| matches!(b, Busy::Local(..) | Busy::Call(..)))
+            .count();
+        if (call.on.is_none() && head.starts_with('('))
+            || depth >= RECEIVER_DEPTH
+            || work.busy.contains(&key)
+        {
+            return false;
+        }
+        work.busy.push(key);
+        let unanswered = matches!(
+            self.resolved(path, call, false, work),
+            Resolution::Unresolved
+        );
+        let outside = unanswered
+            && match call.on {
+                Some(inner) => self.outside_result(path, inner, work),
+                None => {
+                    let seen = &mut self.seen(path, &call.scope);
+                    let receiver =
+                        self.resolve_as(path, &call.scope, head, seen, work, Reading::Value);
+                    match self.holder(&receiver) {
+                        Some((p, s, n)) => match self.receivers[p].get(&(s, n)) {
+                            Some(Class::Type(_)) => !matches!(
+                                self.instance(receiver, work),
+                                Binding::Instance(_) | Binding::Def(_)
+                            ),
+                            Some(Class::Result(made)) => self.outside_result(p, *made, work),
+                            _ => false,
+                        },
+                        None => matches!(receiver, Binding::Unknown | Binding::External(..)),
+                    }
+                }
+            };
+        work.busy.pop();
+        outside
     }
 
     fn narrow(
@@ -3860,23 +3924,7 @@ impl<'a> Code<'a> {
         follow: Follow,
     ) -> Vec<Origin<'a>> {
         match follow {
-            Follow::Values { passes } => {
-                let mut trail = Trail::new(passes);
-                match of {
-                    Of::Name(name) => self.flow_name(path, scope, name, &mut trail),
-                    Of::Value(value) => self.flow(path, scope, value, &mut trail),
-                }
-                let origin = |((p, n), routes): ((&'a str, usize), BTreeSet<Route<'a>>)| {
-                    let call = &self.resolver.files[p].calls[n];
-                    Origin {
-                        call: Some((p, n)),
-                        form: Form::Call,
-                        outside: self.outside(p, &call.scope, &call.callee, call.by_path),
-                        routes: routes.into_iter().collect(),
-                    }
-                };
-                trail.out.into_iter().map(origin).collect()
-            }
+            Follow::Values { passes } => self.origins_within(path, scope, of, passes, &[]),
             Follow::Constants => {
                 let seen = &mut Vec::new();
                 let made = match of {
@@ -5017,22 +5065,54 @@ impl<'a> Code<'a> {
         args.collect()
     }
 
-    /// What the call at `index` of `path` passes for the parameter `n` of `function`, when the
-    /// value flow reaches `function` through that call (`Follow::Values`: its exact target, or
-    /// an extension method called on a receiver, which binds that parameter when it is the
-    /// first). A reader that climbed a return value (`Route::through`) asks it for a parameter
-    /// of that function, so the value comes from the call it climbed alone.
-    pub fn passed(
+    /// The function of the repository the value flow reaches through the call at `index` of
+    /// `path` (`Follow::Values`): its exact target, or the extension method a call made on a
+    /// receiver reaches (`Resolver::flows_to`). A kind asks it whether a function of the
+    /// repository answers a call it would read as a library's.
+    pub fn reaches(&self, path: &'a str, index: usize) -> Option<Target<'a>> {
+        let call = self.resolver.files[path].calls.get(index)?;
+        self.resolver.flows_to(path, call)
+    }
+
+    /// `Code::origins` with `Follow::Values` of what is written inside the functions the calls
+    /// `through` reach, outermost first (an `Origin`'s `Route::through`): each call binds the
+    /// parameters of the function it reaches, as when the walk climbs its return values, so a
+    /// reader that climbed to a value reads what is written there with that call's arguments
+    /// alone. A route's own `through` keeps the calls of `through` still around where its
+    /// origin is written, then those it climbed. None when a call reaches no function.
+    pub fn origins_within(
         &self,
         path: &'a str,
-        index: usize,
-        function: Target<'a>,
-        n: usize,
-    ) -> Option<&'a Value> {
-        let call = self.resolver.files[path].calls.get(index)?;
-        (self.resolver.flows_to(path, call) == Some(function))
-            .then(|| self.arg(path, index, function, n))
-            .flatten()
+        scope: &'a str,
+        of: Of<'a>,
+        passes: Passes,
+        through: &[(&'a str, usize)],
+    ) -> Vec<Origin<'a>> {
+        let mut trail = Trail::new(passes);
+        for &(at, index) in through {
+            let Some(def) = self.reaches(at, index) else {
+                return Vec::new();
+            };
+            trail.frames.push(Frame {
+                def,
+                path: at,
+                index,
+            });
+        }
+        match of {
+            Of::Name(name) => self.flow_name(path, scope, name, &mut trail),
+            Of::Value(value) => self.flow(path, scope, value, &mut trail),
+        }
+        let origin = |((p, n), routes): ((&'a str, usize), BTreeSet<Route<'a>>)| {
+            let call = &self.resolver.files[p].calls[n];
+            Origin {
+                call: Some((p, n)),
+                form: Form::Call,
+                outside: self.outside(p, &call.scope, &call.callee, call.by_path),
+                routes: routes.into_iter().collect(),
+            }
+        };
+        trail.out.into_iter().map(origin).collect()
     }
 
     /// Whether `name`, written in `path` within `scope`, is no binding of the file at all: a

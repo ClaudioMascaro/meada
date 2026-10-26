@@ -10,10 +10,12 @@
 //! the application (`WebApplication.Create(..)`, or `Build()` on a builder made by
 //! `WebApplication.CreateBuilder(..)` and its siblings) is the root; any other origin is a
 //! mount Meada does not read, so what it holds is served nowhere. A builder one function
-//! returns keeps the calls the walk climbed to reach it (`Route::through`), and the parameter
-//! it was made from is read from that call alone (`Code::passed`), so two groups one factory
-//! makes from two builders keep their own prefixes. A builder used under two prefixes (an
-//! extension method called on two groups) serves each route under both.
+//! returns keeps the calls the walk climbed to reach it (`Route::through`), and what is
+//! written in that function is read with that call's arguments alone (`Code::origins_within`),
+//! so two groups one factory makes from two builders keep their own prefixes. A builder used
+//! under two prefixes (an extension method called on two groups) serves each route under both.
+//! A factory that calls itself to make the group it returns, and a repository past
+//! `MINIMAL_NODES` nodes, serve nothing.
 //!
 //! A lambda handler is an inline handler named for its route (`handler_site`, the pack's
 //! `Kind::Inline` scope of a lambda argument); a method group (`Handlers.List`) is that method
@@ -28,9 +30,9 @@ use super::super::{
 };
 use super::optional;
 use crate::contract::Found;
-use crate::lang::{Call, Kind, Value};
+use crate::lang::{Call, Value};
 use crate::names::{one, spellings};
-use crate::resolve::{Code, Follow, Of, passes_nothing};
+use crate::resolve::{Code, Of, passes_nothing};
 
 /// The route methods of one HTTP method, with the method each serves.
 const VERBS: &[(&str, &str)] = &[
@@ -75,10 +77,18 @@ fn method(callee: &str) -> &str {
     name.split('<').next().unwrap_or(name)
 }
 
+/// How many nodes the mounts of one repository may hold.
+// ponytail: real apps make tens of groups; past this (a crafted web of factories) nothing is
+// served, rather than routes under part of their prefixes.
+const MINIMAL_NODES: usize = 4096;
+
 struct Minimal<'c, 'a> {
     code: &'c Code<'a>,
-    /// The method names the repository declares: one hides the framework's.
-    declared: BTreeSet<&'a str>,
+    /// Whether a node was dropped past `MINIMAL_NODES`.
+    overflow: bool,
+    /// The nodes whose origins went round a factory that calls itself (`origins`): what is
+    /// mounted above them is not known, so a route reaching one is served nowhere.
+    cycles: BTreeSet<usize>,
     /// Each node by its place in `nodes`.
     ids: BTreeMap<Node<'a>, usize>,
     nodes: Vec<Node<'a>>,
@@ -89,60 +99,54 @@ struct Minimal<'c, 'a> {
 }
 
 impl<'c, 'a> Minimal<'c, 'a> {
-    /// Whether the repository leaves the framework's method `name` alone.
-    fn framework(&self, name: &str) -> bool {
-        !self.declared.contains(name)
+    /// Whether the call at `index` of `path` is the framework's: no function of the repository
+    /// answers it (a method of the repository named `MapGet` hides it only there).
+    fn framework(&self, path: &'a str, index: usize) -> bool {
+        self.code.reaches(path, index).is_none()
     }
 
-    /// The place of `node` in `nodes`, read later when it is new.
-    fn intern(&mut self, node: Node<'a>) -> usize {
+    /// The place of `node` in `nodes`, read later when it is new; `None` past `MINIMAL_NODES`.
+    fn intern(&mut self, node: Node<'a>) -> Option<usize> {
         if let Some(&id) = self.ids.get(&node) {
-            return id;
+            return Some(id);
+        }
+        if self.nodes.len() >= MINIMAL_NODES {
+            self.overflow = true;
+            return None;
         }
         let id = self.nodes.len();
         self.ids.insert(node.clone(), id);
         self.nodes.push(node);
         self.pending.push(id);
-        id
+        Some(id)
     }
 
-    /// The origins of `value`, written in `scope` of `path`, reached through the calls of
-    /// `context`. A parameter of the function the innermost of them calls is what that call
-    /// passes for it, read where the call is written.
+    /// The origins of `value`, written in `scope` of `path` inside the functions the calls of
+    /// `context` reach, which bind their parameters (`Code::origins_within`); `None` when one
+    /// climbs a call twice, round a factory that calls itself.
     fn origins(
         &self,
         path: &'a str,
         scope: &'a str,
         value: &'a Value,
         context: &[CallAt<'a>],
-    ) -> Vec<Node<'a>> {
-        let code = self.code;
-        // ponytail: only a parameter named in place is read from the climbed call; one held by
-        // a local first (`var p = parent;`) takes every caller's value.
-        if let (Value::Ref(name), Some((&(at, index), rest))) = (value, context.split_last())
-            && let Some((function, n)) = code.param_of(path, scope, name)
-        {
-            let call = &code.files()[at].calls[index];
-            return match code.passed(at, index, function, n) {
-                Some(passed) => self.origins(at, &call.scope, passed, rest),
-                None => Vec::new(),
-            };
-        }
-        let follow = Follow::Values {
-            passes: passes_nothing,
-        };
+    ) -> Option<Vec<Node<'a>>> {
+        let found =
+            (self.code).origins_within(path, scope, Of::Value(value), passes_nothing, context);
         let mut out = BTreeSet::new();
-        for origin in code.origins(path, scope, Of::Value(value), follow) {
+        for origin in found {
             let Some(call) = origin.call else {
                 continue;
             };
             for route in origin.routes {
-                let mut through = context.to_vec();
-                through.extend(route.through);
-                out.insert((call, through));
+                let distinct: BTreeSet<&CallAt<'a>> = route.through.iter().collect();
+                if distinct.len() < route.through.len() {
+                    return None;
+                }
+                out.insert((call, route.through));
             }
         }
-        out.into_iter().collect()
+        Some(out.into_iter().collect())
     }
 
     /// Whether the call at `index` of `path` is the framework's `WebApplication.<name>` for
@@ -174,8 +178,11 @@ impl<'c, 'a> Minimal<'c, 'a> {
         let Some(receiver) = call.receiver.as_ref() else {
             return;
         };
-        if name == "Build" && self.framework("Build") {
-            let made = self.origins(path, scope, receiver, &context);
+        // `Build()` on what the framework's builder made is the framework's.
+        if name == "Build" {
+            let made = self
+                .origins(path, scope, receiver, &context)
+                .unwrap_or_default();
             if !made.is_empty() && (made.iter()).all(|((p, n), _)| self.app_call(p, *n, BUILDERS)) {
                 self.roots.insert(id);
             }
@@ -189,14 +196,34 @@ impl<'c, 'a> Minimal<'c, 'a> {
             _ if CONVENTIONS.contains(&name) => Some(String::new()),
             _ => return,
         };
-        if !self.framework(name) {
+        if !self.framework(path, index) {
             return;
         }
-        let parents = self.origins(path, scope, receiver, &context);
+        let Some(parents) = self.origins(path, scope, receiver, &context) else {
+            self.cycles.insert(id);
+            return;
+        };
         let parents: Vec<(usize, Option<String>)> = (parents.into_iter())
-            .map(|node| (self.intern(node), prefix.clone()))
+            .filter_map(|node| Some((self.intern(node)?, prefix.clone())))
             .collect();
         self.mounts.insert(id, parents);
+    }
+
+    /// Whether a node mounted under `nodes`, at any depth, went round a factory that calls
+    /// itself (`cycles`).
+    fn round(&self, nodes: &[usize]) -> bool {
+        let (mut seen, mut work) = (BTreeSet::new(), nodes.to_vec());
+        while let Some(id) = work.pop() {
+            if !seen.insert(id) {
+                continue;
+            }
+            if self.cycles.contains(&id) {
+                return true;
+            }
+            let parents = self.mounts.get(&id).into_iter().flatten();
+            work.extend(parents.map(|(parent, _)| *parent));
+        }
+        false
     }
 
     /// The methods `value` names, upper-case: a list of literals or `HttpMethods.X`; `None`
@@ -243,15 +270,10 @@ pub(in crate::http) fn providers(code: &Code) -> Vec<Found> {
         .filter(|(p, _)| p.ends_with(".cs"))
         .map(|(p, f)| (*p, *f))
         .collect();
-    let declared = (files.iter())
-        .flat_map(|(_, f)| f.defs.iter())
-        .filter(|d| matches!(d.kind, Kind::Method | Kind::Function))
-        .map(|d| d.name.split('(').next().unwrap_or(&d.name))
-        .map(method)
-        .collect();
     let mut minimal = Minimal {
         code,
-        declared,
+        overflow: false,
+        cycles: BTreeSet::new(),
         ids: BTreeMap::new(),
         nodes: Vec::new(),
         pending: Vec::new(),
@@ -265,7 +287,7 @@ pub(in crate::http) fn providers(code: &Code) -> Vec<Found> {
             let verb = VERBS.iter().find(|(m, _)| *m == name).map(|(_, v)| *v);
             if call.decorates.is_some()
                 || (verb.is_none() && name != MAP_METHODS)
-                || !minimal.framework(name)
+                || !minimal.framework(path, n)
             {
                 continue;
             }
@@ -291,8 +313,13 @@ pub(in crate::http) fn providers(code: &Code) -> Vec<Found> {
             let (Some(methods), Some(pattern)) = (methods, pattern) else {
                 continue;
             };
-            let nodes = minimal.origins(path, scope, receiver, &[]);
-            let nodes = nodes.into_iter().map(|n| minimal.intern(n)).collect();
+            let Some(nodes) = minimal.origins(path, scope, receiver, &[]) else {
+                continue;
+            };
+            let nodes = nodes
+                .into_iter()
+                .filter_map(|n| minimal.intern(n))
+                .collect();
             routes.push(Route {
                 path,
                 call,
@@ -306,9 +333,15 @@ pub(in crate::http) fn providers(code: &Code) -> Vec<Found> {
     while let Some(id) = minimal.pending.pop() {
         minimal.read(id);
     }
+    if minimal.overflow {
+        return Vec::new();
+    }
     let root = |id: usize| minimal.roots.contains(&id).then(String::new);
     let mut found = Vec::new();
     for route in &routes {
+        if minimal.round(&route.nodes) {
+            continue;
+        }
         let mut served = BTreeSet::new();
         for &node in &route.nodes {
             served.extend(prefixes(node, &minimal.mounts, &root, &mut Vec::new()));
@@ -507,6 +540,10 @@ mod tests {
           public static void Admin(RouteGroupBuilder admin) => admin.MapDelete(\"/users\", () => 1);\n\
           public static RouteGroupBuilder Sub(RouteGroupBuilder parent) => parent.MapGroup(\"/sub\");\n\
           public static RouteGroupBuilder Api(this WebApplication app) => app.MapGroup(\"/api\");\n\
+          public static RouteGroupBuilder Typed(RouteGroupBuilder parent) {\n\
+            RouteGroupBuilder p = parent;\n\
+            return p.MapGroup(\"/t\");\n\
+          }\n\
         }\n";
 
     fn routed(program: &str) -> Vec<String> {
@@ -556,7 +593,11 @@ mod tests {
              var b = OrderRoutes.Sub(app.MapGroup(\"/b\"));\n\
              a.MapGet(\"/x\", () => 1);\n\
              b.MapGet(\"/y\", () => 1);\n\
-             app.Api().MapGet(\"/z\", () => 1);",
+             app.Api().MapGet(\"/z\", () => 1);\n\
+             var c = OrderRoutes.Typed(app.MapGroup(\"/c\"));\n\
+             var d = OrderRoutes.Typed(app.MapGroup(\"/d\"));\n\
+             c.MapGet(\"/u\", () => 1);\n\
+             d.MapGet(\"/v\", () => 1);",
         );
         assert_eq!(
             found,
@@ -565,6 +606,8 @@ mod tests {
                 "http::GET::/a/sub/x",
                 "http::GET::/api/z",
                 "http::GET::/b/sub/y",
+                "http::GET::/c/t/u",
+                "http::GET::/d/t/v",
             ]
         );
     }
@@ -596,5 +639,51 @@ mod tests {
         };
         let (small, large) = (time(100), time(400));
         assert!(large < small * 12, "{small:?} then {large:?}");
+    }
+
+    #[test]
+    fn a_method_of_the_repository_hides_the_frameworks_only_where_the_call_reaches_it() {
+        let found = served(
+            "app.MapGroup(\"/g\").WithTags(\"t\").MapGet(\"/a\", () => 1);\n\
+             class OrderBuilder { public int Build() => 1; public void MapGet() {} \
+             public void MapGroup() {} public void WithTags() {} }",
+        );
+        assert_eq!(contracts(found), ["http::GET::/g/a"]);
+    }
+
+    /// A factory that calls itself to make the group it returns is read to a bound and serves
+    /// nothing: a route above a node whose origins climb one call twice is served nowhere.
+    #[test]
+    fn a_recursive_group_factory_is_read_in_bounded_time() {
+        let factories = "static class F {\n\
+            public static RouteGroupBuilder Deep(RouteGroupBuilder g, int n) {\n\
+              if (n == 0) return g;\n\
+              return Deep(g, n - 1).MapGroup(\"/d\");\n\
+            }\n\
+            public static RouteGroupBuilder A(RouteGroupBuilder g) => A(g).MapGroup(\"/a\");\n\
+          }";
+        let start = std::time::Instant::now();
+        let found = contracts(served(&format!(
+            "F.Deep(app.MapGroup(\"/r\"), 2).MapGet(\"/x\", () => 1);\n\
+             F.A(app.MapGroup(\"/s\")).MapGet(\"/y\", () => 1);\n\
+             app.MapGet(\"/ok\", () => 1);\n{factories}"
+        )));
+        let took = start.elapsed();
+        assert!(took < std::time::Duration::from_secs(5), "{took:?}");
+        // What the recursive factories make is served nowhere, not under part of its prefixes.
+        assert_eq!(found, ["http::GET::/ok"]);
+    }
+
+    /// Past `MINIMAL_NODES` nodes nothing is served.
+    #[test]
+    fn past_the_node_ceiling_nothing_is_served() {
+        let groups: String = (0..MINIMAL_NODES)
+            .map(|i| format!("app.MapGroup(\"/g{i}\").MapGet(\"/x\", () => 1);\n"))
+            .collect();
+        assert!(served(&groups).is_empty());
+        let groups: String = (0..10)
+            .map(|i| format!("app.MapGroup(\"/g{i}\").MapGet(\"/x\", () => 1);\n"))
+            .collect();
+        assert_eq!(served(&groups).len(), 10);
     }
 }

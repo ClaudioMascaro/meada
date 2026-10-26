@@ -27,3 +27,11 @@ app.UseEndpoints(endpoints => endpoints.MapGet("/legacy", () => "old"));
 var shelf = new Shelf();
 shelf.Stock();
 var restock = (Crate shelf) => shelf.Stock();
+
+// A call from outside with type arguments is read as outside too (the callee keeps none):
+// a call on what it gives reaches no method of the repository.
+var stocked = System.Text.Json.JsonSerializer.Deserialize<Shelf>("{}");
+stocked.Stock();
+
+// The application comes from outside: `Run` is the framework's, no method of the repository.
+app.Run();

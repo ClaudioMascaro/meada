@@ -127,7 +127,7 @@
     },
     {
       "path": "src/Acme.Web/Program.cs",
-      "hash": "0fe94ddc8e7ab98da66b9e05746d27e016fa00d8a94d6f01377def7eb172a69c"
+      "hash": "46b69c3c6b8ccf7c447ac218a571248a5700d459f13a24a3461d96c7c91e8762"
     },
     {
       "path": "src/Acme.Web/Routes/Admin.cs",
@@ -1828,7 +1828,7 @@
       "span": {
         "path": "src/Acme.Web/Program.cs",
         "start": 376,
-        "end": 1207
+        "end": 1558
       }
     },
     {
@@ -4778,6 +4778,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::System.Text.Json.JsonSerializer.Deserialize#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 1378,
+        "end": 1434
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::WebApplication.CreateBuilder#0",
       "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
       "target": null,
@@ -4877,6 +4888,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::app.Run#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 1548,
+        "end": 1557
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::app.UseEndpoints#0",
       "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
       "target": null,
@@ -4944,6 +4966,17 @@
         "path": "src/Acme.Web/Program.cs",
         "start": 1193,
         "end": 1206
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::stocked.Stock#0",
+      "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Web/Program.cs",
+        "start": 1436,
+        "end": 1451
       }
     },
     {

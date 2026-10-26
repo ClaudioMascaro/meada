@@ -977,11 +977,15 @@ one for the area a change touches.
   `App`, `web::scope`, `web::resource`, `.configure(f)` and Rocket's `build().mount(..)`, whose
   `routes![..]` the Rust pack reads as a list of the handlers' paths).
   `Code::returned` and `Code::constant` give a kind the values a call may return and a
-  constant holds, for what it must not leave unmounted. `Code::passed` gives what one call
-  passes for a parameter of the function the value flow reaches through it (its receiver for
-  a C# extension method's `this`): a kind that climbed a return value (`Route::through`) reads
-  a parameter of that function from the call it climbed alone, so two objects one factory
-  makes from two arguments stay apart (`http/csharp/minimal.rs`).
+  constant holds, for what it must not leave unmounted. `Code::origins_within` is the value
+  flow of what is written inside the functions some calls reach (an origin's
+  `Route::through`), each call binding the parameters of its function as when the walk climbs
+  its return values: a kind that climbed to a value reads what is written there with that
+  call's arguments alone, so two objects one factory makes from two arguments stay apart,
+  through a local holding the parameter too (`http/csharp/minimal.rs`). `Code::reaches` says
+  which function of the repository the value flow reaches through a call (exact, or a C#
+  extension method), for a kind whose library name a method of the repository hides only
+  where it answers the call.
   `Expand::Chain` is `Code::expand` for a request built by a chain (`http/java/clients.rs`; in
   `channel/java.rs` an SQS request, the stream maps of a Redis group read and a
   `BindingBuilder` chain):
@@ -1589,7 +1593,13 @@ one for the area a change touches.
   is no extension. A receiver without a written type (`var x = Make()` of unknown result, a
   lambda parameter, a type parameter) keeps the broad name match. The extensions are not
   looked up: an extension method called as `x.M()` is never `exact`, one called as `Ext.M(x)`
-  is. Ceilings: no generic type argument is read (`Result` and `Result<T>` are one type), a
+  is. A local a call from outside initialized (`var app = builder.Build()`, `var b =
+  WebApplication.CreateBuilder(args)`) is from outside too (`Resolver::outside_result`): the
+  call resolves to nothing of the repository and is made on a name that binds nothing of the
+  repository, on a receiver of a written outside type or on such a local, so a call on it
+  takes extension methods alone (`app.Run()` reaches no repository `Run()`). The callee keeps
+  no type argument, so a local of `GetRequiredService<OrderService>()` or
+  `Deserialize<Order>(..)` is from outside too: its calls lose their name match. Ceilings: no generic type argument is read (`Result` and `Result<T>` are one type), a
   `var` takes a type from `new` and a call alone (no cast, `await` or conditional), a
   target-typed `new()` records no constructor call, and a parameter type written `global::A`
   or `alias::A` is spelled `A` and `alias.A` in a signature.
@@ -2175,12 +2185,14 @@ qualification budget does (ADR 0017).
   read positionally or by name (`pattern:`, `httpMethods:`, `handler:`, `prefix:`), and `?` of
   `{id?}` is dropped as for controllers. A lambda handler is an inline handler named for the
   first route it serves, a method group (`Handlers.List`) the method it names (one overload),
-  anything else the file. A method of the repository named like one of the framework's
-  (`MapGet`, `MapGroup`, `Build`, a convention) hides it. Ceilings: a builder Meada does not
-  read serves nothing (a lambda's parameter, as in `UseEndpoints(e => e.MapGet(..))`, a
-  parameter no call reaches, a field, a builder reassigned, one held by a local bound to a
-  parameter inside a factory reached through a return value, whose callers all count), and so
-  does a group configured through a call outside `CONVENTIONS`; `Map(pattern, handler)`,
+  anything else the file. A method of the repository hides the framework's `MapGet`,
+  `MapGroup` or convention only where it answers the call (`Code::reaches`); `Build()` is the
+  framework's when what it is called on comes from its builder. A route above a node whose
+  origins climb one call twice (a factory that calls itself to make the group it returns) is
+  served nowhere, and so is every route past `MINIMAL_NODES` (4096) nodes in a repository.
+  Ceilings: a builder Meada does not read serves nothing (a lambda's parameter, as in
+  `UseEndpoints(e => e.MapGet(..))`, a parameter no call reaches, a field, a builder
+  reassigned), and so does a group configured through a call outside `CONVENTIONS`; `Map(pattern, handler)`,
   `MapFallback`, `MapHub`, `MapControllers` and `MapRazorPages` are not read, and neither is a
   pattern that does not fold to a literal.
 - `http/csharp/clients.rs` (spec #28, #111): an `HttpClient` call is a consumer when its method

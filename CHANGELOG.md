@@ -57,7 +57,9 @@ All notable changes to Meada are recorded here. The format follows
   Meada cannot read (a lambda's parameter, a field, a reassigned local) serves nothing.
   The shared value flow now follows a local a pack binds to one value (C# and Kotlin) and a C#
   extension method called on a receiver in scope; every C# lambda in a definition is a scope of
-  its own, so its parameters hide outer names only inside it.
+  its own, so its parameters hide outer names only inside it. A C# local an outside call made
+  (`var app = builder.Build()`) is of an outside type, so `app.Run()` reaches no repository
+  `Run()`.
 - C# HttpClient calls as HTTP consumers (issue #111): `GetAsync`, `PostAsync`, `PutAsync`,
   `PatchAsync`, `DeleteAsync`, `GetStringAsync`, `GetStreamAsync`, `GetByteArrayAsync`,
   `GetFromJsonAsync`, `PostAsJsonAsync`, `PutAsJsonAsync` and `SendAsync` with a
