@@ -2042,7 +2042,7 @@ qualification budget does (ADR 0017).
   `Code::origins` (`Follow::Values`) traces to a call to it (counted by the import of its
   callee as `jvm::names::spellings` reads it, so `import io.ktor.client.*` counts), a local the
   pack recorded (`Facts::bound`: a `val x = Callee(..)` with no written type, and the parameter
-  of a `let`, `also` or `use` lambda, whose value is the receiver; `Clients::local` takes the
+  of a `let`, `also` or `use` lambda, whose value is the receiver; `Code::local` takes the
   nearest binding of the name and none when another binding of it shares its scope, so a
   parameter, a loop variable, a `var`, a local named like a property of the file or one declared
   twice hides it) followed through `origins` again, or one whose written type is it
