@@ -66,8 +66,10 @@ All notable changes to Meada are recorded here. The format follows
   argument count remain; the reason ends `; import package`. A class name called constructs the
   class, a call on a class's name reaches its companion before its members (an instance's call,
   the member first), and an extension function crosses only through the import of its name,
-  `inferred`, on a receiver typed or not, never as a member of the class it extends: a member of
-  the receiver's type with the name wins. A call that may leave a default argument out or fills a
+  never as a member of the class it extends: a member of the receiver's type with the name wins,
+  and the link is `exact` when the type the source writes for the receiver is a class of the
+  provider's package whose members are all known and one extension of that class fits,
+  `inferred` on any other receiver. A call that may leave a default argument out or fills a
   `vararg` reaches every overload it could, so the index stores the functions with a variable
   argument count (the `flexible` table, a new stored format). The source roots gain
   `src/main/kotlin` and `src/test/kotlin`, and the Gradle scanner reads the `kotlin` directory

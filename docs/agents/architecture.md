@@ -1191,10 +1191,14 @@ one for the area a change touches.
     as a Kotlin package (`top_level`: the symbols of `Classes::named` that the file exports both
     as written and with its package, which is what makes a declaration top-level and public): a
     function by name and argument count (`ambiguous` when several fit), a class by its capital,
-    as the class itself (its constructor), an extension function (`.name(arity)`) as a name
-    match, `inferred`, which crosses only through the import of its name: the chain carries the
-    receiver's type (`.name(arity)@Class`) when the source writes one, and a member of that class
-    the provider declares hides the extension. A declaration `Classes::published` shows as an
+    as the class itself (its constructor), an extension function (`.name(arity)`), which
+    crosses only through the import of its name: the chain carries the receiver's type
+    (`.name(arity)@Class`) when the source writes one, and a member of that class the provider
+    declares hides the extension. The one extension of that class itself (`package.Class.name`,
+    so the class is of the extension's package) is `exact` when a provider declares the class
+    and its family is all known; any other is a name match, `inferred` (or `ambiguous`). An
+    extension file that imports another class of the name its package declares would make that
+    `exact` wrong, which the provider rows cannot tell (a Known ceiling). A declaration `Classes::published` shows as an
     extension of its class (`Class.method`) is never one of its members (`methods`). A chain
     `Companion.name(arity)` is a call on the class's name: the companion's member first, the
     class's own after; a plain chain is the instance's, in the reverse order. A function with a
@@ -1749,7 +1753,8 @@ one for the area a change touches.
   is read as a constructor only when `f` is capitalized, as Kotlin names classes. An import alias
   of an extension (`import a.slug as s`) brings nothing in scope for it. A bare call a top-level function of its name answers is
   exact to that function, though Kotlin prefers an extension of the implicit receiver. A star import of a class (`import a.C.*`) reads every export of
-  the class's file. In the block of a receiver whose type is outside the repository (a Ktor
+  the class's file. An imported extension of the provider's class `p.C` is `exact` on a
+  receiver typed `p.C`, though the extension's file may import another `C` over its package's. In the block of a receiver whose type is outside the repository (a Ktor
   `Application` or `Route` extension function), a constant's value and a call's receiver are
   the names outside the block, though that type may declare a member of the name; the object a
   client walk or a declared type asks is unknown there. A fully qualified function call (`example.helper()`) is a name match. A class

@@ -478,22 +478,28 @@ impl Ecosystem for Maven {
             receiver,
         } = self::chain(chain);
         // A member of the receiver's type hides an extension of the same name (Kotlin picks it).
+        // A type a provider declares, whose family is all known, has no other member.
+        let mut members_known = false;
         if let Some(class) = receiver {
-            let hidden = (self
+            let (mut hidden, mut declared, mut opaque) = (false, false, false);
+            let matching = (self
                 .entries(exports, providers, from, specifier)
                 .into_iter())
-            .flat_map(|(entry, _)| providers.matching(self, entry))
-            .any(|(m, i)| {
+            .flat_map(|(entry, _)| providers.matching(self, entry));
+            for (m, i) in matching {
                 let (at, manifest) = (at(m), &exports[m].manifests[i]);
                 let known = |id: &str| known(at, id);
-                (declaring(at, manifest, class).into_iter()).any(|c| {
-                    let found = methods(at, &exports[m].repository, c, wanted, false, &known);
-                    !found.0.is_empty()
-                })
-            });
+                for c in declaring(at, manifest, class) {
+                    let (ids, beside) =
+                        methods(at, &exports[m].repository, c, wanted, false, &known);
+                    (hidden, declared, opaque) =
+                        (hidden || !ids.is_empty(), true, opaque || beside);
+                }
+            }
             if hidden {
                 return Vec::new();
             }
+            members_known = declared && !opaque;
         }
         let (mut out, mut reached) = (Vec::new(), HashSet::new());
         for (entry, _) in self.entries(exports, providers, from, specifier) {
@@ -529,9 +535,21 @@ impl Ecosystem for Maven {
                 reached.insert((m, i));
                 targets.sort();
                 targets.dedup();
+                // An extension of the receiver's own type, the package's class, is the one Kotlin
+                // picks when the type's members are all known and none is named so.
+                let own = (receiver.filter(|_| members_known))
+                    .map(|class| format!("::{class}.{}(", wanted.0));
+                let exact: Vec<String> = (targets.iter())
+                    .filter(|id| own.as_ref().is_some_and(|own| id.contains(own.as_str())))
+                    .cloned()
+                    .collect();
+                if let [one] = &exact[..] {
+                    targets = vec![one.clone()];
+                }
                 // An extension may be shadowed by a member of a receiver's type that is not
                 // read (Kotlin picks the member).
-                let level = match (targets.len(), opaque || extension) {
+                let shadowed = extension && exact.len() != 1;
+                let level = match (targets.len(), opaque || shadowed) {
                     (0, _) => continue,
                     (1, false) => Level::Exact,
                     (1, true) => Level::Inferred,

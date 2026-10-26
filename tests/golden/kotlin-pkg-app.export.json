@@ -1090,7 +1090,7 @@
       "site": "example.com/kotlin/app::src/main/kotlin/dev/shop/Ext.kt::dev.shop.labelled(Money)::money.label#0",
       "specifier": "dev.kt.core",
       "name": ".label(0)@dev.kt.core.Money",
-      "level": "inferred",
+      "level": "exact",
       "how": "package",
       "target": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Money.label()"
     },
@@ -1186,7 +1186,7 @@
       "site": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.pay(Int)::doubled.format#0",
       "specifier": "dev.kt.core",
       "name": ".format(0)@dev.kt.core.Money",
-      "level": "inferred",
+      "level": "exact",
       "how": "package",
       "target": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.format()"
     },
@@ -1423,7 +1423,7 @@
       "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Ext.kt::dev.shop.labelled(Money)::money.label#0",
       "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Money.label()",
       "contract": "package::maven::dev.kt.core:core",
-      "level": "inferred",
+      "level": "exact",
       "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
     },
     {
@@ -1507,7 +1507,7 @@
       "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.pay(Int)::doubled.format#0",
       "provider": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.format()",
       "contract": "package::maven::dev.kt.core:core",
-      "level": "inferred",
+      "level": "exact",
       "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
     },
     {
@@ -1760,7 +1760,7 @@
         {
           "depth": 1,
           "repository": "example.com/kotlin/lib",
-          "level": "inferred",
+          "level": "exact",
           "via": "link",
           "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Money.label()",
           "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
@@ -2056,7 +2056,7 @@
         {
           "depth": 1,
           "repository": "example.com/kotlin/lib",
-          "level": "inferred",
+          "level": "exact",
           "via": "link",
           "node": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.format()",
           "reason": "package::maven::dev.kt.core:core 3.1 (local 3.1), range unchecked; import package"
