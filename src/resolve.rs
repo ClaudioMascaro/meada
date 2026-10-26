@@ -4214,17 +4214,21 @@ impl<'a> Code<'a> {
         None
     }
 
+    /// Every name `path` binds to a value (`Facts::bound`), in source order: the kinds that need
+    /// the name a call's result is held by read them once per file.
+    pub fn bindings(&self, path: &'a str) -> &'a [Bound] {
+        self.full(path).map_or(&[], |f| f.bound.as_slice())
+    }
+
     /// Every bound of `name` in exactly `scope` of `path`, in source order (`Facts::bound`):
     /// the packs that record a name once per assignment (C#'s `name=`) are read whole here.
     pub fn bounds(&self, path: &'a str, scope: &'a str, name: &str) -> Vec<&'a Bound> {
         let Some(by_name) = self.by_name(path) else {
             return Vec::new();
         };
-        let key = by_name
-            .bound
-            .iter()
-            .find(|(k, _)| *k.0 == *scope && *k.1 == *name);
-        key.map_or_else(Vec::new, |(_, found)| found.clone())
+        (by_name.bound.get(&(scope, name)).into_iter().flatten())
+            .copied()
+            .collect()
     }
 
     /// The values the call at `index` of `path` may return, when a function of the repository

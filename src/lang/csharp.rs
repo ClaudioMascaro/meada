@@ -744,6 +744,38 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         ));
                     }
                 }
+                // `x.Event += handler` attaches a handler to an event of the name: a bound of
+                // its own for each attachment (`x.Event+=`), the lambda as the inline definition
+                // it makes and a method group as the name it writes.
+                let attaches = node
+                    .child_by_field_name("operator")
+                    .is_some_and(|o| text(o, src) == "+=");
+                if let (Some(left), Some(right), true, true) = (left, right, attaches, definitions)
+                    && left.kind() == "member_access_expression"
+                {
+                    let path = callee(left, src);
+                    let rooted = path.strip_prefix("this.");
+                    let rest = rooted.unwrap_or(&path);
+                    let handler = match right.kind() {
+                        "lambda_expression" | "anonymous_method_expression" => {
+                            let def = qualify(&scope, &format!("@{}", right.start_byte()));
+                            inline(defining, &scope, &classes).then_some(Value::Function(def))
+                        }
+                        "identifier" | "member_access_expression" => Some(value(right, src, 0)),
+                        _ => None,
+                    };
+                    if let Some(handler) = handler
+                        && rest.contains('.')
+                        && !path.contains('(')
+                    {
+                        members.push((
+                            scope.as_ref().clone(),
+                            format!("{rest}+="),
+                            rooted.is_some(),
+                            handler,
+                        ));
+                    }
+                }
             }
             "postfix_unary_expression" | "prefix_unary_expression"
                 if children(node).any(|c| matches!(c.kind(), "++" | "--")) =>
@@ -1151,12 +1183,15 @@ fn bind_unknown(bound: &mut Vec<Bound>, defining: bool, scope: &str, name: &str)
 /// Whether a local or a field with this initializer is bound to it (`Facts::bound`): a
 /// construction or a call, whose value the kinds read the client a name holds off.
 fn held(initializer: &Node) -> bool {
-    matches!(
-        initializer.kind(),
-        "object_creation_expression"
-            | "implicit_object_creation_expression"
-            | "invocation_expression"
-    )
+    match initializer.kind() {
+        "await_expression" => named(*initializer).next().is_some_and(|n| held(&n)),
+        kind => matches!(
+            kind,
+            "object_creation_expression"
+                | "implicit_object_creation_expression"
+                | "invocation_expression"
+        ),
+    }
 }
 
 /// `at`, made on nothing the repository holds when written outside `definitions`.
@@ -1646,6 +1681,17 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 _ => Value::Unknown,
             }
         }
+        // The keyword `string` is `System.String` whatever the repository declares.
+        "member_access_expression"
+            if node
+                .child_by_field_name("expression")
+                .is_some_and(|e| e.kind() == "predefined_type" && text(e, src) == "string")
+                && node
+                    .child_by_field_name("name")
+                    .is_some_and(|n| text(n, src) == "Empty") =>
+        {
+            Value::Str(Vec::new())
+        }
         "identifier" | "member_access_expression" | "qualified_name" => {
             Value::Ref(callee(node, src))
         }
@@ -1728,7 +1774,8 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
         "integer_literal" => Value::Scalar(text(node, src).parse().ok()),
         "boolean_literal" => Value::Scalar(None),
         "null_literal" => Value::Undefined,
-        "parenthesized_expression" => named(node)
+        // An awaited value is the value of its operand.
+        "parenthesized_expression" | "await_expression" => named(node)
             .next()
             .map_or(Value::Unknown, |n| value(n, src, depth + 1)),
         _ => Value::Unknown,
@@ -1936,6 +1983,69 @@ mod tests {
         assert_eq!(scopes.len(), 100);
         assert!(scopes.iter().all(|s| Arc::ptr_eq(s, scopes[0])));
         assert!(scopes[0].len() > 2_000);
+    }
+
+    /// What a call awaited is bound to: the call itself, as the same call not awaited is.
+    #[test]
+    fn a_name_is_bound_to_the_call_it_awaits() {
+        let source = "class C { IChannel _ch; IChannel Ch { get; set; }\n\
+            async Task M(IConnection c) {\n\
+              var a = await c.CreateChannelAsync();\n\
+              _ch = await c.CreateChannelAsync();\n\
+              var b = await Task.Delay(1);\n\
+              var n = (await c.Count());\n\
+            } }";
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        let held = |name: &str| -> Vec<String> {
+            (facts.bound.iter().filter(|b| b.name == name))
+                .map(|b| match &b.value {
+                    Value::Call(call) => call.callee.clone(),
+                    _ => "other".into(),
+                })
+                .collect()
+        };
+        assert_eq!(held("a"), ["c.CreateChannelAsync"]);
+        assert_eq!(held("_ch="), ["c.CreateChannelAsync"]);
+        assert_eq!(held("b"), ["Task.Delay"]);
+        // A parenthesized await is the value of the expression inside.
+        assert_eq!(held("n"), ["c.Count"]);
+    }
+
+    /// Each handler attached to an event of a name with `+=` is a bound of its own, the lambda
+    /// as the inline definition it makes and a method group as the name it writes.
+    #[test]
+    fn a_handler_attached_with_plus_equals_is_bound_for_each_attachment() {
+        let source = "class C { void M(X x) {\n\
+              x.Received += (s, e) => { };\n\
+              x.Received += OnReceived;\n\
+              x.Count += 1;\n\
+              y -= OnReceived;\n\
+            }\n\
+            void OnReceived(object s, object e) { } }";
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        let attached: Vec<(&str, &str, String)> = (facts.bound.iter())
+            .filter(|b| b.name.ends_with("+="))
+            .map(|b| {
+                let value = match &b.value {
+                    Value::Function(def) => format!("function {def}"),
+                    Value::Ref(name) => format!("ref {name}"),
+                    _ => "other".into(),
+                };
+                (b.scope.as_str(), b.name.as_str(), value)
+            })
+            .collect();
+        let lambda = source.find("(s, e)").unwrap();
+        assert_eq!(
+            attached,
+            [
+                (
+                    "C.M(X)",
+                    "x.Received+=",
+                    format!("function C.M(X).@{lambda}")
+                ),
+                ("C.M(X)", "x.Received+=", "ref OnReceived".to_string()),
+            ]
+        );
     }
 
     #[test]

@@ -22,6 +22,10 @@
       "hash": "c658e81ecc90e96c15b70438860a76ffc844de65298aa1c1aa36b4a530c1bf11"
     },
     {
+      "path": "Messaging/ShipmentListener.cs",
+      "hash": "26df5954fb1286e64de8ec66a2bc109dd757a3fcbbd293c433436b333fecda3f"
+    },
+    {
       "path": "Program.cs",
       "hash": "c6085b5784c3f2a798334205c7c763620ba382c656d413ce284a2b0f89c47c37"
     }
@@ -137,6 +141,30 @@
         "path": "Controllers/OrdersController.cs",
         "start": 525,
         "end": 644
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/api::Messaging/ShipmentListener.cs::Api.Messaging.ShipmentListener",
+      "span": {
+        "path": "Messaging/ShipmentListener.cs",
+        "start": 182,
+        "end": 469
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/api::Messaging/ShipmentListener.cs::Api.Messaging.ShipmentListener.OnShipment()",
+      "span": {
+        "path": "Messaging/ShipmentListener.cs",
+        "start": 384,
+        "end": 467
+      }
+    },
+    {
+      "id": "example.com/xlang-csharp/api::Messaging/ShipmentListener.cs::Api.Messaging.ShipmentListener.ShipmentListener(IConsumer<string,string>)",
+      "span": {
+        "path": "Messaging/ShipmentListener.cs",
+        "start": 277,
+        "end": 378
       }
     },
     {
@@ -370,6 +398,17 @@
       }
     },
     {
+      "id": "example.com/xlang-csharp/api::Messaging/ShipmentListener.cs::Api.Messaging.ShipmentListener.OnShipment()::_consumer.Subscribe#0",
+      "caller": "example.com/xlang-csharp/api::Messaging/ShipmentListener.cs::Api.Messaging.ShipmentListener.OnShipment()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Messaging/ShipmentListener.cs",
+        "start": 423,
+        "end": 460
+      }
+    },
+    {
       "id": "example.com/xlang-csharp/api::Program.cs::Main::HttpClient#0",
       "caller": "example.com/xlang-csharp/api::Program.cs::Main",
       "target": null,
@@ -532,6 +571,11 @@
       "via": "env:Prices__BaseUrl"
     },
     {
+      "contract": "channel::kafka::orders.shipped",
+      "site": "example.com/xlang-csharp/api::Messaging/ShipmentListener.cs::Api.Messaging.ShipmentListener.OnShipment()",
+      "via": null
+    },
+    {
       "contract": "http::GET::/api/promotions",
       "site": "example.com/xlang-csharp/api::Program.cs::Main::promotions.GetStringAsync#0",
       "via": "env:Promo__Url"
@@ -597,6 +641,13 @@
       "contract": "http::GET::/api/prices/{}",
       "level": "inferred",
       "reason": "base URL from Prices__BaseUrl, a base_url_env of peer example.com/xlang-csharp/web"
+    },
+    {
+      "consumer": "example.com/xlang-csharp/api::Messaging/ShipmentListener.cs::Api.Messaging.ShipmentListener.OnShipment()",
+      "provider": "example.com/xlang-csharp/web::src/events.ts::announceShipment::producer.send#0",
+      "contract": "channel::kafka::orders.shipped",
+      "level": "exact",
+      "reason": "channel::kafka::orders.shipped"
     },
     {
       "consumer": "example.com/xlang-csharp/api::Program.cs::Main::promotions.GetStringAsync#0",

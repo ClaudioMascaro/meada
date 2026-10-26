@@ -17,6 +17,7 @@ use crate::resolve::Code;
 use crate::shape::Shape;
 use crate::workspace::Repository;
 
+mod csharp;
 mod go;
 mod java;
 mod message;
@@ -188,6 +189,7 @@ impl ContractKind for Channel {
             rust::messages(code),
             go::messages(code),
             java::messages(code, indexed),
+            csharp::messages(code),
         ]
         .into_iter()
         .flatten()

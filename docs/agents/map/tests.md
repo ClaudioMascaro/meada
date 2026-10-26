@@ -390,6 +390,18 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   edited, renamed and added `.csproj` refreshing like a cold workspace. Goldens
   `dotnet-{lib,app}.export.json`, `dotnet-lib.context-{order,total}.txt` and
   `dotnet-app.trace-down.txt`. Unit tests in `package/nuget.rs` and `dotnet/msbuild.rs`.
+- C# channels (spec #28, ticket #115): `conformance-csharp` gains `Channels.cs` and
+  `Channels.Nats.cs` (a client of each library: Confluent.Kafka, RabbitMQ.Client with a
+  default-exchange publish and a named one routed by a binding, AWSSDK.SQS, NATS.Client with a
+  wildcard subject, StackExchange.Redis streams, Azure.Messaging.ServiceBus with a queue, a
+  topic and two processors on it, and names read from the environment on both sides), checked by
+  `csharp` (the definitions and the golden) and `csharp_channel_clients_link_their_producers_to_their_handlers`
+  (every link with its level, and the unresolved sides); `xlang-csharp-web` gains `src/events.ts`
+  (`announceShipment`, kafkajs) and `xlang-csharp-api` `Messaging/ShipmentListener.cs`, and
+  `trace_down_from_a_typescript_producer_reaches_the_csharp_kafka_consumer` holds
+  `xlang-csharp.trace-channel-down.txt`. Unit tests in `channel/csharp.rs` (each library, a
+  repository type that hides the library's, two namespaces for one name, a name assigned twice, a
+  wrapper, the receiver depth) and in `lang/csharp.rs` (`await`, `+=`).
 - **The loopback decider stub** (`tests/it/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500

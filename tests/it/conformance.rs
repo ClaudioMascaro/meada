@@ -3418,6 +3418,89 @@ fn csharp() {
         api("Inside.cs", "Acme.Api.Inside"),
         api("Inside.cs", "Acme.Api.Inside.Run()"),
         orders("Routes.cs", "Routes"),
+        api("Channels.cs", "Acme.Api.Channels.Topics"),
+        api("Channels.cs", "Acme.Api.Channels.KafkaSales"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.KafkaSales.KafkaSales(IProducer<string,string>)",
+        ),
+        api("Channels.cs", "Acme.Api.Channels.KafkaSales.Created()"),
+        api("Channels.cs", "Acme.Api.Channels.KafkaSales.Paid()"),
+        api("Channels.cs", "Acme.Api.Channels.KafkaSales.Dynamic()"),
+        api("Channels.cs", "Acme.Api.Channels.KafkaFeed"),
+        api("Channels.cs", "Acme.Api.Channels.KafkaFeed.OnSale()"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.KafkaFeed.OnMissing(IConsumer<string,string>)",
+        ),
+        api("Channels.cs", "Acme.Api.Channels.RabbitInvoicing"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.RabbitInvoicing.RabbitInvoicing(IChannel)",
+        ),
+        api("Channels.cs", "Acme.Api.Channels.RabbitInvoicing.Invoice()"),
+        api("Channels.cs", "Acme.Api.Channels.RabbitInvoicing.Refund()"),
+        api("Channels.cs", "Acme.Api.Channels.RabbitInvoicing.Attend()"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.RabbitInvoicing.Attend().amqp refunds",
+        ),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.RabbitInvoicing.OnInvoice(object,BasicDeliverEventArgs)",
+        ),
+        api("Channels.cs", "Acme.Api.Channels.SqsShipments"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.SqsShipments.SqsShipments(IAmazonSQS)",
+        ),
+        api("Channels.cs", "Acme.Api.Channels.SqsShipments.Ship()"),
+        api("Channels.cs", "Acme.Api.Channels.SqsShipments.Poll()"),
+        api("Channels.cs", "Acme.Api.Channels.RedisAudits"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.RedisAudits.RedisAudits(IConnectionMultiplexer)",
+        ),
+        api("Channels.cs", "Acme.Api.Channels.RedisAudits.Record()"),
+        api("Channels.cs", "Acme.Api.Channels.RedisAudits.Drain()"),
+        api("Channels.cs", "Acme.Api.Channels.BusDispatch"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.BusDispatch.BusDispatch(ServiceBusClient)",
+        ),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)",
+        ),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)",
+        ),
+        api("Channels.cs", "Acme.Api.Channels.BusDispatch.Work()"),
+        api("Channels.cs", "Acme.Api.Channels.BusDispatch.Watch()"),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.BusDispatch.Watch().servicebus dispatch.events",
+        ),
+        api(
+            "Channels.cs",
+            "Acme.Api.Channels.BusDispatch.OnDispatch(ProcessMessageEventArgs)",
+        ),
+        api("Channels.Nats.cs", "Acme.Api.Channels.NatsDelivery"),
+        api(
+            "Channels.Nats.cs",
+            "Acme.Api.Channels.NatsDelivery.NatsDelivery(IConnection)",
+        ),
+        api(
+            "Channels.Nats.cs",
+            "Acme.Api.Channels.NatsDelivery.Track(byte[])",
+        ),
+        api("Channels.Nats.cs", "Acme.Api.Channels.NatsDelivery.Watch()"),
+        api(
+            "Channels.Nats.cs",
+            "Acme.Api.Channels.NatsDelivery.Watch().nats delivery.*.tracked",
+        ),
+        api("Channels.Nats.cs", "Acme.Api.Channels.NatsDelivery.Poll()"),
         api("Clients.cs", "Acme.Api.Clients.Hosts"),
         api("Clients.cs", "Acme.Api.Clients.Verbs"),
         api("Clients.cs", "Acme.Api.Clients.Verbs.Verbs(HttpClient)"),
@@ -3946,6 +4029,85 @@ fn csharp_minimal_apis_are_providers_with_their_full_paths() {
         .map(|(c, s)| (c.as_str(), s.as_str()))
         .collect();
     assert_eq!(actual, pairs(&expected));
+}
+
+/// Each C# channel client links its producer to its handler (spec #28, #115): Kafka topics from
+/// constants and an array, a RabbitMQ publish to the default exchange (`string.Empty`) and to a
+/// named exchange routed by a binding (`inferred`), the handler a consumer's `+=` attached (a
+/// method and a lambda), an SQS queue named by the end of its URL, a NATS wildcard subject
+/// (`inferred`), a Redis stream, a Service Bus queue and a topic (two processors on it, whatever
+/// their subscriptions), and the names that cannot be evaluated left unresolved.
+#[test]
+fn csharp_channel_clients_link_their_producers_to_their_handlers() {
+    let repo = fixture_repo("csharp_channels", "conformance-csharp", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let short = |site: &str| {
+        let site = site.rsplit("src/Acme.Api/").next().unwrap_or(site);
+        site.split_once("::Acme.Api.Channels.")
+            .map_or(site, |(_, s)| s)
+            .to_string()
+    };
+    let links: Vec<String> = (json["links"].as_array().unwrap().iter())
+        .filter(|l| l["contract"].as_str().unwrap().starts_with("channel::"))
+        .map(|l| {
+            let (level, contract) = (
+                l["level"].as_str().unwrap(),
+                l["contract"].as_str().unwrap(),
+            );
+            let (provider, consumer) = (
+                l["provider"].as_str().unwrap(),
+                l["consumer"].as_str().unwrap(),
+            );
+            format!(
+                "{level} {contract} {} -> {}",
+                short(provider),
+                short(consumer)
+            )
+        })
+        .collect();
+    for wanted in [
+        "exact channel::kafka::orders.created KafkaSales.Created()::_producer.Produce#0 -> KafkaFeed.OnSale()",
+        "exact channel::kafka::orders.paid KafkaSales.Paid()::_producer.ProduceAsync#0 -> KafkaFeed.OnSale()",
+        "inferred channel::amqp::invoices RabbitInvoicing.Invoice()::_channel.BasicPublishAsync#0 -> RabbitInvoicing.OnInvoice(object,BasicDeliverEventArgs)",
+        "exact channel::amqp::refunds RabbitInvoicing.Refund()::_channel.BasicPublishAsync#0 -> RabbitInvoicing.Attend().amqp refunds",
+        "exact channel::sqs::shipments SqsShipments.Ship()::_sqs.SendMessageAsync#0 -> SqsShipments.Poll()",
+        "inferred channel::nats::delivery.*.tracked NatsDelivery.Track(byte[])::_connection.Publish#0 -> NatsDelivery.Watch().nats delivery.*.tracked",
+        "exact channel::redis::audits RedisAudits.Record()::db.StreamAddAsync#0 -> RedisAudits.Drain()",
+        "exact channel::servicebus::dispatch BusDispatch.Send(ServiceBusMessage)::sender.SendMessageAsync#0 -> BusDispatch.OnDispatch(ProcessMessageEventArgs)",
+        "exact channel::servicebus::dispatch.events BusDispatch.Send(ServiceBusMessage)::(invocation_expression).SendMessageAsync#0 -> BusDispatch.OnDispatch(ProcessMessageEventArgs)",
+        "exact channel::servicebus::dispatch.events BusDispatch.Send(ServiceBusMessage)::(invocation_expression).SendMessageAsync#0 -> BusDispatch.Watch().servicebus dispatch.events",
+    ] {
+        assert!(
+            links.contains(&wanted.to_string()),
+            "{wanted} in {links:#?}"
+        );
+    }
+    assert_eq!(links.len(), 10, "{links:#?}");
+    // A name read from the environment is unresolved on both sides, and so is a sender made for
+    // one; a subject no publish names has no producer to link to.
+    let unresolved = |side: &str, kind: &str| -> Vec<String> {
+        (json[side].as_array().unwrap().iter())
+            .filter(|s| s["contract"] == kind)
+            .map(|s| short(s["site"].as_str().unwrap()))
+            .collect()
+    };
+    assert_eq!(
+        unresolved("providers", "channel::kafka"),
+        ["KafkaSales.Dynamic()::_producer.Produce#0"]
+    );
+    assert_eq!(
+        unresolved("consumers", "channel::kafka"),
+        ["KafkaFeed.OnMissing(IConsumer<string,string>)"]
+    );
+    assert_eq!(
+        unresolved("providers", "channel::servicebus"),
+        ["BusDispatch.Dynamic(ServiceBusMessage)::sender.SendMessageAsync#0"]
+    );
+    assert_eq!(
+        unresolved("consumers", "channel::nats::delivery.polled"),
+        ["NatsDelivery.Poll()"]
+    );
 }
 
 /// HttpClient calls are consumers (spec #28, #111): every method, `SendAsync` with a request, a

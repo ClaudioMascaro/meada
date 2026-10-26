@@ -769,7 +769,7 @@ one for the area a change touches.
   for wrappers, `Expand::Chain` reading a call whole). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs` and its `channel/` submodules
-  (`channel/message.rs`: the message types and broker helpers; `channel/{ts,python,rust,go,java}.rs`:
+  (`channel/message.rs`: the message types and broker helpers; `channel/{ts,python,rust,go,java,csharp}.rs`:
   the message libraries of each language): the
   `ContractKind` trait and the HTTP kind (`http.rs`: the contract and path rules, the mount
   machinery and the shared consumer readers; one submodule per language: `http/ts.rs` and
@@ -1292,9 +1292,9 @@ one for the area a change touches.
   as paths, never opening one, so a symlink changes nothing. A change to what is stored
   re-blesses `tests/golden/schema.txt`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the
-  channel kind's module for that language (TS/JS: `channel/ts.rs`; Python: `channel/python.rs`; Rust: `channel/rust.rs`; Go: `channel/go.rs`; Java: `channel/java.rs`), never in the pack, matching a call's
+  channel kind's module for that language (TS/JS: `channel/ts.rs`; Python: `channel/python.rs`; Rust: `channel/rust.rs`; Go: `channel/go.rs`; Java: `channel/java.rs`; C#: `channel/csharp.rs`), never in the pack, matching a call's
   method and the `Code::origins` of its receiver, asked with the policy its language needs (TS/JS:
-  `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Java: the written type, `names::typed`; Python and Rust:
+  `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Java: the written type, `names::typed`; C#: the written type or the construction, `Code::written` and `names::spellings`; Python and Rust:
   `Values`, the constructors named by the file's imports), reading the name through `Code::expand` (a reader that
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
   and giving the handler. A wildcard match (`inferred`, reason `<producer contract> wildcard
@@ -1344,6 +1344,45 @@ one for the area a change touches.
   of its own and reads no kind: it reads `Link::drift`, the exports' consumer shapes (which
   consumers read fields), their calls (where each consumer is) and the seam's `parts` (the part
   of a contract `search` ranks against).
+- **C# channels** (spec #28, ticket #115): `channel/csharp.rs` answers for the `cs` pack only.
+  A form is a method called on a client, and a call counts only when its receiver is one of
+  `TYPES` (Confluent.Kafka's `IProducer`, `IConsumer` and builders, RabbitMQ.Client's
+  `ConnectionFactory`, `IConnection`, `IModel`, `IChannel` and the eventing consumers,
+  AWSSDK.SQS's `IAmazonSQS` and `AmazonSQSClient`, NATS.Client's `ConnectionFactory` and
+  `IConnection`, StackExchange.Redis's multiplexer and `IDatabase`, Azure.Messaging.ServiceBus's
+  `ServiceBusClient` and `ServiceBusSender`) by the type the source writes for it (`Code::written`:
+  a field, a property, a parameter, a typed local) or by the construction it was made by: a
+  `Value::New`, a local the pack bound to one, or a call on a client that makes another
+  (`STEPS`: `Build`, `CreateConnection`, `CreateModel`, `GetDatabase`, `CreateSender`, the
+  static `ConnectionMultiplexer.Connect` called on the type's own name; a builder's `Set*`
+  hands the builder back). A type is accepted as the one spelling in the table the usings give
+  it (`names::spellings`, `names::one`), so a type of the repository with the same name hides
+  the library's, and `ConnectionFactory` or `IConnection` with RabbitMQ.Client and NATS.Client
+  both imported is none. The receiver is followed at most `RECEIVER_DEPTH` links. Names fold
+  like a URL through `Code::expand` (a wrapper's parameter makes each caller a producer or a
+  consumer): `string.Empty` is `""` in the pack, an environment or configuration read is
+  `Part::Read`, so an unresolved name; the first argument names a Kafka topic (a list for
+  `Subscribe`), an SQS queue (the last segment of the URL, or the `QueueUrl` of a request
+  built in place or in a local), a NATS subject, a Redis stream key and a Service Bus queue or
+  topic. A named argument is read by its parameter name. RabbitMQ: `BasicPublish(Async)` is a
+  publish to an exchange (the empty one is a producer of the queue its key names), `QueueBind(Async)`
+  a binding (spec #20's routing rules), `BasicConsume(Async)` takes its queue from the first
+  argument (the second after a consumer built in place). Service Bus: a send method on a
+  sender is a producer named by the first argument of the `CreateSender` call that made it
+  (in place, or held by a local, or by a field assigned once), `CreateProcessor(queue)` and
+  `CreateProcessor(topic, subscription)` are consumers of the first argument alone, so a
+  processor on a topic consumes every message sent to it whatever its subscription.
+  Handlers: the pack records each `x.Event += handler` as a bound named `x.Event+=` (a lambda as
+  its `Kind::Inline` definition, a method group as the name it writes), one per attachment, and
+  the reader takes the only one on the event (`Received`, `ReceivedAsync`, `MessageHandler`,
+  `ProcessMessageAsync`) of the consumer, subscription or processor the call's result is held by
+  (`Code::bindings`, read once per file into a map by the call's range); a NATS
+  `SubscribeAsync` takes the callback it is given, a lambda or a method of the repository; every
+  other client, and a callback not found, takes `consume`'s default, the method holding the call.
+  The pack also reads an `await` as its operand, in a value and in what a field or a local holds
+  (`held`). The `conformance-csharp` fixture holds a client of each library
+  (`Channels.cs`, `Channels.Nats.cs`) and `xlang-csharp-{web,api}` a topic produced in
+  TypeScript and consumed in C#.
 - **Shapes through package imports** (issue #175): a source reading a name that `Code::imported`
   says comes from outside the repository records a `shape::Import` on the shape (its path, the
   importing file, the specifier and name, and the `Want` view: `zod`, `infer`, `literals`,
@@ -2109,6 +2148,23 @@ qualification budget does (ADR 0017).
   (`sendMessage(b -> b.queueUrl(..))`) or held in a local, and Redis streams held in a map
   variable, are unresolved. The same file reads Kotlin (see Kotlin channels above), with the
   same limits.
+- `channel/csharp.rs` (spec #28, #115): `RECEIVER_DEPTH` (32) bounds how many links a receiver
+  is followed through (a local bound to a call on a local bound to another); past it the call is
+  no form, and the unit test holds a client behind thousands of locals. A client counts by its
+  written type or its construction only: a value a repository method returns, a client built by
+  a factory the table does not list, one injected as `object` or an interface of the repository,
+  and a local assigned twice are no client. Left out: MassTransit; `SubscribeSync`,
+  `QueueSubscribe` and `Request` of NATS.Client, and NATS.Net v2 as a whole; `BasicGet`, a consumer class that
+  overrides `HandleBasicDeliver` and the two handlers attached to one event (the handler is the
+  method holding `BasicConsume`); `CreateReceiver`, `CreateSessionProcessor` and a sender made
+  elsewhere than where it is used (a Service Bus sender whose queue is a parameter of the method
+  that makes it is unresolved, its callers are not climbed); a stream read by an array of
+  `StreamPosition` (unresolved); a `TopicPartition` as the Kafka target; a topic list built as
+  `new List<string> { .. }` (unresolved); `request.QueueUrl = ..` set after the construction; a
+  name read from `IConfiguration` or the environment (unresolved on both sides, so appsettings
+  are not read); `String.Empty` and `System.String.Empty` (only the keyword `string.Empty` is
+  folded). A `+=` handler is recorded only for a member target (`x.Event += h`), not for `Event
+  += h` on `this`, and for a lambda, an anonymous method, a name or a member access.
 - `http/java.rs` (spec #26, #86): a Spring MVC route is read from `Call::decorates` on a method
   of a `@RestController` or `@Controller` class, under the class's `@RequestMapping` prefix
   (nested classes do not inherit the outer prefix). An annotation or `RequestMethod.X` counts
