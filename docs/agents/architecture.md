@@ -2267,22 +2267,36 @@ qualification budget does (ADR 0017).
   it, even in another method; `new Uri(base, relative)` with two arguments, a
   `HttpRequestMessage` built with an object initializer and a raw string of several lines are
   not read.
+  A member assigned by `??=` or a compound operator, or by an assignment that may not run when
+  its definition does (the pack's `Visit::conditional`: inside a branch, a loop, a `catch`,
+  `?.` or the right of `&&`, `||`, `??`, reset at each method, constructor and lambda), is an
+  `Unknown` bound, and an assignment whose address differs from the initializer's leaves the
+  base unknown (the call may come before it).
   Typed clients (spec #28, #113): an instance `readonly` field with no initializer that one
-  plain `=` of its class writes, in a constructor (`this.f = v`, or `f = v` with no parameter
-  or local `f` there), is a constant of the class whose value is written in that constructor
-  (`Const::scope`, Java's `final` model), so `_http = http` makes `_http` the constructor's
-  parameter. The pack gives a call's type arguments as written (`Call::uses`, one chain
-  `[Step::Argument(tys)]`, the meaning shape facts give it). The kind expands with an injector
-  for `Injected::Param` only: a parameter of a constructor no call may reach, declared
-  `HttpClient`, is a client whose base is the one `<param>.BaseAddress` the constructor
-  assigns, else the one address every framework `AddHttpClient<T>(c => c.BaseAddress = ..)`
-  of its class sets (`AddHttpClient<I, T>`: the last type argument; the call must reach no
-  function of the repository, `Code::reaches`; the address is the one `<name>.BaseAddress`
-  bound of a receiver of the lambda's scope, folded and its reads decided where the lambda is
-  written). Two registrations with different addresses, one that does not fold, a constructor
-  some call reaches, or a parameter of a method leave the base unknown. The injected value is
-  a construction (`new HttpClient { BaseAddress = new Uri(parts) }`), so the base is read as an
-  initializer's, and an assignment on the field still wins.
+  write of its class sets, a plain `=` in a constructor (`this.f = v`, or `f = v` with no
+  parameter or local `f` there; `out` and `ref`, `this.f` too, count as writes), is a constant
+  of the class whose value is written in that constructor (`Const::scope`, Java's `final`
+  model), so `_http = http` makes `_http` the constructor's parameter (`x ?? throw ..` is `x`).
+  The pass groups the writes by class and name once. The pack gives a call's type arguments
+  as written (`Call::uses`, one chain `[Step::Argument(tys)]`, the meaning shape facts give
+  it), and a target-typed `new(..)` whose declared type it reads (a local, a field or a
+  property declaration) is a construction call of that type, so `may_be_called` sees it. The
+  kind expands with an injector for `Injected::Param` only: a parameter of a constructor no
+  call may reach, declared `HttpClient`, is a client whose base is the one
+  `<param>.BaseAddress` the constructor assigns when every registration of its class sets the
+  same address or none does, else the one address every framework `AddHttpClient<T>(..)` of
+  its class sets (`AddHttpClient<I, T>`: the last type argument; the call must reach no
+  function of the repository, `Code::reaches`). A registration's address is the one
+  `<param>.BaseAddress` bound of its lambda's parameters (its bindings of no class and no
+  value, so a local of the lambda is none), folded and its reads decided where the lambda is
+  written; one that only names the client adds none, and a method group, a lambda that passes
+  a parameter to a call, or a `ConfigureHttpClient` chained on it (`Call::on`) add an unknown
+  one. Two registrations with different addresses, one that does not fold, a constructor some
+  call reaches, or a parameter of a method leave the base unknown. The injected value is a
+  construction (`new HttpClient { BaseAddress = new Uri(parts) }`), so the base is read as an
+  initializer's, and an assignment on the field still wins. Ceilings: a primary constructor's
+  parameter (`class T(HttpClient http)`) is a binding of the class, no constructor parameter,
+  so it is not injected; a target-typed `new(..)` passed, returned or assigned is no call.
 - `http/csharp/refit.rs` (spec #28, #113): a method of an interface (`Facts::interfaces`) with
   Refit's `[Get]`, `[Post]`, `[Put]`, `[Patch]`, `[Delete]` or `[Head]` (through the usings, or
   written as `Refit.Get`, read in the scope around the interface so that a method named like the
@@ -2293,7 +2307,9 @@ qualification budget does (ADR 0017).
   `Expand::Call` (a wrapper's callers pass it) and the reads decided in the file of `For`; one
   consumer per base, and an interface no `For` makes has an unknown base. The route follows the
   base's own path (Refit appends it). `AddRefitClient` and `For` given an `HttpClient` are not
-  read.
+  read. A caller reaches the method through a receiver whose type is declared (a field, a
+  parameter, a typed local); `var api = RestService.For<Api>(..)` types nothing, since the
+  resolver reads no library's result (the kinds run after it), so its calls stay name matches.
 - `http/csharp/reads.rs` and `dotnet/appsettings.rs` (spec #28, #112): environment and
   configuration reads in a consumer's URL. The pack records what looks like a read without
   deciding what it reads: a subscript with one string literal, and a call of a member in `READS`

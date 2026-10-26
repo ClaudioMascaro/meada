@@ -94,8 +94,10 @@ All notable changes to Meada are recorded here. The format follows
 - C# typed clients and Refit interfaces as HTTP consumers (issue #113): `AddHttpClient<T>(c =>
   c.BaseAddress = ...)` gives its base, folded and read from the environment or configuration, to
   the `HttpClient` the container passes to `T`'s constructor and to every call on it in `T`,
-  through a `readonly` field the constructor assigns; two registrations with different bases
-  leave it unknown. Each method of a Refit interface (`[Get]`, `[Post]`, `[Put]`, `[Patch]`,
+  through a `readonly` field the constructor assigns; two registrations with different bases, a
+  registration Meada cannot read, or a constructor the code calls (a typed `T t = new(..)`
+  included) leave it unknown. A `BaseAddress` assigned conditionally, or one that differs from
+  the client's initializer, is unknown. Each method of a Refit interface (`[Get]`, `[Post]`, `[Put]`, `[Patch]`,
   `[Delete]`, `[Head]`) is a consumer with the base of each `RestService.For<T>(url)`, and its
   callers reach it, so `trace` crosses it; `AddRefitClient` is not read. The shared injector
   (`resolve::Inject`) is now also asked about a parameter no annotation marks

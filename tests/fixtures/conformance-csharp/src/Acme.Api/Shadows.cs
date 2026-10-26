@@ -28,3 +28,13 @@ public class FieldShadow
 
     public void Run() { Format.Upper("h"); }
 }
+
+// A `readonly` field the constructor assigns from a parameter hides the type too.
+public class ReadonlyShadow
+{
+    private readonly object Format;
+
+    public ReadonlyShadow(object Format) { this.Format = Format; }
+
+    public void Run() { Format.Upper("i"); }
+}

@@ -67,11 +67,11 @@
     },
     {
       "path": "src/Acme.Api/Shadows.cs",
-      "hash": "067c703f754ef2c75f3fab0a6b4bf0a48694203be6be42471cf31926e04270c4"
+      "hash": "ae805f4d96048d8a684bca656c2044816a80a6b345752265f4b080186705333a"
     },
     {
       "path": "src/Acme.Api/Typed.cs",
-      "hash": "d60504c0749f84276b3b764fe7acc6f886ae51d8f3bbe8724ae2c398cbe49536"
+      "hash": "0a99ecee8a3e2b0e2e15d0ac528dd4f5472c7af88925004ed4159f3f677f514c"
     },
     {
       "path": "src/Acme.Core/Billing/Accounts.cs",
@@ -1016,6 +1016,30 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.ReadonlyShadow",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 937,
+        "end": 1118
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.ReadonlyShadow.ReadonlyShadow(object)",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 1008,
+        "end": 1070
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.ReadonlyShadow.Run()",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 1076,
+        "end": 1116
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows",
       "span": {
         "path": "src/Acme.Api/Shadows.cs",
@@ -1088,6 +1112,30 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient",
+      "span": {
+        "path": "src/Acme.Api/Typed.cs",
+        "start": 1481,
+        "end": 1693
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.BuiltClient(HttpClient)",
+      "span": {
+        "path": "src/Acme.Api/Typed.cs",
+        "start": 1564,
+        "end": 1617
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.Run()",
+      "span": {
+        "path": "src/Acme.Api/Typed.cs",
+        "start": 1627,
+        "end": 1687
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.CatalogClient",
       "span": {
         "path": "src/Acme.Api/Typed.cs",
@@ -1123,16 +1171,24 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations",
       "span": {
         "path": "src/Acme.Api/Typed.cs",
-        "start": 1331,
-        "end": 1839
+        "start": 1699,
+        "end": 2459
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.AddClients(IServiceCollection)",
       "span": {
         "path": "src/Acme.Api/Typed.cs",
-        "start": 1379,
-        "end": 1833
+        "start": 1747,
+        "end": 2309
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()",
+      "span": {
+        "path": "src/Acme.Api/Typed.cs",
+        "start": 2319,
+        "end": 2453
       }
     },
     {
@@ -3904,6 +3960,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.ReadonlyShadow.Run()::Format.Upper#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.ReadonlyShadow.Run()",
+      "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Api/Shadows.cs",
+        "start": 1096,
+        "end": 1113
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Caught()::Format.Upper#0",
       "caller": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Caught()",
       "target": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
@@ -4003,6 +4070,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.Run()::_http.GetStringAsync#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.Run()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Typed.cs",
+        "start": 1656,
+        "end": 1686
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.CatalogClient.Product(int)::this._http.GetStringAsync#0",
       "caller": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.CatalogClient.Product(int)",
       "target": null,
@@ -4031,8 +4109,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Typed.cs",
-        "start": 1538,
-        "end": 1580
+        "start": 1906,
+        "end": 1948
       }
     },
     {
@@ -4042,8 +4120,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Typed.cs",
-        "start": 1652,
-        "end": 1686
+        "start": 2020,
+        "end": 2054
       }
     },
     {
@@ -4053,8 +4131,19 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Typed.cs",
-        "start": 1758,
-        "end": 1792
+        "start": 2126,
+        "end": 2160
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.AddClients(IServiceCollection)::Uri#3",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.AddClients(IServiceCollection)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Typed.cs",
+        "start": 2232,
+        "end": 2268
       }
     },
     {
@@ -4064,8 +4153,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Typed.cs",
-        "start": 1479,
-        "end": 1581
+        "start": 1847,
+        "end": 1949
       }
     },
     {
@@ -4075,8 +4164,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Typed.cs",
-        "start": 1595,
-        "end": 1687
+        "start": 1963,
+        "end": 2055
       }
     },
     {
@@ -4086,8 +4175,41 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Typed.cs",
-        "start": 1701,
-        "end": 1793
+        "start": 2069,
+        "end": 2161
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.AddClients(IServiceCollection)::services.AddHttpClient#3",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.AddClients(IServiceCollection)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Typed.cs",
+        "start": 2175,
+        "end": 2269
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()::BuiltClient#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()",
+      "target": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.BuiltClient(HttpClient)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Typed.cs",
+        "start": 2395,
+        "end": 2416
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()::HttpClient#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Typed.cs",
+        "start": 2399,
+        "end": 2415
       }
     },
     {
@@ -4190,6 +4312,28 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)::Account#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 722,
+        "end": 727
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)::Savings#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 776,
+        "end": 781
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)::item.Freeze#0",
       "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)",
       "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
@@ -4231,6 +4375,17 @@
         "path": "src/Acme.Core/Billing/Probes.cs",
         "start": 843,
         "end": 857
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)::Savings#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 1027,
+        "end": 1032
       }
     },
     {
@@ -4436,6 +4591,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes::Account#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Probes.cs",
+        "start": 248,
+        "end": 253
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Current()::Account#0",
       "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Current()",
       "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account",
@@ -4488,6 +4654,17 @@
         "path": "src/Acme.Core/Billing/Teller.cs",
         "start": 781,
         "end": 794
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)::Account#1",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 930,
+        "end": 935
       }
     },
     {
@@ -4749,6 +4926,17 @@
         "path": "src/Acme.Core/Billing/Teller.cs",
         "start": 530,
         "end": 544
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller::Account#0",
+      "caller": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller",
+      "target": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Core/Billing/Teller.cs",
+        "start": 89,
+        "end": 94
       }
     },
     {
@@ -5863,6 +6051,11 @@
       "via": null
     },
     {
+      "contract": "http::GET::/built",
+      "site": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.Run()::_http.GetStringAsync#0",
+      "via": null
+    },
+    {
       "contract": "http::GET::/products/{}",
       "site": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.CatalogClient.Product(int)::this._http.GetStringAsync#0",
       "via": "host:catalog.example.com"
@@ -5919,6 +6112,7 @@
         "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
         "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home.Index()",
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.FieldShadow.Run()",
+        "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.ReadonlyShadow.Run()",
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Caught()",
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Lambda()",
         "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Local()",
@@ -5933,6 +6127,13 @@
         "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService(string)",
         "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing.Lower(string)",
         "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+      ]
+    },
+    {
+      "name": "src/Acme.Api#10",
+      "members": [
+        "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.BuiltClient(HttpClient)",
+        "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()"
       ]
     },
     {
@@ -6007,6 +6208,8 @@
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings",
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Accrue()",
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Sweep()",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes",
+        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)",
         "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller",
         "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Current()",
         "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Open()",
@@ -6018,7 +6221,6 @@
       "members": [
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
         "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Ledger.Post(T)",
-        "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)",
         "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Field()",
         "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Generic(T)",
         "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)",
@@ -7691,6 +7893,41 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.ReadonlyShadow.ReadonlyShadow(object)",
+      "kind": "export",
+      "label": "Acme.Api.ReadonlyShadow.ReadonlyShadow(object)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.ReadonlyShadow.ReadonlyShadow(object)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.ReadonlyShadow.Run()",
+      "kind": "export",
+      "label": "Acme.Api.ReadonlyShadow.Run()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.ReadonlyShadow.Run()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Caught()",
       "kind": "export",
       "label": "Acme.Api.Shadows.Caught()",
@@ -7845,6 +8082,29 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.Run()",
+      "kind": "export",
+      "label": "Acme.Api.Typed.BuiltClient.Run()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.Run()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.Run()::_http.GetStringAsync#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/built"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.CatalogClient.CatalogClient(HttpClient)",
       "kind": "export",
       "label": "Acme.Api.Typed.CatalogClient.CatalogClient(HttpClient)",
@@ -7915,6 +8175,27 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.AddClients(IServiceCollection)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()",
+      "kind": "export",
+      "label": "Acme.Api.Typed.Registrations.Build()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.BuiltClient(HttpClient)"
         }
       ]
     },
@@ -8042,9 +8323,23 @@
         {
           "depth": 1,
           "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
           "level": "inferred",
           "via": "call",
           "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings"
         },
         {
           "depth": 1,
@@ -8108,6 +8403,13 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings"
         },
         {
           "depth": 1,

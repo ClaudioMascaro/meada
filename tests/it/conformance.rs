@@ -3485,7 +3485,14 @@ fn csharp() {
             "Acme.Api.Typed.TwiceClient.TwiceClient(HttpClient)",
         ),
         api("Typed.cs", "Acme.Api.Typed.TwiceClient.Run()"),
+        api("Typed.cs", "Acme.Api.Typed.BuiltClient"),
+        api(
+            "Typed.cs",
+            "Acme.Api.Typed.BuiltClient.BuiltClient(HttpClient)",
+        ),
+        api("Typed.cs", "Acme.Api.Typed.BuiltClient.Run()"),
         api("Typed.cs", "Acme.Api.Typed.Registrations"),
+        api("Typed.cs", "Acme.Api.Typed.Registrations.Build()"),
         api(
             "Typed.cs",
             "Acme.Api.Typed.Registrations.AddClients(IServiceCollection)",
@@ -3513,6 +3520,9 @@ fn csharp() {
         shadows("Shadows.Parse(object)"),
         shadows("FieldShadow"),
         shadows("FieldShadow.Run()"),
+        shadows("ReadonlyShadow"),
+        shadows("ReadonlyShadow.ReadonlyShadow(object)"),
+        shadows("ReadonlyShadow.Run()"),
         "legacy/Old.cs::Legacy.Old".to_string(),
         "legacy/Old.cs::Legacy.Old.Run()".to_string(),
     ]
@@ -3779,6 +3789,7 @@ fn csharp() {
         "Shadows.Out()",
         "Shadows.Pattern(object)",
         "FieldShadow.Run()",
+        "ReadonlyShadow.Run()",
     ] {
         let id = format!("{}::Format.Upper#0", shadows(scope));
         calls.push((id, INFERRED, vec![upper.clone()]));
@@ -4277,6 +4288,11 @@ fn csharp_typed_clients_and_refit_methods_are_consumers() {
             "http::GET::/twice",
             "",
             &typed("TwiceClient.Run()::_http.GetStringAsync#0"),
+        ),
+        (
+            "http::GET::/built",
+            "",
+            &typed("BuiltClient.Run()::_http.GetStringAsync#0"),
         ),
     ]);
     assert_eq!(consumers(&json, "src/Acme.Api/Typed.cs"), expected);

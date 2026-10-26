@@ -42,6 +42,17 @@ namespace Acme.Api.Typed
         public Task<string> Run() => _http.GetStringAsync("/twice");
     }
 
+    // A typed client the code also builds itself (a target-typed `new`): the client is the
+    // caller's, so the registration's base is not taken.
+    public class BuiltClient
+    {
+        private readonly HttpClient _http;
+
+        public BuiltClient(HttpClient http) { _http = http; }
+
+        public Task<string> Run() => _http.GetStringAsync("/built");
+    }
+
     public static class Registrations
     {
         public static IServiceCollection AddClients(this IServiceCollection services)
@@ -49,7 +60,14 @@ namespace Acme.Api.Typed
             services.AddHttpClient<CatalogClient>(c => c.BaseAddress = new Uri("https://catalog.example.com/v1/"));
             services.AddHttpClient<TwiceClient>(c => c.BaseAddress = new Uri("https://one.example.com"));
             services.AddHttpClient<TwiceClient>(c => c.BaseAddress = new Uri("https://two.example.com"));
+            services.AddHttpClient<BuiltClient>(c => c.BaseAddress = new Uri("https://built.example.com"));
             return services;
+        }
+
+        public static BuiltClient Build()
+        {
+            BuiltClient built = new(new HttpClient());
+            return built;
         }
     }
 }

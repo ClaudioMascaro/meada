@@ -16,14 +16,15 @@
 //! initializer (`new HttpClient { BaseAddress = new Uri(base) }`, in a local, a field, a
 //! property or a `static readonly` field), or the one `BaseAddress = new Uri(base)` assignment
 //! made on the name the call is made on, in the scope that declares the name: a base not read
-//! (two assignments, a name that is assigned or hidden) is unknown, so the path alone is the
-//! contract. A relative URL joins the base as `Uri` does (RFC 3986).
+//! (two assignments, one that may not run, one that sets another address than the initializer,
+//! a name that is assigned or hidden) is unknown, so the path alone is the contract. A relative URL joins the base as `Uri` does (RFC 3986).
 //!
 //! A typed client (#113): the `HttpClient` a dependency injection container passes to a
 //! constructor nothing calls (`Injected::Param`) has the one `BaseAddress` the constructor sets on
-//! it, else the one every `AddHttpClient<T>(c => c.BaseAddress = ..)` of its class sets
-//! (`registered`), and a `readonly` field the constructor assigns it holds it (the pack's
-//! `Const::scope`). Two registrations with different bases leave it unknown.
+//! it when no registration sets another, else the one every `AddHttpClient<T>(..)` of its class
+//! sets (`registered`), and a `readonly` field the constructor assigns it holds it (the pack's
+//! `Const::scope`). Two registrations with different bases, or one Meada cannot read, leave it
+//! unknown.
 // ponytail: a field set from a method's parameter or assigned twice has an unknown base, and so
 // has a client a wrapper takes whose callers build it elsewhere; an instance `readonly` field
 // holds only what one constructor assigns it.
@@ -32,7 +33,7 @@ use super::super::{based, consumer, fetches};
 use super::reads::Reads;
 use crate::contract::Found;
 use crate::index::Indexed;
-use crate::lang::{Bound, Invocation, Part, Step, Ty, Value};
+use crate::lang::{Bound, Class, Facts, Invocation, Part, Receiver, Step, Ty, Value};
 use crate::names::{one, spellings};
 use crate::resolve::{Code, Expand, Expanded, Injected, Target, method as member};
 use std::cell::OnceCell;
@@ -321,9 +322,13 @@ fn base<'a>(
         },
         _ => None,
     };
-    match assigned.or(initial) {
-        Some(set) => address(code, reads, path, set),
-        None => vec![Part::Hole],
+    // An assignment may come after the call, or not run: one that sets another address than
+    // the initializer leaves the base unknown.
+    let [assigned, initial] = [assigned, initial].map(|v| v.map(|v| address(code, reads, path, v)));
+    match (assigned, initial) {
+        (Some(a), Some(i)) if a != i => vec![Part::Hole],
+        (Some(set), _) | (None, Some(set)) => set,
+        (None, None) => vec![Part::Hole],
     }
 }
 
@@ -342,13 +347,18 @@ fn address<'a>(code: &Code<'a>, reads: &Reads, path: &'a str, set: &Value) -> Ve
 
 /// The typed clients the repository registers with the framework's `AddHttpClient<T>(..)`
 /// (`AddHttpClient<I, T>`: the last type argument), by the class's qualified name: the address
-/// each registration's configuring lambda sets (`c => c.BaseAddress = new Uri(base)`), read
-/// where it is written. A registration that sets none adds none.
+/// each registration's configuring lambda sets on its client parameter
+/// (`c => c.BaseAddress = new Uri(base)`), read where it is written. A registration that only
+/// names the client adds none; one Meada cannot read (a method group, a lambda that passes its
+/// client on, a `ConfigureHttpClient` chained on it) adds an unknown one.
 // ponytail: a lambda's address is folded where it is written: a parameter of the method that
-// registers the client is unknown, and so is a lambda passed by name or `ConfigureHttpClient`.
+// registers the client is unknown.
 fn registered<'a>(code: &Code<'a>, reads: &Reads) -> BTreeMap<&'a str, Vec<Vec<Part>>> {
     let mut out: BTreeMap<&'a str, Vec<Vec<Part>>> = BTreeMap::new();
     for (&path, facts) in code.files().iter().filter(|(p, _)| p.ends_with(".cs")) {
+        // Built the first time a registration is met: the file's calls by scope, by the call
+        // they are made on, and its bindings by scope.
+        let index = OnceCell::new();
         for (n, stored) in facts.calls.iter().enumerate() {
             if member(&stored.callee) != REGISTER
                 || stored.decorates.is_some()
@@ -366,27 +376,113 @@ fn registered<'a>(code: &Code<'a>, reads: &Reads) -> BTreeMap<&'a str, Vec<Vec<P
             let Some(class) = code.definition(path, &stored.scope, ty) else {
                 continue;
             };
+            let index = index.get_or_init(|| Index::of(facts));
+            let parts = match registration(code, (path, facts), index, n) {
+                Some(Some(set)) => address(
+                    code,
+                    reads,
+                    path,
+                    &code.value(path, &set.within, &set.value),
+                ),
+                Some(None) => continue,
+                None => vec![Part::Hole],
+            };
             let entry = out.entry(class.name).or_default();
-            let lambda = match code.call(path, n).and_then(|c| c.args.last()) {
-                Some(Value::Function(lambda)) => lambda.as_str(),
-                _ => continue,
-            };
-            // What the lambda sets on its client parameter, whatever its name.
-            let set: Vec<&Bound> = (facts.receivers.iter())
-                .filter(|r| r.scope == lambda)
-                .flat_map(|r| code.bounds(path, lambda, &format!("{}.{BASE}", r.name)))
-                .collect();
-            let parts = match set.as_slice() {
-                [] => continue,
-                [b] => address(code, reads, path, &code.value(path, &b.within, &b.value)),
-                _ => vec![Part::Hole],
-            };
             if !entry.contains(&parts) {
                 entry.push(parts);
             }
         }
     }
     out
+}
+
+/// A file's calls by the scope they are written in and by the call they are made on
+/// (`Call::on`), and its bindings by scope (`Facts::receivers`).
+struct Index<'a> {
+    by_scope: BTreeMap<&'a str, Vec<usize>>,
+    on: BTreeMap<usize, Vec<usize>>,
+    bindings: BTreeMap<&'a str, Vec<&'a Receiver>>,
+}
+
+impl<'a> Index<'a> {
+    fn of(facts: &'a Facts) -> Self {
+        let (mut by_scope, mut on) = (BTreeMap::new(), BTreeMap::new());
+        for (n, call) in facts.calls.iter().enumerate() {
+            by_scope
+                .entry(call.scope.as_str())
+                .or_insert_with(Vec::new)
+                .push(n);
+            if let Some(made) = call.on {
+                on.entry(made).or_insert_with(Vec::new).push(n);
+            }
+        }
+        let mut bindings: BTreeMap<&str, Vec<&Receiver>> = BTreeMap::new();
+        for r in &facts.receivers {
+            bindings.entry(r.scope.as_str()).or_default().push(r);
+        }
+        Index {
+            by_scope,
+            on,
+            bindings,
+        }
+    }
+}
+
+/// What the registration at call `n` of `path` sets as its client's `BaseAddress`: `Some(None)`
+/// when it configures nothing, `None` when Meada cannot read what it configures.
+fn registration<'a>(
+    code: &Code<'a>,
+    (path, facts): (&'a str, &'a Facts),
+    index: &Index<'a>,
+    n: usize,
+) -> Option<Option<&'a Bound>> {
+    // A `ConfigureHttpClient` on the registration's builder configures the client again.
+    let mut chain = vec![n];
+    while let Some(m) = chain.pop() {
+        for &next in index.on.get(&m).into_iter().flatten() {
+            if member(&facts.calls[next].callee) == "ConfigureHttpClient" {
+                return None;
+            }
+            chain.push(next);
+        }
+    }
+    let args = &code.call(path, n)?.args;
+    let lambda = match args.last() {
+        Some(Value::Function(lambda)) => lambda.as_str(),
+        // The client's name, or nothing.
+        _ if args.iter().all(|a| matches!(a, Value::Str(_))) => return Some(None),
+        _ => return None,
+    };
+    // The lambda's parameters: its bindings of no class and no value (a local holds one).
+    let params: Vec<&str> = (index.bindings.get(lambda).into_iter().flatten())
+        .filter(|r| r.class == Class::Unknown)
+        .filter(|r| {
+            (code.local(path, lambda, &r.name)).is_some_and(|b| matches!(b.value, Value::Unknown))
+        })
+        .map(|r| r.name.as_str())
+        .collect();
+    // A call in the lambda (or deeper) that takes a parameter may set anything on it.
+    let inside = (index.by_scope.range(lambda..))
+        .take_while(|(s, _)| s.starts_with(lambda))
+        .filter(|(s, _)| s.len() == lambda.len() || s[lambda.len()..].starts_with('.'))
+        .flat_map(|(_, calls)| calls);
+    for &m in inside {
+        let args = code.call(path, m).map_or(&[][..], |c| c.args.as_slice());
+        if args
+            .iter()
+            .any(|a| matches!(a, Value::Ref(r) if params.contains(&r.as_str())))
+        {
+            return None;
+        }
+    }
+    let set: Vec<&Bound> = (params.iter())
+        .flat_map(|p| code.bounds(path, lambda, &format!("{p}.{BASE}")))
+        .collect();
+    match set.as_slice() {
+        [] => Some(None),
+        [b] => Some(Some(b)),
+        _ => None,
+    }
 }
 
 /// The client a dependency injection container passes for the parameter `n` of the
@@ -411,14 +507,19 @@ fn injected<'a>(
         return None;
     }
     let own = code.bounds(ctor.path, ctor.name, &format!("{}.{BASE}", param.name));
-    let parts = match (own.as_slice(), registered.get(class).map(Vec::as_slice)) {
-        ([b], _) => address(
-            code,
-            reads,
-            ctor.path,
-            &code.value(ctor.path, &b.within, &b.value),
-        ),
-        ([], Some([one])) => one.clone(),
+    let registered = registered.get(class).map_or(&[][..], Vec::as_slice);
+    let parts = match (own.as_slice(), registered) {
+        // The constructor's own address, which no registration contradicts: one set after an
+        // early `return`, or not at all, would leave the registration's.
+        ([b], _) => {
+            let own = code.value(ctor.path, &b.within, &b.value);
+            let own = address(code, reads, ctor.path, &own);
+            match registered.iter().all(|r| *r == own) {
+                true => own,
+                false => return None,
+            }
+        }
+        ([], [one]) => one.clone(),
         _ => return None,
     };
     let address = Value::New("Uri".into(), vec![Value::Str(parts)]);
@@ -1497,6 +1598,129 @@ mod tests {
         assert_eq!(
             sent_with(body, &[("A/Startup.cs", &startup)]),
             [to("http::GET::/a"), to("http::GET::/g")]
+        );
+    }
+
+    /// `TYPED` with the constructor `ctor` in place of its own, registered with `registered`.
+    fn typed_with(ctor: &str, registered: &str) -> Vec<Sent> {
+        let body = TYPED.replace("public C(HttpClient http) { _http = http; }", ctor);
+        let startup = format!(
+            "{USINGS}using Microsoft.Extensions.DependencyInjection;\nnamespace A;\n\
+             public static class Startup {{\n\
+             public static void Add(IServiceCollection services) {{\n{registered}\n}}\n}}\n"
+        );
+        sent_with(&body, &[("A/Startup.cs", &startup)])
+    }
+
+    const REGISTERED: &str =
+        "services.AddHttpClient<C>(c => c.BaseAddress = new Uri(\"https://typed.example.com/\"));";
+
+    #[test]
+    fn a_base_the_constructor_may_not_set_or_that_differs_from_the_registration_is_unknown() {
+        let unknown = [to("http::GET::/a"), to("http::GET::/b")];
+        for ctor in [
+            "public C(HttpClient http) { if (http.BaseAddress == null) http.BaseAddress = new Uri(\"https://own.example.com/\"); _http = http; }",
+            "public C(HttpClient http, bool f) { http.BaseAddress = f ? new Uri(\"https://own.example.com/\") : null; _http = http; }",
+            "public C(HttpClient http) { http.BaseAddress ??= new Uri(\"https://own.example.com/\"); _http = http; }",
+            "public C(HttpClient http, int n) { switch (n) { case 1: http.BaseAddress = new Uri(\"https://own.example.com/\"); break; } _http = http; }",
+            "public C(HttpClient http) { http.BaseAddress = new Uri(\"https://own.example.com/\"); _http = http; }",
+        ] {
+            assert_eq!(typed_with(ctor, REGISTERED), unknown, "{ctor}");
+        }
+        // The same address as the registration's, or no registration, is the constructor's.
+        let own = "public C(HttpClient http) { http.BaseAddress = new Uri(\"https://typed.example.com/\"); _http = http; }";
+        assert_eq!(
+            typed_with(own, REGISTERED),
+            [
+                host("http::GET::/a", "typed.example.com"),
+                host("http::GET::/b", "typed.example.com")
+            ]
+        );
+    }
+
+    #[test]
+    fn a_base_a_local_client_may_not_be_given_or_that_differs_from_its_initializer_is_unknown() {
+        let body = "async Task F(bool f) {\n\
+             var c = new HttpClient { BaseAddress = new Uri(\"https://a.example.com\") };\n\
+             if (f) c.BaseAddress = new Uri(\"https://b.example.com\");\n\
+             await c.GetAsync(\"/c\");\n\
+             var d = new HttpClient { BaseAddress = new Uri(\"https://a.example.com\") };\n\
+             d.BaseAddress = new Uri(\"https://b.example.com\");\n\
+             await d.GetAsync(\"/d\");\n\
+             var e = new HttpClient();\n\
+             while (f) e.BaseAddress = new Uri(\"https://e.example.com\");\n\
+             await e.GetAsync(\"/e\");\n}";
+        assert_eq!(
+            sent(body),
+            [
+                to("http::GET::/c"),
+                to("http::GET::/d"),
+                to("http::GET::/e")
+            ]
+        );
+    }
+
+    #[test]
+    fn a_typed_client_the_code_builds_with_a_target_typed_new_is_not_injected() {
+        let made = format!(
+            "{REGISTERED}\nC made = new(new HttpClient {{ BaseAddress = new Uri(\"https://explicit.example.com/\") }});"
+        );
+        assert_eq!(
+            typed_with("public C(HttpClient http) { _http = http; }", &made),
+            [to("http::GET::/a"), to("http::GET::/b")]
+        );
+    }
+
+    #[test]
+    fn a_registration_meada_cannot_read_leaves_the_base_unknown() {
+        let unknown = [to("http::GET::/a"), to("http::GET::/b")];
+        let ctor = "public C(HttpClient http) { _http = http; }";
+        let other =
+            "services.AddHttpClient<C>(c => c.BaseAddress = new Uri(\"https://two.example.com\"));";
+        // `ConfigureHttpClient` on the registration sets it again.
+        let chained = "services.AddHttpClient<C>(c => c.BaseAddress = new Uri(\"https://one.example.com\"))\
+                       .ConfigureHttpClient(c => c.BaseAddress = new Uri(\"https://two.example.com\"));";
+        assert_eq!(typed_with(ctor, chained), unknown);
+        // A method group, or a lambda that passes the client on, beside another registration.
+        let group = "services.AddHttpClient<C>(Configure);";
+        let passed = "services.AddHttpClient<C>(c => Configure(c));";
+        for unread in [group, passed] {
+            assert_eq!(
+                typed_with(ctor, &format!("{unread}\n{other}")),
+                unknown,
+                "{unread}"
+            );
+            assert_eq!(
+                typed_with(ctor, &format!("{other}\n{unread}")),
+                unknown,
+                "{unread}"
+            );
+        }
+        // A base set on a local of the lambda is no base of its client.
+        let local = "services.AddHttpClient<C>((sp, c) => { var o = new HttpClient(); \
+                     o.BaseAddress = new Uri(\"https://other.example.com\"); c.Timeout = TimeSpan.FromSeconds(1); });";
+        assert_eq!(typed_with(ctor, local), unknown);
+        // A named registration, and one that only names the client, configure nothing else.
+        let named = "services.AddHttpClient<C>(\"n\", c => c.BaseAddress = new Uri(\"https://two.example.com\"));\n\
+                     services.AddHttpClient<C>();";
+        assert_eq!(
+            typed_with(ctor, named),
+            [
+                host("http::GET::/a", "two.example.com"),
+                host("http::GET::/b", "two.example.com")
+            ]
+        );
+    }
+
+    #[test]
+    fn a_field_the_constructor_assigns_through_a_null_check_holds_the_injected_client() {
+        let ctor = "public C(HttpClient http) { _http = http ?? throw new ArgumentNullException(nameof(http)); }";
+        assert_eq!(
+            typed_with(ctor, REGISTERED),
+            [
+                host("http::GET::/a", "typed.example.com"),
+                host("http::GET::/b", "typed.example.com")
+            ]
         );
     }
 }
