@@ -16,7 +16,7 @@ mod declarative;
 use super::{ANY, METHODS, contract, join, path_literal, provider};
 use crate::contract::{Found, Site};
 use crate::index::Indexed;
-use crate::jvm::names::{is_method, java_files, jvm_files, known, local, one, typed};
+use crate::jvm::names::{array_of, is_method, java_files, jvm_files, known, local, one, typed};
 use crate::lang::{Bound, Call, Value};
 use crate::resolve::{Code, Expand, Follow, Inject, Of, passes_nothing};
 
@@ -330,20 +330,6 @@ fn paths<'a>(code: &Code<'a>, file: &'a str, call: &'a Call, keys: &[&str]) -> O
         true => Some(vec![String::new()]),
         false => Some(items.into_iter().filter_map(path_literal).collect()),
     }
-}
-
-/// The elements of Kotlin's `arrayOf(..)` written as an annotation's array, when the name is
-/// the standard library's (a function of the repository by that name is none).
-fn array_of<'a>(
-    code: &Code<'a>,
-    file: &'a str,
-    scope: &'a str,
-    v: &'a Value,
-) -> Option<&'a [Value]> {
-    let Value::Call(call) = v else { return None };
-    (call.receiver.is_none() && call.callee == "arrayOf").then_some(())?;
-    known(code, file, scope, &call.callee, |s| s == "kotlin.arrayOf")?;
-    Some(&call.args)
 }
 
 /// The methods `@RequestMapping(method = ..)` names: every method without one, and those of

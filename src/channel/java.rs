@@ -32,10 +32,10 @@ use super::message::{
     queue_name,
 };
 use crate::index::Indexed;
-use crate::jvm::names::{declared, jvm_files, known, kotlin, one, spellings, typed};
+use crate::jvm::names::{array_of, declared, jvm_files, known, kotlin, one, spellings, typed};
 use crate::jvm::spring::{self, Configs, Properties};
 use crate::lang::{Annotated, Call, Invocation, Kind, Part, Value};
-use crate::resolve::{Code, Expand, Inject, Keywords, method as member};
+use crate::resolve::{Code, Expand, Inject, Keywords, Target, method as member};
 
 const KAFKA_LISTENER: &str = "org.springframework.kafka.annotation.KafkaListener";
 const RABBIT_LISTENER: &str = "org.springframework.amqp.rabbit.annotation.RabbitListener";
@@ -305,14 +305,9 @@ fn streams(a: &[Value], map_of: bool) -> Option<Vec<Option<String>>> {
                 Some(Value::External(s)) if one(s, |s| s == class).is_some())
         };
         if map_of && made.receiver.is_none() && made.callee == "mapOf" {
+            // The pack reads an entry `k to v` as its key `k`; any other entry is no key.
             for entry in &made.args {
-                names.push(match entry {
-                    Value::Call(pair) if pair.callee == "to" => match pair.receiver.as_deref() {
-                        Some(key) => channel_name(key)?,
-                        None => None,
-                    },
-                    _ => None,
-                });
+                names.push(channel_name(entry)?);
             }
             continue;
         }
@@ -340,6 +335,11 @@ fn streams(a: &[Value], map_of: bool) -> Option<Vec<Option<String>>> {
     Some(names)
 }
 
+/// Whether `target` is a class of the repository.
+fn is_class(code: &Code, target: Target) -> bool {
+    (code.files()[target.path].defs.iter()).any(|d| d.name == target.name && d.kind == Kind::Class)
+}
+
 /// Whether the argument at `at` of `call`, as written, is of the outside type `class`: what
 /// picks the overload of `convertAndSend`. `Some(false)` for a literal, a `new` of another type
 /// and a name the source writes another type for; `None` (either overload) for a lambda (Java's
@@ -347,6 +347,22 @@ fn streams(a: &[Value], map_of: bool) -> Option<Vec<Option<String>>> {
 /// pack cannot read.
 fn of<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, at: usize, class: &str) -> Option<bool> {
     let spelled = match call.args.get(at)? {
+        // Kotlin writes a `new` as a call by the type's name: of the repository or outside; a
+        // function's result (`buildMpp()`) is not told.
+        Value::Call(made) if kotlin(path) && made.receiver.is_none() => {
+            let ty = made.callee.rsplit('.').next().unwrap_or(&made.callee);
+            if !ty.starts_with(char::is_uppercase) {
+                return None;
+            }
+            match code.definition(path, &call.scope, &made.callee) {
+                Some(t) if is_class(code, t) => return Some(false),
+                Some(_) => return None,
+                None => match spellings(code, path, &call.scope, &made.callee) {
+                    spelled if spelled.is_empty() => return None,
+                    spelled => spelled,
+                },
+            }
+        }
         Value::Unknown | Value::Call(_) | Value::Function(_) => return None,
         Value::Ref(name) => declared(code, path, &call.scope, name)?,
         Value::New(ty, _) => spellings(code, path, &call.scope, ty),
@@ -541,17 +557,10 @@ fn items(value: &Value) -> Vec<&Value> {
 /// not a function of the repository by that name), or the one value written in their place.
 fn array<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, key: &str) -> Vec<&'a Value> {
     match call.keyword(key) {
-        Some(Value::Call(made))
-            if made.receiver.is_none()
-                && made.callee == "arrayOf"
-                && known(code, path, &call.scope, &made.callee, |s| {
-                    s == "kotlin.arrayOf"
-                })
-                .is_some() =>
-        {
-            made.args.iter().collect()
-        }
-        Some(value) => items(value),
+        Some(value) => match array_of(code, path, &call.scope, value) {
+            Some(args) => args.iter().collect(),
+            None => items(value),
+        },
         None => Vec::new(),
     }
 }
@@ -1432,6 +1441,40 @@ mod tests {
         );
     }
 
+    /// A message the call constructs is of a type, as Java's `new Order()`: a class of the
+    /// repository or an outside one is no post-processor, a function's result may be.
+    #[test]
+    fn a_kotlin_message_constructed_in_the_call_picks_the_overload() {
+        let imports = format!(
+            "{KT_RABBIT}import org.springframework.jms.core.JmsTemplate\n\
+            import org.springframework.jms.core.MessagePostProcessor\n\
+            import com.corp.shared.Dto\n"
+        );
+        let body = "data class Order(val id: String)\n\
+            fun buildMpp(): MessagePostProcessor = MessagePostProcessor { it }\n\
+            class C(private val rabbit: RabbitTemplate, private val jms: JmsTemplate) {\n\
+            fun f() {\n\
+            rabbit.convertAndSend(\"kt.ctor\", Order(\"1\"))\n\
+            rabbit.convertAndSend(\"kt.dto\", Dto())\n\
+            rabbit.convertAndSend(\"kt.mpp\", buildMpp())\n\
+            jms.convertAndSend(\"kt.jms\", Order(\"1\"))\n\
+            jms.convertAndSend(\"kt.jmsdto\", Dto())\n\
+            jms.convertAndSend(\"kt.jmsmpp\", buildMpp())\n\
+            jms.convertAndSend(\"kt.jmssam\", MessagePostProcessor { it })\n}\n}";
+        assert_eq!(
+            kt(&imports, body, &[], ""),
+            [
+                "amqp kt.ctor producer",
+                "amqp kt.dto producer",
+                "amqp unresolved producer",
+                "jms kt.jms producer",
+                "jms kt.jmsdto producer",
+                "jms unresolved producer",
+                "jms unresolved producer",
+            ]
+        );
+    }
+
     #[test]
     fn a_kotlin_sqs_client_sends_and_receives_on_the_queue_its_url_names() {
         let imports = "import software.amazon.awssdk.services.sqs.SqsClient\n\
@@ -1535,6 +1578,36 @@ mod tests {
             class C(private val kafka: KafkaTemplate<String, String>) {\n\
             fun f() { kafka.publish(\"orders.x\", \"v\"); kafka.apply { send(\"orders.y\", \"v\") }; with(kafka) { send(\"orders.z\", \"v\") } }\n}";
         assert!(kt(KT_KAFKA, body, &[], "").is_empty());
+    }
+
+    /// A member of an implicit receiver comes before the names around it (Kotlin's resolution
+    /// order): inside `with(h)`, `h.run`, `h.apply` and an extension of `Holder`, `kafka` is the
+    /// property of `Holder` when the repository's class has one, and unknown when the receiver's
+    /// type is not the repository's; only a repository class without the member lets the lookup
+    /// reach the property of the class around.
+    #[test]
+    fn a_member_of_an_implicit_receiver_hides_the_template() {
+        let body = "class Holder(val kafka: Other)\n\
+            class Plain(val other: Other)\n\
+            class Other { fun send(t: String, m: String) {} }\n\
+            class C(private val kafka: KafkaTemplate<String, String>) {\n\
+            fun a(h: Holder) { with(h) { kafka.send(\"orders.with\", \"m\") } }\n\
+            fun b(h: Holder) { h.run { kafka.send(\"orders.run\", \"m\") } }\n\
+            fun c(h: Holder) { h.apply { kafka.send(\"orders.apply\", \"m\") } }\n\
+            fun d(f: Foreign) { with(f) { kafka.send(\"orders.foreign\", \"m\") } }\n\
+            fun e(p: Plain) { with(p) { kafka.send(\"orders.plain\", \"m\") } }\n\
+            fun g(h: Holder) { with(h) { val kafka = Other(); kafka.send(\"orders.local\", \"m\") } }\n\
+            private fun Holder.ext() { kafka.send(\"orders.ext\", \"m\") }\n\
+            private fun Plain.ext() { kafka.send(\"orders.plainext\", \"m\") }\n\
+            private fun Foreign.ext() { kafka.send(\"orders.foreignext\", \"m\") }\n}";
+        let imports = format!("{KT_KAFKA}import com.corp.shared.Foreign\n");
+        assert_eq!(
+            kt(&imports, body, &[], ""),
+            [
+                "kafka orders.plain producer",
+                "kafka orders.plainext producer"
+            ]
+        );
     }
 
     /// Many annotated methods are read in time linear in their number: a method's annotation

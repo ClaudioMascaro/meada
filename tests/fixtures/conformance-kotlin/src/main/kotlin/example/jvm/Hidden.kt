@@ -1,5 +1,6 @@
 package example.jvm
 
+import java.net.http.HttpClient
 import org.springframework.web.client.RestTemplate
 import org.springframework.web.reactive.function.client.WebClient
 
@@ -47,5 +48,45 @@ class Hidden {
     fun own() {
         rest.delete("https://hidden.example.com/rest")
         web.get().uri("/hidden/own")
+    }
+}
+
+class Gate {
+    fun delete(url: String) {}
+}
+
+class Slot(val rest: Gate)
+
+class Plain(val other: Gate)
+
+// A member of an implicit receiver comes before the property of the class around: `rest` is
+// the slot's, whatever the receiver's type is, until a repository class has no such member.
+class Receivers(private val rest: RestTemplate) {
+    fun viaWith(slot: Slot) {
+        with(slot) { rest.delete("https://hidden.example.com/with") }
+    }
+
+    fun viaRun(slot: Slot) {
+        slot.run { rest.delete("https://hidden.example.com/run") }
+    }
+
+    fun viaApply(slot: Slot) {
+        slot.apply { rest.delete("https://hidden.example.com/apply") }
+    }
+
+    fun viaOutside(client: HttpClient) {
+        with(client) { rest.delete("https://hidden.example.com/outside") }
+    }
+
+    fun viaPlain(plain: Plain) {
+        with(plain) { rest.delete("https://hidden.example.com/plain") }
+    }
+
+    private fun Slot.viaExtension() {
+        rest.delete("https://hidden.example.com/extension")
+    }
+
+    private fun Plain.viaPlainExtension() {
+        rest.delete("https://hidden.example.com/plain-extension")
     }
 }

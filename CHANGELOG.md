@@ -82,9 +82,12 @@ All notable changes to Meada are recorded here. The format follows
   through Spring configuration, and `mapOf("id" to id)` as a Redis stream map. The default
   exchange reaches the queue named by its key (`exact`) and a wildcard NATS subject is
   `inferred`. A name that cannot be evaluated is an unresolved producer or consumer. A
-  trailing-lambda post-processor (`convertAndSend("x") { m -> m }`) no longer counts as the
-  destination in either language. A call on an implicit receiver (an extension function on the
-  client, `apply`, `with`) is not read. A cross-language fixture produces a topic in TypeScript
+  trailing-lambda post-processor (`convertAndSend("x") { m -> m }`) is an untold overload, as
+  Java's lambda: its producer is unresolved. A message built in the call (`Order("1")`) picks
+  the overload as Java's `new` does. In `with`, `run`, `apply` and extension function blocks, a
+  member of the implicit receiver hides the property of the class around, for channel and HTTP
+  clients alike. A call on the receiver itself (an extension function on the client, `apply`,
+  `with`) is not read. A cross-language fixture produces a topic in TypeScript
   and consumes it in a Kotlin `@KafkaListener`, and `trace` down from the producer reaches the
   handler.
 - Java OpenFeign and Retrofit clients (issue #90): each method of an `@FeignClient(name, url)`

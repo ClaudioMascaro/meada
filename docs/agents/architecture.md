@@ -1116,15 +1116,30 @@ one for the area a change touches.
   `.kt`, `.kts`) with no pack gate, since both packs share one `Resolver` and one `Code`. The
   Kotlin pack gives it the same shapes: `kotlin::element` reads an annotation element value
   (a nested `QueueBinding(..)` as `Value::New`, `[..]` and a nested `arrayOf(..)` as
-  `Value::List`; a top-level `arrayOf(..)` stays a `Value::Call` that `channel::array` accepts
-  only when `known` binds `kotlin.arrayOf`), and an infix `a to b` is a `Call` on `a`. The
-  Kotlin `Call::on` is always empty, so a `BindingBuilder` chain is found by the callee shape
-  `(call_expression).with` and its start call by range in a map built once per file. A stream
-  map written `mapOf(key to id)` counts when `known` binds `kotlin.collections.mapOf`; a
-  constructor with no receiver (`Queue("q")`) counts as `new`. `of()` reads a lambda argument
-  as an untold post-processor overload, so `convertAndSend("x") { m -> m }` keeps `x` as the
-  destination. A call on an implicit receiver (an extension function on the client, `apply`,
-  `with`) is not read. The `conformance-kotlin` fixture holds each channel form and the
+  `Value::List`; a top-level `arrayOf(..)` stays a `Value::Call` that `jvm::names::array_of`
+  accepts only when `known` binds `kotlin.arrayOf`, the question the Spring MVC reader asks
+  too). An entry `k to v` of a `mapOf(..)` is its key `k` (`Args::Pairs`): every entry of a
+  `mapOf` is a pair and only the key is read, and a pair built as a call costs two nodes of
+  `EVAL_BUDGET` per entry in a file full of `mapOf` calls. The Kotlin `Call::on` is always empty,
+  so a `BindingBuilder` chain is found by the callee shape `(call_expression).with` and its
+  start call by range in a map built once per file. A stream map written `mapOf(key to id)`
+  counts when `known` binds `kotlin.collections.mapOf`; a constructor with no receiver
+  (`Queue("q")`) counts as `new`, and so does a message `Order("1")` of `of()` when the callee
+  is a class (the repository's, or an outside one an import spells): `buildMpp()` is not told.
+  A lambda argument (`convertAndSend("x") { m -> m }`) is an untold overload, as Java's, so its
+  producer is unresolved.
+
+  A member of an implicit receiver comes before the names around it, as Kotlin resolves them:
+  in the block of a `with`, `run` or `apply`, or in an extension function, `kafka` in
+  `kafka.send(..)` is the receiver's property when the receiver is a class of the repository
+  that has one (`Resolver::lexical_as`, `Reading::Member`, through `Facts::impls` and
+  `Facts::extensions`), unknown when the receiver's type is not the repository's, and the
+  property of the class around only when the receiver is a class of the repository without that
+  member. Only the type a name is declared with asks (`Code::declared`): a constant's value and a
+  called name (an imported extension) are read as before. A call on the receiver itself
+  (`kafka.apply { send(..) }`, `with(kafka) { send(..) }`, an extension function of the
+  template) is not read: its callee has no receiver name. The `conformance-kotlin` fixture holds
+  each channel form and the hidden-name cases (`channels/Receivers.kt`, `jvm/Hidden.kt`), and the
   `xlang-kotlin` one a TypeScript producer reaching a Kotlin `@KafkaListener`.
 - New **package ecosystem** (spec #22 user story 26, spec #225; track B packs): implement the
   `Ecosystem` trait of `package.rs` in a module of its own under `package/` (`npm`, `pypi`,
