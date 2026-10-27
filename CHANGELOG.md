@@ -82,6 +82,10 @@ All notable changes to Meada are recorded here. The format follows
   constants (`static let` too) from other files and modules; a wrapper at any depth is a
   consumer, and a URL that cannot be read is an unresolved consumer, shown in the export and in
   `context`. The stored Swift facts change, so existing indexes are rebuilt.
+- Swift program entry points (spec #29, #123): a type marked `@main` (through its `main()`
+  method when it declares one) and the top-level code of a `main.swift` file, a symbol named
+  `main` that owns the calls written there, each start a process. The stored Swift facts
+  change, so existing indexes are rebuilt.
 - `Directory.Build.props` files apply to the C# projects below them as MSBuild imports them
   (the nearest one, then those it imports with `GetPathOfFileAbove` or a relative path): their
   `<Using>` items, `PackageReference`s and `ProjectReference`s, and the `PackageId`,
