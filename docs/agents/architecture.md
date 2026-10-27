@@ -1767,9 +1767,10 @@ one for the area a change touches.
   (`.post`), a postfix `!` as its target, `a + b` as a string of both, an array as a list and a
   call as `Value::Call` (its labelled arguments in `Invocation::kwargs`, spec #29, #121), read to
   `VALUE_DEPTH` (32).
-  `ProcessInfo.processInfo.environment["X"]` (spec #29, #122) is `Str([Env(X)])` (`env_read`),
+  `ProcessInfo.processInfo.environment["X"]` (spec #29, #122) is `Str([Env(X)])` (`subscript_read`),
   through a postfix `!`, parentheses, `trimmingCharacters`, `replacingOccurrences`, `lowercased`
-  and `uppercased` (a `ProcessInfo` in an argument makes a hole), and a `??` whose fallback is a
+  and `uppercased` (an argument that may read again, a read, a hole or a name of the code but not
+  a type's member such as `CharacterSet.whitespaces`, makes a hole), and a `??` whose fallback is a
   text-only literal (any other fallback is a `Hole`: which value is the base is unknown); it
   is also the one value an interpolation may hold besides a name. The pack decides by the
   spelling alone, as Go's and Rust's do; a repository type named `ProcessInfo` is not looked for. Vapor's
@@ -1779,8 +1780,8 @@ one for the area a change touches.
   calls and names inside it belong to that scope. `Facts::bound` holds a `let` or `var` of one name given
   a call, a name or a string (#121), and drops the name when another binding of the
   function (a loop variable, an `if let`, a `guard let`, a `catch`, a `case let`, a `var` or
-  another `let` in a block) also declares it, when it is assigned afterwards (`x = ..`,
-  `&x`) or when a method is called on a `var` that holds a string, a name or a URL
+  another `let` in a block) also declares it, when its function (or a closure in it) assigns it
+  (`x = ..`, `&x`) or calls a method on a `var` of the name that holds a string, a name or a URL
   (`url.appendPathComponent(..)` changes it in place); a global `var` is not bound, since
   another file of the module may assign it; a top-level or type-level `let` is a `Const` (qualified by its type) holding its
   initializer, and a binding in a block of the top level is a local, not a global. A member

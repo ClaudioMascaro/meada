@@ -117,6 +117,14 @@ func useApi() async throws {
     let api = Api()
     _ = try await api.fetch("/direct")
     try await api.remove(3)
+    let local = "/local"
+    _ = try await api.fetch(local + "/a")
+    let base = "https://api.example.com"
+    _ = try await whole(base + "/whole")
+}
+
+func whole(_ url: String) async throws -> Data {
+    try await URLSession.shared.data(from: URL(string: url)!).0
 }
 
 // A URL that cannot be evaluated is an unresolved consumer.

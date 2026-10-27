@@ -12078,6 +12078,7 @@ fn swift() {
         checkout("Clients.swift", "sessions(id:session:)"),
         checkout("Clients.swift", "unresolved(path:flag:)"),
         checkout("Clients.swift", "useApi()"),
+        checkout("Clients.swift", "whole(_:)"),
         checkout("Clients.swift", "relative(_:)"),
         checkout("Clients.swift", "guarded(session:)"),
         checkout("Clients.swift", "mutated(id:)"),
@@ -12439,6 +12440,9 @@ fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
         ),
         // Wrappers: each call site, through two levels, with a cycle.
         ("http::GET::/direct", api, &at("useApi()", "api.fetch#0")),
+        // A local the call site folds.
+        ("http::GET::/local/a", api, &at("useApi()", "api.fetch#1")),
+        ("http::GET::/whole", api, &at("useApi()", "whole#0")),
         ("http::GET::/users/{}", api, &at("Api.profile()", "user#0")),
         (
             "http::DELETE::/users/{}",

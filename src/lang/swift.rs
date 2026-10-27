@@ -304,14 +304,14 @@ fn walk(
     let mut types: HashSet<String> = HashSet::new();
     let mut returns: HashMap<String, Vec<Value>> = HashMap::new();
     let mut budget = QUALIFICATION_BYTES;
-    // The names assigned (`x = v`, `x += v`, `&x`) anywhere in the file, which hold no one value,
-    // and the members assigned through a name (`request.httpMethod = v`).
-    let mut assigned: HashSet<String> = HashSet::new();
+    // The names assigned (`x = v`, `x += v`, `&x`), by the scope written in, which hold no one
+    // value there, and the members assigned through a name (`request.httpMethod = v`).
+    let mut assigned: Vec<(Rc<String>, String)> = Vec::new();
     let mut members: Vec<Member> = Vec::new();
-    // The names a `var` declares, and those a method is called on (`url.appendPathComponent(..)`
-    // mutates a value in place).
+    // The names a `var` declares, and those a method is called on, by the scope written in
+    // (`url.appendPathComponent(..)` mutates a value in place).
     let mut vars: HashSet<String> = HashSet::new();
-    let mut called: HashSet<String> = HashSet::new();
+    let mut called: Vec<(Rc<String>, String)> = Vec::new();
     // The typed locals: receivers, not `locals`, but declarations of their name all the same.
     let mut typed_names: Vec<String> = Vec::new();
     // The types marked `@main`, each a program through its `main()` method when it has one.
@@ -656,9 +656,7 @@ fn walk(
                     let plain = children(node).any(|c| c.kind() == "=");
                     let result = node.child_by_field_name("result");
                     match name.split_once('.') {
-                        None => {
-                            assigned.insert(name);
-                        }
+                        None => assigned.push((scope.clone(), name)),
                         Some((head, rest)) if !name.contains('(') => {
                             // Only a plain `=` as a statement of the body runs once, in place.
                             let direct = plain && !rest.contains('.') && runs_once(node);
@@ -682,7 +680,7 @@ fn walk(
             }
             "prefix_expression" if text(node, src).starts_with('&') => {
                 if let Some(target) = node.child_by_field_name("target") {
-                    assigned.insert(head(&callee(target, src)).to_string());
+                    assigned.push((scope.clone(), head(&callee(target, src)).to_string()));
                 }
             }
             "call_expression" | "constructor_expression" => {
@@ -699,7 +697,7 @@ fn walk(
                     // A type parameter is no type of the repository: `T()` constructs none.
                     at.constructs &= !generics.holds(head(&at.callee));
                     if let Some((receiver, _)) = at.callee.split_once('.') {
-                        called.insert(receiver.to_string());
+                        called.push((scope.clone(), receiver.to_string()));
                     }
                     facts.calls.push(at);
                 }
@@ -762,9 +760,18 @@ fn walk(
         facts.programs.push(if start { method } else { ty });
     }
     bare_calls(&mut facts);
+    // A name written in a function or a closure in it is written in the whole function (a
+    // closure assigns a local of its function).
+    let by_function = |written: &'_ [(Rc<String>, String)]| -> HashSet<(String, String)> {
+        (written.iter())
+            .map(|(s, n)| (function(s).to_string(), n.clone()))
+            .collect()
+    };
+    let (assigned, called) = (by_function(&assigned), by_function(&called));
     facts.bound.retain(|b| {
-        !assigned.contains(&b.name)
-            && !(vars.contains(&b.name) && called.contains(&b.name) && mutable(&b.value))
+        let at = (function(&b.scope).to_string(), b.name.clone());
+        !assigned.contains(&at)
+            && !(vars.contains(&b.name) && called.contains(&at) && mutable(&b.value))
     });
     assign_members(&mut facts.bound, members);
     // A name another binding of the scope also declares (a loop variable, a `guard let`, a
@@ -818,6 +825,11 @@ struct Member {
     member: String,
     value: Value,
     direct: bool,
+}
+
+/// The function `scope` is in, or is: the scope before its first closure (`f().@120` is in `f()`).
+fn function(scope: &str) -> &str {
+    scope.find(".@").map_or(scope, |at| &scope[..at])
 }
 
 /// Whether a method called on a `var` of this value may change it in place: a string, a name
@@ -957,6 +969,7 @@ fn stores(kind: &str) -> bool {
             | "protocol_function_declaration"
             | "init_declaration"
             | "property_declaration"
+            | "assignment"
             | "call_expression"
             | "constructor_expression"
             | "lambda_literal"
@@ -1680,6 +1693,21 @@ mod tests {
         assert_eq!(names, ["request", "kept", "same"]);
     }
 
+    /// A name assigned, or changed in place, in one function (or a closure in it) holds no one
+    /// value in that function alone: a binding of the name in another function keeps its value.
+    #[test]
+    fn a_name_assigned_in_one_function_keeps_its_value_in_another() {
+        let facts = facts(
+            "func f() {\n  var x = make()\n  x = other()\n  var u = URL(string: \"a\")!\n  \
+             u.appendPathComponent(\"p\")\n  var y = Greeter()\n  run { y = Local() }\n}\n\
+             func g() {\n  var x = make()\n  var u = URL(string: \"b\")!\n  let y = Greeter()\n}\n",
+        );
+        let held: Vec<(&str, &str)> = (facts.bound.iter())
+            .map(|b| (b.scope.as_str(), b.name.as_str()))
+            .collect();
+        assert_eq!(held, [("g()", "x"), ("g()", "u"), ("g()", "y")]);
+    }
+
     #[test]
     fn a_global_var_is_not_bound() {
         let facts = facts(
@@ -1766,6 +1794,29 @@ mod tests {
         assert!(
             (bound.iter()).all(|b| matches!(&b.value, Value::Call(c) if c.kwargs.len() == per))
         );
+        assert!(took < std::time::Duration::from_secs(1), "{took:?}");
+    }
+
+    /// A chain of string methods on an environment read costs its length: each link is read
+    /// once, not once more for every link above it.
+    #[test]
+    fn a_long_chain_of_string_methods_is_read_in_linear_time() {
+        let source = |links: usize| {
+            let chain = ".lowercased()".repeat(links);
+            let read = "ProcessInfo.processInfo.environment[\"X\"]!";
+            format!("func f() {{\n  let a = {read}{chain}\n}}\n")
+        };
+        let started = std::time::Instant::now();
+        let long = facts(&source(128));
+        let took = started.elapsed();
+        // Past the value limit the chain is no read; within it, the read keeps through each link.
+        let held = |facts: &Facts| {
+            (facts.bound.iter().find(|b| b.name == "a")).is_some_and(|b| {
+                matches!(&b.value, Value::Str(p) if matches!(&p[..], [Part::Env(x)] if x == "X"))
+            })
+        };
+        assert!(!held(&long));
+        assert!(held(&facts(&source(8))));
         assert!(took < std::time::Duration::from_secs(1), "{took:?}");
     }
 

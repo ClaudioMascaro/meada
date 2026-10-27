@@ -49,6 +49,11 @@ func replaced() async throws {
     let (_, _) = try await URLSession.shared.data(from: URL(string: base + "/a")!)
 }
 
+func typeMember() async throws {
+    let base = ProcessInfo.processInfo.environment["MEMBER_URL"]!.trimmingCharacters(in: CharacterSet.whitespaces)
+    let (_, _) = try await URLSession.shared.data(from: URL(string: base + "/a")!)
+}
+
 func lowered() async throws {
     let (_, _) = try await URLSession.shared.data(from: URL(string: ProcessInfo.processInfo.environment["LOWERED_URL"]!.lowercased() + "/a")!)
 }
@@ -98,6 +103,12 @@ func trimmedByARead() async throws {
     let (_, _) = try await URLSession.shared.data(from: URL(string: base + "/a")!)
 }
 
+func replacedByALocal() async throws {
+    let other = ProcessInfo.processInfo.environment["OTHER"]!
+    let base = ProcessInfo.processInfo.environment["LOCAL_URL"]!.replacingOccurrences(of: other, with: "")
+    let (_, _) = try await URLSession.shared.data(from: URL(string: base + "/a")!)
+}
+
 func nameFromAVariable() async throws {
     let key = "KEY_URL"
     let (_, _) = try await URLSession.shared.data(from: URL(string: ProcessInfo.processInfo.environment[key]! + "/a")!)
@@ -126,4 +137,13 @@ func optionalBinding() async throws {
     if let base = ProcessInfo.processInfo.environment["BINDING_URL"] {
         let (_, _) = try await URLSession.shared.data(from: URL(string: base + "/a")!)
     }
+}
+
+func wrapped() async throws {
+    let base = ProcessInfo.processInfo.environment["WRAPPED_URL"]!
+    _ = try await fetchWhole(base + "/a")
+}
+
+func fetchWhole(_ url: String) async throws -> Data {
+    try await URLSession.shared.data(from: URL(string: url)!).0
 }
