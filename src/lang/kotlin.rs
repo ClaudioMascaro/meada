@@ -11,8 +11,8 @@ use tree_sitter_language::LanguageFn;
 
 use super::{
     Annotated, Binds, Bound, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported,
-    Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Receiver, Value, children, named,
-    text,
+    Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Receiver, Value, bare_calls,
+    children, named, text, wildcard,
 };
 use crate::{Result, qualify};
 
@@ -807,52 +807,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     Ok(facts)
 }
 
-/// Marks each bare call (`f()`, not in a lambda) as Java's are (`Call::by_path`): the class
-/// members around it, inherited and companion ones included, come before the names outside the
-/// class. Unless a binding of the code around it holds what it invokes: a local, a parameter, a
-/// property, a constant of its name in any scope from the call's out.
-pub(super) fn bare_calls(facts: &mut Facts) {
-    let locals: HashSet<&str> = facts.locals.iter().map(String::as_str).collect();
-    let consts: HashSet<&str> = facts.consts.iter().map(|c| c.name.as_str()).collect();
-    let properties: HashSet<(&str, &str)> = (facts.receivers.iter())
-        .map(|r| (r.scope.as_str(), r.name.as_str()))
-        .collect();
-    let params: HashMap<&str, Vec<&str>> = (facts.defs.iter())
-        .map(|d| {
-            (
-                d.name.as_str(),
-                d.params.iter().map(|p| p.name.as_str()).collect(),
-            )
-        })
-        .collect();
-    let bound = |scope: &str, name: &str| {
-        let mut at = Some(scope);
-        while let Some(s) = at {
-            let qualified = qualify(s, name);
-            if locals.contains(qualified.as_str())
-                || consts.contains(qualified.as_str())
-                || properties.contains(&(s, name))
-                || params.get(s).is_some_and(|p| p.contains(&name))
-            {
-                return true;
-            }
-            at = (!s.is_empty()).then(|| crate::parent(s));
-        }
-        false
-    };
-    let bare: Vec<bool> = (facts.calls.iter())
-        .map(|c| {
-            c.decorates.is_none()
-                && !c.callee.contains('.')
-                && !c.callee.starts_with('(')
-                && !bound(&c.scope, &c.callee)
-        })
-        .collect();
-    for (call, bare) in facts.calls.iter_mut().zip(bare) {
-        call.by_path = bare;
-    }
-}
-
 fn definition(name: &str, kind: Kind, range: Range<usize>, params: Vec<Param>) -> Def {
     Def {
         name: name.to_string(),
@@ -1440,24 +1394,6 @@ fn import(node: Node, src: &[u8], facts: &mut Facts) {
         local: alias.unwrap_or_else(|| written.rsplit('.').next().unwrap_or(&written).into()),
         source: written,
         name: Imported::Qualified,
-    });
-}
-
-pub(super) fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
-    let alias = format!("@glob{}", facts.imports.len());
-    facts.imports.push(Import {
-        local: alias.clone(),
-        source: source.to_string(),
-        name: Imported::Namespace,
-    });
-    facts.imports.push(Import {
-        local: "*".into(),
-        source: String::new(),
-        name: Imported::Glob {
-            path: alias,
-            inside,
-            public: false,
-        },
     });
 }
 

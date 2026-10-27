@@ -1236,7 +1236,7 @@ one for the area a change touches.
     spelling of the one provider whose id differs by case only, before `consume` reads them,
     each by one folded-location map (linear in the manifests).
   - `fits`: literal package-name equality; Maven matches the literal fragments of a computed
-    coordinate. `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
+    coordinate (`pattern_fits`). `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
   - `flag`: the range is unchecked (`range unchecked`); npm checks semver.
   - `reaches`: every provider; npm's `workspace:` keeps the dependent's own repository, Cargo
     and Go share `sourced`, in the seam (a `path` by the folded location, a `git` by the
@@ -1294,14 +1294,16 @@ one for the area a change touches.
     a call through a package (`var o = Order.Of(1); o.Total()`) is not followed (the return
     type lives in the provider's index; Java has the same gap), and two projects in one
     directory share it (the first by path owns the files).
-    SwiftPM (spec #29, #124; `package/swiftpm.rs`) reads `Package.swift` through the pack's
-    `lang/swift/manifest.rs` (`package`: the `Package(name:)` literal, `.library` products with
-    their literal target names, and `.package(url:|path:, ..)` dependencies with their
-    requirement, walked in source order on an explicit stack), so there is one manifest reader.
+    SwiftPM (spec #29, #124; `package/swiftpm.rs`) reads `Package.swift` with
+    `package/swiftpm/manifest.rs` (`package`: the `Package(name:)` literal, `.library` products
+    with their literal target names, and `.package(url:|path:, ..)` dependencies with their
+    requirement, walked in source order on an explicit stack), the PackageDescription forms, on
+    the grammar readers of the pack's `lang/swift/manifest.rs` (`call`, `pattern`, `literal`,
+    beside the `targets` the pack's layout reads), so there is one manifest reader.
     `Summary::products` and `Summary::targets` (module, directory) record what an import can
     name. An entry's `via` is `git <identity>` (`normalize_remote`, from the root manifest only),
     `path <dir>/Package.swift` (`sourced`) or, for a URL or path with an interpolation, `computed
-    git|path <pattern>` (holes written `*`, matched with `jvm::fits`, so the dependency is
+    git|path <pattern>` (holes written `*`, matched with `package::pattern_fits`, so the dependency is
     `ambiguous` and lists every provider whose literal parts fit). An uncertain entry's name always
     carries a `*` (`marked`), even when folding took the computed part out of the location (a
     userinfo, a port, a `..`), since `fits` tells an uncertain entry by it; a computed path
@@ -1314,11 +1316,13 @@ one for the area a change touches.
     (`Code::origins`, `Follow::Declarations`) or the construction a local holds
     (`Follow::Values`, one origin, no steps), else `Code::outside`'s candidates; the lookup
     reads the provider's `exported` rows (a public name only, an overload family has no target)
-    and narrows by labels from the symbol id plus its `Flexible` argument counts, in the order
-    the parameters have (a variadic, of any label, takes the unlabelled arguments after its
-    first). `resolve` is `exact` for one exposing target and `ambiguous` for several; the level
+    and narrows by labels from the symbol id plus its `Flexible` argument counts, with the
+    resolver's matcher (`resolve::labelled`), each parameter one the call may leave out (and,
+    for a function with a variadic one, each variadic), since which have defaults is not
+    stored. `resolve` is `exact` for one exposing target and `ambiguous` for several; the level
     of every link of an import is `ambiguous` when several packages the file depends on expose
-    the module, whether or not each declares the name (`Swiftpm::exposing`). `How::Module`,
+    the module, whether or not each declares the name (`Swiftpm::exposing`, on the entries and the
+    providers they reach that `resolutions_by_ways` walks, `reachable`). `How::Module`,
     `; import module`; the platform modules (`PLATFORM`) are never
     followed. Ceilings: every dependency of the nearest `Package.swift` counts for the files
     below it (not only a target's `.product(name:package:)`), an `internal` member of a public
@@ -1791,10 +1795,12 @@ one for the area a change touches.
   `do` block that is one (not in an `if`, a loop, a `catch` or a closure); written twice, or
   where it may not run, it is `Value::Unknown`.
   `Def::return_values` holds each `return` and the one expression of a function that writes a
-  result type. `Code::arg` matches the labels of a call to the parameters' (`labelled_args`):
-  an unlabelled argument takes the next parameter written `_`, a labelled one the parameter of
-  its label, and the first trailing closure the first parameter that cannot be left out; a
-  trailing closure after the first (`f { } other: { }`) is not bound.
+  result type. `Code::arg` matches the labels of a call to the parameters' with the matcher
+  `labelled` decides the fit with (`labelled_args`, one table of which parameters take which
+  arguments): an unlabelled argument takes a parameter written `_`, a labelled one a parameter
+  of its label, a parameter that may be left out gives its label to a later one when the call
+  fits no other way, and the first trailing closure takes the first parameter that cannot be
+  left out; a trailing closure after the first (`f { } other: { }`) is not bound.
   Method calls on a receiver (spec #29, #118) use the seams Java's and C#'s do, with no new
   one. The pack writes `Facts::receivers` from the written type of a stored property, a
   parameter (scope: the function's labelled name) and a `let` or `var` of code or the top level
@@ -2159,6 +2165,9 @@ qualification budget does (ADR 0017).
   `Resolver::in_references`), and stays `ambiguous` with several or none, since a project
   not referenced may still be visible through references not read.
 
+- `resolve.rs` (`labelled_args`): `LABELLED_CELLS` (65,536) bounds the pairs of a parameter and
+  an argument the label matcher weighs for one call; a wider call fits no function that labels
+  its parameters, so it resolves by name or to nothing.
 - `lang/swift/values.rs`: `VALUE_DEPTH` (32): a value nested deeper (parentheses, a call chain,
   an argument inside an argument) is `Value::Unknown`, so a route written under such a chain is
   served nowhere. The pack's integration tests exceed it.

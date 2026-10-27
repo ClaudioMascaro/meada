@@ -474,69 +474,70 @@ impl<'c> Args<'c> {
     }
 }
 
+/// How many pairs of a parameter and an argument `labelled_args` may weigh for one call: past it,
+/// the call fits no function that labels its parameters.
+// ponytail: real calls pass a handful of arguments; this keeps a crafted one cheap.
+const LABELLED_CELLS: usize = 1 << 16;
+
 /// Whether parameters with labels (`Param::label`, `_` when none) take the arguments of a call
-/// with `labels` in order, as Swift matches them: each argument goes to the next parameter of
-/// its label, a parameter with a default value or a variadic one may take none, a variadic one
-/// takes the unlabelled arguments after its first, and a trailing closure (an empty label) may
-/// take a parameter of any label. A parameter without a label (another language's) takes
+/// with `labels` (`labelled_args`). A parameter without a label (another language's) takes
 /// whatever it is given.
-fn labelled(params: &[Param], labels: &[String]) -> bool {
-    if !params.is_empty() && params.iter().all(|p| p.label.is_none()) {
-        return true;
-    }
-    // `fit[j]`: the parameters read so far take the first `j` arguments.
-    let mut fit = vec![false; labels.len() + 1];
-    fit[0] = true;
-    for p in params {
-        let label = p.label.as_deref().unwrap_or("_");
-        let skips = matches!(p.binds, Binds::Optional | Binds::Rest);
-        let mut next = vec![false; labels.len() + 1];
-        for j in (0..=labels.len()).filter(|&j| fit[j]) {
-            next[j] |= skips;
-            let Some(first) = labels.get(j) else { continue };
-            if first != label && !first.is_empty() {
-                continue;
-            }
-            let mut k = j + 1;
-            next[k] = true;
-            while p.binds == Binds::Rest && labels.get(k).is_some_and(|l| l == "_") {
-                k += 1;
-                next[k] = true;
-            }
-        }
-        fit = next;
-    }
-    fit[labels.len()]
+pub(crate) fn labelled(params: &[Param], labels: &[String]) -> bool {
+    (!params.is_empty() && params.iter().all(|p| p.label.is_none()))
+        || labelled_args(params, labels).is_some()
 }
 
-/// The argument (an index into `labels`) each parameter takes, as `labelled` matches them: a
-/// parameter takes the next argument of its label, or a trailing closure unless it may be
-/// left out. `None` when the call does not fit.
+/// The argument (an index into `labels`) each parameter takes when parameters with labels take
+/// the arguments of a call with `labels` in order, as Swift matches them: each argument goes to
+/// a parameter of its label, a parameter with a default value or a variadic one may take none,
+/// a variadic one takes the unlabelled arguments after its first, and a trailing closure (an
+/// empty label) takes the first parameter that cannot be left out, else any. `None` when the
+/// call does not fit, or weighs more than `LABELLED_CELLS`.
 fn labelled_args(params: &[Param], labels: &[String]) -> Option<Vec<Option<usize>>> {
+    let skips = |p: &Param| matches!(p.binds, Binds::Optional | Binds::Rest);
+    // The ends of the arguments `p` may take from the `j`th on: one of its label, then for a
+    // variadic one the unlabelled ones after it.
+    let ends = |p: &Param, j: usize| {
+        let Some(first) = labels.get(j) else {
+            return j..j;
+        };
+        if first != p.label.as_deref().unwrap_or("_") && !first.is_empty() {
+            return j..j;
+        }
+        let mut k = j + 1;
+        while p.binds == Binds::Rest && labels.get(k).is_some_and(|l| l == "_") {
+            k += 1;
+        }
+        j + 1..k + 1
+    };
+    if (params.len() + 1).saturating_mul(labels.len() + 1) > LABELLED_CELLS {
+        return None;
+    }
+    // `fit[n][j]`: the parameters from the `n`th take the arguments from the `j`th.
+    let mut fit = vec![vec![false; labels.len() + 1]; params.len() + 1];
+    fit[params.len()][labels.len()] = true;
+    for (n, p) in params.iter().enumerate().rev() {
+        for j in 0..=labels.len() {
+            fit[n][j] = (skips(p) && fit[n + 1][j]) || ends(p, j).any(|e| fit[n + 1][e]);
+        }
+    }
+    if !fit[0][0] {
+        return None;
+    }
     let mut takes = vec![None; params.len()];
     let mut j = 0;
     for (n, p) in params.iter().enumerate() {
-        let skips = matches!(p.binds, Binds::Optional | Binds::Rest);
-        let Some(first) = labels.get(j) else {
-            match skips {
-                true => continue,
-                false => return None,
+        let skip = skips(p) && fit[n + 1][j];
+        let closure = labels.get(j).is_some_and(String::is_empty);
+        match ends(p, j).rev().find(|&e| fit[n + 1][e]) {
+            Some(end) if !(skip && closure) => {
+                takes[n] = Some(j);
+                j = end;
             }
-        };
-        let label = p.label.as_deref().unwrap_or("_");
-        if first != label && !(first.is_empty() && !skips) {
-            match skips {
-                true => continue,
-                false => return None,
-            }
-        }
-        takes[n] = Some(j);
-        j += 1;
-        while p.binds == Binds::Rest && labels.get(j).is_some_and(|l| l == "_") {
-            j += 1;
+            _ => {}
         }
     }
-    (j == labels.len()).then_some(takes)
+    Some(takes)
 }
 
 /// Files that share one top-level scope (`Layout::shared`), sorted, and the files whose top
@@ -6794,6 +6795,9 @@ mod tests {
             (&[("xs", rest)], &["xs", "y"], false),
             (&[], &[], true),
             (&[], &["_"], false),
+            // A parameter that may be left out gives its label to a later one.
+            (&[("a", optional), ("a", any)], &["a"], true),
+            (&[("xs", rest), ("_", any)], &["xs", "_", "_"], true),
         ];
         for (params, labels, fits) in cases {
             let params: Vec<Param> = (params.iter())
@@ -6825,6 +6829,22 @@ mod tests {
             labelled_args(&params, &strings(&["on", "times", "_"])),
             Some(vec![Some(0), Some(1), Some(2)])
         );
+        let params = [labelled_param("a", optional), labelled_param("a", any)];
+        assert_eq!(
+            labelled_args(&params, &strings(&["a"])),
+            Some(vec![None, Some(0)])
+        );
+        // A call too wide to weigh fits nothing.
+        let wide = |n: usize| -> (Vec<Param>, Vec<String>) {
+            (
+                (0..n).map(|_| labelled_param("a", any)).collect(),
+                vec!["a".into(); n],
+            )
+        };
+        let (params, labels) = wide(200);
+        assert!(labelled(&params, &labels));
+        let (params, labels) = wide(300);
+        assert!(!labelled(&params, &labels));
     }
 
     /// A plain parameter `name`.

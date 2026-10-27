@@ -96,29 +96,6 @@ pub fn pattern(value: &str) -> Option<String> {
     (!out.is_empty() && out.len() <= crate::package::MAX_NAME).then_some(out)
 }
 
-/// Matches only literal fragments around holes; no properties or expressions are evaluated.
-pub fn fits(pattern: &str, value: &str) -> bool {
-    let mut pieces = pattern.split('*');
-    let first = pieces.next().unwrap_or("");
-    let Some(mut rest) = value.strip_prefix(first) else {
-        return false;
-    };
-    let pieces: Vec<_> = pieces.collect();
-    if pieces.is_empty() {
-        return rest.is_empty();
-    }
-    for (i, piece) in pieces.iter().enumerate() {
-        if i + 1 == pieces.len() {
-            return rest.ends_with(piece);
-        }
-        let Some(at) = rest.find(piece) else {
-            return false;
-        };
-        rest = &rest[at + piece.len()..];
-    }
-    false
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -134,19 +111,5 @@ mod tests {
         assert_eq!(pattern("a/b"), None);
         assert_eq!(pattern(""), None);
         assert_eq!(pattern(&"a".repeat(crate::package::MAX_NAME + 1)), None);
-    }
-
-    #[test]
-    fn fits_matches_only_the_literal_fragments() {
-        assert!(fits("example:model*", "example:models"));
-        assert!(fits("example:model*", "example:model"));
-        assert!(fits("*:tools", "example:tools"));
-        assert!(fits("a*b*c", "aXbYc"));
-        assert!(fits("example:models", "example:models"));
-        assert!(!fits("example:models", "example:models2"));
-        assert!(!fits("*:tools", "example:toolsx"));
-        assert!(!fits("ab*b", "ab"));
-        assert!(!fits("a*b*c", "acb"));
-        assert!(!fits("x*ab*b", "xab"));
     }
 }

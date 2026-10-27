@@ -17,10 +17,10 @@ use std::rc::Rc;
 
 use tree_sitter::{Node, Parser};
 
-use super::kotlin::{bare_calls, wildcard};
 use super::{
     Binds, Bound, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Join, Kind,
-    LanguagePack, Layout, Modules, Param, Receiver, Star, Value, children, named, text,
+    LanguagePack, Layout, Modules, Param, Receiver, Star, Value, bare_calls, children, named, text,
+    wildcard,
 };
 use crate::{Result, qualify};
 use values::Ctx;
@@ -52,7 +52,7 @@ impl LanguagePack for Swift {
 
     /// `Package.swift` is the package's manifest, read as a config file (`manifest`).
     fn is_code(&self, path: &str) -> bool {
-        path.rsplit('/').next() != Some("Package.swift")
+        path.rsplit('/').next() != Some(manifest::MANIFEST)
     }
 
     fn parse(&self, path: &str, src: &[u8]) -> Result<Facts> {
@@ -60,7 +60,7 @@ impl LanguagePack for Swift {
     }
 
     fn config_files(&self) -> &'static [&'static str] {
-        &["**/Package.swift"]
+        &[manifest::MANIFESTS]
     }
 
     /// Each file's module (`Facts::unit`, whose `internal` declarations no other module sees)
