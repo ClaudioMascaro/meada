@@ -2,6 +2,10 @@
   "repository": "example.com/acme/conformance",
   "files": [
     {
+      "path": "Sources/App.swift",
+      "hash": "7526bb5426ef93254045facb8575bc6031cbae9e5bc2f4e958512bd525bb4653"
+    },
+    {
       "path": "Sources/Handler.swift",
       "hash": "831982135a83e8a0512d5ef14b7d3b8663f10e687d0594ab63954ea8514d4053"
     },
@@ -43,6 +47,30 @@
     }
   ],
   "symbols": [
+    {
+      "id": "example.com/acme/conformance::Sources/App.swift::Bare",
+      "span": {
+        "path": "Sources/App.swift",
+        "start": 85,
+        "end": 105
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App.swift::Cli",
+      "span": {
+        "path": "Sources/App.swift",
+        "start": 0,
+        "end": 83
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App.swift::Cli.main()",
+      "span": {
+        "path": "Sources/App.swift",
+        "start": 23,
+        "end": 81
+      }
+    },
     {
       "id": "example.com/acme/conformance::Sources/Handler.swift::run()",
       "span": {
@@ -450,9 +478,39 @@
         "start": 618,
         "end": 639
       }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/main.swift::main",
+      "span": {
+        "path": "Sources/main.swift",
+        "start": 0,
+        "end": 105
+      }
     }
   ],
   "calls": [
+    {
+      "id": "example.com/acme/conformance::Sources/App.swift::Cli.main()::print#0",
+      "caller": "example.com/acme/conformance::Sources/App.swift::Cli.main()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/App.swift",
+        "start": 52,
+        "end": 75
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App.swift::Cli.main()::render#0",
+      "caller": "example.com/acme/conformance::Sources/App.swift::Cli.main()",
+      "target": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::render(count:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/App.swift",
+        "start": 58,
+        "end": 74
+      }
+    },
     {
       "id": "example.com/acme/conformance::Sources/Handler.swift::Ship#0",
       "caller": "example.com/acme/conformance::Sources/Handler.swift",
@@ -1120,8 +1178,8 @@
       }
     },
     {
-      "id": "example.com/acme/conformance::Sources/main.swift::FileLoader#0",
-      "caller": "example.com/acme/conformance::Sources/main.swift",
+      "id": "example.com/acme/conformance::Sources/main.swift::main::FileLoader#0",
+      "caller": "example.com/acme/conformance::Sources/main.swift::main",
       "target": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader",
       "level": "exact",
       "span": {
@@ -1131,8 +1189,8 @@
       }
     },
     {
-      "id": "example.com/acme/conformance::Sources/main.swift::loader.load#0",
-      "caller": "example.com/acme/conformance::Sources/main.swift",
+      "id": "example.com/acme/conformance::Sources/main.swift::main::loader.load#0",
+      "caller": "example.com/acme/conformance::Sources/main.swift::main",
       "target": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)",
       "level": "exact",
       "span": {
@@ -1142,8 +1200,8 @@
       }
     },
     {
-      "id": "example.com/acme/conformance::Sources/main.swift::print#0",
-      "caller": "example.com/acme/conformance::Sources/main.swift",
+      "id": "example.com/acme/conformance::Sources/main.swift::main::print#0",
+      "caller": "example.com/acme/conformance::Sources/main.swift::main",
       "target": null,
       "level": null,
       "span": {
@@ -1153,8 +1211,8 @@
       }
     },
     {
-      "id": "example.com/acme/conformance::Sources/main.swift::render#0",
-      "caller": "example.com/acme/conformance::Sources/main.swift",
+      "id": "example.com/acme/conformance::Sources/main.swift::main::render#0",
+      "caller": "example.com/acme/conformance::Sources/main.swift::main",
       "target": null,
       "level": "ambiguous",
       "candidates": [
@@ -1174,15 +1232,16 @@
     {
       "name": "Sources",
       "members": [
-        "example.com/acme/conformance::Sources/Handler.swift::run()",
-        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+        "example.com/acme/conformance::Sources/App.swift::Cli.main()",
+        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::render(count:)",
+        "example.com/acme/conformance::Sources/Model/Item.swift::renderAll()"
       ]
     },
     {
       "name": "Sources#2",
       "members": [
-        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader",
-        "example.com/acme/conformance::Sources/Receivers.swift::typed(_:)"
+        "example.com/acme/conformance::Sources/Handler.swift::run()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
       ]
     },
     {
@@ -1238,23 +1297,144 @@
     {
       "name": "Sources/Loading",
       "members": [
-        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::render(count:)",
-        "example.com/acme/conformance::Sources/Model/Item.swift::renderAll()"
+        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader",
+        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:)",
+        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)",
+        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)",
+        "example.com/acme/conformance::Sources/Model/Item.swift::Item",
+        "example.com/acme/conformance::Sources/Receivers.swift::typed(_:)",
+        "example.com/acme/conformance::Sources/main.swift::main"
       ]
     },
     {
       "name": "Sources/Model",
       "members": [
-        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:)",
-        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)",
-        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)",
         "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.Size.doubled()",
-        "example.com/acme/conformance::Sources/Model/Item.swift::Item",
         "example.com/acme/conformance::Sources/Model/Item.swift::Item.Size.scaled(by:)",
         "example.com/acme/conformance::Sources/Model/Item.swift::Loader.load(from:)",
         "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)"
       ]
     }
   ],
-  "links": []
+  "links": [],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/conformance::Sources/App.swift::Bare",
+      "kind": "program",
+      "label": "Bare",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/App.swift::Bare"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/App.swift::Cli.main()",
+      "kind": "program",
+      "label": "Cli.main()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/App.swift::Cli.main()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::render(count:)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/main.swift::main",
+      "kind": "program",
+      "label": "main",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/main.swift::main"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:)"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Model/Item.swift::Item"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Model/Item.swift::Item",
+          "mark": "seen"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.display()"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/main.swift::main::render#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::Sources/Model/Item+Display.swift::render(_:)",
+            "example.com/acme/conformance::Sources/Model/Item.swift::render(_:)"
+          ]
+        }
+      ]
+    }
+  ]
 }
