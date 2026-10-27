@@ -12050,6 +12050,8 @@ fn swift() {
         checkout("Gateway.swift", "mountMetrics(_:).GET /internal/metrics"),
         checkout("Gateway.swift", "deeper(_:)"),
         checkout("Gateway.swift", "showItem(request:context:)"),
+        checkout("Gateway.swift", "ItemController"),
+        checkout("Gateway.swift", "controllers()"),
         checkout("Server.swift", "Server"),
         checkout("Server.swift", "Server.run()"),
         checkout("Clients.swift", "Api"),

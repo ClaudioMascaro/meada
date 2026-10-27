@@ -11,7 +11,7 @@
     },
     {
       "path": "Sources/Checkout/Gateway.swift",
-      "hash": "06809f6ab9186c5c56ba0be104025a0c47a71d21d4369043c6f242a6ac9ff3b4"
+      "hash": "4a239d1a79c90ca71962052f5135674143fae1e8e24d9e0795e04d22d75c1550"
     },
     {
       "path": "Sources/Checkout/Globals.swift",
@@ -353,6 +353,22 @@
         "path": "Sources/Checkout/Clients.swift",
         "start": 4317,
         "end": 4431
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::ItemController",
+      "span": {
+        "path": "Sources/Checkout/Gateway.swift",
+        "start": 1997,
+        "end": 2205
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::controllers()",
+      "span": {
+        "path": "Sources/Checkout/Gateway.swift",
+        "start": 2207,
+        "end": 2316
       }
     },
     {
@@ -2632,6 +2648,61 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::ItemController::Get#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::ItemController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Gateway.swift",
+        "start": 2153,
+        "end": 2187
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::ItemController::RouteGroup#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::ItemController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Gateway.swift",
+        "start": 2119,
+        "end": 2197
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::controllers()::ItemController#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::controllers()",
+      "target": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::ItemController",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Gateway.swift",
+        "start": 2275,
+        "end": 2291
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::controllers()::Router#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::controllers()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Gateway.swift",
+        "start": 2245,
+        "end": 2253
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::controllers()::router.addRoutes#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::controllers()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Gateway.swift",
+        "start": 2258,
+        "end": 2314
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::deeper(_:)::parent.group#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::deeper(_:)",
       "target": null,
@@ -4844,13 +4915,20 @@
     {
       "name": "Sources/Checkout#5",
       "members": [
+        "example.com/acme/conformance::Sources/Checkout/Gateway.swift::ItemController",
+        "example.com/acme/conformance::Sources/Checkout/Gateway.swift::controllers()"
+      ]
+    },
+    {
+      "name": "Sources/Checkout#6",
+      "members": [
         "example.com/acme/conformance::Sources/Checkout/Gateway.swift::deeper(_:)",
         "example.com/acme/conformance::Sources/Checkout/Gateway.swift::gateway()",
         "example.com/acme/conformance::Sources/Checkout/Gateway.swift::mountMetrics(_:)"
       ]
     },
     {
-      "name": "Sources/Checkout#6",
+      "name": "Sources/Checkout#7",
       "members": [
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController",
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::explicit(_:)",
@@ -4870,7 +4948,7 @@
       ]
     },
     {
-      "name": "Sources/Checkout#7",
+      "name": "Sources/Checkout#8",
       "members": [
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)",
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:)"

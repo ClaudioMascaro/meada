@@ -74,6 +74,9 @@ All notable changes to Meada are recorded here. The format follows
   `on(.METHOD, ..)` with their `grouped(..)` prefixes, a `RouteCollection` under the builder it
   is registered on, and builders followed through assignments, arguments and return values; the
   handler is the trailing closure or the function given as `use:`.
+- Hummingbird routes are HTTP providers (spec #29, #120): `get`, `post`, `put`, `patch`,
+  `delete` and `on(path, method:)` called on a `Router` or on a `group(prefix)` of it, at any
+  depth, with Vapor's value flow and handler rules; a controller's `addRoutes` is not read.
 - Swift packages (spec #29, #124): each `Package.swift` provides `package::swiftpm::<name>`,
   with its library products and their targets recorded. A `.package(url:)` links to the
   workspace repository of the same remote identity and a `.package(path:)` to the one at that

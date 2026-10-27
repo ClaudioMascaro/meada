@@ -787,7 +787,8 @@ one for the area a change touches.
   providers, and `http/kotlin/client.rs`, Ktor client consumers; `http/csharp.rs`, ASP.NET Core
   controller providers, `http/csharp/minimal.rs`, minimal API providers,
   `http/csharp/clients.rs`, HttpClient and typed client consumers, and `http/csharp/refit.rs`,
-  Refit consumers; `http/swift.rs`, `http/swift/vapor.rs`, Vapor providers, and `http/swift/client.rs`, URLSession,
+  Refit consumers; `http/swift.rs`, `http/swift/vapor.rs`, Vapor providers, `http/swift/hummingbird.rs`,
+  Hummingbird providers, and `http/swift/client.rs`, URLSession,
   Alamofire and AsyncHTTPClient consumers), resource and channel
   kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go, Maven, NuGet and SwiftPM packages as
   contracts (specs #22, #24, #30, #25, #26, #28 and #29), the shared steps and one module per ecosystem behind
@@ -1949,9 +1950,14 @@ one for the area a change touches.
   literal version, each `PackageReference` with its range as written, each `ProjectReference`
   as a `path` folded from the project's directory, each with `Entry::private` when it does not
   pass on (#369), the package properties as written (`Summary::properties`, #381), and
-  `Summary::project`, the mark that it is an SDK-style project that owns its files) and of each
+  `Summary::project`, the mark that it is an SDK-style project that owns its files), of each
   `Directory.Build.props` (#381: its `PackageReference`s, its `ProjectReference`s by the path as
-  written, its package properties and the props file it imports, `Summary::import`), the
+  written, its package properties and the props file it imports, `Summary::import`) and of each
+  `Package.swift` (spec #29, #124: the literal name, the library products with the targets each
+  holds, `Summary::products`, each target's module and directory, `Summary::targets`, and each
+  `.package` dependency with its requirement as written as the range and its source as `via`:
+  `git <identity>` of a `url:`, `path <manifest>` of a `path:`, or `computed git <pattern>` and
+  `computed path <pattern>`, with `*` for a computed part), the
   `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition, constant, type or file they name), the `families` table (spec #26: each public
@@ -2553,6 +2559,12 @@ qualification budget does (ADR 0017).
   leaves the routes under it unserved; an inline handler served under two prefixes has one
   symbol, named by one of them (as in C#); a factory that calls itself serves nothing through
   it, and a builder it reaches by one origin among others serves its routes under the others.
+- `http/swift/hummingbird.rs` (spec #29, #120): Hummingbird routes, a `Dialect` that
+  `vapor.rs::providers` runs with Vapor's value flow, mounts and handler rules. The root is a
+  call that `Hummingbird.Router` names, the child builder is `group(prefix)` (one optional
+  string), and `on(path, method:)` takes the path first. Ceiling: there is no
+  `RouteCollection`, and a controller's `addRoutes(to:)` is not read, so its routes are not
+  served.
 - `http/swift/client.rs` (spec #29, #121): a call is a consumer when it is `data(from:)` or
   `data(for:)` on a `URLSession`, `request(_:)` on Alamofire's `AF`, a `Session` or
   `Session.default`, or `execute(_:..)` on an `HTTPClient`. The receiver counts by its spelling
