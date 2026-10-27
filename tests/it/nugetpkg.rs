@@ -596,3 +596,66 @@ fn an_edited_directory_build_props_refreshes_like_a_cold_workspace() {
     edit(&cold);
     assert_eq!(refreshed.0, export(&cold[1]).0);
 }
+
+/// A receiver typed only by a declaration (a parameter, a field, a typed local), with no call
+/// naming the type, links through the package `using` as a call head does; a type the
+/// repository declares itself wins, and one no package provides stays outside.
+#[test]
+fn a_receiver_typed_by_a_declaration_links_through_a_package_using() {
+    let [_, app] = workspace("nuget_packages_declared");
+    let file = |name: &str, kind: &str, using: &str, body: &str| {
+        let text = format!(
+            "{using}namespace Example.App.Web;\n\npublic class {name}\n{{\n{kind}{body}}}\n"
+        );
+        write(&app, &format!("src/Web/{name}.cs"), &text);
+    };
+    let kit = "using Example.Kit.Pricing;\n\n";
+    file(
+        "ByParam",
+        "",
+        kit,
+        "    public int Run(Order o) => o.Total();\n",
+    );
+    file(
+        "ByField",
+        "",
+        kit,
+        "    private Order _o;\n    public int Run() => _o.Total();\n",
+    );
+    file(
+        "ByLocal",
+        "",
+        kit,
+        "    public Order Get() => null;\n    public int Run()\n    {\n        Order o = Get();\n        return o.Total();\n    }\n",
+    );
+    file(
+        "Stranger",
+        "",
+        "using Example.Nowhere;\n\n",
+        "    public int Run(Order o) => o.Total();\n",
+    );
+    // The repository declares `Order` too, in the namespace of the file: it wins.
+    write(
+        &app,
+        "src/Web/Own.cs",
+        "using Example.Kit.Pricing;\n\nnamespace Example.App.Own;\n\npublic class Order\n{\n    public int Total() => 1;\n}\n\npublic class Own\n{\n    public int Run(Order o) => o.Total();\n}\n",
+    );
+    let (text, json) = export(&app);
+    let provider = format!("{KIT_ORDER}.Total()");
+    for suffix in [
+        "ByParam.Run(Order)::o.Total#0",
+        "ByField.Run()::_o.Total#0",
+        "ByLocal.Run()::o.Total#0",
+    ] {
+        let found = calls(&json, suffix);
+        assert_eq!(found, [(&provider[..], "exact")], "{suffix}: {text}");
+    }
+    assert!(
+        calls(&json, "Stranger.Run(Order)::o.Total#0").is_empty(),
+        "{text}"
+    );
+    assert!(
+        calls(&json, "Own.Run(Order)::o.Total#0").is_empty(),
+        "{text}"
+    );
+}
