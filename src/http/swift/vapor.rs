@@ -96,9 +96,6 @@ struct Vapor<'c, 'a> {
     dialect: &'c Dialect,
     /// Whether a node was dropped past `VAPOR_NODES`.
     overflow: bool,
-    /// The nodes whose origins went round a factory that calls itself (`origins`): what is
-    /// mounted above them is not known, so a route reaching one is served nowhere.
-    cycles: BTreeSet<usize>,
     /// Each node by its place in `nodes`.
     ids: BTreeMap<Node<'a>, usize>,
     nodes: Vec<Node<'a>>,
@@ -232,30 +229,12 @@ impl<'c, 'a> Vapor<'c, 'a> {
             false => None,
         };
         let Some(parents) = self.origins(path, &call.scope, receiver, &context) else {
-            self.cycles.insert(id);
             return;
         };
         let parents: Vec<(usize, Option<String>)> = (parents.into_iter())
             .filter_map(|node| Some((self.intern(node)?, prefix.clone())))
             .collect();
         self.mounts.insert(id, parents);
-    }
-
-    /// Whether a node mounted under `nodes`, at any depth, went round a factory that calls
-    /// itself (`cycles`).
-    fn round(&self, nodes: &[usize]) -> bool {
-        let (mut seen, mut work) = (BTreeSet::new(), nodes.to_vec());
-        while let Some(id) = work.pop() {
-            if !seen.insert(id) {
-                continue;
-            }
-            if self.cycles.contains(&id) {
-                return true;
-            }
-            let parents = self.mounts.get(&id).into_iter().flatten();
-            work.extend(parents.map(|(parent, _)| *parent));
-        }
-        false
     }
 
     /// The method `value` names, upper-case: `.GET` or `HTTPMethod.GET`.
@@ -307,7 +286,6 @@ pub(super) fn providers(code: &Code, dialect: &Dialect) -> Vec<Found> {
         code,
         dialect,
         overflow: false,
-        cycles: BTreeSet::new(),
         ids: BTreeMap::new(),
         nodes: Vec::new(),
         pending: Vec::new(),
@@ -382,9 +360,6 @@ pub(super) fn providers(code: &Code, dialect: &Dialect) -> Vec<Found> {
     let root = |id: usize| vapor.roots.contains(&id).then(String::new);
     let mut found = Vec::new();
     for route in &routes {
-        if vapor.round(&route.nodes) {
-            continue;
-        }
         let mut served = BTreeSet::new();
         for &node in &route.nodes {
             served.extend(prefixes(node, &vapor.mounts, &root, &mut Vec::new()));

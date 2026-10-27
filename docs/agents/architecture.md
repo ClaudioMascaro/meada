@@ -1813,8 +1813,13 @@ one for the area a change touches.
   family and its blocks upward only, so a protocol-typed receiver stops at the requirement, and
   the labels narrow as they do for a bare call. A receiver of unread type (a call result, a
   closure parameter, an element) is the name match `matched` makes by base name and labels. A
-  standard-library type no import names resolves to nothing, so a receiver of one is a name
-  match too (no pack-side list of the library).
+  type from outside the repository (Opaque outside, `LanguagePack::outside_blocks`): a receiver
+  whose written or constructed type nothing in the repository binds (`session: URLSession`, a
+  standard-library type too), or a capitalized name nothing binds (`AF.request`), matches the
+  members of that type's extensions in the repository alone (`Resolver::outside_type`), and a
+  call past a member read on such a name (`URLSession.shared.data(..)`) resolves to nothing.
+  Ceiling: a receiver whose value comes from outside but whose type the source does not write
+  (`let session = URLSession.shared`, a `var` assigned again) keeps the name match.
   C# method calls (spec #28, #108) use the seams Java's do and add none but one flag. The pack
   writes `Facts::receivers` from the declared type of a field, a property, a parameter
   (primary constructors' too), a local with an explicit type, a `foreach`, `out` or pattern
@@ -2545,8 +2550,8 @@ qualification budget does (ADR 0017).
   (`RouteCollection` always is) is a name match, so its routes are not served;
   `grouped(User.authenticator(), User.guardMiddleware())` (a lowercase callee, an unread mount)
   leaves the routes under it unserved; an inline handler served under two prefixes has one
-  symbol, named by one of them (as in C#); a factory that calls itself, reached by one origin
-  of a builder among others, serves the routes under that builder nowhere.
+  symbol, named by one of them (as in C#); a factory that calls itself serves nothing through
+  it, and a builder it reaches by one origin among others serves its routes under the others.
 - `http/swift/client.rs` (spec #29, #121): a call is a consumer when it is `data(from:)` or
   `data(for:)` on a `URLSession`, `request(_:)` on Alamofire's `AF`, a `Session` or
   `Session.default`, or `execute(_:..)` on an `HTTPClient`. The receiver counts by its spelling

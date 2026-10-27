@@ -12009,6 +12009,7 @@ fn swift() {
         checkout("Routes.swift", "routes(_:).GET /guarded"),
         checkout("Routes.swift", "spin(_:)"),
         checkout("Routes.swift", "pick(_:)"),
+        checkout("Routes.swift", "pick(_:).GET /pick/one"),
         checkout("Routes.swift", "shadowedByLet(_:)"),
         checkout("Routes.swift", "shadowedByLoop(_:)"),
         checkout("Routes.swift", "shadowedByIf(_:_:)"),
@@ -12070,7 +12071,7 @@ fn swift() {
         checkout("Clients.swift", "Remote"),
         checkout("Clients.swift", "alamofire(id:session:)"),
         checkout("Clients.swift", "asyncHTTP(client:)"),
-        checkout("Clients.swift", "byName(other:)"),
+        checkout("Clients.swift", "byName()"),
         checkout("Clients.swift", "lookup()"),
         checkout("Clients.swift", "moved(other:)"),
         checkout("Clients.swift", "notRead(session:cache:)"),
@@ -12081,6 +12082,8 @@ fn swift() {
         checkout("Clients.swift", "guarded(session:)"),
         checkout("Clients.swift", "mutated(id:)"),
         checkout("Clients.swift", "versions()"),
+        checkout("Clients.swift", "URLSession.warm(from:)"),
+        checkout("Clients.swift", "warmed(session:other:)"),
         checkout("Ui.swift", "reroute()"),
         checkout("Ui.swift", "uikit(session:)"),
         store("Endpoints.swift", "Endpoints"),
@@ -12310,6 +12313,42 @@ fn swift() {
             one(dispatch("Parcel")),
         ),
     ]);
+    // Opaque outside: a receiver whose written type, or whose capitalized name, is outside the
+    // repository reaches its type's extensions alone; an untyped one matches by name.
+    let clients = |callee: &str| checkout("Clients.swift", callee);
+    let warm = clients("URLSession.warm(from:)");
+    calls.extend([
+        (
+            clients("warmed(session:other:)::session.warm#0"),
+            INFERRED,
+            one(warm),
+        ),
+        (
+            clients("warmed(session:other:)::other.fetch#0"),
+            None,
+            vec![],
+        ),
+        (
+            clients("warmed(session:other:)::URLSession.shared.warm#0"),
+            None,
+            vec![],
+        ),
+        (
+            clients("sessions(id:session:)::session.data#0"),
+            None,
+            vec![],
+        ),
+        (
+            clients("alamofire(id:session:)::AF.request#0"),
+            None,
+            vec![],
+        ),
+        (
+            clients("byName()::other.fetch#0"),
+            INFERRED,
+            one(clients("Api.fetch(_:)")),
+        ),
+    ]);
     conform_owned(
         "conformance-swift",
         &symbols,
@@ -12492,6 +12531,7 @@ fn swift_without_a_package_manifest() {
         shadows("cases(_:)"),
         shadows("work()"),
         receivers("outside(_:_:_:_:)"),
+        receivers("String.shout()"),
         receivers("hidden(_:_:)"),
         receivers("rebound(_:)"),
         receivers("typed(_:)"),
@@ -12585,8 +12625,13 @@ fn swift_without_a_package_manifest() {
     let mut calls = calls;
     let outside = |callee: &str| receivers(&format!("outside(_:_:_:_:)::{callee}"));
     calls.extend([
-        // A standard-library type no import names is no type Meada finds: a name match.
-        (outside("name.label#0"), INFERRED, one(item("Item.label()"))),
+        // A standard-library type is outside the repository: its extensions alone answer.
+        (outside("name.label#0"), None, vec![]),
+        (
+            outside("name.shout#0"),
+            INFERRED,
+            one(receivers("String.shout()")),
+        ),
         // A protocol-typed receiver stops at the requirement; a class-typed one resolves its
         // labels; a nested type is read as written.
         (

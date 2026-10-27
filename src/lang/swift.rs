@@ -155,6 +155,10 @@ impl LanguagePack for Swift {
     fn unordered_bases(&self) -> bool {
         true
     }
+
+    fn outside_blocks(&self) -> bool {
+        true
+    }
 }
 
 /// The module of each target directory the manifests declare (empty at the root); of two

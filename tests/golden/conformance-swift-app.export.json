@@ -27,7 +27,7 @@
     },
     {
       "path": "Sources/Receivers.swift",
-      "hash": "74552c71c50905ef2684418bbe202e319fd7a422bedb6dcfa68300c040ff3e87"
+      "hash": "b63ba6801b2df652708b7b3924a6d1ac7d1ef02a74e42df0023938ad1246e941"
     },
     {
       "path": "Sources/Scopes.swift",
@@ -224,19 +224,27 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::String.shout()",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 631,
+        "end": 662
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/Receivers.swift::generic(_:)",
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 536,
-        "end": 589
+        "start": 553,
+        "end": 606
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Receivers.swift::hidden(_:_:)",
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 218,
-        "end": 338
+        "start": 235,
+        "end": 355
       }
     },
     {
@@ -244,23 +252,23 @@
       "span": {
         "path": "Sources/Receivers.swift",
         "start": 0,
-        "end": 216
+        "end": 233
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Receivers.swift::rebound(_:)",
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 340,
-        "end": 430
+        "start": 357,
+        "end": 447
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Receivers.swift::typed(_:)",
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 432,
-        "end": 534
+        "start": 449,
+        "end": 551
       }
     },
     {
@@ -753,8 +761,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 575,
-        "end": 587
+        "start": 592,
+        "end": 604
       }
     },
     {
@@ -764,8 +772,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 316,
-        "end": 330
+        "start": 333,
+        "end": 347
       }
     },
     {
@@ -775,8 +783,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 267,
-        "end": 279
+        "start": 284,
+        "end": 296
       }
     },
     {
@@ -786,8 +794,8 @@
       "level": null,
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 284,
-        "end": 336
+        "start": 301,
+        "end": 353
       }
     },
     {
@@ -797,8 +805,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 136,
-        "end": 156
+        "start": 153,
+        "end": 173
       }
     },
     {
@@ -808,8 +816,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 161,
-        "end": 191
+        "start": 178,
+        "end": 208
       }
     },
     {
@@ -819,19 +827,30 @@
       "level": "exact",
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 109,
-        "end": 131
+        "start": 126,
+        "end": 148
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)::name.label#0",
       "caller": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)",
-      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Receivers.swift",
         "start": 92,
         "end": 104
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)::name.shout#0",
+      "caller": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)",
+      "target": "example.com/acme/conformance::Sources/Receivers.swift::String.shout()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 109,
+        "end": 121
       }
     },
     {
@@ -841,8 +860,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 196,
-        "end": 214
+        "start": 213,
+        "end": 231
       }
     },
     {
@@ -852,8 +871,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 416,
-        "end": 428
+        "start": 433,
+        "end": 445
       }
     },
     {
@@ -863,8 +882,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 476,
-        "end": 488
+        "start": 493,
+        "end": 505
       }
     },
     {
@@ -874,8 +893,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 520,
-        "end": 532
+        "start": 537,
+        "end": 549
       }
     },
     {
@@ -885,8 +904,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Receivers.swift",
-        "start": 493,
-        "end": 515
+        "start": 510,
+        "end": 532
       }
     },
     {
@@ -1312,6 +1331,7 @@
         "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.Size.doubled()",
         "example.com/acme/conformance::Sources/Model/Item.swift::Item.Size.scaled(by:)",
         "example.com/acme/conformance::Sources/Model/Item.swift::Loader.load(from:)",
+        "example.com/acme/conformance::Sources/Receivers.swift::String.shout()",
         "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)"
       ]
     }

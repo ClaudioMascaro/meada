@@ -161,6 +161,15 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether a block (`Facts::impls`) may add members to a type from outside the repository
+    /// (Swift's `extension URLSession`). A call no binding answers, on a receiver whose type the
+    /// source writes or constructs and the repository lacks, or on a capitalized name nothing in
+    /// it binds (`URLSession.shared`, `AF`), is a name match among the members of that type's
+    /// blocks alone, and past a member read on such a name it resolves to nothing.
+    fn outside_blocks(&self) -> bool {
+        false
+    }
+
     /// Whether a method call that no function of the repository answers may hand back the
     /// value it was called on, as a builder does (`Router::new().route(..)` in Rust):
     /// `Code::origins` then follows the call's `receiver`, to a constructor whose outside name

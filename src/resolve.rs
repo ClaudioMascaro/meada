@@ -353,6 +353,8 @@ pub struct Resolver<'a> {
     unordered_bases: bool,
     /// The pack's `LanguagePack::extension_methods`.
     extension_methods: bool,
+    /// The pack's `LanguagePack::outside_blocks`.
+    outside_blocks: bool,
     /// The pack's `LanguagePack::implicit_members`.
     implicit: &'static [&'static str],
     /// The pack's names bound everywhere (`LanguagePack::globals`).
@@ -849,6 +851,7 @@ impl<'a> Resolver<'a> {
             base_receiver: language.base_receiver(),
             unordered_bases: language.unordered_bases(),
             extension_methods: language.extension_methods(),
+            outside_blocks: language.outside_blocks(),
             implicit: language.implicit_members(),
             globals: language.globals(),
             callers: HashMap::new(),
@@ -1180,6 +1183,37 @@ impl<'a> Resolver<'a> {
         !matches!(found, Binding::Def(t) if self.is_class(t))
     }
 
+    /// In a pack whose outside types take blocks (`LanguagePack::outside_blocks`), the type
+    /// from outside the repository the receiver `head` (bound to `receiver`) is of: the type
+    /// the source writes or constructs for it, or the capitalized name it starts with, when
+    /// nothing in the repository binds that name. `Some(None)` for a member read on such a name
+    /// (`URLSession.shared`), whose type is not known; `None` for any other receiver.
+    fn outside_type(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        head: &'a str,
+        receiver: &Binding<'a>,
+        work: &mut Work<'a>,
+    ) -> Option<Option<&'a str>> {
+        let outside = |name: &'a str, work: &mut Work<'a>| {
+            let seen = &mut self.seen(path, scope);
+            let found = self.resolve_as(path, scope, name, seen, work, Reading::Path);
+            matches!(found, Binding::Unknown | Binding::External(..))
+        };
+        if let Some((p, s, n)) = self.holder(receiver) {
+            return match self.receivers[p].get(&(s, n)) {
+                Some(Class::Type(ty) | Class::Named(ty)) if outside(ty, work) => Some(Some(ty)),
+                _ => None,
+            };
+        }
+        let first = head.split('.').next().unwrap_or(head);
+        if !first.starts_with(|c: char| c.is_ascii_uppercase()) || !outside(first, work) {
+            return None;
+        }
+        Some((first == head).then_some(first))
+    }
+
     /// The name match of a call that no binding answers (`infer`). A call narrowed by its
     /// argument count (`Call::arity`, a pack whose overloads merge across a class family) reads
     /// the family that owns it: a receiver whose class the source writes, `this` and a bare
@@ -1219,6 +1253,8 @@ impl<'a> Resolver<'a> {
             &on_receiver,
         );
         let mut written = false;
+        // A type from outside the repository the receiver is of (`outside_type`).
+        let mut outside = None;
         let owner = match head {
             None if bare => self.class(path, scope),
             None => Binding::Unknown,
@@ -1248,9 +1284,21 @@ impl<'a> Resolver<'a> {
                 {
                     written = self.outside_result(p, *made, work);
                 }
+                if self.outside_blocks {
+                    outside = self.outside_type(path, scope, head, &receiver, work);
+                }
                 self.instance(receiver, work)
             }
         };
+        if let Some(ty) = outside {
+            let blocks = (all.iter().copied())
+                .filter(|t| {
+                    let block = crate::parent(t.name);
+                    ty == Some(block) && self.unread.contains(&(t.path, block))
+                })
+                .collect();
+            return one_of(blocks);
+        }
         let on_instance = matches!(owner, Binding::Instance(_)) || head == self.receiver;
         // An extension method may answer a call on a receiver the repository lacks the member
         // of, or whose written type is outside it; no other method of that name does.

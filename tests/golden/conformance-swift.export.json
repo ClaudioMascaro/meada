@@ -11,7 +11,7 @@
     },
     {
       "path": "Sources/Checkout/Clients.swift",
-      "hash": "ef72c317379d08f3f2a44444f2804ea7fde33e87e1572638108eb146c4fd0112"
+      "hash": "9e70abb64c368d3a97ee354e1558d72d2a45a456c765cd4167cd66e2d1f06bfe"
     },
     {
       "path": "Sources/Checkout/Gateway.swift",
@@ -23,7 +23,7 @@
     },
     {
       "path": "Sources/Checkout/Routes.swift",
-      "hash": "705905d25c02d9ad5213d64ca2ac3bd4536d55f31f052c220d67a848fa965ca5"
+      "hash": "33258cce4b93d765974bd4782262fff05bc389ac4361fb585f3d0d8e7b5d8534"
     },
     {
       "path": "Sources/Checkout/Server.swift",
@@ -175,16 +175,16 @@
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6479,
-        "end": 6544
+        "start": 6490,
+        "end": 6555
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6498,
-        "end": 6542
+        "start": 6509,
+        "end": 6553
       }
     },
     {
@@ -223,16 +223,16 @@
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Local",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6546,
-        "end": 6597
+        "start": 6557,
+        "end": 6608
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Local.request(_:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6565,
-        "end": 6595
+        "start": 6576,
+        "end": 6606
       }
     },
     {
@@ -241,6 +241,14 @@
         "path": "Sources/Checkout/Clients.swift",
         "start": 203,
         "end": 403
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::URLSession.warm(from:)",
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 7162,
+        "end": 7189
       }
     },
     {
@@ -260,59 +268,59 @@
       }
     },
     {
-      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::byName(other:)",
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::byName()",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
         "start": 3716,
-        "end": 3803
+        "end": 3814
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::guarded(session:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6174,
-        "end": 6415
+        "start": 6185,
+        "end": 6426
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::lookup()",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6417,
-        "end": 6477
+        "start": 6428,
+        "end": 6488
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::moved(other:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3852,
-        "end": 4036
+        "start": 3863,
+        "end": 4047
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5538,
-        "end": 6126
+        "start": 5549,
+        "end": 6137
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::notRead(session:cache:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6748,
-        "end": 6998
+        "start": 6759,
+        "end": 7009
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::relative(_:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5084,
-        "end": 5273
+        "start": 5095,
+        "end": 5284
       }
     },
     {
@@ -327,24 +335,32 @@
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::unresolved(path:flag:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4218,
-        "end": 4988
+        "start": 4229,
+        "end": 4999
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::useApi()",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4038,
-        "end": 4155
+        "start": 4049,
+        "end": 4166
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::versions()",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5275,
-        "end": 5444
+        "start": 5286,
+        "end": 5455
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::warmed(session:other:)",
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 7193,
+        "end": 7423
       }
     },
     {
@@ -599,8 +615,16 @@
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::pick(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3895,
-        "end": 3993
+        "start": 3882,
+        "end": 3980
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::pick(_:).GET /pick/one",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 3959,
+        "end": 3978
       }
     },
     {
@@ -703,24 +727,24 @@
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::shadowedByIf(_:_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4428,
-        "end": 4598
+        "start": 4415,
+        "end": 4585
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::shadowedByLet(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4082,
-        "end": 4277
+        "start": 4069,
+        "end": 4264
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::shadowedByLoop(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4279,
-        "end": 4426
+        "start": 4266,
+        "end": 4413
       }
     },
     {
@@ -1557,8 +1581,8 @@
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Gateway.ping()::self.session.data#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Gateway.ping()",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
         "start": 3450,
@@ -1579,8 +1603,8 @@
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Gateway.pong()::session.data#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Gateway.pong()",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
         "start": 3583,
@@ -1590,8 +1614,8 @@
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::alamofire(id:session:)::AF.request#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::alamofire(id:session:)",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Local.request(_:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
         "start": 1527,
@@ -1720,14 +1744,25 @@
       }
     },
     {
-      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::byName(other:)::other.fetch#0",
-      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::byName(other:)",
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::byName()::lookup#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::byName()",
+      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::lookup()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 3761,
+        "end": 3769
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::byName()::other.fetch#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::byName()",
       "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.fetch(_:)",
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3777,
-        "end": 3801
+        "start": 3788,
+        "end": 3812
       }
     },
     {
@@ -1737,8 +1772,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6270,
-        "end": 6311
+        "start": 6281,
+        "end": 6322
       }
     },
     {
@@ -1748,8 +1783,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6254,
-        "end": 6313
+        "start": 6265,
+        "end": 6324
       }
     },
     {
@@ -1759,8 +1794,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6372,
-        "end": 6398
+        "start": 6383,
+        "end": 6409
       }
     },
     {
@@ -1770,8 +1805,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3987,
-        "end": 4032
+        "start": 3998,
+        "end": 4043
       }
     },
     {
@@ -1781,8 +1816,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3969,
-        "end": 4034
+        "start": 3980,
+        "end": 4045
       }
     },
     {
@@ -1792,8 +1827,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5589,
-        "end": 5631
+        "start": 5600,
+        "end": 5642
       }
     },
     {
@@ -1803,8 +1838,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5819,
-        "end": 5850
+        "start": 5830,
+        "end": 5861
       }
     },
     {
@@ -1814,8 +1849,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5887,
-        "end": 5933
+        "start": 5898,
+        "end": 5944
       }
     },
     {
@@ -1825,8 +1860,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6089,
-        "end": 6122
+        "start": 6100,
+        "end": 6133
       }
     },
     {
@@ -1836,30 +1871,30 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5871,
-        "end": 5935
+        "start": 5882,
+        "end": 5946
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URLSession.shared.data#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5688,
-        "end": 5721
+        "start": 5699,
+        "end": 5732
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URLSession.shared.data#1",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5790,
-        "end": 5852
+        "start": 5801,
+        "end": 5863
       }
     },
     {
@@ -1869,19 +1904,19 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6005,
-        "end": 6041
+        "start": 6016,
+        "end": 6052
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URLSession.shared.data#3",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6060,
-        "end": 6124
+        "start": 6071,
+        "end": 6135
       }
     },
     {
@@ -1891,8 +1926,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5940,
-        "end": 5986
+        "start": 5951,
+        "end": 5997
       }
     },
     {
@@ -1902,8 +1937,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5750,
-        "end": 5771
+        "start": 5761,
+        "end": 5782
       }
     },
     {
@@ -1913,8 +1948,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5637,
-        "end": 5669
+        "start": 5648,
+        "end": 5680
       }
     },
     {
@@ -1924,8 +1959,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6802,
-        "end": 6894
+        "start": 6813,
+        "end": 6905
       }
     },
     {
@@ -1935,8 +1970,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6952,
-        "end": 6996
+        "start": 6963,
+        "end": 7007
       }
     },
     {
@@ -1946,8 +1981,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6940,
-        "end": 6947
+        "start": 6951,
+        "end": 6958
       }
     },
     {
@@ -1957,8 +1992,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6825,
-        "end": 6868
+        "start": 6836,
+        "end": 6879
       }
     },
     {
@@ -1968,8 +2003,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6903,
-        "end": 6926
+        "start": 6914,
+        "end": 6937
       }
     },
     {
@@ -1979,8 +2014,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 6802,
-        "end": 6885
+        "start": 6813,
+        "end": 6896
       }
     },
     {
@@ -1990,8 +2025,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5152,
-        "end": 5181
+        "start": 5163,
+        "end": 5192
       }
     },
     {
@@ -2001,19 +2036,19 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5232,
-        "end": 5267
+        "start": 5243,
+        "end": 5278
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::relative(_:)::URLSession.shared.data#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::relative(_:)",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5203,
-        "end": 5269
+        "start": 5214,
+        "end": 5280
       }
     },
     {
@@ -2173,8 +2208,8 @@
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)::URLSession.shared.data#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
         "start": 566,
@@ -2184,8 +2219,8 @@
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)::URLSession.shared.data#1",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
         "start": 702,
@@ -2206,8 +2241,8 @@
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)::URLSession.shared.data#3",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
         "start": 1436,
@@ -2217,8 +2252,8 @@
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)::own.data#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
         "start": 1243,
@@ -2228,8 +2263,8 @@
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)::session.data#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
         "start": 756,
@@ -2239,8 +2274,8 @@
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)::session.data#1",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
         "start": 832,
@@ -2265,8 +2300,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4322,
-        "end": 4343
+        "start": 4333,
+        "end": 4354
       }
     },
     {
@@ -2276,8 +2311,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4393,
-        "end": 4410
+        "start": 4404,
+        "end": 4421
       }
     },
     {
@@ -2287,8 +2322,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4445,
-        "end": 4489
+        "start": 4456,
+        "end": 4500
       }
     },
     {
@@ -2298,8 +2333,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4520,
-        "end": 4565
+        "start": 4531,
+        "end": 4576
       }
     },
     {
@@ -2309,8 +2344,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4653,
-        "end": 4697
+        "start": 4664,
+        "end": 4708
       }
     },
     {
@@ -2320,8 +2355,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4826,
-        "end": 4870
+        "start": 4837,
+        "end": 4881
       }
     },
     {
@@ -2331,8 +2366,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4429,
-        "end": 4491
+        "start": 4440,
+        "end": 4502
       }
     },
     {
@@ -2342,8 +2377,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4504,
-        "end": 4567
+        "start": 4515,
+        "end": 4578
       }
     },
     {
@@ -2353,8 +2388,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4637,
-        "end": 4699
+        "start": 4648,
+        "end": 4710
       }
     },
     {
@@ -2364,30 +2399,30 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4810,
-        "end": 4872
+        "start": 4821,
+        "end": 4883
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::unresolved(path:flag:)::URLSession.shared.data#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::unresolved(path:flag:)",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4293,
-        "end": 4345
+        "start": 4304,
+        "end": 4356
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::unresolved(path:flag:)::URLSession.shared.data#1",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::unresolved(path:flag:)",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4364,
-        "end": 4412
+        "start": 4375,
+        "end": 4423
       }
     },
     {
@@ -2397,8 +2432,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4586,
-        "end": 4620
+        "start": 4597,
+        "end": 4631
       }
     },
     {
@@ -2408,8 +2443,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4759,
-        "end": 4793
+        "start": 4770,
+        "end": 4804
       }
     },
     {
@@ -2419,8 +2454,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4952,
-        "end": 4986
+        "start": 4963,
+        "end": 4997
       }
     },
     {
@@ -2430,8 +2465,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4334,
-        "end": 4342
+        "start": 4345,
+        "end": 4353
       }
     },
     {
@@ -2441,8 +2476,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4081,
-        "end": 4086
+        "start": 4092,
+        "end": 4097
       }
     },
     {
@@ -2452,8 +2487,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4105,
-        "end": 4125
+        "start": 4116,
+        "end": 4136
       }
     },
     {
@@ -2463,8 +2498,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4140,
-        "end": 4153
+        "start": 4151,
+        "end": 4164
       }
     },
     {
@@ -2474,8 +2509,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5324,
-        "end": 5341
+        "start": 5335,
+        "end": 5352
       }
     },
     {
@@ -2485,8 +2520,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5360,
-        "end": 5379
+        "start": 5371,
+        "end": 5390
       }
     },
     {
@@ -2496,8 +2531,63 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5398,
-        "end": 5442
+        "start": 5409,
+        "end": 5453
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::warmed(session:other:)::URL#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::warmed(session:other:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 7267,
+        "end": 7310
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::warmed(session:other:)::URL#1",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::warmed(session:other:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 7374,
+        "end": 7419
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::warmed(session:other:)::URLSession.shared.warm#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::warmed(session:other:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 7345,
+        "end": 7421
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::warmed(session:other:)::other.fetch#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::warmed(session:other:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 7317,
+        "end": 7340
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::warmed(session:other:)::session.warm#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::warmed(session:other:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::URLSession.warm(from:)",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 7248,
+        "end": 7312
       }
     },
     {
@@ -2991,8 +3081,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3937,
-        "end": 3991
+        "start": 3924,
+        "end": 3978
       }
     },
     {
@@ -3002,8 +3092,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3937,
-        "end": 3960
+        "start": 3924,
+        "end": 3947
       }
     },
     {
@@ -3585,8 +3675,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4504,
-        "end": 4521
+        "start": 4491,
+        "end": 4508
       }
     },
     {
@@ -3596,8 +3686,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4554,
-        "end": 4590
+        "start": 4541,
+        "end": 4577
       }
     },
     {
@@ -3607,8 +3697,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4136,
-        "end": 4153
+        "start": 4123,
+        "end": 4140
       }
     },
     {
@@ -3618,8 +3708,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4192,
-        "end": 4228
+        "start": 4179,
+        "end": 4215
       }
     },
     {
@@ -3629,8 +3719,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4239,
-        "end": 4275
+        "start": 4226,
+        "end": 4262
       }
     },
     {
@@ -3640,8 +3730,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4334,
-        "end": 4351
+        "start": 4321,
+        "end": 4338
       }
     },
     {
@@ -3651,8 +3741,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4382,
-        "end": 4418
+        "start": 4369,
+        "end": 4405
       }
     },
     {
@@ -3757,8 +3847,8 @@
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Ui.swift::uikit(session:)::session.data#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Ui.swift::uikit(session:)",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Ui.swift",
         "start": 149,
@@ -4405,6 +4495,10 @@
       "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:).GET /loop/leaf"
     },
     {
+      "contract": "http::GET::/pick/one",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::pick(_:).GET /pick/one"
+    },
+    {
       "contract": "http::GET::/started",
       "site": "example.com/acme/conformance::Sources/Checkout/main.swift::main.GET /started"
     },
@@ -4666,7 +4760,9 @@
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.remove(_:)",
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.send(_:_:)",
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.user(_:)",
-        "example.com/acme/conformance::Sources/Checkout/Clients.swift::byName(other:)",
+        "example.com/acme/conformance::Sources/Checkout/Clients.swift::byName()",
+        "example.com/acme/conformance::Sources/Checkout/Clients.swift::lookup()",
+        "example.com/acme/conformance::Sources/Checkout/Clients.swift::unresolved(path:flag:)",
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::useApi()"
       ]
     },
@@ -4677,23 +4773,17 @@
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.local()",
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache",
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-        "example.com/acme/conformance::Sources/Checkout/Clients.swift::Gateway.ping()",
-        "example.com/acme/conformance::Sources/Checkout/Clients.swift::Gateway.pong()",
-        "example.com/acme/conformance::Sources/Checkout/Clients.swift::lookup()",
+        "example.com/acme/conformance::Sources/Checkout/Clients.swift::Local",
+        "example.com/acme/conformance::Sources/Checkout/Clients.swift::Local.request(_:)",
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::moved(other:)",
-        "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
-        "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)",
-        "example.com/acme/conformance::Sources/Checkout/Clients.swift::unresolved(path:flag:)",
-        "example.com/acme/conformance::Sources/Checkout/Ui.swift::uikit(session:)"
+        "example.com/acme/conformance::Sources/Checkout/Clients.swift::notRead(session:cache:)"
       ]
     },
     {
       "name": "Sources/Checkout#4",
       "members": [
-        "example.com/acme/conformance::Sources/Checkout/Clients.swift::Local",
-        "example.com/acme/conformance::Sources/Checkout/Clients.swift::Local.request(_:)",
-        "example.com/acme/conformance::Sources/Checkout/Clients.swift::alamofire(id:session:)",
-        "example.com/acme/conformance::Sources/Checkout/Clients.swift::notRead(session:cache:)"
+        "example.com/acme/conformance::Sources/Checkout/Clients.swift::URLSession.warm(from:)",
+        "example.com/acme/conformance::Sources/Checkout/Clients.swift::warmed(session:other:)"
       ]
     },
     {
@@ -5174,6 +5264,20 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:).GET /loop/leaf"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::pick(_:).GET /pick/one::http::GET::/pick/one",
+      "kind": "route",
+      "label": "GET /pick/one",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::pick(_:).GET /pick/one"
         }
       ]
     },

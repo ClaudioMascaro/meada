@@ -221,8 +221,8 @@
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::hello(who:)::greeter.hello#0",
       "caller": "example.com/apps/shop::Sources/App/main.swift::hello(who:)",
-      "target": "example.com/apps/shop::Sources/App/main.swift::Local.hello(to:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/App/main.swift",
         "start": 354,
@@ -441,8 +441,8 @@
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::twoOrigins(flag:)::held.hello#0",
       "caller": "example.com/apps/shop::Sources/App/main.swift::twoOrigins(flag:)",
-      "target": "example.com/apps/shop::Sources/App/main.swift::Local.hello(to:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/App/main.swift",
         "start": 1599,
@@ -874,7 +874,6 @@
       "name": "Sources/App#2",
       "members": [
         "example.com/apps/shop::Sources/App/main.swift::Local.hello(to:)",
-        "example.com/apps/shop::Sources/App/main.swift::hello(who:)",
         "example.com/apps/shop::Sources/App/main.swift::hidesGreeterByParameter(greeter:)",
         "example.com/apps/shop::Sources/App/main.swift::hidesTheTypeByParameter(Greeter:)",
         "example.com/apps/shop::Sources/App/main.swift::onAResult()"
