@@ -596,6 +596,7 @@ impl ContractKind for Http {
         found.extend(kotlin::consumers(code, indexed));
         found.extend(java::consumers(code, indexed));
         found.extend(csharp::consumers(code, indexed));
+        found.extend(swift::consumers(code));
         found
     }
 

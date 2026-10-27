@@ -3,7 +3,7 @@
 //! (`Def::return_values`). A string literal is its parts, a name is `Value::Ref`, a call is
 //! `Value::Call`, and a closure is the `Kind::Inline` definition the walk makes of it, when it
 //! is written in code (`Ctx::inline`). A label before an argument makes it a keyword argument
-//! (`get("users", use: list)`), the implicit member of an enum is `.NAME`, and anything else is
+//! (`get("users", use: list)`), the implicit member of an enum (`.GET`) is `Value::Member` with no type, and anything else is
 //! `Unknown`.
 
 use tree_sitter::Node;
@@ -75,6 +75,13 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
     match node.kind() {
         "simple_identifier" => Value::Ref(unbacktick(text(node, src))),
         "self_expression" => Value::Ref("self".into()),
+        // `URL(string: s)!`: the force unwrap is its operand.
+        "postfix_expression"
+            if (node.child_by_field_name("operation")).is_some_and(|o| o.kind() == "bang") =>
+        {
+            node.child_by_field_name("target")
+                .map_or(Value::Unknown, |t| value_at(t, src, ctx, depth + 1))
+        }
         "navigation_expression" | "postfix_expression" => {
             let name = callee(node, src);
             match name.contains('(') {
@@ -84,6 +91,23 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
         }
         "line_string_literal" | "multi_line_string_literal" => {
             Value::Str(string(node, src, ctx, depth))
+        }
+        "additive_expression" if children(node).any(|c| c.kind() == "+") => {
+            let mut out: Vec<Part> = Vec::new();
+            for side in ["lhs", "rhs"] {
+                let part = match node.child_by_field_name(side) {
+                    Some(n) => match value_at(n, src, ctx, depth + 1) {
+                        Value::Str(parts) => parts,
+                        Value::Ref(name) => vec![Part::Ref(name)],
+                        _ => vec![Part::Hole],
+                    },
+                    None => vec![Part::Hole],
+                };
+                for part in part {
+                    push(&mut out, part);
+                }
+            }
+            Value::Str(out)
         }
         "array_literal" => Value::List(
             (children(node))
@@ -102,7 +126,7 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
         "prefix_expression" if text(node, src).starts_with('.') => {
             match node.child_by_field_name("target") {
                 Some(t) if t.kind() == "simple_identifier" => {
-                    Value::Ref(format!(".{}", unbacktick(text(t, src))))
+                    Value::Member(String::new(), unbacktick(text(t, src)))
                 }
                 _ => Value::Unknown,
             }
@@ -117,6 +141,7 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
                 callee: at.callee,
                 receiver: at.receiver.map(Box::new),
                 args: at.args,
+                kwargs: at.kwargs,
                 range: node.byte_range(),
             })
         }
@@ -140,12 +165,17 @@ fn string(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Vec<Part> {
             },
             _ => Part::Hole,
         };
-        match (out.last_mut(), part) {
-            (Some(Part::Text(last)), Part::Text(more)) => last.push_str(&more),
-            (_, part) => out.push(part),
-        }
+        push(&mut out, part);
     }
     out
+}
+
+/// Adds `part` to `out`, joining text to the text before it.
+fn push(out: &mut Vec<Part>, part: Part) {
+    match (out.last_mut(), part) {
+        (Some(Part::Text(last)), Part::Text(more)) => last.push_str(&more),
+        (_, part) => out.push(part),
+    }
 }
 
 /// The value a function with a declared result returns when its body is one expression

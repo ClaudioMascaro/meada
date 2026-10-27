@@ -844,6 +844,7 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
                         callee: callee(f, src),
                         receiver,
                         args: args.map_or(Vec::new(), |a| named(a).map(deeper).collect()),
+                        kwargs: Vec::new(),
                         // The span of the call in `Facts::calls`.
                         range: match awaited_artifact(node) {
                             true => f.start_byte()..node.end_byte(),

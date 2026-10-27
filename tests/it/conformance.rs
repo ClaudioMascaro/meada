@@ -12024,6 +12024,33 @@ fn swift() {
         checkout("Routes.swift", "OrderController.show(req:)"),
         checkout("Server.swift", "Server"),
         checkout("Server.swift", "Server.run()"),
+        checkout("Clients.swift", "Api"),
+        checkout("Clients.swift", "Api.cached(session:)"),
+        checkout("Clients.swift", "Api.fetch(_:)"),
+        checkout("Clients.swift", "Api.local()"),
+        checkout("Clients.swift", "Api.profile()"),
+        checkout("Clients.swift", "Api.remove(_:)"),
+        checkout("Clients.swift", "Api.send(_:_:)"),
+        checkout("Clients.swift", "Api.user(_:)"),
+        checkout("Clients.swift", "Cache"),
+        checkout("Clients.swift", "Cache.data(from:)"),
+        checkout("Clients.swift", "Gateway"),
+        checkout("Clients.swift", "Gateway.init(session:)"),
+        checkout("Clients.swift", "Gateway.ping()"),
+        checkout("Clients.swift", "Gateway.pong()"),
+        checkout("Clients.swift", "Local"),
+        checkout("Clients.swift", "Local.request(_:)"),
+        checkout("Clients.swift", "Remote"),
+        checkout("Clients.swift", "alamofire(id:session:)"),
+        checkout("Clients.swift", "asyncHTTP(client:)"),
+        checkout("Clients.swift", "byName(other:)"),
+        checkout("Clients.swift", "lookup()"),
+        checkout("Clients.swift", "moved(other:)"),
+        checkout("Clients.swift", "notRead(session:cache:)"),
+        checkout("Clients.swift", "sessions(id:session:)"),
+        checkout("Clients.swift", "unresolved(path:flag:)"),
+        checkout("Clients.swift", "useApi()"),
+        store("Endpoints.swift", "Endpoints"),
     ];
     let one = |t: String| vec![t];
     let run = |callee: &str| checkout("Checkout.swift", &format!("Checkout.run()::{callee}"));
@@ -12251,6 +12278,100 @@ fn swift() {
         ),
     ]);
     conform_owned("conformance-swift", &symbols, &calls);
+}
+
+/// Outgoing HTTP calls of Swift are consumers with their URLs evaluated (spec #29, #121).
+#[test]
+fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
+    let repo = fixture_repo("swift_http_consumers", "conformance-swift", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let (api, orders, billing) = (
+        "host:api.example.com",
+        "host:orders.example.com",
+        "host:billing.example.com",
+    );
+    let at =
+        |function: &str, call: &str| format!("Sources/Checkout/Clients.swift::{function}::{call}");
+    let sessions = |call: &str| at("sessions(id:session:)", call);
+    let alamofire = |call: &str| at("alamofire(id:session:)", call);
+    let unresolved = |call: &str| at("unresolved(path:flag:)", call);
+    let expected = triples(&[
+        // URLSession: `data(from:)` is a `GET`, on `URLSession.shared`, a typed parameter and a
+        // local made by `URLSession(configuration:)`.
+        (
+            "http::GET::/ping",
+            api,
+            &sessions("URLSession.shared.data#0"),
+        ),
+        (
+            "http::GET::/users",
+            api,
+            &sessions("URLSession.shared.data#1"),
+        ),
+        ("http::GET::/users/{}", api, &sessions("session.data#0")),
+        ("http::GET::/health", api, &sessions("session.data#1")),
+        // `data(for:)` sends the method the request is assigned, `GET` when none.
+        (
+            "http::POST::/orders/new",
+            orders,
+            &sessions("URLSession.shared.data#2"),
+        ),
+        ("http::GET::/status", billing, &sessions("session.data#2")),
+        ("http::GET::/own", api, &sessions("own.data#0")),
+        (
+            "http::GET::/items/{}",
+            api,
+            &sessions("URLSession.shared.data#3"),
+        ),
+        // Alamofire: `GET` when `method:` is absent, on `AF` and on a `Session`.
+        ("http::GET::/af", api, &alamofire("AF.request#0")),
+        ("http::POST::/af/{}", api, &alamofire("AF.request#1")),
+        ("http::DELETE::/users", api, &alamofire("session.request#0")),
+        ("http::PUT::/health", api, &alamofire("AF.request#2")),
+        (
+            "http::PATCH::/default",
+            api,
+            &alamofire("Session.default.request#0"),
+        ),
+        // AsyncHTTPClient: a request sent with `execute`.
+        (
+            "http::POST::/ahc",
+            api,
+            &at("asyncHTTP(client:)", "client.execute#0"),
+        ),
+        (
+            "http::GET::/health",
+            api,
+            &at("asyncHTTP(client:)", "HTTPClient.shared.execute#0"),
+        ),
+        // A property typed or made by `URLSession.shared`, read through `self` or by name.
+        (
+            "http::GET::/gateway",
+            api,
+            &at("Gateway.ping()", "self.session.data#0"),
+        ),
+        (
+            "http::GET::/pong",
+            api,
+            &at("Gateway.pong()", "session.data#0"),
+        ),
+        // Wrappers: each call site, through two levels, with a cycle.
+        ("http::GET::/direct", api, &at("useApi()", "api.fetch#0")),
+        ("http::GET::/users/{}", api, &at("Api.profile()", "user#0")),
+        (
+            "http::DELETE::/users/{}",
+            api,
+            &at("useApi()", "api.remove#0"),
+        ),
+        // A URL or a method Meada cannot evaluate.
+        ("unresolved", "", &unresolved("URLSession.shared.data#0")),
+        ("unresolved", "", &unresolved("URLSession.shared.data#1")),
+        ("unresolved", "", &unresolved("URLSession.shared.data#2")),
+        ("unresolved", api, &unresolved("URLSession.shared.data#3")),
+        ("unresolved", api, &unresolved("URLSession.shared.data#4")),
+    ]);
+    assert_eq!(consumers(&json, "Sources/Checkout/Clients.swift"), expected);
 }
 
 /// A repository without `Package.swift` is one module (spec #29, #117).
@@ -12562,6 +12683,57 @@ fn swift_hostile_values_and_groups_remain_bounded() {
     assert_eq!(served(&repo, "Many.swift").len(), 10);
     std::fs::write(repo.join("Many.swift"), groups(4200)).unwrap();
     assert!(served(&repo, "").is_empty());
+}
+
+/// Context lists the consumers a Swift call that cannot be evaluated is, unresolved (spec #29, #121).
+#[test]
+fn swift_context_shows_an_unresolved_consumer() {
+    let repo = fixture_repo(
+        "swift_unresolved_consumer",
+        "conformance-swift",
+        Some(ORIGIN),
+    );
+    assert_golden(
+        "conformance-swift.context-unresolved.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .context("unresolved(path:flag:)", None)
+            .unwrap(),
+    );
+}
+
+/// Hostile URLs stay bounded: a `+` chain, a chain of `appendingPathComponent` and calls nested
+/// past the pack's `VALUE_DEPTH` are unresolved consumers, in time that stays small, and a
+/// call after them is still read.
+#[test]
+fn swift_hostile_urls_remain_bounded() {
+    let repo = fixture_repo("swift_hostile_urls", "conformance-swift", Some(ORIGIN));
+    let plus = vec!["\"a\""; 4000].join(" + ");
+    let appended = ".appendingPathComponent(\"x\")".repeat(4000);
+    let nested = format!("{}\"x\"{}", "URL(string: ".repeat(1000), ")".repeat(1000));
+    let get = |url: &str| format!("_ = try await URLSession.shared.data(from: {url})\n");
+    let source = format!(
+        "import Foundation\nfunc hostile() async throws {{\n{}{}{}{}}}\n",
+        get(&format!("URL(string: {plus})!")),
+        get(&format!(
+            "URL(string: \"https://h.example.com\")!{appended}"
+        )),
+        get(&nested),
+        get("URL(string: \"https://h.example.com/fine\")!"),
+    );
+    std::fs::write(repo.join("Hostile.swift"), source).unwrap();
+    let started = std::time::Instant::now();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(started.elapsed() < std::time::Duration::from_secs(30));
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let found: Vec<String> = consumers(&json, "Hostile.swift")
+        .into_iter()
+        .map(|(contract, ..)| contract)
+        .collect();
+    assert_eq!(
+        found,
+        ["http::GET::/fine", "unresolved", "unresolved", "unresolved"]
+    );
 }
 
 /// `search` finds a member an extension declares, under the extended type, and `context` on

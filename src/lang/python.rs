@@ -1352,6 +1352,7 @@ fn value_at(node: Node, src: &[u8], depth: usize) -> Value {
                         .map_or_else(String::new, |f| callee(f, src)),
                     receiver: None,
                     args: Vec::new(),
+                    kwargs: Vec::new(),
                     range: node.byte_range(),
                 })
             },

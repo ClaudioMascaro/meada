@@ -296,6 +296,10 @@ fn walk(
     let mut types: HashSet<String> = HashSet::new();
     let mut returns: HashMap<String, Vec<Value>> = HashMap::new();
     let mut budget = QUALIFICATION_BYTES;
+    // The names assigned (`x = v`, `x += v`, `&x`) anywhere in the file, which hold no one value,
+    // and the members assigned through a name (`request.httpMethod = v`).
+    let mut assigned: HashSet<String> = HashSet::new();
+    let mut members: Vec<Member> = Vec::new();
     let mut stack = vec![Visit {
         node: root,
         scope: Rc::new(String::new()),
@@ -505,7 +509,17 @@ fn walk(
                         class: class.clone(),
                     };
                     match place {
-                        Place::Type => facts.receivers.push(receiver),
+                        Place::Type => {
+                            if constant {
+                                facts.consts.push(Const {
+                                    name: qualify(&scope, &name),
+                                    value: held.clone().unwrap_or(Value::Unknown),
+                                    ty: None,
+                                    scope: None,
+                                });
+                            }
+                            facts.receivers.push(receiver)
+                        }
                         Place::Top if constant => {
                             facts.consts.push(Const {
                                 name: name.clone(),
@@ -519,13 +533,13 @@ fn walk(
                             }
                         }
                         // A typed local or global is a receiver, an untyped one hides its name.
-                        _ if class != Class::Unknown && typed_here => {
-                            facts.receivers.push(receiver)
-                        }
+                        // Either holds the call, the name or the string it is given (a `var`
+                        // assigned later holds none: `assigned`).
                         _ => {
-                            // A `let` of one name holds the call or the name it is given.
-                            if let (Some(value @ (Value::Call(_) | Value::Ref(_))), true, true) =
-                                (&held, constant, defining)
+                            if let (
+                                Some(value @ (Value::Call(_) | Value::Ref(_) | Value::Str(_))),
+                                true,
+                            ) = (&held, defining)
                             {
                                 facts.bound.push(Bound {
                                     scope: scope.as_ref().clone(),
@@ -534,7 +548,10 @@ fn walk(
                                     value: value.clone(),
                                 });
                             }
-                            facts.locals.push(qualify(&scope, &name));
+                            match class != Class::Unknown && typed_here {
+                                true => facts.receivers.push(receiver),
+                                false => facts.locals.push(qualify(&scope, &name)),
+                            }
                         }
                     }
                 }
@@ -573,6 +590,55 @@ fn walk(
                         .entry(scope.as_ref().clone())
                         .or_default()
                         .push(value);
+                }
+            }
+            "assignment" => {
+                if let Some(target) = node
+                    .child_by_field_name("target")
+                    .and_then(|t| named(t).next())
+                {
+                    let name = callee(target, src);
+                    let plain = children(node).any(|c| c.kind() == "=");
+                    let result = node.child_by_field_name("result");
+                    match name.split_once('.') {
+                        None => {
+                            assigned.insert(name);
+                        }
+                        Some((head, rest)) if !name.contains('(') => {
+                            // Only a plain `=` as a statement of the body runs once, in place.
+                            let direct = plain
+                                && !rest.contains('.')
+                                && node.parent().is_some_and(|p| {
+                                    p.kind() == "source_file"
+                                        || (p.kind() == "statements"
+                                            && p.parent().is_some_and(|b| {
+                                                matches!(
+                                                    b.kind(),
+                                                    "function_body" | "lambda_literal"
+                                                )
+                                            }))
+                                });
+                            let value = match (direct, result) {
+                                (true, Some(r)) => {
+                                    values::value(r, src, ctx(&scope, defining, &types))
+                                }
+                                _ => Value::Unknown,
+                            };
+                            members.push(Member {
+                                scope: scope.as_ref().clone(),
+                                head: head.to_string(),
+                                member: rest.split('.').next().unwrap_or(rest).to_string(),
+                                value,
+                                direct,
+                            });
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            "prefix_expression" if text(node, src).starts_with('&') => {
+                if let Some(target) = node.child_by_field_name("target") {
+                    assigned.insert(head(&callee(target, src)).to_string());
                 }
             }
             "call_expression" | "constructor_expression" => {
@@ -638,6 +704,8 @@ fn walk(
         }
     }
     bare_calls(&mut facts);
+    facts.bound.retain(|b| !assigned.contains(&b.name));
+    assign_members(&mut facts.bound, members);
     // A name another binding of the scope also declares (a loop variable, a `guard let`, a
     // `var`) holds no one value: its `let` bounds are dropped (Kotlin's rule). Two `let`s keep
     // both bounds.
@@ -671,6 +739,47 @@ fn walk(
             .collect(),
     );
     facts
+}
+
+/// A member assigned through a name (`request.httpMethod = v`): the scope written in, the name,
+/// the member, its value, and whether the assignment runs once, in place (a statement of a body).
+struct Member {
+    scope: String,
+    head: String,
+    member: String,
+    value: Value,
+    direct: bool,
+}
+
+/// Gives the call a local holds the members assigned through its name, as `<member>=` keyword
+/// arguments (Kotlin's `method=`): the value of the one assignment that runs in place, unknown
+/// when it is written twice, may not run, or the name holds no call.
+fn assign_members(bound: &mut [Bound], members: Vec<Member>) {
+    for b in bound.iter_mut() {
+        let mut written: Vec<(String, Value)> = Vec::new();
+        for m in members.iter().filter(|m| m.head == b.name) {
+            let inside = m.scope == b.scope || m.scope.starts_with(&format!("{}.", b.scope));
+            if !inside {
+                continue;
+            }
+            let key = format!("{}=", m.member);
+            let value = match m.direct && m.scope == b.scope {
+                true => m.value.clone(),
+                false => Value::Unknown,
+            };
+            match written.iter_mut().find(|(k, _)| *k == key) {
+                Some((_, held)) => *held = Value::Unknown,
+                None => written.push((key, value)),
+            }
+        }
+        if written.is_empty() {
+            continue;
+        }
+        match &mut b.value {
+            Value::Call(call) => call.kwargs.extend(written),
+            other => *other = Value::Unknown,
+        }
+    }
 }
 
 /// Pushes the `children` of a function's declaration to be visited in source order, as its
@@ -1168,6 +1277,7 @@ fn definition(name: &str, kind: Kind, range: Range<usize>, bases: Vec<String>) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lang::Part;
 
     fn facts(src: &str) -> Facts {
         parse(src.as_bytes()).unwrap()
@@ -1292,5 +1402,43 @@ mod tests {
         );
         let routes = facts.defs.iter().find(|d| d.name == "routes(_:)").unwrap();
         assert!(matches!(&routes.return_values[..], [Value::Ref(r)] if r == "api"));
+    }
+
+    #[test]
+    fn a_local_holds_the_members_assigned_through_it_in_place() {
+        let facts = facts(
+            "func f(flag: Bool) {\n  var a = URLRequest(url: u)\n  a.httpMethod = \"POST\"\n  \
+             var b = URLRequest(url: u)\n  if flag { b.httpMethod = \"PUT\" }\n  \
+             var c = URLRequest(url: u)\n  c.httpMethod = \"PUT\"\n  c.httpMethod = \"GET\"\n  \
+             var d = URLRequest(url: u)\n  d = other\n  let e = \"x\" + y\n}\n",
+        );
+        let method = |name: &str| {
+            let held = facts.bound.iter().find(|b| b.name == name)?;
+            let Value::Call(call) = &held.value else {
+                return None;
+            };
+            let set = call.kwargs.iter().find(|(k, _)| k == "httpMethod=");
+            Some(match set {
+                Some((_, Value::Str(parts))) => format!("{parts:?}"),
+                Some(_) => "unknown".to_string(),
+                None => "none".to_string(),
+            })
+        };
+        assert_eq!(method("a").as_deref(), Some("[Text(\"POST\")]"));
+        // May not run, written twice, and assigned again as a whole: no one method.
+        assert_eq!(method("b").as_deref(), Some("unknown"));
+        assert_eq!(method("c").as_deref(), Some("unknown"));
+        assert!(method("d").is_none());
+        let e = facts.bound.iter().find(|b| b.name == "e").unwrap();
+        assert!(
+            matches!(&e.value, Value::Str(p) if matches!(&p[..], [Part::Text(t), Part::Ref(r)] if t == "x" && r == "y"))
+        );
+    }
+
+    #[test]
+    fn a_type_level_let_is_a_constant_of_the_type() {
+        let facts = facts("enum Api {\n  static let host = \"h\"\n  var other = \"o\"\n}\n");
+        let names: Vec<&str> = facts.consts.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(names, ["Api.host"]);
     }
 }
