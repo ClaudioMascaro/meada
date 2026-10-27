@@ -62,8 +62,11 @@ indexing carries on.
 - Evaluation visits each node once: a value read through a chain (`a().b().c()`, a `+` fold, a
   wrapper's arguments) costs the chain's length, never a factor per link, so a chain up to the
   depth limit stays cheap. A unit test feeds such a chain and bounds its time, as the
-  `*_in_linear_time` tests do. A new language pack adds its row to `chained` in
-  `tests/it/hostile.rs`, which feeds every pack a chain of locals on call results.
+  `*_in_linear_time` tests do. Its input is sized so the linear path runs in under a twentieth
+  of the bound in a local debug build (CI runners are several times slower and run the suites in
+  parallel), and the implementer reports the measured time. A new language pack adds its row
+  to `chained` in `tests/it/hostile.rs`, which feeds every pack a chain of locals on call
+  results.
 - Expansion (aliases, `$ref`s, variable substitution) is charged to a budget per file, and
   substitution runs once over the original text.
 - A path read from a file or a config stays inside the repository root: relative, without `..`,
