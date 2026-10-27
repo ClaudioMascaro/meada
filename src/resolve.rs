@@ -317,6 +317,9 @@ pub struct Resolver<'a> {
     unordered_globs: bool,
     qualified_types: bool,
     consts: HashMap<&'a str, HashSet<&'a str>>,
+    /// The types each file of a compilation keeps to it (`Facts::private` of a file with a
+    /// `Facts::unit`), for `hidden`.
+    internal: HashMap<&'a str, HashSet<&'a str>>,
     /// The names some file of the repository writes through a selector (`cfg.Base = ..`): a
     /// constant marked `.Name` (Go). A variable of such a name holds no one value.
     written: HashSet<&'a str>,
@@ -616,6 +619,10 @@ impl<'a> Resolver<'a> {
                 (*path, names)
             })
             .collect();
+        let internal = (files.iter())
+            .filter(|(_, facts)| !facts.unit.is_empty() && !facts.private.is_empty())
+            .map(|(path, facts)| (*path, facts.private.iter().map(String::as_str).collect()))
+            .collect();
         let locals = files
             .iter()
             .map(|(path, facts)| (*path, facts.locals.iter().map(String::as_str).collect()))
@@ -718,6 +725,7 @@ impl<'a> Resolver<'a> {
             qualified_types: language.qualified_types(),
             written,
             consts,
+            internal,
             locals,
             receivers,
             params,
@@ -2657,9 +2665,12 @@ impl<'a> Resolver<'a> {
         if from.unit == at.unit || from.unit == path || at.unit == t.path {
             return false;
         }
+        let Some(internal) = self.internal.get(t.path) else {
+            return false;
+        };
         let mut name = t.name;
         while !name.is_empty() {
-            if at.private.iter().any(|p| p == name) {
+            if internal.contains(name) {
                 return true;
             }
             name = crate::parent(name);
@@ -2944,6 +2955,8 @@ impl<'a> Resolver<'a> {
             let bound = self.resolve_as(path, scope, target, seen, work, Reading::Alias);
             let found = self.through_glob(bound, *inside, name, work, seen);
             let found = found.of_namespace(self, self.glob_namespace(path, target));
+            // A definition `path` may not reach is not there: the lookup goes on past it.
+            let found = self.accessible(path, found);
             seen.depth -= 1;
             if seen.cut {
                 return Some(Binding::Unknown);
@@ -9485,5 +9498,57 @@ mod csharp_tests {
                 ]
             );
         }
+    }
+
+    /// An internal type of the file's namespace in another project binds as if it did not
+    /// exist: the lookup goes on to the type a using brings.
+    #[test]
+    fn a_hidden_type_of_the_file_s_namespace_lets_a_using_bind_the_name() {
+        let billing = vec!["Kit2/Tax.cs".to_string()];
+        let public = tax("public").replace("namespace Shop;", "namespace Billing;");
+        let found = resolved(&[
+            ("Kit/Tax.cs", &tax("internal")),
+            ("Kit2/Tax.cs", &public),
+            (
+                "App/Use.cs",
+                &format!("namespace Shop; {}", USE_TAX.replace("Shop", "Billing")),
+            ),
+        ]);
+        assert_eq!(
+            calls_in(&found, "App/Use.cs"),
+            [
+                (
+                    "(expression).Apply".to_string(),
+                    "inferred",
+                    billing.clone()
+                ),
+                ("Tax".to_string(), "exact", billing.clone()),
+                ("Tax.Of".to_string(), "exact", billing),
+            ]
+        );
+    }
+
+    /// Whether a definition is hidden from a file of another project looks its type up among
+    /// the file's internal types at once: scanning them for each call took the calls times the
+    /// types.
+    #[test]
+    fn a_file_of_many_internal_types_hides_them_in_linear_time() {
+        let n = 30_000;
+        let internal: String = (0..n)
+            .map(|i| format!("internal class I{i} {{}}\n"))
+            .collect();
+        let kit = format!(
+            "namespace Shop;\n{internal}public class P {{ public static void M() {{}} }}\n"
+        );
+        let calls: String = (0..n).map(|_| "P.M();\n").collect();
+        let app = format!("using Shop;\nclass U {{ void F() {{\n{calls}}} }}\n");
+        let start = std::time::Instant::now();
+        let found = resolved(&[("Kit/T.cs", &kit), ("App/U.cs", &app)]);
+        let took = start.elapsed();
+        let exact = (found.iter()).filter(|(p, callee, level, _)| {
+            p == "App/U.cs" && callee == "P.M" && *level == "exact"
+        });
+        assert_eq!(exact.count(), n);
+        assert!(took.as_secs() < 20, "{took:?}");
     }
 }

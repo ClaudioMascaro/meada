@@ -2047,8 +2047,8 @@ qualification budget does (ADR 0017).
   library project reads the library's `appsettings.json`, never the consuming app's.
   An `internal` type (one with no access modifier too) links from its own project's files
   alone (`Resolver::hidden`); `InternalsVisibleTo` is not read, so a friend project's calls to
-  it get no link. From a file of its namespace in another project, it still hides a type of
-  its name a using brings, which the call then reaches by a name match. A repository extension method wins over an outside
+  it get no link. From a file of another project it is not there at all, so a type of its
+  name a using brings binds even from a file of its namespace. A repository extension method wins over an outside
   type's instance member of the same name (`sb.Append("x")` beside a
   `static StringBuilder Append(this StringBuilder b, string s)`), where C# picks the member
   (ADR 0018). A file sees what the projects of its repository its project references pass on up
