@@ -4,7 +4,8 @@
 //! project file is read by `dotnet::msbuild`, the reader the C# pack shares. The module answers
 //! the trait's questions as follows:
 //!
-//! - `entries`: the references of the nearest project holding the file, once each.
+//! - `entries`: the references of the nearest project holding the file, then those the projects
+//!   it references in its repository pass on (`dotnet::references`), nearest first, once each.
 //! - `reaches`: a `ProjectReference` (an entry with a `path` source, as Cargo's) only the project
 //!   at that path, and only in another repository: inside its own repository it stays inside it,
 //!   where the pack resolves it. A `PackageReference` reaches every provider of the id.
@@ -24,9 +25,8 @@ use super::{
     Ecosystem, Entry, Export, How, Manifest, Provided, Providers, Resolution, Summary,
     bare_directory, folded, owner, sourced, valid_name,
 };
-use crate::dotnet::msbuild;
+use crate::dotnet::{msbuild, references};
 use crate::lang::Call;
-use crate::repo::relative;
 use crate::resolve::Code;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -48,19 +48,24 @@ fn stem(path: &str) -> &str {
     file.strip_suffix(EXTENSION).unwrap_or(file)
 }
 
-/// The `ProjectReference` to `include`, written in the project at `dir`: its entry, named by the
+/// The `ProjectReference` `reference`, written in the project at `dir`: its entry, named by the
 /// project file's name until `settle` knows the project's id. `None` for a path that is not a
 /// `.csproj` of the repository or beyond it (absolute, or computed).
-fn project(dir: &str, include: &str) -> Option<Entry> {
-    let path = include.replace('\\', "/");
-    let at = relative(dir, &path)?;
-    let written = !include.contains("$(") && !include.contains(':');
-    (written && at.ends_with(EXTENSION)).then(|| Entry {
+fn project(dir: &str, reference: &msbuild::Reference) -> Option<Entry> {
+    let at = references::located(dir, &reference.include)?;
+    Some(Entry {
         field: PROJECT.to_string(),
         name: stem(&at).to_string(),
         via: Some(format!("path {at}")),
+        private: reference.private,
         ..Entry::default()
     })
+}
+
+/// The project file of the repository the `ProjectReference` entry names.
+fn in_repository(entry: &Entry) -> Option<&str> {
+    let at = entry.via.as_deref()?.strip_prefix("path ")?;
+    (entry.field == PROJECT && !at.starts_with("../")).then_some(at)
 }
 
 // ponytail: a `ProjectReference` path is matched in the case written (ids are case-folded), a
@@ -89,14 +94,15 @@ impl Ecosystem for Nuget {
             .unwrap_or_else(|| stem(path).to_string());
         let dir = bare_directory(path);
         let packages = (project_file.packages.iter())
-            .filter(|(name, _)| literal(name))
-            .map(|(name, range)| Entry {
+            .filter(|r| literal(&r.include))
+            .map(|r| Entry {
                 field: PACKAGE.to_string(),
-                name: name.clone(),
-                range: range.clone(),
+                name: r.include.clone(),
+                range: r.version.clone(),
+                private: r.private,
                 ..Entry::default()
             });
-        let projects = project_file.projects.iter().filter_map(|i| project(dir, i));
+        let projects = project_file.projects.iter().filter_map(|r| project(dir, r));
         let mut dependencies: Vec<Entry> = packages.chain(projects).collect();
         dependencies.sort_by(|a, b| (&a.field, &a.name, &a.via).cmp(&(&b.field, &b.name, &b.via)));
         dependencies.dedup();
@@ -146,8 +152,9 @@ impl Ecosystem for Nuget {
         via.is_none() || from.0 != (to.0).0 && sourced(via, from, to)
     }
 
-    /// The references of the project file `from.1` belongs to: the nearest `.csproj` above it,
-    /// once for each package.
+    /// The references of the project file `from.1` belongs to (the nearest `.csproj` above it),
+    /// then those that pass on of each project it references in its repository, directly or not
+    /// (`references::referenced`), nearest first, once for each package: the nearer entry wins.
     fn entries<'e>(
         &self,
         exports: &'e [Export],
@@ -155,9 +162,25 @@ impl Ecosystem for Nuget {
         (n, from): (usize, &str),
         specifier: &str,
     ) -> Vec<(&'e Entry, String)> {
+        let manifests = &exports[n].manifests;
+        let Some(own) = owner(manifests, from, self) else {
+            return Vec::new();
+        };
+        let projects: HashMap<&str, &Summary> = (manifests.iter())
+            .filter(|m| self.owns(m))
+            .map(|m| (m.path.as_str(), &m.summary))
+            .collect();
+        let walked = references::referenced(&own.path, |path| {
+            (projects.get(path).copied().into_iter())
+                .flat_map(|s| &s.dependencies)
+                .filter_map(|e| Some((in_repository(e)?, e.private)))
+                .collect()
+        });
+        let passed = (walked.into_iter())
+            .filter_map(|path| projects.get(path).copied())
+            .flat_map(|s| s.dependencies.iter().filter(|e| !e.private));
         let mut seen = HashSet::new();
-        (owner(&exports[n].manifests, from, self).into_iter())
-            .flat_map(|m| &m.summary.dependencies)
+        (own.summary.dependencies.iter().chain(passed))
             .filter(|e| seen.insert(e.name.as_str()))
             .map(|e| (e, specifier.to_string()))
             .collect()
@@ -360,6 +383,52 @@ mod tests {
                 ),
             ]
         );
+    }
+
+    #[test]
+    fn a_file_sees_what_its_referenced_projects_pass_on_and_the_nearer_entry_wins() {
+        let project = |dir: &str, items: &str| {
+            let path = format!("src/{dir}/{dir}.csproj");
+            let src = format!("<Project Sdk=\"S\"><ItemGroup>{items}</ItemGroup></Project>");
+            Manifest {
+                summary: read(&path, &src),
+                path,
+            }
+        };
+        let package = |id: &str, more: &str| format!("<PackageReference Include=\"{id}\" {more}/>");
+        let reference = |dir: &str, more: &str| {
+            format!("<ProjectReference Include=\"..\\{dir}\\{dir}.csproj\" {more}/>")
+        };
+        let manifests = vec![
+            project(
+                "App",
+                &[package("X", "Version=\"1\""), reference("Lib", "")].concat(),
+            ),
+            project(
+                "Lib",
+                &[
+                    package("X", "Version=\"2\""),
+                    package("Y", ""),
+                    package("P", "PrivateAssets=\"all\""),
+                    reference("Mid", ""),
+                    reference("Hidden", "PrivateAssets=\"all\""),
+                ]
+                .concat(),
+            ),
+            project("Mid", &package("Z", "")),
+            project("Hidden", &package("H", "")),
+        ];
+        let exports = [Export {
+            manifests,
+            ..Export::default()
+        }];
+        let providers = Providers::new(&exports);
+        let found: Vec<_> = (Nuget
+            .entries(&exports, &providers, (0, "src/App/A.cs"), "c")
+            .iter())
+        .map(|(e, _)| format!("{}{}", e.name, e.range.as_deref().unwrap_or("")))
+        .collect();
+        assert_eq!(found, ["X1", "Lib", "Y", "Mid", "Z"]);
     }
 
     #[test]

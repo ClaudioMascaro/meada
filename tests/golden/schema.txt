@@ -2390,6 +2390,11 @@ sample.pom.xml
   "dependencies": [
     {
       "field": "dependencies",
+      "name": "example:fixtures",
+      "private": true
+    },
+    {
+      "field": "dependencies",
       "name": "example:shared*",
       "range": "${release}",
       "via": "computed"
@@ -2460,6 +2465,12 @@ sample.csproj
   "name": "Example.Kit",
   "version": "1.2.0",
   "dependencies": [
+    {
+      "field": "PackageReference",
+      "name": "Example.Analyzers",
+      "range": "1.0",
+      "private": true
+    },
     {
       "field": "PackageReference",
       "name": "Example.Json",

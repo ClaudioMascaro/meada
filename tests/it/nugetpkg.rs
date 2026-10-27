@@ -466,3 +466,46 @@ fn edited_and_added_projects_refresh_like_a_cold_workspace() {
     change_projects(&cold);
     assert_eq!(refreshed, exports(&cold));
 }
+
+#[test]
+fn a_file_sees_the_references_its_project_references_pass_on() {
+    let [_, app] = workspace("nuget_packages_transitive");
+    // App -> Lib, of the app's repository; Lib -> Money, and Kit, privately.
+    let lib = "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup>\n\
+               <PackageReference Include=\"Example.Money\" />\n\
+               <PackageReference Include=\"Example.Kit\" PrivateAssets=\"all\" />\n\
+               </ItemGroup></Project>";
+    write(&app, "src/Lib/Lib.csproj", lib);
+    let project = "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup>\n\
+                   <ProjectReference Include=\"..\\Lib\\Lib.csproj\" />\n\
+                   </ItemGroup></Project>";
+    write(&app, "src/App/App.csproj", project);
+    let user = |ns: &str| {
+        format!(
+            "using Example.Money;\nusing Example.Kit.Pricing;\n\nnamespace Example.{ns};\n\npublic class Uses\n{{\n    public void Go()\n    {{\n        Currency.Cents(1);\n        Order.Of(1);\n    }}\n}}\n"
+        )
+    };
+    write(&app, "src/Lib/Uses.cs", &user("Lib"));
+    write(&app, "src/App/Uses.cs", &user("App"));
+    let (export, json) = export(&app);
+    let cents = "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)";
+    let of = format!("{KIT_ORDER}.Of(int)");
+    let at = |ns: &str, call: &str| calls(&json, &format!("Example.{ns}.Uses.Go()::{call}#0"));
+    assert_eq!(at("Lib", "Currency.Cents"), [(cents, "exact")], "{export}");
+    assert_eq!(at("Lib", "Order.Of"), [(&of[..], "exact")], "{export}");
+    // Through `import namespace`, as from Lib; the private reference stays Lib's.
+    assert_eq!(at("App", "Currency.Cents"), [(cents, "exact")], "{export}");
+    assert!(at("App", "Order.Of").is_empty(), "{export}");
+    let reason = (json["links"].as_array().unwrap().iter())
+        .find(|l| {
+            l["consumer"]
+                .as_str()
+                .unwrap()
+                .ends_with("App.Uses.Go()::Currency.Cents#0")
+        })
+        .map(|l| l["reason"].as_str().unwrap());
+    assert!(
+        reason.is_some_and(|r| r.ends_with("; import namespace")),
+        "{export}"
+    );
+}

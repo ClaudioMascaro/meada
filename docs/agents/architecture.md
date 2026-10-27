@@ -1035,9 +1035,17 @@ one for the area a change touches.
 - `dotnet/` holds what the .NET pack and ecosystems share (spec #28), as `jvm/` does for the
   JVM: `dotnet/msbuild.rs` reads an SDK-style project file (`msbuild::read`: whether it is a
   project and, if so, its `Using`s (the SDK's implicit usings among them), its `PackageId`,
-  `AssemblyName` and version, and its `PackageReference` and `ProjectReference` items), which the
-  C# pack's `join` and the NuGet ecosystem (#116) both read; a second reader of project files is
-  a finding. `xml.rs` holds the bounds every XML build file reader shares
+  `AssemblyName` and version, and its `PackageReference` and `ProjectReference` items, each
+  with whether it is private: a `PrivateAssets` naming `all` or `compile`, or computed, keeps it
+  from passing on), which the C# pack's `join` and the NuGet ecosystem (#116) both read; a second
+  reader of project files is a finding. `dotnet/references.rs` (#369) walks a repository's
+  `ProjectReference`s: `located` turns an `Include` into the project file's path in the
+  repository, and `referenced` gives the projects a project references directly or through the
+  projects those reference, nearest first (breadth first), each once, following a private
+  reference from the start project alone and stopping at a project already found and past
+  `REFERENCE_DEPTH` (32), so each project's references are read once. It takes a project's
+  references through a function over what its read yields, so NuGet's `entries` (from the
+  manifests' entries) and the C# resolver (from `msbuild::read`) walk the same graph. `xml.rs` holds the bounds every XML build file reader shares
   (`within_limits`, `XML_NODES`), owned by neither ecosystem: `jvm/maven.rs` and
   `dotnet/msbuild.rs` both check them before roxmltree parses.
 - New **Go router** (spec #25; net/http, gin, echo, chi and gorilla): a row of `ROUTERS` in
@@ -1249,7 +1257,13 @@ one for the area a change touches.
     class lookup, the family walk and the argument-count pick are the same code; `declaring`
     counts a file only for the ecosystem whose `sources()` has its extension; `entries` is the
     references of the nearest SDK-style `.csproj` above the file (`owner`, `Summary::project`,
-    as the pack's `join`); the three provider loops keep the providers an entry's `reaches`
+    as the pack's `join`), then those that pass on (`Entry::private` false) of each project of
+    its repository it references (`references::referenced`), nearest first, the nearer entry
+    winning a name; Maven's is the dependencies of the poms holding the file, then those that
+    pass on (a `compile` scope, the default, not `optional`) of each module of the repository a
+    `pom.xml` names by its coordinate, through the dependencies that pass on, nearest first and
+    at most `MODULE_DEPTH` (32) modules deep (a module is its own `pom.xml`, without its
+    parent's dependencies, and a Gradle dependency is not followed); the three provider loops keep the providers an entry's `reaches`
     lets through, as the default `resolutions` does, so a `ProjectReference` pins its project;
     the shared code names no ecosystem: each passes its platform prefixes (`java.`, `kotlin.`
     for Maven, `System.` for NuGet) to `imports`, and the class tables take every ecosystem's
@@ -2013,8 +2027,9 @@ qualification budget does (ADR 0017).
   its name a using brings, which the call then reaches by a name match. A repository extension method wins over an outside
   type's instance member of the same name (`sb.Append("x")` beside a
   `static StringBuilder Append(this StringBuilder b, string s)`), where C# picks the member
-  (ADR 0018). Only the nearest project's references are read (`package/nuget.rs`): the
-  `PackageReference`s of a project a `ProjectReference` names are not followed. Generated files
+  (ADR 0018). A file sees what the projects of its repository its project references pass on up
+  to `REFERENCE_DEPTH` (32) projects deep (`dotnet/references.rs`), and nothing that a project
+  of another repository references. Generated files
   under `obj/` are indexed when no ignore file lists them.
 
 - `snapshot/pull.rs`: a generation's bundles hold at most `GENERATION_BYTES_MAX` (256 GiB)
@@ -3189,4 +3204,7 @@ qualification budget does (ADR 0017).
   "1")`, a `group` set only in `subprojects`/`allprojects`, and a top-level `val group`. A
   `group` reset in `afterEvaluate` is not seen, and `publishing { artifactId = .. }` is
   ignored, so the announced package may differ from the published one. JVM coordinate names share
-  `package::MAX_NAME` (214 bytes). These readers never run Maven, Gradle or a JDK.
+  `package::MAX_NAME` (214 bytes). These readers never run Maven, Gradle or a JDK. A file sees
+  what the modules of its repository it depends on pass on up to `MODULE_DEPTH` (32) modules
+  deep (`package/maven.rs`); a module's parent pom adds nothing to what it passes on, and a
+  Gradle dependency passes nothing on.
