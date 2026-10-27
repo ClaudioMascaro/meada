@@ -1730,7 +1730,8 @@ one for the area a change touches.
   variadic or type parameter is no class). A function's own type parameters are read while
   parsing; those of a type and the associated types of a protocol are `Def::type_params`, and
   `join` unsets the class of a receiver scoped in the type or in an extension of it, in any
-  file, whose type is named alike. A `let` or `var` of code is a receiver only directly in the
+  file, whose type is named alike; a call `T()` of such a name constructs nothing
+  (`Call::constructs` unset, here and in `parse`). A `let` or `var` of code is a receiver only directly in the
   body of a function, method or initializer (or at the top level of a file): in a nested
   block, a closure, an accessor, a deinitializer or a subscript it only hides its name
   (`Facts::locals`), since its scope is the function's, the type's or the file's and the name

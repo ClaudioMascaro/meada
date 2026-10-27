@@ -12263,6 +12263,8 @@ fn swift_without_a_package_manifest() {
         scopes("Desk"),
         scopes("Desk.submit(_:)"),
         scopes("Page"),
+        scopes("Page.own()"),
+        "Sources/Page+Show.swift::Page.build()".to_string(),
         "Sources/Page+Show.swift::Page.show(_:)".to_string(),
         scopes("Shelf"),
         scopes("Shelf.stock(_:)"),
@@ -12443,6 +12445,16 @@ fn swift_without_a_package_manifest() {
             scopes("make()::item.label#0"),
             INFERRED,
             one(item("Item.label()")),
+        ),
+    ]);
+    // A type parameter's construction (`Item()`) is no construction of the repository's type.
+    calls.extend([
+        (scopes("make()::Item#0"), None, vec![]),
+        (scopes("Page.own()::Item#0"), None, vec![]),
+        (
+            "Sources/Page+Show.swift::Page.build()::Item#0".to_string(),
+            None,
+            vec![],
         ),
     ]);
     // Each binding form hides the function of its name in its scope: a call of it is a name

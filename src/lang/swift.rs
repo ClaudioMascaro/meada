@@ -75,6 +75,12 @@ impl LanguagePack for Swift {
             let module = module_of(&targets, path);
             wildcard(module, true, facts);
             facts.unit = module.to_string();
+            for call in facts.calls.iter_mut().filter(|c| c.constructs) {
+                let ty = head(&call.callee);
+                let held =
+                    enclosing(&call.scope).any(|t| generics.get(t).is_some_and(|g| g.contains(ty)));
+                call.constructs = !held;
+            }
             for receiver in &mut facts.receivers {
                 let (Class::Type(ty) | Class::Named(ty)) = &receiver.class else {
                     continue;
@@ -512,7 +518,9 @@ fn walk(
             "call_expression" | "constructor_expression" => {
                 // `f(a) { }` may parse as a call of `f(a)`: it is one call of `f`.
                 let (function, suffixes) = parts(node);
-                if let Some(at) = call(function, &suffixes, node, src, &scope) {
+                if let Some(mut at) = call(function, &suffixes, node, src, &scope) {
+                    // A type parameter is no type of the repository: `T()` constructs none.
+                    at.constructs &= !generics.holds(head(&at.callee));
                     facts.calls.push(at);
                 }
                 pushed = std::iter::once(function)

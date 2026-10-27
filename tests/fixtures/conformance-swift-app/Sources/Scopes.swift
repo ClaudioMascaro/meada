@@ -51,7 +51,11 @@ class Desk {
     }
 }
 
-struct Page<Item> {}
+struct Page<Item> {
+    func own() {
+        _ = Item()
+    }
+}
 
 protocol Shelf {
     associatedtype Item
