@@ -14,6 +14,7 @@ use super::{
     LanguagePack, Layout, Modules, Param, Part, Receiver, Step, Ty, Value, children, named, text,
 };
 use crate::dotnet::msbuild::{self, Using};
+use crate::dotnet::references;
 use crate::{Result, qualify};
 
 /// How many named types may enclose a definition. Deeper bodies keep their enclosing symbol.
@@ -138,16 +139,21 @@ impl LanguagePack for CSharp {
     /// its target's name. Each file's `Facts::unit` is its project, whose files alone the parts
     /// of a partial type come from.
     fn join(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Join {
-        // Each project's directory (`a/b/`, empty at the root) and what its file adds.
-        let projects: Vec<(String, Vec<Using>)> = (configs.iter())
+        // Each project file with its directory (`a/b/`, empty at the root), read once.
+        let read: Vec<(&str, String, msbuild::Project)> = (configs.iter())
             .filter(|(path, _)| path.ends_with(".csproj"))
             .filter_map(|(path, src)| {
                 let dir = path
                     .rsplit_once('/')
                     .map_or(String::new(), |(d, _)| format!("{d}/"));
-                Some((dir, msbuild::read(src)?.usings))
+                Some((*path, dir, msbuild::read(src)?))
             })
             .collect();
+        // Each project's directory and what its file adds.
+        let projects: Vec<(String, Vec<Using>)> = (read.iter())
+            .map(|(_, dir, project)| (dir.clone(), project.usings.clone()))
+            .collect();
+        let unit_references = unit_references(&read);
         // Each project's usings, by its directory, or a file's in none by its path. Their order
         // says nothing: the globs combine, and two aliases of one name are no C#.
         let mut usings: BTreeMap<String, BTreeSet<Using>> = BTreeMap::new();
@@ -194,6 +200,7 @@ impl LanguagePack for CSharp {
                     import.name = Imported::Qualified;
                 }
             }
+            facts.unit_references = unit_references.get(&unit).cloned().unwrap_or_default();
             facts.unit = unit;
         })
     }
@@ -210,6 +217,41 @@ fn owner<'p>(projects: &'p [(String, Vec<Using>)], path: &str) -> (String, &'p [
         .map_or((path.to_string(), &[][..]), |(_, (dir, own))| {
             (dir.clone(), own.as_slice())
         })
+}
+
+/// The projects each project directory references (`Facts::unit_references`), as the directories
+/// of the `.csproj` files its `ProjectReference`s reach in the repository (`references`), nearest
+/// first, none its own. A project at the root has no directory to name, so it is never listed.
+/// The first project file of a directory stands for it, as in `owner`.
+fn unit_references(read: &[(&str, String, msbuild::Project)]) -> BTreeMap<String, Vec<String>> {
+    let units: HashMap<&str, &str> = (read.iter())
+        .map(|(path, dir, _)| (*path, dir.as_str()))
+        .collect();
+    let located: HashMap<&str, Vec<(String, bool)>> = (read.iter())
+        .map(|(path, dir, project)| {
+            let from = dir.trim_end_matches('/');
+            let to = (project.projects.iter())
+                .filter_map(|r| Some((references::located(from, &r.include)?, r.private)));
+            (*path, to.collect())
+        })
+        .collect();
+    let mut out = BTreeMap::new();
+    for (path, unit, _) in read {
+        let walked = references::referenced(path, |from| {
+            (located.get(from).into_iter().flatten())
+                .map(|(to, private)| (to.as_str(), *private))
+                .collect()
+        });
+        let mut found: Vec<String> = Vec::new();
+        for to in walked {
+            let Some(&dir) = units.get(to) else { continue };
+            if !dir.is_empty() && dir != unit && !found.iter().any(|f| f == dir) {
+                found.push(dir.to_string());
+            }
+        }
+        out.entry(unit.clone()).or_insert(found);
+    }
+    out
 }
 
 /// A using directive as `Facts::project` spells it: `A.B`, `static A.B` or `X = A.B`.

@@ -1988,7 +1988,11 @@ qualification budget does (ADR 0017).
   conformance test writes one type in 64 files and in 65. Definitions of one name in files of
   several units (C# projects) bind, from a file of one of those units, to its own unit's
   (`Resolver::in_unit`, at the end of `resolve_as`), as the compiler prefers the project's type
-  to a reference's; from a file of no such unit the name stays `ambiguous`.
+  to a reference's; from a file of a unit that declares none of them, the name binds to the
+  one defining unit among those its project references, directly or through the references
+  that pass on (`Facts::unit_references`, from the walk of `dotnet::references`;
+  `Resolver::in_references`), and stays `ambiguous` with several or none, since a project
+  not referenced may still be visible through references not read.
 
 - `lang/csharp.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the C# pack as they bound the Java pack's, with the same

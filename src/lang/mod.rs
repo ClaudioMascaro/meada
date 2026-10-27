@@ -404,6 +404,11 @@ pub struct Facts {
     /// the parts of a partial type come from one. Not kept in the index: it is joined again.
     #[serde(skip)]
     pub unit: String,
+    /// The compilations (`unit`) its own references, directly or through the references that
+    /// pass on (C#'s `ProjectReference`s), nearest first, which `LanguagePack::join` sets.
+    /// Not kept in the index: it is joined again.
+    #[serde(skip)]
+    pub unit_references: Vec<String>,
     /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,
