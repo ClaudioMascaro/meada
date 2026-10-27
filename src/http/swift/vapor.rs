@@ -43,13 +43,31 @@ const VERBS: &[(&str, &str)] = &[
     ("delete", "DELETE"),
 ];
 const ON: &str = "on";
-const GROUPED: &str = "grouped";
 const REGISTER: &str = "register";
 const SELF: &str = "self.";
 /// The function Vapor calls to have a `RouteCollection` register its routes.
 const BOOT: &str = "boot(routes:)";
-/// What makes an application, as the file's imports spell it.
-const APPLICATIONS: &[&str] = &["Vapor.Application", "Vapor.Application.make"];
+
+/// What differs between the frameworks that share this router value flow: Vapor
+/// (`VAPOR`) and Hummingbird (`hummingbird::HUMMINGBIRD`).
+pub(super) struct Dialect {
+    /// What makes the root builder, as the file's imports spell it.
+    pub roots: &'static [&'static str],
+    /// The method that makes a child builder, mounted under its path components.
+    pub group: &'static str,
+    /// Whether `on` takes its method first (`on(.GET, "p")`) or after the path
+    /// (`on("p", method: .get)`).
+    pub method_first: bool,
+    /// Whether `register(collection:)` mounts a `RouteCollection`.
+    pub collections: bool,
+}
+
+pub(super) const VAPOR: Dialect = Dialect {
+    roots: &["Vapor.Application", "Vapor.Application.make"],
+    group: "grouped",
+    method_first: true,
+    collections: true,
+};
 
 /// An origin of a builder: the call that made it and the calls the walk climbed through to
 /// reach it, outermost first (`Route::through`), or the `routes` parameter of a collection's
@@ -75,6 +93,7 @@ const VAPOR_NODES: usize = 4096;
 
 struct Vapor<'c, 'a> {
     code: &'c Code<'a>,
+    dialect: &'c Dialect,
     /// Whether a node was dropped past `VAPOR_NODES`.
     overflow: bool,
     /// The nodes whose origins went round a factory that calls itself (`origins`): what is
@@ -154,7 +173,7 @@ impl<'c, 'a> Vapor<'c, 'a> {
     fn application(&self, path: &'a str, index: usize) -> bool {
         let call = &self.code.files()[path].calls[index];
         let spelled = spellings(self.code, path, &call.scope, &call.callee);
-        one(&spelled, |s| APPLICATIONS.contains(&s)).is_some()
+        one(&spelled, |s| self.dialect.roots.contains(&s)).is_some()
     }
 
     /// The path components `call` is given, joined with `/`: its string arguments, a value that
@@ -165,7 +184,7 @@ impl<'c, 'a> Vapor<'c, 'a> {
             let middleware = matches!(arg, Value::Call(inv)
                 if method(&inv.callee).starts_with(char::is_uppercase)
                     && !PATHS.contains(&method(&inv.callee)));
-            if middleware && call.callee.ends_with(GROUPED) {
+            if middleware && call.callee.ends_with(self.dialect.group) {
                 continue;
             }
             out.push(path_literal(self.code.value(path, &call.scope, arg))?);
@@ -204,7 +223,7 @@ impl<'c, 'a> Vapor<'c, 'a> {
         let Some(receiver) = call.receiver.as_ref() else {
             return;
         };
-        if method(&call.callee) != GROUPED || !self.framework(path, index) {
+        if method(&call.callee) != self.dialect.group || !self.framework(path, index) {
             return;
         }
         let args: Vec<&Value> = call.args.iter().collect();
@@ -279,13 +298,14 @@ struct Route<'a> {
 }
 
 /// Vapor providers: see the module.
-pub(super) fn providers(code: &Code) -> Vec<Found> {
+pub(super) fn providers(code: &Code, dialect: &Dialect) -> Vec<Found> {
     let files: Vec<_> = (code.files().iter())
         .filter(|(p, _)| p.ends_with(".swift"))
         .map(|(p, f)| (*p, *f))
         .collect();
     let mut vapor = Vapor {
         code,
+        dialect,
         overflow: false,
         cycles: BTreeSet::new(),
         ids: BTreeMap::new(),
@@ -300,7 +320,7 @@ pub(super) fn providers(code: &Code) -> Vec<Found> {
         for (n, call) in facts.calls.iter().enumerate() {
             let name = method(&call.callee);
             let verb = VERBS.iter().find(|(m, _)| *m == name).map(|(_, v)| *v);
-            let known = verb.is_some() || matches!(name, ON | REGISTER);
+            let known = verb.is_some() || (name == ON || (dialect.collections && name == REGISTER));
             if !known || !vapor.framework(path, n) {
                 continue;
             }
@@ -325,12 +345,16 @@ pub(super) fn providers(code: &Code) -> Vec<Found> {
             let positional: Vec<&Value> = (call.args.iter())
                 .filter(|v| !matches!(v, Value::Function(_)))
                 .collect();
-            let (method, components) = match verb {
-                Some(verb) => (Some(verb.to_string()), &positional[..]),
-                None => match positional.split_first() {
+            let (method, components) = match (verb, dialect.method_first) {
+                (Some(verb), _) => (Some(verb.to_string()), &positional[..]),
+                (None, true) => match positional.split_first() {
                     Some((first, rest)) => (Vapor::http_method(first), rest),
                     None => (None, &positional[..]),
                 },
+                (None, false) => (
+                    call.keyword("method").and_then(Vapor::http_method),
+                    &positional[..],
+                ),
             };
             let trailing = call.args.last().filter(|v| matches!(v, Value::Function(_)));
             let handler = call.keyword("use").or(trailing);

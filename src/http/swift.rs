@@ -1,7 +1,8 @@
-//! Swift HTTP providers and consumers (spec #29): Vapor's routes in `vapor`, the calls of
-//! URLSession, Alamofire and AsyncHTTPClient in `client`.
+//! Swift HTTP providers and consumers (spec #29): Vapor's routes in `vapor`, Hummingbird's in
+//! `hummingbird`, the calls of URLSession, Alamofire and AsyncHTTPClient in `client`.
 
 mod client;
+mod hummingbird;
 mod vapor;
 
 use super::{PARAM, normalize_path};
@@ -10,7 +11,9 @@ use crate::resolve::Code;
 
 /// The providers of the Swift files of the repository.
 pub(super) fn providers(code: &Code) -> Vec<Found> {
-    vapor::providers(code)
+    let mut found = vapor::providers(code, &vapor::VAPOR);
+    found.extend(vapor::providers(code, &hummingbird::HUMMINGBIRD));
+    found
 }
 
 /// The consumers of the Swift files of the repository.

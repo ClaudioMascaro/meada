@@ -15,7 +15,6 @@ El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [rete
 | Java | `.java`, resueltos por sus declaraciones de `package` |
 | Kotlin | `.kt` y `.kts` (salvo `build.gradle.kts` y `settings.gradle.kts`), resueltos por sus declaraciones de `package` |
 | C# | `.cs`, agrupados en proyectos por los `.csproj` de estilo SDK y resueltos por sus `namespace` |
-| Swift | `URLSession`, Alamofire, AsyncHTTPClient | Vapor |
 | Swift | `.swift` (salvo `Package.swift`), agrupados en módulos por los targets de `Package.swift` |
 
 ### Rust
@@ -83,12 +82,15 @@ Meada conecta consumidores y proveedores entre lenguajes, incluso detrás de gat
 | Java | RestTemplate, WebClient, `java.net.http`, OkHttp, OpenFeign, Retrofit | Spring MVC, JAX-RS |
 | Kotlin | RestTemplate, WebClient, OkHttp, Retrofit, Ktor client | Spring MVC, Ktor |
 | C# | `HttpClient`, typed clients, Refit | ASP.NET Core (controllers, minimal APIs) |
+| Swift | `URLSession`, Alamofire, AsyncHTTPClient | Vapor, Hummingbird |
 
 En Java, un método de una clase `@RestController` o `@Controller` con `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping` o `@RequestMapping(method = RequestMethod.X)` pasa a ser proveedor, bajo el prefijo del `@RequestMapping` de la clase. La ruta pliega constantes `static final` (también de otras clases) y `+`; cada ruta de un array es un proveedor. Un `@RequestMapping` sin `method` atiende todos los métodos (`http::ANY::<ruta>`) y se vincula a consumidores de cualquier método, con "any method" en la razón. `server.servlet.context-path` no se aplica. Las anotaciones y `RequestMethod` valen por un import de Spring, simple, estático o `import ...bind.annotation.*`; una clase del repositorio con el mismo nombre, o un import que también podría traer el nombre, las oculta. En `method` o en un array de rutas, un elemento ilegible se ignora y los demás valen.
 
 En Java, una clase con `@Path` (`javax.ws.rs` o `jakarta.ws.rs`) es un recurso JAX-RS: un método con `@GET`, `@POST`, `@PUT`, `@PATCH`, `@DELETE`, `@HEAD` u `@OPTIONS` pasa a ser proveedor en la ruta de la clase más el `@Path` del método, con constantes plegadas y `{id}` o `{id:regex}` como parámetro. Un método solo con `@Path` (localizador de subrecurso) no es ruta, y `@ApplicationPath` no se aplica. Los nombres valen por import, como en Spring. Una clase de controlador o recurso cuya familia tiene base externa (`extends com.corp.Base`) no da proveedor (#354), y una interfaz con `@Path` es cliente, no servidor. Una anotación totalmente calificada sin import y una anotación heredada de una interfaz no se leen.
 
 En Kotlin, los controladores Spring siguen las reglas de Java. Una ruta Ktor dentro de `routing { }` (`get`, `post`, `put`, `patch`, `delete`, `head`, `options`, con ruta o sin ella, y `route(ruta, HttpMethod.X)`) pasa a ser proveedor bajo el prefijo de cada bloque `route(prefijo) { }` que la rodea, también cuando está en una función de extensión de `Route` o `Routing` llamada dentro del bloque, en otro archivo: llamada bajo dos prefijos, sirve en ambos. El lambda de la ruta es su handler. Los nombres de Ktor solo cuentan con el import de Ktor; el enrutamiento tipado (clases de recurso) no se lee.
+
+En Swift, una ruta Hummingbird (`get`, `post`, `put`, `patch`, `delete` y `on(ruta, method: .get)`) llamada en un `Router()` o en un `group(prefijo)` suyo es proveedor bajo el prefijo de cada `group` que la rodea, a cualquier profundidad, también cuando el router pasa por argumentos y retornos de funciones. El closure de la ruta es el handler, y `use:` acepta una función. Los nombres solo valen con el import `Hummingbird`; el `addRoutes` de un controlador no se lee.
 
 En C#, una minimal API es un proveedor: `MapGet`, `MapPost`, `MapPut`, `MapPatch`, `MapDelete` y `MapMethods(patrón, métodos, handler)` sobre la aplicación (`WebApplication.Create` o el `Build()` de `WebApplication.CreateBuilder`) o sobre un grupo `MapGroup(prefijo)`, con grupos anidados a cualquier profundidad. El prefijo sigue al grupo por variables locales, argumentos de método, valores de retorno y métodos de extensión llamados sobre el grupo (`group.MapOrders()`, con el namespace de la clase estática importado), así que un método de extensión llamado en dos grupos atiende bajo los dos prefijos. `RequireAuthorization()`, `WithTags(..)` y las otras convenciones comunes mantienen el grupo. Un handler lambda es un handler inline con el nombre de su ruta; un method group (`Handlers.List`) es el método que nombra. Un grupo que Meada no lee (un parámetro de lambda, como en `UseEndpoints(e => e.MapGet(..))`, un campo, una variable reasignada) no da ruta, ni siquiera en la raíz.
 

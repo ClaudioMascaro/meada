@@ -15,7 +15,6 @@ Server mode includes the [console](console.md), [snapshots](snapshots.md), [rete
 | Java | `.java`, resolved by their `package` declarations |
 | Kotlin | `.kt` and `.kts` (but `build.gradle.kts` and `settings.gradle.kts`), resolved by their `package` declarations |
 | C# | `.cs`, grouped into projects by SDK-style `.csproj` files and resolved by their `namespace` declarations |
-| Swift | `URLSession`, Alamofire, AsyncHTTPClient | Vapor |
 | Swift | `.swift` (except `Package.swift`), grouped into modules by the targets of `Package.swift` |
 
 ### Rust
@@ -83,12 +82,15 @@ Meada connects consumers and providers across languages, including behind gatewa
 | Java | RestTemplate, WebClient, `java.net.http`, OkHttp, OpenFeign, Retrofit | Spring MVC, JAX-RS |
 | Kotlin | RestTemplate, WebClient, OkHttp, Retrofit, Ktor client | Spring MVC, Ktor |
 | C# | `HttpClient`, typed clients, Refit | ASP.NET Core (controllers, minimal APIs) |
+| Swift | `URLSession`, Alamofire, AsyncHTTPClient | Vapor, Hummingbird |
 
 In Java, a method of a `@RestController` or `@Controller` class with `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping` or `@RequestMapping(method = RequestMethod.X)` becomes a provider under the class's `@RequestMapping` prefix. Paths fold `static final` constants (also from other classes) and `+`; each path of an array is one provider. A `@RequestMapping` without `method` serves every method (`http::ANY::<path>`) and links to consumers of any method, with "any method" in the reason. `server.servlet.context-path` is not applied. Annotations and `RequestMethod` count through a Spring import, single-type, static or `import ...bind.annotation.*`; a repository class with the same name, or an import that could also bring the name, hides them. In `method` or a path array, an unreadable element is ignored and the others count.
 
 In Java, a class with `@Path` (`javax.ws.rs` or `jakarta.ws.rs`) is a JAX-RS resource: a method with `@GET`, `@POST`, `@PUT`, `@PATCH`, `@DELETE`, `@HEAD` or `@OPTIONS` becomes a provider at the class path joined to the method `@Path`, with constants folded and `{id}` or `{id:regex}` as the parameter. A method with only `@Path` (a sub-resource locator) is no route, and `@ApplicationPath` is not applied. Names count through an import, as in Spring. A controller or resource class whose family has an outside base (`extends com.corp.Base`) gives no provider (#354), and a `@Path` interface is a client, not a server. A fully qualified annotation without an import and annotations inherited from an interface are not read.
 
 In Kotlin, Spring controllers follow the Java rules. A Ktor route inside `routing { }` (`get`, `post`, `put`, `patch`, `delete`, `head`, `options`, with or without a path, and `route(path, HttpMethod.X)`) becomes a provider under the prefix of every `route(prefix) { }` block around it, also when it sits in an extension function on `Route` or `Routing` called inside the block, in another file: called under two prefixes, it serves under both. The route's lambda is its handler. Ktor names count only with Ktor's import; type-safe routing (resource classes) is not read.
+
+In Swift, a Hummingbird route (`get`, `post`, `put`, `patch`, `delete` and `on(path, method: .get)`) called on a `Router()` or on a `group(prefix)` of it is a provider under the prefix of every `group` around it, at any depth, also when the router goes through function arguments and return values. The route closure is the handler, and `use:` takes a function. The names hold only with the `Hummingbird` import; a controller's `addRoutes` is not read.
 
 In C#, a minimal API is a provider: `MapGet`, `MapPost`, `MapPut`, `MapPatch`, `MapDelete` and `MapMethods(pattern, methods, handler)` on the application (`WebApplication.Create`, or the `Build()` of `WebApplication.CreateBuilder`) or on a `MapGroup(prefix)` group, with groups nested at any depth. The prefix follows the group through locals, method arguments, return values and extension methods called on the group (`group.MapOrders()`, with the static class's namespace imported), so an extension method called on two groups serves under both prefixes. `RequireAuthorization()`, `WithTags(..)` and the other common conventions keep the group. A lambda handler is an inline handler named for its route; a method group (`Handlers.List`) is the method it names. A group Meada does not read (a lambda's parameter, as in `UseEndpoints(e => e.MapGet(..))`, a field, a reassigned local) gives no route, not even at the root.
 

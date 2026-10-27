@@ -304,6 +304,8 @@ fn walk(
     // mutates a value in place).
     let mut vars: HashSet<String> = HashSet::new();
     let mut called: HashSet<String> = HashSet::new();
+    // The typed locals: receivers, not `locals`, but declarations of their name all the same.
+    let mut typed_names: Vec<String> = Vec::new();
     let mut stack = vec![Visit {
         node: root,
         scope: Rc::new(String::new()),
@@ -558,7 +560,10 @@ fn walk(
                                 });
                             }
                             match class != Class::Unknown && typed_here {
-                                true => facts.receivers.push(receiver),
+                                true => {
+                                    typed_names.push(qualify(&scope, &name));
+                                    facts.receivers.push(receiver)
+                                }
                                 false => facts.locals.push(qualify(&scope, &name)),
                             }
                         }
@@ -717,12 +722,20 @@ fn walk(
         *held.entry(qualify(&b.scope, &b.name)).or_insert(0) += 1;
         held
     });
-    let declared = facts.locals.iter().fold(HashMap::new(), |mut n, l| {
-        *n.entry(l.as_str()).or_insert(0) += 1;
-        n
-    });
+    let declared = facts
+        .locals
+        .iter()
+        .chain(&typed_names)
+        .fold(HashMap::new(), |mut n, l| {
+            *n.entry(l.as_str()).or_insert(0) += 1;
+            n
+        });
     let shared: HashSet<String> = (held.iter())
-        .filter(|(name, bounds)| declared.get(name.as_str()).is_some_and(|d| d > *bounds))
+        .filter(|(name, bounds)| {
+            // A `var` beside another binding of the name holds no one value either.
+            let var = name.rsplit('.').next().is_some_and(|n| vars.contains(n));
+            declared.get(name.as_str()).is_some_and(|d| d > *bounds) || (var && **bounds > 1)
+        })
         .map(|(name, _)| name.clone())
         .collect();
     facts
@@ -1371,6 +1384,20 @@ mod tests {
         assert!(facts.unbuilt && facts.defs.is_empty());
         let src = format!("struct {name} {{ func g() {{\nf()\n}} }}\n");
         assert!(!super::parse(src.as_bytes()).unwrap().unbuilt);
+    }
+
+    #[test]
+    fn a_constructed_local_bound_again_holds_no_one_value() {
+        let bounds = |src: &str| facts(src).bound.len();
+        assert_eq!(bounds("func f() { let router = Router() }\n"), 1);
+        for rebinding in [
+            "if let router = other { }",
+            "for router in xs { }",
+            "var router = Other()",
+        ] {
+            let src = format!("func f() {{ let router = Router(); {rebinding} }}\n");
+            assert_eq!(bounds(&src), 0, "{rebinding}");
+        }
     }
 
     #[test]
