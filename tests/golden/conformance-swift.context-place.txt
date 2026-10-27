@@ -1,5 +1,5 @@
 example.com/acme/conformance Sources/Store/OrderService.swift:30-35 OrderService.place(order:quantity:)
-community: Sources/Store#4
+community: Sources/Store#6
 processes: 1 (1 export; 1 repository): OrderService.place(_:) (example.com/acme/conformance)
 public func place(order: Order, quantity: Int) -> Bool {
         audit(order)
@@ -11,7 +11,7 @@ callers:
 example.com/acme/conformance Sources/Store/OrderService.swift:27 OrderService.place(order:)
 callees:
 example.com/acme/conformance Sources/Store/OrderService.swift:45 OrderService.validate(order:)
-example.com/acme/conformance Sources/Store/Order+Pricing.swift:6 Order.price(quantity:) [inferred: one method named price]
+example.com/acme/conformance Sources/Store/Order+Pricing.swift:6 Order.price(quantity:)
 example.com/acme/conformance Sources/Store/OrderService.swift:4 Notifier.notify(order:)
 example.com/acme/conformance Sources/Store/OrderService+Audit.swift:2 OrderService.audit(_:) [ambiguous: 4 functions or classes named audit]
 example.com/acme/conformance Sources/Store/OrderService.swift:68 OrderService.audit(_:Bool) [ambiguous: 4 functions or classes named audit]

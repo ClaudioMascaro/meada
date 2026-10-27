@@ -18,6 +18,10 @@
       "hash": "ddc43419ae51aba6eaa09999f70bab40d0c4446b1986a76a34c958ded460a0cb"
     },
     {
+      "path": "Sources/Store/Dispatch.swift",
+      "hash": "6d6976d61cfc4c0522773d60084a26c269aff1556befdbec2ed54a7498ff0099"
+    },
+    {
       "path": "Sources/Store/Order+Pricing.swift",
       "hash": "f8f9d18ee108ba40495b65cd09a7736e9ff3485fdb9e07fb6db26e55d311b807"
     },
@@ -265,6 +269,142 @@
         "path": "Sources/Checkout/Summary.swift",
         "start": 14,
         "end": 52
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 284,
+        "end": 361
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat.moor()",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 345,
+        "end": 359
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat.ship(parcel:)",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 311,
+        "end": 339
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Carrier",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 0,
+        "end": 50
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Carrier.ship(parcel:)",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 23,
+        "end": 48
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Crate",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 91,
+        "end": 106
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 363,
+        "end": 1370
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.again(lorry:)",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 1206,
+        "end": 1311
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 564,
+        "end": 1200
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.init(truck:carrier:)",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 456,
+        "end": 558
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.lookup()",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 1317,
+        "end": 1368
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Parcel",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 52,
+        "end": 89
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 108,
+        "end": 282
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.load(_:Crate)",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 252,
+        "end": 280
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.load(_:Parcel)",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 216,
+        "end": 246
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.ship(parcel:)",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 136,
+        "end": 164
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.ship(parcel:fast:)",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 170,
+        "end": 210
       }
     },
     {
@@ -667,7 +807,7 @@
       "id": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()::service.place#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()",
       "target": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:)",
-      "level": "inferred",
+      "level": "exact",
       "span": {
         "path": "Sources/Checkout/Checkout.swift",
         "start": 188,
@@ -1148,6 +1288,229 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.again(lorry:)::Boat#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.again(lorry:)",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 1253,
+        "end": 1259
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.again(lorry:)::Parcel#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.again(lorry:)",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Parcel",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 1287,
+        "end": 1304
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.again(lorry:)::lorry.ship#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.again(lorry:)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat.ship(parcel:)",
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Carrier.ship(parcel:)",
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.ship(parcel:)"
+      ],
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 1268,
+        "end": 1305
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)::Truck#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 909,
+        "end": 916
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)::boat.moor#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat.moor()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 1023,
+        "end": 1034
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)::carrier.ship#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Carrier.ship(parcel:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 951,
+        "end": 979
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)::found.moor#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat.moor()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 1182,
+        "end": 1194
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)::found.ship#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat.ship(parcel:)",
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Carrier.ship(parcel:)",
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.ship(parcel:)"
+      ],
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 1100,
+        "end": 1126
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)::found.ship#1",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.ship(parcel:fast:)",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 1135,
+        "end": 1173
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)::local.ship#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.ship(parcel:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 863,
+        "end": 889
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)::lookup#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.lookup()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 1083,
+        "end": 1091
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)::lorry.ship#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.ship(parcel:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 757,
+        "end": 783
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)::made.load#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.load(_:Crate)",
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.load(_:Parcel)"
+      ],
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 925,
+        "end": 942
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)::other.ship#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Carrier.ship(parcel:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 988,
+        "end": 1014
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)::self.truck.ship#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.ship(parcel:fast:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 705,
+        "end": 748
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)::ships.first.moor#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat.moor()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 1043,
+        "end": 1062
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)::truck.ship#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.ship(parcel:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 670,
+        "end": 696
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)::wrapped.ship#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.ship(parcel:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 792,
+        "end": 821
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot::Boat#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot",
+      "target": "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Dispatch.swift",
+        "start": 444,
+        "end": 450
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.Line.doubled()::total#0",
       "caller": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.Line.doubled()",
       "target": "example.com/acme/conformance::Sources/Store/Order.swift::Order.Line.total()",
@@ -1289,7 +1652,7 @@
       "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:quantity:)::order.price#0",
       "caller": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:quantity:)",
       "target": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.price(quantity:)",
-      "level": "inferred",
+      "level": "exact",
       "span": {
         "path": "Sources/Store/OrderService.swift",
         "start": 641,
@@ -1486,6 +1849,13 @@
       ]
     },
     {
+      "name": "Sources/Store#10",
+      "members": [
+        "example.com/acme/conformance::Sources/Store/Probe.swift::Bag.run()",
+        "example.com/acme/conformance::Sources/Store/Probe.swift::describe()"
+      ]
+    },
+    {
       "name": "Sources/Store#2",
       "members": [
         "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()",
@@ -1501,12 +1871,33 @@
     {
       "name": "Sources/Store#3",
       "members": [
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat",
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot",
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.again(lorry:)",
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Parcel"
+      ]
+    },
+    {
+      "name": "Sources/Store#4",
+      "members": [
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat.moor()",
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Carrier.ship(parcel:)",
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.dispatch(parcel:via:other:wrapped:ships:)",
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.lookup()",
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck",
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.ship(parcel:)",
+        "example.com/acme/conformance::Sources/Store/Dispatch.swift::Truck.ship(parcel:fast:)"
+      ]
+    },
+    {
+      "name": "Sources/Store#5",
+      "members": [
         "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.Line.doubled()",
         "example.com/acme/conformance::Sources/Store/Order.swift::Order.Line.total()"
       ]
     },
     {
-      "name": "Sources/Store#4",
+      "name": "Sources/Store#6",
       "members": [
         "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.discount(quantity:)",
         "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.price(quantity:)",
@@ -1515,7 +1906,7 @@
       ]
     },
     {
-      "name": "Sources/Store#5",
+      "name": "Sources/Store#7",
       "members": [
         "example.com/acme/conformance::Sources/Store/Order.swift::log(_:)",
         "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notify(order:)",
@@ -1525,25 +1916,18 @@
       ]
     },
     {
-      "name": "Sources/Store#6",
+      "name": "Sources/Store#8",
       "members": [
         "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter.report()",
         "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter.summary()"
       ]
     },
     {
-      "name": "Sources/Store#7",
+      "name": "Sources/Store#9",
       "members": [
         "example.com/acme/conformance::Sources/Store/Probe+Tracer.swift::Probe.trace()",
         "example.com/acme/conformance::Sources/Store/Probe.swift::Pinger.ping()",
         "example.com/acme/conformance::Sources/Store/Probe.swift::Probe.run()"
-      ]
-    },
-    {
-      "name": "Sources/Store#8",
-      "members": [
-        "example.com/acme/conformance::Sources/Store/Probe.swift::Bag.run()",
-        "example.com/acme/conformance::Sources/Store/Probe.swift::describe()"
       ]
     }
   ],
@@ -1900,7 +2284,7 @@
         {
           "depth": 3,
           "repository": "example.com/acme/conformance",
-          "level": "inferred",
+          "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.price(quantity:)"
         },

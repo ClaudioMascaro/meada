@@ -65,7 +65,11 @@ All notable changes to Meada are recorded here. The format follows
   functions, methods and initializers are symbols named with their argument labels
   (`OrderService.place(order:quantity:)`), with an extension's members under the extended type.
   Unqualified, `self`, static and initializer calls resolve within the module and the modules
-  it imports, narrowed by argument labels; a tie is `ambiguous`.
+  it imports, narrowed by argument labels; a tie is `ambiguous`. A call on a property,
+  parameter or local whose type is written (`let x: T`, `T(...)`) resolves within that type and
+  the protocols it conforms to, `exact`; through a protocol-typed receiver it stops at the
+  requirement. A receiver of unread type is a name match by base name and labels. The stored
+  Swift facts change, so existing indexes are rebuilt.
 - Vapor routes are HTTP providers (spec #29, #119): `get`, `post`, `put`, `patch`, `delete` and
   `on(.METHOD, ..)` with their `grouped(..)` prefixes, a `RouteCollection` under the builder it
   is registered on, and builders followed through assignments, arguments and return values; the
