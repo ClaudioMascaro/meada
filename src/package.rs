@@ -404,6 +404,10 @@ pub struct Summary {
     /// gives its entries to the projects below it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub import: Option<crate::dotnet::msbuild::Import>,
+    /// NuGet only: the package properties a project or props file writes, as written, for the
+    /// seam's `inherit` to name a project under the props files above it (`msbuild::package`).
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub properties: crate::dotnet::msbuild::Properties,
 }
 
 /// One dependency entry of a manifest. `name` is the package the entry names.

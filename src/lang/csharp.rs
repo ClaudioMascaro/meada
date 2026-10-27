@@ -144,14 +144,11 @@ impl LanguagePack for CSharp {
     /// its target's name. Each file's `Facts::unit` is its project, whose files alone the parts
     /// of a partial type come from.
     fn join(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Join {
-        // The props files by path, with what each imports (none when unreadable, which hides
-        // the files above it all the same).
-        let props: HashMap<&str, (&[u8], Option<msbuild::Import>)> = (configs.iter())
-            .filter(|(path, _)| path.rsplit('/').next() == Some(msbuild::PROPS))
-            .map(|(path, src)| {
-                let import = msbuild::props(path, src).and_then(|p| p.import);
-                (*path, (*src, import))
-            })
+        // The props files by path, each read once (`None` when unreadable, which hides the
+        // files above it all the same).
+        let props: HashMap<&str, Option<msbuild::Props>> = (configs.iter())
+            .filter(|(path, _)| msbuild::is_props(path))
+            .map(|(path, src)| (*path, msbuild::props(path, src)))
             .collect();
         // Each project file with its directory (`a/b/`, empty at the root), read once under
         // the props files MSBuild imports into it.
@@ -159,8 +156,11 @@ impl LanguagePack for CSharp {
             .filter(|(path, _)| path.ends_with(".csproj"))
             .filter_map(|(path, src)| {
                 let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
-                let above = msbuild::chain(dir, |p| props.get(p).map(|(_, import)| import.clone()));
-                let above: Vec<&[u8]> = above.iter().map(|p| props[p.as_str()].0).collect();
+                let imports = |p: &str| props.get(p).map(|read| read.as_ref()?.import.clone());
+                let above = msbuild::chain(dir, imports);
+                let above: Vec<&msbuild::Props> = (above.iter())
+                    .filter_map(|p| props[p.as_str()].as_ref())
+                    .collect();
                 let dir = if dir.is_empty() {
                     String::new()
                 } else {
