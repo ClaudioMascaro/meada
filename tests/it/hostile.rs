@@ -68,8 +68,8 @@ fn chain(
 }
 
 /// Indexes `files` as a repository and exports it, on a thread with `STACK` bytes, then removes
-/// the repository (a failed case's stays to be read).
-fn index(pack: &str, name: &str, files: &[(String, String)]) {
+/// the repository (a failed case's stays to be read). Gives the export.
+fn index(pack: &str, name: &str, files: &[(String, String)]) -> String {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("hostile-{pack}-{name}"));
     let _ = fs::remove_dir_all(&dir);
     for (path, body) in files {
@@ -88,7 +88,6 @@ fn index(pack: &str, name: &str, files: &[(String, String)]) {
             let _ = tx.send(
                 Engine::open(&repo)
                     .and_then(|e| e.export())
-                    .map(|e| e.len())
                     .map_err(|e| e.to_string()),
             );
         })
@@ -96,12 +95,13 @@ fn index(pack: &str, name: &str, files: &[(String, String)]) {
     let done = rx
         .recv_timeout(BUDGET)
         .unwrap_or_else(|_| panic!("{pack}/{name}: no end within {BUDGET:?}"));
-    done.unwrap_or_else(|e| panic!("{pack}/{name}: {e}"));
+    let export = done.unwrap_or_else(|e| panic!("{pack}/{name}: {e}"));
     worker
         .join()
         .unwrap_or_else(|_| panic!("{pack}/{name}: panicked"));
     eprintln!("hostile {pack}/{name}: {:?}", started.elapsed());
     fs::remove_dir_all(&dir).unwrap();
+    export
 }
 
 /// Each pack's cases are split into `PARTS` tests, a case in every `PARTS`th, so the harness
@@ -1513,4 +1513,152 @@ parts! {
     go_survives_hostile_input_1 = "go", go, 1;
     go_survives_hostile_input_2 = "go", go, 2;
     go_survives_hostile_input_3 = "go", go, 3;
+}
+
+/// Locals in a chain, past `RECEIVER_DEPTH` (64) by 16: `var a1 = a0.m(); var a2 = a1.m(); ..`.
+const LOCALS: usize = 80;
+
+/// How a pack writes the chain of `LOCALS` locals, each holding a call on the one before it:
+/// the pack's name, how its repository holds a source, and the head of the source and the type
+/// of `a0` for a receiver typed outside the repository and for one the repository declares.
+/// `{t}`, `{locals}`, `{i}` and `{p}` (the one before `{i}`) stand for those in `function` and
+/// `local`. A new pack adds its row.
+type Chained = (
+    &'static str,
+    fn(String) -> Vec<(String, String)>,
+    [(&'static str, &'static str); 2],
+    &'static str,
+    &'static str,
+);
+
+fn chained() -> [Chained; 7] {
+    [
+        (
+            "ts",
+            |b| one("src/a.ts", b),
+            [
+                ("import { T } from 'lib';\n", "T"),
+                ("export class T { m(): T { return this; } }\n", "T"),
+            ],
+            "export function f(a0: {t}) {\n{locals}\n}\n",
+            "  const a{i} = a{p}.m();",
+        ),
+        (
+            "py",
+            |b| one("a.py", b),
+            [
+                ("from lib import T\n\n", "T"),
+                (
+                    "class T:\n    def m(self) -> 'T':\n        return self\n\n",
+                    "T",
+                ),
+            ],
+            "def f(a0: {t}):\n{locals}\n",
+            "    a{i} = a{p}.m()",
+        ),
+        (
+            "rs",
+            |b| krate(b, vec![]),
+            [
+                ("use lib::T;\n", "T"),
+                (
+                    "pub struct T;\nimpl T { pub fn m(&self) -> T { T } }\n",
+                    "T",
+                ),
+            ],
+            "pub fn f(a0: {t}) {\n{locals}\n}\n",
+            "    let a{i} = a{p}.m();",
+        ),
+        (
+            "go",
+            |b| module(b, vec![]),
+            [
+                ("package h\n\nimport \"example.com/lib\"\n\n", "lib.T"),
+                (
+                    "package h\n\ntype T struct{}\n\nfunc (t T) M() T { return t }\n\n",
+                    "T",
+                ),
+            ],
+            "func f(a0 {t}) {\n{locals}\n}\n",
+            "\ta{i} := a{p}.M()",
+        ),
+        (
+            "java",
+            |b| one("a/C.java", b),
+            [
+                ("package a;\nimport b.T;\n", "T"),
+                ("package a;\nclass T { T m() { return this; } }\n", "T"),
+            ],
+            "class C { void f({t} a0) {\n{locals}\n} }\n",
+            "  var a{i} = a{p}.m();",
+        ),
+        (
+            "kt",
+            |b| one("a/C.kt", b),
+            [
+                ("package a\nimport b.T\n\n", "T"),
+                ("package a\nclass T { fun m(): T = this }\n\n", "T"),
+            ],
+            "class C { fun f(a0: {t}) {\n{locals}\n} }\n",
+            "  val a{i} = a{p}.m()",
+        ),
+        (
+            "cs",
+            |b| one("C.cs", b),
+            [
+                ("using B;\nnamespace A;\n\n", "T"),
+                (
+                    "namespace A;\n\npublic class T { public T M() { return this; } }\n\n",
+                    "T",
+                ),
+            ],
+            "public class C { public void F({t} a0) {\n{locals}\n} }\n",
+            "  var a{i} = a{p}.M();",
+        ),
+    ]
+}
+
+/// Every pack reads a chain of locals on call results, from a receiver typed outside the
+/// repository and from one a type of the repository answers, in time linear in its length: a
+/// result read twice per link (once through the walk and once through the name match) made
+/// Java's cost double per link, and the C# pack's with it. The cases run side by side, each
+/// within `BUDGET`, and the test names the packs that missed it.
+#[test]
+fn every_pack_reads_a_chain_of_locals_on_call_results_in_linear_time() {
+    let cases: Vec<_> = (chained().into_iter())
+        .flat_map(|(pack, wrap, heads, function, local)| {
+            ["outside", "own"]
+                .into_iter()
+                .zip(heads)
+                .map(move |(name, (head, t))| {
+                    let locals = (1..=LOCALS)
+                        .map(|i| {
+                            local
+                                .replace("{i}", &i.to_string())
+                                .replace("{p}", &(i - 1).to_string())
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    let function = function.replace("{t}", t).replace("{locals}", &locals);
+                    (pack, name, wrap(format!("{head}{function}")))
+                })
+        })
+        .collect();
+    let failed: Vec<_> = std::thread::scope(|scope| {
+        let runs: Vec<_> = (cases.iter())
+            .map(|(pack, name, files)| {
+                let run = scope.spawn(move || {
+                    let export = index(pack, name, files);
+                    let export: serde_json::Value = serde_json::from_str(&export).unwrap();
+                    let calls = export["calls"].as_array().unwrap().len();
+                    assert!(calls >= LOCALS, "{pack}/{name}: {calls} calls");
+                });
+                (format!("{pack}/{name}"), run)
+            })
+            .collect();
+        (runs.into_iter())
+            .filter_map(|(case, run)| run.join().is_err().then_some(case))
+            .collect()
+    });
+    assert!(failed.is_empty(), "chains not read in time: {failed:?}");
 }
