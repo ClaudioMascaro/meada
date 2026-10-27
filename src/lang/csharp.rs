@@ -1063,7 +1063,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 // (`lambdas`): a kind may claim it as a handler, and it folds into the symbol
                 // around it otherwise. Its parameters hide outer names in it, and what it
                 // returns is its own.
-                if inline(defining, &scope, &classes) {
+                let own = inline(defining, &scope, &classes);
+                if own {
                     inner = Rc::new(qualify(&scope, &format!("@{}", node.start_byte())));
                     facts.defs.push(Def {
                         name: inner.as_ref().clone(),
@@ -1090,9 +1091,24 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         locals.push(unknown(text(p, src)));
                     }
                     list => {
-                        for (name, _, _) in parameters_of(list, src) {
+                        // A parameter with a written type types its receiver as a method's
+                        // does; an implicit one has none.
+                        for (name, class) in parameter_classes(list, src, &generics) {
                             bind_unknown(&mut bound, definitions, &inner, &name);
-                            locals.push(unknown(&name));
+                            // In a scope of its own the parameter hides a field of the same
+                            // name, as a method's does: it is no local read as the field.
+                            let receiver = Receiver {
+                                scope: inner.as_ref().clone(),
+                                name,
+                                class,
+                            };
+                            match own {
+                                true => facts.receivers.push(receiver),
+                                false => locals.push(Receiver {
+                                    class: Class::Unknown,
+                                    ..receiver
+                                }),
+                            }
                         }
                     }
                 }
@@ -1567,7 +1583,8 @@ fn parameter_classes(list: Option<Node>, src: &[u8], generics: &[String]) -> Vec
 /// its underlying one.
 fn class_of(ty: Node, src: &[u8], generics: &[String]) -> Class {
     let ty = match ty.kind() {
-        "nullable_type" => ty.child_by_field_name("type").unwrap_or(ty),
+        // `ref` of a lambda parameter's type is part of the type node, not a modifier.
+        "nullable_type" | "ref_type" => ty.child_by_field_name("type").unwrap_or(ty),
         _ => ty,
     };
     if !matches!(

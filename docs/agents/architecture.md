@@ -1703,7 +1703,7 @@ one for the area a change touches.
   with every one that fits). With an opaque base, or on a type's name (`Teller.Missing()`),
   or a bare call, the call resolves to nothing, and so does a method of the repository that
   is no extension. A receiver without a written type (`var x = Make()` of unknown result, a
-  lambda parameter, a type parameter) keeps the broad name match. The extensions are not
+  implicitly typed lambda parameter, a type parameter) keeps the broad name match. The extensions are not
   looked up: an extension method called as `x.M()` is never `exact`, one called as `Ext.M(x)`
   is. A local a call from outside initialized (`var app = builder.Build()`, `var b =
   WebApplication.CreateBuilder(args)`) is from outside too (`Resolver::outside_result`): the

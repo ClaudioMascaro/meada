@@ -9069,6 +9069,48 @@ mod csharp_tests {
     /// A type two projects of the repository declare under one qualified name binds, from a
     /// file of one of them, to that project's own (the compiler prefers the source's type); from
     /// a file of neither, the name is ambiguous, and a receiver of that type unknown.
+    /// A lambda parameter with a written type types its receiver as a method's does, in every
+    /// shape of the parameter; an implicit one keeps the broad name match, and a field of the
+    /// same name is neither changed by it nor changes it.
+    #[test]
+    fn a_typed_lambda_parameter_types_its_receiver() {
+        // The lambda's call, then the field's: `(level, target path)` of each.
+        let calls = |body: &str| {
+            let src = format!(
+                "class U {{ Bin shelf; void M() {{ {body} }} void N() => shelf.Stock(); }}"
+            );
+            let found = resolved(&[
+                ("App/C.cs", "class Crate { public int Stock() => 1; }"),
+                ("App/B.cs", "class Bin { public int Stock() => 2; }"),
+                ("App/U.cs", &src),
+            ]);
+            let of = |from: usize| {
+                let at: Vec<_> = found.iter().filter(|c| c.1 == "shelf.Stock").collect();
+                (at[from].2, at[from].3.clone())
+            };
+            (of(0), of(1))
+        };
+        for body in [
+            "Func<Crate,int> f = (Crate shelf) => shelf.Stock();",
+            "Func<Crate,int> f = (Crate shelf) => { return shelf.Stock(); };",
+            "Func<int,Crate,int> f = (int n, Crate shelf) => shelf.Stock();",
+            "Func<Crate,int> f = ([Attr] Crate shelf) => shelf.Stock();",
+            "Func<Crate,int> f = (ref Crate shelf) => shelf.Stock();",
+            "Func<Crate,int> f = delegate (Crate shelf) { return shelf.Stock(); };",
+            "app.MapPost(\"/\", ([FromBody] Crate shelf) => shelf.Stock());",
+        ] {
+            let (lambda, field) = calls(body);
+            assert_eq!(lambda, ("exact", vec!["App/C.cs".to_string()]), "{body}");
+            assert_eq!(field, ("exact", vec!["App/B.cs".to_string()]), "{body}");
+        }
+        for body in [
+            "Func<Crate,int> f = shelf => shelf.Stock();",
+            "Func<Crate,int> f = (shelf) => shelf.Stock();",
+        ] {
+            assert_eq!(calls(body).0.0, "ambiguous", "{body}");
+        }
+    }
+
     #[test]
     fn a_type_two_projects_declare_binds_to_the_caller_s_project_first() {
         let use_it = "namespace P;\nclass Use { void F(Order o) { o.Total(); Order.Of(); \
