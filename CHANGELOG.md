@@ -8,6 +8,21 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A C# `internal` type (one with no access modifier too) links from its own project's files
+  alone: a file of another project of the repository gets no link to it, and the name binds to
+  the type that file sees (a public one of the same name, or one a `using` brings even from a
+  file of the internal type's namespace). `InternalsVisibleTo` is not read.
+- A C# member read between a call and the member called (`Repo.Make().x.Save()`) is the
+  receiver: the field's or property's written type owns `Save`, and an unread one leaves a name
+  match, never the call's class.
+- The `obj/` and `bin/` directories beside a `.csproj` are .NET build output and stay out of the
+  index, whether or not an ignore file lists them: their generated sources no longer add
+  symbols or repeat implicit usings.
+- A C# project file that removes thousands of `<Using>` items, a `Directory.Build.props` read
+  under hundreds of projects, a project referencing many others and many imports of one
+  directory index in time linear in their size; a props file of more than 256 usings and
+  references adds nothing, as one that cannot be read.
+
 - A Spring `application.yml` whose joined keys pass 1 MiB (`YAML_KEY_BUDGET`) reads as empty
   instead of allocating every key joined to each of its children: a crafted file no longer
   costs gigabytes to index.
@@ -44,6 +59,29 @@ All notable changes to Meada are recorded here. The format follows
   transport remains supported, with bilingual operational refusals at the signed ceiling.
 
 ### Added
+
+- `Directory.Build.props` files apply to the C# projects below them as MSBuild imports them
+  (the nearest one, then those it imports with `GetPathOfFileAbove` or a relative path): their
+  `<Using>` items, `PackageReference`s and `ProjectReference`s, and the `PackageId`,
+  `AssemblyName` and version that name a project's NuGet package under the project's own. A
+  computed id there provides no package. The stored manifest summary changes, so existing
+  indexes are rebuilt.
+- A C# file sees what the projects its project references in the repository pass on, directly
+  or through others, and a Java file what the Maven modules its module depends on pass on (a
+  `compile` dependency that is not `optional`); a reference whose `PrivateAssets` includes `all`
+  or `compile`, or is computed, does not pass on.
+- A C# name that two other projects of the repository declare binds, from a file of a third,
+  to the one in the project its project references, instead of `ambiguous`.
+- C# `nameof(x)` is the text of the last identifier of `x`, so a channel name or a URL part
+  written with it is known.
+- A Refit `RestService.For<T>(base)` gives its base to the methods `T` inherits from the
+  repository's interfaces, not only to those `T` declares.
+- A C# receiver typed by a declaration (a parameter, field, property or local) whose type comes
+  through a package `using` links through that package, as a call on the type's name does.
+- An explicitly typed C# lambda parameter (`(Order o) => o.Total()`) types its receiver as a
+  method parameter does; one written with `in` or `out` keeps the name match.
+- Every language pack and every manifest and configuration reader has a hostile-input probe
+  (a chain of locals on call results, files built to explode), held to a time and size budget.
 
 - NuGet packages (spec #28): each SDK-style `.csproj` provides `package::nuget::<id>` (its
   `PackageId`, else `AssemblyName`, else file name). A `PackageReference` naming a workspace
@@ -896,6 +934,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- Coding standards class each string table a language pack holds (syntax, the language's
+  runtime, or a decided exception), and a test fails on a new table until it is listed with
+  its class.
 - A Kotlin `HttpClient` held through more locals than `LOCAL_DEPTH` (8) is now a consumer:
   the shared value flow follows the `val`s the pack binds (`Facts::bound`, issue #110), up to
   its own depth (`EVAL_DEPTH`, 256 more). Before, such a chain of locals gave no consumer.

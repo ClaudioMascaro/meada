@@ -1040,8 +1040,10 @@ one for the area a change touches.
   `AssemblyName` and version, and its `PackageReference` and `ProjectReference` items, each
   with whether it is private: a `PrivateAssets` naming `all` or `compile`, or computed, keeps it
   from passing on), which the C# pack's `join` and the NuGet ecosystem (#116) both read; a second
-  reader of project files is a finding. `msbuild::read` takes the bytes of the `Directory.Build.props`
-  files MSBuild imports into the project (#381), evaluated before it: `msbuild::chain` finds them
+  reader of project files is a finding. `msbuild::read` takes the `Directory.Build.props` files
+  MSBuild imports into the project (#381), each read once by `msbuild::props` (a file of more than
+  `PROPS_ITEMS` (256) usings and references reads as unreadable, so what it copies into each
+  project stays bounded), evaluated before it: `msbuild::chain` finds them
   (the nearest at or above the project's directory, then each it imports with
   `GetPathOfFileAbove('Directory.Build.props', ...)` or a relative path, outer first, up to
   `PROPS_DEPTH` (8) and not one twice), items add up, the project's property wins, a `<Using
@@ -1050,8 +1052,10 @@ one for the area a change touches.
   and the NuGet ecosystem keeps one as a manifest that is no project: `Nuget::inherit` gives its
   `PackageReference` and `ProjectReference` entries (a `ProjectReference` relative to the project,
   as MSBuild evaluates it; one on `$(MSBuildThisFileDirectory)` is computed) to the projects below
-  it and empties the file's own, so they declare them and it declares none; its `PackageId`,
-  `AssemblyName` and version are not given to NuGet's providers. `dotnet/references.rs` (#369) walks a repository's
+  it and empties the file's own, so they declare them and it declares none, and names each
+  project with the package properties the chain writes under the project's own
+  (`msbuild::package`, from `Summary::properties`): a computed id from either makes no provider.
+  `dotnet/references.rs` (#369) walks a repository's
   `ProjectReference`s: `located` turns an `Include` into the project file's path in the
   repository, and `referenced` gives the projects a project references directly or through the
   projects those reference, nearest first (breadth first), each once, following a private
@@ -1704,8 +1708,10 @@ one for the area a change touches.
   keeps the methods with a `Binds::Instance` first parameter alone (`inferred`, or `ambiguous`
   with every one that fits). With an opaque base, or on a type's name (`Teller.Missing()`),
   or a bare call, the call resolves to nothing, and so does a method of the repository that
-  is no extension. A receiver without a written type (`var x = Make()` of unknown result, a
-  implicitly typed lambda parameter, a type parameter) keeps the broad name match. The extensions are not
+  is no extension. A receiver without a written type (`var x = Make()` of unknown result, an
+  implicitly typed lambda parameter, a type parameter) keeps the broad name match; so does a
+  lambda parameter written with `in` or `out` (#379), which tree-sitter-c-sharp 0.23.5 does not
+  parse (an `ERROR` node). The extensions are not
   looked up: an extension method called as `x.M()` is never `exact`, one called as `Ext.M(x)`
   is. A local a call from outside initialized (`var app = builder.Build()`, `var b =
   WebApplication.CreateBuilder(args)`) is from outside too (`Resolver::outside_result`): the
@@ -1805,8 +1811,12 @@ one for the area a change touches.
   literal group, root project name and included project names/directories in `Summary::build`),
   of each SDK-style `.csproj` (spec #28: the package id, else assembly name, else file name, the
   literal version, each `PackageReference` with its range as written, each `ProjectReference`
-  as a `path` folded from the project's directory, and `Summary::project`, the mark that it is
-  an SDK-style project that owns its files), the `tsconfig.json` rows
+  as a `path` folded from the project's directory, each with `Entry::private` when it does not
+  pass on (#369), the package properties as written (`Summary::properties`, #381), and
+  `Summary::project`, the mark that it is an SDK-style project that owns its files) and of each
+  `Directory.Build.props` (#381: its `PackageReference`s, its `ProjectReference`s by the path as
+  written, its package properties and the props file it imports, `Summary::import`), the
+  `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition, constant, type or file they name), the `families` table (spec #26: each public
   Java class's ancestors past it, `Resolver::ancestries`, a repository class by file and name and
@@ -2021,7 +2031,9 @@ qualification budget does (ADR 0017).
   namespace. A project file is SDK-style when its `Project` has an `Sdk` attribute, an `Sdk`
   element or an `Import` with an `Sdk` (any case); its properties are read as written, with no `Condition` and no import
   but a parent `Directory.Build.props` (`Directory.Build.targets` and `Directory.Packages.props`
-  stay unread; the props chain is followed `PROPS_DEPTH` (8) files up, `dotnet/msbuild.rs`), and the nearest project directory owns a file (MSBuild items that
+  stay unread; the props chain is followed `PROPS_DEPTH` (8) files up, and a props file of
+  more than `PROPS_ITEMS` (256) usings and references adds nothing, as an unreadable one:
+  `dotnet/msbuild.rs`), and the nearest project directory owns a file (MSBuild items that
   include or remove files are not read; two project files in one directory take the first).
   Implicit usings add the SDK's own list for `Microsoft.NET.Sdk`, plus `.Web`'s and
   `.Worker`'s; other SDKs add the base list. `.sln` files are not read: they only group
@@ -2041,13 +2053,15 @@ qualification budget does (ADR 0017).
   library project reads the library's `appsettings.json`, never the consuming app's.
   An `internal` type (one with no access modifier too) links from its own project's files
   alone (`Resolver::hidden`); `InternalsVisibleTo` is not read, so a friend project's calls to
-  it get no link. From a file of its namespace in another project, it still hides a type of
-  its name a using brings, which the call then reaches by a name match. A repository extension method wins over an outside
+  it get no link. From a file of another project it is not there at all, so a type of its
+  name a using brings binds even from a file of its namespace. A repository extension method wins over an outside
   type's instance member of the same name (`sb.Append("x")` beside a
   `static StringBuilder Append(this StringBuilder b, string s)`), where C# picks the member
   (ADR 0018). A file sees what the projects of its repository its project references pass on up
   to `REFERENCE_DEPTH` (32) projects deep (`dotnet/references.rs`), and nothing that a project
-  of another repository references.
+  of another repository references. A lambda parameter written with `in` or `out` (`(in Order
+  o) => o.Total()`) types nothing (#379): tree-sitter-c-sharp 0.23.5 reads the list as an
+  `ERROR` node, so its receiver keeps the broad name match.
 
 - `snapshot/pull.rs`: a generation's bundles hold at most `GENERATION_BYTES_MAX` (256 GiB)
   together, as the document records their sizes (checked before any download) and as the
@@ -2432,7 +2446,9 @@ qualification budget does (ADR 0017).
   attribute is no type; `Hiding`, shared with the controllers, says a class of the repository
   named `GetAttribute` hides it) and a path from the root is a consumer at its definition
   (`Site::Def`), as Retrofit's are. Its bases are the first arguments of each framework
-  `RestService.For<Api>(base)` whose first type argument names the interface, read with
+  `RestService.For<Api>(base)` whose first type argument names the interface or one that
+  extends it (#367: the interfaces `Def::bases` reach, up to `BASE_DEPTH` (32) levels, each
+  once), read with
   `Expand::Call` (a wrapper's callers pass it) and the reads decided in the file of `For`; one
   consumer per base, and an interface no `For` makes has an unknown base. The route follows the
   base's own path (Refit appends it). `AddRefitClient` and `For` given an `HttpClient` are not

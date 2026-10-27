@@ -4,7 +4,7 @@
 //! `Directory.Build.props` files MSBuild imports into it (#381); `Directory.Build.targets` and
 //! `Directory.Packages.props` are not read.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use roxmltree::{Document, Node, ParsingOptions};
 use serde::{Deserialize, Serialize};
@@ -28,6 +28,8 @@ pub enum Using {
 pub struct Project {
     /// The usings it adds to each of its files, in order.
     pub usings: Vec<Using>,
+    /// The package properties (`PACKAGE`), each the last one written, an empty one kept.
+    pub properties: Properties,
     /// The `PackageId` and `AssemblyName` properties, and the `PackageVersion` or else `Version`.
     pub package_id: Option<String>,
     pub assembly_name: Option<String>,
@@ -38,8 +40,11 @@ pub struct Project {
     pub projects: Vec<Reference>,
 }
 
+/// The package properties a file writes, by name: what names a project's package.
+pub type Properties = BTreeMap<String, String>;
+
 /// A `PackageReference` or `ProjectReference` item, as written.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Reference {
     pub include: String,
     pub version: Option<String>,
@@ -85,6 +90,12 @@ pub const PROPS: &str = "Directory.Build.props";
 // ponytail: real repositories nest a props file or two; this bounds the walk over a hostile one.
 pub const PROPS_DEPTH: usize = 8;
 
+/// The most usings and references a props file adds to each project below it; a props file with
+/// more reads as one that cannot be read, so that what it gives a project, copied into each of
+/// them, stays bounded.
+// ponytail: real props files add a few analyzers and usings; this bounds a crafted one.
+pub const PROPS_ITEMS: usize = 256;
+
 /// The props file a props file imports, as a path of the repository (`""` is the root).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Import {
@@ -95,15 +106,16 @@ pub enum Import {
 }
 
 /// A props file as it is read: what it adds to the projects below it, and the props file it
-/// imports.
+/// imports. Read once, it is evaluated under each project below it (`read`).
 #[derive(Debug, PartialEq, Eq)]
 pub struct Props {
     pub project: Project,
     pub import: Option<Import>,
+    layer: Layer,
 }
 
 /// One file of an evaluation, as written: a project file or a props file.
-#[derive(Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 struct Layer {
     sdk: Option<String>,
     properties: HashMap<&'static str, String>,
@@ -114,6 +126,8 @@ struct Layer {
     import: Option<Import>,
 }
 
+/// The properties that name a project's package.
+const PACKAGE: [&str; 4] = ["PackageId", "AssemblyName", "PackageVersion", "Version"];
 /// The properties a layer is asked for.
 const PROPERTIES: [&str; 5] = [
     "ImplicitUsings",
@@ -123,32 +137,61 @@ const PROPERTIES: [&str; 5] = [
     "Version",
 ];
 
-/// What an SDK-style project file says, with the props files `props` (the bytes of the
-/// `Directory.Build.props` files MSBuild imports into it, outer first, from `chain`) evaluated
-/// before it: the usings it adds to each of its files, in order (the implicit usings it enables,
-/// then the `<Using>` items, less those removed), its package properties and its references.
-/// A props file that cannot be read adds nothing. `None` when the file is no SDK-style project
-/// (no `Sdk` on `Project`, in an `Sdk` element or on an `Import`), or cannot be read.
+/// What an SDK-style project file says, with the props files `props` (the `Directory.Build.props`
+/// files MSBuild imports into it, outer first, from `chain`, each read once by `props`)
+/// evaluated before it: the usings it adds to each of its files, in order (the implicit usings
+/// it enables, then the `<Using>` items, less those removed), its package properties and its
+/// references. `None` when the file is no SDK-style project (no `Sdk` on `Project`, in an `Sdk`
+/// element or on an `Import`), or cannot be read.
 // ponytail: properties are read as written, with no `Condition` and only a props file's parent
 // imported; the last one written decides. A `ProjectReference` in a props file is relative to
 // the project, as MSBuild evaluates it; one built on `$(MSBuildThisFileDirectory)` is computed.
-pub fn read(src: &[u8], props: &[&[u8]]) -> Option<Project> {
+pub fn read(src: &[u8], props: &[&Props]) -> Option<Project> {
     let own = layer(src, "")?;
     own.sdk.as_ref()?;
-    let mut layers: Vec<Layer> = props.iter().filter_map(|src| layer(src, "")).collect();
-    layers.push(own);
-    Some(merge(layers))
+    let mut layers: Vec<&Layer> = props.iter().map(|p| &p.layer).collect();
+    layers.push(&own);
+    Some(merge(&layers))
 }
 
-/// What the props file at `path` says, as a project file does; `None` when it cannot be read.
+/// What the props file at `path` says, as a project file does; `None` when it cannot be read or
+/// adds more than `PROPS_ITEMS` usings and references.
 pub fn props(path: &str, src: &[u8]) -> Option<Props> {
     let dir = path.rsplit_once('/').map_or("", |(dir, _)| dir);
     let layer = layer(src, dir)?;
-    let import = layer.import.clone();
+    if layer.added.len() + layer.packages.len() + layer.projects.len() > PROPS_ITEMS {
+        return None;
+    }
     Some(Props {
-        project: merge(vec![layer]),
-        import,
+        project: merge(&[&layer]),
+        import: layer.import.clone(),
+        layer,
     })
+}
+
+/// Whether `path` is a `Directory.Build.props` file.
+pub fn is_props(path: &str) -> bool {
+    path.rsplit('/').next() == Some(PROPS)
+}
+
+/// The `PackageId`, else the `AssemblyName`, and the `PackageVersion`, else the `Version`, that
+/// the package properties of `layers` (outer first) give: the last one written of each, an empty
+/// one giving none.
+pub fn package<'a>(
+    layers: impl IntoIterator<Item = &'a Properties>,
+) -> (Option<String>, Option<String>) {
+    let mut properties: HashMap<&str, &str> = HashMap::new();
+    for layer in layers {
+        properties.extend(layer.iter().map(|(k, v)| (k.as_str(), v.as_str())));
+    }
+    let property = |name: &str| {
+        let value = properties.get(name).copied().filter(|v| !v.is_empty());
+        value.map(str::to_string)
+    };
+    (
+        property("PackageId").or_else(|| property("AssemblyName")),
+        property("PackageVersion").or_else(|| property("Version")),
+    )
 }
 
 /// The props files MSBuild imports into a project in the directory `dir` (`a/b`, empty at the
@@ -309,9 +352,9 @@ fn layer(src: &[u8], dir: &str) -> Option<Layer> {
 /// The layers, outer first, evaluated in order: a property written by a later one wins, items
 /// add up, and a `Using` removed drops those the layers before it and its own file add (and the
 /// implicit ones).
-fn merge(layers: Vec<Layer>) -> Project {
+fn merge(layers: &[&Layer]) -> Project {
     let mut properties: HashMap<&str, &str> = HashMap::new();
-    for layer in &layers {
+    for layer in layers {
         properties.extend(layer.properties.iter().map(|(k, v)| (*k, v.as_str())));
     }
     let property = |name: &str| {
@@ -332,20 +375,24 @@ fn merge(layers: Vec<Layer>) -> Project {
         usings.extend(all.map(|ns| Using::Namespace(ns.to_string())));
     }
     let mut project = Project {
+        properties: (properties.iter())
+            .filter(|(k, _)| PACKAGE.contains(k))
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect(),
         package_id: property("PackageId"),
         assembly_name: property("AssemblyName"),
         version: property("PackageVersion").or_else(|| property("Version")),
         ..Project::default()
     };
     for layer in layers {
-        usings.extend(layer.added);
+        usings.extend(layer.added.iter().cloned());
         usings.retain(|u| match u {
             Using::Namespace(n) | Using::Static(n) | Using::Alias(_, n) => {
                 !layer.removed.contains(n)
             }
         });
-        project.packages.extend(layer.packages);
-        project.projects.extend(layer.projects);
+        project.packages.extend(layer.packages.iter().cloned());
+        project.projects.extend(layer.projects.iter().cloned());
     }
     project.usings = usings;
     project
@@ -475,9 +522,11 @@ mod tests {
         assert!(read(big.as_bytes(), &[]).is_none());
     }
 
-    fn project_under(props: &[&str], src: &str) -> Project {
-        let props: Vec<&[u8]> = props.iter().map(|p| p.as_bytes()).collect();
-        read(src.as_bytes(), &props).unwrap()
+    fn project_under(files: &[&str], src: &str) -> Project {
+        let read_once: Vec<Props> = (files.iter())
+            .filter_map(|p| props(PROPS, p.as_bytes()))
+            .collect();
+        read(src.as_bytes(), &read_once.iter().collect::<Vec<_>>()).unwrap()
     }
 
     #[test]
@@ -518,7 +567,26 @@ mod tests {
             project_under(&[&big, "not xml"], own),
             project_under(&[], own)
         );
-        assert!(read(outer.as_bytes(), &[outer.as_bytes()]).is_none());
+        let read_once = props(PROPS, outer.as_bytes()).unwrap();
+        assert!(read(outer.as_bytes(), &[&read_once]).is_none());
+    }
+
+    /// A props file adds at most `PROPS_ITEMS` usings and references to each project below it:
+    /// past them it adds nothing, as one that cannot be read.
+    #[test]
+    fn a_props_file_past_its_items_reads_as_none() {
+        let items = |n: usize| {
+            let usings = (0..n / 2).map(|i| format!("<Using Include=\"N{i}\" />"));
+            let refs = (n / 2..n).map(|i| format!("<PackageReference Include=\"P{i}\" />"));
+            let all: String = usings.chain(refs).collect();
+            format!("<Project><ItemGroup>{all}</ItemGroup></Project>")
+        };
+        let within = props(PROPS, items(PROPS_ITEMS).as_bytes()).unwrap();
+        assert_eq!(
+            within.project.usings.len() + within.project.packages.len(),
+            PROPS_ITEMS
+        );
+        assert!(props(PROPS, items(PROPS_ITEMS + 1).as_bytes()).is_none());
     }
 
     fn found(files: &[(&str, &str)], dir: &str) -> Vec<String> {

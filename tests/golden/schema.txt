@@ -2482,7 +2482,11 @@ sample.csproj
       "via": "path src/Core/Core.csproj"
     }
   ],
-  "project": true
+  "project": true,
+  "properties": {
+    "PackageId": "Example.Kit",
+    "Version": "1.2.0"
+  }
 }
 
 sample.Directory.Build.props
@@ -2501,6 +2505,9 @@ sample.Directory.Build.props
   ],
   "import": {
     "Above": ""
+  },
+  "properties": {
+    "AssemblyName": "Example.$(MSBuildProjectName)"
   }
 }
 

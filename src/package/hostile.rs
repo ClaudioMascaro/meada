@@ -6,6 +6,7 @@
 //! limit (`XML_NODES`, `MAX_NESTING`) is unreadable, which is what that row proves; a row just
 //! under the limit proves the reader.
 
+use std::collections::BTreeMap;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
@@ -14,7 +15,8 @@ use super::nuget::Nuget;
 use super::{Ecosystem, Export, Manifest, Providers, read_manifest};
 use crate::dotnet::{appsettings, msbuild};
 use crate::jvm::spring;
-use crate::lang::MAX_BYTES;
+use crate::lang::csharp::CSharp;
+use crate::lang::{Facts, LanguagePack, MAX_BYTES};
 
 /// The time of the whole table. A row takes about a second in debug; a reader that does work per
 /// pair of nodes, or per link of a chain, misses any bound.
@@ -26,6 +28,9 @@ const MAX_OUT: usize = 4 * MAX_BYTES;
 
 /// How deep a row nests a file whose format puts no limit of its own on its size.
 const NESTING: usize = 100_000;
+
+/// The projects of a repository a row puts under one props file.
+const PROJECTS: usize = 200;
 
 /// `unit(0)`, `unit(1)`, ... until the text reaches the `share`th part of `MAX_BYTES` less the
 /// room a row needs around it.
@@ -83,8 +88,12 @@ fn project(body: &str) -> String {
     format!("<Project Sdk=\"Microsoft.NET.Sdk\">{body}</Project>")
 }
 
-/// The size of the entries `Nuget.entries` gives a file of the project `App`, in a repository of
-/// the projects `projects` (`(name, project file)`).
+/// How many imports a row resolves from the files of one project: `entries` is asked again for
+/// each, so a walk of the project's references per import costs the imports times the walk.
+const IMPORTS: usize = 1000;
+
+/// The size of the entries `Nuget.entries` gives a file of the project `App`, asked for each of
+/// `IMPORTS` files of it, in a repository of the projects `projects` (`(name, project file)`).
 fn referenced(projects: Vec<(String, String)>) -> usize {
     let manifests = (projects.into_iter())
         .map(|(name, text)| {
@@ -100,12 +109,16 @@ fn referenced(projects: Vec<(String, String)>) -> usize {
         ..Export::default()
     }];
     let providers = Providers::new(&exports);
-    let entries = Nuget.entries(&exports, &providers, (0, "App/A.cs"), "c");
-    entries.iter().map(|(e, _)| e.name.len()).sum()
+    let files: Vec<String> = (0..IMPORTS).map(|i| format!("App/A{i}.cs")).collect();
+    let sizes = (files.iter()).map(|file| {
+        let entries = Nuget.entries(&exports, &providers, (0, file), "c");
+        entries.iter().map(|(e, _)| e.name.len()).sum::<usize>()
+    });
+    sizes.max().unwrap_or(0)
 }
 
-/// The size of the entries `Maven.entries` gives a file of the module `app`, in a repository of
-/// the modules `poms` (`(name, pom.xml)`).
+/// The size of the entries `Maven.entries` gives a file of the module `app`, asked for each of
+/// `IMPORTS` files of it, in a repository of the modules `poms` (`(name, pom.xml)`).
 fn modules(poms: Vec<(String, String)>) -> usize {
     let manifests = (poms.into_iter())
         .map(|(name, text)| {
@@ -121,9 +134,14 @@ fn modules(poms: Vec<(String, String)>) -> usize {
         ..Export::default()
     }];
     let providers = Providers::new(&exports);
-    let from = (0, "app/src/main/java/A.java");
-    let entries = Maven.entries(&exports, &providers, from, "c");
-    entries.iter().map(|(e, _)| e.name.len()).sum()
+    let files: Vec<String> = (0..IMPORTS)
+        .map(|i| format!("app/src/main/java/A{i}.java"))
+        .collect();
+    let sizes = (files.iter()).map(|file| {
+        let entries = Maven.entries(&exports, &providers, (0, file), "c");
+        entries.iter().map(|(e, _)| e.name.len()).sum::<usize>()
+    });
+    sizes.max().unwrap_or(0)
 }
 
 fn dependency(artifact: &str) -> String {
@@ -331,8 +349,8 @@ fn probes() -> Vec<Probe> {
             let text = format!("<Project><ItemGroup>{refs}</ItemGroup></Project>");
             manifest("Directory.Build.props", text)
         }),
-        ("nuget: a props file inherited by projects", || {
-            // Each project takes the props file's references: the average is per project.
+        ("nuget: a props file inherited by many projects", || {
+            // Each project takes the props file's references: the size is all of theirs.
             let refs = fill(1, |i| format!("<PackageReference Include=\"P{i}\"/>"));
             let props = format!("<Project><ItemGroup>{refs}</ItemGroup></Project>");
             let path = "Directory.Build.props".to_string();
@@ -340,17 +358,15 @@ fn probes() -> Vec<Probe> {
                 summary: read_manifest(&path, props.as_bytes()),
                 path,
             }];
-            for i in 0..4 {
+            for i in 0..PROJECTS {
                 let path = format!("src/P{i}/P{i}.csproj");
                 let summary = read_manifest(&path, project("").as_bytes());
                 manifests.push(Manifest { summary, path });
             }
             super::inherit(&mut manifests);
-            let sizes = manifests
-                .iter()
-                .skip(1)
-                .map(|m| serde_json::to_string(&m.summary).unwrap().len());
-            sizes.sum::<usize>() / 4
+            (manifests.iter().skip(1))
+                .map(|m| serde_json::to_string(&m.summary).unwrap().len())
+                .sum()
         }),
         ("nuget: projects passing on to each other", || {
             // `App` references thousands of projects, the first two hundred of which exist and
@@ -386,17 +402,18 @@ fn probes() -> Vec<Probe> {
             project_size(msbuild::read(&file(text), &[]))
         }),
         ("msbuild: a chain of props files of many usings", || {
-            // The most props files `chain` follows, each of thousands of usings, and a project
-            // removing as many: the average is per file.
-            let usings = |attribute: &str| {
-                let names = fill(2, |i| format!("N{i};"));
-                project(&format!(
-                    "<ItemGroup><Using {attribute}=\"{names}\"/></ItemGroup>"
-                ))
-            };
-            let (added, removed) = (usings("Include"), usings("Remove"));
-            let layers = vec![added.as_bytes(); msbuild::PROPS_DEPTH];
-            project_size(msbuild::read(removed.as_bytes(), &layers)) / msbuild::PROPS_DEPTH
+            // The most props files `chain` follows, each of the most usings one adds, and a
+            // project removing thousands: the average is per file.
+            let names = count(msbuild::PROPS_ITEMS, |i| format!("N{i};"));
+            let added =
+                format!("<Project><ItemGroup><Using Include=\"{names}\"/></ItemGroup></Project>");
+            let added = msbuild::props(msbuild::PROPS, &file(added)).unwrap();
+            let names = fill(2, |i| format!("N{i};"));
+            let removed = project(&format!(
+                "<ItemGroup><Using Remove=\"{names}\"/></ItemGroup>"
+            ));
+            let layers = vec![&added; msbuild::PROPS_DEPTH];
+            project_size(msbuild::read(&file(removed), &layers)) / msbuild::PROPS_DEPTH
         }),
         ("msbuild: a props file of many imports", || {
             let imports = fill(1, |_| {
@@ -408,6 +425,32 @@ fn probes() -> Vec<Probe> {
             );
             project_size(read.map(|p| p.project))
         }),
+        (
+            "msbuild: a props file of many elements over many projects",
+            || {
+                // The C# pack's `join` reads every project under the props files above it: a props
+                // file read again for each project costs its bytes times the projects, past `BUDGET`
+                // at a thousand.
+                let elements = count(60000, |i| format!("<A{i}/>"));
+                let props = file(format!(
+                    "<Project><PropertyGroup>{elements}</PropertyGroup></Project>"
+                ));
+                let csproj = project("<ItemGroup><Using Include=\"N\"/></ItemGroup>");
+                let paths: Vec<String> = (0..5 * PROJECTS)
+                    .map(|i| format!("P{i}/P{i}.csproj"))
+                    .collect();
+                let mut configs: Vec<(&str, &[u8])> = vec![("Directory.Build.props", &props)];
+                configs.extend(paths.iter().map(|p| (p.as_str(), csproj.as_bytes())));
+                let join = CSharp.join(&configs, &BTreeMap::new());
+                (paths.iter())
+                    .map(|p| {
+                        let mut facts = Facts::default();
+                        join(&p.replace(".csproj", ".cs"), &mut facts);
+                        facts.imports.len()
+                    })
+                    .sum()
+            },
+        ),
         // Spring: `application.properties`, `application.yml`
         ("spring: many properties", || {
             configured(
