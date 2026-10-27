@@ -5,3 +5,7 @@ path = "../swift-pkg-kit"
 [[peer]]
 repo = "example.com/swift/lib"
 path = "../swift-pkg-lib"
+
+[[peer]]
+repo = "example.com/swift/dyn"
+path = "../swift-pkg-dyn"

@@ -8,5 +8,5 @@ callers:
 example.com/swift/kit Sources/Kit/Greeter.swift:18 greet(name:) [inferred: one method named hello]
 callees: none
 consumers:
-example.com/apps/shop Sources/App/main.swift:20 hello(who:) [range unchecked]
-example.com/apps/shop Sources/App/main.swift:24 typed(greeter:) [range unchecked]
+example.com/apps/shop Sources/App/main.swift:21 hello(who:) [range unchecked]
+example.com/apps/shop Sources/App/main.swift:25 typed(greeter:) [range unchecked]

@@ -7,7 +7,7 @@
     },
     {
       "path": "Sources/Kit/Greeter.swift",
-      "hash": "645699c95a319b05d9955874e85e84a69e9d89b8420c4adc295c8f094d8b6cb9"
+      "hash": "a96494e2017d433dd86a492a481e45f3cb85f12d346fcebc019ed634162243a9"
     },
     {
       "path": "Sources/KitMoney/Money.swift",
@@ -92,6 +92,14 @@
       }
     },
     {
+      "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::record(level:items:)",
+      "span": {
+        "path": "Sources/Kit/Greeter.swift",
+        "start": 613,
+        "end": 686
+      }
+    },
+    {
       "id": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money",
       "span": {
         "path": "Sources/KitMoney/Money.swift",
@@ -167,6 +175,17 @@
       }
     },
     {
+      "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::record(level:items:)::print#0",
+      "caller": "example.com/swift/kit::Sources/Kit/Greeter.swift::record(level:items:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Kit/Greeter.swift",
+        "start": 665,
+        "end": 684
+      }
+    },
+    {
       "id": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.of(cents:)::Money#0",
       "caller": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.of(cents:)",
       "target": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.init(cents:)",
@@ -236,7 +255,21 @@
       "provider": "example.com/swift/kit::Package.swift",
       "contract": "package::swiftpm::example.com/swift/*",
       "level": "ambiguous",
-      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked"
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::both(m:)::m.plus#0",
+      "provider": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.plus(_:)",
+      "contract": "package::swiftpm::Kit",
+      "level": "ambiguous",
+      "reason": "package::swiftpm::Kit from 1.2.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::both(m:)::m.plus#0",
+      "provider": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.plus(_:)",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
     },
     {
       "consumer": "example.com/apps/shop::Sources/App/main.swift::formal(who:)::Kit.greet#0",
@@ -250,7 +283,7 @@
       "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:greeting:)",
       "contract": "package::swiftpm::example.com/swift/*",
       "level": "ambiguous",
-      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
     },
     {
       "consumer": "example.com/apps/shop::Sources/App/main.swift::hello(who:)::Greeter#0",
@@ -264,7 +297,7 @@
       "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.init(name:)",
       "contract": "package::swiftpm::example.com/swift/*",
       "level": "ambiguous",
-      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
     },
     {
       "consumer": "example.com/apps/shop::Sources/App/main.swift::hello(who:)::greeter.hello#0",
@@ -278,7 +311,21 @@
       "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.hello(to:loudly:)",
       "contract": "package::swiftpm::example.com/swift/*",
       "level": "ambiguous",
-      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::onAResult()::Greeter#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.init(name:)",
+      "contract": "package::swiftpm::Kit",
+      "level": "exact",
+      "reason": "package::swiftpm::Kit from 1.2.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::onAResult()::Greeter#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.init(name:)",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
     },
     {
       "consumer": "example.com/apps/shop::Sources/App/main.swift::plain(who:)::greet#0",
@@ -292,7 +339,7 @@
       "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(_:)",
       "contract": "package::swiftpm::example.com/swift/*",
       "level": "ambiguous",
-      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
     },
     {
       "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money#0",
@@ -306,7 +353,7 @@
       "provider": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.init(cents:)",
       "contract": "package::swiftpm::example.com/swift/*",
       "level": "ambiguous",
-      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
     },
     {
       "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money.of#0",
@@ -320,7 +367,21 @@
       "provider": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.of(cents:)",
       "contract": "package::swiftpm::example.com/swift/*",
       "level": "ambiguous",
-      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::twoOrigins(flag:)::Greeter#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.init(name:)",
+      "contract": "package::swiftpm::Kit",
+      "level": "exact",
+      "reason": "package::swiftpm::Kit from 1.2.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::twoOrigins(flag:)::Greeter#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.init(name:)",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
     },
     {
       "consumer": "example.com/apps/shop::Sources/App/main.swift::typed(greeter:)::greeter.hello#0",
@@ -334,7 +395,21 @@
       "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.hello(to:loudly:)",
       "contract": "package::swiftpm::example.com/swift/*",
       "level": "ambiguous",
-      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::variadic()::record#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::record(level:items:)",
+      "contract": "package::swiftpm::Kit",
+      "level": "exact",
+      "reason": "package::swiftpm::Kit from 1.2.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::variadic()::record#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::record(level:items:)",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
     },
     {
       "consumer": "example.com/apps/shop::Sources/App/main.swift::welcome(who:)::greet#0",
@@ -348,7 +423,7 @@
       "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:)",
       "contract": "package::swiftpm::example.com/swift/*",
       "level": "ambiguous",
-      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
     }
   ],
   "processes": [
@@ -363,6 +438,20 @@
           "level": null,
           "via": "entry",
           "node": "example.com/swift/kit::Sources/Hidden/Hidden.swift::hiddenTool()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/swift/kit::Sources/Kit/Greeter.swift::record(level:items:)",
+      "kind": "export",
+      "label": "record(level:items:)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/swift/kit",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/swift/kit::Sources/Kit/Greeter.swift::record(level:items:)"
         }
       ]
     },

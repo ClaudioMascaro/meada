@@ -392,9 +392,9 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
 
 - `tests/it/swiftpkg.rs` (spec #29, ticket #124): the fixtures `swift-pkg-kit` (a `Kit` package
   with a library product of two targets, an executable product, internal declarations and
-  overloads of `greet`), `swift-pkg-lib` (a `Shared` package also exposing `KitMoney`) and
-  `swift-pkg-app` (a `.package(url:)`, a `.package(path:)`, a computed URL and an outside
-  dependency). Manifest links, imports narrowed by labels (a bare, a module-qualified and an
+  overloads of `greet`), `swift-pkg-lib` (a `Shared` package also exposing `KitMoney`, and an `Examples` package that depends on its root), `swift-pkg-dyn` (a package whose name is computed) and
+  `swift-pkg-app` (a `.package(url:)`, a `.package(path:)`, computed URLs, an outside
+  dependency, a `Package.resolved` that must stay unread and names that hide the imported ones). Manifest links, imports narrowed by labels (a bare, a module-qualified and an
   unlabelled call, a constructor, a method on a local and on a typed parameter), the ambiguous
   module, `context` on a public function and method, `trace` down across the hop, and edited
   manifests refreshing like a cold workspace. Goldens `swift-pkg-{kit,lib,app}.export.json`,

@@ -70,17 +70,40 @@
   ],
   "providers": [
     {
+      "contract": "package::swiftpm::Examples",
+      "site": "example.com/swift/lib::Examples/Package.swift"
+    },
+    {
       "contract": "package::swiftpm::Shared",
       "site": "example.com/swift/lib::Package.swift"
     }
   ],
-  "consumers": [],
+  "consumers": [
+    {
+      "contract": "package::swiftpm::Shared",
+      "site": "example.com/swift/lib::Examples/Package.swift::dependencies::Shared",
+      "via": "path Package.swift"
+    }
+  ],
   "packages": [
+    {
+      "name": "Examples",
+      "repository": "example.com/swift/lib",
+      "directory": "Examples",
+      "ecosystem": "swiftpm"
+    },
     {
       "name": "Shared",
       "repository": "example.com/swift/lib",
       "directory": ".",
       "ecosystem": "swiftpm"
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "Examples/Package.swift",
+      "field": "dependencies",
+      "name": "Shared"
     }
   ],
   "communities": [
@@ -105,7 +128,14 @@
       "provider": "example.com/swift/lib::Package.swift",
       "contract": "package::swiftpm::example.com/swift/*",
       "level": "ambiguous",
-      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked"
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/apps/shop::Package.swift::dependencies::example.com/swift/lib*",
+      "provider": "example.com/swift/lib::Package.swift",
+      "contract": "package::swiftpm::example.com/swift/lib*",
+      "level": "ambiguous",
+      "reason": "computed dependency; package::swiftpm::example.com/swift/lib* from 1.0.0 (local none), range unchecked"
     },
     {
       "consumer": "example.com/apps/shop::Sources/App/main.swift::loud(text:)::shout#0",
@@ -119,7 +149,14 @@
       "provider": "example.com/swift/lib::Sources/Shared/Shared.swift::shout(_:)",
       "contract": "package::swiftpm::example.com/swift/*",
       "level": "ambiguous",
-      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::loud(text:)::shout#0",
+      "provider": "example.com/swift/lib::Sources/Shared/Shared.swift::shout(_:)",
+      "contract": "package::swiftpm::example.com/swift/lib*",
+      "level": "ambiguous",
+      "reason": "computed dependency; package::swiftpm::example.com/swift/lib* from 1.0.0 (local none), range unchecked; import module"
     },
     {
       "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money#0",
@@ -133,7 +170,14 @@
       "provider": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.init(cents:)",
       "contract": "package::swiftpm::example.com/swift/*",
       "level": "ambiguous",
-      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money#0",
+      "provider": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.init(cents:)",
+      "contract": "package::swiftpm::example.com/swift/lib*",
+      "level": "ambiguous",
+      "reason": "computed dependency; package::swiftpm::example.com/swift/lib* from 1.0.0 (local none), range unchecked; import module"
     },
     {
       "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money.of#0",
@@ -147,7 +191,21 @@
       "provider": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.of(cents:)",
       "contract": "package::swiftpm::example.com/swift/*",
       "level": "ambiguous",
-      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money.of#0",
+      "provider": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.of(cents:)",
+      "contract": "package::swiftpm::example.com/swift/lib*",
+      "level": "ambiguous",
+      "reason": "computed dependency; package::swiftpm::example.com/swift/lib* from 1.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/swift/lib::Examples/Package.swift::dependencies::Shared",
+      "provider": "example.com/swift/lib::Package.swift",
+      "contract": "package::swiftpm::Shared",
+      "level": "exact",
+      "reason": "package::swiftpm::Shared none (local none), range unchecked"
     }
   ],
   "processes": [

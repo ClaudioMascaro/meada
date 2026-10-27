@@ -10,4 +10,4 @@ callees:
 example.com/swift/kit Sources/Kit/Greeter.swift:8 Greeter.hello(to:loudly:) [inferred: one method named hello]
 example.com/swift/kit Sources/Kit/Greeter.swift:4 Greeter.init(name:)
 consumers:
-example.com/apps/shop Sources/App/main.swift:7 welcome(who:) [range unchecked]
+example.com/apps/shop Sources/App/main.swift:8 welcome(who:) [range unchecked]

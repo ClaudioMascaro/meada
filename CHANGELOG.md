@@ -78,7 +78,8 @@ All notable changes to Meada are recorded here. The format follows
   with its library products and their targets recorded. A `.package(url:)` links to the
   workspace repository of the same remote identity and a `.package(path:)` to the one at that
   path, `exact`, with the written requirement as range and `range unchecked`; an interpolated
-  URL, path or name is `ambiguous`, listing every provider that fits. An `import Module` of a
+  URL, path or name is `ambiguous`, listing every provider that fits, and so is a dependency
+  on a package whose own name is computed; a `path:` to the repository's own root links. An `import Module` of a
   module of a depended-on package reaches its public declarations (`; import module`), narrowed
   by argument labels, `ambiguous` when several packages expose the module; `context` and `trace`
   cross the hop. A dependency outside the workspace is ignored and `Package.resolved` is not

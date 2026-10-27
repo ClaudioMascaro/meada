@@ -29,3 +29,7 @@ public func greet(_ name: String) -> String {
 func internalGreet(name: String) -> String {
     name
 }
+
+public func record(level: Int, items: Any...) {
+    print(level, items)
+}

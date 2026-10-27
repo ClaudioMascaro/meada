@@ -1,6 +1,7 @@
 //! `Package.swift`, read with the Swift grammar and no Swift toolchain: the targets a SwiftPM
 //! package declares, each a module of the files under its directory (`targets`), and what the
-//! package kind reads of the manifest (`package`): the package's name, its library products and
+//! package kind reads of the manifest (`package`): the package's name (a `*` for each computed
+//! part), its library products and
 //! its `.package(url:)` and `.package(path:)` dependencies.
 
 use tree_sitter::{Node, Parser};
@@ -86,8 +87,10 @@ pub fn targets(path: &str, src: &[u8]) -> Vec<Target> {
 /// What the package kind reads of a `Package.swift`: only literal values count.
 #[derive(Debug, Default, PartialEq)]
 pub struct Package {
-    /// The `name:` of the `Package(...)` call, when a literal.
+    /// The `name:` of the `Package(...)` call, with a `*` for each part that is computed.
     pub name: Option<String>,
+    /// Whether any part of `name` is computed.
+    pub name_computed: bool,
     /// The library products, as `(name, targets)`: the targets are the modules `import` can name.
     /// A target name that is not a literal is left out of its product.
     pub products: Vec<(String, Vec<String>)>,
@@ -143,7 +146,9 @@ pub fn package(src: &[u8]) -> Package {
         };
         match function {
             "Package" if found.name.is_none() => {
-                found.name = argument("name").and_then(|v| literal(v, src));
+                if let Some((name, computed)) = argument("name").map(|v| pattern(v, src)) {
+                    (found.name, found.name_computed) = (Some(name), computed);
+                }
             }
             "library" => {
                 let Some(name) = argument("name").and_then(|v| literal(v, src)) else {

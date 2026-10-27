@@ -1,3 +1,5 @@
 example.com/apps/shop . Shop (swiftpm) (consumers: 0)
+example.com/swift/dyn . * (swiftpm) (consumers: 2)
 example.com/swift/kit . Kit (swiftpm) (consumers: 2)
-example.com/swift/lib . Shared (swiftpm) (consumers: 2)
+example.com/swift/lib . Shared (swiftpm) (consumers: 4)
+example.com/swift/lib Examples Examples (swiftpm) (consumers: 0)

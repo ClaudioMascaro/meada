@@ -1301,15 +1301,24 @@ one for the area a change touches.
     name. An entry's `via` is `git <identity>` (`normalize_remote`, from the root manifest only),
     `path <dir>/Package.swift` (`sourced`) or, for a URL or path with an interpolation, `computed
     git|path <pattern>` (holes written `*`, matched with `jvm::fits`, so the dependency is
-    `ambiguous` and lists every provider whose literal parts fit). `settle` gives each literal
-    entry the provider's name from its location, so `reaches` never trusts the placeholder.
+    `ambiguous` and lists every provider whose literal parts fit). An uncertain entry's name always
+    carries a `*` (`marked`), even when folding took the computed part out of the location (a
+    userinfo, a port, a `..`), since `fits` tells an uncertain entry by it; a computed path
+    that folds to a first part of its own is held to its repository (`./*`), one that starts
+    computed is not placed. A package whose `name:` is computed is a provider named by its
+    pattern (`*`, `Kit*`); `settle` gives each literal entry the provider's name from its
+    location, and turns the entry into the `computed` form of its source when that name has a
+    `*`, so it links `ambiguous`. A `path:` to the repository's own root is an entry named `.`.
     `imports` turns a call into `(module, Type.member(labels))`: the receiver's written type
     (`Code::origins`, `Follow::Declarations`) or the construction a local holds
     (`Follow::Values`, one origin, no steps), else `Code::outside`'s candidates; the lookup
     reads the provider's `exported` rows (a public name only, an overload family has no target)
     and narrows by labels from the symbol id plus its `Flexible` argument counts, in the order
-    the parameters have. `resolve` is `exact` for one exposing target and `ambiguous` for
-    several, `How::Module`, `; import module`; the platform modules (`PLATFORM`) are never
+    the parameters have (a variadic, of any label, takes the unlabelled arguments after its
+    first). `resolve` is `exact` for one exposing target and `ambiguous` for several; the level
+    of every link of an import is `ambiguous` when several packages the file depends on expose
+    the module, whether or not each declares the name (`Swiftpm::exposing`). `How::Module`,
+    `; import module`; the platform modules (`PLATFORM`) are never
     followed. Ceilings: every dependency of the nearest `Package.swift` counts for the files
     below it (not only a target's `.product(name:package:)`), an `internal` member of a public
     type, an inherited member and an extension of another module are not told apart, and the
