@@ -1979,6 +1979,19 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
         "this" => Value::Ref("this".into()),
         "invocation_expression" => {
             let function = node.child_by_field_name("function");
+            // `nameof(Shop.Orders)` is the last identifier of its argument, as written.
+            if let Some(f) = function
+                && matches!(f.kind(), "identifier" | "generic_name")
+                && text(f, src) == "nameof"
+                && let Some(name) = named(node.child_by_field_name("arguments").unwrap_or(node))
+                    .find(|n| n.kind() == "argument")
+                    .and_then(|a| named(a).next())
+                    .map(|e| callee(e, src))
+                    .and_then(|c| c.rsplit('.').next().map(str::to_string))
+                    .filter(|n| !n.is_empty() && n.chars().all(|c| c.is_alphanumeric() || c == '_'))
+            {
+                return Value::Str(vec![Part::Text(name)]);
+            }
             let object = function
                 .filter(|f| f.kind() == "member_access_expression")
                 .and_then(|f| f.child_by_field_name("expression"));
@@ -2186,6 +2199,31 @@ mod tests {
             .filter(|i| i.local.starts_with("@glob"))
             .map(|i| i.source.as_str())
             .collect()
+    }
+
+    #[test]
+    fn nameof_is_the_last_identifier_of_its_argument() {
+        let name = |arg: &str| {
+            let src = format!("class C {{ void M() {{ F({arg}); }} }}");
+            let facts = CSharp.parse("C.cs", src.as_bytes()).unwrap();
+            match &facts.calls[0].args[..] {
+                [Value::Str(parts)] => match &parts[..] {
+                    [Part::Text(t)] => Some(t.clone()),
+                    _ => None,
+                },
+                _ => None,
+            }
+        };
+        for (arg, expected) in [
+            ("nameof(Orders)", "Orders"),
+            ("nameof(Shop.Orders.Topic)", "Topic"),
+            ("nameof(List<int>)", "List"),
+        ] {
+            assert_eq!(name(arg).as_deref(), Some(expected), "{arg}");
+        }
+        for arg in ["x.nameof(Orders)", "nameof(1)"] {
+            assert_eq!(name(arg), None, "{arg}");
+        }
     }
 
     /// A chain of calls costs its length: each call's receiver is read to `VALUE_DEPTH` at most,
