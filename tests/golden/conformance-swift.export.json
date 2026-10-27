@@ -6,10 +6,6 @@
       "hash": "4f4f06735cb30771dc3c454dfca8955ef54a2b8aa4bed8816ea7e45b55f51331"
     },
     {
-      "path": "Sources/Checkout/Cli.swift",
-      "hash": "2e1f29146d916ec9ed481e8f638206e71edcd1595a394e929d9d4a5f47870d2e"
-    },
-    {
       "path": "Sources/Checkout/Clients.swift",
       "hash": "9e70abb64c368d3a97ee354e1558d72d2a45a456c765cd4167cd66e2d1f06bfe"
     },
@@ -72,6 +68,10 @@
     {
       "path": "Sources/Store/Probe.swift",
       "hash": "5b58ff32f9886027773d9578870bd01eed3d720239081a50579254573723330e"
+    },
+    {
+      "path": "Sources/Tool/Cli.swift",
+      "hash": "685faa4fdb4d2f1d8e899def5b341a80d0a1a6de5e1f19d336b07839753e9e96"
     }
   ],
   "symbols": [
@@ -89,22 +89,6 @@
         "path": "Sources/Checkout/Checkout.swift",
         "start": 98,
         "end": 359
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::Sources/Checkout/Cli.swift::Cli",
-      "span": {
-        "path": "Sources/Checkout/Cli.swift",
-        "start": 0,
-        "end": 71
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::Sources/Checkout/Cli.swift::Cli.main()",
-      "span": {
-        "path": "Sources/Checkout/Cli.swift",
-        "start": 23,
-        "end": 69
       }
     },
     {
@@ -1322,6 +1306,22 @@
         "start": 320,
         "end": 338
       }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Tool/Cli.swift::Cli",
+      "span": {
+        "path": "Sources/Tool/Cli.swift",
+        "start": 162,
+        "end": 235
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Tool/Cli.swift::Cli.main()",
+      "span": {
+        "path": "Sources/Tool/Cli.swift",
+        "start": 185,
+        "end": 233
+      }
     }
   ],
   "calls": [
@@ -1422,17 +1422,6 @@
         "path": "Sources/Checkout/Checkout.swift",
         "start": 68,
         "end": 92
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::Sources/Checkout/Cli.swift::Cli.main()::summarize#0",
-      "caller": "example.com/acme/conformance::Sources/Checkout/Cli.swift::Cli.main()",
-      "target": "example.com/acme/conformance::Sources/Checkout/Summary.swift::summarize()",
-      "level": "exact",
-      "span": {
-        "path": "Sources/Checkout/Cli.swift",
-        "start": 52,
-        "end": 63
       }
     },
     {
@@ -4391,6 +4380,17 @@
         "start": 174,
         "end": 181
       }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Tool/Cli.swift::Cli.main()::log#0",
+      "caller": "example.com/acme/conformance::Sources/Tool/Cli.swift::Cli.main()",
+      "target": "example.com/acme/conformance::Sources/Store/Order.swift::log(level:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Tool/Cli.swift",
+        "start": 214,
+        "end": 227
+      }
     }
   ],
   "providers": [
@@ -4739,21 +4739,6 @@
     {
       "name": "Sources/Checkout",
       "members": [
-        "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()",
-        "example.com/acme/conformance::Sources/Checkout/Cli.swift::Cli.main()",
-        "example.com/acme/conformance::Sources/Checkout/Summary.swift::log(level:)",
-        "example.com/acme/conformance::Sources/Checkout/Summary.swift::summarize()",
-        "example.com/acme/conformance::Sources/Checkout/main.swift::main",
-        "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.init(json:)",
-        "example.com/acme/conformance::Sources/Store/Order.swift::Order.init(id:)",
-        "example.com/acme/conformance::Sources/Store/Order.swift::format(order:)",
-        "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(_:)",
-        "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:)"
-      ]
-    },
-    {
-      "name": "Sources/Checkout#2",
-      "members": [
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api",
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.fetch(_:)",
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.profile()",
@@ -4767,7 +4752,7 @@
       ]
     },
     {
-      "name": "Sources/Checkout#3",
+      "name": "Sources/Checkout#2",
       "members": [
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.cached(session:)",
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.local()",
@@ -4780,21 +4765,21 @@
       ]
     },
     {
-      "name": "Sources/Checkout#4",
+      "name": "Sources/Checkout#3",
       "members": [
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::URLSession.warm(from:)",
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::warmed(session:other:)"
       ]
     },
     {
-      "name": "Sources/Checkout#5",
+      "name": "Sources/Checkout#4",
       "members": [
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::relative(_:)",
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::versions()"
       ]
     },
     {
-      "name": "Sources/Checkout#6",
+      "name": "Sources/Checkout#5",
       "members": [
         "example.com/acme/conformance::Sources/Checkout/Gateway.swift::deeper(_:)",
         "example.com/acme/conformance::Sources/Checkout/Gateway.swift::gateway()",
@@ -4802,7 +4787,7 @@
       ]
     },
     {
-      "name": "Sources/Checkout#7",
+      "name": "Sources/Checkout#6",
       "members": [
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController",
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::explicit(_:)",
@@ -4822,7 +4807,7 @@
       ]
     },
     {
-      "name": "Sources/Checkout#8",
+      "name": "Sources/Checkout#7",
       "members": [
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)",
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:)"
@@ -4837,7 +4822,28 @@
       ]
     },
     {
+      "name": "Sources/Store#10",
+      "members": [
+        "example.com/acme/conformance::Sources/Store/Probe.swift::Bag.run()",
+        "example.com/acme/conformance::Sources/Store/Probe.swift::describe()"
+      ]
+    },
+    {
       "name": "Sources/Store#2",
+      "members": [
+        "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()",
+        "example.com/acme/conformance::Sources/Checkout/Summary.swift::log(level:)",
+        "example.com/acme/conformance::Sources/Checkout/Summary.swift::summarize()",
+        "example.com/acme/conformance::Sources/Checkout/main.swift::main",
+        "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.init(json:)",
+        "example.com/acme/conformance::Sources/Store/Order.swift::Order.init(id:)",
+        "example.com/acme/conformance::Sources/Store/Order.swift::format(order:)",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(_:)",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:)"
+      ]
+    },
+    {
+      "name": "Sources/Store#3",
       "members": [
         "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat",
         "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot",
@@ -4846,7 +4852,7 @@
       ]
     },
     {
-      "name": "Sources/Store#3",
+      "name": "Sources/Store#4",
       "members": [
         "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat.moor()",
         "example.com/acme/conformance::Sources/Store/Dispatch.swift::Carrier.ship(parcel:)",
@@ -4858,14 +4864,14 @@
       ]
     },
     {
-      "name": "Sources/Store#4",
+      "name": "Sources/Store#5",
       "members": [
         "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.Line.doubled()",
         "example.com/acme/conformance::Sources/Store/Order.swift::Order.Line.total()"
       ]
     },
     {
-      "name": "Sources/Store#5",
+      "name": "Sources/Store#6",
       "members": [
         "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.discount(quantity:)",
         "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.price(quantity:)",
@@ -4879,58 +4885,30 @@
       ]
     },
     {
-      "name": "Sources/Store#6",
+      "name": "Sources/Store#7",
+      "members": [
+        "example.com/acme/conformance::Sources/Store/Order.swift::log(level:)",
+        "example.com/acme/conformance::Sources/Tool/Cli.swift::Cli.main()"
+      ]
+    },
+    {
+      "name": "Sources/Store#8",
       "members": [
         "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter.report()",
         "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter.summary()"
       ]
     },
     {
-      "name": "Sources/Store#7",
+      "name": "Sources/Store#9",
       "members": [
         "example.com/acme/conformance::Sources/Store/Probe+Tracer.swift::Probe.trace()",
         "example.com/acme/conformance::Sources/Store/Probe.swift::Pinger.ping()",
         "example.com/acme/conformance::Sources/Store/Probe.swift::Probe.run()"
       ]
-    },
-    {
-      "name": "Sources/Store#8",
-      "members": [
-        "example.com/acme/conformance::Sources/Store/Probe.swift::Bag.run()",
-        "example.com/acme/conformance::Sources/Store/Probe.swift::describe()"
-      ]
     }
   ],
   "links": [],
   "processes": [
-    {
-      "entry_point": "example.com/acme/conformance::Sources/Checkout/Cli.swift::Cli.main()",
-      "kind": "program",
-      "label": "Cli.main()",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/acme/conformance",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/acme/conformance::Sources/Checkout/Cli.swift::Cli.main()"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/conformance",
-          "level": "exact",
-          "via": "call",
-          "node": "example.com/acme/conformance::Sources/Checkout/Summary.swift::summarize()"
-        },
-        {
-          "depth": 2,
-          "repository": "example.com/acme/conformance",
-          "level": "exact",
-          "via": "call",
-          "node": "example.com/acme/conformance::Sources/Checkout/Summary.swift::log(level:)"
-        }
-      ]
-    },
     {
       "entry_point": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::gateway().DELETE /v1/files/{}::http::DELETE::/v1/files/{}",
       "kind": "route",
@@ -5622,6 +5600,27 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::Sources/Store/Order.swift::Order.init(id:)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Tool/Cli.swift::Cli.main()",
+      "kind": "program",
+      "label": "Cli.main()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Tool/Cli.swift::Cli.main()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Store/Order.swift::log(level:)"
         }
       ]
     }

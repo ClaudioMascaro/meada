@@ -1,5 +1,5 @@
 example.com/acme/conformance Sources/Checkout/Clients.swift:123-136 unresolved(path:flag:)
-community: Sources/Checkout#2
+community: Sources/Checkout
 processes: none
 func unresolved(path: String, flag: Bool) async throws {
     _ = try await URLSession.shared.data(from: URL(string: lookup())!)

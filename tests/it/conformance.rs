@@ -12015,8 +12015,8 @@ fn swift() {
         checkout("Routes.swift", "shadowedByIf(_:_:)"),
         checkout("main.swift", "main"),
         checkout("main.swift", "main.GET /started"),
-        checkout("Cli.swift", "Cli"),
-        checkout("Cli.swift", "Cli.main()"),
+        "Sources/Tool/Cli.swift::Cli".to_string(),
+        "Sources/Tool/Cli.swift::Cli.main()".to_string(),
         checkout(
             "Routes.swift",
             "OrderController.boot(routes:).GET /api/v1/alias",
@@ -12353,8 +12353,8 @@ fn swift() {
         "conformance-swift",
         &symbols,
         &[
-            "Sources/Checkout/Cli.swift::Cli.main()",
             "Sources/Checkout/main.swift::main",
+            "Sources/Tool/Cli.swift::Cli.main()",
         ],
         &calls,
     );

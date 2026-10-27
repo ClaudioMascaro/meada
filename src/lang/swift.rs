@@ -362,6 +362,8 @@ fn walk(
         let mut defines_body = false;
         let (mut inner_default, mut inner_ceiling, mut nested) = (default, ceiling, depth);
         let mut pushed: Vec<Node> = named(node).collect();
+        // The initializers of a top-level binding of `main.swift`, top-level code (`main`).
+        let mut initializers: Vec<Node> = Vec::new();
         match node.kind() {
             "class_declaration" | "protocol_declaration" if defining => {
                 let extension = children(node).any(|c| c.kind() == "extension");
@@ -517,13 +519,18 @@ fn walk(
                 });
                 let own = access(node, src).unwrap_or(default).min(ceiling);
                 // The initializer of a top-level binding of `main.swift` is top-level code: its
-                // calls and closures belong to `main`, the binding stays a global.
+                // calls and closures belong to `main`, the binding stays a global, and so do its
+                // accessors.
                 let code =
                     match main_file && node.parent().is_some_and(|p| p.kind() == "source_file") {
                         true => Rc::new(MAIN.to_string()),
                         false => scope.clone(),
                     };
-                inner = code.clone();
+                if code != scope {
+                    initializers = (node.children_by_field_name("value", &mut node.walk()))
+                        .filter(|n| n.is_named())
+                        .collect();
+                }
                 let held = values::initializer(node, src, ctx(&code, defining, &types));
                 let names = bound(node, src);
                 // A typed local is a receiver of its function alone when it is directly in the
@@ -711,20 +718,9 @@ fn walk(
                 "statements" => body,
                 _ => false,
             };
-            // The statements of `main.swift` are its top-level code.
-            let top_code = main_file
-                && node.kind() == "source_file"
-                && !matches!(
-                    child.kind(),
-                    "class_declaration"
-                        | "protocol_declaration"
-                        | "function_declaration"
-                        | "property_declaration"
-                        | "import_declaration"
-                        | "typealias_declaration"
-                        | "comment"
-                        | "multiline_comment"
-                );
+            // The statements and expressions of `main.swift` are its top-level code.
+            let top_code = (main_file && node.kind() == "source_file" && code(child.kind()))
+                || initializers.contains(&child);
             stack.push(Visit {
                 node: child,
                 scope: match top_code {
@@ -911,6 +907,18 @@ fn assign_members(bound: &mut [Bound], members: Vec<Member>) {
             }
         }
     }
+}
+
+/// Whether a node of this kind, written at the top level of `main.swift`, is code that runs
+/// there: a statement or an expression, not a declaration, a directive or a comment.
+fn code(kind: &str) -> bool {
+    ["_expression", "_statement", "_literal", "_operation"]
+        .iter()
+        .any(|suffix| kind.ends_with(suffix))
+        || matches!(
+            kind,
+            "assignment" | "bang" | "macro_invocation" | "value_pack_expansion"
+        )
 }
 
 /// Pushes the `children` of a function's declaration to be visited in source order, as its
@@ -1451,6 +1459,46 @@ mod tests {
         assert_eq!(scope("build"), "T");
         assert!(f.consts.iter().any(|c| c.name == "k"));
         assert!(facts("run()\n").programs.is_empty());
+    }
+
+    /// The accessors of a global of `main.swift` are no top-level code: only its initializer is.
+    #[test]
+    fn the_accessors_of_a_global_of_main_swift_are_no_top_level_code() {
+        let f = script(
+            "var x: Int { compute() }\nvar y = make() { didSet { observe() } }\n\
+             var z: Int { get { fetch() } set { store() } }\n",
+        );
+        let scope = |callee: &str| {
+            (f.calls.iter())
+                .find(|c| c.callee == callee)
+                .unwrap()
+                .scope
+                .clone()
+        };
+        assert_eq!(scope("make"), "main");
+        for callee in ["compute", "observe", "fetch", "store"] {
+            assert_eq!(scope(callee), "", "{callee}");
+        }
+    }
+
+    /// Only statements and expressions of `main.swift` are top-level code: a compiler directive
+    /// block and an operator declaration keep the declarations in them where they are.
+    #[test]
+    fn a_directive_block_of_main_swift_keeps_its_declarations() {
+        let f = script(
+            "#if DEBUG\nfunc dbg() { trace() }\n#endif\nprecedencegroup P { associativity: left }\n\
+             infix operator <>: P\nrun()\n",
+        );
+        assert!(f.defs.iter().any(|d| d.name == "dbg()"));
+        let scope = |callee: &str| {
+            (f.calls.iter())
+                .find(|c| c.callee == callee)
+                .unwrap()
+                .scope
+                .clone()
+        };
+        assert_eq!(scope("trace"), "dbg()");
+        assert_eq!(scope("run"), "main");
     }
 
     #[test]

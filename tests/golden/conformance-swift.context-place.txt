@@ -1,5 +1,5 @@
 example.com/acme/conformance Sources/Store/OrderService.swift:30-35 OrderService.place(order:quantity:)
-community: Sources/Store#5
+community: Sources/Store#6
 processes: 1 (1 export; 1 repository): OrderService.place(_:) (example.com/acme/conformance)
 public func place(order: Order, quantity: Int) -> Bool {
         audit(order)
