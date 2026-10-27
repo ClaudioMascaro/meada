@@ -1093,7 +1093,13 @@ impl<'a> Resolver<'a> {
             None => Binding::Unknown,
             Some(head) => {
                 let seen = &mut self.seen(path, scope);
-                let receiver = match (on, call.on) {
+                // A member read between the call and the member called (`make().x.save()`) is
+                // the receiver, not the call's result: the walk answered it, or no one does.
+                let (on, inner) = match head.contains('.') {
+                    true => (None, None),
+                    false => (on, call.on),
+                };
+                let receiver = match (on, inner) {
                     (Some(known), _) => known,
                     (None, Some(inner)) => self.result_of(path, inner, work),
                     (None, None) => self.resolve_as(path, scope, head, seen, work, Reading::Value),
@@ -9018,5 +9024,95 @@ mod csharp_tests {
                 ("Order.Of", "ambiguous", both)
             ]
         );
+    }
+
+    /// How the `Save` called in `use_it` (in `App`) resolves, with `Repo` (whose `Make` gives a
+    /// `Repo`, and whose members are `members`) and `Store` (`Save` and a `Next` of its own
+    /// type) in `Kit`: the level and the files of its targets.
+    fn save_called(members: &str, use_it: &str) -> (&'static str, Vec<String>) {
+        let repo = format!(
+            "class Repo {{ {members} public void Save() {{}} public static Repo Make() => new(); }}"
+        );
+        let store = "class Store { public void Save() {} public Store Next; }";
+        let app = format!("class U {{ void M() {{ {use_it} }} }}");
+        let found = resolved(&[("Kit/R.cs", &repo), ("Kit/S.cs", store), ("App/U.cs", &app)]);
+        let (_, _, level, targets) = (found.into_iter())
+            .find(|(p, callee, ..)| p == "App/U.cs" && callee.ends_with(".Save"))
+            .unwrap();
+        (level, targets)
+    }
+
+    /// A member read between a call and the member called is the receiver, not the call's
+    /// result: the field's written type owns the member, and an unread one leaves a name match,
+    /// never the class of the call.
+    #[test]
+    fn a_member_step_after_a_call_is_the_receiver_not_the_call_s_class() {
+        let both = ["Kit/R.cs", "Kit/S.cs"].map(String::from).to_vec();
+        let store = vec!["Kit/S.cs".to_string()];
+        for (members, use_it, expected) in [
+            (
+                "public dynamic x;",
+                "Repo.Make().x.Save();",
+                ("ambiguous", &both),
+            ),
+            (
+                "public dynamic X { get; }",
+                "Repo.Make().X.Save();",
+                ("ambiguous", &both),
+            ),
+            (
+                "public dynamic a;",
+                "Repo.Make().a.Next.Save();",
+                ("ambiguous", &both),
+            ),
+            (
+                "public dynamic x;",
+                "Repo.Make()?.x.Save();",
+                ("ambiguous", &both),
+            ),
+            (
+                "public dynamic x;",
+                "Repo.Make().x?.Save();",
+                ("ambiguous", &both),
+            ),
+            (
+                "public Store x;",
+                "Repo.Make().x.Save();",
+                ("exact", &store),
+            ),
+            (
+                "public Store X { get; }",
+                "Repo.Make().X.Save();",
+                ("exact", &store),
+            ),
+            (
+                "public Store a;",
+                "Repo.Make().a.Next.Save();",
+                ("exact", &store),
+            ),
+            (
+                "public Store x;",
+                "Repo.Make()?.x.Save();",
+                ("exact", &store),
+            ),
+            (
+                "public Store x;",
+                "Repo.Make().x?.Save();",
+                ("exact", &store),
+            ),
+        ] {
+            let (level, targets) = save_called(members, use_it);
+            assert_eq!((level, &targets), expected, "{members} {use_it}");
+        }
+    }
+
+    /// With no step between them, the call's result owns the member called.
+    #[test]
+    fn a_call_made_on_a_call_result_directly_narrows_to_its_class() {
+        let repo = vec!["Kit/R.cs".to_string()];
+        for use_it in ["Repo.Make().Save();", "Repo.Make()?.Save();"] {
+            let (level, targets) = save_called("public dynamic x;", use_it);
+            assert_eq!((level, &targets), ("exact", &repo), "{use_it}");
+        }
     }
 }
