@@ -12217,6 +12217,7 @@ fn swift_without_a_package_manifest() {
     let main = |name: &str| format!("Sources/main.swift::{name}");
     let shadows = |name: &str| format!("Sources/Shadows.swift::{name}");
     let receivers = |name: &str| format!("Sources/Receivers.swift::{name}");
+    let scopes = |name: &str| format!("Sources/Scopes.swift::{name}");
     let symbols = [
         item("Item"),
         item("Item.label()"),
@@ -12249,6 +12250,24 @@ fn swift_without_a_package_manifest() {
         receivers("rebound(_:)"),
         receivers("typed(_:)"),
         receivers("generic(_:)"),
+        scopes("Ship"),
+        scopes("Ship.place()"),
+        scopes("Store"),
+        scopes("Store.place()"),
+        scopes("Base"),
+        scopes("Sub"),
+        scopes("Sub.go()"),
+        scopes("Gone"),
+        scopes("Gone.init(store:)"),
+        scopes("Gone.go()"),
+        scopes("Desk"),
+        scopes("Desk.submit(_:)"),
+        scopes("Page"),
+        "Sources/Page+Show.swift::Page.show(_:)".to_string(),
+        scopes("Shelf"),
+        scopes("Shelf.stock(_:)"),
+        scopes("make()"),
+        "Sources/Handler.swift::run()".to_string(),
     ];
     let one = |t: String| vec![t];
     let limit = |callee: &str| loader(&format!("FileLoader.load(from:limit:)::{callee}"));
@@ -12373,6 +12392,56 @@ fn swift_without_a_package_manifest() {
         (
             receivers("typed(_:)::item.label#0"),
             EXACT,
+            one(item("Item.label()")),
+        ),
+    ]);
+    // A typed local of an accessor, a deinitializer, a top-level closure or a nested block
+    // hides its name beyond its own scope: the calls it could leak into are name matches. A
+    // type parameter of the type an extension extends, in another file, or an associated type of the protocol,
+    // is no type of the repository.
+    let places = vec![scopes("Ship.place()"), scopes("Store.place()")];
+    calls.extend([
+        (scopes("Sub::store.place#0"), AMBIGUOUS, places.clone()),
+        (scopes("Sub.go()::store.place#0"), AMBIGUOUS, places.clone()),
+        (scopes("Gone::store.place#0"), AMBIGUOUS, places.clone()),
+        (
+            scopes("Gone.go()::store.place#0"),
+            AMBIGUOUS,
+            places.clone(),
+        ),
+        (
+            scopes("Desk.submit(_:)::ship.place#0"),
+            AMBIGUOUS,
+            places.clone(),
+        ),
+        (
+            scopes("Desk.submit(_:)::ship.place#1"),
+            AMBIGUOUS,
+            places.clone(),
+        ),
+        (
+            "Sources/Handler.swift::session.place#0".to_string(),
+            AMBIGUOUS,
+            places.clone(),
+        ),
+        (
+            "Sources/Handler.swift::run()::session.place#0".to_string(),
+            AMBIGUOUS,
+            places,
+        ),
+        (
+            "Sources/Page+Show.swift::Page.show(_:)::item.label#0".to_string(),
+            INFERRED,
+            one(item("Item.label()")),
+        ),
+        (
+            scopes("Shelf.stock(_:)::item.label#0"),
+            INFERRED,
+            one(item("Item.label()")),
+        ),
+        (
+            scopes("make()::item.label#0"),
+            INFERRED,
             one(item("Item.label()")),
         ),
     ]);

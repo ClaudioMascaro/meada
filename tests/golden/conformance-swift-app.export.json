@@ -2,6 +2,10 @@
   "repository": "example.com/acme/conformance",
   "files": [
     {
+      "path": "Sources/Handler.swift",
+      "hash": "831982135a83e8a0512d5ef14b7d3b8663f10e687d0594ab63954ea8514d4053"
+    },
+    {
       "path": "Sources/Loading/FileLoader.swift",
       "hash": "12906533a69902ae30f8e6c553b6670c5f01d3f3b9ddda8818783343a724f807"
     },
@@ -14,8 +18,20 @@
       "hash": "7cea37fc94c03b1d03dca372c9e04265701799cc6a78a80f56b6b9c87cc9603e"
     },
     {
+      "path": "Sources/Page+Show.swift",
+      "hash": "b6b8d162e2d0f7666d0607e6d9de4c94acb6c99b13699be9c1e1a66574ead129"
+    },
+    {
       "path": "Sources/Receivers.swift",
       "hash": "74552c71c50905ef2684418bbe202e319fd7a422bedb6dcfa68300c040ff3e87"
+    },
+    {
+      "path": "Sources/Scopes.swift",
+      "hash": "a08249c61a545990f6718987bac3444c3631022a2f509426ce0a68595fa65661"
+    },
+    {
+      "path": "Sources/Session.swift",
+      "hash": "dad3e417a3083f25345ddd9e44d721e61cb6b34e4f8bb65c97ea9c933d731dff"
     },
     {
       "path": "Sources/Shadows.swift",
@@ -27,6 +43,14 @@
     }
   ],
   "symbols": [
+    {
+      "id": "example.com/acme/conformance::Sources/Handler.swift::run()",
+      "span": {
+        "path": "Sources/Handler.swift",
+        "start": 70,
+        "end": 104
+      }
+    },
     {
       "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader",
       "span": {
@@ -156,6 +180,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/Page+Show.swift::Page.show(_:)",
+      "span": {
+        "path": "Sources/Page+Show.swift",
+        "start": 21,
+        "end": 73
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/Receivers.swift::generic(_:)",
       "span": {
         "path": "Sources/Receivers.swift",
@@ -193,6 +225,134 @@
         "path": "Sources/Receivers.swift",
         "start": 432,
         "end": 534
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Base",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 75,
+        "end": 113
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Desk",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 502,
+        "end": 697
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 548,
+        "end": 695
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Gone",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 286,
+        "end": 500
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Gone.go()",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 459,
+        "end": 498
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Gone.init(store:)",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 325,
+        "end": 378
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Page",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 699,
+        "end": 719
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Shelf",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 721,
+        "end": 763
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Shelf.stock(_:)",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 787,
+        "end": 840
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Ship",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 0,
+        "end": 35
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 18,
+        "end": 33
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Store",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 37,
+        "end": 73
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Store.place()",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 56,
+        "end": 71
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Sub",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 115,
+        "end": 284
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Sub.go()",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 243,
+        "end": 282
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::make()",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 844,
+        "end": 904
       }
     },
     {
@@ -277,6 +437,47 @@
     }
   ],
   "calls": [
+    {
+      "id": "example.com/acme/conformance::Sources/Handler.swift::Ship#0",
+      "caller": "example.com/acme/conformance::Sources/Handler.swift",
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Ship",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Handler.swift",
+        "start": 40,
+        "end": 46
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Handler.swift::run()::session.place#0",
+      "caller": "example.com/acme/conformance::Sources/Handler.swift::run()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ],
+      "span": {
+        "path": "Sources/Handler.swift",
+        "start": 87,
+        "end": 102
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Handler.swift::session.place#0",
+      "caller": "example.com/acme/conformance::Sources/Handler.swift",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ],
+      "span": {
+        "path": "Sources/Handler.swift",
+        "start": 51,
+        "end": 66
+      }
+    },
     {
       "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:)::Item#0",
       "caller": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:)",
@@ -454,6 +655,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/Page+Show.swift::Page.show(_:)::item.label#0",
+      "caller": "example.com/acme/conformance::Sources/Page+Show.swift::Page.show(_:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Page+Show.swift",
+        "start": 55,
+        "end": 67
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/Receivers.swift::generic(_:)::item.label#0",
       "caller": "example.com/acme/conformance::Sources/Receivers.swift::generic(_:)",
       "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
@@ -594,6 +806,195 @@
         "path": "Sources/Receivers.swift",
         "start": 493,
         "end": 515
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Base::Store#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Base",
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Store",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 104,
+        "end": 111
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)::Store#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)",
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Store",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 626,
+        "end": 633
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)::ship.place#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ],
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 646,
+        "end": 658
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)::ship.place#1",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ],
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 677,
+        "end": 689
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Desk::Ship#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Desk",
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Ship",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 536,
+        "end": 542
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Gone.go()::store.place#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Gone.go()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ],
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 479,
+        "end": 492
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Gone::Ship#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Gone",
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Ship",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 419,
+        "end": 425
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Gone::store.place#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Gone",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ],
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 434,
+        "end": 447
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Shelf.stock(_:)::item.label#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Shelf.stock(_:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 822,
+        "end": 834
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Sub.go()::store.place#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Sub.go()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ],
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 263,
+        "end": 276
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Sub::Ship#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Sub",
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Ship",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 185,
+        "end": 191
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Sub::store.place#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Sub",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ],
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 200,
+        "end": 213
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::make()::Item#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::make()",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 879,
+        "end": 885
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::make()::item.label#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::make()",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 890,
+        "end": 902
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Session.swift::Store#0",
+      "caller": "example.com/acme/conformance::Sources/Session.swift",
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Store",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Session.swift",
+        "start": 14,
+        "end": 21
       }
     },
     {
@@ -739,16 +1140,45 @@
     {
       "name": "Sources",
       "members": [
-        "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.display()",
-        "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
-        "example.com/acme/conformance::Sources/Model/Item.swift::render(_:)",
-        "example.com/acme/conformance::Sources/Receivers.swift::generic(_:)",
-        "example.com/acme/conformance::Sources/Receivers.swift::hidden(_:_:)",
-        "example.com/acme/conformance::Sources/Receivers.swift::rebound(_:)"
+        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader",
+        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)",
+        "example.com/acme/conformance::Sources/Model/Item.swift::Item",
+        "example.com/acme/conformance::Sources/Receivers.swift::typed(_:)",
+        "example.com/acme/conformance::Sources/Scopes.swift::make()"
       ]
     },
     {
       "name": "Sources#2",
+      "members": [
+        "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.display()",
+        "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
+        "example.com/acme/conformance::Sources/Model/Item.swift::render(_:)",
+        "example.com/acme/conformance::Sources/Page+Show.swift::Page.show(_:)",
+        "example.com/acme/conformance::Sources/Receivers.swift::generic(_:)",
+        "example.com/acme/conformance::Sources/Receivers.swift::hidden(_:_:)",
+        "example.com/acme/conformance::Sources/Receivers.swift::rebound(_:)",
+        "example.com/acme/conformance::Sources/Scopes.swift::Shelf.stock(_:)"
+      ]
+    },
+    {
+      "name": "Sources#3",
+      "members": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Base",
+        "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store"
+      ]
+    },
+    {
+      "name": "Sources#4",
+      "members": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Desk",
+        "example.com/acme/conformance::Sources/Scopes.swift::Gone",
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship",
+        "example.com/acme/conformance::Sources/Scopes.swift::Sub"
+      ]
+    },
+    {
+      "name": "Sources#5",
       "members": [
         "example.com/acme/conformance::Sources/Shadows.swift::cases(_:)",
         "example.com/acme/conformance::Sources/Shadows.swift::closures(_:)",
@@ -759,7 +1189,7 @@
       ]
     },
     {
-      "name": "Sources#3",
+      "name": "Sources#6",
       "members": [
         "example.com/acme/conformance::Sources/Shadows.swift::caught()",
         "example.com/acme/conformance::Sources/Shadows.swift::error()",
@@ -768,15 +1198,6 @@
     },
     {
       "name": "Sources/Loading",
-      "members": [
-        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader",
-        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)",
-        "example.com/acme/conformance::Sources/Model/Item.swift::Item",
-        "example.com/acme/conformance::Sources/Receivers.swift::typed(_:)"
-      ]
-    },
-    {
-      "name": "Sources/Loading#2",
       "members": [
         "example.com/acme/conformance::Sources/Loading/FileLoader.swift::render(count:)",
         "example.com/acme/conformance::Sources/Model/Item.swift::renderAll()"
