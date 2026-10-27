@@ -1355,6 +1355,59 @@ fn a_refreshed_go_cross_language_pair_exports_what_a_cold_pair_does() {
     assert!(!refreshed[1].contains("env:WEB_URL"));
 }
 
+/// Edits, adds and deletes `.swift` files of the api and deletes a route of the web app: a route
+/// path changes, the variable a base URL is read from changes names, a file with a consumer on
+/// the declared host appears, and the file with the other environment read goes.
+fn edit_xlang_swift((web, api): &(PathBuf, PathBuf)) {
+    edit_file(
+        api,
+        "Sources/Routes.swift",
+        "app.get(\"orders\", \":id\", use: status)",
+        "app.get(\"orders\", \":id\", \"level\", use: status)",
+    );
+    edit_file(api, "Sources/Orders.swift", "audit()", "report()");
+    edit_file(api, "Sources/Pricing.swift", "\"WEB_URL\"", "\"SITE_URL\"");
+    fs::write(
+        api.join("Sources/Report.swift"),
+        "import Foundation\n\nfunc report() async throws {\n    _ = try await URLSession.shared.data(from: URL(string: \"https://web.example.com/api/audit\")!)\n}\n",
+    )
+    .unwrap();
+    fs::remove_file(api.join("Sources/Audit.swift")).unwrap();
+    fs::remove_file(web.join("app/api/promotions/route.ts")).unwrap();
+}
+
+#[test]
+fn a_refreshed_swift_cross_language_pair_exports_what_a_cold_pair_does() {
+    let exports = |(web, api): &(PathBuf, PathBuf)| -> Vec<String> {
+        [web, api]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = common::xlang_swift("fresh_xlang_swift");
+    [&repos.0, &repos.1].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_xlang_swift(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = common::xlang_swift("fresh_xlang_swift_cold");
+    edit_xlang_swift(&cold);
+    for (n, ((refreshed, before), cold)) in refreshed
+        .iter()
+        .zip(&before)
+        .zip(exports(&cold))
+        .enumerate()
+    {
+        assert_ne!(refreshed, before, "repository {n}");
+        assert_eq!(*refreshed, cold, "repository {n}");
+    }
+    // The renamed variable no longer reaches the web app's routes.
+    assert!(before[1].contains("env:WEB_URL"));
+    assert!(refreshed[1].contains("env:SITE_URL"));
+    assert!(!refreshed[1].contains("env:WEB_URL"));
+}
+
 /// Edits, adds and deletes `.java` and Spring configuration files of the api: a placeholder's
 /// default goes, the YAML file that gave a constructor parameter its literal URL goes (its key
 /// now names a variable), a module appears with a client and a configuration of its own, a

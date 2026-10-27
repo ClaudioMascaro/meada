@@ -5,6 +5,13 @@
 //! is written in code (`Ctx::inline`). A label before an argument makes it a keyword argument
 //! (`get("users", use: list)`), the implicit member of an enum (`.GET`) is `Value::Member` with no type, and anything else is
 //! `Unknown`.
+//!
+//! An environment read is `ProcessInfo.processInfo.environment["X"]` (also `Foundation.`-qualified),
+//! the string `Str([Env(X)])`, also through `!`, parentheses, string methods that keep the text
+//! (`trimmingCharacters`, `replacingOccurrences`, `lowercased`, `uppercased`) and a `??` whose
+//! fallback is a plain string literal. A second read among a method's arguments or in a
+//! fallback, and a fallback that is not a plain literal, make the whole a hole: which of them is
+//! the base is unknown. Meada never reads the variable. Vapor's `Environment.get` is no read.
 
 use tree_sitter::Node;
 
@@ -131,7 +138,13 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
                 _ => Value::Unknown,
             }
         }
+        "tuple_expression" | "nil_coalescing_expression" => {
+            env_read(node, src, ctx, depth).map_or(Value::Unknown, |p| Value::Str(vec![p]))
+        }
         "call_expression" | "constructor_expression" => {
+            if let Some(read) = env_read(node, src, ctx, depth) {
+                return Value::Str(vec![read]);
+            }
             let (function, suffixes) = parts(node);
             let Some(mut at) = call(function, &suffixes, node, src, ctx.scope) else {
                 return Value::Unknown;
@@ -149,6 +162,90 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
     }
 }
 
+/// The expression `ProcessInfo.processInfo.environment` is subscripted on.
+const ENVIRONMENT: &str = "ProcessInfo.processInfo.environment";
+
+/// The methods of `String` an environment read goes through with its text kept.
+const STRING_METHODS: &[&str] = &[
+    "trimmingCharacters",
+    "replacingOccurrences",
+    "lowercased",
+    "uppercased",
+];
+
+/// The environment read the expression `node` is (see the module), `Hole` when it reads a
+/// second one or falls back on something but a literal, `None` when it is no read.
+// ponytail: `ProcessInfo` is Foundation's by its name alone; a type of the repository named so
+// would be read as it, and an argument is searched for the name `ProcessInfo`: one that only
+// looks like a read makes a hole, which is never wrong, only less.
+fn env_read(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Option<Part> {
+    if depth > VALUE_DEPTH {
+        return None;
+    }
+    let again = |n: Node| env_read(n, src, ctx, depth + 1);
+    match node.kind() {
+        "tuple_expression" => match &named(node).collect::<Vec<_>>()[..] {
+            [only] => again(*only),
+            _ => None,
+        },
+        "postfix_expression" => again(node.child_by_field_name("target")?).filter(|_| {
+            node.child_by_field_name("operation")
+                .is_some_and(|o| o.kind() == "bang")
+        }),
+        "nil_coalescing_expression" => {
+            let read = again(node.child_by_field_name("value")?)?;
+            let fallback = value_at(node.child_by_field_name("if_nil")?, src, ctx, depth + 1);
+            let literal =
+                matches!(&fallback, Value::Str(p) if p.iter().all(|p| matches!(p, Part::Text(_))));
+            Some(if literal { read } else { Part::Hole })
+        }
+        "call_expression" => {
+            let (function, suffixes) = parts(node);
+            let [suffix] = suffixes[..] else {
+                return None;
+            };
+            let arguments = children(suffix).find(|c| c.kind() == "value_arguments")?;
+            if function.kind() != "navigation_expression" {
+                return None;
+            }
+            if children(arguments).next()?.kind() == "[" {
+                let name = callee(function, src);
+                if name.strip_prefix("Foundation.").unwrap_or(&name) != ENVIRONMENT {
+                    return None;
+                }
+                let [key] = &named(arguments).collect::<Vec<_>>()[..] else {
+                    return None;
+                };
+                let literal = match key.child_by_field_name("value") {
+                    Some(v) if key.child_by_field_name("name").is_none() => {
+                        value_at(v, src, ctx, depth + 1)
+                    }
+                    _ => return None,
+                };
+                return match literal {
+                    Value::Str(p) => match &p[..] {
+                        [Part::Text(name)] if !name.is_empty() => Some(Part::Env(name.clone())),
+                        _ => Some(Part::Hole),
+                    },
+                    _ => Some(Part::Hole),
+                };
+            }
+            let method = function
+                .child_by_field_name("suffix")?
+                .child_by_field_name("suffix")?;
+            if !STRING_METHODS.contains(&text(method, src)) {
+                return None;
+            }
+            let read = again(function.child_by_field_name("target")?)?;
+            Some(match text(arguments, src).contains("ProcessInfo") {
+                true => Part::Hole,
+                false => read,
+            })
+        }
+        _ => None,
+    }
+}
+
 /// The parts of a string literal: its text, a name interpolated, and a hole for any other
 /// expression or an escape.
 fn string(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Vec<Part> {
@@ -161,6 +258,7 @@ fn string(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Vec<Part> {
                 .map(|v| value_at(v, src, ctx, depth + 1))
             {
                 Some(Value::Ref(name)) => Part::Ref(name),
+                Some(Value::Str(mut read)) if matches!(read[..], [Part::Env(_)]) => read.remove(0),
                 _ => Part::Hole,
             },
             _ => Part::Hole,

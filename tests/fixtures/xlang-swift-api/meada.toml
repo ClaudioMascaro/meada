@@ -1,0 +1,9 @@
+# The api service (Swift, Vapor) reaches the web app (TypeScript, Next.js) through base URL
+# variables and through the web app's declared host, with the keys the TypeScript repository
+# uses.
+[serve]
+hosts = ["api.example.com"]
+
+[[peer]]
+repo = "example.com/xlang-swift/web"
+base_url_env = ["WEB_URL", "STOCK_URL"]

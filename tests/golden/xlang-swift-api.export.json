@@ -1,0 +1,468 @@
+{
+  "repository": "example.com/xlang-swift/api",
+  "files": [
+    {
+      "path": "Sources/Audit.swift",
+      "hash": "4ddb7650155362b6e34dd4eb4f4cf0448264693143be10abdd7f4a56c6c70521"
+    },
+    {
+      "path": "Sources/Entrypoint.swift",
+      "hash": "becf5bc93612adcad91230d801b77f3627f22daded5070a3a16db69a91315457"
+    },
+    {
+      "path": "Sources/Orders.swift",
+      "hash": "f973e12105d5d2b80effa05e13e52bb75e0832a932c56c650e77aafc7d655022"
+    },
+    {
+      "path": "Sources/Pricing.swift",
+      "hash": "67eb5a98acbb865b0c1aa05e6763d9deb6a2825fe62781edebd9036a365aba38"
+    },
+    {
+      "path": "Sources/Routes.swift",
+      "hash": "2162808d725b85a49a48b7dfb8acde98025920863449826eb5df85a0c57858d0"
+    },
+    {
+      "path": "Sources/Stock.swift",
+      "hash": "f0b924ea8ef52d6ecd7f42716d799dfc47e38664420a462dc365566ef1149736"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/xlang-swift/api::Sources/Audit.swift::audit()",
+      "span": {
+        "path": "Sources/Audit.swift",
+        "start": 65,
+        "end": 318
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Entrypoint.swift::Entrypoint",
+      "span": {
+        "path": "Sources/Entrypoint.swift",
+        "start": 14,
+        "end": 204
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Entrypoint.swift::Entrypoint.main()",
+      "span": {
+        "path": "Sources/Entrypoint.swift",
+        "start": 42,
+        "end": 202
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Entrypoint.swift::configure(_:)",
+      "span": {
+        "path": "Sources/Entrypoint.swift",
+        "start": 206,
+        "end": 277
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Orders.swift::reserve(_:)",
+      "span": {
+        "path": "Sources/Orders.swift",
+        "start": 162,
+        "end": 291
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Orders.swift::status(_:)",
+      "span": {
+        "path": "Sources/Orders.swift",
+        "start": 14,
+        "end": 160
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Pricing.swift::priceOf(_:)",
+      "span": {
+        "path": "Sources/Pricing.swift",
+        "start": 99,
+        "end": 425
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Pricing.swift::promotions()",
+      "span": {
+        "path": "Sources/Pricing.swift",
+        "start": 467,
+        "end": 640
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Routes.swift::routes(_:)",
+      "span": {
+        "path": "Sources/Routes.swift",
+        "start": 14,
+        "end": 146
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Stock.swift::stock()",
+      "span": {
+        "path": "Sources/Stock.swift",
+        "start": 93,
+        "end": 261
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/xlang-swift/api::Sources/Audit.swift::audit()::URL#0",
+      "caller": "example.com/xlang-swift/api::Sources/Audit.swift::audit()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Audit.swift",
+        "start": 195,
+        "end": 227
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Audit.swift::audit()::URLRequest#0",
+      "caller": "example.com/xlang-swift/api::Sources/Audit.swift::audit()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Audit.swift",
+        "start": 179,
+        "end": 229
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Audit.swift::audit()::URLSession.shared.data#0",
+      "caller": "example.com/xlang-swift/api::Sources/Audit.swift::audit()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Audit.swift",
+        "start": 280,
+        "end": 316
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Entrypoint.swift::Entrypoint.main()::(prefix_expression)#0",
+      "caller": "example.com/xlang-swift/api::Sources/Entrypoint.swift::Entrypoint.main()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Entrypoint.swift",
+        "start": 121,
+        "end": 130
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Entrypoint.swift::Entrypoint.main()::Application.make#0",
+      "caller": "example.com/xlang-swift/api::Sources/Entrypoint.swift::Entrypoint.main()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Entrypoint.swift",
+        "start": 104,
+        "end": 131
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Entrypoint.swift::Entrypoint.main()::app.execute#0",
+      "caller": "example.com/xlang-swift/api::Sources/Entrypoint.swift::Entrypoint.main()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Entrypoint.swift",
+        "start": 183,
+        "end": 196
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Entrypoint.swift::Entrypoint.main()::configure#0",
+      "caller": "example.com/xlang-swift/api::Sources/Entrypoint.swift::Entrypoint.main()",
+      "target": "example.com/xlang-swift/api::Sources/Entrypoint.swift::configure(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Entrypoint.swift",
+        "start": 150,
+        "end": 164
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Entrypoint.swift::configure(_:)::routes#0",
+      "caller": "example.com/xlang-swift/api::Sources/Entrypoint.swift::configure(_:)",
+      "target": "example.com/xlang-swift/api::Sources/Routes.swift::routes(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Entrypoint.swift",
+        "start": 264,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Orders.swift::reserve(_:)::audit#0",
+      "caller": "example.com/xlang-swift/api::Sources/Orders.swift::reserve(_:)",
+      "target": "example.com/xlang-swift/api::Sources/Audit.swift::audit()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Orders.swift",
+        "start": 261,
+        "end": 268
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Orders.swift::reserve(_:)::promotions#0",
+      "caller": "example.com/xlang-swift/api::Sources/Orders.swift::reserve(_:)",
+      "target": "example.com/xlang-swift/api::Sources/Pricing.swift::promotions()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Orders.swift",
+        "start": 234,
+        "end": 246
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Orders.swift::status(_:)::priceOf#0",
+      "caller": "example.com/xlang-swift/api::Sources/Orders.swift::status(_:)",
+      "target": "example.com/xlang-swift/api::Sources/Pricing.swift::priceOf(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Orders.swift",
+        "start": 81,
+        "end": 120
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Orders.swift::status(_:)::req.parameters.get#0",
+      "caller": "example.com/xlang-swift/api::Sources/Orders.swift::status(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Orders.swift",
+        "start": 89,
+        "end": 113
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Orders.swift::status(_:)::stock#0",
+      "caller": "example.com/xlang-swift/api::Sources/Orders.swift::status(_:)",
+      "target": "example.com/xlang-swift/api::Sources/Stock.swift::stock()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Orders.swift",
+        "start": 135,
+        "end": 142
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Pricing.swift::priceOf(_:)::(tuple_expression).trimmingCharacters#0",
+      "caller": "example.com/xlang-swift/api::Sources/Pricing.swift::priceOf(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Pricing.swift",
+        "start": 165,
+        "end": 305
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Pricing.swift::priceOf(_:)::CharacterSet#0",
+      "caller": "example.com/xlang-swift/api::Sources/Pricing.swift::priceOf(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Pricing.swift",
+        "start": 273,
+        "end": 304
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Pricing.swift::priceOf(_:)::URL#0",
+      "caller": "example.com/xlang-swift/api::Sources/Pricing.swift::priceOf(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Pricing.swift",
+        "start": 365,
+        "end": 405
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Pricing.swift::priceOf(_:)::URLSession.shared.data#0",
+      "caller": "example.com/xlang-swift/api::Sources/Pricing.swift::priceOf(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Pricing.swift",
+        "start": 336,
+        "end": 407
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Pricing.swift::promotions()::URL#0",
+      "caller": "example.com/xlang-swift/api::Sources/Pricing.swift::promotions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Pricing.swift",
+        "start": 567,
+        "end": 620
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Pricing.swift::promotions()::URLSession.shared.data#0",
+      "caller": "example.com/xlang-swift/api::Sources/Pricing.swift::promotions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Pricing.swift",
+        "start": 538,
+        "end": 622
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Routes.swift::routes(_:)::app.get#0",
+      "caller": "example.com/xlang-swift/api::Sources/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Routes.swift",
+        "start": 59,
+        "end": 96
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Routes.swift::routes(_:)::app.post#0",
+      "caller": "example.com/xlang-swift/api::Sources/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Routes.swift",
+        "start": 101,
+        "end": 144
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Stock.swift::stock()::(call_expression).serializingData#0",
+      "caller": "example.com/xlang-swift/api::Sources/Stock.swift::stock()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Stock.swift",
+        "start": 204,
+        "end": 253
+      }
+    },
+    {
+      "id": "example.com/xlang-swift/api::Sources/Stock.swift::stock()::AF.request#0",
+      "caller": "example.com/xlang-swift/api::Sources/Stock.swift::stock()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Stock.swift",
+        "start": 204,
+        "end": 235
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "http::GET::/orders/{}",
+      "site": "example.com/xlang-swift/api::Sources/Orders.swift::status(_:)"
+    },
+    {
+      "contract": "http::POST::/orders/reserve",
+      "site": "example.com/xlang-swift/api::Sources/Orders.swift::reserve(_:)"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "http::POST::/api/audit",
+      "site": "example.com/xlang-swift/api::Sources/Audit.swift::audit()::URLSession.shared.data#0",
+      "via": "env:WEB_URL"
+    },
+    {
+      "contract": "http::GET::/api/prices/{}",
+      "site": "example.com/xlang-swift/api::Sources/Orders.swift::status(_:)::priceOf#0",
+      "via": "env:WEB_URL"
+    },
+    {
+      "contract": "http::GET::/api/promotions",
+      "site": "example.com/xlang-swift/api::Sources/Pricing.swift::promotions()::URLSession.shared.data#0",
+      "via": "host:web.example.com"
+    },
+    {
+      "contract": "http::GET::/api/stock",
+      "site": "example.com/xlang-swift/api::Sources/Stock.swift::stock()::AF.request#0",
+      "via": "env:STOCK_URL"
+    }
+  ],
+  "communities": [
+    {
+      "name": "Sources",
+      "members": [
+        "example.com/xlang-swift/api::Sources/Audit.swift::audit()",
+        "example.com/xlang-swift/api::Sources/Orders.swift::reserve(_:)",
+        "example.com/xlang-swift/api::Sources/Pricing.swift::promotions()"
+      ]
+    },
+    {
+      "name": "Sources#2",
+      "members": [
+        "example.com/xlang-swift/api::Sources/Entrypoint.swift::Entrypoint.main()",
+        "example.com/xlang-swift/api::Sources/Entrypoint.swift::configure(_:)",
+        "example.com/xlang-swift/api::Sources/Routes.swift::routes(_:)"
+      ]
+    },
+    {
+      "name": "Sources#3",
+      "members": [
+        "example.com/xlang-swift/api::Sources/Orders.swift::status(_:)",
+        "example.com/xlang-swift/api::Sources/Pricing.swift::priceOf(_:)",
+        "example.com/xlang-swift/api::Sources/Stock.swift::stock()"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/xlang-swift/api::Sources/Audit.swift::audit()::URLSession.shared.data#0",
+      "provider": "example.com/xlang-swift/web::app/api/audit/route.ts::POST",
+      "contract": "http::POST::/api/audit",
+      "level": "inferred",
+      "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-swift/web"
+    },
+    {
+      "consumer": "example.com/xlang-swift/api::Sources/Orders.swift::status(_:)::priceOf#0",
+      "provider": "example.com/xlang-swift/web::app/api/prices/[sku]/route.ts::GET",
+      "contract": "http::GET::/api/prices/{}",
+      "level": "inferred",
+      "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-swift/web"
+    },
+    {
+      "consumer": "example.com/xlang-swift/api::Sources/Pricing.swift::promotions()::URLSession.shared.data#0",
+      "provider": "example.com/xlang-swift/web::app/api/promotions/route.ts::GET",
+      "contract": "http::GET::/api/promotions",
+      "level": "exact",
+      "reason": "host web.example.com is served by example.com/xlang-swift/web"
+    },
+    {
+      "consumer": "example.com/xlang-swift/api::Sources/Stock.swift::stock()::AF.request#0",
+      "provider": "example.com/xlang-swift/web::app/api/stock/route.ts::GET",
+      "contract": "http::GET::/api/stock",
+      "level": "inferred",
+      "reason": "base URL from STOCK_URL, a base_url_env of peer example.com/xlang-swift/web"
+    },
+    {
+      "consumer": "example.com/xlang-swift/web::src/orders.ts::reserveOrder::fetch#0",
+      "provider": "example.com/xlang-swift/api::Sources/Orders.swift::reserve(_:)",
+      "contract": "http::POST::/orders/reserve",
+      "level": "exact",
+      "reason": "host api.example.com is served by example.com/xlang-swift/api"
+    },
+    {
+      "consumer": "example.com/xlang-swift/web::src/sync.ts::syncOrders::orderStatus#0",
+      "provider": "example.com/xlang-swift/api::Sources/Orders.swift::status(_:)",
+      "contract": "http::GET::/orders/{}",
+      "level": "inferred",
+      "reason": "base URL from API_URL, a base_url_env of peer example.com/xlang-swift/api"
+    }
+  ]
+}
