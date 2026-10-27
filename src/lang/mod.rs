@@ -999,7 +999,8 @@ pub enum Part {
     /// knowing what it reads (C#'s `Environment.GetEnvironmentVariable("X")` and
     /// `configuration["A:B"]`): `callee` as written (a subscript's is its receiver and `[]`),
     /// `key` the literal, `scope` where it is written (shared by the reads of one node) and
-    /// `then` the members called on what it reads, in order (`.TrimEnd('/')`), so the kind that
+    /// `then` the members called on what it reads, in order (`.ToLower()`; the trims of
+    /// `System.String` leave it the read and are not kept), so the kind that
     /// knows the library decides what it is (`Env`, `EnvOr` or `Hole`). Only the C# pack writes
     /// it.
     Read {
@@ -1028,4 +1029,84 @@ fn children<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
 
 fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
     std::str::from_utf8(&src[node.byte_range()]).unwrap_or("")
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    /// Every `&[&str]` table a pack holds, as `file:NAME` below `src/lang`, with its class
+    /// (`CODING_STANDARDS.md`): `syntax` is the language's grammar, `runtime` is the language's
+    /// own library that value evaluation passes through, `exception` is a library table the
+    /// pack keeps for a decided reason. A library table belongs to its kind, so a new one is a
+    /// decision to take in review: list it here with its class, or move it.
+    const TABLES: &[(&str, &str)] = &[
+        ("csharp.rs:TRIMS", "runtime"),
+        ("go/build.rs:ARCHITECTURES", "runtime"),
+        ("go/build.rs:SYSTEMS", "runtime"),
+        ("go/values.rs:METHODS", "exception"),
+        ("kotlin.rs:DECLARATION_KEYWORDS", "syntax"),
+        ("kotlin.rs:DEFAULT_IMPORTS", "runtime"),
+        ("kotlin.rs:FIELD_TARGETS", "syntax"),
+        ("kotlin.rs:PARAM_TARGETS", "syntax"),
+        ("kotlin.rs:STRING_METHODS", "runtime"),
+        ("python.rs:STRING_METHODS", "runtime"),
+        ("rust.rs:ROUTE_ATTRIBUTES", "exception"),
+        ("rust.rs:VERBS", "exception"),
+        ("rust/builders.rs:READING_MACROS", "runtime"),
+        ("rust/builders.rs:READS", "runtime"),
+        ("rust/values.rs:ENV_METHODS", "runtime"),
+        ("rust/values.rs:FORMATS", "runtime"),
+        ("rust/values.rs:KEEPS", "runtime"),
+        ("rust/values.rs:KEEPS_NAMES", "runtime"),
+        ("rust/values.rs:METHOD_CRATES", "exception"),
+        ("ts.rs:BODIES", "syntax"),
+        ("ts.rs:FUNCTIONS", "syntax"),
+        ("ts.rs:STRING_METHODS", "runtime"),
+        ("ts/uses.rs:ELEMENT_METHODS", "runtime"),
+    ];
+
+    /// The `const` and `static` items of type `&[&str]` in the `.rs` files below `dir`.
+    fn tables(dir: &Path, root: &Path, found: &mut Vec<String>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                tables(&path, root, found);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                let name = path
+                    .strip_prefix(root)
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned();
+                for line in std::fs::read_to_string(&path).unwrap().lines() {
+                    let item = line.trim_start().trim_start_matches("pub(crate) ");
+                    let item = item.strip_prefix("pub ").unwrap_or(item);
+                    if let Some(rest) = item.strip_prefix("const ").or(item.strip_prefix("static "))
+                        && let Some((id, ty)) = rest.split_once(':')
+                        && ty.trim_start().starts_with("&[&str]")
+                    {
+                        found.push(format!("{name}:{id}"));
+                    }
+                }
+            }
+        }
+    }
+
+    /// A table in a pack is a decision: a new one fails here until it is listed with its class,
+    /// and a listed one that is gone fails until it is removed from the list.
+    #[test]
+    fn every_str_table_in_a_pack_is_listed_with_its_class() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lang");
+        let mut found = Vec::new();
+        tables(&root, &root, &mut found);
+        found.sort();
+        let listed: Vec<_> = TABLES.iter().map(|(table, _)| table.to_string()).collect();
+        assert_eq!(found, listed, "list a new table in TABLES, with its class");
+        for (table, class) in TABLES {
+            assert!(
+                ["syntax", "runtime", "exception"].contains(class),
+                "{table}: {class}"
+            );
+        }
+    }
 }

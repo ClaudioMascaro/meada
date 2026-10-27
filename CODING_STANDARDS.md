@@ -109,14 +109,25 @@ in the same change:
   rule stays in `package/maven.rs` and a library form in its kind (`http/java*`,
   `channel/java.rs`); either one in `jvm/` is a finding, and so is a JVM reader a second
   module copies instead of sharing.
-- A language pack holds syntax and value evaluation, no library table and no library form. The
-  forms of the libraries a kind reads (web frameworks and HTTP clients, message brokers) live
-  under the kind, one module per language (`http/<language>.rs`, `channel/<language>.rs`); a
-  form may live in a submodule of that module (`http/rust/frameworks.rs`). A table or a form of
-  a library in a pack is a finding, and the kind owns it. Two exceptions are decided. The Rust
-  pack folds `Method::GET` constants at parse time (`METHOD_CRATES` and `VERBS`) and keeps them,
-  `VERBS` being the one pack constant a kind reads. A pack may recognise the one call that reads
-  the platform's environment, as a form and not a table: Java's and Kotlin's `System.getenv`
-  (`getenv` in `lang/java.rs` and `lang/kotlin.rs`) and C#'s `GetEnvironmentVariable`
-  (`ENVIRONMENT_READ` in `lang/csharp.rs`, which leaves the kind to decide whether the
-  `Environment` is the framework's). A table anywhere else in a pack is a finding.
+- A language pack holds syntax and value evaluation, no library table and no library form. A
+  `&[&str]` table in a pack is of one of three classes: `syntax` (the language's grammar:
+  `FUNCTIONS`, `DECLARATION_KEYWORDS`), `runtime` (the language's own library that value
+  evaluation passes through: string methods, environment reads, standard macros, collection
+  callbacks, default imports, build constraints) or `exception` (a library table the pack keeps
+  for a decided reason, below). The forms of the libraries a kind reads (web frameworks and HTTP
+  clients, message brokers) live under the kind, one module per language
+  (`http/<language>.rs`, `channel/<language>.rs`); a form may live in a submodule of that module
+  (`http/rust/frameworks.rs`). A table or a form of a library in a pack is a finding, and the
+  kind owns it. Three exceptions are decided. The Rust pack folds `Method::GET` constants at
+  parse time (`METHOD_CRATES` and `VERBS`) and keeps them, `VERBS` being the one pack constant a
+  kind reads; the Go pack folds `net/http`'s `MethodGet`-style constants the same way, gated on
+  the file's `net/http` import (`METHODS` in `lang/go/values.rs`); and the Rust pack keeps
+  `ROUTE_ATTRIBUTES`, because which attributes it emits as calls that decorate a function
+  (`Call::decorates`) is a syntax decision a kind cannot take after the fact without a hook from
+  pack to kind. A pack may recognise the one call that reads the platform's environment, as a
+  form and not a table: Java's and Kotlin's `System.getenv` (`getenv` in `lang/java.rs` and
+  `lang/kotlin.rs`) and C#'s `GetEnvironmentVariable` (`ENVIRONMENT_READ` in `lang/csharp.rs`,
+  which leaves the kind to decide whether the `Environment` is the framework's); C# also keeps
+  the trims of `System.String` (`TRIMS`) as runtime. The test in `lang/mod.rs`
+  (`every_str_table_in_a_pack_is_listed_with_its_class`) lists every such table with its class,
+  so a new one is a decision visible in review: a table anywhere else in a pack is a finding.

@@ -1822,6 +1822,9 @@ thread_local! {
 // (`CODING_STANDARDS.md`): the kind decides whether the `Environment` is the framework's.
 const ENVIRONMENT_READ: &str = "GetEnvironmentVariable";
 
+/// The methods of `System.String` that trim it: called on a read, they leave it the read.
+const TRIMS: &[&str] = &["Trim", "TrimEnd", "TrimStart"];
+
 /// `callee` and `key` as a read in the scope `parse` is reading.
 fn read(callee: String, key: String) -> Part {
     let scope = SCOPE.with_borrow_mut(|(scope, shared)| {
@@ -1997,7 +2000,8 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 .and_then(|f| f.child_by_field_name("expression"));
             let receiver = object.map(|n| value(n, src, depth + 1));
             let member = function.and_then(|f| f.child_by_field_name("name"));
-            // A member called on a read is the read with the member, for the kind to judge.
+            // A member called on a read is the read with the member, for the kind to judge,
+            // unless it only trims the string (`System.String`, the language's own runtime).
             if let (
                 Some(member),
                 Some(Part::Read {
@@ -2008,7 +2012,10 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 }),
             ) = (member, receiver.as_ref().and_then(read_of))
             {
-                then.push(text(member, src).to_string());
+                let member = text(member, src);
+                if !TRIMS.contains(&member) {
+                    then.push(member.to_string());
+                }
                 return Value::Str(vec![Part::Read {
                     scope,
                     callee,
@@ -2295,7 +2302,7 @@ mod tests {
     }
 
     /// The pack reads no library: a member called on a read is the read with the members it
-    /// calls, which the kind judges, and `string.Empty` is a name like `String.Empty`.
+    /// calls (a trim leaves it the read), which the kind judges, and `string.Empty` is a name like `String.Empty`.
     #[test]
     fn a_member_called_on_a_read_and_string_empty_are_left_to_the_kind() {
         let source = "class C { void M() { \
@@ -2320,8 +2327,24 @@ mod tests {
             (callee.as_str(), key.as_str()),
             ("Environment.GetEnvironmentVariable", "X")
         );
-        assert_eq!(then, &["TrimEnd", "ToLower"]);
+        assert_eq!(then, &["ToLower"]);
         assert_eq!(empty, "string.Empty");
+    }
+
+    /// The trims of `System.String` are the pack's runtime: a read they trim is still the read.
+    #[test]
+    fn a_trim_called_on_a_read_leaves_it_the_read() {
+        let source = "class C { void M() { \
+                      H.Get(Environment.GetEnvironmentVariable(\"X\").Trim().TrimStart('/')); } }";
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        let call = facts.calls.iter().find(|c| c.callee == "H.Get").unwrap();
+        let [Value::Str(read)] = &call.args[..] else {
+            panic!("{}", call.args.len())
+        };
+        assert!(
+            matches!(&read[..], [Part::Read { then, .. }] if then.is_empty()),
+            "{read:?}"
+        );
     }
 
     /// Top-level statements are a synthetic `Main`, a program, unless the file declares a type

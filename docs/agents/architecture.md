@@ -923,7 +923,9 @@ one for the area a change touches.
   `engine.rs`, `items.rs`, `decisions.rs`, `trace.rs`, `entry.rs` or the extraction loop of
   `index.rs` names a kind, and a kind's rule stays in its own file, with the library forms it reads in each
   language (one module per language: `http/<language>.rs`, `channel/<language>.rs`), never in
-  the pack. Three questions are
+  the pack, whose `&[&str]` tables are only `syntax`, `runtime` (the language's own library that
+  value evaluation passes through) or a decided `exception`, each listed with its class by a test
+  in `lang/mod.rs` (`CODING_STANDARDS.md`). Three questions are
   required: `prefix`, `extract` (receives `Code`, never the syntax tree, and `Indexed`, what the
   index read of the repository besides: the manifests and tsconfigs, the exported rows, the
   files of every pack and the bytes of the config files the packs list (`Indexed::configs`,
@@ -2447,9 +2449,9 @@ qualification budget does (ADR 0017).
   into the URL like any other. The reads of one node share one `Arc` of their scope. The pack
   folds `??` chains (the first operand a read and no other operand a read, so the reads count
   across the whole chain; past `VALUE_DEPTH` operands it is unknown), `!` around it, and keeps
-  the members called on it in `then`. `Reads::value` in the kind turns the part into `Env`,
-  `EnvOr` or `Hole` with the resolver: a read whose `then` holds a member other than `Trim`,
-  `TrimStart` and `TrimEnd` (`TRIMS`) is a hole, `Environment.GetEnvironmentVariable` is the
+  the members called on it in `then`, except the trims of `System.String` (`Trim`, `TrimStart`,
+  `TrimEnd`: `TRIMS`, the language's own runtime), which leave it the read. `Reads::value` in the kind turns the part into `Env`,
+  `EnvOr` or `Hole` with the resolver: a read whose `then` holds a member is a hole, `Environment.GetEnvironmentVariable` is the
   framework's `System.Environment` (a repository type of that name hides it, through
   `names::spellings`), and `x[".."]` is a configuration when `x` is declared `IConfiguration`
   (`Code::written`, confirmed through the usings) or is `builder.Configuration` of a
