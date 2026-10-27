@@ -1736,12 +1736,15 @@ one for the area a change touches.
   calls and names inside it belong to that scope. `Facts::bound` holds a `let` or `var` of one name given
   a call, a name or a string (#121), and drops the name when another binding of the
   function (a loop variable, an `if let`, a `guard let`, a `catch`, a `case let`, a `var` or
-  another `let` in a block) also declares it, or when it is assigned afterwards (`x = ..`,
-  `&x`); a top-level or type-level `let` is a `Const` (qualified by its type) holding its
+  another `let` in a block) also declares it, when it is assigned afterwards (`x = ..`,
+  `&x`) or when a method is called on a `var` that holds a string, a name or a URL
+  (`url.appendPathComponent(..)` changes it in place); a global `var` is not bound, since
+  another file of the module may assign it; a top-level or type-level `let` is a `Const` (qualified by its type) holding its
   initializer, and a binding in a block of the top level is a local, not a global. A member
   assigned through a local that holds a call (`request.httpMethod = "POST"`) is a `<member>=`
-  keyword argument of that call, when it is a plain `=` in the function's own statements; written
-  twice, in a nested block or in a closure it is `Value::Unknown`.
+  keyword argument of that call, when it is a plain `=` in the function's own statements or in a
+  `do` block that is one (not in an `if`, a loop, a `catch` or a closure); written twice, or
+  where it may not run, it is `Value::Unknown`.
   `Def::return_values` holds each `return` and the one expression of a function that writes a
   result type. `Code::arg` matches the labels of a call to the parameters' (`labelled_args`):
   an unlabelled argument takes the next parameter written `_`, a labelled one the parameter of
@@ -2509,10 +2512,12 @@ qualification budget does (ADR 0017).
   `CLIENT_DEPTH` (8) names; a repository type of the same name hides the library's. The call is
   read whole by `Expand::Chain` as in `http/kotlin/client.rs`, so a wrapper at any depth (the
   URL, the method or the request a parameter) is a consumer, with cycle detection. The URL is
-  `URL(string:)`, `URL(string:relativeTo:)` (RFC 3986 resolution), `appendingPathComponent`, a
-  literal, an interpolation, a `+` or a `let` constant (`static let` too, from other files and
-  imported modules); a hole the evaluation cannot fold stays a parameter marker, and a URL left
-  unknown is an unresolved consumer. `URLRequest(url:)` takes its method from an `httpMethod`
+  `URL(string:)`, `URL(string:relativeTo:)` (RFC 3986 resolution: the scheme before any `/?#`,
+  network paths, dot segments, the base's query dropped), `appendingPathComponent` (before the
+  query), a literal, an interpolation, a `+` or a `let` constant (`static let` too, from other files and
+  imported modules); a hole the evaluation cannot fold stays a parameter marker, a reference or a
+  base that is a wrapper's parameter is resolved at its call sites, and a URL left unknown is an
+  unresolved consumer. UIKit, AppKit, SwiftUI and Cocoa spell Foundation's names (they re-export it). `URLRequest(url:)` takes its method from an `httpMethod`
   assignment, `HTTPClientRequest(url:)` from `method`, Alamofire from `method:`; GET when absent.
   Not read: `dataTask(with:)`, `AF.download` and `AF.upload`, a request mutated through an
   `inout` or an alias, a request with `url` assigned afterwards (unknown URL), a method that is

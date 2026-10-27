@@ -7,7 +7,11 @@
     },
     {
       "path": "Sources/Checkout/Clients.swift",
-      "hash": "3987bd1314fd7d2026a41d4f0c2774a5ad06b1d901e42a8a75230e482d252d63"
+      "hash": "ef72c317379d08f3f2a44444f2804ea7fde33e87e1572638108eb146c4fd0112"
+    },
+    {
+      "path": "Sources/Checkout/Globals.swift",
+      "hash": "3e24eca181b3f69265bae1b25b6d7d6070781b192ca3de32c8c11527dc27b1d2"
     },
     {
       "path": "Sources/Checkout/Routes.swift",
@@ -20,6 +24,10 @@
     {
       "path": "Sources/Checkout/Summary.swift",
       "hash": "ddc43419ae51aba6eaa09999f70bab40d0c4446b1986a76a34c958ded460a0cb"
+    },
+    {
+      "path": "Sources/Checkout/Ui.swift",
+      "hash": "875c400f61c055b503f2ec19202e0006760ba2a43c1339c2470688d267c8c76f"
     },
     {
       "path": "Sources/Checkout/main.swift",
@@ -79,208 +87,240 @@
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2183,
-        "end": 3216
+        "start": 2253,
+        "end": 3286
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.cached(session:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3063,
-        "end": 3122
+        "start": 3133,
+        "end": 3192
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.fetch(_:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2237,
-        "end": 2500
+        "start": 2307,
+        "end": 2570
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.local()",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3128,
-        "end": 3214
+        "start": 3198,
+        "end": 3284
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.profile()",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2601,
-        "end": 2670
+        "start": 2671,
+        "end": 2740
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.remove(_:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2903,
-        "end": 2995
+        "start": 2973,
+        "end": 3065
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.send(_:_:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2676,
-        "end": 2897
+        "start": 2746,
+        "end": 2967
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.user(_:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2506,
-        "end": 2595
+        "start": 2576,
+        "end": 2665
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4982,
-        "end": 5047
+        "start": 6479,
+        "end": 6544
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5001,
-        "end": 5045
+        "start": 6498,
+        "end": 6542
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Gateway",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3218,
-        "end": 3585
+        "start": 3288,
+        "end": 3655
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Gateway.init(session:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3273,
-        "end": 3325
+        "start": 3343,
+        "end": 3395
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Gateway.ping()",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3331,
-        "end": 3458
+        "start": 3401,
+        "end": 3528
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Gateway.pong()",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3464,
-        "end": 3583
+        "start": 3534,
+        "end": 3653
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Local",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5049,
-        "end": 5100
+        "start": 6546,
+        "end": 6597
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Local.request(_:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5068,
-        "end": 5098
+        "start": 6565,
+        "end": 6595
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Remote",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 190,
-        "end": 333
+        "start": 203,
+        "end": 403
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::alamofire(id:session:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1405,
-        "end": 1770
+        "start": 1475,
+        "end": 1840
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::asyncHTTP(client:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1772,
-        "end": 2091
+        "start": 1842,
+        "end": 2161
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::byName(other:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3646,
-        "end": 3733
+        "start": 3716,
+        "end": 3803
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::guarded(session:)",
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 6174,
+        "end": 6415
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::lookup()",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4920,
-        "end": 4980
+        "start": 6417,
+        "end": 6477
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::moved(other:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3782,
-        "end": 3966
+        "start": 3852,
+        "end": 4036
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5538,
+        "end": 6126
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::notRead(session:cache:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5251,
-        "end": 5501
+        "start": 6748,
+        "end": 6998
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::relative(_:)",
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5084,
+        "end": 5273
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 419,
-        "end": 1403
+        "start": 489,
+        "end": 1473
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::unresolved(path:flag:)",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4148,
-        "end": 4918
+        "start": 4218,
+        "end": 4988
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::useApi()",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3968,
-        "end": 4085
+        "start": 4038,
+        "end": 4155
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::versions()",
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5275,
+        "end": 5444
       }
     },
     {
@@ -601,6 +641,22 @@
         "path": "Sources/Checkout/Summary.swift",
         "start": 14,
         "end": 52
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Ui.swift::reroute()",
+      "span": {
+        "path": "Sources/Checkout/Ui.swift",
+        "start": 218,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Ui.swift::uikit(session:)",
+      "span": {
+        "path": "Sources/Checkout/Ui.swift",
+        "start": 84,
+        "end": 216
       }
     },
     {
@@ -1191,8 +1247,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3097,
-        "end": 3120
+        "start": 3167,
+        "end": 3190
       }
     },
     {
@@ -1202,8 +1258,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2347,
-        "end": 2378
+        "start": 2417,
+        "end": 2448
       }
     },
     {
@@ -1213,8 +1269,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2461,
-        "end": 2472
+        "start": 2531,
+        "end": 2542
       }
     },
     {
@@ -1224,8 +1280,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2328,
-        "end": 2380
+        "start": 2398,
+        "end": 2450
       }
     },
     {
@@ -1235,8 +1291,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3165,
-        "end": 3172
+        "start": 3235,
+        "end": 3242
       }
     },
     {
@@ -1246,8 +1302,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3185,
-        "end": 3208
+        "start": 3255,
+        "end": 3278
       }
     },
     {
@@ -1257,8 +1313,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2657,
-        "end": 2664
+        "start": 2727,
+        "end": 2734
       }
     },
     {
@@ -1268,8 +1324,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2959,
-        "end": 2989
+        "start": 3029,
+        "end": 3059
       }
     },
     {
@@ -1279,8 +1335,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2773,
-        "end": 2804
+        "start": 2843,
+        "end": 2874
       }
     },
     {
@@ -1290,8 +1346,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2757,
-        "end": 2806
+        "start": 2827,
+        "end": 2876
       }
     },
     {
@@ -1301,8 +1357,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2865,
-        "end": 2891
+        "start": 2935,
+        "end": 2961
       }
     },
     {
@@ -1312,8 +1368,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2568,
-        "end": 2589
+        "start": 2638,
+        "end": 2659
       }
     },
     {
@@ -1323,8 +1379,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3404,
-        "end": 3450
+        "start": 3474,
+        "end": 3520
       }
     },
     {
@@ -1334,8 +1390,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3380,
-        "end": 3452
+        "start": 3450,
+        "end": 3522
       }
     },
     {
@@ -1345,8 +1401,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3532,
-        "end": 3575
+        "start": 3602,
+        "end": 3645
       }
     },
     {
@@ -1356,8 +1412,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3513,
-        "end": 3577
+        "start": 3583,
+        "end": 3647
       }
     },
     {
@@ -1367,8 +1423,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1457,
-        "end": 1497
+        "start": 1527,
+        "end": 1567
       }
     },
     {
@@ -1378,8 +1434,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1506,
-        "end": 1558
+        "start": 1576,
+        "end": 1628
       }
     },
     {
@@ -1389,8 +1445,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1622,
-        "end": 1685
+        "start": 1692,
+        "end": 1755
       }
     },
     {
@@ -1400,8 +1456,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1694,
-        "end": 1768
+        "start": 1764,
+        "end": 1838
       }
     },
     {
@@ -1411,8 +1467,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1633,
-        "end": 1659
+        "start": 1703,
+        "end": 1729
       }
     },
     {
@@ -1422,8 +1478,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1567,
-        "end": 1613
+        "start": 1637,
+        "end": 1683
       }
     },
     {
@@ -1433,8 +1489,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1954,
-        "end": 1965
+        "start": 2024,
+        "end": 2035
       }
     },
     {
@@ -1444,8 +1500,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2077,
-        "end": 2088
+        "start": 2147,
+        "end": 2158
       }
     },
     {
@@ -1455,8 +1511,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 2037,
-        "end": 2089
+        "start": 2107,
+        "end": 2159
       }
     },
     {
@@ -1466,8 +1522,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1837,
-        "end": 1881
+        "start": 1907,
+        "end": 1951
       }
     },
     {
@@ -1477,8 +1533,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1981,
-        "end": 2018
+        "start": 2051,
+        "end": 2088
       }
     },
     {
@@ -1488,8 +1544,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1924,
-        "end": 1966
+        "start": 1994,
+        "end": 2036
       }
     },
     {
@@ -1499,8 +1555,41 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3707,
-        "end": 3731
+        "start": 3777,
+        "end": 3801
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::guarded(session:)::URL#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::guarded(session:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 6270,
+        "end": 6311
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::guarded(session:)::URLRequest#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::guarded(session:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 6254,
+        "end": 6313
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::guarded(session:)::session.data#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::guarded(session:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 6372,
+        "end": 6398
       }
     },
     {
@@ -1510,8 +1599,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3917,
-        "end": 3962
+        "start": 3987,
+        "end": 4032
       }
     },
     {
@@ -1521,8 +1610,140 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 3899,
-        "end": 3964
+        "start": 3969,
+        "end": 4034
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URL#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5589,
+        "end": 5631
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URL#1",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5819,
+        "end": 5850
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URL#2",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5887,
+        "end": 5933
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URL#3",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 6089,
+        "end": 6122
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URLRequest#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5871,
+        "end": 5935
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URLSession.shared.data#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5688,
+        "end": 5721
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URLSession.shared.data#1",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5790,
+        "end": 5852
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URLSession.shared.data#2",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 6005,
+        "end": 6041
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URLSession.shared.data#3",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 6060,
+        "end": 6124
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::headers.setValue#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5940,
+        "end": 5986
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::path.append#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5750,
+        "end": 5771
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::url.appendPathComponent#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5637,
+        "end": 5669
       }
     },
     {
@@ -1532,8 +1753,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5305,
-        "end": 5397
+        "start": 6802,
+        "end": 6894
       }
     },
     {
@@ -1543,8 +1764,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5455,
-        "end": 5499
+        "start": 6952,
+        "end": 6996
       }
     },
     {
@@ -1554,8 +1775,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5443,
-        "end": 5450
+        "start": 6940,
+        "end": 6947
       }
     },
     {
@@ -1565,8 +1786,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5328,
-        "end": 5371
+        "start": 6825,
+        "end": 6868
       }
     },
     {
@@ -1576,8 +1797,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5406,
-        "end": 5429
+        "start": 6903,
+        "end": 6926
       }
     },
     {
@@ -1587,8 +1808,41 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 5305,
-        "end": 5388
+        "start": 6802,
+        "end": 6885
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::relative(_:)::URL#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::relative(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5152,
+        "end": 5181
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::relative(_:)::URL#1",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::relative(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5232,
+        "end": 5267
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::relative(_:)::URLSession.shared.data#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::relative(_:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5203,
+        "end": 5269
       }
     },
     {
@@ -1598,8 +1852,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1249,
-        "end": 1347
+        "start": 1319,
+        "end": 1417
       }
     },
     {
@@ -1609,8 +1863,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1249,
-        "end": 1306
+        "start": 1319,
+        "end": 1376
       }
     },
     {
@@ -1620,8 +1874,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 525,
-        "end": 568
+        "start": 595,
+        "end": 638
       }
     },
     {
@@ -1631,8 +1885,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 587,
-        "end": 612
+        "start": 657,
+        "end": 682
       }
     },
     {
@@ -1642,8 +1896,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 705,
-        "end": 741
+        "start": 775,
+        "end": 811
       }
     },
     {
@@ -1653,8 +1907,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 781,
-        "end": 807
+        "start": 851,
+        "end": 877
       }
     },
     {
@@ -1664,8 +1918,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 843,
-        "end": 881
+        "start": 913,
+        "end": 951
       }
     },
     {
@@ -1675,8 +1929,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1002,
-        "end": 1058
+        "start": 1072,
+        "end": 1128
       }
     },
     {
@@ -1686,8 +1940,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1037,
-        "end": 1057
+        "start": 1107,
+        "end": 1127
       }
     },
     {
@@ -1697,8 +1951,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1188,
-        "end": 1230
+        "start": 1258,
+        "end": 1300
       }
     },
     {
@@ -1708,8 +1962,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1249,
-        "end": 1273
+        "start": 1319,
+        "end": 1343
       }
     },
     {
@@ -1719,8 +1973,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 827,
-        "end": 883
+        "start": 897,
+        "end": 953
       }
     },
     {
@@ -1730,8 +1984,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 986,
-        "end": 1060
+        "start": 1056,
+        "end": 1130
       }
     },
     {
@@ -1741,8 +1995,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1119,
-        "end": 1154
+        "start": 1189,
+        "end": 1224
       }
     },
     {
@@ -1752,8 +2006,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 496,
-        "end": 570
+        "start": 566,
+        "end": 640
       }
     },
     {
@@ -1763,8 +2017,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 632,
-        "end": 667
+        "start": 702,
+        "end": 737
       }
     },
     {
@@ -1774,8 +2028,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 933,
-        "end": 968
+        "start": 1003,
+        "end": 1038
       }
     },
     {
@@ -1785,8 +2039,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1366,
-        "end": 1401
+        "start": 1436,
+        "end": 1471
       }
     },
     {
@@ -1796,8 +2050,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1173,
-        "end": 1232
+        "start": 1243,
+        "end": 1302
       }
     },
     {
@@ -1807,8 +2061,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 686,
-        "end": 743
+        "start": 756,
+        "end": 813
       }
     },
     {
@@ -1818,8 +2072,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 762,
-        "end": 809
+        "start": 832,
+        "end": 879
       }
     },
     {
@@ -1829,8 +2083,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 1079,
-        "end": 1104
+        "start": 1149,
+        "end": 1174
       }
     },
     {
@@ -1840,8 +2094,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4252,
-        "end": 4273
+        "start": 4322,
+        "end": 4343
       }
     },
     {
@@ -1851,8 +2105,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4323,
-        "end": 4340
+        "start": 4393,
+        "end": 4410
       }
     },
     {
@@ -1862,8 +2116,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4375,
-        "end": 4419
+        "start": 4445,
+        "end": 4489
       }
     },
     {
@@ -1873,8 +2127,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4450,
-        "end": 4495
+        "start": 4520,
+        "end": 4565
       }
     },
     {
@@ -1884,8 +2138,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4583,
-        "end": 4627
+        "start": 4653,
+        "end": 4697
       }
     },
     {
@@ -1895,8 +2149,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4756,
-        "end": 4800
+        "start": 4826,
+        "end": 4870
       }
     },
     {
@@ -1906,8 +2160,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4359,
-        "end": 4421
+        "start": 4429,
+        "end": 4491
       }
     },
     {
@@ -1917,8 +2171,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4434,
-        "end": 4497
+        "start": 4504,
+        "end": 4567
       }
     },
     {
@@ -1928,8 +2182,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4567,
-        "end": 4629
+        "start": 4637,
+        "end": 4699
       }
     },
     {
@@ -1939,8 +2193,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4740,
-        "end": 4802
+        "start": 4810,
+        "end": 4872
       }
     },
     {
@@ -1950,8 +2204,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4223,
-        "end": 4275
+        "start": 4293,
+        "end": 4345
       }
     },
     {
@@ -1961,8 +2215,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4294,
-        "end": 4342
+        "start": 4364,
+        "end": 4412
       }
     },
     {
@@ -1972,8 +2226,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4516,
-        "end": 4550
+        "start": 4586,
+        "end": 4620
       }
     },
     {
@@ -1983,8 +2237,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4689,
-        "end": 4723
+        "start": 4759,
+        "end": 4793
       }
     },
     {
@@ -1994,8 +2248,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4882,
-        "end": 4916
+        "start": 4952,
+        "end": 4986
       }
     },
     {
@@ -2005,8 +2259,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4264,
-        "end": 4272
+        "start": 4334,
+        "end": 4342
       }
     },
     {
@@ -2016,8 +2270,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4011,
-        "end": 4016
+        "start": 4081,
+        "end": 4086
       }
     },
     {
@@ -2027,8 +2281,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4035,
-        "end": 4055
+        "start": 4105,
+        "end": 4125
       }
     },
     {
@@ -2038,8 +2292,41 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Clients.swift",
-        "start": 4070,
-        "end": 4083
+        "start": 4140,
+        "end": 4153
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::versions()::relative#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::versions()",
+      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::relative(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5324,
+        "end": 5341
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::versions()::relative#1",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::versions()",
+      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::relative(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5360,
+        "end": 5379
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::versions()::relative#2",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::versions()",
+      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::relative(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Clients.swift",
+        "start": 5398,
+        "end": 5442
       }
     },
     {
@@ -2956,6 +3243,28 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/Checkout/Ui.swift::uikit(session:)::URL#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Ui.swift::uikit(session:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Ui.swift",
+        "start": 168,
+        "end": 212
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Ui.swift::uikit(session:)::session.data#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Ui.swift::uikit(session:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Checkout/Ui.swift",
+        "start": 149,
+        "end": 214
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/Checkout/main.swift::(prefix_expression)#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/main.swift",
       "target": null,
@@ -3640,6 +3949,31 @@
       "via": "host:api.example.com"
     },
     {
+      "contract": "http::POST::/do",
+      "site": "example.com/acme/conformance::Sources/Checkout/Clients.swift::guarded(session:)::session.data#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": null,
+      "site": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URLSession.shared.data#0",
+      "via": null
+    },
+    {
+      "contract": null,
+      "site": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URLSession.shared.data#1",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/headers",
+      "site": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URLSession.shared.data#2",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/global",
+      "site": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URLSession.shared.data#3",
+      "via": null
+    },
+    {
       "contract": "http::GET::/ping",
       "site": "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)::URLSession.shared.data#0",
       "via": "host:api.example.com"
@@ -3713,6 +4047,26 @@
       "contract": "http::DELETE::/users/{}",
       "site": "example.com/acme/conformance::Sources/Checkout/Clients.swift::useApi()::api.remove#0",
       "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/v1/users",
+      "site": "example.com/acme/conformance::Sources/Checkout/Clients.swift::versions()::relative#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/health",
+      "site": "example.com/acme/conformance::Sources/Checkout/Clients.swift::versions()::relative#1",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/up",
+      "site": "example.com/acme/conformance::Sources/Checkout/Clients.swift::versions()::relative#2",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/uikit",
+      "site": "example.com/acme/conformance::Sources/Checkout/Ui.swift::uikit(session:)::session.data#0",
+      "via": "host:api.example.com"
     }
   ],
   "communities": [
@@ -3740,8 +4094,10 @@
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::Gateway.pong()",
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::lookup()",
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::moved(other:)",
+        "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)",
         "example.com/acme/conformance::Sources/Checkout/Clients.swift::sessions(id:session:)",
-        "example.com/acme/conformance::Sources/Checkout/Clients.swift::unresolved(path:flag:)"
+        "example.com/acme/conformance::Sources/Checkout/Clients.swift::unresolved(path:flag:)",
+        "example.com/acme/conformance::Sources/Checkout/Ui.swift::uikit(session:)"
       ]
     },
     {
@@ -3755,6 +4111,13 @@
     },
     {
       "name": "Sources/Checkout#4",
+      "members": [
+        "example.com/acme/conformance::Sources/Checkout/Clients.swift::relative(_:)",
+        "example.com/acme/conformance::Sources/Checkout/Clients.swift::versions()"
+      ]
+    },
+    {
+      "name": "Sources/Checkout#5",
       "members": [
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController",
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::explicit(_:)",
@@ -3774,7 +4137,7 @@
       ]
     },
     {
-      "name": "Sources/Checkout#5",
+      "name": "Sources/Checkout#6",
       "members": [
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)",
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:)"

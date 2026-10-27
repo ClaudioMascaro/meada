@@ -2,6 +2,7 @@ import Alamofire
 import AsyncHTTPClient
 import Foundation
 import Store
+import UIKit
 
 // URLSession, Alamofire and AsyncHTTPClient consumers (spec #29, #121).
 let billing = "https://billing.example.com"
@@ -10,6 +11,7 @@ enum Remote {
     static let base = "https://api.example.com"
     static let users = "\(base)/users"
     static let health = base + "/health"
+    static let versioned = "https://api.example.com/v1/"
 }
 
 // `data(from:)` is a `GET`; `data(for:)` sends the method its request is assigned.
@@ -130,6 +132,41 @@ func unresolved(path: String, flag: Bool) async throws {
     twice.httpMethod = "PUT"
     twice.httpMethod = "DELETE"
     _ = try await URLSession.shared.data(for: twice)
+}
+
+// `relativeTo` resolves against the base as RFC 3986 does, at each call site of the wrapper.
+func relative(_ path: String) async throws -> Data {
+    let base = URL(string: Remote.versioned)
+    return try await URLSession.shared.data(from: URL(string: path, relativeTo: base)!).0
+}
+
+func versions() async throws {
+    _ = try await relative("users")
+    _ = try await relative("/health")
+    _ = try await relative("../up?next=https://x.example.com")
+}
+
+// A method called on a `var` may change it in place; a global `var` is open to every file.
+func mutated(id: Int) async throws {
+    var url = URL(string: "https://api.example.com/api")!
+    url.appendPathComponent("users")
+    _ = try await URLSession.shared.data(from: url)
+    var path = "/users"
+    path.append("/\(id)")
+    _ = try await URLSession.shared.data(from: URL(string: Remote.base + path)!)
+    var headers = URLRequest(url: URL(string: "https://api.example.com/headers")!)
+    headers.setValue("a", forHTTPHeaderField: "b")
+    _ = try await URLSession.shared.data(for: headers)
+    _ = try await URLSession.shared.data(from: URL(string: gateHost + "/global")!)
+}
+
+// A `do` block runs its statements in place.
+func guarded(session: URLSession) async throws {
+    do {
+        var request = URLRequest(url: URL(string: "https://api.example.com/do")!)
+        request.httpMethod = "POST"
+        _ = try await session.data(for: request)
+    } catch {}
 }
 
 func lookup() -> String { "https://api.example.com/lookup" }

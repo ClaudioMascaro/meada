@@ -1,9 +1,10 @@
 //! Swift HTTP consumers (spec #29, #121): URLSession's `data(from:)` and `data(for:)`, Alamofire's
 //! `request` and AsyncHTTPClient's `execute`. A call counts when its receiver is the library's by
 //! what the imports say: a name the library binds (`URLSession.shared`, `AF`), a name written as
-//! its type (a parameter, a property, a local), or the construction a local holds
-//! (`URLSession(configuration:)`, via `Code::origins`); a type of the repository with the same
-//! name hides it. `dataTask(with:)` is not read.
+//! its type (a parameter, a property, a local), or the construction or the name a local or a
+//! constant holds (`URLSession(configuration:)`, `let session = URLSession.shared`); a type of
+//! the repository with the same name hides it. UIKit, AppKit, SwiftUI and Cocoa re-export
+//! Foundation, so an import of one of them spells its names. `dataTask(with:)` is not read.
 //!
 //! The call is read whole (`Expand::Chain`), so a client wrapper, a function whose URL or method
 //! depends on its parameters, makes each of its call sites a consumer with its arguments
@@ -49,11 +50,8 @@ impl Lib {
     fn receivers(self) -> (&'static [&'static str], &'static [&'static str]) {
         match self {
             Self::Session => (
-                &["Foundation.URLSession", "FoundationNetworking.URLSession"],
-                &[
-                    "Foundation.URLSession.shared",
-                    "FoundationNetworking.URLSession.shared",
-                ],
+                &["Foundation.URLSession"],
+                &["Foundation.URLSession.shared"],
             ),
             Self::Alamofire => (
                 &["Alamofire.Session"],
@@ -75,9 +73,30 @@ impl Lib {
     }
 }
 
-/// Whether exactly one of the spellings of a name is in `table`.
+/// The modules that re-export Foundation's names: `import UIKit` spells `URLSession` as
+/// `Foundation.URLSession` does.
+const FOUNDATION: &[&str] = &[
+    "UIKit",
+    "AppKit",
+    "SwiftUI",
+    "Cocoa",
+    "FoundationNetworking",
+];
+
+/// Whether exactly one of the spellings of a name is in `table`, Foundation's re-exports being
+/// one spelling with it.
 fn named(spelled: &[String], table: &[&str]) -> bool {
-    one(spelled, |s| table.contains(&s)).is_some()
+    let mut spellings: Vec<String> = Vec::new();
+    for s in spelled {
+        let s = match s.split_once('.') {
+            Some((module, rest)) if FOUNDATION.contains(&module) => format!("Foundation.{rest}"),
+            _ => s.clone(),
+        };
+        if !spellings.contains(&s) {
+            spellings.push(s);
+        }
+    }
+    one(&spellings, |s| table.contains(&s)).is_some()
 }
 
 struct Clients<'c, 'a> {
@@ -265,7 +284,11 @@ impl Reads<'_, '_> {
             let parts = text_parts(keyword(call, "string")?)?;
             return match keyword(call, "relativeTo") {
                 None => Some(parts),
-                Some(base) => resolve(&text_parts(&self.url(base))?, &parts),
+                Some(base) => {
+                    let base = text_parts(&self.url(base))?;
+                    // A parameter on either side is resolved at the wrapper's call sites.
+                    resolve(&base, &parts).or_else(|| depends(&base, &parts))
+                }
             };
         }
         if member(&call.callee) == "appendingPathComponent" && call.callee.contains('.') {
@@ -285,75 +308,197 @@ fn text_parts(value: &Value) -> Option<Vec<Part>> {
     }
 }
 
-/// `base` with the path component `component` added after a `/`.
-fn append(mut base: Vec<Part>, mut component: Vec<Part>) -> Vec<Part> {
-    if let Some(Part::Text(t)) = base.last_mut() {
+/// Where in the parts of a string a position is: the part and the byte in it (a text).
+type At = (usize, usize);
+
+/// The first of `set` at or after `from` in the texts of `parts`.
+fn find(parts: &[Part], from: At, set: &[char]) -> Option<At> {
+    (from.0..parts.len()).find_map(|i| match &parts[i] {
+        Part::Text(t) => {
+            let start = if i == from.0 { from.1 } else { 0 };
+            t[start..].find(set).map(|at| (i, start + at))
+        }
+        _ => None,
+    })
+}
+
+/// The parts from `from` up to `to`.
+fn slice(parts: &[Part], from: At, to: At) -> Vec<Part> {
+    let mut out = Vec::new();
+    for (i, part) in parts.iter().enumerate().take(to.0 + 1).skip(from.0) {
+        match part {
+            Part::Text(t) => {
+                let (low, high) = (if i == from.0 { from.1 } else { 0 }, t.len());
+                let high = if i == to.0 { to.1 } else { high };
+                if low < high {
+                    out.push(Part::Text(t[low..high].to_string()));
+                }
+            }
+            other => out.push(other.clone()),
+        }
+    }
+    out
+}
+
+/// Whether a name of a wrapper's parameter is among the parts.
+fn holds_ref(parts: &[Part]) -> bool {
+    parts.iter().any(|p| matches!(p, Part::Ref(_)))
+}
+
+/// The two strings side by side, for a URL that depends on a parameter on either side: a
+/// placeholder the wrapper's call sites replace with the real resolution.
+fn depends(a: &[Part], b: &[Part]) -> Option<Vec<Part>> {
+    (holds_ref(a) || holds_ref(b)).then(|| merged([a, b].concat()))
+}
+
+/// `base` with the path component `component` added after a `/`, in its path (before a query or
+/// a fragment).
+fn append(base: Vec<Part>, mut component: Vec<Part>) -> Vec<Part> {
+    let end = (base.len(), 0);
+    let at = find(&base, (0, 0), &['?', '#']).unwrap_or(end);
+    let mut out = slice(&base, (0, 0), at);
+    if let Some(Part::Text(t)) = out.last_mut() {
         *t = t.trim_end_matches('/').to_string();
     }
     if let Some(Part::Text(t)) = component.first_mut() {
         *t = t.trim_start_matches('/').to_string();
     }
-    base.push(Part::Text("/".into()));
-    base.extend(component);
-    base
+    out.push(Part::Text("/".into()));
+    out.extend(component);
+    out.extend(slice(&base, at, end));
+    merged(out)
 }
 
-/// The reference `relative` resolved against `base` as RFC 3986 does, for the references that
-/// are an absolute URL, an absolute path or a relative path; `None` for any other.
-fn resolve(base: &[Part], relative: &[Part]) -> Option<Vec<Part>> {
-    let lead = match relative.first() {
-        Some(Part::Text(t)) => t.as_str(),
-        _ => "",
+/// How a reference is written, RFC 3986 section 4.2.
+enum Reference {
+    Absolute,
+    NetworkPath,
+    AbsolutePath,
+    RelativePath,
+}
+
+/// The kind of a reference; none for one this does not read (a query or a fragment alone, or a
+/// start that is not text, whose scheme and path it could change).
+fn classify(relative: &[Part]) -> Option<Reference> {
+    let Some(Part::Text(lead)) = relative.first() else {
+        return None;
     };
-    if lead.contains("://") {
+    // A scheme is letters, digits, `+`, `-` and `.` from a letter, then `:`, before any `/?#`.
+    for (at, c) in lead.char_indices() {
+        match c {
+            ':' if at > 0 => return Some(Reference::Absolute),
+            '/' | '?' | '#' | ':' => break,
+            c if c.is_ascii_alphabetic()
+                || (at > 0 && (c.is_ascii_digit() || "+-.".contains(c))) =>
+            {
+                if at + c.len_utf8() == lead.len() && relative.len() > 1 {
+                    return None;
+                }
+            }
+            _ => break,
+        }
+    }
+    match lead {
+        l if l.starts_with("//") => Some(Reference::NetworkPath),
+        l if l.starts_with('/') => Some(Reference::AbsolutePath),
+        l if l.starts_with(['?', '#']) || l.is_empty() => None,
+        _ => Some(Reference::RelativePath),
+    }
+}
+
+/// The reference `relative` resolved against `base` as RFC 3986 does, dot segments removed;
+/// `None` when either does not say enough (a base with no visible scheme and authority, a
+/// reference that starts with a parameter, one that is a query or a fragment alone).
+fn resolve(base: &[Part], relative: &[Part]) -> Option<Vec<Part>> {
+    let kind = classify(relative)?;
+    if let Reference::Absolute = kind {
         return Some(relative.to_vec());
     }
-    if lead.starts_with(['?', '#']) || lead.is_empty() {
-        return None;
-    }
-    // The part and the offset in it where the base's path starts: the first `/` after `://`.
+    let end = (base.len(), 0);
+    // The scheme (up to its `:`), the authority and the path of the base.
     let scheme = base
         .iter()
         .position(|p| matches!(p, Part::Text(t) if t.contains("://")))?;
-    let authority = |p: &Part, from: usize| match p {
-        Part::Text(t) => t[from..].find('/').map(|at| at + from),
-        _ => None,
+    let Part::Text(t) = &base[scheme] else {
+        return None;
     };
-    let start = |p: &Part| match p {
-        Part::Text(t) => t.find("://").map_or(0, |at| at + 3),
-        _ => 0,
-    };
-    let root = (scheme..base.len()).find_map(|i| {
-        let from = if i == scheme { start(&base[i]) } else { 0 };
-        authority(&base[i], from).map(|at| (i, at))
-    });
-    let mut out: Vec<Part> = Vec::new();
-    match (lead.starts_with('/'), root) {
-        // An absolute path replaces the base's path.
-        (true, Some((i, at))) => {
-            out.extend(base[..i].iter().cloned());
-            if let Part::Text(t) = &base[i] {
-                out.push(Part::Text(t[..at].to_string()));
+    let colon = t.find("://")?;
+    let path = find(base, (scheme, colon + 3), &['/', '?', '#']).unwrap_or(end);
+    let stop = find(base, path, &['?', '#']).unwrap_or(end);
+    if let Reference::NetworkPath = kind {
+        let mut out = slice(base, (0, 0), (scheme, colon + 1));
+        out.extend(relative.iter().cloned());
+        return Some(merged(out));
+    }
+    let mut route = match kind {
+        Reference::AbsolutePath => Vec::new(),
+        // The base's path up to its last `/`, or the root when it has none.
+        _ => {
+            let slash = (path.0..=stop.0.min(base.len().saturating_sub(1)))
+                .rev()
+                .find_map(|i| {
+                    let Part::Text(t) = &base[i] else {
+                        return None;
+                    };
+                    let low = if i == path.0 { path.1 } else { 0 };
+                    let high = if i == stop.0 { stop.1 } else { t.len() };
+                    t.get(low..high)?.rfind('/').map(|at| (i, low + at + 1))
+                });
+            match slash {
+                Some(to) => slice(base, path, to),
+                None => vec![Part::Text("/".into())],
             }
         }
-        (true, None) => out.extend(base.iter().cloned()),
-        // A relative path replaces the base's last segment.
-        (false, Some((i, _))) => {
-            let (j, at) = (i..base.len()).rev().find_map(|j| match &base[j] {
-                Part::Text(t) => t.rfind('/').map(|at| (j, at)),
-                _ => None,
-            })?;
-            out.extend(base[..j].iter().cloned());
-            if let Part::Text(t) = &base[j] {
-                out.push(Part::Text(t[..=at].to_string()));
+    };
+    route.extend(relative.iter().cloned());
+    let mut out = slice(base, (0, 0), path);
+    out.extend(without_dots(&route)?);
+    Some(merged(out))
+}
+
+/// The path `path` (which starts with `/`, and may end in a query or a fragment) without its `.`
+/// and `..` segments; none when a `..` would remove a segment that holds a parameter, which may
+/// be several.
+fn without_dots(path: &[Part]) -> Option<Vec<Part>> {
+    let end = (path.len(), 0);
+    let cut = find(path, (0, 0), &['?', '#']).unwrap_or(end);
+    let mut segments: Vec<Vec<Part>> = vec![Vec::new()];
+    for part in slice(path, (0, 0), cut) {
+        match part {
+            Part::Text(t) => {
+                for (k, piece) in t.split('/').enumerate() {
+                    if k > 0 {
+                        segments.push(Vec::new());
+                    }
+                    if !piece.is_empty() {
+                        segments.last_mut()?.push(Part::Text(piece.into()));
+                    }
+                }
             }
-        }
-        (false, None) => {
-            out.extend(base.iter().cloned());
-            out.push(Part::Text("/".into()));
+            other => segments.last_mut()?.push(other),
         }
     }
-    out.extend(relative.iter().cloned());
+    let last = segments.len() - 1;
+    let mut kept: Vec<Vec<Part>> = vec![Vec::new()];
+    for (k, segment) in segments.into_iter().enumerate().skip(1) {
+        let dot = matches!(&segment[..], [Part::Text(t)] if t == ".");
+        let up = matches!(&segment[..], [Part::Text(t)] if t == "..");
+        if up && kept.len() > 1 && kept.pop()?.iter().any(|p| !matches!(p, Part::Text(_))) {
+            return None;
+        }
+        match dot || up {
+            // A trailing dot segment leaves the slash.
+            true if k == last => kept.push(Vec::new()),
+            true => {}
+            false => kept.push(segment),
+        }
+    }
+    let mut out = Vec::new();
+    for segment in kept.into_iter().skip(1) {
+        out.push(Part::Text("/".into()));
+        out.extend(segment);
+    }
+    out.extend(slice(path, cut, end));
     Some(merged(out))
 }
 
@@ -468,6 +613,47 @@ mod tests {
                 "{base} + {relative}"
             );
         }
+        // The scheme ends at a `:` before any `/?#`; `//` is a network path; dot segments go;
+        // the base's query is not its path.
+        for (base, relative, url) in [
+            (
+                "https://h.example.com/api/",
+                "users?next=https://x",
+                "https://h.example.com/api/users?next=https://x",
+            ),
+            (
+                "https://h.example.com/api/",
+                "//cdn.example.com/x",
+                "https://cdn.example.com/x",
+            ),
+            (
+                "https://h.example.com/api/v1/",
+                "../users",
+                "https://h.example.com/api/users",
+            ),
+            (
+                "https://h.example.com/api/v1/",
+                "./a/../b",
+                "https://h.example.com/api/v1/b",
+            ),
+            (
+                "https://h.example.com/api/",
+                "/x/../../users",
+                "https://h.example.com/users",
+            ),
+            (
+                "https://h.example.com/api/v1?next=/a/b",
+                "status",
+                "https://h.example.com/api/status",
+            ),
+            ("https://h.example.com", "mailto:a@b", "mailto:a@b"),
+        ] {
+            assert_eq!(
+                joined(base, relative).as_deref(),
+                Some(url),
+                "{base} + {relative}"
+            );
+        }
         // A query or a fragment alone, and a base with no scheme, are not read.
         assert_eq!(joined("https://h.example.com", "?q=1"), None);
         assert_eq!(joined("/api", "status"), None);
@@ -487,6 +673,48 @@ mod tests {
         );
         let absolute = [Part::Text("/x".into())];
         assert_eq!(written(&resolve(&base, &absolute).unwrap()), "https://{}/x");
+    }
+
+    #[test]
+    fn a_parameter_on_either_side_waits_for_the_call_sites() {
+        let (base, users) = (
+            [Part::Text("https://h.example.com/v1/".into())],
+            [Part::Ref("p".into())],
+        );
+        assert!(resolve(&base, &users).is_none());
+        assert_eq!(
+            written(&depends(&base, &users).unwrap()),
+            "https://h.example.com/v1/{}"
+        );
+        let (base, users) = ([Part::Ref("b".into())], [Part::Text("users".into())]);
+        assert!(resolve(&base, &users).is_none());
+        assert!(depends(&base, &users).is_some());
+        // A string with no parameter that cannot be resolved stays unread.
+        assert!(depends(&users, &users).is_none());
+    }
+
+    #[test]
+    fn a_path_component_is_added_before_the_query() {
+        let base = vec![Part::Text("https://h.example.com/api/?v=1#top".into())];
+        let joined = append(base, vec![Part::Text("users".into())]);
+        assert_eq!(written(&joined), "https://h.example.com/api/users?v=1#top");
+    }
+
+    #[test]
+    fn the_modules_that_re_export_foundation_spell_its_names() {
+        let both = [
+            "UIKit.URLSession".to_string(),
+            "Foundation.URLSession".to_string(),
+        ];
+        assert!(named(&both, &["Foundation.URLSession"]));
+        assert!(named(
+            &["Cocoa.URLSession".to_string()],
+            &["Foundation.URLSession"]
+        ));
+        assert!(!named(
+            &["Other.URLSession".to_string()],
+            &["Foundation.URLSession"]
+        ));
     }
 
     #[test]

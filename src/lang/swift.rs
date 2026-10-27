@@ -300,6 +300,10 @@ fn walk(
     // and the members assigned through a name (`request.httpMethod = v`).
     let mut assigned: HashSet<String> = HashSet::new();
     let mut members: Vec<Member> = Vec::new();
+    // The names a `var` declares, and those a method is called on (`url.appendPathComponent(..)`
+    // mutates a value in place).
+    let mut vars: HashSet<String> = HashSet::new();
+    let mut called: HashSet<String> = HashSet::new();
     let mut stack = vec![Visit {
         node: root,
         scope: Rc::new(String::new()),
@@ -536,10 +540,15 @@ fn walk(
                         // Either holds the call, the name or the string it is given (a `var`
                         // assigned later holds none: `assigned`).
                         _ => {
+                            if !constant {
+                                vars.insert(name.clone());
+                            }
+                            // A global `var` is open to every file of the module: no one value.
                             if let (
                                 Some(value @ (Value::Call(_) | Value::Ref(_) | Value::Str(_))),
                                 true,
-                            ) = (&held, defining)
+                                true,
+                            ) = (&held, defining, place != Place::Top)
                             {
                                 facts.bound.push(Bound {
                                     scope: scope.as_ref().clone(),
@@ -606,18 +615,7 @@ fn walk(
                         }
                         Some((head, rest)) if !name.contains('(') => {
                             // Only a plain `=` as a statement of the body runs once, in place.
-                            let direct = plain
-                                && !rest.contains('.')
-                                && node.parent().is_some_and(|p| {
-                                    p.kind() == "source_file"
-                                        || (p.kind() == "statements"
-                                            && p.parent().is_some_and(|b| {
-                                                matches!(
-                                                    b.kind(),
-                                                    "function_body" | "lambda_literal"
-                                                )
-                                            }))
-                                });
+                            let direct = plain && !rest.contains('.') && runs_once(node);
                             let value = match (direct, result) {
                                 (true, Some(r)) => {
                                     values::value(r, src, ctx(&scope, defining, &types))
@@ -654,6 +652,9 @@ fn walk(
                     );
                     // A type parameter is no type of the repository: `T()` constructs none.
                     at.constructs &= !generics.holds(head(&at.callee));
+                    if let Some((receiver, _)) = at.callee.split_once('.') {
+                        called.insert(receiver.to_string());
+                    }
                     facts.calls.push(at);
                 }
                 pushed = std::iter::once(function)
@@ -704,7 +705,10 @@ fn walk(
         }
     }
     bare_calls(&mut facts);
-    facts.bound.retain(|b| !assigned.contains(&b.name));
+    facts.bound.retain(|b| {
+        !assigned.contains(&b.name)
+            && !(vars.contains(&b.name) && called.contains(&b.name) && mutable(&b.value))
+    });
     assign_members(&mut facts.bound, members);
     // A name another binding of the scope also declares (a loop variable, a `guard let`, a
     // `var`) holds no one value: its `let` bounds are dropped (Kotlin's rule). Two `let`s keep
@@ -751,33 +755,91 @@ struct Member {
     direct: bool,
 }
 
+/// Whether a method called on a `var` of this value may change it in place: a string, a name
+/// (another value's copy) or a URL (`appendPathComponent`, `append(path:)`). A builder or a
+/// request a `var` holds is changed through its members, which `Member` records.
+fn mutable(value: &Value) -> bool {
+    match value {
+        Value::Call(call) => {
+            let made = call.callee.rsplit('.').next().unwrap_or(&call.callee);
+            made == "URL" || made.starts_with("appending") || made.starts_with("deleting")
+        }
+        _ => true,
+    }
+}
+
+/// Whether a statement runs once, in place, whenever its function or closure does: a statement
+/// of the file, of a body, or of a `do` block that is one itself (an `if`, a loop or a `catch`
+/// may skip it or run it again).
+fn runs_once(statement: Node) -> bool {
+    let mut node = statement;
+    while let Some(parent) = node.parent() {
+        if parent.kind() == "source_file" {
+            return true;
+        }
+        let Some(block) = parent.parent().filter(|_| parent.kind() == "statements") else {
+            return false;
+        };
+        match block.kind() {
+            "function_body" | "lambda_literal" => return true,
+            "do_statement" => node = block,
+            _ => return false,
+        }
+    }
+    false
+}
+
 /// Gives the call a local holds the members assigned through its name, as `<member>=` keyword
 /// arguments (Kotlin's `method=`): the value of the one assignment that runs in place, unknown
-/// when it is written twice, may not run, or the name holds no call.
+/// when it is written twice, may not run, the scope declares the name twice, or the name holds
+/// no call. One pass over the members: each looks up the bindings of its scope and the scopes
+/// around it.
 fn assign_members(bound: &mut [Bound], members: Vec<Member>) {
-    for b in bound.iter_mut() {
-        let mut written: Vec<(String, Value)> = Vec::new();
-        for m in members.iter().filter(|m| m.head == b.name) {
-            let inside = m.scope == b.scope || m.scope.starts_with(&format!("{}.", b.scope));
-            if !inside {
+    // A slot is a name bound in a scope; `index` finds it by the name and then the scope.
+    let mut slots: Vec<Vec<usize>> = Vec::new();
+    let mut index: HashMap<&str, HashMap<&str, usize>> = HashMap::new();
+    for (at, b) in bound.iter().enumerate() {
+        let scopes = index.entry(&b.name).or_default();
+        let next = slots.len();
+        let slot = *scopes.entry(&b.scope).or_insert(next);
+        if slot == next {
+            slots.push(Vec::new());
+        }
+        slots[slot].push(at);
+    }
+    let mut written: Vec<Vec<(String, Value)>> = vec![Vec::new(); slots.len()];
+    let mut seen: Vec<HashMap<&str, usize>> = vec![HashMap::new(); slots.len()];
+    for m in &members {
+        let Some(scopes) = index.get(m.head.as_str()) else {
+            continue;
+        };
+        let outer = m.scope.match_indices('.').map(|(at, _)| &m.scope[..at]);
+        for scope in std::iter::once(m.scope.as_str()).chain(outer) {
+            let Some(&slot) = scopes.get(scope) else {
                 continue;
-            }
-            let key = format!("{}=", m.member);
-            let value = match m.direct && m.scope == b.scope {
-                true => m.value.clone(),
-                false => Value::Unknown,
             };
-            match written.iter_mut().find(|(k, _)| *k == key) {
-                Some((_, held)) => *held = Value::Unknown,
-                None => written.push((key, value)),
+            match seen[slot].get(m.member.as_str()) {
+                Some(&at) => written[slot][at].1 = Value::Unknown,
+                None => {
+                    let value = match m.direct && scope.len() == m.scope.len() {
+                        true => m.value.clone(),
+                        false => Value::Unknown,
+                    };
+                    seen[slot].insert(&m.member, written[slot].len());
+                    written[slot].push((format!("{}=", m.member), value));
+                }
             }
         }
-        if written.is_empty() {
+    }
+    for (slot, ids) in slots.iter().enumerate() {
+        if written[slot].is_empty() {
             continue;
         }
-        match &mut b.value {
-            Value::Call(call) => call.kwargs.extend(written),
-            other => *other = Value::Unknown,
+        for &at in ids {
+            match (&mut bound[at].value, ids.len()) {
+                (Value::Call(call), 1) => call.kwargs.extend(std::mem::take(&mut written[slot])),
+                (other, _) => *other = Value::Unknown,
+            }
         }
     }
 }
@@ -1432,6 +1494,86 @@ mod tests {
         let e = facts.bound.iter().find(|b| b.name == "e").unwrap();
         assert!(
             matches!(&e.value, Value::Str(p) if matches!(&p[..], [Part::Text(t), Part::Ref(r)] if t == "x" && r == "y"))
+        );
+    }
+
+    #[test]
+    fn a_var_a_method_is_called_on_holds_no_one_value() {
+        let facts = facts(
+            "var global = \"https://h\"\nfunc f(id: Int) {\n  var url = URL(string: \"https://h/api\")!\n  \
+             url.appendPathComponent(\"users\")\n  var path = \"/users\"\n  path.append(\"/x\")\n  \
+             var request = URLRequest(url: url)\n  request.setValue(\"a\", forHTTPHeaderField: \"b\")\n  \
+             var kept = \"/kept\"\n  let same = \"/same\"\n  same.hasPrefix(\"/\")\n}\n",
+        );
+        let names: Vec<&str> = facts.bound.iter().map(|b| b.name.as_str()).collect();
+        // A request is changed through its members, a string or a URL in place.
+        assert_eq!(names, ["request", "kept", "same"]);
+    }
+
+    #[test]
+    fn a_global_var_is_not_bound() {
+        let facts = facts(
+            "var host = \"https://h\"\nlet fixed = \"https://f\"\nfunc f() { var local = \"x\" }\n",
+        );
+        let names: Vec<&str> = facts.bound.iter().map(|b| b.name.as_str()).collect();
+        assert_eq!(names, ["local"]);
+    }
+
+    #[test]
+    fn a_do_block_runs_its_statements_in_place() {
+        let facts = facts(
+            "func f(s: URLSession, flag: Bool) async throws {\n  do {\n    var a = URLRequest(url: u)\n    \
+             a.httpMethod = \"POST\"\n    var b = URLRequest(url: u)\n    if flag { b.httpMethod = \"PUT\" }\n  \
+             } catch {\n    var c = URLRequest(url: u)\n    c.httpMethod = \"PUT\"\n  }\n  \
+             for _ in 0..<2 {\n    do {\n      var d = URLRequest(url: u)\n      d.httpMethod = \"PUT\"\n    }\n  }\n}\n",
+        );
+        let method = |name: &str| {
+            let Value::Call(call) = &facts.bound.iter().find(|b| b.name == name)?.value else {
+                return None;
+            };
+            let set = call.kwargs.iter().find(|(k, _)| k == "httpMethod=");
+            Some(matches!(set, Some((_, Value::Str(_)))))
+        };
+        assert_eq!(method("a"), Some(true));
+        // A branch, a `catch` and a loop may skip or repeat it.
+        assert_eq!(method("b"), Some(false));
+        assert_eq!(method("c"), Some(false));
+        assert_eq!(method("d"), Some(false));
+    }
+
+    /// Members assigned through many names are read in one pass: no pair of a name and a member
+    /// is compared.
+    #[test]
+    fn many_names_and_many_members_stay_linear() {
+        let (names, per) = (12_000, 4);
+        let mut source = String::from("func f() {\n");
+        for n in 0..names {
+            source += &format!("  var r{n} = URLRequest(url: u)\n");
+        }
+        for n in 0..names {
+            for m in 0..per {
+                source += &format!("  r{n}.a{m} = 1\n");
+            }
+        }
+        source += "  var s = URLRequest(url: u)\n  var s = URLRequest(url: u)\n  s.httpMethod = \"GET\"\n}\n";
+        let started = std::time::Instant::now();
+        let facts = facts(&source);
+        assert!(started.elapsed() < std::time::Duration::from_secs(10));
+        // A name bound twice in a scope holds no one value once a member is assigned.
+        assert!(
+            facts
+                .bound
+                .iter()
+                .filter(|b| b.name == "s")
+                .all(|b| matches!(b.value, Value::Unknown))
+        );
+        assert_eq!(
+            facts
+                .bound
+                .iter()
+                .filter(|b| b.name.starts_with('r'))
+                .count(),
+            names
         );
     }
 
