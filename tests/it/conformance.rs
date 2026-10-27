@@ -12037,11 +12037,45 @@ fn swift() {
         checkout("Gateway.swift", "gateway().GET /bare"),
         checkout("Gateway.swift", "gateway().GET /a/b"),
         checkout("Gateway.swift", "mountMetrics(_:)"),
+        checkout("Gateway.swift", "rebound(_:)"),
         checkout("Gateway.swift", "mountMetrics(_:).GET /internal/metrics"),
         checkout("Gateway.swift", "deeper(_:)"),
         checkout("Gateway.swift", "showItem(request:context:)"),
         checkout("Server.swift", "Server"),
         checkout("Server.swift", "Server.run()"),
+        checkout("Clients.swift", "Api"),
+        checkout("Clients.swift", "Api.cached(session:)"),
+        checkout("Clients.swift", "Api.fetch(_:)"),
+        checkout("Clients.swift", "Api.local()"),
+        checkout("Clients.swift", "Api.profile()"),
+        checkout("Clients.swift", "Api.remove(_:)"),
+        checkout("Clients.swift", "Api.send(_:_:)"),
+        checkout("Clients.swift", "Api.user(_:)"),
+        checkout("Clients.swift", "Cache"),
+        checkout("Clients.swift", "Cache.data(from:)"),
+        checkout("Clients.swift", "Gateway"),
+        checkout("Clients.swift", "Gateway.init(session:)"),
+        checkout("Clients.swift", "Gateway.ping()"),
+        checkout("Clients.swift", "Gateway.pong()"),
+        checkout("Clients.swift", "Local"),
+        checkout("Clients.swift", "Local.request(_:)"),
+        checkout("Clients.swift", "Remote"),
+        checkout("Clients.swift", "alamofire(id:session:)"),
+        checkout("Clients.swift", "asyncHTTP(client:)"),
+        checkout("Clients.swift", "byName(other:)"),
+        checkout("Clients.swift", "lookup()"),
+        checkout("Clients.swift", "moved(other:)"),
+        checkout("Clients.swift", "notRead(session:cache:)"),
+        checkout("Clients.swift", "sessions(id:session:)"),
+        checkout("Clients.swift", "unresolved(path:flag:)"),
+        checkout("Clients.swift", "useApi()"),
+        checkout("Clients.swift", "relative(_:)"),
+        checkout("Clients.swift", "guarded(session:)"),
+        checkout("Clients.swift", "mutated(id:)"),
+        checkout("Clients.swift", "versions()"),
+        checkout("Ui.swift", "reroute()"),
+        checkout("Ui.swift", "uikit(session:)"),
+        store("Endpoints.swift", "Endpoints"),
     ];
     let one = |t: String| vec![t];
     let run = |callee: &str| checkout("Checkout.swift", &format!("Checkout.run()::{callee}"));
@@ -12269,6 +12303,134 @@ fn swift() {
         ),
     ]);
     conform_owned("conformance-swift", &symbols, &calls);
+}
+
+/// Outgoing HTTP calls of Swift are consumers with their URLs evaluated (spec #29, #121).
+#[test]
+fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
+    let repo = fixture_repo("swift_http_consumers", "conformance-swift", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let (api, orders, billing) = (
+        "host:api.example.com",
+        "host:orders.example.com",
+        "host:billing.example.com",
+    );
+    let at =
+        |function: &str, call: &str| format!("Sources/Checkout/Clients.swift::{function}::{call}");
+    let sessions = |call: &str| at("sessions(id:session:)", call);
+    let alamofire = |call: &str| at("alamofire(id:session:)", call);
+    let unresolved = |call: &str| at("unresolved(path:flag:)", call);
+    let mutated = |call: &str| at("mutated(id:)", call);
+    let expected = triples(&[
+        // URLSession: `data(from:)` is a `GET`, on `URLSession.shared`, a typed parameter and a
+        // local made by `URLSession(configuration:)`.
+        (
+            "http::GET::/ping",
+            api,
+            &sessions("URLSession.shared.data#0"),
+        ),
+        (
+            "http::GET::/users",
+            api,
+            &sessions("URLSession.shared.data#1"),
+        ),
+        ("http::GET::/users/{}", api, &sessions("session.data#0")),
+        ("http::GET::/health", api, &sessions("session.data#1")),
+        // `data(for:)` sends the method the request is assigned, `GET` when none.
+        (
+            "http::POST::/orders/new",
+            orders,
+            &sessions("URLSession.shared.data#2"),
+        ),
+        ("http::GET::/status", billing, &sessions("session.data#2")),
+        ("http::GET::/own", api, &sessions("own.data#0")),
+        (
+            "http::GET::/items/{}",
+            api,
+            &sessions("URLSession.shared.data#3"),
+        ),
+        // Alamofire: `GET` when `method:` is absent, on `AF` and on a `Session`.
+        ("http::GET::/af", api, &alamofire("AF.request#0")),
+        ("http::POST::/af/{}", api, &alamofire("AF.request#1")),
+        ("http::DELETE::/users", api, &alamofire("session.request#0")),
+        ("http::PUT::/health", api, &alamofire("AF.request#2")),
+        (
+            "http::PATCH::/default",
+            api,
+            &alamofire("Session.default.request#0"),
+        ),
+        // AsyncHTTPClient: a request sent with `execute`.
+        (
+            "http::POST::/ahc",
+            api,
+            &at("asyncHTTP(client:)", "client.execute#0"),
+        ),
+        (
+            "http::GET::/health",
+            api,
+            &at("asyncHTTP(client:)", "HTTPClient.shared.execute#0"),
+        ),
+        // A property typed or made by `URLSession.shared`, read through `self` or by name.
+        (
+            "http::GET::/gateway",
+            api,
+            &at("Gateway.ping()", "self.session.data#0"),
+        ),
+        (
+            "http::GET::/pong",
+            api,
+            &at("Gateway.pong()", "session.data#0"),
+        ),
+        // Wrappers: each call site, through two levels, with a cycle.
+        ("http::GET::/direct", api, &at("useApi()", "api.fetch#0")),
+        ("http::GET::/users/{}", api, &at("Api.profile()", "user#0")),
+        (
+            "http::DELETE::/users/{}",
+            api,
+            &at("useApi()", "api.remove#0"),
+        ),
+        // `relativeTo` is resolved at each call site of the wrapper, as RFC 3986 does.
+        ("http::GET::/v1/users", api, &at("versions()", "relative#0")),
+        ("http::GET::/health", api, &at("versions()", "relative#1")),
+        ("http::GET::/up", api, &at("versions()", "relative#2")),
+        // A method called on a `var` may change it, and a global `var` is open to every file:
+        // neither folds its initial value. A request is changed through its members alone.
+        ("unresolved", "", &mutated("URLSession.shared.data#0")),
+        ("unresolved", "", &mutated("URLSession.shared.data#1")),
+        (
+            "http::GET::/headers",
+            api,
+            &mutated("URLSession.shared.data#2"),
+        ),
+        (
+            "http::GET::/global",
+            "",
+            &mutated("URLSession.shared.data#3"),
+        ),
+        // A `do` block runs its statements in place.
+        (
+            "http::POST::/do",
+            api,
+            &at("guarded(session:)", "session.data#0"),
+        ),
+        // A URL or a method Meada cannot evaluate.
+        ("unresolved", "", &unresolved("URLSession.shared.data#0")),
+        ("unresolved", "", &unresolved("URLSession.shared.data#1")),
+        ("unresolved", "", &unresolved("URLSession.shared.data#2")),
+        ("unresolved", api, &unresolved("URLSession.shared.data#3")),
+        ("unresolved", api, &unresolved("URLSession.shared.data#4")),
+    ]);
+    assert_eq!(consumers(&json, "Sources/Checkout/Clients.swift"), expected);
+    // An import of UIKit alone spells Foundation's `URLSession`.
+    assert_eq!(
+        consumers(&json, "Sources/Checkout/Ui.swift"),
+        triples(&[(
+            "http::GET::/uikit",
+            api,
+            "Sources/Checkout/Ui.swift::uikit(session:)::session.data#0",
+        )])
+    );
 }
 
 /// A repository without `Package.swift` is one module (spec #29, #117).
@@ -12580,6 +12742,143 @@ fn swift_hostile_values_and_groups_remain_bounded() {
     assert_eq!(served(&repo, "Many.swift").len(), 10);
     std::fs::write(repo.join("Many.swift"), groups(4200)).unwrap();
     assert!(served(&repo, "").is_empty());
+}
+
+/// Context lists the consumers a Swift call that cannot be evaluated is, unresolved (spec #29, #121).
+#[test]
+fn swift_context_shows_an_unresolved_consumer() {
+    let repo = fixture_repo(
+        "swift_unresolved_consumer",
+        "conformance-swift",
+        Some(ORIGIN),
+    );
+    assert_golden(
+        "conformance-swift.context-unresolved.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .context("unresolved(path:flag:)", None)
+            .unwrap(),
+    );
+}
+
+/// Hostile URLs stay bounded: a `+` chain, a chain of `appendingPathComponent` and calls nested
+/// past the pack's `VALUE_DEPTH` are unresolved consumers, in time that stays small, and a
+/// call after them is still read.
+#[test]
+fn swift_hostile_urls_remain_bounded() {
+    let repo = fixture_repo("swift_hostile_urls", "conformance-swift", Some(ORIGIN));
+    let plus = vec!["\"a\""; 4000].join(" + ");
+    let appended = ".appendingPathComponent(\"x\")".repeat(4000);
+    let nested = format!("{}\"x\"{}", "URL(string: ".repeat(1000), ")".repeat(1000));
+    let get = |url: &str| format!("_ = try await URLSession.shared.data(from: {url})\n");
+    let source = format!(
+        "import Foundation\nfunc hostile() async throws {{\n{}{}{}{}}}\n",
+        get(&format!("URL(string: {plus})!")),
+        get(&format!(
+            "URL(string: \"https://h.example.com\")!{appended}"
+        )),
+        get(&nested),
+        get("URL(string: \"https://h.example.com/fine\")!"),
+    );
+    std::fs::write(repo.join("Hostile.swift"), source).unwrap();
+    let started = std::time::Instant::now();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(started.elapsed() < std::time::Duration::from_secs(30));
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let found: Vec<String> = consumers(&json, "Hostile.swift")
+        .into_iter()
+        .map(|(contract, ..)| contract)
+        .collect();
+    assert_eq!(
+        found,
+        ["http::GET::/fine", "unresolved", "unresolved", "unresolved"]
+    );
+}
+
+/// A type of the repository named `URL`, `URLRequest` or `HTTPClientRequest` hides the
+/// library's: the consumer is unresolved, not read as the library's (spec #29, #121). Each
+/// type is in a module of its own, so the others stay the library's there.
+#[test]
+fn swift_a_repository_type_hides_the_library_s_request_and_url() {
+    let repo = fixture_repo("swift_hidden_names", "conformance-swift", Some(ORIGIN));
+    let manifest = std::fs::read_to_string(repo.join("Package.swift")).unwrap();
+    let targets: String = ["HiddenUrl", "HiddenRequest", "HiddenAhc"]
+        .iter()
+        .map(|name| format!(".target(name: \"{name}\"), "))
+        .collect();
+    std::fs::write(
+        repo.join("Package.swift"),
+        manifest.replace(
+            ".target(name: \"Store\"),",
+            &format!(".target(name: \"Store\"), {targets}"),
+        ),
+    )
+    .unwrap();
+    let write = |dir: &str, source: &str| {
+        std::fs::create_dir_all(repo.join("Sources").join(dir)).unwrap();
+        std::fs::write(repo.join("Sources").join(dir).join("Hidden.swift"), source).unwrap();
+    };
+    let get = "_ = try await session.data(from: ";
+    write(
+        "HiddenUrl",
+        &format!(
+            "import Foundation\nstruct URL {{ init(string: String) {{}} }}\n\
+             func f(session: URLSession) async throws {{\n  {get}URL(string: \"https://api.example.com/u\"))\n}}\n"
+        ),
+    );
+    write(
+        "HiddenRequest",
+        "import Foundation\nstruct URLRequest { init(url: URL) {} }\n\
+         func f(session: URLSession) async throws {\n  \
+         let r = URLRequest(url: URL(string: \"https://api.example.com/r\")!)\n  \
+         _ = try await session.data(for: r)\n}\n",
+    );
+    write(
+        "HiddenAhc",
+        "import AsyncHTTPClient\nstruct HTTPClientRequest { init(url: String) {} }\n\
+         func f(client: HTTPClient) async throws {\n  \
+         let r = HTTPClientRequest(url: \"https://api.example.com/a\")\n  \
+         _ = try await client.execute(r, timeout: .seconds(5))\n}\n",
+    );
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    for dir in ["HiddenUrl", "HiddenRequest", "HiddenAhc"] {
+        let found: Vec<String> = consumers(&json, &format!("Sources/{dir}/"))
+            .into_iter()
+            .map(|(contract, ..)| contract)
+            .collect();
+        assert_eq!(found, ["unresolved"], "{dir}");
+    }
+}
+
+/// A client is followed through eight names at most: past that the call is no consumer, and a
+/// short chain still is one (spec #29, #121).
+#[test]
+fn swift_a_client_held_through_many_names_is_not_followed_past_the_limit() {
+    let repo = fixture_repo("swift_client_depth", "conformance-swift", Some(ORIGIN));
+    let chain = |name: &str, hops: usize| {
+        let mut source = format!("  let {name}0 = URLSession.shared\n");
+        for n in 1..=hops {
+            source += &format!("  let {name}{n} = {name}{}\n", n - 1);
+        }
+        source
+            + &format!(
+                "  _ = try await {name}{hops}.data(from: URL(string: \"https://api.example.com/{name}\")!)\n"
+            )
+    };
+    let source = format!(
+        "import Foundation\nfunc depth() async throws {{\n{}{}}}\n",
+        chain("far", 12),
+        chain("near", 3)
+    );
+    std::fs::write(repo.join("Depth.swift"), source).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let found: Vec<String> = consumers(&json, "Depth.swift")
+        .into_iter()
+        .map(|(contract, ..)| contract)
+        .collect();
+    assert_eq!(found, ["http::GET::/near"]);
 }
 
 /// `search` finds a member an extension declares, under the extended type, and `context` on

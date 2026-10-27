@@ -260,10 +260,12 @@ impl<'c, 'a> Vapor<'c, 'a> {
 
     /// The method `value` names, upper-case: `.GET` or `HTTPMethod.GET`.
     fn http_method(value: &Value) -> Option<String> {
-        let Value::Ref(name) = value else {
-            return None;
+        let name = match value {
+            Value::Ref(name) => method(name),
+            Value::Member(ty, name) if ty.is_empty() => name,
+            _ => return None,
         };
-        let method = method(name).to_uppercase();
+        let method = name.to_uppercase();
         METHODS.contains(&method.as_str()).then_some(method)
     }
 

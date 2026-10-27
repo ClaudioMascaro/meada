@@ -2038,6 +2038,7 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 callee,
                 receiver: receiver.map(Box::new),
                 args,
+                kwargs: Vec::new(),
                 range: node.byte_range(),
             })
         }

@@ -1899,6 +1899,7 @@ fn element(node: Node, src: &[u8], depth: usize, nested: bool) -> Value {
                         callee,
                         receiver: None,
                         args: items,
+                        kwargs: Vec::new(),
                         range: node.byte_range(),
                     }),
                     _ => Value::Unknown,
@@ -2179,6 +2180,7 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 callee,
                 receiver: receiver.map(Box::new),
                 args,
+                kwargs: Vec::new(),
                 range: node.byte_range(),
             })
         }

@@ -20,6 +20,21 @@ func gateway() throws {
     router.group().get("bare") { _, _ in "bare" }
     router.group(String(describing: router)).get("unread") { _, _ in "unread" }
     router.get("a/b") { _, _ in "nested" }
+    // `on` needs `method:` after the path: neither a missing one nor Vapor's order is a route.
+    v1.on("no-method") { _, _ in "unread" }
+    v1.on(.get, "positional") { _, _ in "unread" }
+}
+
+// A name bound again in the function is unknown there, though the first binding is typed.
+func rebound(_ other: Router<BasicRequestContext>?) {
+    let r1 = Router()
+    if let r1 = other {
+        r1.get("unread") { _, _ in "unread" }
+    }
+    let r2 = Router()
+    for r2 in [other] {
+        r2?.get("unread") { _, _ in "unread" }
+    }
 }
 
 func mountMetrics(_ routes: Router<BasicRequestContext>) {

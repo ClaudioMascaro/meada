@@ -961,6 +961,8 @@ pub struct Invocation {
     pub callee: String,
     pub receiver: Option<Box<Value>>,
     pub args: Vec<Value>,
+    /// The arguments written with a label that is no positional one (Swift's `URL(string: s)`).
+    pub kwargs: Vec<(String, Value)>,
     pub range: Range<usize>,
 }
 

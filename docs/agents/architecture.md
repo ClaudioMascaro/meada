@@ -787,7 +787,8 @@ one for the area a change touches.
   providers, and `http/kotlin/client.rs`, Ktor client consumers; `http/csharp.rs`, ASP.NET Core
   controller providers, `http/csharp/minimal.rs`, minimal API providers,
   `http/csharp/clients.rs`, HttpClient and typed client consumers, and `http/csharp/refit.rs`,
-  Refit consumers; `http/swift.rs` and `http/swift/vapor.rs`, Vapor providers), resource and channel
+  Refit consumers; `http/swift.rs`, `http/swift/vapor.rs`, Vapor providers, and `http/swift/client.rs`, URLSession,
+  Alamofire and AsyncHTTPClient consumers), resource and channel
   kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go, Maven and NuGet packages as
   contracts (specs #22, #24, #30, #25, #26 and #28), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
@@ -1727,14 +1728,23 @@ one for the area a change touches.
   each call: its receiver (`a.b` of `a.b.f()`), its arguments (a label makes a keyword
   argument, `get("users", use: list)`, a trailing closure the last positional one), a string as
   its parts (an interpolated name a `Part::Ref`, any other expression or an escape a hole), a
-  name or a member chain as `Value::Ref`, an implicit member as `.NAME`, an array as a list and
-  a call as `Value::Call`, read to `VALUE_DEPTH` (32). A closure written in code (not in a
+  name or a member chain as `Value::Ref`, an implicit member as `Value::Member` with no type
+  (`.post`), a postfix `!` as its target, `a + b` as a string of both, an array as a list and a
+  call as `Value::Call` (its labelled arguments in `Invocation::kwargs`, spec #29, #121), read to
+  `VALUE_DEPTH` (32). A closure written in code (not in a
   type's property initializer) is a `Kind::Inline` definition named `<scope>.@<offset>`, and the
-  calls and names inside it belong to that scope. `Facts::bound` holds a `let` of one name given
-  a call or a name (a `var` is never bound), and drops the name when another binding of the
+  calls and names inside it belong to that scope. `Facts::bound` holds a `let` or `var` of one name given
+  a call, a name or a string (#121), and drops the name when another binding of the
   function (a loop variable, an `if let`, a `guard let`, a `catch`, a `case let`, a `var` or
-  another `let` in a block) also declares it; a top-level `let` is a `Const` holding its
-  initializer, and a binding in a block of the top level is a local, not a global.
+  another `let` in a block) also declares it, when it is assigned afterwards (`x = ..`,
+  `&x`) or when a method is called on a `var` that holds a string, a name or a URL
+  (`url.appendPathComponent(..)` changes it in place); a global `var` is not bound, since
+  another file of the module may assign it; a top-level or type-level `let` is a `Const` (qualified by its type) holding its
+  initializer, and a binding in a block of the top level is a local, not a global. A member
+  assigned through a local that holds a call (`request.httpMethod = "POST"`) is a `<member>=`
+  keyword argument of that call, when it is a plain `=` in the function's own statements or in a
+  `do` block that is one (not in an `if`, a loop, a `catch` or a closure); written twice, or
+  where it may not run, it is `Value::Unknown`.
   `Def::return_values` holds each `return` and the one expression of a function that writes a
   result type. `Code::arg` matches the labels of a call to the parameters' (`labelled_args`):
   an unlabelled argument takes the next parameter written `_`, a labelled one the parameter of
@@ -2111,6 +2121,11 @@ qualification budget does (ADR 0017).
   where Java and C# keep it function-wide), and the
   protocols a conformed protocol inherits when the conformance is written on an extension. As in Java, an outside base
   (`NSObject`, `Codable`, a raw value type) keeps a type's own overloads from `exact` (#353).
+- `http/swift/client.rs`: `CLIENT_DEPTH` (8) bounds the locals, properties and constants followed
+  from a call's receiver to a client; past it the receiver is no client and the call is no
+  consumer. The pack's unit tests and the hostile-URL integration test exceed the URL limits
+  (a `+` chain, `appendingPathComponent` chain or nested `URL(string:` past `VALUE_DEPTH` is an
+  unresolved consumer). Beyond the limit, what it leaves out (spec #29, #121): see its entry.
 - `lang/csharp.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the C# pack as they bound the Java pack's, with the same
   outcome past each (a call inside a definition nested too deep is `(opaque).`, resolving to
@@ -2489,6 +2504,24 @@ qualification budget does (ADR 0017).
   leaves the routes under it unserved; an inline handler served under two prefixes has one
   symbol, named by one of them (as in C#); a factory that calls itself, reached by one origin
   of a builder among others, serves the routes under that builder nowhere.
+- `http/swift/client.rs` (spec #29, #121): a call is a consumer when it is `data(from:)` or
+  `data(for:)` on a `URLSession`, `request(_:)` on Alamofire's `AF`, a `Session` or
+  `Session.default`, or `execute(_:..)` on an `HTTPClient`. The receiver counts by its spelling
+  (`URLSession.shared`, `AF`, `HTTPClient.shared`, as the imports spell them), by a written type
+  (`names::typed`) or by a local, property or `let` constant that holds one, followed to
+  `CLIENT_DEPTH` (8) names; a repository type of the same name hides the library's. The call is
+  read whole by `Expand::Chain` as in `http/kotlin/client.rs`, so a wrapper at any depth (the
+  URL, the method or the request a parameter) is a consumer, with cycle detection. The URL is
+  `URL(string:)`, `URL(string:relativeTo:)` (RFC 3986 resolution: the scheme before any `/?#`,
+  network paths, dot segments, the base's query dropped), `appendingPathComponent` (before the
+  query), a literal, an interpolation, a `+` or a `let` constant (`static let` too, from other files and
+  imported modules); a hole the evaluation cannot fold stays a parameter marker, a reference or a
+  base that is a wrapper's parameter is resolved at its call sites, and a URL left unknown is an
+  unresolved consumer. UIKit, AppKit, SwiftUI and Cocoa spell Foundation's names (they re-export it). `URLRequest(url:)` takes its method from an `httpMethod`
+  assignment, `HTTPClientRequest(url:)` from `method`, Alamofire from `method:`; GET when absent.
+  Not read: `dataTask(with:)`, `AF.download` and `AF.upload`, a request mutated through an
+  `inout` or an alias, a request with `url` assigned afterwards (unknown URL), a method that is
+  not one of the HTTP verbs, and a base URL from `ProcessInfo.processInfo.environment` (#122).
 - `http/csharp/clients.rs` (spec #28, #111): an `HttpClient` call is a consumer when its method
   is in `CLIENT_METHODS` (`GetAsync` to `PutAsJsonAsync`) or is `SendAsync`, and its receiver is
   an `HttpClient`: `Code::written` gives the type text written for a field, a parameter or a
