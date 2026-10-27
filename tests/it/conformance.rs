@@ -11892,7 +11892,12 @@ fn go_kafka_writer_topic_written_after_the_literal_is_unresolved() {
 }
 
 /// `conform` with owned ids, as the Swift tests build them.
-fn conform_owned(fixture: &str, symbols: &[String], calls: &[(String, Option<&str>, Vec<String>)]) {
+fn conform_owned(
+    fixture: &str,
+    symbols: &[String],
+    programs: &[&str],
+    calls: &[(String, Option<&str>, Vec<String>)],
+) {
     let symbols: Vec<&str> = symbols.iter().map(String::as_str).collect();
     let targets: Vec<Vec<&str>> = (calls.iter())
         .map(|(_, _, t)| t.iter().map(String::as_str).collect())
@@ -11900,7 +11905,7 @@ fn conform_owned(fixture: &str, symbols: &[String], calls: &[(String, Option<&st
     let calls: Vec<ExpectedCall> = (calls.iter().zip(&targets))
         .map(|((id, level, _), targets)| (id.as_str(), *level, targets.as_slice()))
         .collect();
-    conform(fixture, &symbols, &[], &calls);
+    conform(fixture, &symbols, programs, &calls);
 }
 
 /// A SwiftPM repository with two targets (spec #29, #117): each target is a module, a member an
@@ -12007,7 +12012,10 @@ fn swift() {
         checkout("Routes.swift", "shadowedByLet(_:)"),
         checkout("Routes.swift", "shadowedByLoop(_:)"),
         checkout("Routes.swift", "shadowedByIf(_:_:)"),
-        checkout("main.swift", "GET /started"),
+        checkout("main.swift", "main"),
+        checkout("main.swift", "main.GET /started"),
+        checkout("Cli.swift", "Cli"),
+        checkout("Cli.swift", "Cli.main()"),
         checkout(
             "Routes.swift",
             "OrderController.boot(routes:).GET /api/v1/alias",
@@ -12302,7 +12310,15 @@ fn swift() {
             one(dispatch("Parcel")),
         ),
     ]);
-    conform_owned("conformance-swift", &symbols, &calls);
+    conform_owned(
+        "conformance-swift",
+        &symbols,
+        &[
+            "Sources/Checkout/Cli.swift::Cli.main()",
+            "Sources/Checkout/main.swift::main",
+        ],
+        &calls,
+    );
 }
 
 /// Outgoing HTTP calls of Swift are consumers with their URLs evaluated (spec #29, #121).
@@ -12443,7 +12459,12 @@ fn swift_without_a_package_manifest() {
     let shadows = |name: &str| format!("Sources/Shadows.swift::{name}");
     let receivers = |name: &str| format!("Sources/Receivers.swift::{name}");
     let scopes = |name: &str| format!("Sources/Scopes.swift::{name}");
+    let app = |name: &str| format!("Sources/App.swift::{name}");
     let symbols = [
+        app("Bare"),
+        app("Cli"),
+        app("Cli.main()"),
+        main("main"),
         item("Item"),
         item("Item.label()"),
         item("Item.Size"),
@@ -12543,15 +12564,15 @@ fn swift_without_a_package_manifest() {
             INFERRED,
             one(display("Item.display()")),
         ),
-        (main("FileLoader#0"), EXACT, one(loader("FileLoader"))),
+        (main("main::FileLoader#0"), EXACT, one(loader("FileLoader"))),
         (
-            main("loader.load#0"),
+            main("main::loader.load#0"),
             EXACT,
             one(loader("FileLoader.load(from:limit:)")),
         ),
         // The top-level functions of a name in the module's files are one family.
         (
-            main("render#0"),
+            main("main::render#0"),
             AMBIGUOUS,
             vec![display("render(_:)"), item("render(_:)")],
         ),
@@ -12697,7 +12718,28 @@ fn swift_without_a_package_manifest() {
         let id = shadows(&format!("{scope}::{callee}#0"));
         calls.push((id, INFERRED, one(shadows(target))));
     }
-    conform_owned("conformance-swift-app", &symbols, &calls);
+    conform_owned(
+        "conformance-swift-app",
+        &symbols,
+        &[
+            "Sources/App.swift::Bare",
+            "Sources/App.swift::Cli.main()",
+            "Sources/main.swift::main",
+        ],
+        &calls,
+    );
+}
+
+#[test]
+fn swift_search_finds_the_program_entry_points() {
+    let repo = fixture_repo("swift_programs", "conformance-swift", Some(ORIGIN));
+    assert_golden(
+        "conformance-swift.search-process-main.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .search("main", Some("process"), None)
+            .unwrap(),
+    );
 }
 
 /// Hostile Vapor input stays bounded: values and group chains past the pack's `VALUE_DEPTH`

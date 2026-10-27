@@ -40,6 +40,9 @@ const QUALIFICATION_BYTES: usize = 4 * 1024 * 1024;
 /// The module of the files no target of a `Package.swift` holds, which no import can name.
 const NO_TARGET: &str = "(no target)";
 
+/// The symbol of the top-level code of a `main.swift` file, a program entry point.
+const MAIN: &str = "main";
+
 pub struct Swift;
 
 impl LanguagePack for Swift {
@@ -52,8 +55,8 @@ impl LanguagePack for Swift {
         path.rsplit('/').next() != Some("Package.swift")
     }
 
-    fn parse(&self, _path: &str, src: &[u8]) -> Result<Facts> {
-        parse(src)
+    fn parse(&self, path: &str, src: &[u8]) -> Result<Facts> {
+        parse(src, path.rsplit('/').next() == Some("main.swift"))
     }
 
     fn config_files(&self) -> &'static [&'static str] {
@@ -256,7 +259,7 @@ impl Signature {
     }
 }
 
-fn parse(src: &[u8]) -> Result<Facts> {
+fn parse(src: &[u8], main_file: bool) -> Result<Facts> {
     let mut parser = Parser::new();
     parser.set_language(&tree_sitter_swift::LANGUAGE.into())?;
     let tree = parser
@@ -266,12 +269,12 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // The first walk finds the functions of one scope with the same labels and other types
     // (a type's body and its extensions in the file alike); the second names those with types.
     let mut signatures = HashMap::new();
-    walk(root, src, &HashSet::new(), &mut signatures);
+    walk(root, src, main_file, &HashSet::new(), &mut signatures);
     let typed: HashSet<String> = (signatures.into_iter())
         .filter(|(_, types)| types.len() > 1)
         .map(|(name, _)| name)
         .collect();
-    Ok(walk(root, src, &typed, &mut HashMap::new()))
+    Ok(walk(root, src, main_file, &typed, &mut HashMap::new()))
 }
 
 /// The facts of the file `root`, naming the functions of `typed` (by `Visit::plain` name) with
@@ -280,6 +283,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
 fn walk(
     root: Node,
     src: &[u8],
+    main_file: bool,
     typed: &HashSet<String>,
     signatures: &mut HashMap<String, HashSet<Vec<String>>>,
 ) -> Facts {
@@ -306,6 +310,17 @@ fn walk(
     let mut called: HashSet<String> = HashSet::new();
     // The typed locals: receivers, not `locals`, but declarations of their name all the same.
     let mut typed_names: Vec<String> = Vec::new();
+    // The types marked `@main`, each a program through its `main()` method when it has one.
+    let mut mains: Vec<String> = Vec::new();
+    if main_file && defined.insert(MAIN.to_string()) {
+        facts.defs.push(definition(
+            MAIN,
+            Kind::Function,
+            root.byte_range(),
+            Vec::new(),
+        ));
+        facts.programs.push(MAIN.to_string());
+    }
     let mut stack = vec![Visit {
         node: root,
         scope: Rc::new(String::new()),
@@ -386,6 +401,13 @@ fn walk(
                     };
                     if protocol {
                         facts.interfaces.push(inner.as_ref().clone());
+                    }
+                    if named(node)
+                        .filter(|n| n.kind() == "modifiers")
+                        .flat_map(named)
+                        .any(|a| a.kind() == "attribute" && text(a, src) == "@main")
+                    {
+                        mains.push(inner.as_ref().clone());
                     }
                     if defined.insert(inner.as_ref().clone()) {
                         facts.defs.push(Def {
@@ -490,7 +512,15 @@ fn walk(
                             .is_some_and(|m| text(m, src) == "let")
                 });
                 let own = access(node, src).unwrap_or(default).min(ceiling);
-                let held = values::initializer(node, src, ctx(&scope, defining, &types));
+                // The initializer of a top-level binding of `main.swift` is top-level code: its
+                // calls and closures belong to `main`, the binding stays a global.
+                let code =
+                    match main_file && node.parent().is_some_and(|p| p.kind() == "source_file") {
+                        true => Rc::new(MAIN.to_string()),
+                        false => scope.clone(),
+                    };
+                inner = code.clone();
+                let held = values::initializer(node, src, ctx(&code, defining, &types));
                 let names = bound(node, src);
                 // A typed local is a receiver of its function alone when it is directly in the
                 // function's body: in a nested block, a closure or an accessor its name would
@@ -677,9 +707,26 @@ fn walk(
                 "statements" => body,
                 _ => false,
             };
+            // The statements of `main.swift` are its top-level code.
+            let top_code = main_file
+                && node.kind() == "source_file"
+                && !matches!(
+                    child.kind(),
+                    "class_declaration"
+                        | "protocol_declaration"
+                        | "function_declaration"
+                        | "property_declaration"
+                        | "import_declaration"
+                        | "typealias_declaration"
+                        | "comment"
+                        | "multiline_comment"
+                );
             stack.push(Visit {
                 node: child,
-                scope: inner.clone(),
+                scope: match top_code {
+                    true => Rc::new(MAIN.to_string()),
+                    false => inner.clone(),
+                },
                 place: inner_place,
                 default: inner_default,
                 ceiling: inner_ceiling,
@@ -708,6 +755,11 @@ fn walk(
         {
             def.return_values = values;
         }
+    }
+    for ty in mains {
+        let method = qualify(&ty, "main()");
+        let start = facts.defs.iter().any(|d| d.name == method);
+        facts.programs.push(if start { method } else { ty });
     }
     bare_calls(&mut facts);
     facts.bound.retain(|b| {
@@ -1355,7 +1407,46 @@ mod tests {
     use crate::lang::Part;
 
     fn facts(src: &str) -> Facts {
-        parse(src.as_bytes()).unwrap()
+        parse(src.as_bytes(), false).unwrap()
+    }
+
+    fn script(src: &str) -> Facts {
+        parse(src.as_bytes(), true).unwrap()
+    }
+
+    #[test]
+    fn an_at_main_type_starts_a_program_through_its_main_method() {
+        let f = facts(
+            "@main struct App { static func main() { run() } }\n@main struct Bare {}\nstruct Other {}\n",
+        );
+        assert_eq!(f.programs, ["App.main()", "Bare"]);
+    }
+
+    #[test]
+    fn the_top_level_code_of_main_swift_is_the_main_symbol() {
+        let f = script(
+            "import Foundation\nlet n = make()\nlet k = 1\nrun()\nfunc helper() { go() }\nstruct T { var x = build() }\n",
+        );
+        assert_eq!(f.programs, ["main"]);
+        assert!(
+            f.defs
+                .iter()
+                .any(|d| d.name == "main" && d.kind == Kind::Function)
+        );
+        let scope = |callee: &str| {
+            f.calls
+                .iter()
+                .find(|c| c.callee == callee)
+                .unwrap()
+                .scope
+                .clone()
+        };
+        assert_eq!(scope("make"), "main");
+        assert_eq!(scope("run"), "main");
+        assert_eq!(scope("go"), "helper()");
+        assert_eq!(scope("build"), "T");
+        assert!(f.consts.iter().any(|c| c.name == "k"));
+        assert!(facts("run()\n").programs.is_empty());
     }
 
     #[test]
@@ -1383,7 +1474,7 @@ mod tests {
         let facts = facts(&src);
         assert!(facts.unbuilt && facts.defs.is_empty());
         let src = format!("struct {name} {{ func g() {{\nf()\n}} }}\n");
-        assert!(!super::parse(src.as_bytes()).unwrap().unbuilt);
+        assert!(!super::parse(src.as_bytes(), false).unwrap().unbuilt);
     }
 
     #[test]

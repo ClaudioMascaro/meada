@@ -1687,7 +1687,10 @@ one for the area a change touches.
   target; Go `func main` in package `main`; Java `public static void main(String[])`; Kotlin a
   top-level `fun main`; C# a `static Main` (any signature) and, for top-level statements, a
   symbol `Main` (none when the file declares a global type `Main`, which would share it); Swift
-  an `@main` type and `main.swift` as symbol `main`; Rust `fn main` in `src/main.rs` and
+  an `@main` type (its `main()` method when the type declares one, the type otherwise) and
+  `main.swift` as symbol `main` (spec #29, #123: the statements of the file, and the
+  initializers of its top-level `let`/`var`, are scoped `main`, so their calls belong to it;
+  the bindings and constants themselves stay globals of the module); Rust `fn main` in `src/main.rs` and
   `src/bin/`. TS/JS declares none.
   A pack whose files bind names another file writes (C#'s `global using` directives, and the
   `<Using>` items and implicit usings of a project file, which apply to every file of the

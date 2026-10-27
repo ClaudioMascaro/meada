@@ -1,5 +1,5 @@
 example.com/acme/conformance Sources/Store/Dispatch.swift:12-12 Truck.ship(parcel:)
-community: Sources/Store#4
+community: Sources/Store#3
 processes: none
 func ship(parcel: Parcel) {}
 callers:
