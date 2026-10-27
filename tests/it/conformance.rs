@@ -3668,6 +3668,10 @@ fn csharp() {
         api("Remote.cs", "Acme.Api.Remote.IInventoryApi.Delete(string)"),
         api("Remote.cs", "Acme.Api.Remote.IReportsApi"),
         api("Remote.cs", "Acme.Api.Remote.IReportsApi.All()"),
+        api("Remote.cs", "Acme.Api.Remote.IHealthApi"),
+        api("Remote.cs", "Acme.Api.Remote.IHealthApi.Ping()"),
+        api("Remote.cs", "Acme.Api.Remote.IOrdersApi"),
+        api("Remote.cs", "Acme.Api.Remote.IOrdersApi.List()"),
         api("Remote.cs", "Acme.Api.Remote.Inventory"),
         api("Remote.cs", "Acme.Api.Remote.Inventory.Find(string)"),
         api(
@@ -4586,6 +4590,16 @@ fn csharp_typed_clients_and_refit_methods_are_consumers() {
             &remote("IInventoryApi.Delete(string)"),
         ),
         ("http::GET::/reports", "", &remote("IReportsApi.All()")),
+        (
+            "http::GET::/orders",
+            "host:orders.example.com",
+            &remote("IOrdersApi.List()"),
+        ),
+        (
+            "http::GET::/ping",
+            "host:orders.example.com",
+            &remote("IHealthApi.Ping()"),
+        ),
     ]);
     assert_eq!(consumers(&json, "src/Acme.Api/Remote.cs"), expected);
 }

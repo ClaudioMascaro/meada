@@ -24,10 +24,25 @@ namespace Acme.Api.Remote
         Task<string> All();
     }
 
+    // `For<IOrdersApi>` gives its base to the endpoints it inherits from `IHealthApi` too.
+    public interface IHealthApi
+    {
+        [Get("/ping")]
+        Task Ping();
+    }
+
+    public interface IOrdersApi : IHealthApi
+    {
+        [Get("/orders")]
+        Task<string> List();
+    }
+
     // A caller of an interface method reaches it like any call.
     public class Inventory
     {
         private readonly IInventoryApi _api = RestService.For<IInventoryApi>("https://inventory.example.com/api");
+
+        private readonly IOrdersApi _orders = RestService.For<IOrdersApi>("https://orders.example.com");
 
         public Task<string> Find(string sku) => _api.Item(sku);
 
