@@ -82,6 +82,13 @@ All notable changes to Meada are recorded here. The format follows
   constants (`static let` too) from other files and modules; a wrapper at any depth is a
   consumer, and a URL that cannot be read is an unresolved consumer, shown in the export and in
   `context`. The stored Swift facts change, so existing indexes are rebuilt.
+- Swift base URLs from the environment (spec #29, #122): `ProcessInfo.processInfo.environment["X"]`
+  at the start of a URL is the base URL variable `X` and maps through `base_url_env`, also
+  through `!`, parentheses, `??` fallbacks that are plain literals and string methods such as
+  `trimmingCharacters`; a second read, any other fallback, a key that is no literal and Vapor's
+  `Environment.get` leave the base unknown. A Swift repository joins a TypeScript workspace with
+  the same `meada.toml` keys, and `trace` follows the chain across both boundaries. The stored
+  Swift facts change, so existing indexes are rebuilt.
 - `Directory.Build.props` files apply to the C# projects below them as MSBuild imports them
   (the nearest one, then those it imports with `GetPathOfFileAbove` or a relative path): their
   `<Using>` items, `PackageReference`s and `ProjectReference`s, and the `PackageId`,

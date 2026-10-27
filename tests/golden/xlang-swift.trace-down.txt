@@ -1,0 +1,14 @@
+example.com/xlang-swift/web src/sync.ts:3 syncOrders
+  example.com/xlang-swift/web src/orders.ts:4 orderStatus
+  →[inferred: base URL from API_URL, a base_url_env of peer example.com/xlang-swift/api] example.com/xlang-swift/api Sources/Orders.swift:3 status(_:)
+    example.com/xlang-swift/api Sources/Pricing.swift:4 priceOf(_:)
+    →[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-swift/web] example.com/xlang-swift/web app/api/prices/[sku]/route.ts:1 GET
+    example.com/xlang-swift/api Sources/Stock.swift:5 stock()
+      →[inferred: base URL from STOCK_URL, a base_url_env of peer example.com/xlang-swift/web] example.com/xlang-swift/web app/api/stock/route.ts:1 GET
+  example.com/xlang-swift/web src/orders.ts:9 reserveOrder
+    →[exact: host api.example.com is served by example.com/xlang-swift/api] example.com/xlang-swift/api Sources/Orders.swift:9 reserve(_:)
+      example.com/xlang-swift/api Sources/Pricing.swift:12 promotions()
+        →[exact: host web.example.com is served by example.com/xlang-swift/web] example.com/xlang-swift/web app/api/promotions/route.ts:1 GET
+      example.com/xlang-swift/api Sources/Audit.swift:4 audit()
+        →[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-swift/web] example.com/xlang-swift/web app/api/audit/route.ts:1 POST
+chain: inferred · 6 hops · 2 repos · 348 tokens

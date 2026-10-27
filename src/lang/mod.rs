@@ -1084,6 +1084,7 @@ mod tests {
         ("rust/values.rs:KEEPS", "runtime"),
         ("rust/values.rs:KEEPS_NAMES", "runtime"),
         ("rust/values.rs:METHOD_CRATES", "exception"),
+        ("swift/values.rs:STRING_METHODS", "runtime"),
         ("ts.rs:BODIES", "syntax"),
         ("ts.rs:EXTENSIONS", "syntax"),
         ("ts.rs:FUNCTIONS", "syntax"),
