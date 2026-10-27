@@ -6873,12 +6873,8 @@
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::shelf.Stock#1",
       "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
-      "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate.Stock()",
-        "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf.Stock()"
-      ],
+      "target": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate.Stock()",
+      "level": "exact",
       "span": {
         "path": "src/Acme.Web/Program.cs",
         "start": 1193,
@@ -7841,6 +7837,7 @@
         "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
         "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Admin.Map(RouteGroupBuilder)",
         "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Reports.Group(WebApplication)",
+        "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate.Stock()",
         "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf",
         "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf.Stock()",
         "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder)",
@@ -11481,14 +11478,9 @@
         {
           "depth": 1,
           "repository": "example.com/acme/conformance",
-          "level": "ambiguous",
+          "level": "exact",
           "via": "call",
-          "node": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::shelf.Stock#1",
-          "mark": "ambiguous",
-          "candidates": [
-            "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate.Stock()",
-            "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf.Stock()"
-          ]
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate.Stock()"
         }
       ]
     },
