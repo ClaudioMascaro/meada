@@ -535,6 +535,27 @@ fn probes() -> Vec<Probe> {
             });
             swift_modules(format!("let package = Package(targets: [{targets}])"))
         }),
+        ("Package.swift: many dependencies and products", || {
+            let deps = fill(2, |i| {
+                format!(".package(url: \"https://h/p{i}.git\", from: \"1.{i}\"),\n")
+            });
+            let libs = fill(2, |i| {
+                format!(".library(name: \"L{i}\", targets: [\"T{i}\"]),\n")
+            });
+            manifest(
+                "Package.swift",
+                format!(
+                    "let package = Package(name: \"P\", products: [{libs}], dependencies: [{deps}])"
+                ),
+            )
+        }),
+        ("Package.swift: deep nesting in the package reader", || {
+            let nest = "[".repeat(NESTING) + ".package(path: \"a\")" + &"]".repeat(NESTING);
+            manifest(
+                "Package.swift",
+                format!("let package = Package(name: \"P\", dependencies: {nest})"),
+            )
+        }),
         ("Package.swift: deep nesting", || {
             let nest = "[".repeat(NESTING) + ".target(name: \"T\")" + &"]".repeat(NESTING);
             swift_modules(format!("let package = Package(targets: {nest})"))

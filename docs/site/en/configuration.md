@@ -51,3 +51,8 @@ In C#, the base URL may come from `Environment.GetEnvironmentVariable("X")` or f
 ## NuGet packages
 
 NuGet package contracts are discovered from the SDK-style `.csproj` files. They need no additional `meada.toml` key: a `PackageReference` links to a provider by its id, and a `ProjectReference` by the path of its project file, which reaches a project of another repository by the roots of the workspace repositories (declare it in `[[peer]]`). Property values such as `$(Version)` stay unevaluated.
+
+## Swift packages
+
+Swift package contracts are discovered from `Package.swift`. They need no additional `meada.toml` key: a `.package(url:)` links to the workspace repository with the same remote identity and a `.package(path:)` to the repository at that path, which must be a `[[peer]]` of the workspace when it is another repository. Use literal URLs, paths and names for `exact` links.
+

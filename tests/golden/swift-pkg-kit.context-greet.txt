@@ -1,0 +1,13 @@
+example.com/swift/kit Sources/Kit/Greeter.swift:17-19 greet(name:)
+community: Sources/Kit
+processes: none
+public func greet(name: String) -> String {
+    Greeter(name: name).hello(to: name)
+}
+callers:
+example.com/swift/kit Sources/Kit/Greeter.swift:26 greet(_:)
+callees:
+example.com/swift/kit Sources/Kit/Greeter.swift:8 Greeter.hello(to:loudly:) [inferred: one method named hello]
+example.com/swift/kit Sources/Kit/Greeter.swift:4 Greeter.init(name:)
+consumers:
+example.com/apps/shop Sources/App/main.swift:8 welcome(who:) [range unchecked]

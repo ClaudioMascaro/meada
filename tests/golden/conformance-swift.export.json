@@ -4455,6 +4455,10 @@
     {
       "contract": "http::PUT::/v1/items/{}",
       "site": "example.com/acme/conformance::Sources/Checkout/Gateway.swift::gateway().PUT /v1/items/{}"
+    },
+    {
+      "contract": "package::swiftpm::Shop",
+      "site": "example.com/acme/conformance::Package.swift"
     }
   ],
   "consumers": [
@@ -4627,6 +4631,14 @@
       "contract": "http::GET::/uikit",
       "site": "example.com/acme/conformance::Sources/Checkout/Ui.swift::uikit(session:)::session.data#0",
       "via": "host:api.example.com"
+    }
+  ],
+  "packages": [
+    {
+      "name": "Shop",
+      "repository": "example.com/acme/conformance",
+      "directory": ".",
+      "ecosystem": "swiftpm"
     }
   ],
   "communities": [

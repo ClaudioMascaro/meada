@@ -2706,6 +2706,53 @@ sample.Directory.Build.props
   }
 }
 
+sample.Package.swift
+{
+  "name": "Sample",
+  "dependencies": [
+    {
+      "field": "dependencies",
+      "name": "example.com/org/*",
+      "range": "exact 2.0.0",
+      "via": "computed git example.com/org/*"
+    },
+    {
+      "field": "dependencies",
+      "name": "example.com/org/kit",
+      "range": "from 1.2.0",
+      "via": "git example.com/org/kit"
+    },
+    {
+      "field": "dependencies",
+      "name": "lib",
+      "via": "path lib/Package.swift"
+    }
+  ],
+  "products": [
+    [
+      "Sample",
+      [
+        "Core",
+        "Money"
+      ]
+    ]
+  ],
+  "targets": [
+    [
+      "Core",
+      "pkg/Sources/Core"
+    ],
+    [
+      "Money",
+      "pkg/Sources/Currency"
+    ],
+    [
+      "Tool",
+      "pkg/Sources/Tool"
+    ]
+  ]
+}
+
 sample.tsconfig.json
 {
   "out_dir": "./dist",

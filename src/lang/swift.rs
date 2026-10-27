@@ -8,7 +8,7 @@
 //! its members are the extended type's (`Facts::impls`). The values a call, a local and a
 //! function write are in `values`.
 
-mod manifest;
+pub(crate) mod manifest;
 mod values;
 
 use std::collections::{BTreeMap, HashMap, HashSet};

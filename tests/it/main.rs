@@ -42,6 +42,7 @@ mod server;
 mod serving;
 mod snapshot;
 mod stale;
+mod swiftpkg;
 mod trace;
 mod ui;
 mod urls;

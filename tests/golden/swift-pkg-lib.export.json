@@ -1,0 +1,248 @@
+{
+  "repository": "example.com/swift/lib",
+  "files": [
+    {
+      "path": "Sources/KitMoney/Money.swift",
+      "hash": "6b6111dd010611a71fc63fc09d217675ffd5118097844ebb38dfc29aa5bcbf1b"
+    },
+    {
+      "path": "Sources/Shared/Shared.swift",
+      "hash": "320fb972ffddc8ca1c74e958428ab064d3a5f502f188bab5ea1e377d6fd1099f"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money",
+      "span": {
+        "path": "Sources/KitMoney/Money.swift",
+        "start": 0,
+        "end": 197
+      }
+    },
+    {
+      "id": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.init(cents:)",
+      "span": {
+        "path": "Sources/KitMoney/Money.swift",
+        "start": 53,
+        "end": 111
+      }
+    },
+    {
+      "id": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.of(cents:)",
+      "span": {
+        "path": "Sources/KitMoney/Money.swift",
+        "start": 117,
+        "end": 195
+      }
+    },
+    {
+      "id": "example.com/swift/lib::Sources/Shared/Shared.swift::shout(_:)",
+      "span": {
+        "path": "Sources/Shared/Shared.swift",
+        "start": 0,
+        "end": 69
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.of(cents:)::Money#0",
+      "caller": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.of(cents:)",
+      "target": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.init(cents:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/KitMoney/Money.swift",
+        "start": 170,
+        "end": 189
+      }
+    },
+    {
+      "id": "example.com/swift/lib::Sources/Shared/Shared.swift::shout(_:)::text.uppercased#0",
+      "caller": "example.com/swift/lib::Sources/Shared/Shared.swift::shout(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Shared/Shared.swift",
+        "start": 50,
+        "end": 67
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::swiftpm::Examples",
+      "site": "example.com/swift/lib::Examples/Package.swift"
+    },
+    {
+      "contract": "package::swiftpm::Shared",
+      "site": "example.com/swift/lib::Package.swift"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "package::swiftpm::Shared",
+      "site": "example.com/swift/lib::Examples/Package.swift::dependencies::Shared",
+      "via": "path Package.swift"
+    }
+  ],
+  "packages": [
+    {
+      "name": "Examples",
+      "repository": "example.com/swift/lib",
+      "directory": "Examples",
+      "ecosystem": "swiftpm"
+    },
+    {
+      "name": "Shared",
+      "repository": "example.com/swift/lib",
+      "directory": ".",
+      "ecosystem": "swiftpm"
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "Examples/Package.swift",
+      "field": "dependencies",
+      "name": "Shared"
+    }
+  ],
+  "communities": [
+    {
+      "name": "Sources/KitMoney",
+      "members": [
+        "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.init(cents:)",
+        "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.of(cents:)"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/apps/shop::Package.swift::dependencies::Shared",
+      "provider": "example.com/swift/lib::Package.swift",
+      "contract": "package::swiftpm::Shared",
+      "level": "exact",
+      "reason": "package::swiftpm::Shared none (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/apps/shop::Package.swift::dependencies::example.com/swift/*",
+      "provider": "example.com/swift/lib::Package.swift",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/apps/shop::Package.swift::dependencies::example.com/swift/lib*",
+      "provider": "example.com/swift/lib::Package.swift",
+      "contract": "package::swiftpm::example.com/swift/lib*",
+      "level": "ambiguous",
+      "reason": "computed dependency; package::swiftpm::example.com/swift/lib* from 1.0.0 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::loud(text:)::shout#0",
+      "provider": "example.com/swift/lib::Sources/Shared/Shared.swift::shout(_:)",
+      "contract": "package::swiftpm::Shared",
+      "level": "exact",
+      "reason": "package::swiftpm::Shared none (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::loud(text:)::shout#0",
+      "provider": "example.com/swift/lib::Sources/Shared/Shared.swift::shout(_:)",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::loud(text:)::shout#0",
+      "provider": "example.com/swift/lib::Sources/Shared/Shared.swift::shout(_:)",
+      "contract": "package::swiftpm::example.com/swift/lib*",
+      "level": "ambiguous",
+      "reason": "computed dependency; package::swiftpm::example.com/swift/lib* from 1.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money#0",
+      "provider": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.init(cents:)",
+      "contract": "package::swiftpm::Shared",
+      "level": "ambiguous",
+      "reason": "package::swiftpm::Shared none (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money#0",
+      "provider": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.init(cents:)",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money#0",
+      "provider": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.init(cents:)",
+      "contract": "package::swiftpm::example.com/swift/lib*",
+      "level": "ambiguous",
+      "reason": "computed dependency; package::swiftpm::example.com/swift/lib* from 1.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money.of#0",
+      "provider": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.of(cents:)",
+      "contract": "package::swiftpm::Shared",
+      "level": "ambiguous",
+      "reason": "package::swiftpm::Shared none (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money.of#0",
+      "provider": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.of(cents:)",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "3 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money.of#0",
+      "provider": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.of(cents:)",
+      "contract": "package::swiftpm::example.com/swift/lib*",
+      "level": "ambiguous",
+      "reason": "computed dependency; package::swiftpm::example.com/swift/lib* from 1.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/swift/lib::Examples/Package.swift::dependencies::Shared",
+      "provider": "example.com/swift/lib::Package.swift",
+      "contract": "package::swiftpm::Shared",
+      "level": "exact",
+      "reason": "package::swiftpm::Shared none (local none), range unchecked"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.of(cents:)",
+      "kind": "export",
+      "label": "Money.of(cents:)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/swift/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.of(cents:)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/swift/lib",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.init(cents:)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/swift/lib::Sources/Shared/Shared.swift::shout(_:)",
+      "kind": "export",
+      "label": "shout(_:)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/swift/lib",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/swift/lib::Sources/Shared/Shared.swift::shout(_:)"
+        }
+      ]
+    }
+  ]
+}

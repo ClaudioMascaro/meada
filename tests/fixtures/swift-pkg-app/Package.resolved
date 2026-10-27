@@ -1,0 +1,11 @@
+{
+  "pins" : [
+    {
+      "identity" : "dyn",
+      "kind" : "remoteSourceControl",
+      "location" : "https://example.com/swift/kit.git",
+      "state" : { "revision" : "0000000000000000000000000000000000000000", "version" : "9.9.9" }
+    }
+  ],
+  "version" : 2
+}
