@@ -100,6 +100,18 @@ fn csharp_exports_of_the_same_files_are_byte_identical() {
 }
 
 #[test]
+fn swift_exports_of_the_same_files_are_byte_identical() {
+    let origin = Some("https://example.com/acme/conformance.git");
+    for fixture in ["conformance-swift", "conformance-swift-app"] {
+        let a = fixture_repo(&format!("{fixture}_byte_identical_a"), fixture, origin);
+        let b = fixture_repo(&format!("{fixture}_byte_identical_b"), fixture, origin);
+        let first = Engine::open(&a).unwrap().export().unwrap();
+        assert_eq!(first, Engine::open(&a).unwrap().export().unwrap());
+        assert_eq!(first, Engine::open(&b).unwrap().export().unwrap());
+    }
+}
+
+#[test]
 fn rust_exports_of_the_same_files_are_byte_identical() {
     let origin = Some("https://example.com/acme/conformance.git");
     let a = fixture_repo("rust_byte_identical_a", "conformance-rust", origin);

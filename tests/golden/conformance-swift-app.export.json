@@ -1,0 +1,1460 @@
+{
+  "repository": "example.com/acme/conformance",
+  "files": [
+    {
+      "path": "Sources/App.swift",
+      "hash": "7526bb5426ef93254045facb8575bc6031cbae9e5bc2f4e958512bd525bb4653"
+    },
+    {
+      "path": "Sources/Handler.swift",
+      "hash": "831982135a83e8a0512d5ef14b7d3b8663f10e687d0594ab63954ea8514d4053"
+    },
+    {
+      "path": "Sources/Loading/FileLoader.swift",
+      "hash": "12906533a69902ae30f8e6c553b6670c5f01d3f3b9ddda8818783343a724f807"
+    },
+    {
+      "path": "Sources/Model/Item+Display.swift",
+      "hash": "883159ba743a26f3edf208ba71fc4d3cc2965b44316c3779f46e9f189135fa65"
+    },
+    {
+      "path": "Sources/Model/Item.swift",
+      "hash": "7cea37fc94c03b1d03dca372c9e04265701799cc6a78a80f56b6b9c87cc9603e"
+    },
+    {
+      "path": "Sources/Page+Show.swift",
+      "hash": "f3c7b48a28858b02e2f87af509fb9962c619dea468a6e770dff4afe502041e4c"
+    },
+    {
+      "path": "Sources/Receivers.swift",
+      "hash": "b63ba6801b2df652708b7b3924a6d1ac7d1ef02a74e42df0023938ad1246e941"
+    },
+    {
+      "path": "Sources/Scopes.swift",
+      "hash": "bd924e1620c929374aba59f950732a3e4a880fdb595c231c26e5d106044d7a35"
+    },
+    {
+      "path": "Sources/Session.swift",
+      "hash": "dad3e417a3083f25345ddd9e44d721e61cb6b34e4f8bb65c97ea9c933d731dff"
+    },
+    {
+      "path": "Sources/Shadows.swift",
+      "hash": "b5f612e30e50bb076627df87db603954b63b242b436048a9b6e3b20a9b7abd56"
+    },
+    {
+      "path": "Sources/main.swift",
+      "hash": "52305e3beb2c1c0e3cab2d9efa48ce557e9e46138e7a2ecfab470d5580980286"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/conformance::Sources/App.swift::Bare",
+      "span": {
+        "path": "Sources/App.swift",
+        "start": 85,
+        "end": 105
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App.swift::Cli",
+      "span": {
+        "path": "Sources/App.swift",
+        "start": 0,
+        "end": 83
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App.swift::Cli.main()",
+      "span": {
+        "path": "Sources/App.swift",
+        "start": 23,
+        "end": 81
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Handler.swift::run()",
+      "span": {
+        "path": "Sources/Handler.swift",
+        "start": 70,
+        "end": 104
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader",
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 0,
+        "end": 526
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:)",
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 37,
+        "end": 141
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)",
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 147,
+        "end": 339
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)",
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 345,
+        "end": 524
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::render(count:)",
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 528,
+        "end": 579
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.Size.doubled()",
+      "span": {
+        "path": "Sources/Model/Item+Display.swift",
+        "start": 106,
+        "end": 164
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.display()",
+      "span": {
+        "path": "Sources/Model/Item+Display.swift",
+        "start": 21,
+        "end": 76
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Model/Item+Display.swift::render(_:)",
+      "span": {
+        "path": "Sources/Model/Item+Display.swift",
+        "start": 168,
+        "end": 226
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Model/Item.swift::Item",
+      "span": {
+        "path": "Sources/Model/Item.swift",
+        "start": 19,
+        "end": 242
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Model/Item.swift::Item.Size",
+      "span": {
+        "path": "Sources/Model/Item.swift",
+        "start": 115,
+        "end": 240
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Model/Item.swift::Item.Size.scaled(by:)",
+      "span": {
+        "path": "Sources/Model/Item.swift",
+        "start": 162,
+        "end": 234
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
+      "span": {
+        "path": "Sources/Model/Item.swift",
+        "start": 59,
+        "end": 109
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Model/Item.swift::Loader",
+      "span": {
+        "path": "Sources/Model/Item.swift",
+        "start": 244,
+        "end": 306
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Model/Item.swift::Loader.load(from:)",
+      "span": {
+        "path": "Sources/Model/Item.swift",
+        "start": 266,
+        "end": 304
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Model/Item.swift::render(_:)",
+      "span": {
+        "path": "Sources/Model/Item.swift",
+        "start": 308,
+        "end": 371
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Model/Item.swift::renderAll()",
+      "span": {
+        "path": "Sources/Model/Item.swift",
+        "start": 373,
+        "end": 418
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Page+Show.swift::Page.build()",
+      "span": {
+        "path": "Sources/Page+Show.swift",
+        "start": 79,
+        "end": 118
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Page+Show.swift::Page.show(_:)",
+      "span": {
+        "path": "Sources/Page+Show.swift",
+        "start": 21,
+        "end": 73
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::String.shout()",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 631,
+        "end": 662
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::generic(_:)",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 553,
+        "end": 606
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::hidden(_:_:)",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 235,
+        "end": 355
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 0,
+        "end": 233
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::rebound(_:)",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 357,
+        "end": 447
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::typed(_:)",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 449,
+        "end": 551
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Base",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 75,
+        "end": 113
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Desk",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 502,
+        "end": 697
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 548,
+        "end": 695
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Gone",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 286,
+        "end": 500
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Gone.go()",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 459,
+        "end": 498
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Gone.init(store:)",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 325,
+        "end": 378
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Page",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 699,
+        "end": 762
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Page.own()",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 723,
+        "end": 760
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Shelf",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 764,
+        "end": 806
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Shelf.stock(_:)",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 830,
+        "end": 883
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Ship",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 0,
+        "end": 35
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 18,
+        "end": 33
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Store",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 37,
+        "end": 73
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Store.place()",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 56,
+        "end": 71
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Sub",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 115,
+        "end": 284
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Sub.go()",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 243,
+        "end": 282
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::make()",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 887,
+        "end": 947
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::Choice",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 35,
+        "end": 75
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::cases(_:)",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 514,
+        "end": 616
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::caught()",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 431,
+        "end": 512
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::closures(_:)",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 77,
+        "end": 168
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::error()",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 18,
+        "end": 33
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::guarded(_:)",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 257,
+        "end": 347
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::loops(_:)",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 349,
+        "end": 429
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::optionals(_:)",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 170,
+        "end": 255
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::shadow()",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 0,
+        "end": 16
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::work()",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 618,
+        "end": 639
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/main.swift::main",
+      "span": {
+        "path": "Sources/main.swift",
+        "start": 0,
+        "end": 105
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/conformance::Sources/App.swift::Cli.main()::print#0",
+      "caller": "example.com/acme/conformance::Sources/App.swift::Cli.main()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/App.swift",
+        "start": 52,
+        "end": 75
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App.swift::Cli.main()::render#0",
+      "caller": "example.com/acme/conformance::Sources/App.swift::Cli.main()",
+      "target": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::render(count:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/App.swift",
+        "start": 58,
+        "end": 74
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Handler.swift::Ship#0",
+      "caller": "example.com/acme/conformance::Sources/Handler.swift",
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Ship",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Handler.swift",
+        "start": 40,
+        "end": 46
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Handler.swift::run()::session.place#0",
+      "caller": "example.com/acme/conformance::Sources/Handler.swift::run()",
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Store.place()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Handler.swift",
+        "start": 87,
+        "end": 102
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Handler.swift::session.place#0",
+      "caller": "example.com/acme/conformance::Sources/Handler.swift",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ],
+      "span": {
+        "path": "Sources/Handler.swift",
+        "start": 51,
+        "end": 66
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:)::Item#0",
+      "caller": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 97,
+        "end": 113
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)::Array#0",
+      "caller": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 309,
+        "end": 333
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)::all.prefix#0",
+      "caller": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 315,
+        "end": 332
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)::load#0",
+      "caller": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)",
+      "target": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 218,
+        "end": 234
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)::print#0",
+      "caller": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 272,
+        "end": 283
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)::report#0",
+      "caller": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)",
+      "target": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 243,
+        "end": 293
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)::Item#0",
+      "caller": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 409,
+        "end": 424
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)::Item#1",
+      "caller": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 502,
+        "end": 517
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)::format#0",
+      "caller": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 395,
+        "end": 426
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)::item.display#0",
+      "caller": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.display()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 466,
+        "end": 480
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)::render#0",
+      "caller": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 402,
+        "end": 425
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)::render#1",
+      "caller": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Loading/FileLoader.swift",
+        "start": 495,
+        "end": 518
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.Size.doubled()::scaled#0",
+      "caller": "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.Size.doubled()",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.Size.scaled(by:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Model/Item+Display.swift",
+        "start": 145,
+        "end": 158
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.display()::label#0",
+      "caller": "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.display()",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Model/Item+Display.swift",
+        "start": 63,
+        "end": 70
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Model/Item.swift::render(_:)::item.label#0",
+      "caller": "example.com/acme/conformance::Sources/Model/Item.swift::render(_:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Model/Item.swift",
+        "start": 357,
+        "end": 369
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Model/Item.swift::renderAll()::render#0",
+      "caller": "example.com/acme/conformance::Sources/Model/Item.swift::renderAll()",
+      "target": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::render(count:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Model/Item.swift",
+        "start": 400,
+        "end": 416
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Page+Show.swift::Page.build()::Item#0",
+      "caller": "example.com/acme/conformance::Sources/Page+Show.swift::Page.build()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Page+Show.swift",
+        "start": 106,
+        "end": 112
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Page+Show.swift::Page.show(_:)::item.label#0",
+      "caller": "example.com/acme/conformance::Sources/Page+Show.swift::Page.show(_:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Page+Show.swift",
+        "start": 55,
+        "end": 67
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::generic(_:)::item.label#0",
+      "caller": "example.com/acme/conformance::Sources/Receivers.swift::generic(_:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 592,
+        "end": 604
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::hidden(_:_:)::item.display#0",
+      "caller": "example.com/acme/conformance::Sources/Receivers.swift::hidden(_:_:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.display()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 333,
+        "end": 347
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::hidden(_:_:)::item.label#0",
+      "caller": "example.com/acme/conformance::Sources/Receivers.swift::hidden(_:_:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 284,
+        "end": 296
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::hidden(_:_:)::items.forEach#0",
+      "caller": "example.com/acme/conformance::Sources/Receivers.swift::hidden(_:_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 301,
+        "end": 353
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)::file.load#0",
+      "caller": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)",
+      "target": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 153,
+        "end": 173
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)::file.load#1",
+      "caller": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)",
+      "target": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 178,
+        "end": 208
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)::loader.load#0",
+      "caller": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Loader.load(from:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 126,
+        "end": 148
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)::name.label#0",
+      "caller": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 92,
+        "end": 104
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)::name.shout#0",
+      "caller": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)",
+      "target": "example.com/acme/conformance::Sources/Receivers.swift::String.shout()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 109,
+        "end": 121
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)::size.scaled#0",
+      "caller": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.Size.scaled(by:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 213,
+        "end": 231
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::rebound(_:)::item.label#0",
+      "caller": "example.com/acme/conformance::Sources/Receivers.swift::rebound(_:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 433,
+        "end": 445
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::typed(_:)::FileLoader#0",
+      "caller": "example.com/acme/conformance::Sources/Receivers.swift::typed(_:)",
+      "target": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 493,
+        "end": 505
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::typed(_:)::item.label#0",
+      "caller": "example.com/acme/conformance::Sources/Receivers.swift::typed(_:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 537,
+        "end": 549
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Receivers.swift::typed(_:)::loader.report#0",
+      "caller": "example.com/acme/conformance::Sources/Receivers.swift::typed(_:)",
+      "target": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Receivers.swift",
+        "start": 510,
+        "end": 532
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Base::Store#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Base",
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Store",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 104,
+        "end": 111
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)::Store#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)",
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Store",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 626,
+        "end": 633
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)::ship.place#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ],
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 646,
+        "end": 658
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)::ship.place#1",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ],
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 677,
+        "end": 689
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Desk::Ship#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Desk",
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Ship",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 536,
+        "end": 542
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Gone.go()::store.place#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Gone.go()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ],
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 479,
+        "end": 492
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Gone::Ship#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Gone",
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Ship",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 419,
+        "end": 425
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Gone::store.place#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Gone",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ],
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 434,
+        "end": 447
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Page.own()::Item#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Page.own()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 748,
+        "end": 754
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Shelf.stock(_:)::item.label#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Shelf.stock(_:)",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 865,
+        "end": 877
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Sub.go()::store.place#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Sub.go()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ],
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 263,
+        "end": 276
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Sub::Ship#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Sub",
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Ship",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 185,
+        "end": 191
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::Sub::store.place#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::Sub",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ],
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 200,
+        "end": 213
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::make()::Item#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::make()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 922,
+        "end": 928
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Scopes.swift::make()::item.label#0",
+      "caller": "example.com/acme/conformance::Sources/Scopes.swift::make()",
+      "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Scopes.swift",
+        "start": 933,
+        "end": 945
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Session.swift::Store#0",
+      "caller": "example.com/acme/conformance::Sources/Session.swift",
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Store",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Session.swift",
+        "start": 14,
+        "end": 21
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::cases(_:)::shadow#0",
+      "caller": "example.com/acme/conformance::Sources/Shadows.swift::cases(_:)",
+      "target": "example.com/acme/conformance::Sources/Shadows.swift::shadow()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 600,
+        "end": 608
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::caught()::error#0",
+      "caller": "example.com/acme/conformance::Sources/Shadows.swift::caught()",
+      "target": "example.com/acme/conformance::Sources/Shadows.swift::error()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 497,
+        "end": 504
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::caught()::work#0",
+      "caller": "example.com/acme/conformance::Sources/Shadows.swift::caught()",
+      "target": "example.com/acme/conformance::Sources/Shadows.swift::work()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 468,
+        "end": 474
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::closures(_:)::list.forEach#0",
+      "caller": "example.com/acme/conformance::Sources/Shadows.swift::closures(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 119,
+        "end": 166
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::closures(_:)::shadow#0",
+      "caller": "example.com/acme/conformance::Sources/Shadows.swift::closures(_:)",
+      "target": "example.com/acme/conformance::Sources/Shadows.swift::shadow()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 152,
+        "end": 160
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::guarded(_:)::shadow#0",
+      "caller": "example.com/acme/conformance::Sources/Shadows.swift::guarded(_:)",
+      "target": "example.com/acme/conformance::Sources/Shadows.swift::shadow()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 337,
+        "end": 345
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::loops(_:)::shadow#0",
+      "caller": "example.com/acme/conformance::Sources/Shadows.swift::loops(_:)",
+      "target": "example.com/acme/conformance::Sources/Shadows.swift::shadow()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 413,
+        "end": 421
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Shadows.swift::optionals(_:)::shadow#0",
+      "caller": "example.com/acme/conformance::Sources/Shadows.swift::optionals(_:)",
+      "target": "example.com/acme/conformance::Sources/Shadows.swift::shadow()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Shadows.swift",
+        "start": 239,
+        "end": 247
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/main.swift::main::FileLoader#0",
+      "caller": "example.com/acme/conformance::Sources/main.swift::main",
+      "target": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader",
+      "level": "exact",
+      "span": {
+        "path": "Sources/main.swift",
+        "start": 13,
+        "end": 25
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/main.swift::main::loader.load#0",
+      "caller": "example.com/acme/conformance::Sources/main.swift::main",
+      "target": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/main.swift",
+        "start": 38,
+        "end": 80
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/main.swift::main::print#0",
+      "caller": "example.com/acme/conformance::Sources/main.swift::main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/main.swift",
+        "start": 81,
+        "end": 104
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/main.swift::main::render#0",
+      "caller": "example.com/acme/conformance::Sources/main.swift::main",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Model/Item+Display.swift::render(_:)",
+        "example.com/acme/conformance::Sources/Model/Item.swift::render(_:)"
+      ],
+      "span": {
+        "path": "Sources/main.swift",
+        "start": 87,
+        "end": 103
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [],
+  "communities": [
+    {
+      "name": "Sources",
+      "members": [
+        "example.com/acme/conformance::Sources/App.swift::Cli.main()",
+        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::render(count:)",
+        "example.com/acme/conformance::Sources/Model/Item.swift::renderAll()"
+      ]
+    },
+    {
+      "name": "Sources#2",
+      "members": [
+        "example.com/acme/conformance::Sources/Handler.swift::run()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ]
+    },
+    {
+      "name": "Sources#3",
+      "members": [
+        "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.display()",
+        "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
+        "example.com/acme/conformance::Sources/Model/Item.swift::render(_:)",
+        "example.com/acme/conformance::Sources/Page+Show.swift::Page.show(_:)",
+        "example.com/acme/conformance::Sources/Receivers.swift::generic(_:)",
+        "example.com/acme/conformance::Sources/Receivers.swift::hidden(_:_:)",
+        "example.com/acme/conformance::Sources/Receivers.swift::rebound(_:)",
+        "example.com/acme/conformance::Sources/Scopes.swift::Shelf.stock(_:)",
+        "example.com/acme/conformance::Sources/Scopes.swift::make()"
+      ]
+    },
+    {
+      "name": "Sources#4",
+      "members": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Base",
+        "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store"
+      ]
+    },
+    {
+      "name": "Sources#5",
+      "members": [
+        "example.com/acme/conformance::Sources/Scopes.swift::Desk",
+        "example.com/acme/conformance::Sources/Scopes.swift::Gone",
+        "example.com/acme/conformance::Sources/Scopes.swift::Ship",
+        "example.com/acme/conformance::Sources/Scopes.swift::Sub"
+      ]
+    },
+    {
+      "name": "Sources#6",
+      "members": [
+        "example.com/acme/conformance::Sources/Shadows.swift::cases(_:)",
+        "example.com/acme/conformance::Sources/Shadows.swift::closures(_:)",
+        "example.com/acme/conformance::Sources/Shadows.swift::guarded(_:)",
+        "example.com/acme/conformance::Sources/Shadows.swift::loops(_:)",
+        "example.com/acme/conformance::Sources/Shadows.swift::optionals(_:)",
+        "example.com/acme/conformance::Sources/Shadows.swift::shadow()"
+      ]
+    },
+    {
+      "name": "Sources#7",
+      "members": [
+        "example.com/acme/conformance::Sources/Shadows.swift::caught()",
+        "example.com/acme/conformance::Sources/Shadows.swift::error()",
+        "example.com/acme/conformance::Sources/Shadows.swift::work()"
+      ]
+    },
+    {
+      "name": "Sources/Loading",
+      "members": [
+        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader",
+        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:)",
+        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)",
+        "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)",
+        "example.com/acme/conformance::Sources/Model/Item.swift::Item",
+        "example.com/acme/conformance::Sources/Receivers.swift::typed(_:)",
+        "example.com/acme/conformance::Sources/main.swift::main"
+      ]
+    },
+    {
+      "name": "Sources/Model",
+      "members": [
+        "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.Size.doubled()",
+        "example.com/acme/conformance::Sources/Model/Item.swift::Item.Size.scaled(by:)",
+        "example.com/acme/conformance::Sources/Model/Item.swift::Loader.load(from:)",
+        "example.com/acme/conformance::Sources/Receivers.swift::String.shout()",
+        "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)"
+      ]
+    }
+  ],
+  "links": [],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/conformance::Sources/App.swift::Bare",
+      "kind": "program",
+      "label": "Bare",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/App.swift::Bare"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/App.swift::Cli.main()",
+      "kind": "program",
+      "label": "Cli.main()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/App.swift::Cli.main()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::render(count:)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/main.swift::main",
+      "kind": "program",
+      "label": "main",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/main.swift::main"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:)"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Model/Item.swift::Item"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Model/Item.swift::Item",
+          "mark": "seen"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.display()"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/main.swift::main::render#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::Sources/Model/Item+Display.swift::render(_:)",
+            "example.com/acme/conformance::Sources/Model/Item.swift::render(_:)"
+          ]
+        }
+      ]
+    }
+  ]
+}

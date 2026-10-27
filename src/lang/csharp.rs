@@ -491,6 +491,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 .map(|(name, _, binds)| Param {
                     name,
                     binds,
+                    label: None,
                     default: None,
                     fields: Vec::new(),
                 })
@@ -1645,6 +1646,7 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
         scope: scope.to_string(),
         callee,
         arity: None,
+        labels: None,
         constructs: false,
         range,
         args: Vec::new(),
@@ -2036,6 +2038,7 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 callee,
                 receiver: receiver.map(Box::new),
                 args,
+                kwargs: Vec::new(),
                 range: node.byte_range(),
             })
         }

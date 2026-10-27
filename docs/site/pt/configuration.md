@@ -53,3 +53,8 @@ Em C#, a URL base pode vir de `Environment.GetEnvironmentVariable("X")` ou de `c
 ## Pacotes NuGet
 
 Os contratos de pacotes NuGet são descobertos nos `.csproj` com SDK. Não precisam de chave extra no `meada.toml`: um `PackageReference` liga ao provedor pelo id, e um `ProjectReference` pelo caminho do arquivo do projeto, que alcança um projeto de outro repositório pelas raízes dos repositórios do workspace (declare-o em `[[peer]]`). Valores de propriedade como `$(Version)` ficam sem avaliar.
+
+## Pacotes Swift
+
+Os contratos de pacote Swift são descobertos no `Package.swift`. Não precisam de chave nova no `meada.toml`: um `.package(url:)` liga ao repositório do workspace de mesma identidade de remoto e um `.package(path:)` ao repositório nesse caminho, que precisa ser um `[[peer]]` do workspace quando é outro repositório. Use URLs, caminhos e nomes literais para ligações `exact`.
+

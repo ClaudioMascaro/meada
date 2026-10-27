@@ -115,6 +115,7 @@ impl LanguagePack for TsJs {
                         };
                         facts.calls.push(Call {
                             arity: None,
+                            labels: None,
                             constructs: false,
                             scope: scope.clone(),
                             callee: callee(function, src),
@@ -547,6 +548,7 @@ fn params(node: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Param> {
         return vec![Param {
             name: text(list, src).to_string(),
             binds: Binds::Any,
+            label: None,
             default: None,
             fields: Vec::new(),
         }];
@@ -571,6 +573,7 @@ fn params(node: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Param> {
                     .map_or("", |n| text(n, src))
                     .to_string(),
                 binds: Binds::Any,
+                label: None,
                 default: default.map(|d| value(d, src, scope, up)),
                 fields: pattern
                     .filter(|n| n.kind() == "object_pattern")
@@ -841,6 +844,7 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
                         callee: callee(f, src),
                         receiver,
                         args: args.map_or(Vec::new(), |a| named(a).map(deeper).collect()),
+                        kwargs: Vec::new(),
                         // The span of the call in `Facts::calls`.
                         range: match awaited_artifact(node) {
                             true => f.start_byte()..node.end_byte(),

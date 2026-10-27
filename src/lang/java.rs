@@ -8,7 +8,7 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Annotated, Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
-    LanguagePack, Layout, Marked, Modules, Param, Part, Receiver, children, named, text,
+    LanguagePack, Layout, Marked, Modules, Param, Part, Receiver, children, named, text, wildcard,
 };
 use crate::{Result, qualify};
 
@@ -307,6 +307,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 .map(|(name, _, _)| Param {
                     name,
                     binds: Binds::Any,
+                    label: None,
                     default: None,
                     fields: Vec::new(),
                 })
@@ -814,24 +815,6 @@ fn import(node: Node, src: &[u8], facts: &mut Facts) {
     }
 }
 
-fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
-    let alias = format!("@glob{}", facts.imports.len());
-    facts.imports.push(Import {
-        local: alias.clone(),
-        source: source.to_string(),
-        name: Imported::Namespace,
-    });
-    facts.imports.push(Import {
-        local: "*".into(),
-        source: String::new(),
-        name: Imported::Glob {
-            path: alias,
-            inside,
-            public: false,
-        },
-    });
-}
-
 /// What the constructor `node` of `class` assigns to fields (`this.f = v`, or `f = v` when no
 /// parameter is `f`), by class and field. Lambdas and class bodies inside assign none of them.
 // ponytail: a local of the constructor named like a field and assigned with `f = v` counts as
@@ -977,6 +960,7 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
         scope: scope.to_string(),
         callee,
         arity: None,
+        labels: None,
         constructs: false,
         range,
         args: Vec::new(),
@@ -1195,6 +1179,7 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 .child_by_field_name("object")
                 .map(|n| Box::new(value(n, src, depth + 1))),
             args: arguments(node, src, depth + 1),
+            kwargs: Vec::new(),
             range: node.byte_range(),
         }),
         "object_creation_expression" => node

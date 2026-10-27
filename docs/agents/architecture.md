@@ -764,7 +764,7 @@ one for the area a change touches.
   one, never a missing or empty file; `refresh` stays one transaction in place. An operator
   renames an index in (built elsewhere) only while no `meada index` writes that index, one
   writer per index: a refresh's live `index.db-journal` would be taken for the new file's. `lang/`: the
-  language adapter and the TS/JS, Python, Rust, Go, Java, Kotlin and C# packs. `resolve.rs`: calls to definitions (`Resolver`), values
+  language adapter and the TS/JS, Python, Rust, Go, Java, Kotlin, C# and Swift packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`: `Code::origins`, the one origin question, with three evidence policies
   (`Values`, `Constants` for the TypeScript forms, `Declarations` for Go's typed clients and
   forms), `Code::outside` for what an import from outside binds a name to, `Code::extensions`
@@ -787,9 +787,11 @@ one for the area a change touches.
   providers, and `http/kotlin/client.rs`, Ktor client consumers; `http/csharp.rs`, ASP.NET Core
   controller providers, `http/csharp/minimal.rs`, minimal API providers,
   `http/csharp/clients.rs`, HttpClient and typed client consumers, and `http/csharp/refit.rs`,
-  Refit consumers), resource and channel
-  kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go, Maven and NuGet packages as
-  contracts (specs #22, #24, #30, #25, #26 and #28), the shared steps and one module per ecosystem behind
+  Refit consumers; `http/swift.rs`, `http/swift/vapor.rs`, Vapor providers, `http/swift/hummingbird.rs`,
+  Hummingbird providers, and `http/swift/client.rs`, URLSession,
+  Alamofire and AsyncHTTPClient consumers), resource and channel
+  kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go, Maven, NuGet and SwiftPM packages as
+  contracts (specs #22, #24, #30, #25, #26, #28 and #29), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `literals.rs`, `zod.rs` (and `meada-core`'s `shape.rs`): OpenAPI and AsyncAPI
@@ -839,7 +841,8 @@ one for the area a change touches.
   `package::cargo::<name>` (the `[package] name`; a dependent's site names the key it writes, so
   a renamed crate has its own site) or `package::go::<module path>` (the `module` of a `go.mod`), or
   `package::maven::<group>:<artifact>` (a Maven or Gradle artifact) or `package::nuget::<id>` (an
-  SDK-style `.csproj`: its `PackageId`, else `AssemblyName`, else file name),
+  SDK-style `.csproj`: its `PackageId`, else `AssemblyName`, else file name) or
+  `package::swiftpm::<name>` (a `Package.swift`: the literal of `Package(name:)`),
   provided at `<repository>::<manifest path>` (such as `example.com/pkg/shared::package.json` or
   `example.com/pkg/pylib::pyproject.toml`) and consumed at `<repository>::<manifest
   path>::<field>::<name>` (PyPI fields: `project.dependencies`, `tool.poetry.dependencies`, and
@@ -1203,7 +1206,7 @@ one for the area a change touches.
   `xlang-kotlin` one a TypeScript producer reaching a Kotlin `@KafkaListener`.
 - New **package ecosystem** (spec #22 user story 26, spec #225; track B packs): implement the
   `Ecosystem` trait of `package.rs` in a module of its own under `package/` (`npm`, `pypi`,
-  `cargo`, `go`, `maven`, `nuget` today) and add it to `ECOSYSTEMS`; the package kind, the index writer
+  `cargo`, `go`, `maven`, `nuget`, `swiftpm` today) and add it to `ECOSYSTEMS`; the package kind, the index writer
   and the packs learn no name. An arm for one ecosystem added to the shared code is a finding. It plugs
   in another manifest format (`Cargo.toml`, `go.mod`) without a new kind of contract: the
   contract `package::<name>::<package>` (`Ecosystem::prefix`, derived from `name`) still routes
@@ -1233,7 +1236,7 @@ one for the area a change touches.
     spelling of the one provider whose id differs by case only, before `consume` reads them,
     each by one folded-location map (linear in the manifests).
   - `fits`: literal package-name equality; Maven matches the literal fragments of a computed
-    coordinate. `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
+    coordinate (`pattern_fits`). `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
   - `flag`: the range is unchecked (`range unchecked`); npm checks semver.
   - `reaches`: every provider; npm's `workspace:` keeps the dependent's own repository, Cargo
     and Go share `sourced`, in the seam (a `path` by the folded location, a `git` by the
@@ -1291,6 +1294,41 @@ one for the area a change touches.
     a call through a package (`var o = Order.Of(1); o.Total()`) is not followed (the return
     type lives in the provider's index; Java has the same gap), and two projects in one
     directory share it (the first by path owns the files).
+    SwiftPM (spec #29, #124; `package/swiftpm.rs`) reads `Package.swift` with
+    `package/swiftpm/manifest.rs` (`package`: the `Package(name:)` literal, `.library` products
+    with their literal target names, and `.package(url:|path:, ..)` dependencies with their
+    requirement, walked in source order on an explicit stack), the PackageDescription forms, on
+    the grammar readers of the pack's `lang/swift/manifest.rs` (`call`, `pattern`, `literal`,
+    beside the `targets` the pack's layout reads), so there is one manifest reader.
+    `Summary::products` and `Summary::targets` (module, directory) record what an import can
+    name. An entry's `via` is `git <identity>` (`normalize_remote`, from the root manifest only),
+    `path <dir>/Package.swift` (`sourced`) or, for a URL or path with an interpolation, `computed
+    git|path <pattern>` (holes written `*`, matched with `package::pattern_fits`, so the dependency is
+    `ambiguous` and lists every provider whose literal parts fit). An uncertain entry's name always
+    carries a `*` (`marked`), even when folding took the computed part out of the location (a
+    userinfo, a port, a `..`), since `fits` tells an uncertain entry by it; a computed path
+    that folds to a first part of its own is held to its repository (`./*`), one that starts
+    computed is not placed. A package whose `name:` is computed is a provider named by its
+    pattern (`*`, `Kit*`); `settle` gives each literal entry the provider's name from its
+    location, and turns the entry into the `computed` form of its source when that name has a
+    `*`, so it links `ambiguous`. A `path:` to the repository's own root is an entry named `.`.
+    `imports` turns a call into `(module, Type.member(labels))`: the receiver's written type
+    (`Code::origins`, `Follow::Declarations`) or the construction a local holds
+    (`Follow::Values`, one origin, no steps), else `Code::outside`'s candidates; the lookup
+    reads the provider's `exported` rows (a public name only, an overload family has no target)
+    and narrows by labels from the symbol id plus its `Flexible` argument counts, with the
+    resolver's matcher (`resolve::labelled`), each parameter one the call may leave out (and,
+    for a function with a variadic one, each variadic), since which have defaults is not
+    stored. `resolve` is `exact` for one exposing target and `ambiguous` for several; the level
+    of every link of an import is `ambiguous` when several packages the file depends on expose
+    the module, whether or not each declares the name (`Swiftpm::exposing`, on the entries and the
+    providers they reach that `resolutions_by_ways` walks, `reachable`). `How::Module`,
+    `; import module`; the platform modules (`PLATFORM`) are never
+    followed. Ceilings: every dependency of the nearest `Package.swift` counts for the files
+    below it (not only a target's `.product(name:package:)`), an `internal` member of a public
+    type, an inherited member and an extension of another module are not told apart, and the
+    `Flexible` counts do not say which parameter is optional, so a call that skips a required
+    parameter and keeps an optional one still fits.
     `member_of`: none; Maven's and NuGet's
     constructors and methods of a class (a companion's too), so `context` on a public class
     lists, once per call, the calls that reach its members (`reached`, at the best level of the
@@ -1663,7 +1701,10 @@ one for the area a change touches.
   target; Go `func main` in package `main`; Java `public static void main(String[])`; Kotlin a
   top-level `fun main`; C# a `static Main` (any signature) and, for top-level statements, a
   symbol `Main` (none when the file declares a global type `Main`, which would share it); Swift
-  an `@main` type and `main.swift` as symbol `main`; Rust `fn main` in `src/main.rs` and
+  an `@main` type (its `main()` method when the type declares one, the type otherwise) and
+  `main.swift` as symbol `main` (spec #29, #123: the statements of the file, and the
+  initializers of its top-level `let`/`var`, are scoped `main`, so their calls belong to it;
+  the bindings and constants themselves stay globals of the module); Rust `fn main` in `src/main.rs` and
   `src/bin/`. TS/JS declares none.
   A pack whose files bind names another file writes (C#'s `global using` directives, and the
   `<Using>` items and implicit usings of a project file, which apply to every file of the
@@ -1686,6 +1727,107 @@ one for the area a change touches.
   classes declared in that namespace alone (`Binding::of_namespace`), since a C# file's group
   is its first namespace's and it may declare types in another; the C# layout names such a file
   for each other namespace it declares types in, when no file has that namespace as package.
+  A pack whose type names carry no namespace turns that check off (`LanguagePack::namespaced`,
+  false for Swift: a module is no part of its types' names).
+  The Swift pack (spec #29, #117; `lang/swift.rs`) reads `Package.swift` with the same grammar
+  (`lang/swift/manifest.rs`: every `.target`, `.executableTarget`, `.testTarget`, `.macro` and
+  `.plugin` call with a literal `name:` outside a `dependencies:` argument, under its literal
+  `path:` inside the package or the default directory) as a config file (`**/Package.swift`,
+  no code: `is_code`). Each target is a module of the files under its directory, the deepest
+  one when several hold a file (looked up by the file's directories, so the cost is the path's
+  depth), and the files no target holds (all of them without a manifest) are one module no
+  import names. The layout shares a module's scope among its files (`Layout::shared`), whose
+  top-level overload families are one family across its files (`Group::families`,
+  `Resolver::family_at`), and names it by its first file; `join` sets each file's
+  `Facts::unit` to its module, so `internal` declarations (`Facts::private`) stay in it
+  (`Resolver::hidden`), and appends the module's own inside glob after the imports, so its
+  names come before an import's. `import M` is a namespace import of `M` and an outside glob
+  of it, which takes `M`'s public names (`Facts::star`). A function's name carries its
+  argument labels (`place(order:quantity:)`, `init(baseURL:)`, `_` for none); declarations of
+  one scope in a file (a type's body and its extensions alike) with the same labels and other
+  types carry each label's written type too (`audit(_:Order)`): `parse` walks the file twice,
+  the first time to find them. Each `Param::label` and each `Call::labels` (`_` for an
+  unlabelled argument, empty for a trailing closure) is kept with the facts, and `Arity`
+  narrows an overload family by them (`labelled`: in order, past parameters with a default
+  value, a variadic one taking the unlabelled arguments after its first, a trailing closure any
+  label), so a tie is `ambiguous` with each overload. An extension is no definition but a
+  `Facts::impls` block of the extended type, one more per protocol it writes (`Impl::of`).
+  `Resolver::overloaded` reads one level per class of the family, the class with its blocks in
+  any file (two declarations of one signature there are two overloads, but for a protocol a
+  block's member of a requirement's signature is its default body), then one level per
+  protocol a block conforms to, with that protocol's inherent blocks; a signature an earlier
+  level declares overrides a later one. A protocol from outside the repository a block conforms
+  to makes the family opaque (`Resolver::opaque`, which `inherited` and `matched` read as an
+  opaque base). A protocol extension's member of the requirement's signature in the
+  requirement's file is that one definition. A capitalized callee (`Order(id:)`,
+  `Order.Line()`) constructs (`Call::constructs`): the type's initializers in its body and its
+  blocks (`Facts::constructors`, also the family `Type.init` for `self.init(..)`), or the type
+  itself when it declares none (a memberwise initializer). Bare calls are Kotlin's
+  (`bare_calls`).
+  The values the contract kinds read (spec #29, #119; `lang/swift/values.rs`) are written for
+  each call: its receiver (`a.b` of `a.b.f()`), its arguments (a label makes a keyword
+  argument, `get("users", use: list)`, a trailing closure the last positional one), a string as
+  its parts (an interpolated name a `Part::Ref`, any other expression or an escape a hole), a
+  name or a member chain as `Value::Ref`, an implicit member as `Value::Member` with no type
+  (`.post`), a postfix `!` as its target, `a + b` as a string of both, an array as a list and a
+  call as `Value::Call` (its labelled arguments in `Invocation::kwargs`, spec #29, #121), read to
+  `VALUE_DEPTH` (32).
+  `ProcessInfo.processInfo.environment["X"]` (spec #29, #122) is `Str([Env(X)])` (`subscript_read`),
+  through a postfix `!`, parentheses, `trimmingCharacters`, `replacingOccurrences`, `lowercased`
+  and `uppercased` (an argument that may read again, a read, a hole or a name of the code but not
+  a type's member such as `CharacterSet.whitespaces`, makes a hole), and a `??` whose fallback is a
+  text-only literal (any other fallback is a `Hole`: which value is the base is unknown); it
+  is also the one value an interpolation may hold besides a name. The pack decides by the
+  spelling alone, as Go's and Rust's do; a repository type named `ProcessInfo` is not looked for. Vapor's
+  `Environment.get` and an optional binding are no reads. `http` takes the leading `Env` as the
+  `base_url_env` variable, as for every language. A closure written in code (not in a
+  type's property initializer) is a `Kind::Inline` definition named `<scope>.@<offset>`, and the
+  calls and names inside it belong to that scope. `Facts::bound` holds a `let` or `var` of one name given
+  a call, a name or a string (#121), and drops the name when another binding of the
+  function (a loop variable, an `if let`, a `guard let`, a `catch`, a `case let`, a `var` or
+  another `let` in a block) also declares it, when its function (or a closure in it) assigns it
+  (`x = ..`, `&x`) or calls a method on a `var` of the name that holds a string, a name or a URL
+  (`url.appendPathComponent(..)` changes it in place); a global `var` is not bound, since
+  another file of the module may assign it; a top-level or type-level `let` is a `Const` (qualified by its type) holding its
+  initializer, and a binding in a block of the top level is a local, not a global. A member
+  assigned through a local that holds a call (`request.httpMethod = "POST"`) is a `<member>=`
+  keyword argument of that call, when it is a plain `=` in the function's own statements or in a
+  `do` block that is one (not in an `if`, a loop, a `catch` or a closure); written twice, or
+  where it may not run, it is `Value::Unknown`.
+  `Def::return_values` holds each `return` and the one expression of a function that writes a
+  result type. `Code::arg` matches the labels of a call to the parameters' with the matcher
+  `labelled` decides the fit with (`labelled_args`, one table of which parameters take which
+  arguments): an unlabelled argument takes a parameter written `_`, a labelled one a parameter
+  of its label, a parameter that may be left out gives its label to a later one when the call
+  fits no other way, and the first trailing closure takes the first parameter that cannot be
+  left out; a trailing closure after the first (`f { } other: { }`) is not bound.
+  Method calls on a receiver (spec #29, #118) use the seams Java's and C#'s do, with no new
+  one. The pack writes `Facts::receivers` from the written type of a stored property, a
+  parameter (scope: the function's labelled name) and a `let` or `var` of code or the top level
+  (`Class::Type`; `T?`, `any P` and `some P` are `T` and `P`; an array, tuple, function type,
+  variadic or type parameter is no class). A function's own type parameters are read while
+  parsing; those of a type and the associated types of a protocol are `Def::type_params`, and
+  `join` unsets the class of a receiver scoped in the type or in an extension of it, in any
+  file, whose type is named alike; a call `T()` of such a name constructs nothing
+  (`Call::constructs` unset, here and in `parse`). A `let` or `var` of code is a receiver only directly in the
+  body of a function, method or initializer (or at the top level of a file): in a nested
+  block, a closure, an accessor, a deinitializer or a subscript it only hides its name
+  (`Facts::locals`), since its scope is the function's, the type's or the file's and the name
+  would reach code outside it. Without a written type, the class is the one an initializer
+  constructs (`Type(..)`, through `try` and `await`: `Class::Named`). A name bound twice in a scope with two classes, or also
+  by a binding with no written class (`Facts::locals`: an `if let` or `guard let`, a `for` or
+  `case` pattern, or a closure parameter, whose scope is the closure's own), is unknown for the
+  whole scope. `member` walks the
+  family and its blocks upward only, so a protocol-typed receiver stops at the requirement, and
+  the labels narrow as they do for a bare call. A receiver of unread type (a call result, a
+  closure parameter, an element) is the name match `matched` makes by base name and labels. A
+  type from outside the repository (Opaque outside, `LanguagePack::outside_blocks`): a receiver
+  whose written or constructed type nothing in the repository binds (`session: URLSession`, a
+  standard-library type too), or a capitalized name nothing binds (`AF.request`), matches the
+  members of that type's extensions in the repository alone (`Resolver::outside_type`), and a
+  call past a member read on such a name (`URLSession.shared.data(..)`) resolves to nothing.
+  Ceiling: a receiver whose value comes from outside but whose type the source does not write
+  (`let session = URLSession.shared`, a `var` assigned again) keeps the name match.
   C# method calls (spec #28, #108) use the seams Java's do and add none but one flag. The pack
   writes `Facts::receivers` from the declared type of a field, a property, a parameter
   (primary constructors' too), a local with an explicit type, a `foreach`, `out` or pattern
@@ -1772,8 +1914,9 @@ one for the area a change touches.
   unreadable one, is rebuilt beside it and renamed over it, and `status` says so. One whose stored facts do not
   parse is rebuilt by the first refresh that reads them (when a file changed), which `status`
   cannot tell.
-- The index holds no source text and no values, apart from the argument count and constructor
-  form of an overloaded call (`Call::arity`, `Call::constructs`), the place of the call a
+- The index holds no source text and no values, apart from the argument count, the argument
+  labels and constructor form of an overloaded call (`Call::arity`, `Call::labels`,
+  `Call::constructs`) and the argument label of a parameter (`Param::label`), the place of the call a
   chained call is made on (`Call::on`), whether an `inferred` call was narrowed from several
   definitions of its name (`calls.narrowed`), callable-to-signature and
   static-member names (`Facts::overloads`, `Facts::constructors` and
@@ -1813,9 +1956,14 @@ one for the area a change touches.
   literal version, each `PackageReference` with its range as written, each `ProjectReference`
   as a `path` folded from the project's directory, each with `Entry::private` when it does not
   pass on (#369), the package properties as written (`Summary::properties`, #381), and
-  `Summary::project`, the mark that it is an SDK-style project that owns its files) and of each
+  `Summary::project`, the mark that it is an SDK-style project that owns its files), of each
   `Directory.Build.props` (#381: its `PackageReference`s, its `ProjectReference`s by the path as
-  written, its package properties and the props file it imports, `Summary::import`), the
+  written, its package properties and the props file it imports, `Summary::import`) and of each
+  `Package.swift` (spec #29, #124: the literal name, the library products with the targets each
+  holds, `Summary::products`, each target's module and directory, `Summary::targets`, and each
+  `.package` dependency with its requirement as written as the range and its source as `via`:
+  `git <identity>` of a `url:`, `path <manifest>` of a `path:`, or `computed git <pattern>` and
+  `computed path <pattern>`, with `*` for a computed part), the
   `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition, constant, type or file they name), the `families` table (spec #26: each public
@@ -2017,6 +2165,31 @@ qualification budget does (ADR 0017).
   `Resolver::in_references`), and stays `ambiguous` with several or none, since a project
   not referenced may still be visible through references not read.
 
+- `resolve.rs` (`labelled_args`): `LABELLED_CELLS` (65,536) bounds the pairs of a parameter and
+  an argument the label matcher weighs for one call; a wider call fits no function that labels
+  its parameters, so it resolves by name or to nothing.
+- `lang/swift/values.rs`: `VALUE_DEPTH` (32): a value nested deeper (parentheses, a call chain,
+  an argument inside an argument) is `Value::Unknown`, so a route written under such a chain is
+  served nowhere. The pack's integration tests exceed it.
+- `lang/swift.rs`: `DEFINITION_DEPTH` (128) and `PATH_DEPTH` (256) bound the definitions
+  around a definition and the segments of a callee (past them a body keeps its enclosing
+  symbol and a callee is `(navigation_expression)`); `QUALIFICATION_BYTES` (4 MiB) bounds the
+  enclosing-name bytes a file's definitions, calls and bindings store, past which the file
+  keeps no facts. The pack's unit tests exceed each. Beyond the limits, what the pack leaves out
+  (spec #29, #117): a target's `sources:` and `exclude:`, two packages of the repository that
+  name a target alike (one module), `@testable import` (no `internal` access), a closure,
+  deinitializer, subscript or accessor (their calls and locals are the enclosing symbol's, so
+  an accessor's local hides its name in the whole type), an operator
+  function, enum cases, `Self` as a type's name, a local typed by a call result or a closure
+  parameter's type (#118), a typed local of a nested block, closure or accessor (a name match
+  where Java and C# keep it function-wide), and the
+  protocols a conformed protocol inherits when the conformance is written on an extension. As in Java, an outside base
+  (`NSObject`, `Codable`, a raw value type) keeps a type's own overloads from `exact` (#353).
+- `http/swift/client.rs`: `CLIENT_DEPTH` (8) bounds the locals, properties and constants followed
+  from a call's receiver to a client; past it the receiver is no client and the call is no
+  consumer. The pack's unit tests and the hostile-URL integration test exceed the URL limits
+  (a `+` chain, `appendingPathComponent` chain or nested `URL(string:` past `VALUE_DEPTH` is an
+  unresolved consumer). Beyond the limit, what it leaves out (spec #29, #121): see its entry.
 - `lang/csharp.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the C# pack as they bound the Java pack's, with the same
   outcome past each (a call inside a definition nested too deep is `(opaque).`, resolving to
@@ -2370,6 +2543,55 @@ qualification budget does (ADR 0017).
   reassigned), and so does a group configured through a call outside `CONVENTIONS`; `Map(pattern, handler)`,
   `MapFallback`, `MapHub`, `MapControllers` and `MapRazorPages` are not read, and neither is a
   pattern that does not fold to a literal.
+- `http/swift/vapor.rs` (spec #29, #119): Vapor routes, through the same `Mounts` and `prefixes`
+  and the origins of a builder as `http/csharp/minimal.rs`. A `grouped(..)` call is mounted on
+  the origins of its receiver under its path components (string arguments joined with `/`; one
+  that constructs a value is a middleware and adds none, but `String`, `Substring` and
+  `PathComponent` construct a path, so those and any other unreadable argument serve nothing),
+  and the application is the root: a call that `Vapor.Application` or
+  `Vapor.Application.make` names as the file's imports spell it. `get`, `post`, `put`, `patch`,
+  `delete` and `on(.METHOD, ..)` register a route whose path components are the string
+  arguments (`*` and `**` are one parameter each, `http/swift.rs`), whose handler is the
+  trailing closure (an inline handler) or `use:` (a function; `self.f` is `f` of the type
+  around the route). Vapor calls `boot(routes:)`, so no call binds its parameter:
+  `register(collection: C())` (the type constructed in the argument or in the local it names)
+  mounts `Node::Boot`, the `routes` parameter of `C.boot(routes:)`, on the origins of the
+  builder it is called on, with no segment; a collection registered on two builders serves each
+  route under both. `routes` is followed through a `let` alias and, as any parameter no call
+  binds (`Code::origins_unbound`), through the arguments of exact calls. Ceilings as the
+  minimal APIs': a builder Meada does not read serves nothing (a parameter no call reaches, a
+  `var`, a property), the closure form `group("api") { }` is not read, and a repository past
+  `VAPOR_NODES` (4096) nodes serves nothing. Also: a helper `boot` calls (`mount(routes)`) is
+  followed only when the call is exact, and a call made inside a type of an outside protocol
+  (`RouteCollection` always is) is a name match, so its routes are not served;
+  `grouped(User.authenticator(), User.guardMiddleware())` (a lowercase callee, an unread mount)
+  leaves the routes under it unserved; an inline handler served under two prefixes has one
+  symbol, named by one of them (as in C#); a factory that calls itself serves nothing through
+  it, and a builder it reaches by one origin among others serves its routes under the others.
+- `http/swift/hummingbird.rs` (spec #29, #120): Hummingbird routes, a `Dialect` that
+  `vapor.rs::providers` runs with Vapor's value flow, mounts and handler rules. The root is a
+  call that `Hummingbird.Router` names, the child builder is `group(prefix)` (one optional
+  string), and `on(path, method:)` takes the path first. Ceiling: there is no
+  `RouteCollection`, and a controller's `addRoutes(to:)` is not read, so its routes are not
+  served.
+- `http/swift/client.rs` (spec #29, #121): a call is a consumer when it is `data(from:)` or
+  `data(for:)` on a `URLSession`, `request(_:)` on Alamofire's `AF`, a `Session` or
+  `Session.default`, or `execute(_:..)` on an `HTTPClient`. The receiver counts by its spelling
+  (`URLSession.shared`, `AF`, `HTTPClient.shared`, as the imports spell them), by a written type
+  (`names::typed`) or by a local, property or `let` constant that holds one, followed to
+  `CLIENT_DEPTH` (8) names; a repository type of the same name hides the library's. The call is
+  read whole by `Expand::Chain` as in `http/kotlin/client.rs`, so a wrapper at any depth (the
+  URL, the method or the request a parameter) is a consumer, with cycle detection. The URL is
+  `URL(string:)`, `URL(string:relativeTo:)` (RFC 3986 resolution: the scheme before any `/?#`,
+  network paths, dot segments, the base's query dropped), `appendingPathComponent` (before the
+  query), a literal, an interpolation, a `+` or a `let` constant (`static let` too, from other files and
+  imported modules); a hole the evaluation cannot fold stays a parameter marker, a reference or a
+  base that is a wrapper's parameter is resolved at its call sites, and a URL left unknown is an
+  unresolved consumer. UIKit, AppKit, SwiftUI and Cocoa spell Foundation's names (they re-export it). `URLRequest(url:)` takes its method from an `httpMethod`
+  assignment, `HTTPClientRequest(url:)` from `method`, Alamofire from `method:`; GET when absent.
+  Not read: `dataTask(with:)`, `AF.download` and `AF.upload`, a request mutated through an
+  `inout` or an alias, a request with `url` assigned afterwards (unknown URL), a method that is
+  not one of the HTTP verbs.
 - `http/csharp/clients.rs` (spec #28, #111): an `HttpClient` call is a consumer when its method
   is in `CLIENT_METHODS` (`GetAsync` to `PutAsJsonAsync`) or is `SendAsync`, and its receiver is
   an `HttpClient`: `Code::written` gives the type text written for a field, a parameter or a

@@ -940,6 +940,7 @@ fn result_list(node: Node) -> Option<Node> {
 fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
     Call {
         arity: None,
+        labels: None,
         constructs: false,
         scope: scope.to_string(),
         callee,
@@ -980,6 +981,7 @@ fn params(list: Option<Node>, src: &[u8]) -> Vec<Param> {
             name.to_string()
         },
         binds: Binds::Any,
+        label: None,
         default: None,
         fields: Vec::new(),
     };

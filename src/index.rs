@@ -2702,6 +2702,7 @@ mod tests {
             ("sample.settings.gradle.kts", "settings.gradle.kts"),
             ("sample.csproj", "src/Kit/Kit.csproj"),
             ("sample.Directory.Build.props", "src/Directory.Build.props"),
+            ("sample.Package.swift", "pkg/Package.swift"),
         ] {
             let src = fs::read(tests.join("fixtures/schema").join(name)).unwrap();
             let summary = package::read_manifest(path, &src);

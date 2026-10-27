@@ -3229,7 +3229,7 @@ fn conform(fixture: &str, symbols: &[&str], programs: &[&str], calls: &[Expected
     expected.sort();
     assert_eq!(actual, expected, "definitions of {fixture}");
 
-    let actual: Vec<&str> = (json["processes"].as_array().unwrap().iter())
+    let actual: Vec<&str> = (json["processes"].as_array().into_iter().flatten())
         .filter(|p| p["kind"] == "program")
         .map(|p| p["entry_point"].as_str().unwrap())
         .collect();
@@ -11888,5 +11888,1116 @@ fn go_kafka_writer_topic_written_after_the_literal_is_unresolved() {
     assert_eq!(
         producers,
         pairs(&[("channel::kafka", "writer.go::Produce::w.WriteMessages#0")])
+    );
+}
+
+/// `conform` with owned ids, as the Swift tests build them.
+fn conform_owned(
+    fixture: &str,
+    symbols: &[String],
+    programs: &[&str],
+    calls: &[(String, Option<&str>, Vec<String>)],
+) {
+    let symbols: Vec<&str> = symbols.iter().map(String::as_str).collect();
+    let targets: Vec<Vec<&str>> = (calls.iter())
+        .map(|(_, _, t)| t.iter().map(String::as_str).collect())
+        .collect();
+    let calls: Vec<ExpectedCall> = (calls.iter().zip(&targets))
+        .map(|((id, level, _), targets)| (id.as_str(), *level, targets.as_slice()))
+        .collect();
+    conform(fixture, &symbols, programs, &calls);
+}
+
+/// A SwiftPM repository with two targets (spec #29, #117): each target is a module, a member an
+/// extension declares belongs to the extended type, argument labels tell overloads apart, and
+/// an import reaches the public declarations of the module it names.
+#[test]
+fn swift() {
+    let store = |file: &str, name: &str| format!("Sources/Store/{file}::{name}");
+    let order = |name: &str| store("Order.swift", name);
+    let pricing = |name: &str| store("Order+Pricing.swift", name);
+    let service = |name: &str| store("OrderService.swift", name);
+    let probe = |name: &str| store("Probe.swift", name);
+    let dispatch = |name: &str| store("Dispatch.swift", name);
+    const DISPATCH: &str = "dispatch(parcel:via:other:wrapped:ships:)";
+    let checkout = |file: &str, name: &str| format!("Sources/Checkout/{file}::{name}");
+    let symbols = [
+        order("Order"),
+        order("Order.init(id:)"),
+        order("Order.Line"),
+        order("Order.Line.total()"),
+        order("format(order:)"),
+        order("format(id:)"),
+        order("log(_:)"),
+        order("log(level:)"),
+        pricing("Order.init(json:)"),
+        pricing("Order.price(quantity:)"),
+        pricing("Order.discount(quantity:)"),
+        pricing("Order.Line.doubled()"),
+        service("Notifier"),
+        service("Notifier.notify(order:)"),
+        service("Notifier.notifyAll(orders:)"),
+        service("OrderService"),
+        service("OrderService.init()"),
+        service("OrderService.init(retries:)"),
+        service("OrderService.place(order:)"),
+        service("OrderService.place(order:quantity:)"),
+        service("OrderService.place(_:)"),
+        service("OrderService.audit(_:Order)"),
+        service("OrderService.audit(_:String)"),
+        service("OrderService.audit(_:Bool)"),
+        store("OrderService+Audit.swift", "OrderService.audit(_:)"),
+        service("OrderService.validate(order:)"),
+        service("OrderService.retry(times:_:)"),
+        service("OrderService.run()"),
+        service("Reporter"),
+        service("Reporter.report()"),
+        service("Reporter.summary()"),
+        probe("Pinger"),
+        probe("Pinger.ping()"),
+        probe("Pinger.trace()"),
+        probe("Tracer"),
+        probe("Probe"),
+        probe("Probe.run()"),
+        probe("Bag"),
+        probe("Bag.run()"),
+        probe("describe()"),
+        store("Probe+Tracer.swift", "Probe.trace()"),
+        dispatch("Carrier"),
+        dispatch("Carrier.ship(parcel:)"),
+        dispatch("Parcel"),
+        dispatch("Crate"),
+        dispatch("Truck"),
+        dispatch("Truck.ship(parcel:)"),
+        dispatch("Truck.ship(parcel:fast:)"),
+        dispatch("Truck.load(_:Parcel)"),
+        dispatch("Truck.load(_:Crate)"),
+        dispatch("Boat"),
+        dispatch("Boat.ship(parcel:)"),
+        dispatch("Boat.moor()"),
+        dispatch("Depot"),
+        dispatch("Depot.init(truck:carrier:)"),
+        dispatch(&format!("Depot.{DISPATCH}")),
+        dispatch("Depot.again(lorry:)"),
+        dispatch("Depot.lookup()"),
+        checkout("Checkout.swift", "Checkout"),
+        checkout("Checkout.swift", "Checkout.run()"),
+        checkout("Summary.swift", "summarize()"),
+        checkout("Summary.swift", "log(level:)"),
+        checkout("Routes.swift", "routes(_:)"),
+        checkout("Routes.swift", "routes(_:).GET /"),
+        checkout("Routes.swift", "routes(_:).POST /api/v1/users"),
+        checkout("Routes.swift", "routes(_:).PATCH /api/v1/users/{}/name"),
+        checkout("Routes.swift", "routes(_:).PUT /api/v1/assets/{}"),
+        checkout("Routes.swift", "routes(_:).DELETE /api/v1/assets/{}"),
+        checkout("Routes.swift", "routes(_:).GET /api/v1/admin/tools/ping"),
+        checkout("Routes.swift", "routes(_:).GET /api/v1/shared/hammer"),
+        checkout("Routes.swift", "mountReports(_:)"),
+        checkout("Routes.swift", "sharedTools(_:)"),
+        checkout("Routes.swift", "nest(_:)"),
+        checkout("Routes.swift", "mountAudit(under:)"),
+        checkout("Routes.swift", "mountAudit(under:).GET /api/v1/audit/log"),
+        checkout("Routes.swift", "orphan(_:)"),
+        checkout("Routes.swift", "unlisted(_:)"),
+        checkout("Routes.swift", "nest(_:).GET /loop/leaf"),
+        checkout("Routes.swift", "mount(admin:_:)"),
+        checkout("Routes.swift", "mount(admin:_:).GET /admin/stats"),
+        checkout("Routes.swift", "secured(on:_:)"),
+        checkout("Routes.swift", "secured(on:_:).GET /api/v1/sec/secured"),
+        checkout("Routes.swift", "explicit(_:)"),
+        checkout("Routes.swift", "routes(_:).GET /api/v1/ex/explicit"),
+        checkout("Routes.swift", "routes(_:).GET /guarded"),
+        checkout("Routes.swift", "spin(_:)"),
+        checkout("Routes.swift", "pick(_:)"),
+        checkout("Routes.swift", "pick(_:).GET /pick/one"),
+        checkout("Routes.swift", "shadowedByLet(_:)"),
+        checkout("Routes.swift", "shadowedByLoop(_:)"),
+        checkout("Routes.swift", "shadowedByIf(_:_:)"),
+        checkout("main.swift", "main"),
+        checkout("main.swift", "main.GET /started"),
+        "Sources/Tool/Cli.swift::Cli".to_string(),
+        "Sources/Tool/Cli.swift::Cli.main()".to_string(),
+        checkout(
+            "Routes.swift",
+            "OrderController.boot(routes:).GET /api/v1/alias",
+        ),
+        checkout("Routes.swift", "showUser(req:)"),
+        checkout("Routes.swift", "showReport(req:)"),
+        checkout("Routes.swift", "OrderController"),
+        checkout("Routes.swift", "OrderController.boot(routes:)"),
+        checkout(
+            "Routes.swift",
+            "OrderController.boot(routes:).POST /api/v1/beta/orders",
+        ),
+        checkout("Routes.swift", "OrderController.list(req:)"),
+        checkout("Routes.swift", "OrderController.show(req:)"),
+        checkout("Gateway.swift", "gateway()"),
+        checkout("Gateway.swift", "gateway().GET /health"),
+        checkout("Gateway.swift", "gateway().POST /v1/items"),
+        checkout("Gateway.swift", "gateway().PUT /v1/items/{}"),
+        checkout("Gateway.swift", "gateway().PATCH /v1/items/{}/name"),
+        checkout("Gateway.swift", "gateway().DELETE /v1/files/{}"),
+        checkout("Gateway.swift", "gateway().GET /v1/search"),
+        checkout("Gateway.swift", "gateway().GET /v1/admin/tools/ping"),
+        checkout(
+            "Gateway.swift",
+            "gateway().GET /v1/admin/tools/deeper/hammer",
+        ),
+        checkout("Gateway.swift", "gateway().GET /bare"),
+        checkout("Gateway.swift", "gateway().GET /a/b"),
+        checkout("Gateway.swift", "mountMetrics(_:)"),
+        checkout("Gateway.swift", "rebound(_:)"),
+        checkout("Gateway.swift", "mountMetrics(_:).GET /internal/metrics"),
+        checkout("Gateway.swift", "deeper(_:)"),
+        checkout("Gateway.swift", "showItem(request:context:)"),
+        checkout("Gateway.swift", "ItemController"),
+        checkout("Gateway.swift", "controllers()"),
+        checkout("Server.swift", "Server"),
+        checkout("Server.swift", "Server.run()"),
+        checkout("Clients.swift", "Api"),
+        checkout("Clients.swift", "Api.cached(session:)"),
+        checkout("Clients.swift", "Api.fetch(_:)"),
+        checkout("Clients.swift", "Api.local()"),
+        checkout("Clients.swift", "Api.profile()"),
+        checkout("Clients.swift", "Api.remove(_:)"),
+        checkout("Clients.swift", "Api.send(_:_:)"),
+        checkout("Clients.swift", "Api.user(_:)"),
+        checkout("Clients.swift", "Cache"),
+        checkout("Clients.swift", "Cache.data(from:)"),
+        checkout("Clients.swift", "Gateway"),
+        checkout("Clients.swift", "Gateway.init(session:)"),
+        checkout("Clients.swift", "Gateway.ping()"),
+        checkout("Clients.swift", "Gateway.pong()"),
+        checkout("Clients.swift", "Local"),
+        checkout("Clients.swift", "Local.request(_:)"),
+        checkout("Clients.swift", "Remote"),
+        checkout("Clients.swift", "alamofire(id:session:)"),
+        checkout("Clients.swift", "asyncHTTP(client:)"),
+        checkout("Clients.swift", "byName()"),
+        checkout("Clients.swift", "lookup()"),
+        checkout("Clients.swift", "moved(other:)"),
+        checkout("Clients.swift", "notRead(session:cache:)"),
+        checkout("Clients.swift", "sessions(id:session:)"),
+        checkout("Clients.swift", "unresolved(path:flag:)"),
+        checkout("Clients.swift", "useApi()"),
+        checkout("Clients.swift", "whole(_:)"),
+        checkout("Clients.swift", "relative(_:)"),
+        checkout("Clients.swift", "guarded(session:)"),
+        checkout("Clients.swift", "mutated(id:)"),
+        checkout("Clients.swift", "versions()"),
+        checkout("Clients.swift", "URLSession.warm(from:)"),
+        checkout("Clients.swift", "warmed(session:other:)"),
+        checkout("Ui.swift", "reroute()"),
+        checkout("Ui.swift", "uikit(session:)"),
+        store("Endpoints.swift", "Endpoints"),
+    ];
+    let one = |t: String| vec![t];
+    let run = |callee: &str| checkout("Checkout.swift", &format!("Checkout.run()::{callee}"));
+    let place = |callee: &str| service(&format!("OrderService.place(order:quantity:)::{callee}"));
+    let calls = vec![
+        // A member of an extension calls one of the same extension, and through `self` one of
+        // another; an extension of a nested type calls a member the type declares elsewhere.
+        (
+            pricing("Order.price(quantity:)::discount#0"),
+            EXACT,
+            one(pricing("Order.discount(quantity:)")),
+        ),
+        (
+            pricing("Order.discount(quantity:)::self.price#0"),
+            EXACT,
+            one(pricing("Order.price(quantity:)")),
+        ),
+        (
+            pricing("Order.Line.doubled()::total#0"),
+            EXACT,
+            one(order("Order.Line.total()")),
+        ),
+        // A function of another file of the module, from a protocol's default implementation.
+        (
+            service("Notifier.notify(order:)::log#0"),
+            EXACT,
+            one(order("log(_:)")),
+        ),
+        // A protocol extension calls the protocol's requirement.
+        (
+            service("Notifier.notifyAll(orders:)::notify#0"),
+            EXACT,
+            one(service("Notifier.notify(order:)")),
+        ),
+        (
+            service("OrderService.init(retries:)::self.init#0"),
+            EXACT,
+            one(service("OrderService.init()")),
+        ),
+        // Labels pick one overload of three.
+        (
+            service("OrderService.place(order:)::place#0"),
+            EXACT,
+            one(service("OrderService.place(order:quantity:)")),
+        ),
+        // Overloads with the same labels tie: in the type's body, in its extension of the same
+        // file (all three named with their types) and in one of another file.
+        (
+            place("audit#0"),
+            AMBIGUOUS,
+            vec![
+                store("OrderService+Audit.swift", "OrderService.audit(_:)"),
+                service("OrderService.audit(_:Bool)"),
+                service("OrderService.audit(_:Order)"),
+                service("OrderService.audit(_:String)"),
+            ],
+        ),
+        // An initializer an extension declares in another file is the type's.
+        (
+            pricing("Order.init(json:)::self.init#0"),
+            EXACT,
+            one(order("Order.init(id:)")),
+        ),
+        // A protocol an extension conforms to: its requirement; the type's own member, from a
+        // later extension of another file, before that protocol's default body; and an outside
+        // protocol keeps a bare name from the top-level function.
+        (
+            probe("Probe.run()::ping#0"),
+            EXACT,
+            one(probe("Pinger.ping()")),
+        ),
+        (
+            probe("Probe.run()::trace#0"),
+            EXACT,
+            one(store("Probe+Tracer.swift", "Probe.trace()")),
+        ),
+        (
+            probe("Bag.run()::describe#0"),
+            INFERRED,
+            one(probe("describe()")),
+        ),
+        // `self` reaches the requirement of a protocol the class conforms to.
+        (
+            place("self.notify#0"),
+            EXACT,
+            one(service("Notifier.notify(order:)")),
+        ),
+        // A parameter typed in the source reaches the method of its type.
+        (
+            place("order.price#0"),
+            EXACT,
+            one(pricing("Order.price(quantity:)")),
+        ),
+        (
+            place("OrderService.validate#0"),
+            EXACT,
+            one(service("OrderService.validate(order:)")),
+        ),
+        (
+            service("OrderService.place(_:)::place#0"),
+            EXACT,
+            one(service("OrderService.place(order:)")),
+        ),
+        (
+            service("OrderService.place(_:)::Order#0"),
+            EXACT,
+            one(order("Order.init(id:)")),
+        ),
+        // A trailing closure takes the last parameter, past one with a default value.
+        (
+            service("OrderService.run()::retry#0"),
+            EXACT,
+            one(service("OrderService.retry(times:_:)")),
+        ),
+        (
+            service("OrderService.run()::retry#1"),
+            EXACT,
+            one(service("OrderService.retry(times:_:)")),
+        ),
+        // A call in a closure belongs to the function around it.
+        (
+            service("OrderService.run()::log#0"),
+            EXACT,
+            one(order("log(_:)")),
+        ),
+        // A base from outside the repository may declare the member: a name match.
+        (
+            service("Reporter.report()::summary#0"),
+            INFERRED,
+            one(service("Reporter.summary()")),
+        ),
+        // Across the import: a public initializer and function, the module's name as a
+        // qualifier, and an internal function the import does not reach.
+        (
+            checkout("Checkout.swift", "Checkout::OrderService#0"),
+            EXACT,
+            one(service("OrderService.init(retries:)")),
+        ),
+        (run("Order#0"), EXACT, one(order("Order.init(id:)"))),
+        (run("Order#1"), EXACT, one(pricing("Order.init(json:)"))),
+        (
+            run("service.place#0"),
+            EXACT,
+            one(service("OrderService.place(order:)")),
+        ),
+        (run("format#0"), EXACT, one(order("format(order:)"))),
+        (run("format#1"), None, vec![]),
+        (run("Store.format#0"), EXACT, one(order("format(order:)"))),
+        // The file's own module first: its `log(level:)`, not the imported module's public one.
+        (
+            run("summarize#0"),
+            EXACT,
+            one(checkout("Summary.swift", "summarize()")),
+        ),
+        (
+            checkout("Summary.swift", "summarize()::log#0"),
+            EXACT,
+            one(checkout("Summary.swift", "log(level:)")),
+        ),
+        (run("missing#0"), None, vec![]),
+    ];
+    let mut calls = calls;
+    let depot = |callee: &str| dispatch(&format!("Depot.{DISPATCH}::{callee}"));
+    let ship = dispatch("Truck.ship(parcel:)");
+    let fast = dispatch("Truck.ship(parcel:fast:)");
+    let moor = dispatch("Boat.moor()");
+    let every_ship = vec![
+        dispatch("Boat.ship(parcel:)"),
+        dispatch("Carrier.ship(parcel:)"),
+        ship.clone(),
+    ];
+    calls.extend([
+        // A property, a parameter, an optional one and a local with a written type reach their
+        // type's method; the labels pick the overload of the type.
+        (depot("truck.ship#0"), EXACT, one(ship.clone())),
+        (depot("self.truck.ship#0"), EXACT, one(fast.clone())),
+        (depot("lorry.ship#0"), EXACT, one(ship.clone())),
+        (depot("wrapped.ship#0"), EXACT, one(ship.clone())),
+        (depot("local.ship#0"), EXACT, one(ship.clone())),
+        // A local initialized with `Type(..)` and a property initialized so are of that type;
+        // the overloads of one label tie.
+        (
+            depot("made.load#0"),
+            AMBIGUOUS,
+            vec![
+                dispatch("Truck.load(_:Crate)"),
+                dispatch("Truck.load(_:Parcel)"),
+            ],
+        ),
+        (depot("Truck#0"), EXACT, one(dispatch("Truck"))),
+        (depot("boat.moor#0"), EXACT, one(moor.clone())),
+        (dispatch("Depot::Boat#0"), EXACT, one(dispatch("Boat"))),
+        // A protocol-typed receiver stops at the requirement, whatever conforms to it.
+        (
+            depot("carrier.ship#0"),
+            EXACT,
+            one(dispatch("Carrier.ship(parcel:)")),
+        ),
+        (
+            depot("other.ship#0"),
+            EXACT,
+            one(dispatch("Carrier.ship(parcel:)")),
+        ),
+        // A receiver whose type is not read matches by name and labels.
+        (depot("ships.first.moor#0"), INFERRED, one(moor.clone())),
+        (depot("lookup#0"), EXACT, one(dispatch("Depot.lookup()"))),
+        (depot("found.ship#0"), AMBIGUOUS, every_ship.clone()),
+        (depot("found.ship#1"), INFERRED, one(fast)),
+        (depot("found.moor#0"), INFERRED, one(moor)),
+        // A name bound twice with other types in one function has no type.
+        (
+            dispatch("Depot.again(lorry:)::lorry.ship#0"),
+            AMBIGUOUS,
+            every_ship,
+        ),
+        (
+            dispatch("Depot.again(lorry:)::Boat#0"),
+            EXACT,
+            one(dispatch("Boat")),
+        ),
+        (
+            dispatch("Depot.again(lorry:)::Parcel#0"),
+            EXACT,
+            one(dispatch("Parcel")),
+        ),
+    ]);
+    // Opaque outside: a receiver whose written type, or whose capitalized name, is outside the
+    // repository reaches its type's extensions alone; an untyped one matches by name.
+    let clients = |callee: &str| checkout("Clients.swift", callee);
+    let warm = clients("URLSession.warm(from:)");
+    calls.extend([
+        (
+            clients("warmed(session:other:)::session.warm#0"),
+            INFERRED,
+            one(warm),
+        ),
+        (
+            clients("warmed(session:other:)::other.fetch#0"),
+            None,
+            vec![],
+        ),
+        (
+            clients("warmed(session:other:)::URLSession.shared.warm#0"),
+            None,
+            vec![],
+        ),
+        (
+            clients("sessions(id:session:)::session.data#0"),
+            None,
+            vec![],
+        ),
+        (
+            clients("alamofire(id:session:)::AF.request#0"),
+            None,
+            vec![],
+        ),
+        (
+            clients("byName()::other.fetch#0"),
+            INFERRED,
+            one(clients("Api.fetch(_:)")),
+        ),
+    ]);
+    conform_owned(
+        "conformance-swift",
+        &symbols,
+        &[
+            "Sources/Checkout/main.swift::main",
+            "Sources/Tool/Cli.swift::Cli.main()",
+        ],
+        &calls,
+    );
+}
+
+/// Outgoing HTTP calls of Swift are consumers with their URLs evaluated (spec #29, #121).
+#[test]
+fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
+    let repo = fixture_repo("swift_http_consumers", "conformance-swift", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let (api, orders, billing) = (
+        "host:api.example.com",
+        "host:orders.example.com",
+        "host:billing.example.com",
+    );
+    let at =
+        |function: &str, call: &str| format!("Sources/Checkout/Clients.swift::{function}::{call}");
+    let sessions = |call: &str| at("sessions(id:session:)", call);
+    let alamofire = |call: &str| at("alamofire(id:session:)", call);
+    let unresolved = |call: &str| at("unresolved(path:flag:)", call);
+    let mutated = |call: &str| at("mutated(id:)", call);
+    let expected = triples(&[
+        // URLSession: `data(from:)` is a `GET`, on `URLSession.shared`, a typed parameter and a
+        // local made by `URLSession(configuration:)`.
+        (
+            "http::GET::/ping",
+            api,
+            &sessions("URLSession.shared.data#0"),
+        ),
+        (
+            "http::GET::/users",
+            api,
+            &sessions("URLSession.shared.data#1"),
+        ),
+        ("http::GET::/users/{}", api, &sessions("session.data#0")),
+        ("http::GET::/health", api, &sessions("session.data#1")),
+        // `data(for:)` sends the method the request is assigned, `GET` when none.
+        (
+            "http::POST::/orders/new",
+            orders,
+            &sessions("URLSession.shared.data#2"),
+        ),
+        ("http::GET::/status", billing, &sessions("session.data#2")),
+        ("http::GET::/own", api, &sessions("own.data#0")),
+        (
+            "http::GET::/items/{}",
+            api,
+            &sessions("URLSession.shared.data#3"),
+        ),
+        // Alamofire: `GET` when `method:` is absent, on `AF` and on a `Session`.
+        ("http::GET::/af", api, &alamofire("AF.request#0")),
+        ("http::POST::/af/{}", api, &alamofire("AF.request#1")),
+        ("http::DELETE::/users", api, &alamofire("session.request#0")),
+        ("http::PUT::/health", api, &alamofire("AF.request#2")),
+        (
+            "http::PATCH::/default",
+            api,
+            &alamofire("Session.default.request#0"),
+        ),
+        // AsyncHTTPClient: a request sent with `execute`.
+        (
+            "http::POST::/ahc",
+            api,
+            &at("asyncHTTP(client:)", "client.execute#0"),
+        ),
+        (
+            "http::GET::/health",
+            api,
+            &at("asyncHTTP(client:)", "HTTPClient.shared.execute#0"),
+        ),
+        // A property typed or made by `URLSession.shared`, read through `self` or by name.
+        (
+            "http::GET::/gateway",
+            api,
+            &at("Gateway.ping()", "self.session.data#0"),
+        ),
+        (
+            "http::GET::/pong",
+            api,
+            &at("Gateway.pong()", "session.data#0"),
+        ),
+        // Wrappers: each call site, through two levels, with a cycle.
+        ("http::GET::/direct", api, &at("useApi()", "api.fetch#0")),
+        // A local the call site folds.
+        ("http::GET::/local/a", api, &at("useApi()", "api.fetch#1")),
+        ("http::GET::/whole", api, &at("useApi()", "whole#0")),
+        ("http::GET::/users/{}", api, &at("Api.profile()", "user#0")),
+        (
+            "http::DELETE::/users/{}",
+            api,
+            &at("useApi()", "api.remove#0"),
+        ),
+        // `relativeTo` is resolved at each call site of the wrapper, as RFC 3986 does.
+        ("http::GET::/v1/users", api, &at("versions()", "relative#0")),
+        ("http::GET::/health", api, &at("versions()", "relative#1")),
+        ("http::GET::/up", api, &at("versions()", "relative#2")),
+        // A method called on a `var` may change it, and a global `var` is open to every file:
+        // neither folds its initial value. A request is changed through its members alone.
+        ("unresolved", "", &mutated("URLSession.shared.data#0")),
+        ("unresolved", "", &mutated("URLSession.shared.data#1")),
+        (
+            "http::GET::/headers",
+            api,
+            &mutated("URLSession.shared.data#2"),
+        ),
+        (
+            "http::GET::/global",
+            "",
+            &mutated("URLSession.shared.data#3"),
+        ),
+        // A `do` block runs its statements in place.
+        (
+            "http::POST::/do",
+            api,
+            &at("guarded(session:)", "session.data#0"),
+        ),
+        // A URL or a method Meada cannot evaluate.
+        ("unresolved", "", &unresolved("URLSession.shared.data#0")),
+        ("unresolved", "", &unresolved("URLSession.shared.data#1")),
+        ("unresolved", "", &unresolved("URLSession.shared.data#2")),
+        ("unresolved", api, &unresolved("URLSession.shared.data#3")),
+        ("unresolved", api, &unresolved("URLSession.shared.data#4")),
+    ]);
+    assert_eq!(consumers(&json, "Sources/Checkout/Clients.swift"), expected);
+    // An import of UIKit alone spells Foundation's `URLSession`.
+    assert_eq!(
+        consumers(&json, "Sources/Checkout/Ui.swift"),
+        triples(&[(
+            "http::GET::/uikit",
+            api,
+            "Sources/Checkout/Ui.swift::uikit(session:)::session.data#0",
+        )])
+    );
+}
+
+/// A repository without `Package.swift` is one module (spec #29, #117).
+#[test]
+fn swift_without_a_package_manifest() {
+    let item = |name: &str| format!("Sources/Model/Item.swift::{name}");
+    let display = |name: &str| format!("Sources/Model/Item+Display.swift::{name}");
+    let loader = |name: &str| format!("Sources/Loading/FileLoader.swift::{name}");
+    let main = |name: &str| format!("Sources/main.swift::{name}");
+    let shadows = |name: &str| format!("Sources/Shadows.swift::{name}");
+    let receivers = |name: &str| format!("Sources/Receivers.swift::{name}");
+    let scopes = |name: &str| format!("Sources/Scopes.swift::{name}");
+    let app = |name: &str| format!("Sources/App.swift::{name}");
+    let symbols = [
+        app("Bare"),
+        app("Cli"),
+        app("Cli.main()"),
+        main("main"),
+        item("Item"),
+        item("Item.label()"),
+        item("Item.Size"),
+        item("Item.Size.scaled(by:)"),
+        item("Loader"),
+        item("Loader.load(from:)"),
+        item("render(_:)"),
+        item("renderAll()"),
+        display("Item.display()"),
+        display("Item.Size.doubled()"),
+        display("render(_:)"),
+        loader("FileLoader"),
+        loader("FileLoader.load(from:)"),
+        loader("FileLoader.load(from:limit:)"),
+        loader("FileLoader.report(_:)"),
+        loader("render(count:)"),
+        shadows("shadow()"),
+        shadows("error()"),
+        shadows("Choice"),
+        shadows("closures(_:)"),
+        shadows("optionals(_:)"),
+        shadows("guarded(_:)"),
+        shadows("loops(_:)"),
+        shadows("caught()"),
+        shadows("cases(_:)"),
+        shadows("work()"),
+        receivers("outside(_:_:_:_:)"),
+        receivers("String.shout()"),
+        receivers("hidden(_:_:)"),
+        receivers("rebound(_:)"),
+        receivers("typed(_:)"),
+        receivers("generic(_:)"),
+        scopes("Ship"),
+        scopes("Ship.place()"),
+        scopes("Store"),
+        scopes("Store.place()"),
+        scopes("Base"),
+        scopes("Sub"),
+        scopes("Sub.go()"),
+        scopes("Gone"),
+        scopes("Gone.init(store:)"),
+        scopes("Gone.go()"),
+        scopes("Desk"),
+        scopes("Desk.submit(_:)"),
+        scopes("Page"),
+        scopes("Page.own()"),
+        "Sources/Page+Show.swift::Page.build()".to_string(),
+        "Sources/Page+Show.swift::Page.show(_:)".to_string(),
+        scopes("Shelf"),
+        scopes("Shelf.stock(_:)"),
+        scopes("make()"),
+        "Sources/Handler.swift::run()".to_string(),
+    ];
+    let one = |t: String| vec![t];
+    let limit = |callee: &str| loader(&format!("FileLoader.load(from:limit:)::{callee}"));
+    let report = |callee: &str| loader(&format!("FileLoader.report(_:)::{callee}"));
+    let calls = vec![
+        (
+            item("render(_:)::item.label#0"),
+            EXACT,
+            one(item("Item.label()")),
+        ),
+        (
+            display("Item.display()::label#0"),
+            EXACT,
+            one(item("Item.label()")),
+        ),
+        (
+            display("Item.Size.doubled()::scaled#0"),
+            EXACT,
+            one(item("Item.Size.scaled(by:)")),
+        ),
+        // A type that declares no initializer is what its name constructs.
+        (
+            loader("FileLoader.load(from:)::Item#0"),
+            EXACT,
+            one(item("Item")),
+        ),
+        (
+            limit("load#0"),
+            EXACT,
+            one(loader("FileLoader.load(from:)")),
+        ),
+        (
+            limit("report#0"),
+            EXACT,
+            one(loader("FileLoader.report(_:)")),
+        ),
+        (limit("print#0"), None, vec![]),
+        (limit("Array#0"), None, vec![]),
+        // A parameter and a local hide the functions of their names in the whole function.
+        (report("format#0"), None, vec![]),
+        (report("render#0"), None, vec![]),
+        (report("render#1"), None, vec![]),
+        (report("Item#0"), EXACT, one(item("Item"))),
+        (
+            report("item.display#0"),
+            INFERRED,
+            one(display("Item.display()")),
+        ),
+        (main("main::FileLoader#0"), EXACT, one(loader("FileLoader"))),
+        (
+            main("main::loader.load#0"),
+            EXACT,
+            one(loader("FileLoader.load(from:limit:)")),
+        ),
+        // The top-level functions of a name in the module's files are one family.
+        (
+            main("main::render#0"),
+            AMBIGUOUS,
+            vec![display("render(_:)"), item("render(_:)")],
+        ),
+        (
+            item("renderAll()::render#0"),
+            EXACT,
+            one(loader("render(count:)")),
+        ),
+    ];
+    let mut calls = calls;
+    let outside = |callee: &str| receivers(&format!("outside(_:_:_:_:)::{callee}"));
+    calls.extend([
+        // A standard-library type is outside the repository: its extensions alone answer.
+        (outside("name.label#0"), None, vec![]),
+        (
+            outside("name.shout#0"),
+            INFERRED,
+            one(receivers("String.shout()")),
+        ),
+        // A protocol-typed receiver stops at the requirement; a class-typed one resolves its
+        // labels; a nested type is read as written.
+        (
+            outside("loader.load#0"),
+            EXACT,
+            one(item("Loader.load(from:)")),
+        ),
+        (
+            outside("file.load#0"),
+            EXACT,
+            one(loader("FileLoader.load(from:)")),
+        ),
+        (
+            outside("file.load#1"),
+            EXACT,
+            one(loader("FileLoader.load(from:limit:)")),
+        ),
+        (
+            outside("size.scaled#0"),
+            EXACT,
+            one(item("Item.Size.scaled(by:)")),
+        ),
+        // A name a `guard let` or a type parameter binds again in the function has no known type
+        // there; a closure parameter hides it in the closure alone, a scope of its own.
+        (
+            receivers("hidden(_:_:)::item.label#0"),
+            EXACT,
+            one(item("Item.label()")),
+        ),
+        (
+            receivers("hidden(_:_:)::item.display#0"),
+            INFERRED,
+            one(display("Item.display()")),
+        ),
+        (
+            receivers("rebound(_:)::item.label#0"),
+            INFERRED,
+            one(item("Item.label()")),
+        ),
+        (
+            receivers("generic(_:)::item.label#0"),
+            INFERRED,
+            one(item("Item.label()")),
+        ),
+        // A local hides the global of its name, and is of its own type.
+        (
+            receivers("typed(_:)::loader.report#0"),
+            EXACT,
+            one(loader("FileLoader.report(_:)")),
+        ),
+        (
+            receivers("typed(_:)::item.label#0"),
+            EXACT,
+            one(item("Item.label()")),
+        ),
+    ]);
+    // A typed local of an accessor, a deinitializer, a top-level closure or a nested block
+    // hides its name beyond its own scope: the calls it could leak into are name matches. A
+    // type parameter of the type an extension extends, in another file, or an associated type of the protocol,
+    // is no type of the repository.
+    let places = vec![scopes("Ship.place()"), scopes("Store.place()")];
+    calls.extend([
+        (scopes("Sub::store.place#0"), AMBIGUOUS, places.clone()),
+        (scopes("Sub.go()::store.place#0"), AMBIGUOUS, places.clone()),
+        (scopes("Gone::store.place#0"), AMBIGUOUS, places.clone()),
+        (
+            scopes("Gone.go()::store.place#0"),
+            AMBIGUOUS,
+            places.clone(),
+        ),
+        (
+            scopes("Desk.submit(_:)::ship.place#0"),
+            AMBIGUOUS,
+            places.clone(),
+        ),
+        (
+            scopes("Desk.submit(_:)::ship.place#1"),
+            AMBIGUOUS,
+            places.clone(),
+        ),
+        (
+            "Sources/Handler.swift::session.place#0".to_string(),
+            AMBIGUOUS,
+            places.clone(),
+        ),
+        // The typed `session` of a closure is that closure's own scope: the global one is
+        // `Store`'s.
+        (
+            "Sources/Handler.swift::run()::session.place#0".to_string(),
+            EXACT,
+            vec![scopes("Store.place()")],
+        ),
+        (
+            "Sources/Page+Show.swift::Page.show(_:)::item.label#0".to_string(),
+            INFERRED,
+            one(item("Item.label()")),
+        ),
+        (
+            scopes("Shelf.stock(_:)::item.label#0"),
+            INFERRED,
+            one(item("Item.label()")),
+        ),
+        (
+            scopes("make()::item.label#0"),
+            INFERRED,
+            one(item("Item.label()")),
+        ),
+    ]);
+    // A type parameter's construction (`Item()`) is no construction of the repository's type.
+    calls.extend([
+        (scopes("make()::Item#0"), None, vec![]),
+        (scopes("Page.own()::Item#0"), None, vec![]),
+        (
+            "Sources/Page+Show.swift::Page.build()::Item#0".to_string(),
+            None,
+            vec![],
+        ),
+    ]);
+    // Each binding form hides the function of its name in its scope: a call of it is a name
+    // match.
+    for (scope, callee, target) in [
+        ("closures(_:)", "shadow", "shadow()"),
+        ("optionals(_:)", "shadow", "shadow()"),
+        ("guarded(_:)", "shadow", "shadow()"),
+        ("loops(_:)", "shadow", "shadow()"),
+        ("caught()", "error", "error()"),
+        ("cases(_:)", "shadow", "shadow()"),
+    ] {
+        let id = shadows(&format!("{scope}::{callee}#0"));
+        calls.push((id, INFERRED, one(shadows(target))));
+    }
+    conform_owned(
+        "conformance-swift-app",
+        &symbols,
+        &[
+            "Sources/App.swift::Bare",
+            "Sources/App.swift::Cli.main()",
+            "Sources/main.swift::main",
+        ],
+        &calls,
+    );
+}
+
+#[test]
+fn swift_search_finds_the_program_entry_points() {
+    let repo = fixture_repo("swift_programs", "conformance-swift", Some(ORIGIN));
+    assert_golden(
+        "conformance-swift.search-process-main.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .search("main", Some("process"), None)
+            .unwrap(),
+    );
+}
+
+/// Hostile Vapor input stays bounded: values and group chains past the pack's `VALUE_DEPTH`
+/// serve nothing, and so do more groups than `VAPOR_NODES`, in time that does not grow with
+/// the squares of their number.
+#[test]
+fn swift_hostile_values_and_groups_remain_bounded() {
+    let served = |repo: &std::path::Path, file: &str| -> Vec<String> {
+        let json: Value =
+            serde_json::from_str(&Engine::open(repo).unwrap().export().unwrap()).unwrap();
+        (json["providers"].as_array().unwrap().iter())
+            .filter(|p| p["site"].as_str().unwrap().contains(file))
+            .map(|p| p["contract"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let repo = fixture_repo("swift_hostile_values", "conformance-swift", Some(ORIGIN));
+    let expression = format!("{}\"v\"{}", "(".repeat(1024), ")".repeat(1024));
+    let member = format!("root{}.send()", ".part".repeat(300));
+    let deep = format!(
+        "app{}.get(\"deep\") {{ req in \"x\" }}",
+        ".grouped(\"a\")".repeat(200)
+    );
+    let source = format!(
+        "import Vapor\nfunc hostile() async throws {{\nlet app = try await Application.make(.detect())\napp.get({expression}) {{ req in \"x\" }}\n{member}\n{deep}\napp.get(\"fine\") {{ req in \"x\" }}\n}}\n"
+    );
+    std::fs::write(repo.join("Hostile.swift"), source).unwrap();
+    let started = std::time::Instant::now();
+    let found = served(&repo, "Hostile.swift");
+    assert!(started.elapsed() < std::time::Duration::from_secs(30));
+    assert_eq!(found, ["http::GET::/fine"]);
+
+    let groups = |n: usize| -> String {
+        let body: String = (0..n)
+            .map(|i| format!("app.grouped(\"g{i}\").get(\"x\") {{ req in \"x\" }}\n"))
+            .collect();
+        format!(
+            "import Vapor\nfunc many() async throws {{\nlet app = try await Application.make(.detect())\n{body}}}\n"
+        )
+    };
+    let repo = fixture_repo("swift_hostile_nodes", "conformance-swift", Some(ORIGIN));
+    std::fs::write(repo.join("Many.swift"), groups(10)).unwrap();
+    assert_eq!(served(&repo, "Many.swift").len(), 10);
+    std::fs::write(repo.join("Many.swift"), groups(4200)).unwrap();
+    // Only the repository's `Package.swift` still gives its package contract.
+    assert_eq!(served(&repo, ""), ["package::swiftpm::Shop"]);
+}
+
+/// Context lists the consumers a Swift call that cannot be evaluated is, unresolved (spec #29, #121).
+#[test]
+fn swift_context_shows_an_unresolved_consumer() {
+    let repo = fixture_repo(
+        "swift_unresolved_consumer",
+        "conformance-swift",
+        Some(ORIGIN),
+    );
+    assert_golden(
+        "conformance-swift.context-unresolved.txt",
+        &Engine::open(&repo)
+            .unwrap()
+            .context("unresolved(path:flag:)", None)
+            .unwrap(),
+    );
+}
+
+/// Hostile URLs stay bounded: a `+` chain, a chain of `appendingPathComponent` and calls nested
+/// past the pack's `VALUE_DEPTH` are unresolved consumers, in time that stays small, and a
+/// call after them is still read.
+#[test]
+fn swift_hostile_urls_remain_bounded() {
+    let repo = fixture_repo("swift_hostile_urls", "conformance-swift", Some(ORIGIN));
+    let plus = vec!["\"a\""; 4000].join(" + ");
+    let appended = ".appendingPathComponent(\"x\")".repeat(4000);
+    let nested = format!("{}\"x\"{}", "URL(string: ".repeat(1000), ")".repeat(1000));
+    let get = |url: &str| format!("_ = try await URLSession.shared.data(from: {url})\n");
+    let source = format!(
+        "import Foundation\nfunc hostile() async throws {{\n{}{}{}{}}}\n",
+        get(&format!("URL(string: {plus})!")),
+        get(&format!(
+            "URL(string: \"https://h.example.com\")!{appended}"
+        )),
+        get(&nested),
+        get("URL(string: \"https://h.example.com/fine\")!"),
+    );
+    std::fs::write(repo.join("Hostile.swift"), source).unwrap();
+    let started = std::time::Instant::now();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(started.elapsed() < std::time::Duration::from_secs(30));
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let found: Vec<String> = consumers(&json, "Hostile.swift")
+        .into_iter()
+        .map(|(contract, ..)| contract)
+        .collect();
+    assert_eq!(
+        found,
+        ["http::GET::/fine", "unresolved", "unresolved", "unresolved"]
+    );
+}
+
+/// A type of the repository named `URL`, `URLRequest` or `HTTPClientRequest` hides the
+/// library's: the consumer is unresolved, not read as the library's (spec #29, #121). Each
+/// type is in a module of its own, so the others stay the library's there.
+#[test]
+fn swift_a_repository_type_hides_the_library_s_request_and_url() {
+    let repo = fixture_repo("swift_hidden_names", "conformance-swift", Some(ORIGIN));
+    let manifest = std::fs::read_to_string(repo.join("Package.swift")).unwrap();
+    let targets: String = ["HiddenUrl", "HiddenRequest", "HiddenAhc"]
+        .iter()
+        .map(|name| format!(".target(name: \"{name}\"), "))
+        .collect();
+    std::fs::write(
+        repo.join("Package.swift"),
+        manifest.replace(
+            ".target(name: \"Store\"),",
+            &format!(".target(name: \"Store\"), {targets}"),
+        ),
+    )
+    .unwrap();
+    let write = |dir: &str, source: &str| {
+        std::fs::create_dir_all(repo.join("Sources").join(dir)).unwrap();
+        std::fs::write(repo.join("Sources").join(dir).join("Hidden.swift"), source).unwrap();
+    };
+    let get = "_ = try await session.data(from: ";
+    write(
+        "HiddenUrl",
+        &format!(
+            "import Foundation\nstruct URL {{ init(string: String) {{}} }}\n\
+             func f(session: URLSession) async throws {{\n  {get}URL(string: \"https://api.example.com/u\"))\n}}\n"
+        ),
+    );
+    write(
+        "HiddenRequest",
+        "import Foundation\nstruct URLRequest { init(url: URL) {} }\n\
+         func f(session: URLSession) async throws {\n  \
+         let r = URLRequest(url: URL(string: \"https://api.example.com/r\")!)\n  \
+         _ = try await session.data(for: r)\n}\n",
+    );
+    write(
+        "HiddenAhc",
+        "import AsyncHTTPClient\nstruct HTTPClientRequest { init(url: String) {} }\n\
+         func f(client: HTTPClient) async throws {\n  \
+         let r = HTTPClientRequest(url: \"https://api.example.com/a\")\n  \
+         _ = try await client.execute(r, timeout: .seconds(5))\n}\n",
+    );
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    for dir in ["HiddenUrl", "HiddenRequest", "HiddenAhc"] {
+        let found: Vec<String> = consumers(&json, &format!("Sources/{dir}/"))
+            .into_iter()
+            .map(|(contract, ..)| contract)
+            .collect();
+        assert_eq!(found, ["unresolved"], "{dir}");
+    }
+}
+
+/// A client is followed through eight names at most: past that the call is no consumer, and a
+/// short chain still is one (spec #29, #121).
+#[test]
+fn swift_a_client_held_through_many_names_is_not_followed_past_the_limit() {
+    let repo = fixture_repo("swift_client_depth", "conformance-swift", Some(ORIGIN));
+    let chain = |name: &str, hops: usize| {
+        let mut source = format!("  let {name}0 = URLSession.shared\n");
+        for n in 1..=hops {
+            source += &format!("  let {name}{n} = {name}{}\n", n - 1);
+        }
+        source
+            + &format!(
+                "  _ = try await {name}{hops}.data(from: URL(string: \"https://api.example.com/{name}\")!)\n"
+            )
+    };
+    let source = format!(
+        "import Foundation\nfunc depth() async throws {{\n{}{}}}\n",
+        chain("far", 12),
+        chain("near", 3)
+    );
+    std::fs::write(repo.join("Depth.swift"), source).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let found: Vec<String> = consumers(&json, "Depth.swift")
+        .into_iter()
+        .map(|(contract, ..)| contract)
+        .collect();
+    assert_eq!(found, ["http::GET::/near"]);
+}
+
+/// `search` finds a member an extension declares, under the extended type, and `context` on
+/// a method lists its callers and callees with their levels (spec #29, #117, #118).
+#[test]
+fn swift_search_finds_an_extension_member_and_context_lists_callers_and_callees() {
+    let repo = fixture_repo("swift_queries", "conformance-swift", Some(ORIGIN));
+    let engine = Engine::open(&repo).unwrap();
+    assert_golden(
+        "conformance-swift.search-price.txt",
+        &engine.search("price", Some("symbol"), None).unwrap(),
+    );
+    assert_golden(
+        "conformance-swift.context-place.txt",
+        &engine
+            .context("OrderService.place(order:quantity:)", None)
+            .unwrap(),
+    );
+    // Callers through a typed receiver are `exact`; a receiver of unread type matches the name.
+    assert_golden(
+        "conformance-swift.context-ship.txt",
+        &engine.context("Truck.ship(parcel:)", None).unwrap(),
+    );
+    assert_golden(
+        "conformance-swift.context-moor.txt",
+        &engine.context("Boat.moor()", None).unwrap(),
     );
 }

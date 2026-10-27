@@ -697,6 +697,7 @@ fn invocation(node: Node, function: Node, src: &[u8], read: impl Fn(Node) -> Val
         callee: callee(function, src),
         receiver: operand.map(|o| Box::new(read(o))),
         args: arguments(node).map(&read).collect(),
+        kwargs: Vec::new(),
         range: node.byte_range(),
     }
 }

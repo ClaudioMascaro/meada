@@ -11,8 +11,8 @@ use tree_sitter_language::LanguageFn;
 
 use super::{
     Annotated, Binds, Bound, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported,
-    Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Receiver, Value, children, named,
-    text,
+    Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Receiver, Value, bare_calls,
+    children, named, text, wildcard,
 };
 use crate::{Result, qualify};
 
@@ -807,52 +807,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     Ok(facts)
 }
 
-/// Marks each bare call (`f()`, not in a lambda) as Java's are (`Call::by_path`): the class
-/// members around it, inherited and companion ones included, come before the names outside the
-/// class. Unless a binding of the code around it holds what it invokes: a local, a parameter, a
-/// property, a constant of its name in any scope from the call's out.
-fn bare_calls(facts: &mut Facts) {
-    let locals: HashSet<&str> = facts.locals.iter().map(String::as_str).collect();
-    let consts: HashSet<&str> = facts.consts.iter().map(|c| c.name.as_str()).collect();
-    let properties: HashSet<(&str, &str)> = (facts.receivers.iter())
-        .map(|r| (r.scope.as_str(), r.name.as_str()))
-        .collect();
-    let params: HashMap<&str, Vec<&str>> = (facts.defs.iter())
-        .map(|d| {
-            (
-                d.name.as_str(),
-                d.params.iter().map(|p| p.name.as_str()).collect(),
-            )
-        })
-        .collect();
-    let bound = |scope: &str, name: &str| {
-        let mut at = Some(scope);
-        while let Some(s) = at {
-            let qualified = qualify(s, name);
-            if locals.contains(qualified.as_str())
-                || consts.contains(qualified.as_str())
-                || properties.contains(&(s, name))
-                || params.get(s).is_some_and(|p| p.contains(&name))
-            {
-                return true;
-            }
-            at = (!s.is_empty()).then(|| crate::parent(s));
-        }
-        false
-    };
-    let bare: Vec<bool> = (facts.calls.iter())
-        .map(|c| {
-            c.decorates.is_none()
-                && !c.callee.contains('.')
-                && !c.callee.starts_with('(')
-                && !bound(&c.scope, &c.callee)
-        })
-        .collect();
-    for (call, bare) in facts.calls.iter_mut().zip(bare) {
-        call.by_path = bare;
-    }
-}
-
 fn definition(name: &str, kind: Kind, range: Range<usize>, params: Vec<Param>) -> Def {
     Def {
         name: name.to_string(),
@@ -960,6 +914,7 @@ fn constructor(node: Node, src: &[u8]) -> Option<Vec<Param>> {
             } else {
                 Binds::Any
             },
+            label: None,
             default: None,
             fields: Vec::new(),
         });
@@ -1047,6 +1002,7 @@ fn parameters(
                 params.push(Param {
                     name: name.map_or("", |n| text(n, src)).to_string(),
                     binds: if vararg { Binds::Rest } else { Binds::Any },
+                    label: None,
                     default: None,
                     fields: Vec::new(),
                 });
@@ -1441,24 +1397,6 @@ fn import(node: Node, src: &[u8], facts: &mut Facts) {
     });
 }
 
-fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
-    let alias = format!("@glob{}", facts.imports.len());
-    facts.imports.push(Import {
-        local: alias.clone(),
-        source: source.to_string(),
-        name: Imported::Namespace,
-    });
-    facts.imports.push(Import {
-        local: "*".into(),
-        source: String::new(),
-        name: Imported::Glob {
-            path: alias,
-            inside,
-            public: false,
-        },
-    });
-}
-
 /// Whether the call `node` passes a trailing lambda to the call `first` it is written after:
 /// `f(a) { }` is one call of `f`, not a call of what `f(a)` returns.
 fn trailing(node: Node, first: Node) -> bool {
@@ -1517,6 +1455,7 @@ fn call(node: Node, src: &[u8], scope: &str, implicit: Implicit, lambdas: bool) 
         scope: scope.to_string(),
         callee,
         arity: Some(args.len()),
+        labels: None,
         constructs: false,
         range: node.byte_range(),
         args: Vec::new(),
@@ -1844,6 +1783,7 @@ fn annotations_of<'s>(modifiers: Node, src: &'s [u8], scope: &str) -> Vec<(Call,
             scope: scope.to_string(),
             callee: name,
             arity: None,
+            labels: None,
             constructs: false,
             range: annotation.byte_range(),
             args: positional,
@@ -1895,6 +1835,7 @@ fn element(node: Node, src: &[u8], depth: usize, nested: bool) -> Value {
                         callee,
                         receiver: None,
                         args: items,
+                        kwargs: Vec::new(),
                         range: node.byte_range(),
                     }),
                     _ => Value::Unknown,
@@ -2175,6 +2116,7 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 callee,
                 receiver: receiver.map(Box::new),
                 args,
+                kwargs: Vec::new(),
                 range: node.byte_range(),
             })
         }

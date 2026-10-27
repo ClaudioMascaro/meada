@@ -1,0 +1,12 @@
+example.com/acme/conformance Sources/Store/Dispatch.swift:12-12 Truck.ship(parcel:)
+community: Sources/Store#4
+processes: none
+func ship(parcel: Parcel) {}
+callers:
+example.com/acme/conformance Sources/Store/Dispatch.swift:38 Depot.dispatch(parcel:via:other:wrapped:ships:)
+example.com/acme/conformance Sources/Store/Dispatch.swift:40 Depot.dispatch(parcel:via:other:wrapped:ships:)
+example.com/acme/conformance Sources/Store/Dispatch.swift:41 Depot.dispatch(parcel:via:other:wrapped:ships:)
+example.com/acme/conformance Sources/Store/Dispatch.swift:43 Depot.dispatch(parcel:via:other:wrapped:ships:)
+example.com/acme/conformance Sources/Store/Dispatch.swift:51 Depot.dispatch(parcel:via:other:wrapped:ships:) [ambiguous: 3 methods named ship]
+example.com/acme/conformance Sources/Store/Dispatch.swift:58 Depot.again(lorry:) [ambiguous: 3 methods named ship]
+callees: none

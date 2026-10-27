@@ -272,6 +272,7 @@ impl<'a, 't> Reader<'a, 't> {
             callee: self.callee(at, function),
             receiver: None,
             args: Vec::new(),
+            kwargs: Vec::new(),
             range: node.byte_range(),
         })
     }

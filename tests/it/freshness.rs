@@ -397,6 +397,74 @@ fn edit(repo: &Path) {
     fs::write(repo.join("tsconfig.json"), "{}\n").unwrap();
 }
 
+/// Edits, adds and deletes `.swift` files of the SwiftPM fixture, then edits its `Package.swift`
+/// alone: each refreshed export equals a cold export of the same files (spec #29, #117).
+#[test]
+fn swift_refreshed_export_after_edit_add_delete_and_a_manifest_edit_equals_a_cold_export() {
+    let run = "Checkout.run()::";
+    let files = |repo: &Path| {
+        replace(
+            repo,
+            "Sources/Store/Order.swift",
+            "func format(id:",
+            "public func format(id:",
+        );
+        fs::write(
+            repo.join("Sources/Checkout/Extra.swift"),
+            "func missing() {}\n",
+        )
+        .unwrap();
+        fs::remove_file(repo.join("Sources/Store/Order+Pricing.swift")).unwrap();
+    };
+    let repo = fixture_repo("fresh_swift", "conformance-swift", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    files(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_swift_cold", "conformance-swift", ORIGIN, files)
+    );
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    assert_eq!(level(&json, &format!("{run}format#1")), "exact");
+    assert_eq!(level(&json, &format!("{run}missing#0")), "exact");
+    assert!(level(&json, "place(order:quantity:)::order.price#0").is_null());
+
+    // The `Store` target moves away from its files: they leave the module the import names.
+    let manifest = |repo: &Path| {
+        files(repo);
+        replace(
+            repo,
+            "Package.swift",
+            ".target(name: \"Store\")",
+            ".target(name: \"Store\", path: \"Sources/Shop\")",
+        );
+    };
+    age(&repo);
+    replace(
+        &repo,
+        "Package.swift",
+        ".target(name: \"Store\")",
+        ".target(name: \"Store\", path: \"Sources/Shop\")",
+    );
+    let moved = engine.export().unwrap();
+    assert_ne!(refreshed, moved);
+    assert_eq!(
+        moved,
+        cold_export(
+            "fresh_swift_manifest_cold",
+            "conformance-swift",
+            ORIGIN,
+            manifest
+        )
+    );
+    let json: serde_json::Value = serde_json::from_str(&moved).unwrap();
+    assert!(level(&json, &format!("{run}format#0")).is_null());
+    assert!(level(&json, &format!("{run}Order#0")).is_null());
+}
+
 fn cold_export(case: &str, fixture: &str, origin: Option<&str>, edit: impl Fn(&Path)) -> String {
     let repo = fixture_repo(case, fixture, origin);
     edit(&repo);
@@ -1272,6 +1340,59 @@ fn a_refreshed_go_cross_language_pair_exports_what_a_cold_pair_does() {
 
     let cold = common::xlang_go("fresh_xlang_go_cold");
     edit_xlang_go(&cold);
+    for (n, ((refreshed, before), cold)) in refreshed
+        .iter()
+        .zip(&before)
+        .zip(exports(&cold))
+        .enumerate()
+    {
+        assert_ne!(refreshed, before, "repository {n}");
+        assert_eq!(*refreshed, cold, "repository {n}");
+    }
+    // The renamed variable no longer reaches the web app's routes.
+    assert!(before[1].contains("env:WEB_URL"));
+    assert!(refreshed[1].contains("env:SITE_URL"));
+    assert!(!refreshed[1].contains("env:WEB_URL"));
+}
+
+/// Edits, adds and deletes `.swift` files of the api and deletes a route of the web app: a route
+/// path changes, the variable a base URL is read from changes names, a file with a consumer on
+/// the declared host appears, and the file with the other environment read goes.
+fn edit_xlang_swift((web, api): &(PathBuf, PathBuf)) {
+    edit_file(
+        api,
+        "Sources/Routes.swift",
+        "app.get(\"orders\", \":id\", use: status)",
+        "app.get(\"orders\", \":id\", \"level\", use: status)",
+    );
+    edit_file(api, "Sources/Orders.swift", "audit()", "report()");
+    edit_file(api, "Sources/Pricing.swift", "\"WEB_URL\"", "\"SITE_URL\"");
+    fs::write(
+        api.join("Sources/Report.swift"),
+        "import Foundation\n\nfunc report() async throws {\n    _ = try await URLSession.shared.data(from: URL(string: \"https://web.example.com/api/audit\")!)\n}\n",
+    )
+    .unwrap();
+    fs::remove_file(api.join("Sources/Audit.swift")).unwrap();
+    fs::remove_file(web.join("app/api/promotions/route.ts")).unwrap();
+}
+
+#[test]
+fn a_refreshed_swift_cross_language_pair_exports_what_a_cold_pair_does() {
+    let exports = |(web, api): &(PathBuf, PathBuf)| -> Vec<String> {
+        [web, api]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = common::xlang_swift("fresh_xlang_swift");
+    [&repos.0, &repos.1].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_xlang_swift(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = common::xlang_swift("fresh_xlang_swift_cold");
+    edit_xlang_swift(&cold);
     for (n, ((refreshed, before), cold)) in refreshed
         .iter()
         .zip(&before)

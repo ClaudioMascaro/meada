@@ -1,0 +1,4 @@
+example.com/xlang-swift/api Sources/Orders.swift:9 reserve(_:)
+  →[exact: host api.example.com is served by example.com/xlang-swift/api] example.com/xlang-swift/web src/orders.ts:10 reserveOrder
+    example.com/xlang-swift/web src/sync.ts:5 syncOrders
+chain: exact · 1 hops · 2 repos · 76 tokens

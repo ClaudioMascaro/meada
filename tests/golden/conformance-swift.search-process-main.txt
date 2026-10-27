@@ -1,0 +1,2 @@
+example.com/acme/conformance main process::example.com/acme/conformance::Sources/Checkout/main.swift::main (program)
+example.com/acme/conformance Cli.main() process::example.com/acme/conformance::Sources/Tool/Cli.swift::Cli.main() (program)

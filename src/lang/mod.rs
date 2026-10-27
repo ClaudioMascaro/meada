@@ -16,6 +16,7 @@ pub mod java;
 pub mod kotlin;
 pub mod python;
 pub mod rust;
+pub mod swift;
 pub mod ts;
 
 pub trait LanguagePack {
@@ -115,6 +116,13 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether a type's qualified name starts with the namespace an on-demand import names
+    /// (Java's `p.Own`, C#'s namespaces), so a glob of a namespace takes the types declared in
+    /// it alone (`Binding::of_namespace`). A Swift module is no part of its types' names.
+    fn namespaced(&self) -> bool {
+        true
+    }
+
     /// A keyword naming the base of the enclosing class, such as `super`: what its members
     /// are is not resolved, except an overload family (`Facts::overloads`), read through the
     /// class's family past the class itself.
@@ -150,6 +158,15 @@ pub trait LanguagePack {
     /// no member answers, one of a class of the repository without an opaque base or one of a
     /// type outside it, is a name match among those methods; otherwise it resolves to nothing.
     fn extension_methods(&self) -> bool {
+        false
+    }
+
+    /// Whether a block (`Facts::impls`) may add members to a type from outside the repository
+    /// (Swift's `extension URLSession`). A call no binding answers, on a receiver whose type the
+    /// source writes or constructs and the repository lacks, or on a capitalized name nothing in
+    /// it binds (`URLSession.shared`, `AF`), is a name match among the members of that type's
+    /// blocks alone, and past a member read on such a name it resolves to nothing.
+    fn outside_blocks(&self) -> bool {
         false
     }
 
@@ -238,6 +255,7 @@ const PACKS: &[&dyn LanguagePack] = &[
     &java::Java,
     &kotlin::Kotlin,
     &csharp::CSharp,
+    &swift::Swift,
 ];
 
 /// Whether a file named `file` is one a `**/` name of `config_files` names (`pattern`, past
@@ -384,9 +402,9 @@ pub struct Facts {
     /// Not kept in the index (see `Call::args`).
     #[serde(skip)]
     pub annotated: Vec<Annotated>,
-    /// The value each Kotlin or C# local, or the parameter of a tracked lambda, was given, where
-    /// no constant records it: the call a `val` holds, the receiver `use` passes on; in C#, the
-    /// creation or call a field or a local is initialized with, and a member written through a
+    /// The value each Kotlin, C# or Swift local, or the parameter of a tracked lambda, was given,
+    /// where no constant records it: the call a `val` (a Swift `let`) holds, the receiver `use`
+    /// passes on; in C#, the creation or call a field or a local is initialized with, and a member written through a
     /// name (`c.BaseAddress = v`, named `c.BaseAddress`). Not kept in
     /// the index (see `Call::args`).
     #[serde(skip)]
@@ -672,6 +690,11 @@ pub struct Param {
     /// Which argument of a call binds it.
     #[serde(default)]
     pub binds: Binds,
+    /// The argument label a call writes for it, `_` when it takes none (Swift's `order` in
+    /// `place(order o: Order)`), in a language whose calls label their arguments: a call then
+    /// fits the function only with its labels in order (`Call::labels`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
     /// The default value, as written. Not kept in the index (see `Call::args`).
     #[serde(skip)]
     pub default: Option<Value>,
@@ -747,6 +770,12 @@ pub struct Call {
     /// a cached file's facts, so a refreshed resolution agrees with a cold one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub arity: Option<usize>,
+    /// The label of each argument, in a language whose calls label them (Swift's
+    /// `place(order: o, quantity: 2)`): `_` for an unlabelled one, empty for a trailing closure,
+    /// which takes a parameter of any label. A function fits the call when its parameters
+    /// (`Param::label`) take them in order. Kept in cached facts, like `arity`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub labels: Option<Vec<String>>,
     /// Whether this call uses constructor syntax, in languages with a distinct constructor
     /// namespace. Kept with its argument count in cached facts.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -941,6 +970,8 @@ pub struct Invocation {
     pub callee: String,
     pub receiver: Option<Box<Value>>,
     pub args: Vec<Value>,
+    /// The arguments written with a label that is no positional one (Swift's `URL(string: s)`).
+    pub kwargs: Vec<(String, Value)>,
     pub range: Range<usize>,
 }
 
@@ -1013,9 +1044,78 @@ pub enum Part {
     Hole,
 }
 
+// Facts helpers the JVM packs and Swift share.
+
+/// Marks each bare call (`f()`, not in a lambda) as Java's are (`Call::by_path`): the class
+/// members around it, inherited and companion ones included, come before the names outside the
+/// class. Unless a binding of the code around it holds what it invokes: a local, a parameter, a
+/// property, a constant of its name in any scope from the call's out.
+fn bare_calls(facts: &mut Facts) {
+    let locals: HashSet<&str> = facts.locals.iter().map(String::as_str).collect();
+    let consts: HashSet<&str> = facts.consts.iter().map(|c| c.name.as_str()).collect();
+    let properties: HashSet<(&str, &str)> = (facts.receivers.iter())
+        .map(|r| (r.scope.as_str(), r.name.as_str()))
+        .collect();
+    let params: HashMap<&str, Vec<&str>> = (facts.defs.iter())
+        .map(|d| {
+            (
+                d.name.as_str(),
+                d.params.iter().map(|p| p.name.as_str()).collect(),
+            )
+        })
+        .collect();
+    let bound = |scope: &str, name: &str| {
+        let mut at = Some(scope);
+        while let Some(s) = at {
+            let qualified = crate::qualify(s, name);
+            if locals.contains(qualified.as_str())
+                || consts.contains(qualified.as_str())
+                || properties.contains(&(s, name))
+                || params.get(s).is_some_and(|p| p.contains(&name))
+            {
+                return true;
+            }
+            at = (!s.is_empty()).then(|| crate::parent(s));
+        }
+        false
+    };
+    let bare: Vec<bool> = (facts.calls.iter())
+        .map(|c| {
+            c.decorates.is_none()
+                && !c.callee.contains('.')
+                && !c.callee.starts_with('(')
+                && !bound(&c.scope, &c.callee)
+        })
+        .collect();
+    for (call, bare) in facts.calls.iter_mut().zip(bare) {
+        call.by_path = bare;
+    }
+}
+
+/// Imports every name `source` exports (a Java or Kotlin package, a Swift module) on demand: a
+/// namespace import of it under an alias and a glob of that alias, `inside` when the names are
+/// the file's own package's.
+fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
+    let alias = format!("@glob{}", facts.imports.len());
+    facts.imports.push(Import {
+        local: alias.clone(),
+        source: source.to_string(),
+        name: Imported::Namespace,
+    });
+    facts.imports.push(Import {
+        local: "*".into(),
+        source: String::new(),
+        name: Imported::Glob {
+            path: alias,
+            inside,
+            public: false,
+        },
+    });
+}
+
 // Tree-sitter helpers every pack uses.
 
-fn named<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
+pub(crate) fn named<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
     let mut cursor = node.walk();
     node.named_children(&mut cursor)
         .collect::<Vec<_>>()
@@ -1062,6 +1162,7 @@ mod tests {
         ("rust/values.rs:KEEPS", "runtime"),
         ("rust/values.rs:KEEPS_NAMES", "runtime"),
         ("rust/values.rs:METHOD_CRATES", "exception"),
+        ("swift/values.rs:STRING_METHODS", "runtime"),
         ("ts.rs:BODIES", "syntax"),
         ("ts.rs:EXTENSIONS", "syntax"),
         ("ts.rs:FUNCTIONS", "syntax"),

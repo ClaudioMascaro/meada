@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::{
     Ecosystem, Entry, Export, How, Manifest, Provided, Providers, Resolution, Resolved, Summary,
-    bare_directory, holding, of, of_source,
+    bare_directory, holding, of, of_source, pattern_fits,
 };
 use crate::contract::Level;
 use crate::jvm;
@@ -343,7 +343,7 @@ impl Ecosystem for Maven {
         }
     }
     fn fits(&self, wanted: &str, provided: &str) -> bool {
-        jvm::fits(wanted, provided)
+        pattern_fits(wanted, provided)
     }
     fn uncertainty(&self, via: Option<&str>) -> Option<&'static str> {
         (via == Some("computed")).then_some("computed coordinate")

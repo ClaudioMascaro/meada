@@ -1,0 +1,41 @@
+example.com/acme/conformance Sources/Checkout/Clients.swift:131-144 unresolved(path:flag:)
+community: Sources/Checkout
+processes: none
+func unresolved(path: String, flag: Bool) async throws {
+    _ = try await URLSession.shared.data(from: URL(string: lookup())!)
+    _ = try await URLSession.shared.data(from: URL(string: path)!)
+    var moved = URLRequest(url: URL(string: "https://api.example.com/first")!)
+    moved = URLRequest(url: URL(string: "https://api.example.com/second")!)
+    _ = try await URLSession.shared.data(for: moved)
+    var maybe = URLRequest(url: URL(string: "https://api.example.com/maybe")!)
+    if flag { maybe.httpMethod = "PUT" }
+    _ = try await URLSession.shared.data(for: maybe)
+    var twice = URLRequest(url: URL(string: "https://api.example.com/twice")!)
+    twice.httpMethod = "PUT"
+    twice.httpMethod = "DELETE"
+    _ = try await URLSession.shared.data(for: twice)
+}
+callers: none
+callees:
+example.com/acme/conformance Sources/Checkout/Clients.swift:181 lookup()
+example.com/acme/conformance Sources/Checkout/Clients.swift:132 (unresolved) URL
+example.com/acme/conformance Sources/Checkout/Clients.swift:133 (unresolved) URL
+example.com/acme/conformance Sources/Checkout/Clients.swift:134 (unresolved) URL
+example.com/acme/conformance Sources/Checkout/Clients.swift:135 (unresolved) URL
+example.com/acme/conformance Sources/Checkout/Clients.swift:137 (unresolved) URL
+example.com/acme/conformance Sources/Checkout/Clients.swift:140 (unresolved) URL
+example.com/acme/conformance Sources/Checkout/Clients.swift:134 (unresolved) URLRequest
+example.com/acme/conformance Sources/Checkout/Clients.swift:135 (unresolved) URLRequest
+example.com/acme/conformance Sources/Checkout/Clients.swift:137 (unresolved) URLRequest
+example.com/acme/conformance Sources/Checkout/Clients.swift:140 (unresolved) URLRequest
+example.com/acme/conformance Sources/Checkout/Clients.swift:132 (unresolved) URLSession.shared.data
+example.com/acme/conformance Sources/Checkout/Clients.swift:133 (unresolved) URLSession.shared.data
+example.com/acme/conformance Sources/Checkout/Clients.swift:136 (unresolved) URLSession.shared.data
+example.com/acme/conformance Sources/Checkout/Clients.swift:139 (unresolved) URLSession.shared.data
+example.com/acme/conformance Sources/Checkout/Clients.swift:143 (unresolved) URLSession.shared.data
+contracts:
+example.com/acme/conformance Sources/Checkout/Clients.swift:132 consumes (unresolved) URLSession.shared.data
+example.com/acme/conformance Sources/Checkout/Clients.swift:133 consumes (unresolved) URLSession.shared.data
+example.com/acme/conformance Sources/Checkout/Clients.swift:136 consumes (unresolved) URLSession.shared.data
+example.com/acme/conformance Sources/Checkout/Clients.swift:139 consumes (unresolved) URLSession.shared.data
+example.com/acme/conformance Sources/Checkout/Clients.swift:143 consumes (unresolved) URLSession.shared.data

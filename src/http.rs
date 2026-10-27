@@ -19,6 +19,7 @@ mod java;
 mod kotlin;
 mod python;
 mod rust;
+mod swift;
 mod ts;
 
 pub use meada_core::http::{PARAM, normalize_path};
@@ -591,9 +592,11 @@ impl ContractKind for Http {
         found.extend(csharp::providers(code));
         found.extend(csharp::minimal_providers(code));
         found.extend(kotlin::providers(code));
+        found.extend(swift::providers(code));
         found.extend(kotlin::consumers(code, indexed));
         found.extend(java::consumers(code, indexed));
         found.extend(csharp::consumers(code, indexed));
+        found.extend(swift::consumers(code));
         found
     }
 

@@ -60,6 +60,54 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Swift language pack (spec #29, #117): `.swift` files without a Swift toolchain or Xcode. Each
+  SwiftPM target of `Package.swift` is a module (one module without it); types, protocols,
+  functions, methods and initializers are symbols named with their argument labels
+  (`OrderService.place(order:quantity:)`), with an extension's members under the extended type.
+  Unqualified, `self`, static and initializer calls resolve within the module and the modules
+  it imports, narrowed by argument labels; a tie is `ambiguous`. A call on a property,
+  parameter or local whose type is written (`let x: T`, `T(...)`) resolves within that type and
+  the protocols it conforms to, `exact`; through a protocol-typed receiver it stops at the
+  requirement. A receiver of unread type is a name match by base name and labels; one whose
+  type is outside the repository (`URLSession`, `String`, `AF`) reaches only the members of
+  that type's extensions in the repository. The stored
+  Swift facts change, so existing indexes are rebuilt.
+- Vapor routes are HTTP providers (spec #29, #119): `get`, `post`, `put`, `patch`, `delete` and
+  `on(.METHOD, ..)` with their `grouped(..)` prefixes, a `RouteCollection` under the builder it
+  is registered on, and builders followed through assignments, arguments and return values; the
+  handler is the trailing closure or the function given as `use:`.
+- Hummingbird routes are HTTP providers (spec #29, #120): `get`, `post`, `put`, `patch`,
+  `delete` and `on(path, method:)` called on a `Router` or on a `group(prefix)` of it, at any
+  depth, with Vapor's value flow and handler rules; a controller's `addRoutes` is not read.
+- Swift packages (spec #29, #124): each `Package.swift` provides `package::swiftpm::<name>`,
+  with its library products and their targets recorded. A `.package(url:)` links to the
+  workspace repository of the same remote identity and a `.package(path:)` to the one at that
+  path, `exact`, with the written requirement as range and `range unchecked`; an interpolated
+  URL, path or name is `ambiguous`, listing every provider that fits, and so is a dependency
+  on a package whose own name is computed; a `path:` to the repository's own root links. An `import Module` of a
+  module of a depended-on package reaches its public declarations (`; import module`), narrowed
+  by argument labels, `ambiguous` when several packages expose the module; `context` and `trace`
+  cross the hop. A dependency outside the workspace is ignored and `Package.resolved` is not
+  read. The stored manifest summary changes, so existing indexes are rebuilt.
+- Swift HTTP consumers (spec #29, #121): `URLSession` `data(from:)` and `data(for:)` (with a
+  `URLRequest(url:)` whose `httpMethod` is assigned), Alamofire `AF.request(url, method:)` and
+  the same on a `Session`, and AsyncHTTPClient `execute` of an `HTTPClientRequest(url:)` with
+  `method` set; GET when the method is absent. The URL folds `URL(string:)`,
+  `URL(string:relativeTo:)`, `appendingPathComponent`, literals, interpolation, `+` and `let`
+  constants (`static let` too) from other files and modules; a wrapper at any depth is a
+  consumer, and a URL that cannot be read is an unresolved consumer, shown in the export and in
+  `context`. The stored Swift facts change, so existing indexes are rebuilt.
+- Swift base URLs from the environment (spec #29, #122): `ProcessInfo.processInfo.environment["X"]`
+  at the start of a URL is the base URL variable `X` and maps through `base_url_env`, also
+  through `!`, parentheses, `??` fallbacks that are plain literals and string methods such as
+  `trimmingCharacters`; a second read, any other fallback, a key that is no literal and Vapor's
+  `Environment.get` leave the base unknown. A Swift repository joins a TypeScript workspace with
+  the same `meada.toml` keys, and `trace` follows the chain across both boundaries. The stored
+  Swift facts change, so existing indexes are rebuilt.
+- Swift program entry points (spec #29, #123): a type marked `@main` (through its `main()`
+  method when it declares one) and the top-level code of a `main.swift` file, a symbol named
+  `main` that owns the calls written there, each start a process. The stored Swift facts
+  change, so existing indexes are rebuilt.
 - `Directory.Build.props` files apply to the C# projects below them as MSBuild imports them
   (the nearest one, then those it imports with `GetPathOfFileAbove` or a relative path): their
   `<Using>` items, `PackageReference`s and `ProjectReference`s, and the `PackageId`,

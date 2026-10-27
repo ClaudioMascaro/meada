@@ -2136,6 +2136,201 @@ sample.cs
   ]
 }
 
+sample.swift
+{
+  "defs": [
+    {
+      "name": "Order",
+      "kind": "Class",
+      "range": {
+        "start": 14,
+        "end": 68
+      },
+      "params": []
+    },
+    {
+      "name": "Order.init(id:)",
+      "kind": "Method",
+      "range": {
+        "start": 40,
+        "end": 66
+      },
+      "params": [
+        {
+          "name": "id",
+          "binds": "Any",
+          "label": "id"
+        }
+      ]
+    },
+    {
+      "name": "Order.place(order:quantity:_:)",
+      "kind": "Method",
+      "range": {
+        "start": 101,
+        "end": 205
+      },
+      "params": [
+        {
+          "name": "o",
+          "binds": "Any",
+          "label": "order"
+        },
+        {
+          "name": "quantity",
+          "binds": "Optional",
+          "label": "quantity"
+        },
+        {
+          "name": "rest",
+          "binds": "Rest",
+          "label": "_"
+        }
+      ]
+    },
+    {
+      "name": "Order.place(order:quantity:_:).@196",
+      "kind": "Inline",
+      "range": {
+        "start": 196,
+        "end": 199
+      },
+      "params": []
+    }
+  ],
+  "overloads": {
+    "Order.init": [
+      "Order.init(id:)"
+    ],
+    "Order.place": [
+      "Order.place(order:quantity:_:)"
+    ]
+  },
+  "constructors": {
+    "Order": [
+      "Order.init(id:)"
+    ]
+  },
+  "imports": [
+    {
+      "local": "Store",
+      "source": "Store",
+      "name": "Namespace"
+    },
+    {
+      "local": "@glob1",
+      "source": "Store",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob1",
+          "inside": false,
+          "public": false
+        }
+      }
+    }
+  ],
+  "exports": [
+    {
+      "Local": {
+        "exported": "Order",
+        "local": "Order"
+      }
+    },
+    {
+      "Local": {
+        "exported": "limit",
+        "local": "limit"
+      }
+    }
+  ],
+  "star": {
+    "Only": [
+      "Order"
+    ]
+  },
+  "calls": [
+    {
+      "scope": "Order.place(order:quantity:_:)",
+      "callee": "audit",
+      "arity": 1,
+      "labels": [
+        "_"
+      ],
+      "range": {
+        "start": 173,
+        "end": 181
+      },
+      "by_path": true
+    },
+    {
+      "scope": "Order.place(order:quantity:_:)",
+      "callee": "retry",
+      "arity": 1,
+      "labels": [
+        ""
+      ],
+      "range": {
+        "start": 190,
+        "end": 199
+      },
+      "by_path": true
+    }
+  ],
+  "consts": [
+    {
+      "name": "limit"
+    }
+  ],
+  "receivers": [
+    {
+      "scope": "Order.init(id:)",
+      "name": "id",
+      "class": {
+        "Type": "String"
+      }
+    },
+    {
+      "scope": "Order.place(order:quantity:_:)",
+      "name": "o",
+      "class": {
+        "Type": "Order"
+      }
+    },
+    {
+      "scope": "Order.place(order:quantity:_:)",
+      "name": "quantity",
+      "class": {
+        "Type": "Int"
+      }
+    }
+  ],
+  "impls": [
+    {
+      "scope": "Order",
+      "ty": "Order",
+      "within": ""
+    },
+    {
+      "scope": "Order",
+      "ty": "Order",
+      "of": "Codable",
+      "within": ""
+    }
+  ],
+  "private": [
+    "Order.place(order:quantity:_:)",
+    "limit"
+  ],
+  "hidden": [
+    "Order.place(order:quantity:_:)"
+  ]
+}
+
 sample.openapi.yaml
 {
   "format": "openapi",
@@ -2509,6 +2704,53 @@ sample.Directory.Build.props
   "properties": {
     "AssemblyName": "Example.$(MSBuildProjectName)"
   }
+}
+
+sample.Package.swift
+{
+  "name": "Sample",
+  "dependencies": [
+    {
+      "field": "dependencies",
+      "name": "example.com/org/*",
+      "range": "exact 2.0.0",
+      "via": "computed git example.com/org/*"
+    },
+    {
+      "field": "dependencies",
+      "name": "example.com/org/kit",
+      "range": "from 1.2.0",
+      "via": "git example.com/org/kit"
+    },
+    {
+      "field": "dependencies",
+      "name": "lib",
+      "via": "path lib/Package.swift"
+    }
+  ],
+  "products": [
+    [
+      "Sample",
+      [
+        "Core",
+        "Money"
+      ]
+    ]
+  ],
+  "targets": [
+    [
+      "Core",
+      "pkg/Sources/Core"
+    ],
+    [
+      "Money",
+      "pkg/Sources/Currency"
+    ],
+    [
+      "Tool",
+      "pkg/Sources/Tool"
+    ]
+  ]
 }
 
 sample.tsconfig.json

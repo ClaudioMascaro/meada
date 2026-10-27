@@ -1,0 +1,4 @@
+example.com/xlang-swift/web app/api/prices/[sku]/route.ts:1 GET
+  →[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-swift/web] example.com/xlang-swift/api Sources/Orders.swift:4 status(_:)
+    →[inferred: base URL from API_URL, a base_url_env of peer example.com/xlang-swift/api] example.com/xlang-swift/web src/sync.ts:4 syncOrders
+chain: inferred · 2 hops · 2 repos · 104 tokens

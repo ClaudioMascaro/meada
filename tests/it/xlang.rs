@@ -9,7 +9,7 @@ use std::fs;
 
 use common::{
     assert_golden, without_processes, xlang, xlang_csharp, xlang_go, xlang_java, xlang_java_mirror,
-    xlang_kotlin, xlang_rust,
+    xlang_kotlin, xlang_rust, xlang_swift,
 };
 use meada::engine::{Direction, Engine, Start};
 
@@ -730,6 +730,155 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_csharp_file() {
         .unwrap();
 
     assert_golden("xlang-csharp.trace-uncommitted.txt", &answer);
+}
+
+/// The same chain with a Swift service (spec #29): the web app (TypeScript, Next.js) reaches the
+/// api (Vapor) through `API_URL` and through the api's declared host; the api reaches the web app
+/// with URLSession and Alamofire through bases it reads from `ProcessInfo` (`WEB_URL` through a
+/// fallback and a trim, `STOCK_URL` through a force unwrap) and through the web app's host.
+#[test]
+fn swift_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_host() {
+    let (web, api) = xlang_swift("xlang_swift_export");
+
+    for (repo, name) in [(web, "web"), (api, "api")] {
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        assert_golden(
+            &format!("xlang-swift-{name}.export.json"),
+            &without_processes(&export),
+        );
+    }
+}
+
+/// Every shape of environment read the Swift pack folds, and the near misses it leaves alone: the
+/// `via` of the request each function of `swift-env-reads` makes.
+#[test]
+fn a_swift_base_url_is_the_variable_of_exactly_one_process_environment_read() {
+    let repo = common::fixture_repo(
+        "xlang_swift_env_reads",
+        "swift-env-reads",
+        Some("https://example.com/swiftenv/probes.git"),
+    );
+    let export: serde_json::Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let vias: std::collections::BTreeMap<&str, Option<&str>> = export["consumers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| {
+            let site = c["site"].as_str().unwrap();
+            let function = site.split("::").nth(2).unwrap();
+            (function.trim_end_matches("()"), c["via"].as_str())
+        })
+        .collect();
+
+    let read = [
+        ("direct", "DIRECT_URL"),
+        ("named", "NAMED_URL"),
+        ("fallback", "FALLBACK_URL"),
+        ("emptyFallback", "EMPTY_URL"),
+        ("trimmed", "TRIMMED_URL"),
+        ("optionalTrim", "OPTIONAL_URL"),
+        ("replaced", "REPLACED_URL"),
+        ("typeMember", "MEMBER_URL"),
+        ("wrapped", "WRAPPED_URL"),
+        ("lowered", "LOWERED_URL"),
+        ("qualified", "QUALIFIED_URL"),
+        ("interpolated", "INTERPOLATED_URL"),
+        ("topLevel", "PKG_URL"),
+        ("typeLevel", "STATIC_URL"),
+    ];
+    for (function, variable) in read {
+        let expected = format!("env:{variable}");
+        assert_eq!(
+            vias.get(function),
+            Some(&Some(expected.as_str())),
+            "{function}"
+        );
+    }
+    let unread = [
+        "fallbackToAnotherRead",
+        "fallbackToACall",
+        "fallbackToAName",
+        "fallbackInterpolated",
+        "trimmedByARead",
+        "replacedByALocal",
+        "nameFromAVariable",
+        "methodOfAnotherKind",
+        "assignedAgain",
+        "vaporEnvironment",
+        "ofAnotherObject",
+        "optionalBinding",
+    ];
+    for function in unread {
+        assert_eq!(vias.get(function), Some(&None), "{function}");
+    }
+    assert_eq!(vias.len(), read.len() + unread.len(), "{vias:?}");
+}
+
+#[test]
+fn two_exports_of_the_swift_cross_language_fixture_are_byte_identical() {
+    let export = |case| {
+        let (web, api) = xlang_swift(case);
+        [web, api].map(|r| Engine::open(&r).unwrap().export().unwrap())
+    };
+
+    assert_eq!(export("xlang_swift_twice_a"), export("xlang_swift_twice_b"));
+}
+
+#[test]
+fn trace_down_crosses_into_swift_and_back_to_typescript() {
+    let (web, _) = xlang_swift("xlang_swift_down");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("syncOrders"), Direction::Down, None)
+        .unwrap();
+
+    for link in [
+        "→[inferred: base URL from API_URL, a base_url_env of peer example.com/xlang-swift/api]",
+        "→[exact: host api.example.com is served by example.com/xlang-swift/api]",
+        "→[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-swift/web] example.com/xlang-swift/web app/api/prices/[sku]/route.ts:1 GET",
+        "→[inferred: base URL from STOCK_URL, a base_url_env of peer example.com/xlang-swift/web] example.com/xlang-swift/web app/api/stock/route.ts:1 GET",
+        "→[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-swift/web] example.com/xlang-swift/web app/api/audit/route.ts:1 POST",
+        "→[exact: host web.example.com is served by example.com/xlang-swift/web] example.com/xlang-swift/web app/api/promotions/route.ts:1 GET",
+    ] {
+        assert!(answer.contains(link), "{link}\n{answer}");
+    }
+    assert_golden("xlang-swift.trace-down.txt", &answer);
+}
+
+#[test]
+fn trace_up_crosses_into_swift_and_back_to_typescript() {
+    let (web, _) = xlang_swift("xlang_swift_up");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(
+            Start::From("http::GET::/api/prices/{}"),
+            Direction::Up,
+            None,
+        )
+        .unwrap();
+
+    assert_golden("xlang-swift.trace-up.txt", &answer);
+}
+
+#[test]
+fn trace_from_uncommitted_changes_starts_at_an_edited_swift_file() {
+    let (_, api) = xlang_swift("xlang_swift_uncommitted");
+    let orders = api.join("Sources/Orders.swift");
+    let edited = fs::read_to_string(&orders).unwrap().replace(
+        "    try await promotions()\n",
+        "    req.logger.info(\"reserve\")\n    try await promotions()\n",
+    );
+    fs::write(&orders, edited).unwrap();
+
+    let answer = Engine::open(&api)
+        .unwrap()
+        .trace(Start::Uncommitted, Direction::Up, None)
+        .unwrap();
+
+    assert_golden("xlang-swift.trace-uncommitted.txt", &answer);
 }
 
 /// The default's host two repositories serve (a mirror of the web app beside it): the one

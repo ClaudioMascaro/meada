@@ -158,6 +158,23 @@ pub fn xlang_csharp(case: &str) -> (PathBuf, PathBuf) {
     )
 }
 
+/// The web app (TypeScript) and the api service (Swift, Vapor) of spec #29, in a workspace of
+/// their own under `case`: web first, then api.
+pub fn xlang_swift(case: &str) -> (PathBuf, PathBuf) {
+    (
+        fixture_repo(
+            case,
+            "xlang-swift-web",
+            Some("https://example.com/xlang-swift/web.git"),
+        ),
+        fixture_repo(
+            case,
+            "xlang-swift-api",
+            Some("git@example.com:xlang-swift/api.git"),
+        ),
+    )
+}
+
 /// The Java chain with a mirror of the web app beside it, serving the web app's `routes` under
 /// its own host, and a peer of the api: a consumer that leaves its host open links to both.
 pub fn xlang_java_mirror(case: &str, routes: &[&str]) -> (PathBuf, PathBuf) {
