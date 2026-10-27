@@ -397,6 +397,74 @@ fn edit(repo: &Path) {
     fs::write(repo.join("tsconfig.json"), "{}\n").unwrap();
 }
 
+/// Edits, adds and deletes `.swift` files of the SwiftPM fixture, then edits its `Package.swift`
+/// alone: each refreshed export equals a cold export of the same files (spec #29, #117).
+#[test]
+fn swift_refreshed_export_after_edit_add_delete_and_a_manifest_edit_equals_a_cold_export() {
+    let run = "Checkout.run()::";
+    let files = |repo: &Path| {
+        replace(
+            repo,
+            "Sources/Store/Order.swift",
+            "func format(id:",
+            "public func format(id:",
+        );
+        fs::write(
+            repo.join("Sources/Checkout/Extra.swift"),
+            "func missing() {}\n",
+        )
+        .unwrap();
+        fs::remove_file(repo.join("Sources/Store/Order+Pricing.swift")).unwrap();
+    };
+    let repo = fixture_repo("fresh_swift", "conformance-swift", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    files(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_swift_cold", "conformance-swift", ORIGIN, files)
+    );
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    assert_eq!(level(&json, &format!("{run}format#1")), "exact");
+    assert_eq!(level(&json, &format!("{run}missing#0")), "exact");
+    assert!(level(&json, "place(order:quantity:)::order.price#0").is_null());
+
+    // The `Store` target moves away from its files: they leave the module the import names.
+    let manifest = |repo: &Path| {
+        files(repo);
+        replace(
+            repo,
+            "Package.swift",
+            ".target(name: \"Store\")",
+            ".target(name: \"Store\", path: \"Sources/Shop\")",
+        );
+    };
+    age(&repo);
+    replace(
+        &repo,
+        "Package.swift",
+        ".target(name: \"Store\")",
+        ".target(name: \"Store\", path: \"Sources/Shop\")",
+    );
+    let moved = engine.export().unwrap();
+    assert_ne!(refreshed, moved);
+    assert_eq!(
+        moved,
+        cold_export(
+            "fresh_swift_manifest_cold",
+            "conformance-swift",
+            ORIGIN,
+            manifest
+        )
+    );
+    let json: serde_json::Value = serde_json::from_str(&moved).unwrap();
+    assert!(level(&json, &format!("{run}format#0")).is_null());
+    assert!(level(&json, &format!("{run}Order#0")).is_null());
+}
+
 fn cold_export(case: &str, fixture: &str, origin: Option<&str>, edit: impl Fn(&Path)) -> String {
     let repo = fixture_repo(case, fixture, origin);
     edit(&repo);

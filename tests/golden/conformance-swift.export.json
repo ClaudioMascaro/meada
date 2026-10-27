@@ -1,0 +1,944 @@
+{
+  "repository": "example.com/acme/conformance",
+  "files": [
+    {
+      "path": "Sources/Checkout/Checkout.swift",
+      "hash": "4f4f06735cb30771dc3c454dfca8955ef54a2b8aa4bed8816ea7e45b55f51331"
+    },
+    {
+      "path": "Sources/Checkout/Summary.swift",
+      "hash": "ddc43419ae51aba6eaa09999f70bab40d0c4446b1986a76a34c958ded460a0cb"
+    },
+    {
+      "path": "Sources/Store/Order+Pricing.swift",
+      "hash": "f8f9d18ee108ba40495b65cd09a7736e9ff3485fdb9e07fb6db26e55d311b807"
+    },
+    {
+      "path": "Sources/Store/Order.swift",
+      "hash": "cc22fd79dfdf01022e5cac99e41af360ab3ec1d6b8762e398da3abda104adfa5"
+    },
+    {
+      "path": "Sources/Store/OrderService+Audit.swift",
+      "hash": "d909dbaf57d6d94d66541e0d59506de531a8d63e6082fcb764fec2da1e0b1730"
+    },
+    {
+      "path": "Sources/Store/OrderService.swift",
+      "hash": "c6f363fd5e2ac549d4a52c66b4dea7dd3d58a8c306a9403d9d799a0b6caa8b77"
+    },
+    {
+      "path": "Sources/Store/Probe+Tracer.swift",
+      "hash": "284b44b922fed7829917a72a704ac62e5131d8e6b3815190f45fa3ffd36178db"
+    },
+    {
+      "path": "Sources/Store/Probe.swift",
+      "hash": "5b58ff32f9886027773d9578870bd01eed3d720239081a50579254573723330e"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout",
+      "span": {
+        "path": "Sources/Checkout/Checkout.swift",
+        "start": 32,
+        "end": 361
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()",
+      "span": {
+        "path": "Sources/Checkout/Checkout.swift",
+        "start": 98,
+        "end": 359
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Summary.swift::log(level:)",
+      "span": {
+        "path": "Sources/Checkout/Summary.swift",
+        "start": 54,
+        "end": 77
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Summary.swift::summarize()",
+      "span": {
+        "path": "Sources/Checkout/Summary.swift",
+        "start": 14,
+        "end": 52
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.Line.doubled()",
+      "span": {
+        "path": "Sources/Store/Order+Pricing.swift",
+        "start": 310,
+        "end": 366
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.discount(quantity:)",
+      "span": {
+        "path": "Sources/Store/Order+Pricing.swift",
+        "start": 186,
+        "end": 279
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.init(json:)",
+      "span": {
+        "path": "Sources/Store/Order+Pricing.swift",
+        "start": 22,
+        "end": 83
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.price(quantity:)",
+      "span": {
+        "path": "Sources/Store/Order+Pricing.swift",
+        "start": 89,
+        "end": 180
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order.swift::Order",
+      "span": {
+        "path": "Sources/Store/Order.swift",
+        "start": 0,
+        "end": 207
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order.swift::Order.Line",
+      "span": {
+        "path": "Sources/Store/Order.swift",
+        "start": 111,
+        "end": 205
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order.swift::Order.Line.total()",
+      "span": {
+        "path": "Sources/Store/Order.swift",
+        "start": 140,
+        "end": 199
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order.swift::Order.init(id:)",
+      "span": {
+        "path": "Sources/Store/Order.swift",
+        "start": 53,
+        "end": 105
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order.swift::format(id:)",
+      "span": {
+        "path": "Sources/Store/Order.swift",
+        "start": 277,
+        "end": 328
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order.swift::format(order:)",
+      "span": {
+        "path": "Sources/Store/Order.swift",
+        "start": 209,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order.swift::log(_:)",
+      "span": {
+        "path": "Sources/Store/Order.swift",
+        "start": 330,
+        "end": 360
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order.swift::log(level:)",
+      "span": {
+        "path": "Sources/Store/Order.swift",
+        "start": 362,
+        "end": 392
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService+Audit.swift::OrderService.audit(_:)",
+      "span": {
+        "path": "Sources/Store/OrderService+Audit.swift",
+        "start": 29,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 19,
+        "end": 77
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notify(order:)",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 50,
+        "end": 75
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notifyAll(orders:)",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 172,
+        "end": 291
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 295,
+        "end": 1128
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.audit(_:Bool)",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 1269,
+        "end": 1296
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.audit(_:Order)",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 831,
+        "end": 860
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.audit(_:String)",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 866,
+        "end": 893
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.init()",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 335,
+        "end": 351
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.init(retries:)",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 357,
+        "end": 410
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(_:)",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 735,
+        "end": 825
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:)",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 416,
+        "end": 511
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:quantity:)",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 517,
+        "end": 729
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.retry(times:_:)",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 975,
+        "end": 1024
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.run()",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 1030,
+        "end": 1126
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.validate(order:)",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 899,
+        "end": 969
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 1130,
+        "end": 1238
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter.report()",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 1174,
+        "end": 1213
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter.summary()",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 1219,
+        "end": 1236
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Probe+Tracer.swift::Probe.trace()",
+      "span": {
+        "path": "Sources/Store/Probe+Tracer.swift",
+        "start": 30,
+        "end": 45
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Bag",
+      "span": {
+        "path": "Sources/Store/Probe.swift",
+        "start": 219,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Bag.run()",
+      "span": {
+        "path": "Sources/Store/Probe.swift",
+        "start": 236,
+        "end": 273
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Pinger",
+      "span": {
+        "path": "Sources/Store/Probe.swift",
+        "start": 0,
+        "end": 35
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Pinger.ping()",
+      "span": {
+        "path": "Sources/Store/Probe.swift",
+        "start": 22,
+        "end": 33
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Pinger.trace()",
+      "span": {
+        "path": "Sources/Store/Probe.swift",
+        "start": 80,
+        "end": 95
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Probe",
+      "span": {
+        "path": "Sources/Store/Probe.swift",
+        "start": 119,
+        "end": 189
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Probe.run()",
+      "span": {
+        "path": "Sources/Store/Probe.swift",
+        "start": 138,
+        "end": 187
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Tracer",
+      "span": {
+        "path": "Sources/Store/Probe.swift",
+        "start": 99,
+        "end": 117
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Probe.swift::describe()",
+      "span": {
+        "path": "Sources/Store/Probe.swift",
+        "start": 320,
+        "end": 338
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()::Order#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()",
+      "target": "example.com/acme/conformance::Sources/Store/Order.swift::Order.init(id:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Checkout.swift",
+        "start": 131,
+        "end": 145
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()::Order#1",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()",
+      "target": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.init(json:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Checkout.swift",
+        "start": 158,
+        "end": 175
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()::Store.format#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()",
+      "target": "example.com/acme/conformance::Sources/Store/Order.swift::format(order:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Checkout.swift",
+        "start": 289,
+        "end": 315
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()::format#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()",
+      "target": "example.com/acme/conformance::Sources/Store/Order.swift::format(order:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Checkout.swift",
+        "start": 228,
+        "end": 248
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()::format#1",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Checkout.swift",
+        "start": 261,
+        "end": 276
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()::missing#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Checkout.swift",
+        "start": 344,
+        "end": 353
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()::service.place#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()",
+      "target": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:)",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Checkout/Checkout.swift",
+        "start": 188,
+        "end": 215
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()::summarize#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()",
+      "target": "example.com/acme/conformance::Sources/Checkout/Summary.swift::summarize()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Checkout.swift",
+        "start": 324,
+        "end": 335
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout::OrderService#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout",
+      "target": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.init(retries:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Checkout.swift",
+        "start": 68,
+        "end": 92
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Summary.swift::summarize()::log#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Summary.swift::summarize()",
+      "target": "example.com/acme/conformance::Sources/Checkout/Summary.swift::log(level:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Summary.swift",
+        "start": 37,
+        "end": 50
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.Line.doubled()::total#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.Line.doubled()",
+      "target": "example.com/acme/conformance::Sources/Store/Order.swift::Order.Line.total()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Order+Pricing.swift",
+        "start": 349,
+        "end": 356
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.discount(quantity:)::self.price#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.discount(quantity:)",
+      "target": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.price(quantity:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Order+Pricing.swift",
+        "start": 239,
+        "end": 273
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.init(json:)::self.init#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.init(json:)",
+      "target": "example.com/acme/conformance::Sources/Store/Order.swift::Order.init(id:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Order+Pricing.swift",
+        "start": 58,
+        "end": 77
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.price(quantity:)::discount#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.price(quantity:)",
+      "target": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.discount(quantity:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Order+Pricing.swift",
+        "start": 146,
+        "end": 174
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notify(order:)::log#0",
+      "caller": "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notify(order:)",
+      "target": "example.com/acme/conformance::Sources/Store/Order.swift::log(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 147,
+        "end": 160
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notifyAll(orders:)::notify#0",
+      "caller": "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notifyAll(orders:)",
+      "target": "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notify(order:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 255,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.init(retries:)::self.init#0",
+      "caller": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.init(retries:)",
+      "target": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.init()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 393,
+        "end": 404
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(_:)::Order#0",
+      "caller": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(_:)",
+      "target": "example.com/acme/conformance::Sources/Store/Order.swift::Order.init(id:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 805,
+        "end": 818
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(_:)::place#0",
+      "caller": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(_:)",
+      "target": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 792,
+        "end": 819
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:)::place#0",
+      "caller": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:)",
+      "target": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:quantity:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 473,
+        "end": 505
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:quantity:)::OrderService.validate#0",
+      "caller": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:quantity:)",
+      "target": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.validate(order:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 688,
+        "end": 723
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:quantity:)::audit#0",
+      "caller": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:quantity:)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Store/OrderService+Audit.swift::OrderService.audit(_:)",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.audit(_:Bool)",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.audit(_:Order)",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.audit(_:String)"
+      ],
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 582,
+        "end": 594
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:quantity:)::order.price#0",
+      "caller": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:quantity:)",
+      "target": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.price(quantity:)",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 641,
+        "end": 672
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:quantity:)::self.notify#0",
+      "caller": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:quantity:)",
+      "target": "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notify(order:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 603,
+        "end": 628
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.run()::log#0",
+      "caller": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.run()",
+      "target": "example.com/acme/conformance::Sources/Store/Order.swift::log(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 1071,
+        "end": 1083
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.run()::retry#0",
+      "caller": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.run()",
+      "target": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.retry(times:_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 1051,
+        "end": 1093
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.run()::retry#1",
+      "caller": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.run()",
+      "target": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.retry(times:_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 1102,
+        "end": 1120
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter.report()::summary#0",
+      "caller": "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter.report()",
+      "target": "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter.summary()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Store/OrderService.swift",
+        "start": 1198,
+        "end": 1207
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Bag.run()::describe#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Probe.swift::Bag.run()",
+      "target": "example.com/acme/conformance::Sources/Store/Probe.swift::describe()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Store/Probe.swift",
+        "start": 257,
+        "end": 267
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Probe.run()::ping#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Probe.swift::Probe.run()",
+      "target": "example.com/acme/conformance::Sources/Store/Probe.swift::Pinger.ping()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Probe.swift",
+        "start": 159,
+        "end": 165
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Probe.run()::trace#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Probe.swift::Probe.run()",
+      "target": "example.com/acme/conformance::Sources/Store/Probe+Tracer.swift::Probe.trace()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Probe.swift",
+        "start": 174,
+        "end": 181
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [],
+  "communities": [
+    {
+      "name": "Sources/Store",
+      "members": [
+        "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.init()",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.init(retries:)"
+      ]
+    },
+    {
+      "name": "Sources/Store#2",
+      "members": [
+        "example.com/acme/conformance::Sources/Checkout/Checkout.swift::Checkout.run()",
+        "example.com/acme/conformance::Sources/Checkout/Summary.swift::log(level:)",
+        "example.com/acme/conformance::Sources/Checkout/Summary.swift::summarize()",
+        "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.init(json:)",
+        "example.com/acme/conformance::Sources/Store/Order.swift::Order.init(id:)",
+        "example.com/acme/conformance::Sources/Store/Order.swift::format(order:)",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(_:)",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:)"
+      ]
+    },
+    {
+      "name": "Sources/Store#3",
+      "members": [
+        "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.Line.doubled()",
+        "example.com/acme/conformance::Sources/Store/Order.swift::Order.Line.total()"
+      ]
+    },
+    {
+      "name": "Sources/Store#4",
+      "members": [
+        "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.discount(quantity:)",
+        "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.price(quantity:)",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:quantity:)",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.validate(order:)"
+      ]
+    },
+    {
+      "name": "Sources/Store#5",
+      "members": [
+        "example.com/acme/conformance::Sources/Store/Order.swift::log(_:)",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notify(order:)",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notifyAll(orders:)",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.retry(times:_:)",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.run()"
+      ]
+    },
+    {
+      "name": "Sources/Store#6",
+      "members": [
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter.report()",
+        "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter.summary()"
+      ]
+    },
+    {
+      "name": "Sources/Store#7",
+      "members": [
+        "example.com/acme/conformance::Sources/Store/Probe+Tracer.swift::Probe.trace()",
+        "example.com/acme/conformance::Sources/Store/Probe.swift::Pinger.ping()",
+        "example.com/acme/conformance::Sources/Store/Probe.swift::Probe.run()"
+      ]
+    },
+    {
+      "name": "Sources/Store#8",
+      "members": [
+        "example.com/acme/conformance::Sources/Store/Probe.swift::Bag.run()",
+        "example.com/acme/conformance::Sources/Store/Probe.swift::describe()"
+      ]
+    }
+  ],
+  "links": [],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notifyAll(orders:)",
+      "kind": "export",
+      "label": "Notifier.notifyAll(orders:)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notifyAll(orders:)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notify(order:)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Store/Order.swift::log(_:)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(_:)",
+      "kind": "export",
+      "label": "OrderService.place(_:)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(_:)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:)"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:quantity:)"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.place(order:quantity:)::audit#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::Sources/Store/OrderService+Audit.swift::OrderService.audit(_:)",
+            "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.audit(_:Bool)",
+            "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.audit(_:Order)",
+            "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.audit(_:String)"
+          ]
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notify(order:)"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Store/Order.swift::log(_:)"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.price(quantity:)"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.discount(quantity:)"
+        },
+        {
+          "depth": 5,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.price(quantity:)",
+          "mark": "cycle"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Store/OrderService.swift::OrderService.validate(order:)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::Sources/Store/Order.swift::Order.init(id:)"
+        }
+      ]
+    }
+  ]
+}

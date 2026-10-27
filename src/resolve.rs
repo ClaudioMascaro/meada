@@ -311,11 +311,13 @@ pub struct Resolver<'a> {
     overloads: HashMap<&'a str, HashMap<&'a str, Vec<Target<'a>>>>,
     constructors: HashMap<&'a str, HashMap<&'a str, Vec<Target<'a>>>>,
     /// The argument counts each overload takes, fewest to most (`Arity`).
-    arities: HashMap<Target<'a>, Arity>,
+    arities: HashMap<Target<'a>, Arity<'a>>,
     statics: HashSet<Target<'a>>,
     members_in_scope: bool,
     unordered_globs: bool,
     qualified_types: bool,
+    /// The pack's `LanguagePack::namespaced`.
+    namespaced: bool,
     consts: HashMap<&'a str, HashSet<&'a str>>,
     /// The types each file of a compilation keeps to it (`Facts::private` of a file with a
     /// `Facts::unit`), for `hidden`.
@@ -413,22 +415,26 @@ fn nested_in(inner: Target, outer: Target) -> bool {
 
 /// The argument counts a function takes: one per parameter, fewer for the ones a call may leave
 /// out (`Binds::Optional`), and any number more for a `Binds::Rest` one (Kotlin's `vararg`).
+/// Where its parameters carry argument labels (`Param::label`, Swift), a call fits only with
+/// its labels in order (`Args::labels`).
 #[derive(Clone, Copy)]
-struct Arity {
+struct Arity<'a> {
     least: usize,
     most: Option<usize>,
     /// Whether the first parameter is the instance a call made on a receiver supplies (C#'s
     /// extension `this`): such a call counts one argument fewer than `Ext.F(x)` does.
     receiver: bool,
+    params: &'a [Param],
 }
 
-impl Arity {
-    fn of(params: &[Param]) -> Self {
+impl<'a> Arity<'a> {
+    fn of(params: &'a [Param]) -> Self {
         let required = |p: &&Param| !matches!(p.binds, Binds::Optional | Binds::Rest);
         Arity {
             least: params.iter().filter(required).count(),
             most: (!params.iter().any(|p| p.binds == Binds::Rest)).then_some(params.len()),
             receiver: params.first().is_some_and(|p| p.binds == Binds::Instance),
+            params,
         }
     }
 
@@ -437,11 +443,68 @@ impl Arity {
     }
 
     /// `fits` for a call whose form `on_receiver` tells, only when the function takes its
-    /// receiver as a first parameter.
-    fn fits_call(self, arity: usize, on_receiver: &dyn Fn() -> bool) -> bool {
-        let arity = arity + usize::from(self.receiver && on_receiver());
+    /// receiver as a first parameter, and whose labels, when it writes them, the parameters
+    /// take (`labelled`).
+    fn fits_call(self, args: Args, on_receiver: &dyn Fn() -> bool) -> bool {
+        let arity = args.count + usize::from(self.receiver && on_receiver());
         self.fits(arity)
+            && args
+                .labels
+                .is_none_or(|labels| labelled(self.params, labels))
     }
+}
+
+/// What a call gives the function it reaches to fit (`Arity::fits_call`): its argument count
+/// and, in a language whose calls label their arguments, those labels (`Call::labels`).
+#[derive(Clone, Copy)]
+struct Args<'c> {
+    count: usize,
+    labels: Option<&'c [String]>,
+}
+
+impl<'c> Args<'c> {
+    /// The arguments of `call`, when it is narrowed by them (`Call::arity`).
+    fn of(call: &'c Call) -> Option<Self> {
+        Some(Args {
+            count: call.arity?,
+            labels: call.labels.as_deref(),
+        })
+    }
+}
+
+/// Whether parameters with labels (`Param::label`, `_` when none) take the arguments of a call
+/// with `labels` in order, as Swift matches them: each argument goes to the next parameter of
+/// its label, a parameter with a default value or a variadic one may take none, a variadic one
+/// takes the unlabelled arguments after its first, and a trailing closure (an empty label) may
+/// take a parameter of any label. A parameter without a label (another language's) takes
+/// whatever it is given.
+fn labelled(params: &[Param], labels: &[String]) -> bool {
+    if !params.is_empty() && params.iter().all(|p| p.label.is_none()) {
+        return true;
+    }
+    // `fit[j]`: the parameters read so far take the first `j` arguments.
+    let mut fit = vec![false; labels.len() + 1];
+    fit[0] = true;
+    for p in params {
+        let label = p.label.as_deref().unwrap_or("_");
+        let skips = matches!(p.binds, Binds::Optional | Binds::Rest);
+        let mut next = vec![false; labels.len() + 1];
+        for j in (0..=labels.len()).filter(|&j| fit[j]) {
+            next[j] |= skips;
+            let Some(first) = labels.get(j) else { continue };
+            if first != label && !first.is_empty() {
+                continue;
+            }
+            let mut k = j + 1;
+            next[k] = true;
+            while p.binds == Binds::Rest && labels.get(k).is_some_and(|l| l == "_") {
+                k += 1;
+                next[k] = true;
+            }
+        }
+        fit = next;
+    }
+    fit[labels.len()]
 }
 
 /// Files that share one top-level scope (`Layout::shared`), sorted, and the files whose top
@@ -454,6 +517,9 @@ struct Group<'a> {
     /// Where in `files` sit the files that name each name in their exports, and those with a
     /// star export.
     exporting: Named<'a>,
+    /// The top-level overload families (`Facts::overloads`), by name, with the functions of
+    /// every file of the group: one family, as Swift's module scope makes it.
+    families: HashMap<&'a str, Vec<Target<'a>>>,
 }
 
 /// An extension function (`Facts::extensions`): the scope it is written in (its file's package
@@ -526,7 +592,7 @@ impl<'a> Resolver<'a> {
                 })
                 .collect()
         };
-        let overloads = families(|f| &f.overloads);
+        let overloads: HashMap<&str, HashMap<&str, Vec<Target>>> = families(|f| &f.overloads);
         let constructors = families(|f| &f.constructors);
         let statics = files
             .iter()
@@ -572,11 +638,23 @@ impl<'a> Resolver<'a> {
                 }
                 sharing.insert(path, groups.len());
             }
+            // The top-level function families of the group, each with the functions every file
+            // of it declares under that name.
+            let mut families: HashMap<&str, Vec<Target>> = HashMap::new();
+            for &path in &members {
+                for (&alias, targets) in &overloads[path] {
+                    if !alias.contains('.') {
+                        families.entry(alias).or_default().extend(targets);
+                    }
+                }
+            }
+            families.values_mut().for_each(|f| f.sort());
             groups.push(Group {
                 files: members,
                 tops,
                 methods,
                 exporting,
+                families,
             });
         }
         let mut parts: HashMap<(&str, &str), Vec<&str>> = HashMap::new();
@@ -723,6 +801,7 @@ impl<'a> Resolver<'a> {
             members_in_scope: language.members_in_scope(),
             unordered_globs: language.unordered_globs(),
             qualified_types: language.qualified_types(),
+            namespaced: language.namespaced(),
             written,
             consts,
             internal,
@@ -1008,10 +1087,17 @@ impl<'a> Resolver<'a> {
                 } else {
                     (&self.overloads, Binding::Unknown)
                 };
-                let all: Vec<Target> = (self.parts(t).into_iter())
-                    .flat_map(|part| families[part.path].get(part.name).into_iter().flatten())
+                // A block of the type (Swift's extension, in any file) adds to its families.
+                let blocks = self.impls.get(&t).into_iter().flatten();
+                let scopes = (self.parts(t).into_iter())
+                    .map(|part| (part.path, part.name))
+                    .chain(blocks.map(|b| (b.path, b.scope)));
+                let mut all: Vec<Target> = scopes
+                    .flat_map(|(path, scope)| families[path].get(scope).into_iter().flatten())
                     .copied()
                     .collect();
+                all.sort();
+                all.dedup();
                 match all.is_empty() {
                     true => absent,
                     false => Binding::Several(all),
@@ -1020,7 +1106,7 @@ impl<'a> Resolver<'a> {
             found => found,
         };
         let known = matches!(binding, Binding::Def(_) | Binding::Several(_));
-        let binding = self.narrow(binding, call.arity, &|| self.on_receiver(path, call));
+        let binding = self.narrow(binding, Args::of(call), &|| self.on_receiver(path, call));
         // No member fits: an extension function in scope may.
         if matches!(binding, Binding::Unknown | Binding::External(..))
             && let Some(found) = self.extended(path, call, on.clone(), work)
@@ -1094,7 +1180,14 @@ impl<'a> Resolver<'a> {
         }
         let bare = head.is_none() && self.members_in_scope;
         let on_receiver = || self.on_receiver(path, call);
-        let all = self.candidates(path, callee, call.by_path, call.arity, bare, &on_receiver);
+        let all = self.candidates(
+            path,
+            callee,
+            call.by_path,
+            Args::of(call),
+            bare,
+            &on_receiver,
+        );
         let mut written = false;
         let owner = match head {
             None if bare => self.class(path, scope),
@@ -1188,7 +1281,7 @@ impl<'a> Resolver<'a> {
         match within[..] {
             [one] => narrowed(one, all.len()),
             [_, _, ..] => Resolution::Ambiguous(within),
-            [] if bare && family.iter().any(|a| matches!(a, Ancestor::Opaque(_))) => {
+            [] if bare && self.opaque(&family) => {
                 // What the scope would bind with the family's base read as declaring nothing:
                 // that base may declare the name and hide it.
                 let found = self.resolve_as(
@@ -1199,16 +1292,13 @@ impl<'a> Resolver<'a> {
                     work,
                     Reading::Path,
                 );
-                match self.narrow(found, call.arity, &|| self.on_receiver(path, call)) {
+                match self.narrow(found, Args::of(call), &|| self.on_receiver(path, call)) {
                     Binding::Def(t) => narrowed(t, all.len().max(1)),
                     Binding::Several(several) => Resolution::Ambiguous(several),
                     _ => Resolution::Unresolved,
                 }
             }
-            [] if self.extension_methods
-                && on_instance
-                && !family.iter().any(|a| matches!(a, Ancestor::Opaque(_))) =>
-            {
+            [] if self.extension_methods && on_instance && !self.opaque(&family) => {
                 one_of(extensions(&all))
             }
             [] => Resolution::Unresolved,
@@ -1310,12 +1400,12 @@ impl<'a> Resolver<'a> {
     fn narrow(
         &self,
         binding: Binding<'a>,
-        arity: Option<usize>,
+        args: Option<Args>,
         on_receiver: &dyn Fn() -> bool,
     ) -> Binding<'a> {
-        let Some(arity) = arity else { return binding };
+        let Some(args) = args else { return binding };
         let fits =
-            |t: &Target<'a>| (self.arities.get(t)).is_none_or(|n| n.fits_call(arity, on_receiver));
+            |t: &Target<'a>| (self.arities.get(t)).is_none_or(|n| n.fits_call(args, on_receiver));
         match binding {
             Binding::Def(t) if !fits(&t) => Binding::Unknown,
             Binding::Several(all) => match all.into_iter().filter(fits).collect::<Vec<_>>()[..] {
@@ -1938,33 +2028,76 @@ impl<'a> Resolver<'a> {
     /// name (a field) are not methods and do not join the family, nor does a Kotlin extension
     /// written in its class's file (`fun Foo.x()` beside `class Foo`, a function named under
     /// the class): it is reached through `Resolver::extensions` alone, after the members.
+    /// A class's blocks (`Facts::impls`: Swift's extensions, in any file) declare overloads
+    /// after the class itself, and a block's protocol (`Impl::of`) after them, with that
+    /// protocol's own inherent blocks (its default implementations); a protocol from outside the
+    /// repository is an opaque base.
     fn overloaded(&self, family: &[Ancestor<'a>], member: &str) -> Option<Binding<'a>> {
         let (mut found, mut signatures, mut opaque) = (Vec::new(), HashSet::new(), false);
+        let blocks = |c: Target<'a>| self.impls.get(&c).into_iter().flatten();
+        // Each class with its blocks is one level, in family order; then each protocol a block
+        // conforms to, with its own blocks.
+        let (mut levels, mut conformed) = (Vec::new(), Vec::new());
         for ancestor in self.with_parts(family).iter() {
             let Ancestor::Class(c) = *ancestor else {
                 opaque = true;
                 continue;
             };
-            if self.overloads[c.path].is_empty() {
-                continue;
+            let mut scopes = vec![(c.path, c.name)];
+            for b in blocks(c) {
+                scopes.push((b.path, b.scope));
+                match b.of {
+                    Some(p) => conformed.push(p),
+                    None => opaque |= b.of_trait,
+                }
             }
-            let qualified = format!("{}.{member}", c.name);
-            if self.defs[c.path].contains_key(qualified.as_str()) {
-                continue;
-            }
-            let Some(all) = self.overloads[c.path].get(qualified.as_str()) else {
-                continue;
-            };
-            for t in all {
-                if self.extends(*t) {
+            levels.push((c, scopes));
+        }
+        for p in conformed {
+            let inherent = blocks(p).filter(|pb| !pb.of_trait);
+            let scopes =
+                std::iter::once((p.path, p.name)).chain(inherent.map(|b| (b.path, b.scope)));
+            levels.push((p, scopes.collect()));
+        }
+        for (class, scopes) in levels {
+            // A signature an earlier level declares is overridden there. Within a level, one
+            // the class declares twice is two overloads (types the labels do not tell), but a
+            // protocol extension's member of a requirement's signature is its default body.
+            let protocol = self.files[class.path]
+                .interfaces
+                .iter()
+                .any(|i| i == class.name);
+            let mut level: Vec<(&str, usize, Target<'a>)> = Vec::new();
+            for (at, (path, scope)) in scopes.into_iter().enumerate() {
+                if self.overloads[path].is_empty() {
                     continue;
                 }
-                if signatures.insert(t.name.strip_prefix(c.name).unwrap_or(t.name)) {
-                    found.push(*t);
+                let qualified = format!("{scope}.{member}");
+                if self.defs[path].contains_key(qualified.as_str()) {
+                    continue;
                 }
+                let Some(all) = self.overloads[path].get(qualified.as_str()) else {
+                    continue;
+                };
+                for t in all {
+                    let signature = t.name.strip_prefix(scope).unwrap_or(t.name);
+                    let required = || level.iter().any(|(s, a, _)| *s == signature && *a == 0);
+                    if self.extends(*t)
+                        || signatures.contains(signature)
+                        || (protocol && at > 0 && required())
+                    {
+                        continue;
+                    }
+                    level.push((signature, at, *t));
+                }
+            }
+            for (signature, _, t) in level {
+                signatures.insert(signature);
+                found.push(t);
             }
         }
         found.sort();
+        found.dedup();
         match found[..] {
             [] => None,
             _ if opaque => Some(Binding::Unknown),
@@ -2021,6 +2154,18 @@ impl<'a> Resolver<'a> {
             .filter(|found| !matches!(found, Binding::Unknown))
     }
 
+    /// Whether a member of `family` may come from outside the repository: a base whose members
+    /// are not known, or a protocol from outside that a block of one of its classes conforms
+    /// to (Swift's `extension S: Sequence`).
+    fn opaque(&self, family: &[Ancestor<'a>]) -> bool {
+        family.iter().any(|a| match a {
+            Ancestor::Opaque(_) => true,
+            Ancestor::Class(c) => {
+                (self.impls.get(c).into_iter().flatten()).any(|b| b.of_trait && b.of.is_none())
+            }
+        })
+    }
+
     /// What a bare method name written in the body of class `class` of `path` names
     /// (`Reading::Method`): the overloads its family declares (`overloaded`). Unknown when the
     /// family is absent, or when none declares it and a base whose members are not known may,
@@ -2033,11 +2178,7 @@ impl<'a> Resolver<'a> {
             return Some(Binding::Unknown);
         };
         match self.overloaded(family, name) {
-            None if self.implicit.contains(&name)
-                || family.iter().any(|a| matches!(a, Ancestor::Opaque(_))) =>
-            {
-                Some(Binding::Unknown)
-            }
+            None if self.implicit.contains(&name) || self.opaque(family) => Some(Binding::Unknown),
             None => {
                 let class = Target { path, name: class };
                 let companion = self.companion(class, &mut Work::default())?;
@@ -2292,14 +2433,14 @@ impl<'a> Resolver<'a> {
         path: &str,
         callee: &str,
         by_path: bool,
-        arity: Option<usize>,
+        args: Option<Args>,
         bare: bool,
     ) -> Resolution<'a> {
-        one_of(self.candidates(path, callee, by_path, arity, bare, &|| false))
+        one_of(self.candidates(path, callee, by_path, args, bare, &|| false))
     }
 
     /// The definitions whose name matches the callee's last name anywhere `path` reaches
-    /// (`reaches`), narrowed by the argument count: methods for a member call (`x.area()`) and
+    /// (`reaches`), narrowed by the arguments (`Args`): methods for a member call (`x.area()`) and
     /// for a `bare` one where class members are in scope, top-level functions and classes for
     /// a plain call (`area()`), both for a path (`a::area()`, `by_path`).
     fn candidates(
@@ -2307,7 +2448,7 @@ impl<'a> Resolver<'a> {
         path: &str,
         callee: &str,
         by_path: bool,
-        arity: Option<usize>,
+        args: Option<Args>,
         bare: bool,
         on_receiver: &dyn Fn() -> bool,
     ) -> Vec<Target<'a>> {
@@ -2327,8 +2468,8 @@ impl<'a> Resolver<'a> {
         if self.files.get(path).is_some_and(|f| !f.unit.is_empty()) {
             found.retain(|t| !self.hidden(path, *t));
         }
-        if let Some(arity) = arity {
-            found.retain(|t| (self.arities.get(t)).is_none_or(|n| n.fits_call(arity, on_receiver)));
+        if let Some(args) = args {
+            found.retain(|t| (self.arities.get(t)).is_none_or(|n| n.fits_call(args, on_receiver)));
         }
         // A file whose calls reach no extension function (Java's) matches none by name either.
         if !self.extending.contains(path) {
@@ -2470,12 +2611,9 @@ impl<'a> Resolver<'a> {
                             }
                         }
                         if reading != Reading::Type
-                            && let Some(overloads) = self.overloads[path].get(candidate.as_str())
+                            && let Some(found) = self.family_at(path, s, &candidate)
                         {
-                            return match overloads[..] {
-                                [one] => Binding::Def(one),
-                                _ => Binding::Several(overloads.clone()),
-                            };
+                            return found;
                         }
                         if let Some(found) = self.imported_at(path, s, name, seen) {
                             let method = matches!(found, Binding::Def(t) if self.defs[t.path][t.name].kind == Kind::Method)
@@ -2507,11 +2645,8 @@ impl<'a> Resolver<'a> {
                 return Binding::Def(Target { path, name });
             }
             let read = reading.read() && self.members_in_scope;
-            if !read && let Some(overloads) = self.overloads[path].get(candidate.as_str()) {
-                return match overloads[..] {
-                    [one] => Binding::Def(one),
-                    _ => Binding::Several(overloads.clone()),
-                };
+            if !read && let Some(found) = self.family_at(path, s, &candidate) {
+                return found;
             }
             // A field a class body sees may be its base's (`protected Repo repo`), before an
             // outer class's.
@@ -2558,6 +2693,20 @@ impl<'a> Resolver<'a> {
             }
             found => found,
         }
+    }
+
+    /// The overload family `candidate` that the scope `scope` of `path` declares: at the top
+    /// level, of every file of its group (`Layout::shared`), which share that scope.
+    fn family_at(&self, path: &'a str, scope: &str, candidate: &str) -> Option<Binding<'a>> {
+        let group = (self.shared.get(path)).filter(|_| scope.is_empty());
+        let found = match group.and_then(|&g| self.groups[g].families.get(candidate)) {
+            Some(all) => all,
+            None => self.overloads[path].get(candidate)?,
+        };
+        Some(match found[..] {
+            [one] => Binding::Def(one),
+            _ => Binding::Several(found.clone()),
+        })
     }
 
     /// Whether a function or lambda around the block `block`, up to a class or the top level,
@@ -2857,8 +3006,12 @@ impl<'a> Resolver<'a> {
     }
 
     /// The namespace a glob of `path` whose target is the import `target` takes the names of
-    /// (`wildcard`'s `Imported::Namespace` source), if it is one.
+    /// (`wildcard`'s `Imported::Namespace` source), if it is one, where the pack's type names
+    /// carry their namespace (`LanguagePack::namespaced`).
     fn glob_namespace(&self, path: &'a str, target: &str) -> Option<&'a str> {
+        if !self.namespaced {
+            return None;
+        }
         let imports = &self.files[path].imports;
         (self.by_local[path].of(target).iter().rev())
             .map(|&at| &imports[at])
@@ -6465,11 +6618,67 @@ mod tests {
         assert!(took.as_secs() < 20, "{took:?}");
     }
 
+    /// Swift's argument labels: each argument goes to the next parameter of its label in order,
+    /// past those with a default value; a variadic one takes the unlabelled arguments after its
+    /// first; a trailing closure (an empty label) takes a parameter of any label.
+    #[test]
+    fn labelled_parameters_take_the_labels_of_a_call_in_order() {
+        let labelled_param = |label: &str, binds| Param {
+            label: Some(label.into()),
+            binds,
+            ..param(label)
+        };
+        let (any, optional, rest) = (Binds::Any, Binds::Optional, Binds::Rest);
+        // The parameters, by label and binding, the labels of a call, and whether they fit.
+        type Case<'c> = (&'c [(&'c str, Binds)], &'c [&'c str], bool);
+        let cases: &[Case] = &[
+            (
+                &[("order", any), ("quantity", any)],
+                &["order", "quantity"],
+                true,
+            ),
+            (&[("order", any), ("quantity", any)], &["order"], false),
+            (
+                &[("order", any), ("quantity", any)],
+                &["quantity", "order"],
+                false,
+            ),
+            (&[("order", any)], &["_"], false),
+            (&[("_", any)], &["_"], true),
+            (&[("_", any)], &["order"], false),
+            (&[("times", optional), ("_", any)], &[""], true),
+            (&[("times", optional), ("_", any)], &["times", ""], true),
+            (&[("times", optional), ("_", any)], &["_"], true),
+            (&[("times", optional), ("_", any)], &[], false),
+            (
+                &[("a", any), ("b", optional), ("c", any)],
+                &["a", "c"],
+                true,
+            ),
+            (&[("xs", rest)], &["xs", "_", "_"], true),
+            (&[("xs", rest)], &[], true),
+            (&[("xs", rest), ("y", any)], &["xs", "_", "y"], true),
+            (&[("xs", rest)], &["xs", "y"], false),
+            (&[], &[], true),
+            (&[], &["_"], false),
+        ];
+        for (params, labels, fits) in cases {
+            let params: Vec<Param> = (params.iter())
+                .map(|(label, binds)| labelled_param(label, *binds))
+                .collect();
+            let labels: Vec<String> = labels.iter().map(|l| l.to_string()).collect();
+            assert_eq!(labelled(&params, &labels), *fits, "{labels:?}");
+        }
+        // Parameters without labels (another language's) take whatever they are given.
+        assert!(labelled(&[param("x")], &["y".to_string()]));
+    }
+
     /// A plain parameter `name`.
     fn param(name: &str) -> Param {
         Param {
             name: name.into(),
             binds: Binds::Any,
+            label: None,
             default: None,
             fields: Vec::new(),
         }
@@ -6521,6 +6730,7 @@ mod tests {
         facts.calls = (names.iter().enumerate())
             .map(|(i, name)| Call {
                 arity: None,
+                labels: None,
                 constructs: false,
                 scope: String::new(),
                 callee: name.clone(),

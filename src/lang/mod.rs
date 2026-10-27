@@ -16,6 +16,7 @@ pub mod java;
 pub mod kotlin;
 pub mod python;
 pub mod rust;
+pub mod swift;
 pub mod ts;
 
 pub trait LanguagePack {
@@ -113,6 +114,13 @@ pub trait LanguagePack {
     /// lexical value hides its head (Java's fully qualified types).
     fn qualified_types(&self) -> bool {
         false
+    }
+
+    /// Whether a type's qualified name starts with the namespace an on-demand import names
+    /// (Java's `p.Own`, C#'s namespaces), so a glob of a namespace takes the types declared in
+    /// it alone (`Binding::of_namespace`). A Swift module is no part of its types' names.
+    fn namespaced(&self) -> bool {
+        true
     }
 
     /// A keyword naming the base of the enclosing class, such as `super`: what its members
@@ -238,6 +246,7 @@ const PACKS: &[&dyn LanguagePack] = &[
     &java::Java,
     &kotlin::Kotlin,
     &csharp::CSharp,
+    &swift::Swift,
 ];
 
 /// Whether a file named `file` is one a `**/` name of `config_files` names (`pattern`, past
@@ -672,6 +681,11 @@ pub struct Param {
     /// Which argument of a call binds it.
     #[serde(default)]
     pub binds: Binds,
+    /// The argument label a call writes for it, `_` when it takes none (Swift's `order` in
+    /// `place(order o: Order)`), in a language whose calls label their arguments: a call then
+    /// fits the function only with its labels in order (`Call::labels`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
     /// The default value, as written. Not kept in the index (see `Call::args`).
     #[serde(skip)]
     pub default: Option<Value>,
@@ -747,6 +761,12 @@ pub struct Call {
     /// a cached file's facts, so a refreshed resolution agrees with a cold one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub arity: Option<usize>,
+    /// The label of each argument, in a language whose calls label them (Swift's
+    /// `place(order: o, quantity: 2)`): `_` for an unlabelled one, empty for a trailing closure,
+    /// which takes a parameter of any label. A function fits the call when its parameters
+    /// (`Param::label`) take them in order. Kept in cached facts, like `arity`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub labels: Option<Vec<String>>,
     /// Whether this call uses constructor syntax, in languages with a distinct constructor
     /// namespace. Kept with its argument count in cached facts.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]

@@ -1531,7 +1531,7 @@ type Chained = (
     &'static str,
 );
 
-fn chained() -> [Chained; 7] {
+fn chained() -> [Chained; 8] {
     [
         (
             "ts",
@@ -1614,6 +1614,16 @@ fn chained() -> [Chained; 7] {
             ],
             "public class C { public void F({t} a0) {\n{locals}\n} }\n",
             "  var a{i} = a{p}.M();",
+        ),
+        (
+            "swift",
+            |b| one("Sources/C.swift", b),
+            [
+                ("import Lib\n\n", "T"),
+                ("final class T { func m() -> T { return self } }\n\n", "T"),
+            ],
+            "func f(a0: {t}) {\n{locals}\n}\n",
+            "    let a{i} = a{p}.m()",
         ),
     ]
 }

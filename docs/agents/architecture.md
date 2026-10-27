@@ -764,7 +764,7 @@ one for the area a change touches.
   one, never a missing or empty file; `refresh` stays one transaction in place. An operator
   renames an index in (built elsewhere) only while no `meada index` writes that index, one
   writer per index: a refresh's live `index.db-journal` would be taken for the new file's. `lang/`: the
-  language adapter and the TS/JS, Python, Rust, Go, Java, Kotlin and C# packs. `resolve.rs`: calls to definitions (`Resolver`), values
+  language adapter and the TS/JS, Python, Rust, Go, Java, Kotlin, C# and Swift packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`: `Code::origins`, the one origin question, with three evidence policies
   (`Values`, `Constants` for the TypeScript forms, `Declarations` for Go's typed clients and
   forms), `Code::outside` for what an import from outside binds a name to, `Code::extensions`
@@ -1686,6 +1686,43 @@ one for the area a change touches.
   classes declared in that namespace alone (`Binding::of_namespace`), since a C# file's group
   is its first namespace's and it may declare types in another; the C# layout names such a file
   for each other namespace it declares types in, when no file has that namespace as package.
+  A pack whose type names carry no namespace turns that check off (`LanguagePack::namespaced`,
+  false for Swift: a module is no part of its types' names).
+  The Swift pack (spec #29, #117; `lang/swift.rs`) reads `Package.swift` with the same grammar
+  (`lang/swift/manifest.rs`: every `.target`, `.executableTarget`, `.testTarget`, `.macro` and
+  `.plugin` call with a literal `name:` outside a `dependencies:` argument, under its literal
+  `path:` inside the package or the default directory) as a config file (`**/Package.swift`,
+  no code: `is_code`). Each target is a module of the files under its directory, the deepest
+  one when several hold a file (looked up by the file's directories, so the cost is the path's
+  depth), and the files no target holds (all of them without a manifest) are one module no
+  import names. The layout shares a module's scope among its files (`Layout::shared`), whose
+  top-level overload families are one family across its files (`Group::families`,
+  `Resolver::family_at`), and names it by its first file; `join` sets each file's
+  `Facts::unit` to its module, so `internal` declarations (`Facts::private`) stay in it
+  (`Resolver::hidden`), and appends the module's own inside glob after the imports, so its
+  names come before an import's. `import M` is a namespace import of `M` and an outside glob
+  of it, which takes `M`'s public names (`Facts::star`). A function's name carries its
+  argument labels (`place(order:quantity:)`, `init(baseURL:)`, `_` for none); declarations of
+  one scope in a file (a type's body and its extensions alike) with the same labels and other
+  types carry each label's written type too (`audit(_:Order)`): `parse` walks the file twice,
+  the first time to find them. Each `Param::label` and each `Call::labels` (`_` for an
+  unlabelled argument, empty for a trailing closure) is kept with the facts, and `Arity`
+  narrows an overload family by them (`labelled`: in order, past parameters with a default
+  value, a variadic one taking the unlabelled arguments after its first, a trailing closure any
+  label), so a tie is `ambiguous` with each overload. An extension is no definition but a
+  `Facts::impls` block of the extended type, one more per protocol it writes (`Impl::of`).
+  `Resolver::overloaded` reads one level per class of the family, the class with its blocks in
+  any file (two declarations of one signature there are two overloads, but for a protocol a
+  block's member of a requirement's signature is its default body), then one level per
+  protocol a block conforms to, with that protocol's inherent blocks; a signature an earlier
+  level declares overrides a later one. A protocol from outside the repository a block conforms
+  to makes the family opaque (`Resolver::opaque`, which `inherited` and `matched` read as an
+  opaque base). A protocol extension's member of the requirement's signature in the
+  requirement's file is that one definition. A capitalized callee (`Order(id:)`,
+  `Order.Line()`) constructs (`Call::constructs`): the type's initializers in its body and its
+  blocks (`Facts::constructors`, also the family `Type.init` for `self.init(..)`), or the type
+  itself when it declares none (a memberwise initializer). Bare calls are Kotlin's
+  (`bare_calls`).
   C# method calls (spec #28, #108) use the seams Java's do and add none but one flag. The pack
   writes `Facts::receivers` from the declared type of a field, a property, a parameter
   (primary constructors' too), a local with an explicit type, a `foreach`, `out` or pattern
@@ -1772,8 +1809,9 @@ one for the area a change touches.
   unreadable one, is rebuilt beside it and renamed over it, and `status` says so. One whose stored facts do not
   parse is rebuilt by the first refresh that reads them (when a file changed), which `status`
   cannot tell.
-- The index holds no source text and no values, apart from the argument count and constructor
-  form of an overloaded call (`Call::arity`, `Call::constructs`), the place of the call a
+- The index holds no source text and no values, apart from the argument count, the argument
+  labels and constructor form of an overloaded call (`Call::arity`, `Call::labels`,
+  `Call::constructs`) and the argument label of a parameter (`Param::label`), the place of the call a
   chained call is made on (`Call::on`), whether an `inferred` call was narrowed from several
   definitions of its name (`calls.narrowed`), callable-to-signature and
   static-member names (`Facts::overloads`, `Facts::constructors` and
@@ -2017,6 +2055,18 @@ qualification budget does (ADR 0017).
   `Resolver::in_references`), and stays `ambiguous` with several or none, since a project
   not referenced may still be visible through references not read.
 
+- `lang/swift.rs`: `DEFINITION_DEPTH` (128) and `PATH_DEPTH` (256) bound the definitions
+  around a definition and the segments of a callee (past them a body keeps its enclosing
+  symbol and a callee is `(navigation_expression)`); `QUALIFICATION_BYTES` (4 MiB) bounds the
+  enclosing-name bytes a file's definitions, calls and bindings store, past which the file
+  keeps no facts. The pack's unit tests exceed each. Beyond the limits, what the pack leaves out
+  (spec #29, #117): a target's `sources:` and `exclude:`, two packages of the repository that
+  name a target alike (one module), `@testable import` (no `internal` access), a closure,
+  deinitializer, subscript or accessor (their calls and locals are the enclosing symbol's, so
+  an accessor's local hides its name in the whole type), an operator
+  function, enum cases, `Self` as a type's name, and the protocols a conformed protocol
+  inherits when the conformance is written on an extension. As in Java, an outside base
+  (`NSObject`, `Codable`, a raw value type) keeps a type's own overloads from `exact` (#353).
 - `lang/csharp.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the C# pack as they bound the Java pack's, with the same
   outcome past each (a call inside a definition nested too deep is `(opaque).`, resolving to
