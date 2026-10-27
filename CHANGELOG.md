@@ -66,6 +66,10 @@ All notable changes to Meada are recorded here. The format follows
   (`OrderService.place(order:quantity:)`), with an extension's members under the extended type.
   Unqualified, `self`, static and initializer calls resolve within the module and the modules
   it imports, narrowed by argument labels; a tie is `ambiguous`.
+- Vapor routes are HTTP providers (spec #29, #119): `get`, `post`, `put`, `patch`, `delete` and
+  `on(.METHOD, ..)` with their `grouped(..)` prefixes, a `RouteCollection` under the builder it
+  is registered on, and builders followed through assignments, arguments and return values; the
+  handler is the trailing closure or the function given as `use:`.
 - `Directory.Build.props` files apply to the C# projects below them as MSBuild imports them
   (the nearest one, then those it imports with `GetPathOfFileAbove` or a relative path): their
   `<Using>` items, `PackageReference`s and `ProjectReference`s, and the `PackageId`,

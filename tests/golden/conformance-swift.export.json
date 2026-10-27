@@ -6,6 +6,14 @@
       "hash": "4f4f06735cb30771dc3c454dfca8955ef54a2b8aa4bed8816ea7e45b55f51331"
     },
     {
+      "path": "Sources/Checkout/Routes.swift",
+      "hash": "981f304835f4aef4b4a2d221838986cb22c9d53aae9c6e3f9c7092658051a275"
+    },
+    {
+      "path": "Sources/Checkout/Server.swift",
+      "hash": "9088258a7f16e15e74382012c17dbb36d08596242e2b63a065dc35643049daff"
+    },
+    {
       "path": "Sources/Checkout/Summary.swift",
       "hash": "ddc43419ae51aba6eaa09999f70bab40d0c4446b1986a76a34c958ded460a0cb"
     },
@@ -49,6 +57,198 @@
         "path": "Sources/Checkout/Checkout.swift",
         "start": 98,
         "end": 359
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1644,
+        "end": 2020
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1690,
+        "end": 1895
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:).POST /api/v1/beta/orders",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1870,
+        "end": 1889
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.list(req:)",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1901,
+        "end": 1955
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.show(req:)",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1961,
+        "end": 2018
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mountAudit(under:)",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1174,
+        "end": 1263
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mountAudit(under:).GET /api/v1/audit/log",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1243,
+        "end": 1261
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mountReports(_:)",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1083,
+        "end": 1172
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:)",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1317,
+        "end": 1430
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:).GET /loop/leaf",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1377,
+        "end": 1394
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::orphan(_:)",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 2077,
+        "end": 2162
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 167,
+        "end": 1081
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).DELETE /api/v1/assets/{}",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 540,
+        "end": 557
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).GET /",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 220,
+        "end": 237
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).GET /api/v1/admin/tools/ping",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 634,
+        "end": 651
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).GET /api/v1/shared/hammer",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 939,
+        "end": 956
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).PATCH /api/v1/users/{}/name",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 442,
+        "end": 462
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).POST /api/v1/users",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 342,
+        "end": 404
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).PUT /api/v1/assets/{}",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 490,
+        "end": 508
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::sharedTools(_:)",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1432,
+        "end": 1523
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::showReport(req:)",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1586,
+        "end": 1642
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::showUser(req:)",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1525,
+        "end": 1584
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Server.swift::Server",
+      "span": {
+        "path": "Sources/Checkout/Server.swift",
+        "start": 14,
+        "end": 152
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Server.swift::Server.run()",
+      "span": {
+        "path": "Sources/Checkout/Server.swift",
+        "start": 32,
+        "end": 150
       }
     },
     {
@@ -497,6 +697,446 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)::orders.get#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1786,
+        "end": 1807
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)::orders.get#1",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1816,
+        "end": 1849
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)::orders.post#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1858,
+        "end": 1889
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)::routes.grouped#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1753,
+        "end": 1777
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mountAudit(under:)::routes.get#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mountAudit(under:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1225,
+        "end": 1261
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mountReports(_:)::routes.get#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mountReports(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1132,
+        "end": 1170
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:)::nest#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1399,
+        "end": 1428
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:)::routes.get#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1358,
+        "end": 1394
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:)::routes.grouped#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1404,
+        "end": 1427
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::orphan(_:)::routes.get#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::orphan(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 2120,
+        "end": 2160
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::(call_expression).grouped#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 574,
+        "end": 611
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::(try_expression).register#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 708,
+        "end": 771
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::OrderController#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 685,
+        "end": 702
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::OrderController#1",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 753,
+        "end": 770
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::api.delete#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 513,
+        "end": 557
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::api.get#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 281,
+        "end": 319
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::api.grouped#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 574,
+        "end": 594
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::api.grouped#1",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 712,
+        "end": 731
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::api.grouped#2",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 858,
+        "end": 878
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::api.on#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 409,
+        "end": 462
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::api.post#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 324,
+        "end": 404
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::api.put#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 467,
+        "end": 508
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::api.register#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 660,
+        "end": 703
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::app.get#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 212,
+        "end": 237
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::app.group#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 991,
+        "end": 1079
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::app.grouped#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 252,
+        "end": 276
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::app.grouped#1",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 811,
+        "end": 834
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::app.grouped#2",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 966,
+        "end": 985
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::group.get#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1031,
+        "end": 1073
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::mountAudit#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mountAudit(under:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 840,
+        "end": 879
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::mountReports#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mountReports(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 776,
+        "end": 793
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::mountReports#1",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mountReports(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 798,
+        "end": 835
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::nest#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 961,
+        "end": 986
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::shared.get#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 918,
+        "end": 956
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::sharedTools#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Routes.swift::sharedTools(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 897,
+        "end": 913
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)::tools.get#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 616,
+        "end": 651
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::sharedTools(_:)::parent.grouped#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::sharedTools(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 1497,
+        "end": 1521
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Server.swift::Server.run()::(prefix_expression)#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Server.swift::Server.run()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Server.swift",
+        "start": 110,
+        "end": 119
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Server.swift::Server.run()::Application.make#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Server.swift::Server.run()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Server.swift",
+        "start": 93,
+        "end": 120
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Server.swift::Server.run()::routes#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Server.swift::Server.run()",
+      "target": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Server.swift",
+        "start": 133,
+        "end": 144
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/Checkout/Summary.swift::summarize()::log#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Summary.swift::summarize()",
       "target": "example.com/acme/conformance::Sources/Checkout/Summary.swift::log(level:)",
@@ -745,9 +1385,98 @@
       }
     }
   ],
-  "providers": [],
+  "providers": [
+    {
+      "contract": "http::DELETE::/api/v1/assets/{}",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).DELETE /api/v1/assets/{}"
+    },
+    {
+      "contract": "http::GET::/",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).GET /"
+    },
+    {
+      "contract": "http::GET::/api/v1/admin/tools/ping",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).GET /api/v1/admin/tools/ping"
+    },
+    {
+      "contract": "http::GET::/api/v1/audit/log",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mountAudit(under:).GET /api/v1/audit/log"
+    },
+    {
+      "contract": "http::GET::/api/v1/beta/orders",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.list(req:)"
+    },
+    {
+      "contract": "http::GET::/api/v1/beta/orders/{}",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.show(req:)"
+    },
+    {
+      "contract": "http::GET::/api/v1/orders",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.list(req:)"
+    },
+    {
+      "contract": "http::GET::/api/v1/orders/{}",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.show(req:)"
+    },
+    {
+      "contract": "http::GET::/api/v1/reports",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::showReport(req:)"
+    },
+    {
+      "contract": "http::GET::/api/v1/shared/hammer",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).GET /api/v1/shared/hammer"
+    },
+    {
+      "contract": "http::GET::/api/v1/users/{}",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::showUser(req:)"
+    },
+    {
+      "contract": "http::GET::/internal/reports",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::showReport(req:)"
+    },
+    {
+      "contract": "http::GET::/loop/again/leaf",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:).GET /loop/leaf"
+    },
+    {
+      "contract": "http::GET::/loop/leaf",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:).GET /loop/leaf"
+    },
+    {
+      "contract": "http::PATCH::/api/v1/users/{}/name",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).PATCH /api/v1/users/{}/name"
+    },
+    {
+      "contract": "http::POST::/api/v1/beta/orders",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:).POST /api/v1/beta/orders"
+    },
+    {
+      "contract": "http::POST::/api/v1/orders",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:).POST /api/v1/beta/orders"
+    },
+    {
+      "contract": "http::POST::/api/v1/users",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).POST /api/v1/users"
+    },
+    {
+      "contract": "http::PUT::/api/v1/assets/{}",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).PUT /api/v1/assets/{}"
+    }
+  ],
   "consumers": [],
   "communities": [
+    {
+      "name": "Sources/Checkout",
+      "members": [
+        "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController",
+        "example.com/acme/conformance::Sources/Checkout/Routes.swift::mountAudit(under:)",
+        "example.com/acme/conformance::Sources/Checkout/Routes.swift::mountReports(_:)",
+        "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:)",
+        "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:)",
+        "example.com/acme/conformance::Sources/Checkout/Routes.swift::sharedTools(_:)",
+        "example.com/acme/conformance::Sources/Checkout/Server.swift::Server.run()"
+      ]
+    },
     {
       "name": "Sources/Store",
       "members": [
@@ -820,6 +1549,272 @@
   ],
   "links": [],
   "processes": [
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:).POST /api/v1/beta/orders::http::POST::/api/v1/beta/orders",
+      "kind": "route",
+      "label": "POST /api/v1/beta/orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:).POST /api/v1/beta/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:).POST /api/v1/beta/orders::http::POST::/api/v1/orders",
+      "kind": "route",
+      "label": "POST /api/v1/orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:).POST /api/v1/beta/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.list(req:)::http::GET::/api/v1/beta/orders",
+      "kind": "route",
+      "label": "GET /api/v1/beta/orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.list(req:)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.list(req:)::http::GET::/api/v1/orders",
+      "kind": "route",
+      "label": "GET /api/v1/orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.list(req:)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.show(req:)::http::GET::/api/v1/beta/orders/{}",
+      "kind": "route",
+      "label": "GET /api/v1/beta/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.show(req:)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.show(req:)::http::GET::/api/v1/orders/{}",
+      "kind": "route",
+      "label": "GET /api/v1/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.show(req:)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mountAudit(under:).GET /api/v1/audit/log::http::GET::/api/v1/audit/log",
+      "kind": "route",
+      "label": "GET /api/v1/audit/log",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mountAudit(under:).GET /api/v1/audit/log"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:).GET /loop/leaf::http::GET::/loop/again/leaf",
+      "kind": "route",
+      "label": "GET /loop/again/leaf",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:).GET /loop/leaf"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:).GET /loop/leaf::http::GET::/loop/leaf",
+      "kind": "route",
+      "label": "GET /loop/leaf",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::nest(_:).GET /loop/leaf"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).DELETE /api/v1/assets/{}::http::DELETE::/api/v1/assets/{}",
+      "kind": "route",
+      "label": "DELETE /api/v1/assets/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).DELETE /api/v1/assets/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).GET /::http::GET::/",
+      "kind": "route",
+      "label": "GET /",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).GET /"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).GET /api/v1/admin/tools/ping::http::GET::/api/v1/admin/tools/ping",
+      "kind": "route",
+      "label": "GET /api/v1/admin/tools/ping",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).GET /api/v1/admin/tools/ping"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).GET /api/v1/shared/hammer::http::GET::/api/v1/shared/hammer",
+      "kind": "route",
+      "label": "GET /api/v1/shared/hammer",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).GET /api/v1/shared/hammer"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).PATCH /api/v1/users/{}/name::http::PATCH::/api/v1/users/{}/name",
+      "kind": "route",
+      "label": "PATCH /api/v1/users/{}/name",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).PATCH /api/v1/users/{}/name"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).POST /api/v1/users::http::POST::/api/v1/users",
+      "kind": "route",
+      "label": "POST /api/v1/users",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).POST /api/v1/users"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).PUT /api/v1/assets/{}::http::PUT::/api/v1/assets/{}",
+      "kind": "route",
+      "label": "PUT /api/v1/assets/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).PUT /api/v1/assets/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::showReport(req:)::http::GET::/api/v1/reports",
+      "kind": "route",
+      "label": "GET /api/v1/reports",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::showReport(req:)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::showReport(req:)::http::GET::/internal/reports",
+      "kind": "route",
+      "label": "GET /internal/reports",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::showReport(req:)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::showUser(req:)::http::GET::/api/v1/users/{}",
+      "kind": "route",
+      "label": "GET /api/v1/users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::showUser(req:)"
+        }
+      ]
+    },
     {
       "entry_point": "example.com/acme/conformance::Sources/Store/OrderService.swift::Notifier.notifyAll(orders:)",
       "kind": "export",

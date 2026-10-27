@@ -787,7 +787,7 @@ one for the area a change touches.
   providers, and `http/kotlin/client.rs`, Ktor client consumers; `http/csharp.rs`, ASP.NET Core
   controller providers, `http/csharp/minimal.rs`, minimal API providers,
   `http/csharp/clients.rs`, HttpClient and typed client consumers, and `http/csharp/refit.rs`,
-  Refit consumers), resource and channel
+  Refit consumers; `http/swift.rs` and `http/swift/vapor.rs`, Vapor providers), resource and channel
   kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go, Maven and NuGet packages as
   contracts (specs #22, #24, #30, #25, #26 and #28), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
@@ -1723,6 +1723,17 @@ one for the area a change touches.
   blocks (`Facts::constructors`, also the family `Type.init` for `self.init(..)`), or the type
   itself when it declares none (a memberwise initializer). Bare calls are Kotlin's
   (`bare_calls`).
+  The values the contract kinds read (spec #29, #119; `lang/swift/values.rs`) are written for
+  each call: its receiver (`a.b` of `a.b.f()`), its arguments (a label makes a keyword
+  argument, `get("users", use: list)`, a trailing closure the last positional one), a string as
+  its parts (an interpolated name a `Part::Ref`, any other expression or an escape a hole), a
+  name or a member chain as `Value::Ref`, an implicit member as `.NAME`, an array as a list and
+  a call as `Value::Call`, read to `VALUE_DEPTH` (32). A closure written in code (not in a
+  type's property initializer) is a `Kind::Inline` definition named `<scope>.@<offset>`, and the
+  calls and names inside it belong to that scope. `Facts::bound` holds a `let` of one name given
+  a call (a `var` is never bound), a top-level `let` is a `Const` holding its initializer, and
+  `Def::return_values` holds each `return` and the one expression of a function that writes a
+  result type. `Code::arg` looks a keyword argument up by the parameter's label.
   C# method calls (spec #28, #108) use the seams Java's do and add none but one flag. The pack
   writes `Facts::receivers` from the declared type of a field, a property, a parameter
   (primary constructors' too), a local with an explicit type, a `foreach`, `out` or pattern
@@ -2420,6 +2431,23 @@ qualification budget does (ADR 0017).
   reassigned), and so does a group configured through a call outside `CONVENTIONS`; `Map(pattern, handler)`,
   `MapFallback`, `MapHub`, `MapControllers` and `MapRazorPages` are not read, and neither is a
   pattern that does not fold to a literal.
+- `http/swift/vapor.rs` (spec #29, #119): Vapor routes, through the same `Mounts` and `prefixes`
+  and the origins of a builder as `http/csharp/minimal.rs`. A `grouped(..)` call is mounted on
+  the origins of its receiver under its path components (string arguments joined with `/`; one
+  that constructs a value is a middleware and adds none, any other unreadable argument serves
+  nothing), and the application is the root: a call that `Vapor.Application` or
+  `Vapor.Application.make` names as the file's imports spell it. `get`, `post`, `put`, `patch`,
+  `delete` and `on(.METHOD, ..)` register a route whose path components are the string
+  arguments (`*` and `**` are one parameter each, `http/swift.rs`), whose handler is the
+  trailing closure (an inline handler) or `use:` (a function; `self.f` is `f` of the type
+  around the route). Vapor calls `boot(routes:)`, so no call binds its parameter:
+  `register(collection: C())` (the type constructed in the argument or in the local it names)
+  mounts `Node::Boot`, the `routes` parameter of `C.boot(routes:)`, on the origins of the
+  builder it is called on, with no segment; a collection registered on two builders serves each
+  route under both. Ceilings as the minimal APIs': a builder Meada does not read serves nothing
+  (a parameter no call reaches, a `var`, a property, a local that only aliases `routes` inside
+  `boot`), the closure form `group("api") { }` is not read, and a repository past
+  `VAPOR_NODES` (4096) nodes serves nothing.
 - `http/csharp/clients.rs` (spec #28, #111): an `HttpClient` call is a consumer when its method
   is in `CLIENT_METHODS` (`GetAsync` to `PutAsJsonAsync`) or is `SendAsync`, and its receiver is
   an `HttpClient`: `Code::written` gives the type text written for a field, a parameter or a

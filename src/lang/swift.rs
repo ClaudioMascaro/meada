@@ -5,9 +5,11 @@
 //! the module it names (`join`). A function's name carries its argument labels
 //! (`place(order:quantity:)`), and so does each of its parameters (`Param::label`) and each call
 //! (`Call::labels`): the shared resolution narrows overloads by them. An extension is no type:
-//! its members are the extended type's (`Facts::impls`).
+//! its members are the extended type's (`Facts::impls`). The values a call, a local and a
+//! function write are in `values`.
 
 mod manifest;
+mod values;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Range;
@@ -17,10 +19,11 @@ use tree_sitter::{Node, Parser};
 
 use super::kotlin::{bare_calls, wildcard};
 use super::{
-    Binds, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Join, Kind,
+    Binds, Bound, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Join, Kind,
     LanguagePack, Layout, Modules, Param, Receiver, Star, Value, children, named, text,
 };
 use crate::{Result, qualify};
+use values::Ctx;
 
 /// How many named types and functions may enclose a definition. Deeper bodies keep their
 /// enclosing symbol.
@@ -241,6 +244,10 @@ fn walk(
     // access of its functions.
     let mut families: BTreeMap<String, Access> = BTreeMap::new();
     let mut defined: HashSet<String> = HashSet::new();
+    // The types, whose scope a closure of their initializers is no definition in; and the values
+    // each function returns (`Def::return_values`).
+    let mut types: HashSet<String> = HashSet::new();
+    let mut returns: HashMap<String, Vec<Value>> = HashMap::new();
     let mut budget = QUALIFICATION_BYTES;
     let mut stack = vec![Visit {
         node: root,
@@ -288,6 +295,7 @@ fn walk(
                         continue;
                     }
                     inner = Rc::new(name.clone());
+                    types.insert(name.clone());
                     inner_plain = inner.clone();
                     inner_default = written.unwrap_or(Access::Internal);
                     inner_ceiling = Access::Public;
@@ -302,6 +310,7 @@ fn walk(
                     }
                 } else {
                     inner = Rc::new(qualify(&scope, &name));
+                    types.insert(inner.as_ref().clone());
                     inner_plain = Rc::new(qualify(&plain, &name));
                     let own = written.unwrap_or(default).min(ceiling);
                     let protocol = node.kind() == "protocol_declaration";
@@ -344,6 +353,14 @@ fn walk(
                 if !defined.insert(inner.as_ref().clone()) {
                     stack_children(&mut stack, &pushed, &inner, &inner_plain, nested);
                     continue;
+                }
+                if let Some(value) =
+                    values::implicit_return(node, src, ctx(&inner, defining, &types))
+                {
+                    returns
+                        .entry(inner.as_ref().clone())
+                        .or_default()
+                        .push(value);
                 }
                 let kind = match place {
                     Place::Type => Kind::Method,
@@ -389,6 +406,7 @@ fn walk(
                             .is_some_and(|m| text(m, src) == "let")
                 });
                 let own = access(node, src).unwrap_or(default).min(ceiling);
+                let held = values::initializer(node, src, ctx(&scope, defining, &types));
                 for name in bound(node, src) {
                     match place {
                         Place::Type => facts.receivers.push(Receiver {
@@ -399,13 +417,26 @@ fn walk(
                         Place::Top if constant => {
                             facts.consts.push(Const {
                                 name: name.clone(),
-                                value: Value::Unknown,
+                                value: held.clone().unwrap_or(Value::Unknown),
                                 ty: None,
                                 scope: None,
                             });
                             publish(&mut facts, place, own, &name, &name);
                         }
-                        _ => facts.locals.push(qualify(&scope, &name)),
+                        _ => {
+                            // A `let` of one name holds the call it is given.
+                            if let (Some(value @ Value::Call(_)), true, true) =
+                                (&held, constant, defining)
+                            {
+                                facts.bound.push(Bound {
+                                    scope: scope.as_ref().clone(),
+                                    within: scope.as_ref().clone(),
+                                    name: name.clone(),
+                                    value: value.clone(),
+                                });
+                            }
+                            facts.locals.push(qualify(&scope, &name));
+                        }
                     }
                 }
                 // Its names are no locals of the code its initializer and accessors are.
@@ -420,11 +451,42 @@ fn walk(
                     facts.locals.push(qualify(&scope, &name));
                 }
             }
-            "lambda_literal" => inner_place = Place::Code,
+            "lambda_literal" => {
+                inner_place = Place::Code;
+                // A closure written in code is a definition of its own, which a call's argument
+                // names (`values`): a contract kind may claim it as a handler, and it folds into
+                // the symbol around it otherwise.
+                if ctx(&scope, defining, &types).inline {
+                    inner = Rc::new(values::inline_name(&scope, node));
+                    facts.defs.push(definition(
+                        &inner,
+                        Kind::Inline,
+                        node.byte_range(),
+                        Vec::new(),
+                    ));
+                    nested += 1;
+                }
+            }
+            "control_transfer_statement" if text(node, src).starts_with("return") => {
+                if let Some(result) = node.child_by_field_name("result") {
+                    let value = values::value(result, src, ctx(&scope, defining, &types));
+                    returns
+                        .entry(scope.as_ref().clone())
+                        .or_default()
+                        .push(value);
+                }
+            }
             "call_expression" | "constructor_expression" => {
                 // `f(a) { }` may parse as a call of `f(a)`: it is one call of `f`.
                 let (function, suffixes) = parts(node);
-                if let Some(at) = call(function, &suffixes, node, src, &scope) {
+                if let Some(mut at) = call(function, &suffixes, node, src, &scope) {
+                    values::fill(
+                        &mut at,
+                        function,
+                        &suffixes,
+                        src,
+                        ctx(&scope, defining, &types),
+                    );
                     facts.calls.push(at);
                 }
                 pushed = std::iter::once(function)
@@ -456,6 +518,13 @@ fn walk(
             exported: family.clone(),
             local: family,
         });
+    }
+    for def in &mut facts.defs {
+        if let Some(values) = returns.remove(&def.name)
+            && def.kind != Kind::Class
+        {
+            def.return_values = values;
+        }
     }
     bare_calls(&mut facts);
     facts.locals.sort();
@@ -509,6 +578,7 @@ fn stores(kind: &str) -> bool {
             | "property_declaration"
             | "call_expression"
             | "constructor_expression"
+            | "lambda_literal"
             | "lambda_parameter"
             | "pattern"
             | "catch_block"
@@ -812,6 +882,15 @@ fn callee(node: Node, src: &[u8]) -> String {
     segments.join(".")
 }
 
+/// Where the code of `scope` writes a value: a closure there is a definition unless the scope is
+/// a type (a property's initializer) or the walk no longer names definitions.
+fn ctx<'s>(scope: &'s str, defining: bool, types: &HashSet<String>) -> Ctx<'s> {
+    Ctx {
+        scope,
+        inline: defining && !types.contains(scope),
+    }
+}
+
 fn definition(name: &str, kind: Kind, range: Range<usize>, bases: Vec<String>) -> Def {
     Def {
         name: name.to_string(),
@@ -933,5 +1012,26 @@ mod tests {
                 ("run".to_string(), owned(&["a", "", "other"])),
             ]
         );
+    }
+
+    #[test]
+    fn a_call_writes_its_receiver_its_arguments_and_its_closure_as_a_definition() {
+        let facts = facts(
+            "func routes(_ app: Application) -> Builder {\n  let api = app.grouped(\"api\", \"v1\")\n  \
+             api.get(\"users\", use: list) { req in 1 }\n  return api\n}\n",
+        );
+        let get = facts.calls.iter().find(|c| c.callee == "api.get").unwrap();
+        assert!(matches!(&get.receiver, Some(Value::Ref(r)) if r == "api"));
+        assert!(
+            matches!(&get.args[..], [Value::Str(_), Value::Function(f)] if f.starts_with("routes(_:).@"))
+        );
+        assert!(matches!(&get.kwargs[..], [(k, Value::Ref(r))] if k == "use" && r == "list"));
+        let inline = facts.defs.iter().filter(|d| d.kind == Kind::Inline).count();
+        assert_eq!(inline, 1);
+        assert!(
+            matches!(&facts.bound[..], [b] if b.name == "api" && matches!(b.value, Value::Call(_)))
+        );
+        let routes = facts.defs.iter().find(|d| d.name == "routes(_:)").unwrap();
+        assert!(matches!(&routes.return_values[..], [Value::Ref(r)] if r == "api"));
     }
 }

@@ -2187,6 +2187,15 @@ sample.swift
           "label": "_"
         }
       ]
+    },
+    {
+      "name": "Order.place(order:quantity:_:).@196",
+      "kind": "Inline",
+      "range": {
+        "start": 196,
+        "end": 199
+      },
+      "params": []
     }
   ],
   "overloads": {

@@ -4833,6 +4833,11 @@ impl<'a> Code<'a> {
         let call = self.call(path, index)?;
         let params = &self.resolver.defs[function.path][function.name].params;
         let param = params.get(n)?;
+        // A call writes the argument label of a parameter (Swift's `f(under: x)`), not its name.
+        let key = match param.label.as_deref() {
+            Some(label) if label != "_" => label,
+            _ => &param.name,
+        };
         // The call's receiver binds a class method's first parameter, and a method's when it
         // is called on an instance rather than on the class.
         let bound = match params.first().map(|p| p.binds) {
@@ -4853,10 +4858,10 @@ impl<'a> Code<'a> {
         }
         match param.binds {
             Binds::Rest => None,
-            Binds::Keyword => call.keyword(&param.name),
+            Binds::Keyword => call.keyword(key),
             Binds::Any | Binds::Optional | Binds::Instance | Binds::Class => (position)
                 .and_then(|at| call.args.get(at))
-                .or_else(|| call.keyword(&param.name)),
+                .or_else(|| call.keyword(key)),
         }
     }
 
