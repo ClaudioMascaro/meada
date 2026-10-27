@@ -467,12 +467,8 @@
     {
       "id": "example.com/acme/conformance::Sources/Handler.swift::run()::session.place#0",
       "caller": "example.com/acme/conformance::Sources/Handler.swift::run()",
-      "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
-        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
-      ],
+      "target": "example.com/acme/conformance::Sources/Scopes.swift::Store.place()",
+      "level": "exact",
       "span": {
         "path": "Sources/Handler.swift",
         "start": 87,
@@ -718,7 +714,7 @@
       "id": "example.com/acme/conformance::Sources/Receivers.swift::hidden(_:_:)::item.label#0",
       "caller": "example.com/acme/conformance::Sources/Receivers.swift::hidden(_:_:)",
       "target": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
-      "level": "inferred",
+      "level": "exact",
       "span": {
         "path": "Sources/Receivers.swift",
         "start": 267,
@@ -1178,12 +1174,19 @@
     {
       "name": "Sources",
       "members": [
+        "example.com/acme/conformance::Sources/Handler.swift::run()",
+        "example.com/acme/conformance::Sources/Scopes.swift::Store.place()"
+      ]
+    },
+    {
+      "name": "Sources#2",
+      "members": [
         "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader",
         "example.com/acme/conformance::Sources/Receivers.swift::typed(_:)"
       ]
     },
     {
-      "name": "Sources#2",
+      "name": "Sources#3",
       "members": [
         "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.display()",
         "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
@@ -1197,7 +1200,7 @@
       ]
     },
     {
-      "name": "Sources#3",
+      "name": "Sources#4",
       "members": [
         "example.com/acme/conformance::Sources/Scopes.swift::Base",
         "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)",
@@ -1205,7 +1208,7 @@
       ]
     },
     {
-      "name": "Sources#4",
+      "name": "Sources#5",
       "members": [
         "example.com/acme/conformance::Sources/Scopes.swift::Desk",
         "example.com/acme/conformance::Sources/Scopes.swift::Gone",
@@ -1214,7 +1217,7 @@
       ]
     },
     {
-      "name": "Sources#5",
+      "name": "Sources#6",
       "members": [
         "example.com/acme/conformance::Sources/Shadows.swift::cases(_:)",
         "example.com/acme/conformance::Sources/Shadows.swift::closures(_:)",
@@ -1225,7 +1228,7 @@
       ]
     },
     {
-      "name": "Sources#6",
+      "name": "Sources#7",
       "members": [
         "example.com/acme/conformance::Sources/Shadows.swift::caught()",
         "example.com/acme/conformance::Sources/Shadows.swift::error()",

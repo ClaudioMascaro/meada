@@ -787,7 +787,7 @@ one for the area a change touches.
   providers, and `http/kotlin/client.rs`, Ktor client consumers; `http/csharp.rs`, ASP.NET Core
   controller providers, `http/csharp/minimal.rs`, minimal API providers,
   `http/csharp/clients.rs`, HttpClient and typed client consumers, and `http/csharp/refit.rs`,
-  Refit consumers), resource and channel
+  Refit consumers; `http/swift.rs` and `http/swift/vapor.rs`, Vapor providers), resource and channel
   kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go, Maven and NuGet packages as
   contracts (specs #22, #24, #30, #25, #26 and #28), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
@@ -1723,6 +1723,23 @@ one for the area a change touches.
   blocks (`Facts::constructors`, also the family `Type.init` for `self.init(..)`), or the type
   itself when it declares none (a memberwise initializer). Bare calls are Kotlin's
   (`bare_calls`).
+  The values the contract kinds read (spec #29, #119; `lang/swift/values.rs`) are written for
+  each call: its receiver (`a.b` of `a.b.f()`), its arguments (a label makes a keyword
+  argument, `get("users", use: list)`, a trailing closure the last positional one), a string as
+  its parts (an interpolated name a `Part::Ref`, any other expression or an escape a hole), a
+  name or a member chain as `Value::Ref`, an implicit member as `.NAME`, an array as a list and
+  a call as `Value::Call`, read to `VALUE_DEPTH` (32). A closure written in code (not in a
+  type's property initializer) is a `Kind::Inline` definition named `<scope>.@<offset>`, and the
+  calls and names inside it belong to that scope. `Facts::bound` holds a `let` of one name given
+  a call or a name (a `var` is never bound), and drops the name when another binding of the
+  function (a loop variable, an `if let`, a `guard let`, a `catch`, a `case let`, a `var` or
+  another `let` in a block) also declares it; a top-level `let` is a `Const` holding its
+  initializer, and a binding in a block of the top level is a local, not a global.
+  `Def::return_values` holds each `return` and the one expression of a function that writes a
+  result type. `Code::arg` matches the labels of a call to the parameters' (`labelled_args`):
+  an unlabelled argument takes the next parameter written `_`, a labelled one the parameter of
+  its label, and the first trailing closure the first parameter that cannot be left out; a
+  trailing closure after the first (`f { } other: { }`) is not bound.
   Method calls on a receiver (spec #29, #118) use the seams Java's and C#'s do, with no new
   one. The pack writes `Facts::receivers` from the written type of a stored property, a
   parameter (scope: the function's labelled name) and a `let` or `var` of code or the top level
@@ -1737,8 +1754,9 @@ one for the area a change touches.
   (`Facts::locals`), since its scope is the function's, the type's or the file's and the name
   would reach code outside it. Without a written type, the class is the one an initializer
   constructs (`Type(..)`, through `try` and `await`: `Class::Named`). A name bound twice in a scope with two classes, or also
-  by a binding with no written class (`Facts::locals`: a closure parameter, an `if let` or
-  `guard let`, a `for` or `case` pattern), is unknown for the whole scope. `member` walks the
+  by a binding with no written class (`Facts::locals`: an `if let` or `guard let`, a `for` or
+  `case` pattern, or a closure parameter, whose scope is the closure's own), is unknown for the
+  whole scope. `member` walks the
   family and its blocks upward only, so a protocol-typed receiver stops at the requirement, and
   the labels narrow as they do for a bare call. A receiver of unread type (a call result, a
   closure parameter, an element) is the name match `matched` makes by base name and labels. A
@@ -2076,6 +2094,9 @@ qualification budget does (ADR 0017).
   `Resolver::in_references`), and stays `ambiguous` with several or none, since a project
   not referenced may still be visible through references not read.
 
+- `lang/swift/values.rs`: `VALUE_DEPTH` (32): a value nested deeper (parentheses, a call chain,
+  an argument inside an argument) is `Value::Unknown`, so a route written under such a chain is
+  served nowhere. The pack's integration tests exceed it.
 - `lang/swift.rs`: `DEFINITION_DEPTH` (128) and `PATH_DEPTH` (256) bound the definitions
   around a definition and the segments of a callee (past them a body keeps its enclosing
   symbol and a callee is `(navigation_expression)`); `QUALIFICATION_BYTES` (4 MiB) bounds the
@@ -2443,6 +2464,31 @@ qualification budget does (ADR 0017).
   reassigned), and so does a group configured through a call outside `CONVENTIONS`; `Map(pattern, handler)`,
   `MapFallback`, `MapHub`, `MapControllers` and `MapRazorPages` are not read, and neither is a
   pattern that does not fold to a literal.
+- `http/swift/vapor.rs` (spec #29, #119): Vapor routes, through the same `Mounts` and `prefixes`
+  and the origins of a builder as `http/csharp/minimal.rs`. A `grouped(..)` call is mounted on
+  the origins of its receiver under its path components (string arguments joined with `/`; one
+  that constructs a value is a middleware and adds none, but `String`, `Substring` and
+  `PathComponent` construct a path, so those and any other unreadable argument serve nothing),
+  and the application is the root: a call that `Vapor.Application` or
+  `Vapor.Application.make` names as the file's imports spell it. `get`, `post`, `put`, `patch`,
+  `delete` and `on(.METHOD, ..)` register a route whose path components are the string
+  arguments (`*` and `**` are one parameter each, `http/swift.rs`), whose handler is the
+  trailing closure (an inline handler) or `use:` (a function; `self.f` is `f` of the type
+  around the route). Vapor calls `boot(routes:)`, so no call binds its parameter:
+  `register(collection: C())` (the type constructed in the argument or in the local it names)
+  mounts `Node::Boot`, the `routes` parameter of `C.boot(routes:)`, on the origins of the
+  builder it is called on, with no segment; a collection registered on two builders serves each
+  route under both. `routes` is followed through a `let` alias and, as any parameter no call
+  binds (`Code::origins_unbound`), through the arguments of exact calls. Ceilings as the
+  minimal APIs': a builder Meada does not read serves nothing (a parameter no call reaches, a
+  `var`, a property), the closure form `group("api") { }` is not read, and a repository past
+  `VAPOR_NODES` (4096) nodes serves nothing. Also: a helper `boot` calls (`mount(routes)`) is
+  followed only when the call is exact, and a call made inside a type of an outside protocol
+  (`RouteCollection` always is) is a name match, so its routes are not served;
+  `grouped(User.authenticator(), User.guardMiddleware())` (a lowercase callee, an unread mount)
+  leaves the routes under it unserved; an inline handler served under two prefixes has one
+  symbol, named by one of them (as in C#); a factory that calls itself, reached by one origin
+  of a builder among others, serves the routes under that builder nowhere.
 - `http/csharp/clients.rs` (spec #28, #111): an `HttpClient` call is a consumer when its method
   is in `CLIENT_METHODS` (`GetAsync` to `PutAsJsonAsync`) or is `SendAsync`, and its receiver is
   an `HttpClient`: `Code::written` gives the type text written for a field, a parameter or a

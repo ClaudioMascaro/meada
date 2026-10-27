@@ -70,6 +70,10 @@ All notable changes to Meada are recorded here. The format follows
   the protocols it conforms to, `exact`; through a protocol-typed receiver it stops at the
   requirement. A receiver of unread type is a name match by base name and labels. The stored
   Swift facts change, so existing indexes are rebuilt.
+- Vapor routes are HTTP providers (spec #29, #119): `get`, `post`, `put`, `patch`, `delete` and
+  `on(.METHOD, ..)` with their `grouped(..)` prefixes, a `RouteCollection` under the builder it
+  is registered on, and builders followed through assignments, arguments and return values; the
+  handler is the trailing closure or the function given as `use:`.
 - `Directory.Build.props` files apply to the C# projects below them as MSBuild imports them
   (the nearest one, then those it imports with `GetPathOfFileAbove` or a relative path): their
   `<Using>` items, `PackageReference`s and `ProjectReference`s, and the `PackageId`,

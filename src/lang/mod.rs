@@ -393,9 +393,9 @@ pub struct Facts {
     /// Not kept in the index (see `Call::args`).
     #[serde(skip)]
     pub annotated: Vec<Annotated>,
-    /// The value each Kotlin or C# local, or the parameter of a tracked lambda, was given, where
-    /// no constant records it: the call a `val` holds, the receiver `use` passes on; in C#, the
-    /// creation or call a field or a local is initialized with, and a member written through a
+    /// The value each Kotlin, C# or Swift local, or the parameter of a tracked lambda, was given,
+    /// where no constant records it: the call a `val` (a Swift `let`) holds, the receiver `use`
+    /// passes on; in C#, the creation or call a field or a local is initialized with, and a member written through a
     /// name (`c.BaseAddress = v`, named `c.BaseAddress`). Not kept in
     /// the index (see `Call::args`).
     #[serde(skip)]
