@@ -114,7 +114,7 @@ in the same change:
   `channel/java.rs`); either one in `jvm/` is a finding, and so is a JVM reader a second
   module copies instead of sharing.
 - A language pack holds syntax and value evaluation, no library table and no library form. A
-  `&[&str]` table in a pack is of one of three classes: `syntax` (the language's grammar:
+  `&[&str]` or `[&str; N]` table in a pack is of one of three classes: `syntax` (the language's grammar:
   `FUNCTIONS`, `DECLARATION_KEYWORDS`), `runtime` (the language's own library that value
   evaluation passes through: string methods, environment reads, standard macros, collection
   callbacks, default imports, build constraints) or `exception` (a library table the pack keeps
@@ -132,6 +132,8 @@ in the same change:
   form and not a table: Java's and Kotlin's `System.getenv` (`getenv` in `lang/java.rs` and
   `lang/kotlin.rs`) and C#'s `GetEnvironmentVariable` (`ENVIRONMENT_READ` in `lang/csharp.rs`,
   which leaves the kind to decide whether the `Environment` is the framework's); C# also keeps
-  the trims of `System.String` (`TRIMS`) as runtime. The test in `lang/mod.rs`
+  the trims of `System.String` (`TRIMS`) as runtime. Two exceptions are pending (#383): the
+  TypeScript pack's `RESPONSES` (Next.js `NextResponse`) and `INFERS` (zod and io-ts) in
+  `lang/ts/types.rs`, type reads it makes at parse time. The test in `lang/mod.rs`
   (`every_str_table_in_a_pack_is_listed_with_its_class`) lists every such table with its class,
   so a new one is a decision visible in review: a table anywhere else in a pack is a finding.

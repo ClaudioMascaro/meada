@@ -1618,6 +1618,24 @@ fn chained() -> [Chained; 7] {
     ]
 }
 
+/// `chained` has a row for each pack of `PACKS` (`src/lang/mod.rs`), one each: a new pack fails
+/// here until it adds its row.
+#[test]
+fn the_chain_table_has_a_row_for_each_pack() {
+    let lang = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lang/mod.rs"));
+    let lang = lang.unwrap();
+    let (_, packs) = lang.split_once("const PACKS: ").expect("a PACKS list");
+    let (packs, _) = packs.split_once("];").unwrap();
+    // Past the line of the type, one `&module::Pack,` line each.
+    let packs = (packs.lines().skip(1))
+        .filter(|l| l.trim().starts_with('&'))
+        .count();
+    let mut rows: Vec<&str> = chained().iter().map(|row| row.0).collect();
+    rows.sort();
+    rows.dedup();
+    assert_eq!(rows.len(), packs, "one chained row per pack: {rows:?}");
+}
+
 /// Every pack reads a chain of locals on call results, from a receiver typed outside the
 /// repository and from one a type of the repository answers, in time linear in its length: a
 /// result read twice per link (once through the walk and once through the name match) made

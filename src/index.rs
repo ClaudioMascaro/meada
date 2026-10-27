@@ -1430,11 +1430,11 @@ pub fn with_reversed_walk<T>(f: impl FnOnce() -> T) -> T {
 /// A directory named `obj` or `bin` beside a `*.csproj`: .NET build output, whether or not an
 /// ignore file lists it. With no project file beside it, it is an ordinary directory.
 fn is_build_output(path: &Path) -> bool {
-    path.is_dir()
-        && matches!(
-            path.file_name().and_then(|n| n.to_str()),
-            Some("obj" | "bin")
-        )
+    // The name first: only an `obj` or `bin` entry costs a stat.
+    matches!(
+        path.file_name().and_then(|n| n.to_str()),
+        Some("obj" | "bin")
+    ) && path.is_dir()
         && path
             .parent()
             .and_then(|p| fs::read_dir(p).ok())

@@ -629,6 +629,12 @@ fn a_receiver_typed_by_a_declaration_links_through_a_package_using() {
         "    public Order Get() => null;\n    public int Run()\n    {\n        Order o = Get();\n        return o.Total();\n    }\n",
     );
     file(
+        "ByProperty",
+        "",
+        kit,
+        "    public Order O { get; }\n    public int Run() => O.Total();\n",
+    );
+    file(
         "Stranger",
         "",
         "using Example.Nowhere;\n\n",
@@ -646,6 +652,7 @@ fn a_receiver_typed_by_a_declaration_links_through_a_package_using() {
         "ByParam.Run(Order)::o.Total#0",
         "ByField.Run()::_o.Total#0",
         "ByLocal.Run()::o.Total#0",
+        "ByProperty.Run()::O.Total#0",
     ] {
         let found = calls(&json, suffix);
         assert_eq!(found, [(&provider[..], "exact")], "{suffix}: {text}");
@@ -658,4 +665,14 @@ fn a_receiver_typed_by_a_declaration_links_through_a_package_using() {
         calls(&json, "Own.Run(Order)::o.Total#0").is_empty(),
         "{text}"
     );
+    let own = (json["calls"].as_array().unwrap().iter())
+        .find(|c| {
+            c["id"]
+                .as_str()
+                .unwrap()
+                .ends_with("Own.Run(Order)::o.Total#0")
+        })
+        .map(|c| (c["target"].as_str(), c["level"].as_str()));
+    let target = "example.com/dotnet/app::src/Web/Own.cs::Example.App.Own.Order.Total()";
+    assert_eq!(own, Some((Some(target), Some("exact"))), "{text}");
 }

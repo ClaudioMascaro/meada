@@ -9079,9 +9079,6 @@ mod csharp_tests {
         out
     }
 
-    /// A type two projects of the repository declare under one qualified name binds, from a
-    /// file of one of them, to that project's own (the compiler prefers the source's type); from
-    /// a file of neither, the name is ambiguous, and a receiver of that type unknown.
     /// A lambda parameter with a written type types its receiver as a method's does, in every
     /// shape of the parameter; an implicit one keeps the broad name match, and a field of the
     /// same name is neither changed by it nor changes it.
@@ -9124,6 +9121,9 @@ mod csharp_tests {
         }
     }
 
+    /// A type two projects of the repository declare under one qualified name binds, from a
+    /// file of one of them, to that project's own (the compiler prefers the source's type); from
+    /// a file of neither, the name is ambiguous, and a receiver of that type unknown.
     #[test]
     fn a_type_two_projects_declare_binds_to_the_caller_s_project_first() {
         let use_it = "namespace P;\nclass Use { void F(Order o) { o.Total(); Order.Of(); \

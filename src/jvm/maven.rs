@@ -105,7 +105,7 @@ pub fn read(src: &[u8]) -> Summary {
             let computed = group.contains("${") || artifact.contains("${");
             // Only a `compile` dependency, the default, passes on to the module's dependents,
             // and only when not `optional`; a value the reader cannot tell does not.
-            let is = |key, value: &str| {
+            let unset_or = |key, value: &str| {
                 let written = dep.children().any(|n| {
                     n.is_element()
                         && n.tag_name().name() == key
@@ -118,7 +118,7 @@ pub fn read(src: &[u8]) -> Summary {
                 name,
                 range,
                 via: computed.then(|| "computed".into()),
-                private: !is("scope", "compile") || !is("optional", "false"),
+                private: !unset_or("scope", "compile") || !unset_or("optional", "false"),
                 ..Entry::default()
             });
         }

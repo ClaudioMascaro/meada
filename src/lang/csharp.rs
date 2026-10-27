@@ -1984,7 +1984,7 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             let function = node.child_by_field_name("function");
             // `nameof(Shop.Orders)` is the last identifier of its argument, as written.
             if let Some(f) = function
-                && matches!(f.kind(), "identifier" | "generic_name")
+                && f.kind() == "identifier"
                 && text(f, src) == "nameof"
                 && let Some(name) = named(node.child_by_field_name("arguments").unwrap_or(node))
                     .find(|n| n.kind() == "argument")

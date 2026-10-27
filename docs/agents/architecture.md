@@ -2438,7 +2438,9 @@ qualification budget does (ADR 0017).
   attribute is no type; `Hiding`, shared with the controllers, says a class of the repository
   named `GetAttribute` hides it) and a path from the root is a consumer at its definition
   (`Site::Def`), as Retrofit's are. Its bases are the first arguments of each framework
-  `RestService.For<Api>(base)` whose first type argument names the interface, read with
+  `RestService.For<Api>(base)` whose first type argument names the interface or one that
+  extends it (#367: the interfaces `Def::bases` reach, up to `BASE_DEPTH` (32) levels, each
+  once), read with
   `Expand::Call` (a wrapper's callers pass it) and the reads decided in the file of `For`; one
   consumer per base, and an interface no `For` makes has an unknown base. The route follows the
   base's own path (Refit appends it). `AddRefitClient` and `For` given an `HttpClient` are not

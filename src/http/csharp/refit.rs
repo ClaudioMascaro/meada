@@ -177,6 +177,7 @@ fn bases<'a>(
 }
 
 /// How many levels of written bases `For<Api>` reaches.
+// ponytail: real interfaces extend a few others; this bounds a crafted chain.
 const BASE_DEPTH: usize = 32;
 
 /// The interface `name` of `path` and the repository interfaces it extends, directly or through

@@ -1035,7 +1035,8 @@ fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
 mod tests {
     use std::path::Path;
 
-    /// Every `&[&str]` table a pack holds, as `file:NAME` below `src/lang`, with its class
+    /// Every `&[&str]` or `[&str; N]` table a pack holds, as `file:NAME` below `src/lang`, with
+    /// its class
     /// (`CODING_STANDARDS.md`): `syntax` is the language's grammar, `runtime` is the language's
     /// own library that value evaluation passes through, `exception` is a library table the
     /// pack keeps for a decided reason. A library table belongs to its kind, so a new one is a
@@ -1055,18 +1056,24 @@ mod tests {
         ("rust.rs:VERBS", "exception"),
         ("rust/builders.rs:READING_MACROS", "runtime"),
         ("rust/builders.rs:READS", "runtime"),
+        ("rust/crates.rs:KINDS", "syntax"),
         ("rust/values.rs:ENV_METHODS", "runtime"),
         ("rust/values.rs:FORMATS", "runtime"),
         ("rust/values.rs:KEEPS", "runtime"),
         ("rust/values.rs:KEEPS_NAMES", "runtime"),
         ("rust/values.rs:METHOD_CRATES", "exception"),
         ("ts.rs:BODIES", "syntax"),
+        ("ts.rs:EXTENSIONS", "syntax"),
         ("ts.rs:FUNCTIONS", "syntax"),
         ("ts.rs:STRING_METHODS", "runtime"),
+        // Type reads the pack makes at parse time, pending #383.
+        ("ts/types.rs:INFERS", "exception"),
+        ("ts/types.rs:RESPONSES", "exception"),
         ("ts/uses.rs:ELEMENT_METHODS", "runtime"),
     ];
 
-    /// The `const` and `static` items of type `&[&str]` in the `.rs` files below `dir`.
+    /// The `const` and `static` items of type `&[&str]` or `[&str; N]` in the `.rs` files below
+    /// `dir`.
     fn tables(dir: &Path, root: &Path, found: &mut Vec<String>) {
         for entry in std::fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
@@ -1083,7 +1090,8 @@ mod tests {
                     let item = item.strip_prefix("pub ").unwrap_or(item);
                     if let Some(rest) = item.strip_prefix("const ").or(item.strip_prefix("static "))
                         && let Some((id, ty)) = rest.split_once(':')
-                        && ty.trim_start().starts_with("&[&str]")
+                        && (ty.trim_start().starts_with("&[&str]")
+                            || ty.trim_start().starts_with("[&str;"))
                     {
                         found.push(format!("{name}:{id}"));
                     }
