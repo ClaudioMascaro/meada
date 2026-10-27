@@ -69,8 +69,10 @@ systemd-run --user --scope -q -p MemoryMax=2G -p MemorySwapMax=0 -- \
   timeout 600 /usr/bin/time -f "%e s, %M KB max RSS" meada index
 ```
 
-The cap is never raised: a repository that hits it is recorded below and not retried. Rows
-without an RSS were measured before the cap existed. Skipped on size: `google/guava` (1.4 GB
+The 2 GB cap is the default. A repository that hits it is recorded below and not retried; only
+a single probe of a known-oversized repository may run at 3500M, alone with at least 4000 MB
+available, as `kubernetes/kubernetes` did. Rows without an RSS were measured before the cap
+existed. Skipped on size: `google/guava` (1.4 GB
 on GitHub), `dotnet/aspnetcore`, `mozilla-mobile/firefox-ios`. `nestjs/nest`, swapped out in the
 first round for its 215k lines, is back.
 
@@ -78,9 +80,11 @@ first round for its 215k lines, is back.
 
 Candidates for issues, not opened.
 
-- `kubernetes/kubernetes` (5,476,634 lines of Go, 422 MB, commit 3e6f6b9a): the index was killed
-  by the kernel at 5.2 GB RSS (7.2 GB virtual) on the 7 GB machine, leaving a 3.2 GB
-  `index.db.new.*`. Not indexed, not retried.
+- `kubernetes/kubernetes` (commit 3e6f6b9a, 422 MB): 5,476,634 lines of Go, 4,022,054 without
+  `vendor/`. Three runs, none finished. Uncapped: killed by the kernel at 5.2 GB RSS (7.2 GB
+  virtual), leaving a 3.2 GB `index.db.new.*`. At 3500M with swap off: OOM-killed at about 3.4 GB
+  RSS after 74 s. With `vendor/` removed, same cap: OOM-killed after about 62 s (sampled peak 2.8
+  GB, the kill came between samples). Not indexed, not retried.
 - `bitwarden/server` (2,134,048 lines of C#, 131 MB, commit 2346d34e): `meada index` passed the
   600 s timeout without finishing (exit 143). Not retried.
 - `dotnet/efcore` (1,774,591 lines of C#, 132 MB, commit 203a4ec9): not a Rust panic: `thread
