@@ -4,7 +4,7 @@
 //! `Directory.Build.props` files MSBuild imports into it (#381); `Directory.Build.targets` and
 //! `Directory.Packages.props` are not read.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use roxmltree::{Document, Node, ParsingOptions};
 use serde::{Deserialize, Serialize};
@@ -108,7 +108,7 @@ struct Layer {
     sdk: Option<String>,
     properties: HashMap<&'static str, String>,
     added: Vec<Using>,
-    removed: Vec<String>,
+    removed: HashSet<String>,
     packages: Vec<Reference>,
     projects: Vec<Reference>,
     import: Option<Import>,
