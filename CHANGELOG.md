@@ -89,6 +89,10 @@ All notable changes to Meada are recorded here. The format follows
   `Environment.get` leave the base unknown. A Swift repository joins a TypeScript workspace with
   the same `meada.toml` keys, and `trace` follows the chain across both boundaries. The stored
   Swift facts change, so existing indexes are rebuilt.
+- Swift program entry points (spec #29, #123): a type marked `@main` (through its `main()`
+  method when it declares one) and the top-level code of a `main.swift` file, a symbol named
+  `main` that owns the calls written there, each start a process. The stored Swift facts
+  change, so existing indexes are rebuilt.
 - `Directory.Build.props` files apply to the C# projects below them as MSBuild imports them
   (the nearest one, then those it imports with `GetPathOfFileAbove` or a relative path): their
   `<Using>` items, `PackageReference`s and `ProjectReference`s, and the `PackageId`,
