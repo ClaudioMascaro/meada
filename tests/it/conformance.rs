@@ -11993,7 +11993,25 @@ fn swift() {
         checkout("Routes.swift", "mountAudit(under:)"),
         checkout("Routes.swift", "mountAudit(under:).GET /api/v1/audit/log"),
         checkout("Routes.swift", "orphan(_:)"),
+        checkout("Routes.swift", "unlisted(_:)"),
         checkout("Routes.swift", "nest(_:).GET /loop/leaf"),
+        checkout("Routes.swift", "mount(admin:_:)"),
+        checkout("Routes.swift", "mount(admin:_:).GET /admin/stats"),
+        checkout("Routes.swift", "secured(on:_:)"),
+        checkout("Routes.swift", "secured(on:_:).GET /api/v1/sec/secured"),
+        checkout("Routes.swift", "explicit(_:)"),
+        checkout("Routes.swift", "routes(_:).GET /api/v1/ex/explicit"),
+        checkout("Routes.swift", "routes(_:).GET /guarded"),
+        checkout("Routes.swift", "spin(_:)"),
+        checkout("Routes.swift", "pick(_:)"),
+        checkout("Routes.swift", "shadowedByLet(_:)"),
+        checkout("Routes.swift", "shadowedByLoop(_:)"),
+        checkout("Routes.swift", "shadowedByIf(_:_:)"),
+        checkout("main.swift", "GET /started"),
+        checkout(
+            "Routes.swift",
+            "OrderController.boot(routes:).GET /api/v1/alias",
+        ),
         checkout("Routes.swift", "showUser(req:)"),
         checkout("Routes.swift", "showReport(req:)"),
         checkout("Routes.swift", "OrderController"),
@@ -12500,6 +12518,50 @@ fn swift_without_a_package_manifest() {
         calls.push((id, INFERRED, one(shadows(target))));
     }
     conform_owned("conformance-swift-app", &symbols, &calls);
+}
+
+/// Hostile Vapor input stays bounded: values and group chains past the pack's `VALUE_DEPTH`
+/// serve nothing, and so do more groups than `VAPOR_NODES`, in time that does not grow with
+/// the squares of their number.
+#[test]
+fn swift_hostile_values_and_groups_remain_bounded() {
+    let served = |repo: &std::path::Path, file: &str| -> Vec<String> {
+        let json: Value =
+            serde_json::from_str(&Engine::open(repo).unwrap().export().unwrap()).unwrap();
+        (json["providers"].as_array().unwrap().iter())
+            .filter(|p| p["site"].as_str().unwrap().contains(file))
+            .map(|p| p["contract"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let repo = fixture_repo("swift_hostile_values", "conformance-swift", Some(ORIGIN));
+    let expression = format!("{}\"v\"{}", "(".repeat(1024), ")".repeat(1024));
+    let member = format!("root{}.send()", ".part".repeat(300));
+    let deep = format!(
+        "app{}.get(\"deep\") {{ req in \"x\" }}",
+        ".grouped(\"a\")".repeat(200)
+    );
+    let source = format!(
+        "import Vapor\nfunc hostile() async throws {{\nlet app = try await Application.make(.detect())\napp.get({expression}) {{ req in \"x\" }}\n{member}\n{deep}\napp.get(\"fine\") {{ req in \"x\" }}\n}}\n"
+    );
+    std::fs::write(repo.join("Hostile.swift"), source).unwrap();
+    let started = std::time::Instant::now();
+    let found = served(&repo, "Hostile.swift");
+    assert!(started.elapsed() < std::time::Duration::from_secs(30));
+    assert_eq!(found, ["http::GET::/fine"]);
+
+    let groups = |n: usize| -> String {
+        let body: String = (0..n)
+            .map(|i| format!("app.grouped(\"g{i}\").get(\"x\") {{ req in \"x\" }}\n"))
+            .collect();
+        format!(
+            "import Vapor\nfunc many() async throws {{\nlet app = try await Application.make(.detect())\n{body}}}\n"
+        )
+    };
+    let repo = fixture_repo("swift_hostile_nodes", "conformance-swift", Some(ORIGIN));
+    std::fs::write(repo.join("Many.swift"), groups(10)).unwrap();
+    assert_eq!(served(&repo, "Many.swift").len(), 10);
+    std::fs::write(repo.join("Many.swift"), groups(4200)).unwrap();
+    assert!(served(&repo, "").is_empty());
 }
 
 /// `search` finds a member an extension declares, under the extended type, and `context` on

@@ -488,6 +488,11 @@ fn walk(
                 // file's), so it only hides the name.
                 let top =
                     place == Place::Top && node.parent().is_some_and(|p| p.kind() == "source_file");
+                // A property in a block of the top level is a local, not a global.
+                let place = match place == Place::Top && !top {
+                    true => Place::Code,
+                    false => place,
+                };
                 let typed_here = top || (body && depth < DEFINITION_DEPTH);
                 let class = match names.len() {
                     1 => declared(node, src, &generics),
@@ -518,8 +523,8 @@ fn walk(
                             facts.receivers.push(receiver)
                         }
                         _ => {
-                            // A `let` of one name holds the call it is given.
-                            if let (Some(value @ Value::Call(_)), true, true) =
+                            // A `let` of one name holds the call or the name it is given.
+                            if let (Some(value @ (Value::Call(_) | Value::Ref(_))), true, true) =
                                 (&held, constant, defining)
                             {
                                 facts.bound.push(Bound {
@@ -539,7 +544,7 @@ fn walk(
             }
             "lambda_parameter" | "pattern" | "catch_block" | "if_statement" | "guard_statement"
             | "while_statement"
-                if place == Place::Code =>
+                if place != Place::Type =>
             {
                 for name in bound(node, src) {
                     facts.locals.push(qualify(&scope, &name));
@@ -633,6 +638,24 @@ fn walk(
         }
     }
     bare_calls(&mut facts);
+    // A name another binding of the scope also declares (a loop variable, a `guard let`, a
+    // `var`) holds no one value: its `let` bounds are dropped (Kotlin's rule). Two `let`s keep
+    // both bounds.
+    let held = facts.bound.iter().fold(HashMap::new(), |mut held, b| {
+        *held.entry(qualify(&b.scope, &b.name)).or_insert(0) += 1;
+        held
+    });
+    let declared = facts.locals.iter().fold(HashMap::new(), |mut n, l| {
+        *n.entry(l.as_str()).or_insert(0) += 1;
+        n
+    });
+    let shared: HashSet<String> = (held.iter())
+        .filter(|(name, bounds)| declared.get(name.as_str()).is_some_and(|d| d > *bounds))
+        .map(|(name, _)| name.clone())
+        .collect();
+    facts
+        .bound
+        .retain(|b| !shared.contains(&qualify(&b.scope, &b.name)));
     facts.locals.sort();
     facts.locals.dedup();
     facts.receivers = one_class_each(std::mem::take(&mut facts.receivers), &facts.locals);

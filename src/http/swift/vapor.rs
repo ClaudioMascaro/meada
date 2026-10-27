@@ -20,8 +20,8 @@
 //! A closure handler is an inline handler named for its route, and a function given as `use:`
 //! is that function (`handler_site`). A method of the repository named like one of the
 //! framework's (`get`, `grouped`) hides it where a call reaches it. A `grouped` argument that
-//! constructs a value (`grouped(AuthMiddleware())`) is a middleware and adds no segment; one
-//! else that is no string literal serves nothing.
+//! constructs a value (`grouped(AuthMiddleware())`) is a middleware and adds no segment, unless
+//! it constructs a path (`PATHS`); one else that is no string literal serves nothing.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -64,6 +64,9 @@ enum Node<'a> {
 fn method(callee: &str) -> &str {
     callee.rsplit('.').next().unwrap_or(callee)
 }
+
+/// The types whose construction is a path component, not a middleware.
+const PATHS: [&str; 3] = ["String", "Substring", "PathComponent"];
 
 /// How many nodes the mounts of one repository may hold.
 // ponytail: real apps make tens of groups; past this (a crafted web of factories) nothing is
@@ -111,12 +114,6 @@ impl<'c, 'a> Vapor<'c, 'a> {
         Some(id)
     }
 
-    /// The `boot(routes:)` whose parameter `name`, written in `scope` of `path`, is.
-    fn boot(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<Target<'a>> {
-        let (function, at) = self.code.param_of(path, scope, name)?;
-        (at == 0 && function.name.ends_with(&format!(".{BOOT}"))).then_some(function)
-    }
-
     /// The origins of `value`, written in `scope` of `path` inside the functions the calls of
     /// `context` reach, which bind their parameters (`Code::origins_within`); `None` when one
     /// climbs a call twice, round a factory that calls itself.
@@ -128,13 +125,15 @@ impl<'c, 'a> Vapor<'c, 'a> {
         context: &[CallAt<'a>],
     ) -> Option<Vec<Node<'a>>> {
         let mut out = BTreeSet::new();
-        if let Value::Ref(name) = value
-            && let Some(boot) = self.boot(path, scope, name)
-        {
-            out.insert(Node::Boot(boot.path, boot.name));
+        let (found, unbound) =
+            (self.code).origins_unbound(path, scope, Of::Value(value), passes_nothing, context);
+        // Vapor calls `boot(routes:)`, so no call binds its parameter: a builder that comes from
+        // it, through arguments and aliases, is the collection's `routes`.
+        for (function, at) in unbound {
+            if at == 0 && function.name.ends_with(&format!(".{BOOT}")) {
+                out.insert(Node::Boot(function.path, function.name));
+            }
         }
-        let found =
-            (self.code).origins_within(path, scope, Of::Value(value), passes_nothing, context);
         for origin in found {
             let Some(call) = origin.call else {
                 continue;
@@ -164,7 +163,8 @@ impl<'c, 'a> Vapor<'c, 'a> {
         let mut out = Vec::new();
         for &arg in args {
             let middleware = matches!(arg, Value::Call(inv)
-                if method(&inv.callee).starts_with(char::is_uppercase));
+                if method(&inv.callee).starts_with(char::is_uppercase)
+                    && !PATHS.contains(&method(&inv.callee)));
             if middleware && call.callee.ends_with(GROUPED) {
                 continue;
             }

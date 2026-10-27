@@ -507,6 +507,36 @@ fn labelled(params: &[Param], labels: &[String]) -> bool {
     fit[labels.len()]
 }
 
+/// The argument (an index into `labels`) each parameter takes, as `labelled` matches them: a
+/// parameter takes the next argument of its label, or a trailing closure unless it may be
+/// left out. `None` when the call does not fit.
+fn labelled_args(params: &[Param], labels: &[String]) -> Option<Vec<Option<usize>>> {
+    let mut takes = vec![None; params.len()];
+    let mut j = 0;
+    for (n, p) in params.iter().enumerate() {
+        let skips = matches!(p.binds, Binds::Optional | Binds::Rest);
+        let Some(first) = labels.get(j) else {
+            match skips {
+                true => continue,
+                false => return None,
+            }
+        };
+        let label = p.label.as_deref().unwrap_or("_");
+        if first != label && !(first.is_empty() && !skips) {
+            match skips {
+                true => continue,
+                false => return None,
+            }
+        }
+        takes[n] = Some(j);
+        j += 1;
+        while p.binds == Binds::Rest && labels.get(j).is_some_and(|l| l == "_") {
+            j += 1;
+        }
+    }
+    (j == labels.len()).then_some(takes)
+}
+
 /// Files that share one top-level scope (`Layout::shared`), sorted, and the files whose top
 /// level binds each name: a definition that is no method, or a constant.
 struct Group<'a> {
@@ -3943,6 +3973,8 @@ struct Trail<'a> {
     frames: Vec<Frame<'a>>,
     busy: Vec<Flow<'a>>,
     out: BTreeMap<(&'a str, usize), BTreeSet<Route<'a>>>,
+    /// The parameters (function and position) the walk reached that no call binds.
+    unbound: BTreeSet<(Target<'a>, usize)>,
     /// The methods of the builder chains being followed, outermost first, which the library
     /// they start at must pass through (`Follow::Values::passes`).
     steps: Vec<&'a str>,
@@ -3959,6 +3991,7 @@ impl<'a> Trail<'a> {
             frames: Vec::new(),
             busy: Vec::new(),
             out: BTreeMap::new(),
+            unbound: BTreeSet::new(),
             steps: Vec::new(),
             held: None,
             passes,
@@ -4833,11 +4866,15 @@ impl<'a> Code<'a> {
         let call = self.call(path, index)?;
         let params = &self.resolver.defs[function.path][function.name].params;
         let param = params.get(n)?;
-        // A call writes the argument label of a parameter (Swift's `f(under: x)`), not its name.
-        let key = match param.label.as_deref() {
-            Some(label) if label != "_" => label,
-            _ => &param.name,
-        };
+        // A call writes the argument label of a parameter (Swift's `f(under: x)`), not its name,
+        // and the labels it writes tell which argument each parameter takes.
+        if let (Some(_), Some(labels)) = (&param.label, &call.labels) {
+            return match param.binds {
+                Binds::Rest => None,
+                _ => Self::labelled_arg(call, &labelled_args(params, labels)?, labels, n),
+            };
+        }
+        let key = &param.name;
         // The call's receiver binds a class method's first parameter, and a method's when it
         // is called on an instance rather than on the class.
         let bound = match params.first().map(|p| p.binds) {
@@ -4862,6 +4899,24 @@ impl<'a> Code<'a> {
             Binds::Any | Binds::Optional | Binds::Instance | Binds::Class => (position)
                 .and_then(|at| call.args.get(at))
                 .or_else(|| call.keyword(key)),
+        }
+    }
+
+    /// The value `call` passes for parameter `n`, given the argument each parameter takes
+    /// (`labelled_args`): an unlabelled argument and the first trailing closure are in
+    /// `args`, in order, and a labelled one is a keyword.
+    fn labelled_arg(
+        call: &'a Call,
+        takes: &[Option<usize>],
+        labels: &[String],
+        n: usize,
+    ) -> Option<&'a Value> {
+        let i = (*takes.get(n)?)?;
+        let before = labels[..i].iter().filter(|l| *l == "_").count();
+        match labels[i].as_str() {
+            "_" => call.args.get(before),
+            "" => call.args.get(labels.iter().filter(|l| *l == "_").count()),
+            label => call.keyword(label),
         }
     }
 
@@ -5110,6 +5165,9 @@ impl<'a> Code<'a> {
                         .map(|c| (c.path, c.index))
                         .collect(),
                 };
+                if sites.is_empty() {
+                    trail.unbound.insert((function, n));
+                }
                 if !self.follows(trail, &Flow::Param(function, n)) {
                     return;
                 }
@@ -5381,10 +5439,24 @@ impl<'a> Code<'a> {
         passes: Passes,
         through: &[(&'a str, usize)],
     ) -> Vec<Origin<'a>> {
+        self.origins_unbound(path, scope, of, passes, through).0
+    }
+
+    /// `Code::origins_within`, and the parameters the walk reached that no exact caller binds
+    /// (a callback the framework calls, such as Vapor's `boot(routes:)`), by function and
+    /// position, sorted.
+    pub fn origins_unbound(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        of: Of<'a>,
+        passes: Passes,
+        through: &[(&'a str, usize)],
+    ) -> (Vec<Origin<'a>>, Vec<(Target<'a>, usize)>) {
         let mut trail = Trail::new(passes);
         for &(at, index) in through {
             let Some(def) = self.reaches(at, index) else {
-                return Vec::new();
+                return Default::default();
             };
             trail.frames.push(Frame {
                 def,
@@ -5405,7 +5477,8 @@ impl<'a> Code<'a> {
                 routes: routes.into_iter().collect(),
             }
         };
-        trail.out.into_iter().map(origin).collect()
+        let unbound = trail.unbound.into_iter().collect();
+        (trail.out.into_iter().map(origin).collect(), unbound)
     }
 
     /// Whether `name`, written in `path` within `scope`, is no binding of the file at all: a
@@ -6673,9 +6746,30 @@ mod tests {
                 .collect();
             let labels: Vec<String> = labels.iter().map(|l| l.to_string()).collect();
             assert_eq!(labelled(&params, &labels), *fits, "{labels:?}");
+            assert_eq!(
+                labelled_args(&params, &labels).is_some(),
+                *fits,
+                "{labels:?}"
+            );
         }
         // Parameters without labels (another language's) take whatever they are given.
         assert!(labelled(&[param("x")], &["y".to_string()]));
+        // The argument each takes: a defaulted one left out takes none, and a trailing closure
+        // takes the first parameter that cannot be left out.
+        let params = [
+            labelled_param("on", any),
+            labelled_param("times", optional),
+            labelled_param("_", any),
+        ];
+        let strings = |labels: &[&str]| labels.iter().map(|l| l.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            labelled_args(&params, &strings(&["on", ""])),
+            Some(vec![Some(0), None, Some(1)])
+        );
+        assert_eq!(
+            labelled_args(&params, &strings(&["on", "times", "_"])),
+            Some(vec![Some(0), Some(1), Some(2)])
+        );
     }
 
     /// A plain parameter `name`.
