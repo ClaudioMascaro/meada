@@ -2045,8 +2045,7 @@ qualification budget does (ADR 0017).
   `static StringBuilder Append(this StringBuilder b, string s)`), where C# picks the member
   (ADR 0018). A file sees what the projects of its repository its project references pass on up
   to `REFERENCE_DEPTH` (32) projects deep (`dotnet/references.rs`), and nothing that a project
-  of another repository references. Generated files
-  under `obj/` are indexed when no ignore file lists them.
+  of another repository references.
 
 - `snapshot/pull.rs`: a generation's bundles hold at most `GENERATION_BYTES_MAX` (256 GiB)
   together, as the document records their sizes (checked before any download) and as the
