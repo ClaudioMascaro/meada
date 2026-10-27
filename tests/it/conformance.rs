@@ -12741,7 +12741,12 @@ fn swift_hostile_values_and_groups_remain_bounded() {
     std::fs::write(repo.join("Many.swift"), groups(10)).unwrap();
     assert_eq!(served(&repo, "Many.swift").len(), 10);
     std::fs::write(repo.join("Many.swift"), groups(4200)).unwrap();
-    assert!(served(&repo, "").is_empty());
+    // The repository's `Package.swift` still gives its package contract.
+    assert!(
+        served(&repo, "").iter().all(|c| c.starts_with("package::")),
+        "{:?}",
+        served(&repo, "")
+    );
 }
 
 /// Context lists the consumers a Swift call that cannot be evaluated is, unresolved (spec #29, #121).

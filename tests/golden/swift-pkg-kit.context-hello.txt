@@ -1,0 +1,12 @@
+example.com/swift/kit Sources/Kit/Greeter.swift:8-10 Greeter.hello(to:loudly:)
+community: Sources/Kit
+processes: none
+public func hello(to other: String, loudly: Bool = false) -> String {
+        loudly ? "HELLO \(other)" : "hello \(other)"
+    }
+callers:
+example.com/swift/kit Sources/Kit/Greeter.swift:18 greet(name:) [inferred: one method named hello]
+callees: none
+consumers:
+example.com/apps/shop Sources/App/main.swift:20 hello(who:) [range unchecked]
+example.com/apps/shop Sources/App/main.swift:24 typed(greeter:) [range unchecked]

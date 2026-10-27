@@ -1,0 +1,412 @@
+{
+  "repository": "example.com/swift/kit",
+  "files": [
+    {
+      "path": "Sources/Hidden/Hidden.swift",
+      "hash": "22002ff7433f332d9386285fd55548533ba3c41d1be94a2e26f3c930aedee273"
+    },
+    {
+      "path": "Sources/Kit/Greeter.swift",
+      "hash": "645699c95a319b05d9955874e85e84a69e9d89b8420c4adc295c8f094d8b6cb9"
+    },
+    {
+      "path": "Sources/KitMoney/Money.swift",
+      "hash": "ea55fc09dc3d9266b6c747d969d4637c7506f415b1c19be41ce408052bd2a49e"
+    },
+    {
+      "path": "Tests/KitTests/GreeterTests.swift",
+      "hash": "e16b127123a275610f1f0ce20cd8297c485a5b09ed3ea60596ead9ada5b92e67"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/swift/kit::Sources/Hidden/Hidden.swift::hiddenTool()",
+      "span": {
+        "path": "Sources/Hidden/Hidden.swift",
+        "start": 0,
+        "end": 49
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter",
+      "span": {
+        "path": "Sources/Kit/Greeter.swift",
+        "start": 0,
+        "end": 305
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.hello(to:loudly:)",
+      "span": {
+        "path": "Sources/Kit/Greeter.swift",
+        "start": 121,
+        "end": 249
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.init(name:)",
+      "span": {
+        "path": "Sources/Kit/Greeter.swift",
+        "start": 57,
+        "end": 115
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.secret()",
+      "span": {
+        "path": "Sources/Kit/Greeter.swift",
+        "start": 255,
+        "end": 303
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(_:)",
+      "span": {
+        "path": "Sources/Kit/Greeter.swift",
+        "start": 485,
+        "end": 554
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:)",
+      "span": {
+        "path": "Sources/Kit/Greeter.swift",
+        "start": 307,
+        "end": 392
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:greeting:)",
+      "span": {
+        "path": "Sources/Kit/Greeter.swift",
+        "start": 394,
+        "end": 483
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::internalGreet(name:)",
+      "span": {
+        "path": "Sources/Kit/Greeter.swift",
+        "start": 556,
+        "end": 611
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money",
+      "span": {
+        "path": "Sources/KitMoney/Money.swift",
+        "start": 0,
+        "end": 294
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.init(cents:)",
+      "span": {
+        "path": "Sources/KitMoney/Money.swift",
+        "start": 53,
+        "end": 111
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.of(cents:)",
+      "span": {
+        "path": "Sources/KitMoney/Money.swift",
+        "start": 117,
+        "end": 195
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.plus(_:)",
+      "span": {
+        "path": "Sources/KitMoney/Money.swift",
+        "start": 201,
+        "end": 292
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Tests/KitTests/GreeterTests.swift::testGreeter()",
+      "span": {
+        "path": "Tests/KitTests/GreeterTests.swift",
+        "start": 0,
+        "end": 21
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(_:)::greet#0",
+      "caller": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(_:)",
+      "target": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Kit/Greeter.swift",
+        "start": 535,
+        "end": 552
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:)::(call_expression).hello#0",
+      "caller": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:)",
+      "target": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.hello(to:loudly:)",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Kit/Greeter.swift",
+        "start": 355,
+        "end": 390
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:)::Greeter#0",
+      "caller": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:)",
+      "target": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.init(name:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Kit/Greeter.swift",
+        "start": 355,
+        "end": 374
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.of(cents:)::Money#0",
+      "caller": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.of(cents:)",
+      "target": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.init(cents:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/KitMoney/Money.swift",
+        "start": 170,
+        "end": 189
+      }
+    },
+    {
+      "id": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.plus(_:)::Money#0",
+      "caller": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.plus(_:)",
+      "target": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.init(cents:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/KitMoney/Money.swift",
+        "start": 253,
+        "end": 286
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::swiftpm::Kit",
+      "site": "example.com/swift/kit::Package.swift"
+    }
+  ],
+  "consumers": [],
+  "packages": [
+    {
+      "name": "Kit",
+      "repository": "example.com/swift/kit",
+      "directory": ".",
+      "ecosystem": "swiftpm"
+    }
+  ],
+  "communities": [
+    {
+      "name": "Sources/Kit",
+      "members": [
+        "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.hello(to:loudly:)",
+        "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.init(name:)",
+        "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(_:)",
+        "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:)"
+      ]
+    },
+    {
+      "name": "Sources/KitMoney",
+      "members": [
+        "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.init(cents:)",
+        "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.of(cents:)",
+        "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.plus(_:)"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/apps/shop::Package.swift::dependencies::Kit",
+      "provider": "example.com/swift/kit::Package.swift",
+      "contract": "package::swiftpm::Kit",
+      "level": "exact",
+      "reason": "package::swiftpm::Kit from 1.2.0 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/apps/shop::Package.swift::dependencies::example.com/swift/*",
+      "provider": "example.com/swift/kit::Package.swift",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::formal(who:)::Kit.greet#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:greeting:)",
+      "contract": "package::swiftpm::Kit",
+      "level": "exact",
+      "reason": "package::swiftpm::Kit from 1.2.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::formal(who:)::Kit.greet#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:greeting:)",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::hello(who:)::Greeter#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.init(name:)",
+      "contract": "package::swiftpm::Kit",
+      "level": "exact",
+      "reason": "package::swiftpm::Kit from 1.2.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::hello(who:)::Greeter#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.init(name:)",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::hello(who:)::greeter.hello#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.hello(to:loudly:)",
+      "contract": "package::swiftpm::Kit",
+      "level": "exact",
+      "reason": "package::swiftpm::Kit from 1.2.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::hello(who:)::greeter.hello#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.hello(to:loudly:)",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::plain(who:)::greet#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(_:)",
+      "contract": "package::swiftpm::Kit",
+      "level": "exact",
+      "reason": "package::swiftpm::Kit from 1.2.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::plain(who:)::greet#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(_:)",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money#0",
+      "provider": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.init(cents:)",
+      "contract": "package::swiftpm::Kit",
+      "level": "ambiguous",
+      "reason": "package::swiftpm::Kit from 1.2.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money#0",
+      "provider": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.init(cents:)",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money.of#0",
+      "provider": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.of(cents:)",
+      "contract": "package::swiftpm::Kit",
+      "level": "ambiguous",
+      "reason": "package::swiftpm::Kit from 1.2.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::total()::Money.of#0",
+      "provider": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.of(cents:)",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::typed(greeter:)::greeter.hello#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.hello(to:loudly:)",
+      "contract": "package::swiftpm::Kit",
+      "level": "exact",
+      "reason": "package::swiftpm::Kit from 1.2.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::typed(greeter:)::greeter.hello#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.hello(to:loudly:)",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::welcome(who:)::greet#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:)",
+      "contract": "package::swiftpm::Kit",
+      "level": "exact",
+      "reason": "package::swiftpm::Kit from 1.2.0 (local none), range unchecked; import module"
+    },
+    {
+      "consumer": "example.com/apps/shop::Sources/App/main.swift::welcome(who:)::greet#0",
+      "provider": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:)",
+      "contract": "package::swiftpm::example.com/swift/*",
+      "level": "ambiguous",
+      "reason": "2 providers fit; computed dependency; package::swiftpm::example.com/swift/* exact 2.0.0 (local none), range unchecked; import module"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/swift/kit::Sources/Hidden/Hidden.swift::hiddenTool()",
+      "kind": "export",
+      "label": "hiddenTool()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/swift/kit",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/swift/kit::Sources/Hidden/Hidden.swift::hiddenTool()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.of(cents:)",
+      "kind": "export",
+      "label": "Money.of(cents:)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/swift/kit",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.of(cents:)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/swift/kit",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.init(cents:)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.plus(_:)",
+      "kind": "export",
+      "label": "Money.plus(_:)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/swift/kit",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.plus(_:)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/swift/kit",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.init(cents:)"
+        }
+      ]
+    }
+  ]
+}

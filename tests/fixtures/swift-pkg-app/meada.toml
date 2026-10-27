@@ -1,0 +1,7 @@
+[[peer]]
+repo = "example.com/swift/kit"
+path = "../swift-pkg-kit"
+
+[[peer]]
+repo = "example.com/swift/lib"
+path = "../swift-pkg-lib"

@@ -74,6 +74,15 @@ All notable changes to Meada are recorded here. The format follows
   `on(.METHOD, ..)` with their `grouped(..)` prefixes, a `RouteCollection` under the builder it
   is registered on, and builders followed through assignments, arguments and return values; the
   handler is the trailing closure or the function given as `use:`.
+- Swift packages (spec #29, #124): each `Package.swift` provides `package::swiftpm::<name>`,
+  with its library products and their targets recorded. A `.package(url:)` links to the
+  workspace repository of the same remote identity and a `.package(path:)` to the one at that
+  path, `exact`, with the written requirement as range and `range unchecked`; an interpolated
+  URL, path or name is `ambiguous`, listing every provider that fits. An `import Module` of a
+  module of a depended-on package reaches its public declarations (`; import module`), narrowed
+  by argument labels, `ambiguous` when several packages expose the module; `context` and `trace`
+  cross the hop. A dependency outside the workspace is ignored and `Package.resolved` is not
+  read. The stored manifest summary changes, so existing indexes are rebuilt.
 - Swift HTTP consumers (spec #29, #121): `URLSession` `data(from:)` and `data(for:)` (with a
   `URLRequest(url:)` whose `httpMethod` is assigned), Alamofire `AF.request(url, method:)` and
   the same on a `Session`, and AsyncHTTPClient `execute` of an `HTTPClientRequest(url:)` with

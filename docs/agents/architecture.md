@@ -789,8 +789,8 @@ one for the area a change touches.
   `http/csharp/clients.rs`, HttpClient and typed client consumers, and `http/csharp/refit.rs`,
   Refit consumers; `http/swift.rs`, `http/swift/vapor.rs`, Vapor providers, and `http/swift/client.rs`, URLSession,
   Alamofire and AsyncHTTPClient consumers), resource and channel
-  kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go, Maven and NuGet packages as
-  contracts (specs #22, #24, #30, #25, #26 and #28), the shared steps and one module per ecosystem behind
+  kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go, Maven, NuGet and SwiftPM packages as
+  contracts (specs #22, #24, #30, #25, #26, #28 and #29), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `literals.rs`, `zod.rs` (and `meada-core`'s `shape.rs`): OpenAPI and AsyncAPI
@@ -840,7 +840,8 @@ one for the area a change touches.
   `package::cargo::<name>` (the `[package] name`; a dependent's site names the key it writes, so
   a renamed crate has its own site) or `package::go::<module path>` (the `module` of a `go.mod`), or
   `package::maven::<group>:<artifact>` (a Maven or Gradle artifact) or `package::nuget::<id>` (an
-  SDK-style `.csproj`: its `PackageId`, else `AssemblyName`, else file name),
+  SDK-style `.csproj`: its `PackageId`, else `AssemblyName`, else file name) or
+  `package::swiftpm::<name>` (a `Package.swift`: the literal of `Package(name:)`),
   provided at `<repository>::<manifest path>` (such as `example.com/pkg/shared::package.json` or
   `example.com/pkg/pylib::pyproject.toml`) and consumed at `<repository>::<manifest
   path>::<field>::<name>` (PyPI fields: `project.dependencies`, `tool.poetry.dependencies`, and
@@ -1204,7 +1205,7 @@ one for the area a change touches.
   `xlang-kotlin` one a TypeScript producer reaching a Kotlin `@KafkaListener`.
 - New **package ecosystem** (spec #22 user story 26, spec #225; track B packs): implement the
   `Ecosystem` trait of `package.rs` in a module of its own under `package/` (`npm`, `pypi`,
-  `cargo`, `go`, `maven`, `nuget` today) and add it to `ECOSYSTEMS`; the package kind, the index writer
+  `cargo`, `go`, `maven`, `nuget`, `swiftpm` today) and add it to `ECOSYSTEMS`; the package kind, the index writer
   and the packs learn no name. An arm for one ecosystem added to the shared code is a finding. It plugs
   in another manifest format (`Cargo.toml`, `go.mod`) without a new kind of contract: the
   contract `package::<name>::<package>` (`Ecosystem::prefix`, derived from `name`) still routes
@@ -1292,6 +1293,28 @@ one for the area a change touches.
     a call through a package (`var o = Order.Of(1); o.Total()`) is not followed (the return
     type lives in the provider's index; Java has the same gap), and two projects in one
     directory share it (the first by path owns the files).
+    SwiftPM (spec #29, #124; `package/swiftpm.rs`) reads `Package.swift` through the pack's
+    `lang/swift/manifest.rs` (`package`: the `Package(name:)` literal, `.library` products with
+    their literal target names, and `.package(url:|path:, ..)` dependencies with their
+    requirement, walked in source order on an explicit stack), so there is one manifest reader.
+    `Summary::products` and `Summary::targets` (module, directory) record what an import can
+    name. An entry's `via` is `git <identity>` (`normalize_remote`, from the root manifest only),
+    `path <dir>/Package.swift` (`sourced`) or, for a URL or path with an interpolation, `computed
+    git|path <pattern>` (holes written `*`, matched with `jvm::fits`, so the dependency is
+    `ambiguous` and lists every provider whose literal parts fit). `settle` gives each literal
+    entry the provider's name from its location, so `reaches` never trusts the placeholder.
+    `imports` turns a call into `(module, Type.member(labels))`: the receiver's written type
+    (`Code::origins`, `Follow::Declarations`) or the construction a local holds
+    (`Follow::Values`, one origin, no steps), else `Code::outside`'s candidates; the lookup
+    reads the provider's `exported` rows (a public name only, an overload family has no target)
+    and narrows by labels from the symbol id plus its `Flexible` argument counts, in the order
+    the parameters have. `resolve` is `exact` for one exposing target and `ambiguous` for
+    several, `How::Module`, `; import module`; the platform modules (`PLATFORM`) are never
+    followed. Ceilings: every dependency of the nearest `Package.swift` counts for the files
+    below it (not only a target's `.product(name:package:)`), an `internal` member of a public
+    type, an inherited member and an extension of another module are not told apart, and the
+    `Flexible` counts do not say which parameter is optional, so a call that skips a required
+    parameter and keeps an optional one still fits.
     `member_of`: none; Maven's and NuGet's
     constructors and methods of a class (a companion's too), so `context` on a public class
     lists, once per call, the calls that reach its members (`reached`, at the best level of the

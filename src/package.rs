@@ -1,7 +1,8 @@
 //! Packages (spec #22): every manifest of a workspace repository with a valid name provides
 //! `package::<ecosystem>::<name>` (`package.json`: `npm`; `pyproject.toml`: `pypi`, spec #24;
 //! `Cargo.toml`: `cargo`, spec #30; `go.mod`: `go`, spec #25; `pom.xml` and the Gradle build and
-//! settings files: `maven`, spec #26; `*.csproj`: `nuget`, spec #28),
+//! settings files: `maven`, spec #26; `*.csproj`: `nuget`, spec #28; `Package.swift`: `swiftpm`,
+//! spec #29),
 //! and every dependency entry that names a package of the workspace, in the same ecosystem,
 //! consumes it. `refresh` reads each manifest into a `Summary`, derived from its bytes
 //! alone and stored in the index; `Packages::declare` turns the named ones into providers and
@@ -12,7 +13,7 @@
 //! This file holds what the ecosystems share: the `Ecosystem` trait with its defaults (Node's
 //! rule for the ways in, the candidates and the provider view), the list `ECOSYSTEMS`, the
 //! summary types and the workspace steps. Each ecosystem's own rules live in its module under
-//! `package/` (`npm`, `pypi`, `cargo`, `go`, `maven`, `nuget`).
+//! `package/` (`npm`, `pypi`, `cargo`, `go`, `maven`, `nuget`, `swiftpm`).
 //!
 //! Imports cross too: `extract` stores every call through a binding imported from a bare
 //! specifier, and `import`, a workspace step after `consume`, resolves those whose package the
@@ -49,6 +50,7 @@ mod maven;
 mod npm;
 mod nuget;
 mod pypi;
+mod swiftpm;
 
 use cargo::Cargo;
 use go::Go;
@@ -56,6 +58,7 @@ use maven::Maven;
 use npm::{Npm, exported};
 use nuget::Nuget;
 use pypi::Pypi;
+use swiftpm::Swiftpm;
 
 pub struct Packages;
 
@@ -205,28 +208,15 @@ trait Ecosystem {
         (specifier, chain): (&str, &str),
         known: &dyn Fn(&Provided<'e>, &str) -> bool,
     ) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
-        let mut out = Vec::new();
-        for (entry, subpath) in self.entries(exports, providers, (n, from), specifier) {
-            let mut resolved = Vec::new();
-            for (m, i) in providers.matching(self, entry) {
-                let manifest = &exports[m].manifests[i];
-                let source = (entry.via.as_deref(), entry.range.as_deref());
-                let to = (exports[m].place(), manifest.path.as_str());
-                if !self.reaches(source, exports[n].place(), to) {
-                    continue;
-                }
-                let at = at(m);
-                let known = |id: &str| known(at, id);
-                let repository = &exports[m].repository;
-                let import = ((entry, subpath.as_str()), (specifier, chain));
-                if let Some(r) = self.resolve(at, repository, manifest, import.0, import.1, &known)
-                {
-                    resolved.push((m, manifest, at, r));
-                }
-            }
-            out.push((entry, resolved));
-        }
-        out
+        resolutions_by_ways(
+            self,
+            exports,
+            providers,
+            at,
+            (n, from),
+            (specifier, chain),
+            known,
+        )
     }
 
     /// Whether a provider of an artifact the file `from.1` of the repository `from.0` depends on
@@ -264,8 +254,43 @@ trait Ecosystem {
     fn settle(&self, _exports: &mut [Export]) {}
 }
 
+/// `Ecosystem::resolutions` by its default rule: each entry the import may name and, in each
+/// provider the entry reaches, where `resolve` leads.
+fn resolutions_by_ways<'e, E: Ecosystem + ?Sized>(
+    ecosystem: &E,
+    exports: &'e [Export],
+    providers: &Providers,
+    at: &dyn Fn(usize) -> &'e Provided<'e>,
+    (n, from): (usize, &str),
+    (specifier, chain): (&str, &str),
+    known: &dyn Fn(&Provided<'e>, &str) -> bool,
+) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
+    let mut out = Vec::new();
+    for (entry, subpath) in ecosystem.entries(exports, providers, (n, from), specifier) {
+        let mut resolved = Vec::new();
+        for (m, i) in providers.matching(ecosystem, entry) {
+            let manifest = &exports[m].manifests[i];
+            let source = (entry.via.as_deref(), entry.range.as_deref());
+            let to = (exports[m].place(), manifest.path.as_str());
+            if !ecosystem.reaches(source, exports[n].place(), to) {
+                continue;
+            }
+            let at = at(m);
+            let known = |id: &str| known(at, id);
+            let repository = &exports[m].repository;
+            let import = ((entry, subpath.as_str()), (specifier, chain));
+            if let Some(r) = ecosystem.resolve(at, repository, manifest, import.0, import.1, &known)
+            {
+                resolved.push((m, manifest, at, r));
+            }
+        }
+        out.push((entry, resolved));
+    }
+    out
+}
+
 /// Every ecosystem, in the order `of` and `of_contract` search and `inherit` runs.
-const ECOSYSTEMS: &[&dyn Ecosystem] = &[&Npm, &Pypi, &Cargo, &Go, &Maven, &Nuget];
+const ECOSYSTEMS: &[&dyn Ecosystem] = &[&Npm, &Pypi, &Cargo, &Go, &Maven, &Nuget, &Swiftpm];
 
 /// The ecosystem of the manifest at `path`, by its file name (`Ecosystem::is_manifest`); `None`
 /// for any other file.
@@ -404,6 +429,14 @@ pub struct Summary {
     /// gives its entries to the projects below it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub import: Option<crate::dotnet::msbuild::Import>,
+    /// SwiftPM only: the library products, as `(name, targets)`: the targets are the modules an
+    /// `import` of the package can name.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub products: Vec<(String, Vec<String>)>,
+    /// SwiftPM only: each target of the package as `(module, directory of its files)`, the
+    /// directory relative to the repository.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub targets: Vec<(String, String)>,
     /// NuGet only: the package properties a project or props file writes, as written, for the
     /// seam's `inherit` to name a project under the props files above it (`msbuild::package`).
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
@@ -803,6 +836,8 @@ struct Provided<'e> {
     /// The public classes and methods of the Java, Kotlin and C# files. Built the first time one
     /// of their imports asks (`maven::resolutions`), once for all.
     classes: OnceCell<maven::Classes<'e>>,
+    /// The Swift symbols by written name. Built the first time a Swift import asks.
+    swift: OnceCell<swiftpm::Symbols<'e>>,
     /// The families of the public classes (`Ancestry`), for `Classes`.
     ancestries: &'e [Ancestry],
     /// The functions that take more than one count of arguments (`Flexible`), for `Classes`.
@@ -838,6 +873,7 @@ impl<'e> Provided<'e> {
             owned: Default::default(),
             go_dirs: OnceCell::new(),
             classes: OnceCell::new(),
+            swift: OnceCell::new(),
             ancestries: &export.ancestries,
             flexible: &export.flexible,
         }
@@ -1341,6 +1377,7 @@ fn surface(
         owned: Default::default(),
         go_dirs: OnceCell::new(),
         classes: OnceCell::new(),
+        swift: OnceCell::new(),
         ancestries: &[],
         flexible: &[],
     };
@@ -2390,7 +2427,10 @@ mod tests {
     #[test]
     fn the_list_names_each_ecosystem_once_in_its_order() {
         let names: Vec<_> = ECOSYSTEMS.iter().map(|e| e.name()).collect();
-        assert_eq!(names, ["npm", "pypi", "cargo", "go", "maven", "nuget"]);
+        assert_eq!(
+            names,
+            ["npm", "pypi", "cargo", "go", "maven", "nuget", "swiftpm"]
+        );
         let prefixes: Vec<_> = ECOSYSTEMS.iter().map(|e| e.prefix()).collect();
         assert_eq!(
             prefixes,
@@ -2400,7 +2440,8 @@ mod tests {
                 "package::cargo::",
                 "package::go::",
                 "package::maven::",
-                "package::nuget::"
+                "package::nuget::",
+                "package::swiftpm::"
             ]
         );
     }
@@ -2788,6 +2829,7 @@ mod tests {
             classes: OnceCell::new(),
             ancestries: &[],
             flexible: &[],
+            swift: OnceCell::new(),
         }
     }
 

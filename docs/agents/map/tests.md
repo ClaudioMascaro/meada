@@ -390,6 +390,17 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `jvm-maven.context-order.txt` and `jvm-client.trace-down.txt`. Unit tests in
   `package/maven.rs` and `jvm/gradle.rs`.
 
+- `tests/it/swiftpkg.rs` (spec #29, ticket #124): the fixtures `swift-pkg-kit` (a `Kit` package
+  with a library product of two targets, an executable product, internal declarations and
+  overloads of `greet`), `swift-pkg-lib` (a `Shared` package also exposing `KitMoney`) and
+  `swift-pkg-app` (a `.package(url:)`, a `.package(path:)`, a computed URL and an outside
+  dependency). Manifest links, imports narrowed by labels (a bare, a module-qualified and an
+  unlabelled call, a constructor, a method on a local and on a typed parameter), the ambiguous
+  module, `context` on a public function and method, `trace` down across the hop, and edited
+  manifests refreshing like a cold workspace. Goldens `swift-pkg-{kit,lib,app}.export.json`,
+  `swift-pkg-kit.context-{greet,hello}.txt`, `swift-pkg-app.trace-down.txt` and
+  `swift-packages.search.txt`; `conformance-swift.export.json` gains the `Shop` package. Unit
+  tests in `package/swiftpm.rs` and `lang/swift/manifest.rs`.
 - `tests/it/nugetpkg.rs` (spec #28, ticket #116): the fixtures `dotnet-lib` (a `PackageId`
   project `Example.Kit` with `Order`, and a `Money` project whose `AssemblyName` differs from its
   file) and `dotnet-app` (a `PackageReference` project, a `ProjectReference` one to the other
