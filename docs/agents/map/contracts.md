@@ -460,7 +460,10 @@ modules updates it.
   the file name until `Ecosystem::settle`, at the start of `Packages::workspace_step`, gives it
   the id of the project at that path in another repository; `reaches` keeps it to that project
   and to other repositories (`sourced`), so a reference inside one repository adds no package
-  link. Imports share Maven's code (`maven::{imports, resolutions, declares}`, with `How`
+  link. `entries` adds what the projects of the repository the file's project references pass
+  on (`dotnet::references::referenced`, #369; `Entry::private` marks a `PrivateAssets` one), and
+  Maven's what the modules of the repository its poms depend on pass on (`compile`, not
+  `optional`). Imports share Maven's code (`maven::{imports, resolutions, declares}`, with `How`
   `Namespace`, the reason's `; import namespace`): the `.cs` exports rows give a public type its
   qualified name, as Java's do. `How::Namespace` is a new value of the exported `how`; the
   stored format gains only a `manifests` summary kind, with `tests/fixtures/schema/sample.csproj`.

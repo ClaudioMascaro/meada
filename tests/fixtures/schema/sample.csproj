@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <PackageReference Include="Example.Json" Version="[1.0,2.0)" />
+    <PackageReference Include="Example.Analyzers" Version="1.0" PrivateAssets="all" />
     <ProjectReference Include="..\Core\Core.csproj" />
   </ItemGroup>
 

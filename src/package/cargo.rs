@@ -64,7 +64,7 @@ fn entry(dir: &str, field: &str, key: &str, spec: &toml::Value) -> Option<Entry>
         alias: (name != key).then(|| key.to_string()),
         range,
         via,
-        inherits: false,
+        ..Entry::default()
     })
 }
 

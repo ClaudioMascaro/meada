@@ -26,10 +26,20 @@ pub struct Project {
     pub package_id: Option<String>,
     pub assembly_name: Option<String>,
     pub version: Option<String>,
-    /// Its `PackageReference` items, as `(Include, Version)`, in order.
-    pub packages: Vec<(String, Option<String>)>,
-    /// The `Include` of its `ProjectReference` items, in order, as written.
-    pub projects: Vec<String>,
+    /// Its `PackageReference` items, in order.
+    pub packages: Vec<Reference>,
+    /// Its `ProjectReference` items, in order.
+    pub projects: Vec<Reference>,
+}
+
+/// A `PackageReference` or `ProjectReference` item, as written.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Reference {
+    pub include: String,
+    pub version: Option<String>,
+    /// It does not pass on to the projects that reference this one: its `PrivateAssets` names
+    /// `all` or `compile`, or is computed (`$(Property)`), which the reader cannot tell.
+    pub private: bool,
 }
 
 /// The namespaces implicit usings add in every SDK project (the SDK's own list).
@@ -150,24 +160,30 @@ pub fn read(src: &[u8]) -> Option<Project> {
             .filter_map(|n| Some((n, n.attribute("Include")?.trim())))
             .filter(|(_, include)| !include.is_empty())
     };
-    let version = |item: Node| {
-        let child = elements(item, "Version").next().and_then(|v| v.text());
-        (item.attribute("Version").or(child))
+    // An attribute, else a child element of the item.
+    let metadata = |item: Node<'_, '_>, name: &'static str| {
+        let child = elements(item, name).next().and_then(|v| v.text());
+        (item.attribute(name).or(child))
             .map(str::trim)
             .filter(|v| !v.is_empty())
             .map(str::to_string)
+    };
+    let reference = |(item, include): (Node, &str)| Reference {
+        include: include.to_string(),
+        version: metadata(item, "Version"),
+        private: metadata(item, "PrivateAssets").is_some_and(|assets| {
+            assets.contains("$(")
+                || (assets.split(';').map(str::trim))
+                    .any(|a| a.eq_ignore_ascii_case("all") || a.eq_ignore_ascii_case("compile"))
+        }),
     };
     Some(Project {
         usings,
         package_id: property("PackageId"),
         assembly_name: property("AssemblyName"),
         version: property("PackageVersion").or_else(|| property("Version")),
-        packages: items("PackageReference")
-            .map(|(n, include)| (include.to_string(), version(n)))
-            .collect(),
-        projects: items("ProjectReference")
-            .map(|(_, include)| include.to_string())
-            .collect(),
+        packages: items("PackageReference").map(reference).collect(),
+        projects: items("ProjectReference").map(reference).collect(),
     })
 }
 
@@ -221,9 +237,48 @@ mod tests {
         assert_eq!(project.assembly_name, None);
         assert_eq!(project.version.as_deref(), Some("2.0"));
         let packages = [("A", Some("1.*")), ("B", Some("[2,3)")), ("C", None)];
-        let packages = packages.map(|(n, v)| (n.to_string(), v.map(String::from)));
+        let packages = packages.map(|(n, v)| Reference {
+            include: n.to_string(),
+            version: v.map(String::from),
+            private: false,
+        });
         assert_eq!(project.packages, packages);
-        assert_eq!(project.projects, ["..\\X\\X.csproj"]);
+        let projects: Vec<_> = project.projects.iter().map(|r| &r.include).collect();
+        assert_eq!(projects, ["..\\X\\X.csproj"]);
+    }
+
+    #[test]
+    fn a_reference_with_private_compile_assets_or_computed_ones_does_not_pass_on() {
+        let src = r#"<Project Sdk="S"><ItemGroup>
+            <PackageReference Include="A" PrivateAssets="All" />
+            <PackageReference Include="B"><PrivateAssets>contentfiles; Compile</PrivateAssets></PackageReference>
+            <PackageReference Include="C" PrivateAssets="$(Assets)" />
+            <PackageReference Include="D" PrivateAssets="analyzers;build" />
+            <PackageReference Include="E" />
+            <ProjectReference Include="X.csproj" PrivateAssets="all" />
+            <ProjectReference Include="Y.csproj" PrivateAssets="none" />
+          </ItemGroup></Project>"#;
+        let project = read(src.as_bytes()).unwrap();
+        let private = |refs: &[Reference]| -> Vec<_> {
+            refs.iter()
+                .map(|r| (r.include.clone(), r.private))
+                .collect()
+        };
+        let row = |n: &str, p| (n.to_string(), p);
+        assert_eq!(
+            private(&project.packages),
+            [
+                row("A", true),
+                row("B", true),
+                row("C", true),
+                row("D", false),
+                row("E", false)
+            ]
+        );
+        assert_eq!(
+            private(&project.projects),
+            [row("X.csproj", true), row("Y.csproj", false)]
+        );
     }
 
     #[test]

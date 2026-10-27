@@ -418,6 +418,11 @@ pub struct Entry {
     /// Cargo only: `workspace = true`, until the seam's `inherit` fills the entry.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub inherits: bool,
+    /// NuGet and a `pom.xml` only: the entry does not pass on to the manifest's dependents, so a
+    /// walk through the manifest skips it (NuGet `msbuild::Reference::private`; a Maven scope
+    /// other than `compile`, or `optional`; also when the file computes either).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub private: bool,
 }
 
 impl Entry {
