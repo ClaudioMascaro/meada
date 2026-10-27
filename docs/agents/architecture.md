@@ -2007,8 +2007,10 @@ qualification budget does (ADR 0017).
   A configuration read is decided with the project of the file that holds the call, the
   constructor or the registration it is read for (`http/csharp/reads.rs`), so a client in a
   library project reads the library's `appsettings.json`, never the consuming app's.
-  An `internal` type joins its namespace's star for the whole repository, so a file of another
-  project links to it as to a public one. A repository extension method wins over an outside
+  An `internal` type (one with no access modifier too) links from its own project's files
+  alone (`Resolver::hidden`); `InternalsVisibleTo` is not read, so a friend project's calls to
+  it get no link. From a file of its namespace in another project, it still hides a type of
+  its name a using brings, which the call then reaches by a name match. A repository extension method wins over an outside
   type's instance member of the same name (`sb.Append("x")` beside a
   `static StringBuilder Append(this StringBuilder b, string s)`), where C# picks the member
   (ADR 0018). Only the nearest project's references are read (`package/nuget.rs`): the

@@ -1616,7 +1616,7 @@ impl<'a> Resolver<'a> {
             (binding, members) = found;
         }
         let found = self.walk(binding, members, seen, work, reading);
-        self.in_unit(path, found)
+        self.in_unit(path, self.accessible(path, found))
     }
 
     /// `binding`'s dotted `members`, each looked up in what the one before gives (`member` for
@@ -2316,6 +2316,9 @@ impl<'a> Resolver<'a> {
         if let Some(reaches) = &self.reaches {
             found.retain(|t| reaches(path, t.path));
         }
+        if self.files.get(path).is_some_and(|f| !f.unit.is_empty()) {
+            found.retain(|t| !self.hidden(path, *t));
+        }
         if let Some(arity) = arity {
             found.retain(|t| (self.arities.get(t)).is_none_or(|n| n.fits_call(arity, on_receiver)));
         }
@@ -2622,6 +2625,46 @@ impl<'a> Resolver<'a> {
                 def => def,
             });
         one(found.collect())
+    }
+
+    /// `found` without the definitions `path` may not reach (`hidden`): nothing when none is
+    /// left, the one left when one is.
+    fn accessible(&self, path: &'a str, found: Binding<'a>) -> Binding<'a> {
+        let all = match found {
+            Binding::Def(t) if self.hidden(path, t) => return Binding::Unknown,
+            Binding::Several(all) => all,
+            found => return found,
+        };
+        let left: Vec<Target<'a>> = (all.iter().copied())
+            .filter(|t| !self.hidden(path, *t))
+            .collect();
+        match left[..] {
+            _ if left.len() == all.len() => Binding::Several(all),
+            [] => Binding::Unknown,
+            [one] => Binding::Def(one),
+            _ => Binding::Several(left),
+        }
+    }
+
+    /// Whether `t` is, or is declared in, a type its file keeps to its compilation
+    /// (`Facts::private` of a file with a `Facts::unit`: C#'s `internal` types) and `path` is
+    /// in another one. A file in no project (its own unit) neither hides nor is hidden.
+    // ponytail: `InternalsVisibleTo` is not read, so a friend project gets no link.
+    fn hidden(&self, path: &str, t: Target) -> bool {
+        let (Some(from), Some(at)) = (self.files.get(path), self.files.get(t.path)) else {
+            return false;
+        };
+        if from.unit == at.unit || from.unit == path || at.unit == t.path {
+            return false;
+        }
+        let mut name = t.name;
+        while !name.is_empty() {
+            if at.private.iter().any(|p| p == name) {
+                return true;
+            }
+            name = crate::parent(name);
+        }
+        false
     }
 
     /// `found`, when files define its name apart (`Several`), narrowed to the definitions of the
@@ -9031,9 +9074,10 @@ mod csharp_tests {
     /// type) in `Kit`: the level and the files of its targets.
     fn save_called(members: &str, use_it: &str) -> (&'static str, Vec<String>) {
         let repo = format!(
-            "class Repo {{ {members} public void Save() {{}} public static Repo Make() => new(); }}"
+            "public class Repo {{ {members} public void Save() {{}} \
+             public static Repo Make() => new(); }}"
         );
-        let store = "class Store { public void Save() {} public Store Next; }";
+        let store = "public class Store { public void Save() {} public Store Next; }";
         let app = format!("class U {{ void M() {{ {use_it} }} }}");
         let found = resolved(&[("Kit/R.cs", &repo), ("Kit/S.cs", store), ("App/U.cs", &app)]);
         let (_, _, level, targets) = (found.into_iter())
@@ -9113,6 +9157,83 @@ mod csharp_tests {
         for use_it in ["Repo.Make().Save();", "Repo.Make()?.Save();"] {
             let (level, targets) = save_called("public dynamic x;", use_it);
             assert_eq!((level, &targets), ("exact", &repo), "{use_it}");
+        }
+    }
+
+    /// The calls `found` holds in `path`: `(callee, level, targets' paths)`.
+    fn calls_in(
+        found: &[(String, String, &'static str, Vec<String>)],
+        path: &str,
+    ) -> Vec<(String, &'static str, Vec<String>)> {
+        (found.iter())
+            .filter(|(p, ..)| p == path)
+            .map(|(_, callee, level, targets)| (callee.clone(), *level, targets.clone()))
+            .collect()
+    }
+
+    const USE_TAX: &str = "using Shop; class U { void M() { new Tax().Apply(); Tax.Of(); } }";
+
+    /// A `Shop.Tax` declared with `access` (`internal`, or none at namespace level): `Apply` and
+    /// a static `Of`.
+    fn tax(access: &str) -> String {
+        format!(
+            "namespace Shop; {access} class Tax {{ public void Apply() {{}} \
+             public static void Of() {{}} }}"
+        )
+    }
+
+    /// An `internal` type, written so or with no access modifier, is its project's alone: a
+    /// file of another project gets no link to it nor to its members.
+    #[test]
+    fn an_internal_type_links_from_its_own_project_alone() {
+        for access in ["internal", ""] {
+            let found = resolved(&[("Kit/Tax.cs", &tax(access)), ("App/Use.cs", USE_TAX)]);
+            assert_eq!(
+                calls_in(&found, "App/Use.cs"),
+                [
+                    ("(expression).Apply".to_string(), "unresolved", vec![]),
+                    ("Tax".to_string(), "unresolved", vec![]),
+                    ("Tax.Of".to_string(), "unresolved", vec![]),
+                ],
+                "{access:?}"
+            );
+        }
+    }
+
+    /// From another project, a public type of the internal one's name is the one found; from a
+    /// file of each of two projects with an internal type of one name, its project's own.
+    #[test]
+    fn a_name_an_internal_type_hides_binds_to_the_type_the_file_sees() {
+        let kit2 = vec!["Kit2/Tax.cs".to_string()];
+        let found = resolved(&[
+            ("Kit/Tax.cs", &tax("internal")),
+            ("Kit2/Tax.cs", &tax("public")),
+            ("App/Use.cs", USE_TAX),
+        ]);
+        assert_eq!(
+            calls_in(&found, "App/Use.cs"),
+            [
+                ("(expression).Apply".to_string(), "inferred", kit2.clone()),
+                ("Tax".to_string(), "exact", kit2.clone()),
+                ("Tax.Of".to_string(), "exact", kit2),
+            ]
+        );
+        let found = resolved(&[
+            ("Kit/Tax.cs", &tax("internal")),
+            ("Kit2/Tax.cs", &tax("internal")),
+            ("Kit/Use.cs", USE_TAX),
+            ("Kit2/Use.cs", USE_TAX),
+        ]);
+        for project in ["Kit", "Kit2"] {
+            let own = vec![format!("{project}/Tax.cs")];
+            assert_eq!(
+                calls_in(&found, &format!("{project}/Use.cs")),
+                [
+                    ("(expression).Apply".to_string(), "inferred", own.clone()),
+                    ("Tax".to_string(), "exact", own.clone()),
+                    ("Tax.Of".to_string(), "exact", own),
+                ]
+            );
         }
     }
 }
