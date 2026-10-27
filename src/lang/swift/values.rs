@@ -9,9 +9,10 @@
 //! An environment read is `ProcessInfo.processInfo.environment["X"]` (also `Foundation.`-qualified),
 //! the string `Str([Env(X)])`, also through `!`, parentheses, string methods that keep the text
 //! (`trimmingCharacters`, `replacingOccurrences`, `lowercased`, `uppercased`) and a `??` whose
-//! fallback is a plain string literal. A second read among a method's arguments or in a
-//! fallback, and a fallback that is not a plain literal, make the whole a hole: which of them is
-//! the base is unknown. Meada never reads the variable. Vapor's `Environment.get` is no read.
+//! fallback is a plain string literal. A method's argument that may read again (a read, a hole or
+//! a name of the code, which may hold one) and a fallback that is not a plain literal make the
+//! whole a hole: which of them is the base is unknown. The read is found bottom-up, each link of
+//! a chain once. Meada never reads the variable. Vapor's `Environment.get` is no read.
 
 use tree_sitter::Node;
 
@@ -138,11 +139,28 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
                 _ => Value::Unknown,
             }
         }
-        "tuple_expression" | "nil_coalescing_expression" => {
-            env_read(node, src, ctx, depth).map_or(Value::Unknown, |p| Value::Str(vec![p]))
+        // `(read)`, and `read ?? "fallback"`: a fallback but a text-only literal is a hole.
+        "tuple_expression" => match &named(node).collect::<Vec<_>>()[..] {
+            [only] => env(value_at(*only, src, ctx, depth + 1)),
+            _ => Value::Unknown,
+        },
+        "nil_coalescing_expression" => {
+            let side = |field| match node.child_by_field_name(field) {
+                Some(n) => value_at(n, src, ctx, depth + 1),
+                None => Value::Unknown,
+            };
+            match (env(side("value")), side("if_nil")) {
+                (Value::Str(read), Value::Str(p))
+                    if p.iter().all(|p| matches!(p, Part::Text(_))) =>
+                {
+                    Value::Str(read)
+                }
+                (Value::Str(_), _) => Value::Str(vec![Part::Hole]),
+                _ => Value::Unknown,
+            }
         }
         "call_expression" | "constructor_expression" => {
-            if let Some(read) = env_read(node, src, ctx, depth) {
+            if let Some(read) = subscript_read(node, src, ctx, depth) {
                 return Value::Str(vec![read]);
             }
             let (function, suffixes) = parts(node);
@@ -150,6 +168,19 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
                 return Value::Unknown;
             };
             fill_at(&mut at, function, &suffixes, src, ctx, depth);
+            // A string method keeps the read it is called on; an argument that may read again
+            // makes it a hole, since which read is the base is unknown.
+            let method = at.callee.rsplit('.').next().unwrap_or(&at.callee);
+            if let [_] = suffixes[..]
+                && STRING_METHODS.contains(&method)
+                && let Some(read) = at.receiver.as_ref().and_then(read)
+            {
+                let args = at.args.iter().chain(at.kwargs.iter().map(|(_, v)| v));
+                return match args.clone().any(may_read) {
+                    true => Value::Str(vec![Part::Hole]),
+                    false => Value::Str(read.to_vec()),
+                };
+            }
             Value::Call(Invocation {
                 callee: at.callee,
                 receiver: at.receiver.map(Box::new),
@@ -173,76 +204,74 @@ const STRING_METHODS: &[&str] = &[
     "uppercased",
 ];
 
-/// The environment read the expression `node` is (see the module), `Hole` when it reads a
-/// second one or falls back on something but a literal, `None` when it is no read.
+/// The environment read `ProcessInfo.processInfo.environment["X"]` the subscript `node` is:
+/// `Env(X)`, `Hole` when the key is no text-only literal, `None` when it is no read.
 // ponytail: `ProcessInfo` is Foundation's by its name alone; a type of the repository named so
-// would be read as it, and an argument is searched for the name `ProcessInfo`: one that only
-// looks like a read makes a hole, which is never wrong, only less.
-fn env_read(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Option<Part> {
-    if depth > VALUE_DEPTH {
+// would be read as it.
+fn subscript_read(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Option<Part> {
+    let (function, suffixes) = parts(node);
+    let [suffix] = suffixes[..] else {
+        return None;
+    };
+    let arguments = children(suffix).find(|c| c.kind() == "value_arguments")?;
+    if node.kind() != "call_expression"
+        || function.kind() != "navigation_expression"
+        || children(arguments).next()?.kind() != "["
+    {
         return None;
     }
-    let again = |n: Node| env_read(n, src, ctx, depth + 1);
-    match node.kind() {
-        "tuple_expression" => match &named(node).collect::<Vec<_>>()[..] {
-            [only] => again(*only),
-            _ => None,
+    let name = callee(function, src);
+    if name.strip_prefix("Foundation.").unwrap_or(&name) != ENVIRONMENT {
+        return None;
+    }
+    let [key] = &named(arguments).collect::<Vec<_>>()[..] else {
+        return None;
+    };
+    let literal = match key.child_by_field_name("value") {
+        Some(v) if key.child_by_field_name("name").is_none() => value_at(v, src, ctx, depth + 1),
+        _ => return None,
+    };
+    Some(match literal {
+        Value::Str(p) => match &p[..] {
+            [Part::Text(name)] if !name.is_empty() => Part::Env(name.clone()),
+            _ => Part::Hole,
         },
-        "postfix_expression" => again(node.child_by_field_name("target")?).filter(|_| {
-            node.child_by_field_name("operation")
-                .is_some_and(|o| o.kind() == "bang")
-        }),
-        "nil_coalescing_expression" => {
-            let read = again(node.child_by_field_name("value")?)?;
-            let fallback = value_at(node.child_by_field_name("if_nil")?, src, ctx, depth + 1);
-            let literal =
-                matches!(&fallback, Value::Str(p) if p.iter().all(|p| matches!(p, Part::Text(_))));
-            Some(if literal { read } else { Part::Hole })
-        }
-        "call_expression" => {
-            let (function, suffixes) = parts(node);
-            let [suffix] = suffixes[..] else {
-                return None;
-            };
-            let arguments = children(suffix).find(|c| c.kind() == "value_arguments")?;
-            if function.kind() != "navigation_expression" {
-                return None;
-            }
-            if children(arguments).next()?.kind() == "[" {
-                let name = callee(function, src);
-                if name.strip_prefix("Foundation.").unwrap_or(&name) != ENVIRONMENT {
-                    return None;
-                }
-                let [key] = &named(arguments).collect::<Vec<_>>()[..] else {
-                    return None;
-                };
-                let literal = match key.child_by_field_name("value") {
-                    Some(v) if key.child_by_field_name("name").is_none() => {
-                        value_at(v, src, ctx, depth + 1)
-                    }
-                    _ => return None,
-                };
-                return match literal {
-                    Value::Str(p) => match &p[..] {
-                        [Part::Text(name)] if !name.is_empty() => Some(Part::Env(name.clone())),
-                        _ => Some(Part::Hole),
-                    },
-                    _ => Some(Part::Hole),
-                };
-            }
-            let method = function
-                .child_by_field_name("suffix")?
-                .child_by_field_name("suffix")?;
-            if !STRING_METHODS.contains(&text(method, src)) {
-                return None;
-            }
-            let read = again(function.child_by_field_name("target")?)?;
-            Some(match text(arguments, src).contains("ProcessInfo") {
-                true => Part::Hole,
-                false => read,
-            })
-        }
+        _ => Part::Hole,
+    })
+}
+
+/// `value` when it is one environment read (a string of one `Env` or `Hole` part, see the
+/// module), `Unknown` otherwise.
+fn env(value: Value) -> Value {
+    match read(&value) {
+        Some(_) => value,
+        None => Value::Unknown,
+    }
+}
+
+/// The parts of `value` when it is one environment read.
+fn read(value: &Value) -> Option<&[Part]> {
+    match value {
+        Value::Str(p) if matches!(p[..], [Part::Env(_) | Part::Hole]) => Some(p),
         _ => None,
+    }
+}
+
+/// Whether `value` may read the environment: a read or a hole in it, or a name of the code (a
+/// local or a parameter may hold a read; a member of a type, `CharacterSet.whitespaces`, does
+/// not), at any depth of a call.
+fn may_read(value: &Value) -> bool {
+    match value {
+        Value::Str(parts) => {
+            (parts.iter()).any(|p| matches!(p, Part::Env(_) | Part::Hole | Part::Ref(_)))
+        }
+        Value::Ref(name) => !name.starts_with(char::is_uppercase),
+        Value::Call(call) => (call.args.iter())
+            .chain(call.kwargs.iter().map(|(_, v)| v))
+            .chain(call.receiver.as_deref())
+            .any(may_read),
+        Value::List(items) => items.iter().any(may_read),
+        _ => false,
     }
 }
 

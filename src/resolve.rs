@@ -353,6 +353,8 @@ pub struct Resolver<'a> {
     unordered_bases: bool,
     /// The pack's `LanguagePack::extension_methods`.
     extension_methods: bool,
+    /// The pack's `LanguagePack::outside_blocks`.
+    outside_blocks: bool,
     /// The pack's `LanguagePack::implicit_members`.
     implicit: &'static [&'static str],
     /// The pack's names bound everywhere (`LanguagePack::globals`).
@@ -472,69 +474,70 @@ impl<'c> Args<'c> {
     }
 }
 
+/// How many pairs of a parameter and an argument `labelled_args` may weigh for one call: past it,
+/// the call fits no function that labels its parameters.
+// ponytail: real calls pass a handful of arguments; this keeps a crafted one cheap.
+const LABELLED_CELLS: usize = 1 << 16;
+
 /// Whether parameters with labels (`Param::label`, `_` when none) take the arguments of a call
-/// with `labels` in order, as Swift matches them: each argument goes to the next parameter of
-/// its label, a parameter with a default value or a variadic one may take none, a variadic one
-/// takes the unlabelled arguments after its first, and a trailing closure (an empty label) may
-/// take a parameter of any label. A parameter without a label (another language's) takes
+/// with `labels` (`labelled_args`). A parameter without a label (another language's) takes
 /// whatever it is given.
-fn labelled(params: &[Param], labels: &[String]) -> bool {
-    if !params.is_empty() && params.iter().all(|p| p.label.is_none()) {
-        return true;
-    }
-    // `fit[j]`: the parameters read so far take the first `j` arguments.
-    let mut fit = vec![false; labels.len() + 1];
-    fit[0] = true;
-    for p in params {
-        let label = p.label.as_deref().unwrap_or("_");
-        let skips = matches!(p.binds, Binds::Optional | Binds::Rest);
-        let mut next = vec![false; labels.len() + 1];
-        for j in (0..=labels.len()).filter(|&j| fit[j]) {
-            next[j] |= skips;
-            let Some(first) = labels.get(j) else { continue };
-            if first != label && !first.is_empty() {
-                continue;
-            }
-            let mut k = j + 1;
-            next[k] = true;
-            while p.binds == Binds::Rest && labels.get(k).is_some_and(|l| l == "_") {
-                k += 1;
-                next[k] = true;
-            }
-        }
-        fit = next;
-    }
-    fit[labels.len()]
+pub(crate) fn labelled(params: &[Param], labels: &[String]) -> bool {
+    (!params.is_empty() && params.iter().all(|p| p.label.is_none()))
+        || labelled_args(params, labels).is_some()
 }
 
-/// The argument (an index into `labels`) each parameter takes, as `labelled` matches them: a
-/// parameter takes the next argument of its label, or a trailing closure unless it may be
-/// left out. `None` when the call does not fit.
+/// The argument (an index into `labels`) each parameter takes when parameters with labels take
+/// the arguments of a call with `labels` in order, as Swift matches them: each argument goes to
+/// a parameter of its label, a parameter with a default value or a variadic one may take none,
+/// a variadic one takes the unlabelled arguments after its first, and a trailing closure (an
+/// empty label) takes the first parameter that cannot be left out, else any. `None` when the
+/// call does not fit, or weighs more than `LABELLED_CELLS`.
 fn labelled_args(params: &[Param], labels: &[String]) -> Option<Vec<Option<usize>>> {
+    let skips = |p: &Param| matches!(p.binds, Binds::Optional | Binds::Rest);
+    // The ends of the arguments `p` may take from the `j`th on: one of its label, then for a
+    // variadic one the unlabelled ones after it.
+    let ends = |p: &Param, j: usize| {
+        let Some(first) = labels.get(j) else {
+            return j..j;
+        };
+        if first != p.label.as_deref().unwrap_or("_") && !first.is_empty() {
+            return j..j;
+        }
+        let mut k = j + 1;
+        while p.binds == Binds::Rest && labels.get(k).is_some_and(|l| l == "_") {
+            k += 1;
+        }
+        j + 1..k + 1
+    };
+    if (params.len() + 1).saturating_mul(labels.len() + 1) > LABELLED_CELLS {
+        return None;
+    }
+    // `fit[n][j]`: the parameters from the `n`th take the arguments from the `j`th.
+    let mut fit = vec![vec![false; labels.len() + 1]; params.len() + 1];
+    fit[params.len()][labels.len()] = true;
+    for (n, p) in params.iter().enumerate().rev() {
+        for j in 0..=labels.len() {
+            fit[n][j] = (skips(p) && fit[n + 1][j]) || ends(p, j).any(|e| fit[n + 1][e]);
+        }
+    }
+    if !fit[0][0] {
+        return None;
+    }
     let mut takes = vec![None; params.len()];
     let mut j = 0;
     for (n, p) in params.iter().enumerate() {
-        let skips = matches!(p.binds, Binds::Optional | Binds::Rest);
-        let Some(first) = labels.get(j) else {
-            match skips {
-                true => continue,
-                false => return None,
+        let skip = skips(p) && fit[n + 1][j];
+        let closure = labels.get(j).is_some_and(String::is_empty);
+        match ends(p, j).rev().find(|&e| fit[n + 1][e]) {
+            Some(end) if !(skip && closure) => {
+                takes[n] = Some(j);
+                j = end;
             }
-        };
-        let label = p.label.as_deref().unwrap_or("_");
-        if first != label && !(first.is_empty() && !skips) {
-            match skips {
-                true => continue,
-                false => return None,
-            }
-        }
-        takes[n] = Some(j);
-        j += 1;
-        while p.binds == Binds::Rest && labels.get(j).is_some_and(|l| l == "_") {
-            j += 1;
+            _ => {}
         }
     }
-    (j == labels.len()).then_some(takes)
+    Some(takes)
 }
 
 /// Files that share one top-level scope (`Layout::shared`), sorted, and the files whose top
@@ -849,6 +852,7 @@ impl<'a> Resolver<'a> {
             base_receiver: language.base_receiver(),
             unordered_bases: language.unordered_bases(),
             extension_methods: language.extension_methods(),
+            outside_blocks: language.outside_blocks(),
             implicit: language.implicit_members(),
             globals: language.globals(),
             callers: HashMap::new(),
@@ -1180,6 +1184,37 @@ impl<'a> Resolver<'a> {
         !matches!(found, Binding::Def(t) if self.is_class(t))
     }
 
+    /// In a pack whose outside types take blocks (`LanguagePack::outside_blocks`), the type
+    /// from outside the repository the receiver `head` (bound to `receiver`) is of: the type
+    /// the source writes or constructs for it, or the capitalized name it starts with, when
+    /// nothing in the repository binds that name. `Some(None)` for a member read on such a name
+    /// (`URLSession.shared`), whose type is not known; `None` for any other receiver.
+    fn outside_type(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        head: &'a str,
+        receiver: &Binding<'a>,
+        work: &mut Work<'a>,
+    ) -> Option<Option<&'a str>> {
+        let outside = |name: &'a str, work: &mut Work<'a>| {
+            let seen = &mut self.seen(path, scope);
+            let found = self.resolve_as(path, scope, name, seen, work, Reading::Path);
+            matches!(found, Binding::Unknown | Binding::External(..))
+        };
+        if let Some((p, s, n)) = self.holder(receiver) {
+            return match self.receivers[p].get(&(s, n)) {
+                Some(Class::Type(ty) | Class::Named(ty)) if outside(ty, work) => Some(Some(ty)),
+                _ => None,
+            };
+        }
+        let first = head.split('.').next().unwrap_or(head);
+        if !first.starts_with(|c: char| c.is_ascii_uppercase()) || !outside(first, work) {
+            return None;
+        }
+        Some((first == head).then_some(first))
+    }
+
     /// The name match of a call that no binding answers (`infer`). A call narrowed by its
     /// argument count (`Call::arity`, a pack whose overloads merge across a class family) reads
     /// the family that owns it: a receiver whose class the source writes, `this` and a bare
@@ -1219,6 +1254,8 @@ impl<'a> Resolver<'a> {
             &on_receiver,
         );
         let mut written = false;
+        // A type from outside the repository the receiver is of (`outside_type`).
+        let mut outside = None;
         let owner = match head {
             None if bare => self.class(path, scope),
             None => Binding::Unknown,
@@ -1248,9 +1285,21 @@ impl<'a> Resolver<'a> {
                 {
                     written = self.outside_result(p, *made, work);
                 }
+                if self.outside_blocks {
+                    outside = self.outside_type(path, scope, head, &receiver, work);
+                }
                 self.instance(receiver, work)
             }
         };
+        if let Some(ty) = outside {
+            let blocks = (all.iter().copied())
+                .filter(|t| {
+                    let block = crate::parent(t.name);
+                    ty == Some(block) && self.unread.contains(&(t.path, block))
+                })
+                .collect();
+            return one_of(blocks);
+        }
         let on_instance = matches!(owner, Binding::Instance(_)) || head == self.receiver;
         // An extension method may answer a call on a receiver the repository lacks the member
         // of, or whose written type is outside it; no other method of that name does.
@@ -6746,6 +6795,9 @@ mod tests {
             (&[("xs", rest)], &["xs", "y"], false),
             (&[], &[], true),
             (&[], &["_"], false),
+            // A parameter that may be left out gives its label to a later one.
+            (&[("a", optional), ("a", any)], &["a"], true),
+            (&[("xs", rest), ("_", any)], &["xs", "_", "_"], true),
         ];
         for (params, labels, fits) in cases {
             let params: Vec<Param> = (params.iter())
@@ -6777,6 +6829,22 @@ mod tests {
             labelled_args(&params, &strings(&["on", "times", "_"])),
             Some(vec![Some(0), Some(1), Some(2)])
         );
+        let params = [labelled_param("a", optional), labelled_param("a", any)];
+        assert_eq!(
+            labelled_args(&params, &strings(&["a"])),
+            Some(vec![None, Some(0)])
+        );
+        // A call too wide to weigh fits nothing.
+        let wide = |n: usize| -> (Vec<Param>, Vec<String>) {
+            (
+                (0..n).map(|_| labelled_param("a", any)).collect(),
+                vec!["a".into(); n],
+            )
+        };
+        let (params, labels) = wide(200);
+        assert!(labelled(&params, &labels));
+        let (params, labels) = wide(300);
+        assert!(!labelled(&params, &labels));
     }
 
     /// A plain parameter `name`.

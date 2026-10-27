@@ -101,7 +101,8 @@ final class Gateway {
 }
 
 // A call matched by name alone is no call of the wrapper.
-func byName(other: Mystery) async throws {
+func byName() async throws {
+    let other = lookup()
     _ = try await other.fetch("/inferred")
 }
 
@@ -116,6 +117,14 @@ func useApi() async throws {
     let api = Api()
     _ = try await api.fetch("/direct")
     try await api.remove(3)
+    let local = "/local"
+    _ = try await api.fetch(local + "/a")
+    let base = "https://api.example.com"
+    _ = try await whole(base + "/whole")
+}
+
+func whole(_ url: String) async throws -> Data {
+    try await URLSession.shared.data(from: URL(string: url)!).0
 }
 
 // A URL that cannot be evaluated is an unresolved consumer.
@@ -186,4 +195,16 @@ func notRead(session: URLSession, cache: Cache) {
     _ = cache.data(from: "key")
     let AF = Local()
     AF.request("https://api.example.com/hidden")
+}
+
+// Opaque outside: a receiver of a type from outside the repository reaches the members of that
+// type's extensions alone.
+extension URLSession {
+    func warm(from url: URL) {}
+}
+
+func warmed(session: URLSession, other: Mystery) {
+    session.warm(from: URL(string: "https://api.example.com/warm")!)
+    other.fetch("/mystery")
+    URLSession.shared.warm(from: URL(string: "https://api.example.com/shared")!)
 }

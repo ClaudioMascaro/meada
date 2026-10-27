@@ -268,7 +268,7 @@ The registry a package is published to, which decides the manifests that declare
 second part of its contract: npm (`package.json`, `package::npm::<name>`), PyPI
 (`pyproject.toml` and `requirements*.txt`, `package::pypi::<name>`), Cargo (`Cargo.toml`,
 `package::cargo::<name>`), Go (`go.mod`, `package::go::<name>`), Maven (`pom.xml` and
-Gradle's build files, `package::maven::<group>:<artifact>`) NuGet (SDK-style `.csproj`,
+Gradle's build files, `package::maven::<group>:<artifact>`), NuGet (SDK-style `.csproj`,
 `package::nuget::<id>`) or SwiftPM (`Package.swift`, `package::swiftpm::<name>`). An ecosystem is one module
 behind the `Ecosystem` trait, registered in a list. A dependency links only to a package of
 its own ecosystem, so an npm and a PyPI package of one name never link.

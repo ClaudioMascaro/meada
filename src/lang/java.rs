@@ -8,7 +8,7 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Annotated, Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
-    LanguagePack, Layout, Marked, Modules, Param, Part, Receiver, children, named, text,
+    LanguagePack, Layout, Marked, Modules, Param, Part, Receiver, children, named, text, wildcard,
 };
 use crate::{Result, qualify};
 
@@ -813,24 +813,6 @@ fn import(node: Node, src: &[u8], facts: &mut Facts) {
             name: Imported::Qualified,
         });
     }
-}
-
-fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
-    let alias = format!("@glob{}", facts.imports.len());
-    facts.imports.push(Import {
-        local: alias.clone(),
-        source: source.to_string(),
-        name: Imported::Namespace,
-    });
-    facts.imports.push(Import {
-        local: "*".into(),
-        source: String::new(),
-        name: Imported::Glob {
-            path: alias,
-            inside,
-            public: false,
-        },
-    });
 }
 
 /// What the constructor `node` of `class` assigns to fields (`this.f = v`, or `f = v` when no

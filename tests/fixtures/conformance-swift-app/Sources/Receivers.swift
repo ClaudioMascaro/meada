@@ -1,5 +1,6 @@
 func outside(_ name: String, _ loader: Loader, _ file: FileLoader, _ size: Item.Size) {
     name.label()
+    name.shout()
     loader.load(from: "x")
     file.load(from: "x")
     file.load(from: "x", limit: 1)
@@ -26,4 +27,8 @@ func typed(_ item: Item) {
 
 func generic<Item>(_ item: Item) {
     item.label()
+}
+
+extension String {
+    func shout() -> String { self }
 }

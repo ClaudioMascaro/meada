@@ -9,5 +9,6 @@ let package = Package(
     targets: [
         .target(name: "Store"),
         .executableTarget(name: "App", dependencies: ["Store"], path: "Sources/Checkout"),
+        .executableTarget(name: "Tool", dependencies: ["Store"]),
     ]
 )

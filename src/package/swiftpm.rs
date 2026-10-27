@@ -25,19 +25,19 @@ use std::path::{Path, PathBuf};
 
 use super::{
     Ecosystem, Entry, Export, How, Manifest, Provided, Providers, Resolution, Resolved, Summary,
-    bare_directory, folded, owner, resolutions_by_ways, sourced, valid_name,
+    bare_directory, folded, owner, pattern_fits, reachable, resolutions_by_ways, sourced,
+    valid_name,
 };
 use crate::contract::Level;
-use crate::jvm;
-use crate::lang::Call;
-use crate::lang::swift::manifest;
+use crate::lang::swift::manifest::{MANIFEST, targets};
+use crate::lang::{Binds, Call, Param};
 use crate::repo::{normalize_remote, relative};
-use crate::resolve::{Code, Follow, Form, Of, Origin, Outside, passes_nothing};
+use crate::resolve::{Code, Follow, Form, Of, Origin, Outside, labelled, passes_nothing};
+
+mod manifest;
 
 /// The field every dependency is kept under.
 const FIELD: &str = "dependencies";
-/// The manifest a repository's package is declared in.
-const MANIFEST: &str = "Package.swift";
 
 /// The modules of the platform and its toolchain, which no package of the workspace provides.
 // A table of the language's runtime, not a library form; a package named like one is not
@@ -196,29 +196,28 @@ fn labels_of(id: &str) -> Option<Vec<&str>> {
 
 /// Whether a call with argument `labels` (`_` for none, empty for a trailing closure) fits a
 /// function whose parameters are labelled `params` and which takes `least` to `most` arguments
-/// (any number more when `None`, a variadic): the labels are some of the parameters', in order.
-// ponytail: which parameters have defaults is not stored, only how many; a call that skips a
-// required parameter and keeps an optional one still fits.
+/// (any number more when `None`, a variadic): the labels the resolver matches
+/// (`resolve::labelled`), each parameter one the call may leave out and, when the function has a
+/// variadic one, each variadic.
+// ponytail: which parameters have defaults, and which is variadic, is not stored, only how many
+// arguments the function takes; a call that skips a required parameter and keeps an optional
+// one still fits.
 fn fits(params: &[&str], (least, most): (usize, Option<usize>), labels: &[String]) -> bool {
     let n = labels.len();
-    if n < least || most.is_some_and(|m| n > m) {
-        return false;
-    }
-    let mut taken = 0;
-    for &param in params {
-        let Some(label) = labels.get(taken) else {
-            break;
-        };
-        if label == param || label.is_empty() {
-            taken += 1;
-            // A variadic parameter, whatever its label, takes the unlabelled arguments after its
-            // first. Which parameter it is is not stored: any may, when the function has one.
-            while most.is_none() && labels.get(taken).is_some_and(|l| l == "_") {
-                taken += 1;
-            }
-        }
-    }
-    taken == n
+    let binds = match most {
+        None => Binds::Rest,
+        Some(_) => Binds::Optional,
+    };
+    let params: Vec<Param> = (params.iter())
+        .map(|label| Param {
+            name: label.to_string(),
+            binds,
+            label: Some(label.to_string()),
+            default: None,
+            fields: Vec::new(),
+        })
+        .collect();
+    least <= n && most.is_none_or(|m| n <= m) && labelled(&params, labels)
 }
 
 /// The qualified name and labels of an import's chain, `Greeter.hello(to:loudly:)`; the labels
@@ -298,11 +297,6 @@ fn found<'e>(
     ids
 }
 
-/// Whether `pattern`, a location with `*` for what is computed, fits `value`.
-fn glob(pattern: &str, value: &str) -> bool {
-    jvm::fits(pattern, value)
-}
-
 // ponytail: the dependencies of the nearest `Package.swift` all count for every file below it,
 // not only those a file's target lists with `.product(name:package:)`; an `internal` member of a
 // public type, a member inherited from a base class and a declaration an extension of another
@@ -319,16 +313,8 @@ impl Swiftpm {
         from: (usize, &str),
         module: &str,
     ) -> HashSet<(usize, usize)> {
-        (self.entries(exports, providers, from, module).into_iter())
-            .flat_map(|(entry, _)| {
-                let source = (entry.via.as_deref(), entry.range.as_deref());
-                (providers.matching(self, entry).into_iter())
-                    .filter(|&(m, i)| {
-                        let to = (exports[m].place(), exports[m].manifests[i].path.as_str());
-                        self.reaches(source, exports[from.0].place(), to)
-                    })
-                    .collect::<Vec<_>>()
-            })
+        (reachable(self, exports, providers, from, module).into_iter())
+            .flat_map(|(_, _, reached)| reached)
             .filter(|&(m, i)| exposed(&exports[m].manifests[i], module).is_some())
             .collect()
     }
@@ -357,7 +343,7 @@ impl Ecosystem for Swiftpm {
             .collect();
         dependencies.sort_by(|a, b| (&a.name, &a.via, &a.range).cmp(&(&b.name, &b.via, &b.range)));
         dependencies.dedup();
-        let targets = (manifest::targets(path, src).into_iter())
+        let targets = (targets(path, src).into_iter())
             .map(|t| (t.name, t.dir))
             .collect();
         Summary {
@@ -495,14 +481,14 @@ impl Ecosystem for Swiftpm {
             "git" => identity == rest && provider == MANIFEST,
             "path" => sourced(via, from, to),
             "computed" => match rest.split_once(' ') {
-                Some(("git", pattern)) => glob(pattern, identity) && provider == MANIFEST,
+                Some(("git", pattern)) => pattern_fits(pattern, identity) && provider == MANIFEST,
                 Some(("path", pattern)) => {
                     let place = folded(&root.join(bare_directory(provider)));
                     let wanted = match pattern.starts_with('*') {
                         true => pattern.to_string(),
                         false => folded(&from.1.join(pattern)).to_string_lossy().into_owned(),
                     };
-                    glob(&wanted, &place.to_string_lossy())
+                    pattern_fits(&wanted, &place.to_string_lossy())
                 }
                 _ => false,
             },

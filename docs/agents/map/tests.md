@@ -400,7 +400,7 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   manifests refreshing like a cold workspace. Goldens `swift-pkg-{kit,lib,app}.export.json`,
   `swift-pkg-kit.context-{greet,hello}.txt`, `swift-pkg-app.trace-down.txt` and
   `swift-packages.search.txt`; `conformance-swift.export.json` gains the `Shop` package. Unit
-  tests in `package/swiftpm.rs` and `lang/swift/manifest.rs`.
+  tests in `package/swiftpm.rs`, `package/swiftpm/manifest.rs` and `lang/swift/manifest.rs`.
 - `tests/it/nugetpkg.rs` (spec #28, ticket #116): the fixtures `dotnet-lib` (a `PackageId`
   project `Example.Kit` with `Order`, and a `Money` project whose `AssemblyName` differs from its
   file) and `dotnet-app` (a `PackageReference` project, a `ProjectReference` one to the other

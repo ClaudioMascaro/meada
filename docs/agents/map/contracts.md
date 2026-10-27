@@ -450,7 +450,8 @@ modules updates it.
   dropped before the defaults join, so the test roots are always among the kept ones.
 
 - SwiftPM packages (spec #29, ticket #124): `package/swiftpm.rs` implements `Ecosystem` for
-  `Package.swift`, read by `lang/swift/manifest.rs` (`package`, beside `targets`). It provides
+  `Package.swift`, read by `package/swiftpm/manifest.rs` (`package`, on the grammar readers of
+  `lang/swift/manifest.rs`, beside `targets`). It provides
   `package::swiftpm::<name>` from the literal `Package(name:)`; `.library` products and their
   targets go to `Summary::products` and `targets`. A `.package(url:)` is a `git <identity>` entry
   (ADR 0004), a `.package(path:)` a `path <dir>/Package.swift` one (`sourced`), both `exact` with

@@ -48,3 +48,18 @@ func deeper(_ parent: RouterGroup<BasicRequestContext>) -> RouterGroup<BasicRequ
 @Sendable func showItem(request: Request, context: BasicRequestContext) async throws -> String {
     "item"
 }
+
+// Unread mounts: a controller's routes reach the router through `addRoutes(_:atPath:)`, which
+// is not read, so they serve nothing.
+struct ItemController<Context: RequestContext>: RouterController {
+    var body: some RouterMiddleware<Context> {
+        RouteGroup("items") {
+            Get("listed") { _, _ in "unread" }
+        }
+    }
+}
+
+func controllers() {
+    let router = Router()
+    router.addRoutes(ItemController(), atPath: "controlled")
+}

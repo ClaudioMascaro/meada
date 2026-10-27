@@ -17,10 +17,10 @@ use std::rc::Rc;
 
 use tree_sitter::{Node, Parser};
 
-use super::kotlin::{bare_calls, wildcard};
 use super::{
     Binds, Bound, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Join, Kind,
-    LanguagePack, Layout, Modules, Param, Receiver, Star, Value, children, named, text,
+    LanguagePack, Layout, Modules, Param, Receiver, Star, Value, bare_calls, children, named, text,
+    wildcard,
 };
 use crate::{Result, qualify};
 use values::Ctx;
@@ -52,7 +52,7 @@ impl LanguagePack for Swift {
 
     /// `Package.swift` is the package's manifest, read as a config file (`manifest`).
     fn is_code(&self, path: &str) -> bool {
-        path.rsplit('/').next() != Some("Package.swift")
+        path.rsplit('/').next() != Some(manifest::MANIFEST)
     }
 
     fn parse(&self, path: &str, src: &[u8]) -> Result<Facts> {
@@ -60,7 +60,7 @@ impl LanguagePack for Swift {
     }
 
     fn config_files(&self) -> &'static [&'static str] {
-        &["**/Package.swift"]
+        &[manifest::MANIFESTS]
     }
 
     /// Each file's module (`Facts::unit`, whose `internal` declarations no other module sees)
@@ -153,6 +153,10 @@ impl LanguagePack for Swift {
 
     /// A type's conformances may be written in any order.
     fn unordered_bases(&self) -> bool {
+        true
+    }
+
+    fn outside_blocks(&self) -> bool {
         true
     }
 }
@@ -300,14 +304,14 @@ fn walk(
     let mut types: HashSet<String> = HashSet::new();
     let mut returns: HashMap<String, Vec<Value>> = HashMap::new();
     let mut budget = QUALIFICATION_BYTES;
-    // The names assigned (`x = v`, `x += v`, `&x`) anywhere in the file, which hold no one value,
-    // and the members assigned through a name (`request.httpMethod = v`).
-    let mut assigned: HashSet<String> = HashSet::new();
+    // The names assigned (`x = v`, `x += v`, `&x`), by the scope written in, which hold no one
+    // value there, and the members assigned through a name (`request.httpMethod = v`).
+    let mut assigned: Vec<(Rc<String>, String)> = Vec::new();
     let mut members: Vec<Member> = Vec::new();
-    // The names a `var` declares, and those a method is called on (`url.appendPathComponent(..)`
-    // mutates a value in place).
+    // The names a `var` declares, and those a method is called on, by the scope written in
+    // (`url.appendPathComponent(..)` mutates a value in place).
     let mut vars: HashSet<String> = HashSet::new();
-    let mut called: HashSet<String> = HashSet::new();
+    let mut called: Vec<(Rc<String>, String)> = Vec::new();
     // The typed locals: receivers, not `locals`, but declarations of their name all the same.
     let mut typed_names: Vec<String> = Vec::new();
     // The types marked `@main`, each a program through its `main()` method when it has one.
@@ -358,6 +362,8 @@ fn walk(
         let mut defines_body = false;
         let (mut inner_default, mut inner_ceiling, mut nested) = (default, ceiling, depth);
         let mut pushed: Vec<Node> = named(node).collect();
+        // The initializers of a top-level binding of `main.swift`, top-level code (`main`).
+        let mut initializers: Vec<Node> = Vec::new();
         match node.kind() {
             "class_declaration" | "protocol_declaration" if defining => {
                 let extension = children(node).any(|c| c.kind() == "extension");
@@ -513,13 +519,18 @@ fn walk(
                 });
                 let own = access(node, src).unwrap_or(default).min(ceiling);
                 // The initializer of a top-level binding of `main.swift` is top-level code: its
-                // calls and closures belong to `main`, the binding stays a global.
+                // calls and closures belong to `main`, the binding stays a global, and so do its
+                // accessors.
                 let code =
                     match main_file && node.parent().is_some_and(|p| p.kind() == "source_file") {
                         true => Rc::new(MAIN.to_string()),
                         false => scope.clone(),
                     };
-                inner = code.clone();
+                if code != scope {
+                    initializers = (node.children_by_field_name("value", &mut node.walk()))
+                        .filter(|n| n.is_named())
+                        .collect();
+                }
                 let held = values::initializer(node, src, ctx(&code, defining, &types));
                 let names = bound(node, src);
                 // A typed local is a receiver of its function alone when it is directly in the
@@ -645,9 +656,7 @@ fn walk(
                     let plain = children(node).any(|c| c.kind() == "=");
                     let result = node.child_by_field_name("result");
                     match name.split_once('.') {
-                        None => {
-                            assigned.insert(name);
-                        }
+                        None => assigned.push((scope.clone(), name)),
                         Some((head, rest)) if !name.contains('(') => {
                             // Only a plain `=` as a statement of the body runs once, in place.
                             let direct = plain && !rest.contains('.') && runs_once(node);
@@ -671,7 +680,7 @@ fn walk(
             }
             "prefix_expression" if text(node, src).starts_with('&') => {
                 if let Some(target) = node.child_by_field_name("target") {
-                    assigned.insert(head(&callee(target, src)).to_string());
+                    assigned.push((scope.clone(), head(&callee(target, src)).to_string()));
                 }
             }
             "call_expression" | "constructor_expression" => {
@@ -688,7 +697,7 @@ fn walk(
                     // A type parameter is no type of the repository: `T()` constructs none.
                     at.constructs &= !generics.holds(head(&at.callee));
                     if let Some((receiver, _)) = at.callee.split_once('.') {
-                        called.insert(receiver.to_string());
+                        called.push((scope.clone(), receiver.to_string()));
                     }
                     facts.calls.push(at);
                 }
@@ -707,20 +716,9 @@ fn walk(
                 "statements" => body,
                 _ => false,
             };
-            // The statements of `main.swift` are its top-level code.
-            let top_code = main_file
-                && node.kind() == "source_file"
-                && !matches!(
-                    child.kind(),
-                    "class_declaration"
-                        | "protocol_declaration"
-                        | "function_declaration"
-                        | "property_declaration"
-                        | "import_declaration"
-                        | "typealias_declaration"
-                        | "comment"
-                        | "multiline_comment"
-                );
+            // The statements and expressions of `main.swift` are its top-level code.
+            let top_code = (main_file && node.kind() == "source_file" && code(child.kind()))
+                || initializers.contains(&child);
             stack.push(Visit {
                 node: child,
                 scope: match top_code {
@@ -762,9 +760,18 @@ fn walk(
         facts.programs.push(if start { method } else { ty });
     }
     bare_calls(&mut facts);
+    // A name written in a function or a closure in it is written in the whole function (a
+    // closure assigns a local of its function).
+    let by_function = |written: &'_ [(Rc<String>, String)]| -> HashSet<(String, String)> {
+        (written.iter())
+            .map(|(s, n)| (function(s).to_string(), n.clone()))
+            .collect()
+    };
+    let (assigned, called) = (by_function(&assigned), by_function(&called));
     facts.bound.retain(|b| {
-        !assigned.contains(&b.name)
-            && !(vars.contains(&b.name) && called.contains(&b.name) && mutable(&b.value))
+        let at = (function(&b.scope).to_string(), b.name.clone());
+        !assigned.contains(&at)
+            && !(vars.contains(&b.name) && called.contains(&at) && mutable(&b.value))
     });
     assign_members(&mut facts.bound, members);
     // A name another binding of the scope also declares (a loop variable, a `guard let`, a
@@ -818,6 +825,11 @@ struct Member {
     member: String,
     value: Value,
     direct: bool,
+}
+
+/// The function `scope` is in, or is: the scope before its first closure (`f().@120` is in `f()`).
+fn function(scope: &str) -> &str {
+    scope.find(".@").map_or(scope, |at| &scope[..at])
 }
 
 /// Whether a method called on a `var` of this value may change it in place: a string, a name
@@ -909,6 +921,18 @@ fn assign_members(bound: &mut [Bound], members: Vec<Member>) {
     }
 }
 
+/// Whether a node of this kind, written at the top level of `main.swift`, is code that runs
+/// there: a statement or an expression, not a declaration, a directive or a comment.
+fn code(kind: &str) -> bool {
+    ["_expression", "_statement", "_literal", "_operation"]
+        .iter()
+        .any(|suffix| kind.ends_with(suffix))
+        || matches!(
+            kind,
+            "assignment" | "bang" | "macro_invocation" | "value_pack_expansion"
+        )
+}
+
 /// Pushes the `children` of a function's declaration to be visited in source order, as its
 /// code, under `scope` (`plain`).
 fn stack_children<'t>(
@@ -945,6 +969,7 @@ fn stores(kind: &str) -> bool {
             | "protocol_function_declaration"
             | "init_declaration"
             | "property_declaration"
+            | "assignment"
             | "call_expression"
             | "constructor_expression"
             | "lambda_literal"
@@ -1404,7 +1429,7 @@ fn definition(name: &str, kind: Kind, range: Range<usize>, bases: Vec<String>) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lang::Part;
+    use crate::lang::{Invocation, Part};
 
     fn facts(src: &str) -> Facts {
         parse(src.as_bytes(), false).unwrap()
@@ -1447,6 +1472,46 @@ mod tests {
         assert_eq!(scope("build"), "T");
         assert!(f.consts.iter().any(|c| c.name == "k"));
         assert!(facts("run()\n").programs.is_empty());
+    }
+
+    /// The accessors of a global of `main.swift` are no top-level code: only its initializer is.
+    #[test]
+    fn the_accessors_of_a_global_of_main_swift_are_no_top_level_code() {
+        let f = script(
+            "var x: Int { compute() }\nvar y = make() { didSet { observe() } }\n\
+             var z: Int { get { fetch() } set { store() } }\n",
+        );
+        let scope = |callee: &str| {
+            (f.calls.iter())
+                .find(|c| c.callee == callee)
+                .unwrap()
+                .scope
+                .clone()
+        };
+        assert_eq!(scope("make"), "main");
+        for callee in ["compute", "observe", "fetch", "store"] {
+            assert_eq!(scope(callee), "", "{callee}");
+        }
+    }
+
+    /// Only statements and expressions of `main.swift` are top-level code: a compiler directive
+    /// block and an operator declaration keep the declarations in them where they are.
+    #[test]
+    fn a_directive_block_of_main_swift_keeps_its_declarations() {
+        let f = script(
+            "#if DEBUG\nfunc dbg() { trace() }\n#endif\nprecedencegroup P { associativity: left }\n\
+             infix operator <>: P\nrun()\n",
+        );
+        assert!(f.defs.iter().any(|d| d.name == "dbg()"));
+        let scope = |callee: &str| {
+            (f.calls.iter())
+                .find(|c| c.callee == callee)
+                .unwrap()
+                .scope
+                .clone()
+        };
+        assert_eq!(scope("trace"), "dbg()");
+        assert_eq!(scope("run"), "main");
     }
 
     #[test]
@@ -1628,6 +1693,21 @@ mod tests {
         assert_eq!(names, ["request", "kept", "same"]);
     }
 
+    /// A name assigned, or changed in place, in one function (or a closure in it) holds no one
+    /// value in that function alone: a binding of the name in another function keeps its value.
+    #[test]
+    fn a_name_assigned_in_one_function_keeps_its_value_in_another() {
+        let facts = facts(
+            "func f() {\n  var x = make()\n  x = other()\n  var u = URL(string: \"a\")!\n  \
+             u.appendPathComponent(\"p\")\n  var y = Greeter()\n  run { y = Local() }\n}\n\
+             func g() {\n  var x = make()\n  var u = URL(string: \"b\")!\n  let y = Greeter()\n}\n",
+        );
+        let held: Vec<(&str, &str)> = (facts.bound.iter())
+            .map(|b| (b.scope.as_str(), b.name.as_str()))
+            .collect();
+        assert_eq!(held, [("g()", "x"), ("g()", "u"), ("g()", "y")]);
+    }
+
     #[test]
     fn a_global_var_is_not_bound() {
         let facts = facts(
@@ -1659,40 +1739,85 @@ mod tests {
         assert_eq!(method("d"), Some(false));
     }
 
-    /// Members assigned through many names are read in one pass: no pair of a name and a member
-    /// is compared.
+    /// A name bound twice in a scope holds no one value once a member is assigned through it.
     #[test]
-    fn many_names_and_many_members_stay_linear() {
-        let (names, per) = (12_000, 4);
-        let mut source = String::from("func f() {\n");
-        for n in 0..names {
-            source += &format!("  var r{n} = URLRequest(url: u)\n");
-        }
-        for n in 0..names {
-            for m in 0..per {
-                source += &format!("  r{n}.a{m} = 1\n");
-            }
-        }
-        source += "  var s = URLRequest(url: u)\n  var s = URLRequest(url: u)\n  s.httpMethod = \"GET\"\n}\n";
+    fn a_name_bound_twice_holds_no_value_once_a_member_is_assigned() {
+        let facts = facts(
+            "func f() {\n  var s = URLRequest(url: u)\n  var s = URLRequest(url: u)\n  \
+             s.httpMethod = \"GET\"\n  var r = URLRequest(url: u)\n  r.a = 1\n}\n",
+        );
+        let held = |name: &str| -> Vec<&Value> {
+            (facts.bound.iter().filter(|b| b.name == name))
+                .map(|b| &b.value)
+                .collect()
+        };
+        assert!(held("s").iter().all(|v| matches!(v, Value::Unknown)));
+        let assigned = |v: &Value| match v {
+            Value::Call(c) => c.kwargs.iter().any(|(k, _)| k == "a="),
+            _ => false,
+        };
+        assert!(matches!(held("r")[..], [v] if assigned(v)));
+    }
+
+    /// Members assigned through many names are read in one pass: no pair of a name and a member
+    /// is compared (a scan of the bindings per member takes seconds here).
+    #[test]
+    fn many_names_and_many_members_are_assigned_in_linear_time() {
+        let (names, per) = (12_000, 2);
+        let call = |n: usize| Invocation {
+            callee: format!("Make{n}"),
+            receiver: None,
+            args: Vec::new(),
+            kwargs: Vec::new(),
+            range: 0..0,
+        };
+        let mut bound: Vec<Bound> = (0..names)
+            .map(|n| Bound {
+                scope: "f".into(),
+                within: "f".into(),
+                name: format!("r{n}"),
+                value: Value::Call(call(n)),
+            })
+            .collect();
+        let members = (0..names * per)
+            .map(|at| Member {
+                scope: "f.@1".into(),
+                head: format!("r{}", at / per),
+                member: format!("a{}", at % per),
+                value: Value::Unknown,
+                direct: true,
+            })
+            .collect();
         let started = std::time::Instant::now();
-        let facts = facts(&source);
-        assert!(started.elapsed() < std::time::Duration::from_secs(10));
-        // A name bound twice in a scope holds no one value once a member is assigned.
+        assign_members(&mut bound, members);
+        let took = started.elapsed();
         assert!(
-            facts
-                .bound
-                .iter()
-                .filter(|b| b.name == "s")
-                .all(|b| matches!(b.value, Value::Unknown))
+            (bound.iter()).all(|b| matches!(&b.value, Value::Call(c) if c.kwargs.len() == per))
         );
-        assert_eq!(
-            facts
-                .bound
-                .iter()
-                .filter(|b| b.name.starts_with('r'))
-                .count(),
-            names
-        );
+        assert!(took < std::time::Duration::from_secs(1), "{took:?}");
+    }
+
+    /// A chain of string methods on an environment read costs its length: each link is read
+    /// once, not once more for every link above it.
+    #[test]
+    fn a_long_chain_of_string_methods_is_read_in_linear_time() {
+        let source = |links: usize| {
+            let chain = ".lowercased()".repeat(links);
+            let read = "ProcessInfo.processInfo.environment[\"X\"]!";
+            format!("func f() {{\n  let a = {read}{chain}\n}}\n")
+        };
+        let started = std::time::Instant::now();
+        let long = facts(&source(128));
+        let took = started.elapsed();
+        // Past the value limit the chain is no read; within it, the read keeps through each link.
+        let held = |facts: &Facts| {
+            (facts.bound.iter().find(|b| b.name == "a")).is_some_and(|b| {
+                matches!(&b.value, Value::Str(p) if matches!(&p[..], [Part::Env(x)] if x == "X"))
+            })
+        };
+        assert!(!held(&long));
+        assert!(held(&facts(&source(8))));
+        assert!(took < std::time::Duration::from_secs(1), "{took:?}");
     }
 
     #[test]

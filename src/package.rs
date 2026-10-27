@@ -266,15 +266,11 @@ fn resolutions_by_ways<'e, E: Ecosystem + ?Sized>(
     known: &dyn Fn(&Provided<'e>, &str) -> bool,
 ) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
     let mut out = Vec::new();
-    for (entry, subpath) in ecosystem.entries(exports, providers, (n, from), specifier) {
+    for (entry, subpath, reached) in reachable(ecosystem, exports, providers, (n, from), specifier)
+    {
         let mut resolved = Vec::new();
-        for (m, i) in providers.matching(ecosystem, entry) {
+        for (m, i) in reached {
             let manifest = &exports[m].manifests[i];
-            let source = (entry.via.as_deref(), entry.range.as_deref());
-            let to = (exports[m].place(), manifest.path.as_str());
-            if !ecosystem.reaches(source, exports[n].place(), to) {
-                continue;
-            }
             let at = at(m);
             let known = |id: &str| known(at, id);
             let repository = &exports[m].repository;
@@ -287,6 +283,35 @@ fn resolutions_by_ways<'e, E: Ecosystem + ?Sized>(
         out.push((entry, resolved));
     }
     out
+}
+
+/// An entry an import may name, the path under the package it names, and the manifests
+/// (`(export, manifest)`) of the providers it reaches.
+type Reached<'e> = (&'e Entry, String, Vec<(usize, usize)>);
+
+/// Each entry an import of `specifier` from the file `from` of export `n` may name, with what it
+/// reaches (`Ecosystem::reaches`).
+fn reachable<'e, E: Ecosystem + ?Sized>(
+    ecosystem: &E,
+    exports: &'e [Export],
+    providers: &Providers,
+    (n, from): (usize, &str),
+    specifier: &str,
+) -> Vec<Reached<'e>> {
+    (ecosystem
+        .entries(exports, providers, (n, from), specifier)
+        .into_iter())
+    .map(|(entry, subpath)| {
+        let source = (entry.via.as_deref(), entry.range.as_deref());
+        let reached = (providers.matching(ecosystem, entry).into_iter())
+            .filter(|&(m, i)| {
+                let to = (exports[m].place(), exports[m].manifests[i].path.as_str());
+                ecosystem.reaches(source, exports[n].place(), to)
+            })
+            .collect();
+        (entry, subpath, reached)
+    })
+    .collect()
 }
 
 /// Every ecosystem, in the order `of` and `of_contract` search and `inherit` runs.
@@ -639,6 +664,30 @@ fn site(repository: &str, path: &str) -> String {
 /// The directory of the manifest at `path`: `.` for one at the root.
 fn directory(path: &str) -> &str {
     path.rsplit_once('/').map_or(".", |(dir, _)| dir)
+}
+
+/// Whether `pattern`, a coordinate or a location with `*` for each computed part, fits `value`:
+/// only the literal fragments around the holes match; nothing computed is evaluated.
+fn pattern_fits(pattern: &str, value: &str) -> bool {
+    let mut pieces = pattern.split('*');
+    let first = pieces.next().unwrap_or("");
+    let Some(mut rest) = value.strip_prefix(first) else {
+        return false;
+    };
+    let pieces: Vec<_> = pieces.collect();
+    if pieces.is_empty() {
+        return rest.is_empty();
+    }
+    for (i, piece) in pieces.iter().enumerate() {
+        if i + 1 == pieces.len() {
+            return rest.ends_with(piece);
+        }
+        let Some(at) = rest.find(piece) else {
+            return false;
+        };
+        rest = &rest[at + piece.len()..];
+    }
+    false
 }
 
 /// The directory of the manifest at `path` as a repository path to join onto: the root is empty.
@@ -1916,6 +1965,20 @@ impl ContractKind for Packages {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_pattern_fits_only_by_its_literal_fragments() {
+        assert!(pattern_fits("example:model*", "example:models"));
+        assert!(pattern_fits("example:model*", "example:model"));
+        assert!(pattern_fits("*:tools", "example:tools"));
+        assert!(pattern_fits("a*b*c", "aXbYc"));
+        assert!(pattern_fits("example:models", "example:models"));
+        assert!(!pattern_fits("example:models", "example:models2"));
+        assert!(!pattern_fits("*:tools", "example:toolsx"));
+        assert!(!pattern_fits("ab*b", "ab"));
+        assert!(!pattern_fits("a*b*c", "acb"));
+        assert!(!pattern_fits("x*ab*b", "xab"));
+    }
     use crate::index::Span;
     use std::path::PathBuf;
 

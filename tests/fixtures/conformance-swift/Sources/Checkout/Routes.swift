@@ -118,7 +118,7 @@ func spin(_ parent: RoutesBuilder) -> RoutesBuilder {
 }
 
 // A route under a builder one of whose origins went round a factory calling itself is served
-// nowhere, not under the other origin alone.
+// under the other origin alone.
 func pick(_ builder: RoutesBuilder) {
     builder.grouped("pick").get("one") { req in "unread" }
 }
