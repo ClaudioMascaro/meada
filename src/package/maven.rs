@@ -374,43 +374,62 @@ impl Ecosystem for Maven {
     fn entries<'e>(
         &self,
         exports: &'e [Export],
-        _providers: &Providers,
+        providers: &Providers,
         (n, from): (usize, &str),
         specifier: &str,
     ) -> Vec<(&'e Entry, String)> {
-        let manifests = &exports[n].manifests;
-        let own = holding(manifests, from, self);
-        let mut found: Vec<&Entry> = own.iter().flat_map(|m| &m.summary.dependencies).collect();
-        // ponytail: a module is its own `pom.xml`, without its parent's dependencies, and a
-        // Gradle dependency is not followed (`project(..)` is not read, and an `implementation`
-        // one does not pass on).
-        let mut modules: HashMap<&str, Vec<&Manifest>> = HashMap::new();
-        for m in manifests
-            .iter()
-            .filter(|m| m.path.rsplit('/').next() == Some("pom.xml"))
-        {
-            if let Some(name) = &m.summary.name {
-                modules.entry(name).or_default().push(m);
-            }
-        }
-        let mut walked: HashSet<&str> = own.iter().map(|m| m.path.as_str()).collect();
-        let mut level = found.clone();
-        for _ in 0..MODULE_DEPTH {
-            let next: Vec<&Entry> = (level.iter())
-                .filter(|e| !e.private && e.via.is_none())
-                .flat_map(|e| modules.get(e.name.as_str()).into_iter().flatten())
-                .filter(|m| walked.insert(m.path.as_str()))
-                .flat_map(|m| m.summary.dependencies.iter().filter(|e| !e.private))
-                .collect();
-            if next.is_empty() {
-                break;
-            }
-            found.extend(&next);
-            level = next;
-        }
-        let mut seen = HashSet::new();
+        let found = providers.walked(
+            self.name(),
+            exports,
+            (n, bare_directory(from)),
+            |manifests| {
+                let at = |m: &Manifest| manifests.iter().position(|x| std::ptr::eq(x, m));
+                let own: Vec<usize> = holding(manifests, from, self)
+                    .into_iter()
+                    .filter_map(at)
+                    .collect();
+                let dependencies = |i: usize| manifests[i].summary.dependencies.iter().enumerate();
+                let mut found: Vec<(usize, usize)> = (own.iter())
+                    .flat_map(|&i| dependencies(i).map(move |(j, _)| (i, j)))
+                    .collect();
+                // ponytail: a module is its own `pom.xml`, without its parent's dependencies, and a
+                // Gradle dependency is not followed (`project(..)` is not read, and an `implementation`
+                // one does not pass on).
+                let mut modules: HashMap<&str, Vec<usize>> = HashMap::new();
+                for (i, m) in (manifests.iter().enumerate())
+                    .filter(|(_, m)| m.path.rsplit('/').next() == Some("pom.xml"))
+                {
+                    if let Some(name) = &m.summary.name {
+                        modules.entry(name).or_default().push(i);
+                    }
+                }
+                let entry = |(i, j): (usize, usize)| &manifests[i].summary.dependencies[j];
+                let mut walked: HashSet<usize> = own.into_iter().collect();
+                let mut level = found.clone();
+                for _ in 0..MODULE_DEPTH {
+                    let next: Vec<(usize, usize)> = (level.iter().copied())
+                        .filter(|&e| !entry(e).private && entry(e).via.is_none())
+                        .flat_map(|e| modules.get(entry(e).name.as_str()).into_iter().flatten())
+                        .filter(|&&i| walked.insert(i))
+                        .flat_map(|&i| {
+                            (dependencies(i))
+                                .filter(|(_, e)| !e.private)
+                                .map(move |(j, _)| (i, j))
+                        })
+                        .collect();
+                    if next.is_empty() {
+                        break;
+                    }
+                    found.extend(&next);
+                    level = next;
+                }
+                let mut seen = HashSet::new();
+                (found.into_iter())
+                    .filter(|&e| seen.insert(entry(e).name.as_str()))
+                    .collect()
+            },
+        );
         (found.into_iter())
-            .filter(|e| seen.insert(e.name.as_str()))
             .map(|e| (e, specifier.to_string()))
             .collect()
     }

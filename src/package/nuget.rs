@@ -213,30 +213,45 @@ impl Ecosystem for Nuget {
     fn entries<'e>(
         &self,
         exports: &'e [Export],
-        _providers: &Providers,
+        providers: &Providers,
         (n, from): (usize, &str),
         specifier: &str,
     ) -> Vec<(&'e Entry, String)> {
-        let manifests = &exports[n].manifests;
-        let Some(own) = owner(manifests, from, self) else {
-            return Vec::new();
-        };
-        let projects: HashMap<&str, &Summary> = (manifests.iter())
-            .filter(|m| self.owns(m))
-            .map(|m| (m.path.as_str(), &m.summary))
-            .collect();
-        let walked = references::referenced(&own.path, |path| {
-            (projects.get(path).copied().into_iter())
-                .flat_map(|s| &s.dependencies)
-                .filter_map(|e| Some((in_repository(e)?, e.private)))
-                .collect()
-        });
-        let passed = (walked.into_iter())
-            .filter_map(|path| projects.get(path).copied())
-            .flat_map(|s| s.dependencies.iter().filter(|e| !e.private));
-        let mut seen = HashSet::new();
-        (own.summary.dependencies.iter().chain(passed))
-            .filter(|e| seen.insert(e.name.as_str()))
+        let found = providers.walked(
+            self.name(),
+            exports,
+            (n, bare_directory(from)),
+            |manifests| {
+                let Some(own) = owner(manifests, from, self) else {
+                    return Vec::new();
+                };
+                let projects: HashMap<&str, usize> = (manifests.iter().enumerate())
+                    .filter(|(_, m)| self.owns(m))
+                    .map(|(i, m)| (m.path.as_str(), i))
+                    .collect();
+                let dependencies = |i: usize| manifests[i].summary.dependencies.iter().enumerate();
+                let walked = references::referenced(&own.path, |path| {
+                    (projects.get(path).into_iter())
+                        .flat_map(|&i| dependencies(i))
+                        .filter_map(|(_, e)| Some((in_repository(e)?, e.private)))
+                        .collect()
+                });
+                let at = projects[own.path.as_str()];
+                let own = dependencies(at).map(|(j, _)| (at, j));
+                let passed = (walked.into_iter())
+                    .filter_map(|path| projects.get(path).copied())
+                    .flat_map(|i| {
+                        (dependencies(i))
+                            .filter(|(_, e)| !e.private)
+                            .map(move |(j, _)| (i, j))
+                    });
+                let mut seen = HashSet::new();
+                (own.chain(passed))
+                    .filter(|&(i, j)| seen.insert(&manifests[i].summary.dependencies[j].name))
+                    .collect()
+            },
+        );
+        (found.into_iter())
             .map(|e| (e, specifier.to_string()))
             .collect()
     }

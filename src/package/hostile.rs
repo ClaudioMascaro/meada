@@ -88,8 +88,12 @@ fn project(body: &str) -> String {
     format!("<Project Sdk=\"Microsoft.NET.Sdk\">{body}</Project>")
 }
 
-/// The size of the entries `Nuget.entries` gives a file of the project `App`, in a repository of
-/// the projects `projects` (`(name, project file)`).
+/// How many imports a row resolves from the files of one project: `entries` is asked again for
+/// each, so a walk of the project's references per import costs the imports times the walk.
+const IMPORTS: usize = 1000;
+
+/// The size of the entries `Nuget.entries` gives a file of the project `App`, asked for each of
+/// `IMPORTS` files of it, in a repository of the projects `projects` (`(name, project file)`).
 fn referenced(projects: Vec<(String, String)>) -> usize {
     let manifests = (projects.into_iter())
         .map(|(name, text)| {
@@ -105,12 +109,16 @@ fn referenced(projects: Vec<(String, String)>) -> usize {
         ..Export::default()
     }];
     let providers = Providers::new(&exports);
-    let entries = Nuget.entries(&exports, &providers, (0, "App/A.cs"), "c");
-    entries.iter().map(|(e, _)| e.name.len()).sum()
+    let files: Vec<String> = (0..IMPORTS).map(|i| format!("App/A{i}.cs")).collect();
+    let sizes = (files.iter()).map(|file| {
+        let entries = Nuget.entries(&exports, &providers, (0, file), "c");
+        entries.iter().map(|(e, _)| e.name.len()).sum::<usize>()
+    });
+    sizes.max().unwrap_or(0)
 }
 
-/// The size of the entries `Maven.entries` gives a file of the module `app`, in a repository of
-/// the modules `poms` (`(name, pom.xml)`).
+/// The size of the entries `Maven.entries` gives a file of the module `app`, asked for each of
+/// `IMPORTS` files of it, in a repository of the modules `poms` (`(name, pom.xml)`).
 fn modules(poms: Vec<(String, String)>) -> usize {
     let manifests = (poms.into_iter())
         .map(|(name, text)| {
@@ -126,9 +134,14 @@ fn modules(poms: Vec<(String, String)>) -> usize {
         ..Export::default()
     }];
     let providers = Providers::new(&exports);
-    let from = (0, "app/src/main/java/A.java");
-    let entries = Maven.entries(&exports, &providers, from, "c");
-    entries.iter().map(|(e, _)| e.name.len()).sum()
+    let files: Vec<String> = (0..IMPORTS)
+        .map(|i| format!("app/src/main/java/A{i}.java"))
+        .collect();
+    let sizes = (files.iter()).map(|file| {
+        let entries = Maven.entries(&exports, &providers, (0, file), "c");
+        entries.iter().map(|(e, _)| e.name.len()).sum::<usize>()
+    });
+    sizes.max().unwrap_or(0)
 }
 
 fn dependency(artifact: &str) -> String {
