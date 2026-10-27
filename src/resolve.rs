@@ -2680,9 +2680,25 @@ impl<'a> Resolver<'a> {
         let kept: Vec<Target<'a>> = all.iter().filter(own).copied().collect();
         match kept[..] {
             _ if unit.is_empty() => Binding::Several(all),
-            [] => Binding::Several(all),
+            [] => self.in_references(path, all),
             [one] => Binding::Def(one),
             _ => Binding::Several(kept),
+        }
+    }
+
+    /// `all`, the definitions of a name in compilations other than `path`'s (`in_unit`), as the
+    /// one that is in the compilations `path`'s references reach (`Facts::unit_references`)
+    /// when it is the only one there, else as they are: a compilation that is not referenced
+    /// may still be visible through references not read (`Directory.Build.props`, a `Condition`).
+    fn in_references(&self, path: &'a str, all: Vec<Target<'a>>) -> Binding<'a> {
+        let reached = |t: &&Target| {
+            let unit = self.files.get(t.path).map_or("", |f| f.unit.as_str());
+            (self.files.get(path)).is_some_and(|f| f.unit_references.iter().any(|r| r == unit))
+        };
+        let mut referenced = all.iter().filter(reached);
+        match (referenced.next(), referenced.next()) {
+            (Some(&one), None) => Binding::Def(one),
+            _ => Binding::Several(all),
         }
     }
 
@@ -8999,18 +9015,26 @@ mod csharp_tests {
             .into_iter()
             .map(|p| (p, PROJECT))
             .collect();
+        resolved_in(files, &configs)
+    }
+
+    /// `resolved` over the project files `configs`.
+    fn resolved_in(
+        files: &[(&str, &str)],
+        configs: &[(&str, &[u8])],
+    ) -> Vec<(String, String, &'static str, Vec<String>)> {
         let mut parsed: Vec<(&str, Facts)> = (files.iter())
             .map(|(p, s)| (*p, CSharp.parse(p, s.as_bytes()).unwrap()))
             .collect();
         let join = {
             let raw: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
-            CSharp.join(&configs, &raw)
+            CSharp.join(configs, &raw)
         };
         for (path, facts) in &mut parsed {
             join(path, facts);
         }
         let files: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
-        let layout = CSharp.layout(&configs, &files).unwrap();
+        let layout = CSharp.layout(configs, &files).unwrap();
         let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &CSharp);
         let paths = |ts: &[Target]| ts.iter().map(|t| t.path.to_string()).collect();
         let mut out = Vec::new();
@@ -9067,6 +9091,95 @@ mod csharp_tests {
                 ("Order.Of", "ambiguous", both)
             ]
         );
+    }
+
+    /// A project file with the `ProjectReference`s `refs`, each `(include, attributes)`.
+    fn project(refs: &[(&str, &str)]) -> Vec<u8> {
+        let items: String = (refs.iter())
+            .map(|(to, attrs)| format!("<ProjectReference Include=\"{to}\" {attrs} />"))
+            .collect();
+        format!("<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup>{items}</ItemGroup></Project>")
+            .into_bytes()
+    }
+
+    /// Where `Order.Of()` of `App/Run.cs` binds when `Kit` and `Kit2` declare `Order`, with the
+    /// project files `projects` (`App` and `Mid` as the case writes them): the level and files.
+    fn order_called(projects: &[(&str, Vec<u8>)]) -> (&'static str, Vec<String>) {
+        let mut configs: Vec<(&str, &[u8])> = vec![
+            ("Kit/Kit.csproj", PROJECT),
+            ("Kit2/Kit2.csproj", PROJECT),
+            ("Mid/Mid.csproj", PROJECT),
+            ("App/App.csproj", PROJECT),
+        ];
+        for (path, src) in projects {
+            configs.retain(|(p, _)| p != path);
+            configs.push((path, src));
+        }
+        let app = "namespace Q;\nusing P;\nclass Run { void F() { Order.Of(); } }\n";
+        let found = resolved_in(
+            &[
+                ("Kit/Order.cs", ORDER),
+                ("Kit2/Order.cs", ORDER),
+                ("App/Run.cs", app),
+            ],
+            &configs,
+        );
+        let (_, _, level, targets) = (found.into_iter())
+            .find(|(p, callee, ..)| p == "App/Run.cs" && callee == "Order.Of")
+            .unwrap();
+        (level, targets)
+    }
+
+    /// A name several projects declare binds, from a file of a project that declares none, to
+    /// the one project it references, directly or through the references that pass on; several
+    /// referenced, or none, stay ambiguous, and a cycle ends.
+    #[test]
+    fn a_type_two_projects_declare_binds_to_the_one_project_the_caller_references() {
+        let kit = vec!["Kit/Order.cs".to_string()];
+        let both = vec!["Kit/Order.cs".to_string(), "Kit2/Order.cs".to_string()];
+        let to = |reference: &str, attrs: &str| project(&[(reference, attrs)]);
+        let app_kit = || ("App/App.csproj", to("..\\Kit\\Kit.csproj", ""));
+        assert_eq!(order_called(&[app_kit()]), ("exact", kit.clone()));
+        let through = |attrs: &str| {
+            [
+                ("App/App.csproj", to("..\\Mid\\Mid.csproj", "")),
+                ("Mid/Mid.csproj", to("..\\Kit\\Kit.csproj", attrs)),
+            ]
+        };
+        assert_eq!(order_called(&through("")), ("exact", kit.clone()));
+        assert_eq!(
+            order_called(&through("PrivateAssets=\"all\"")),
+            ("ambiguous", both.clone())
+        );
+        let twice = project(&[("..\\Kit\\Kit.csproj", ""), ("..\\Kit2\\Kit2.csproj", "")]);
+        assert_eq!(
+            order_called(&[("App/App.csproj", twice)]),
+            ("ambiguous", both.clone())
+        );
+        // Neither, or a project that is no `.csproj` of the repository.
+        assert_eq!(order_called(&[]), ("ambiguous", both.clone()));
+        let outside = to("..\\Other\\Other.csproj", "");
+        assert_eq!(
+            order_called(&[("App/App.csproj", outside)]),
+            ("ambiguous", both)
+        );
+        // A name only a project the caller does not reference declares keeps its link.
+        let configs: [(&str, &[u8]); 2] = [
+            ("Kit/Kit.csproj", PROJECT),
+            ("App/App.csproj", &to("..\\Kit2\\Kit2.csproj", "")),
+        ];
+        let app = "namespace Q;\nusing P;\nclass Run { void F() { Order.Of(); } }\n";
+        let found = resolved_in(&[("Kit/Order.cs", ORDER), ("App/Run.cs", app)], &configs);
+        assert_eq!(found[0].2, "exact");
+        // A cycle that does not reach `Kit2` ends and binds `Kit`.
+        let cycle = [
+            ("App/App.csproj", to("..\\Mid\\Mid.csproj", "")),
+            (
+                "Mid/Mid.csproj",
+                project(&[("..\\App\\App.csproj", ""), ("..\\Kit\\Kit.csproj", "")]),
+            ),
+        ];
+        assert_eq!(order_called(&cycle), ("exact", kit));
     }
 
     /// How the `Save` called in `use_it` (in `App`) resolves, with `Repo` (whose `Make` gives a
