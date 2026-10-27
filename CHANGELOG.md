@@ -74,6 +74,14 @@ All notable changes to Meada are recorded here. The format follows
   `on(.METHOD, ..)` with their `grouped(..)` prefixes, a `RouteCollection` under the builder it
   is registered on, and builders followed through assignments, arguments and return values; the
   handler is the trailing closure or the function given as `use:`.
+- Swift HTTP consumers (spec #29, #121): `URLSession` `data(from:)` and `data(for:)` (with a
+  `URLRequest(url:)` whose `httpMethod` is assigned), Alamofire `AF.request(url, method:)` and
+  the same on a `Session`, and AsyncHTTPClient `execute` of an `HTTPClientRequest(url:)` with
+  `method` set; GET when the method is absent. The URL folds `URL(string:)`,
+  `URL(string:relativeTo:)`, `appendingPathComponent`, literals, interpolation, `+` and `let`
+  constants (`static let` too) from other files and modules; a wrapper at any depth is a
+  consumer, and a URL that cannot be read is an unresolved consumer, shown in the export and in
+  `context`. The stored Swift facts change, so existing indexes are rebuilt.
 - `Directory.Build.props` files apply to the C# projects below them as MSBuild imports them
   (the nearest one, then those it imports with `GetPathOfFileAbove` or a relative path): their
   `<Using>` items, `PackageReference`s and `ProjectReference`s, and the `PackageId`,

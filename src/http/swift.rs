@@ -1,5 +1,7 @@
-//! Swift HTTP providers (spec #29): Vapor's routes in `vapor`.
+//! Swift HTTP providers and consumers (spec #29): Vapor's routes in `vapor`, the calls of
+//! URLSession, Alamofire and AsyncHTTPClient in `client`.
 
+mod client;
 mod vapor;
 
 use super::{PARAM, normalize_path};
@@ -9,6 +11,11 @@ use crate::resolve::Code;
 /// The providers of the Swift files of the repository.
 pub(super) fn providers(code: &Code) -> Vec<Found> {
     vapor::providers(code)
+}
+
+/// The consumers of the Swift files of the repository.
+pub(super) fn consumers(code: &Code) -> Vec<Found> {
+    client::consumers(code)
 }
 
 /// `path` as the trunk reads it, a `*` or a `**` segment too a parameter (Vapor's `.anything` and

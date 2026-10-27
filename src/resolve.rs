@@ -5716,6 +5716,7 @@ impl<'a> Code<'a> {
                     callee: call.callee.clone(),
                     receiver,
                     args: call.args.iter().map(&mut eval).collect(),
+                    kwargs: Vec::new(),
                     range: call.range.clone(),
                 };
                 let kwargs = (call.kwargs.iter()).map(|(k, v)| (k.clone(), eval(v)));
@@ -5868,7 +5869,10 @@ impl<'a> Code<'a> {
                 Value::Call(Invocation {
                     callee: call.callee.clone(),
                     receiver,
-                    args: call.args.iter().map(eval).collect(),
+                    args: call.args.iter().map(&mut eval).collect(),
+                    kwargs: (call.kwargs.iter())
+                        .map(|(k, v)| (k.clone(), eval(v)))
+                        .collect(),
                     range: call.range.clone(),
                 })
             }
@@ -6062,6 +6066,9 @@ fn unbind(value: Value, chain: bool) -> Value {
         Value::Call(call) if chain => Value::Call(Invocation {
             receiver: call.receiver.map(|r| Box::new(unbind(*r))),
             args: call.args.into_iter().map(unbind).collect(),
+            kwargs: (call.kwargs.into_iter())
+                .map(|(k, v)| (k, unbind(v)))
+                .collect(),
             ..call
         }),
         other => other,
@@ -6803,6 +6810,7 @@ mod tests {
                     callee: name.clone(),
                     receiver: None,
                     args: Vec::new(),
+                    kwargs: Vec::new(),
                     range: i..i + 1,
                 })
             })

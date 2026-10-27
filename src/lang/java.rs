@@ -1197,6 +1197,7 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 .child_by_field_name("object")
                 .map(|n| Box::new(value(n, src, depth + 1))),
             args: arguments(node, src, depth + 1),
+            kwargs: Vec::new(),
             range: node.byte_range(),
         }),
         "object_creation_expression" => node
