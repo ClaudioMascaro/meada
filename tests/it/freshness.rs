@@ -101,6 +101,48 @@ fn csharp_refreshed_export_after_a_project_file_edit_equals_a_cold_export() {
     assert_eq!(level(&json, "Checkout.Run()::Svc.Default#0"), "exact");
 }
 
+/// A `Directory.Build.props` changes alone: the files of the projects below it resolve anew.
+#[test]
+fn csharp_refreshed_export_after_a_directory_build_props_edit_equals_a_cold_export() {
+    let props = "src/Acme.Api/Directory.Build.props";
+    // The project's `<Using>` moves to the props file beside it.
+    let setup = |repo: &Path| {
+        replace(
+            repo,
+            API_PROJECT,
+            "<Using Include=\"Acme.Core.Orders\" />",
+            "",
+        );
+        let using =
+            "<Project><ItemGroup><Using Include=\"Acme.Core.Orders\" /></ItemGroup></Project>";
+        fs::write(repo.join(props), using).unwrap();
+    };
+    let edit = |repo: &Path| {
+        setup(repo);
+        replace(repo, props, "<Using Include=\"Acme.Core.Orders\" />", "");
+    };
+    let repo = fixture_repo("fresh_csharp_props", "conformance-csharp", ORIGIN);
+    setup(&repo);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    let call = "Checkout.Run()::OrderService.Default#0";
+    let json: serde_json::Value = serde_json::from_str(&before).unwrap();
+    assert_eq!(level(&json, call), "exact");
+    replace(&repo, props, "<Using Include=\"Acme.Core.Orders\" />", "");
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    let cold = cold_export(
+        "fresh_csharp_props_cold",
+        "conformance-csharp",
+        ORIGIN,
+        edit,
+    );
+    assert_eq!(refreshed, cold);
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    assert!(level(&json, call).is_null());
+}
+
 /// A global using file changes alone: the other files of its project resolve anew.
 #[test]
 fn csharp_refreshed_export_after_a_global_using_edit_equals_a_cold_export() {

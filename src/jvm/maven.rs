@@ -103,11 +103,22 @@ pub fn read(src: &[u8]) -> Summary {
             // A computed version keeps the coordinate literal; its range stays as written.
             let range = field(dep, "version");
             let computed = group.contains("${") || artifact.contains("${");
+            // Only a `compile` dependency, the default, passes on to the module's dependents,
+            // and only when not `optional`; a value the reader cannot tell does not.
+            let unset_or = |key, value: &str| {
+                let written = dep.children().any(|n| {
+                    n.is_element()
+                        && n.tag_name().name() == key
+                        && n.tag_name().namespace() == dep.tag_name().namespace()
+                });
+                !written || field(dep, key).is_some_and(|v| v.eq_ignore_ascii_case(value))
+            };
             dependencies.push(Entry {
                 field: "dependencies".into(),
                 name,
                 range,
                 via: computed.then(|| "computed".into()),
+                private: !unset_or("scope", "compile") || !unset_or("optional", "false"),
                 ..Entry::default()
             });
         }
@@ -152,6 +163,41 @@ mod tests {
             ]
         );
         assert_eq!(summary.test_roots, ["src/test/java", "src/test/kotlin"]);
+    }
+
+    #[test]
+    fn only_a_compile_dependency_that_is_not_optional_passes_on() {
+        let dep = |n: &str, more: &str| {
+            format!(
+                "<dependency><groupId>g</groupId><artifactId>{n}</artifactId>{more}</dependency>"
+            )
+        };
+        let deps = [
+            dep("a", ""),
+            dep("b", "<scope>compile</scope><optional>false</optional>"),
+            dep("c", "<scope>test</scope>"),
+            dep("d", "<scope>provided</scope>"),
+            dep("e", "<optional>true</optional>"),
+            dep("f", "<scope>${scope}</scope>"),
+            dep("g", "<scope>compile</scope><scope>test</scope>"),
+        ];
+        let body = format!("<dependencies>{}</dependencies>", deps.concat());
+        let summary = read(project("", &body).as_bytes());
+        let private: Vec<_> = (summary.dependencies.iter())
+            .map(|e| (e.name.as_str(), e.private))
+            .collect();
+        assert_eq!(
+            private,
+            [
+                ("g:a", false),
+                ("g:b", false),
+                ("g:c", true),
+                ("g:d", true),
+                ("g:e", true),
+                ("g:f", true),
+                ("g:g", true)
+            ]
+        );
     }
 
     #[test]

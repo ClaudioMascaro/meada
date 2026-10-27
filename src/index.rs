@@ -1427,6 +1427,22 @@ pub fn with_reversed_walk<T>(f: impl FnOnce() -> T) -> T {
     f()
 }
 
+/// A directory named `obj` or `bin` beside a `*.csproj`: .NET build output, whether or not an
+/// ignore file lists it. With no project file beside it, it is an ordinary directory.
+fn is_build_output(path: &Path) -> bool {
+    // The name first: only an `obj` or `bin` entry costs a stat.
+    matches!(
+        path.file_name().and_then(|n| n.to_str()),
+        Some("obj" | "bin")
+    ) && path.is_dir()
+        && path
+            .parent()
+            .and_then(|p| fs::read_dir(p).ok())
+            .is_some_and(|mut d| {
+                d.any(|e| e.is_ok_and(|e| e.path().extension().is_some_and(|x| x == "csproj")))
+            })
+}
+
 /// Every file under `root` but what `.gitignore` excludes, sorted (reversed under
 /// [`with_reversed_walk`]).
 fn walk(root: &Path) -> Vec<(String, PathBuf)> {
@@ -1434,6 +1450,7 @@ fn walk(root: &Path) -> Vec<(String, PathBuf)> {
         .require_git(false)
         // The repository's own ignore files only, never those of directories above it.
         .parents(false)
+        .filter_entry(|e| !is_build_output(e.path()))
         .build()
         .filter_map(|entry| entry.ok())
         .filter(|entry| entry.file_type().is_some_and(|t| t.is_file()))
@@ -2105,7 +2122,8 @@ mod tests {
     use rusqlite::{Connection, OpenFlags};
 
     use super::{
-        SCHEMA, State, open, open_read, read_config, refresh_stamped, state, with_busy_timeout,
+        SCHEMA, State, open, open_read, read_config, refresh_stamped, state, walk,
+        with_busy_timeout,
     };
     use crate::config::Serve;
     use crate::msg::Fix;
@@ -2357,6 +2375,30 @@ mod tests {
             .collect();
         left.sort();
         assert_eq!(left, ["index.db", "index.db.lock"]);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The walk skips `obj/` and `bin/` beside a project file with no ignore file, and keeps
+    /// the ones with none beside them. Cold index and refresh share this walk.
+    #[test]
+    fn the_walk_skips_build_output_beside_a_project_file() {
+        let (dir, _) = index_dir("build_output");
+        for (path, body) in [
+            ("App/App.csproj", "<Project/>"),
+            ("App/Program.cs", ""),
+            ("App/obj/Debug/net8.0/App.AssemblyInfo.cs", ""),
+            ("App/bin/Debug/x.cs", ""),
+            ("tools/obj/Thing.cs", ""),
+        ] {
+            let file = dir.join(path);
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(file, body).unwrap();
+        }
+        let seen: Vec<String> = walk(&dir).into_iter().map(|(p, _)| p).collect();
+        assert_eq!(
+            seen,
+            ["App/App.csproj", "App/Program.cs", "tools/obj/Thing.cs"]
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -2659,6 +2701,7 @@ mod tests {
             ("sample.build.gradle.kts", "build.gradle.kts"),
             ("sample.settings.gradle.kts", "settings.gradle.kts"),
             ("sample.csproj", "src/Kit/Kit.csproj"),
+            ("sample.Directory.Build.props", "src/Directory.Build.props"),
         ] {
             let src = fs::read(tests.join("fixtures/schema").join(name)).unwrap();
             let summary = package::read_manifest(path, &src);

@@ -3668,6 +3668,10 @@ fn csharp() {
         api("Remote.cs", "Acme.Api.Remote.IInventoryApi.Delete(string)"),
         api("Remote.cs", "Acme.Api.Remote.IReportsApi"),
         api("Remote.cs", "Acme.Api.Remote.IReportsApi.All()"),
+        api("Remote.cs", "Acme.Api.Remote.IHealthApi"),
+        api("Remote.cs", "Acme.Api.Remote.IHealthApi.Ping()"),
+        api("Remote.cs", "Acme.Api.Remote.IOrdersApi"),
+        api("Remote.cs", "Acme.Api.Remote.IOrdersApi.List()"),
         api("Remote.cs", "Acme.Api.Remote.Inventory"),
         api("Remote.cs", "Acme.Api.Remote.Inventory.Find(string)"),
         api(
@@ -4095,7 +4099,7 @@ fn web_symbols() -> Vec<String> {
 }
 
 /// The calls of the minimal API project: an extension method called on a group is a name
-/// match, a lambda's parameter hides a local of its name only inside the lambda, and the
+/// match, a lambda's parameter hides a local of its name only inside the lambda (and its written type types it), and the
 /// application an outside call made reaches no method of the repository.
 fn web_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
     let main = |callee: &str| format!("{WEB}/Program.cs::Main::{callee}");
@@ -4121,11 +4125,8 @@ fn web_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
         // A local an outside call made is from outside: only an extension method answers it.
         (main("app.Run#0"), None, vec![]),
         (main("stocked.Stock#0"), None, vec![]),
-        (
-            main("shelf.Stock#1"),
-            AMBIGUOUS,
-            vec![stock("Crate"), stock("Shelf")],
-        ),
+        // The lambda's parameter is written `Crate`: it types the receiver.
+        (main("shelf.Stock#1"), EXACT, vec![stock("Crate")]),
     ]
 }
 
@@ -4589,6 +4590,16 @@ fn csharp_typed_clients_and_refit_methods_are_consumers() {
             &remote("IInventoryApi.Delete(string)"),
         ),
         ("http::GET::/reports", "", &remote("IReportsApi.All()")),
+        (
+            "http::GET::/orders",
+            "host:orders.example.com",
+            &remote("IOrdersApi.List()"),
+        ),
+        (
+            "http::GET::/ping",
+            "host:orders.example.com",
+            &remote("IHealthApi.Ping()"),
+        ),
     ]);
     assert_eq!(consumers(&json, "src/Acme.Api/Remote.cs"), expected);
 }

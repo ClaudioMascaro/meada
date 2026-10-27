@@ -23,7 +23,7 @@
 //! each constant, schema or type its files export (`exported_shapes`), never its source text, and
 //! `shapes`, a workspace step after `import`, fills the parts of the shapes that import one.
 
-use std::cell::OnceCell;
+use std::cell::{OnceCell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 
@@ -43,6 +43,8 @@ use crate::workspace::Repository;
 
 mod cargo;
 mod go;
+#[cfg(test)]
+mod hostile;
 mod maven;
 mod npm;
 mod nuget;
@@ -398,6 +400,14 @@ pub struct Summary {
     /// NuGet only: the `.csproj` is an SDK-style project, the only kind that bounds a package.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub project: bool,
+    /// NuGet only: the props file a `Directory.Build.props` imports, until the seam's `inherit`
+    /// gives its entries to the projects below it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub import: Option<crate::dotnet::msbuild::Import>,
+    /// NuGet only: the package properties a project or props file writes, as written, for the
+    /// seam's `inherit` to name a project under the props files above it (`msbuild::package`).
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub properties: crate::dotnet::msbuild::Properties,
 }
 
 /// One dependency entry of a manifest. `name` is the package the entry names.
@@ -418,6 +428,11 @@ pub struct Entry {
     /// Cargo only: `workspace = true`, until the seam's `inherit` fills the entry.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub inherits: bool,
+    /// NuGet and a `pom.xml` only: the entry does not pass on to the manifest's dependents, so a
+    /// walk through the manifest skips it (NuGet `msbuild::Reference::private`; a Maven scope
+    /// other than `compile`, or `optional`; also when the file computes either).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub private: bool,
 }
 
 impl Entry {
@@ -1009,7 +1024,17 @@ impl<'e> Provided<'e> {
 /// repository in `exports`, then its manifest in `Export::manifests`. Built once for the
 /// workspace steps (`consume`, `import`), both of which only add to the exports and never move
 /// a manifest.
-struct Providers(HashMap<(&'static str, String), Vec<(usize, usize)>>);
+struct Providers {
+    by_name: HashMap<(&'static str, String), Vec<(usize, usize)>>,
+    /// The entries `Ecosystem::entries` gives the files of a directory of a repository, by the
+    /// ecosystem's name, the repository's position and the directory: walked once, though asked
+    /// again for each import of the files.
+    walked: RefCell<HashMap<(&'static str, usize, String), Positions>>,
+}
+
+/// Dependency entries of a repository, as positions in `Export::manifests` and then in
+/// `Summary::dependencies`.
+type Positions = Vec<(usize, usize)>;
 
 impl Providers {
     fn new(exports: &[Export]) -> Self {
@@ -1022,7 +1047,28 @@ impl Providers {
                 }
             }
         }
-        Self(providers)
+        Self {
+            by_name: providers,
+            walked: RefCell::default(),
+        }
+    }
+
+    /// The entries of `exports[n]` that `walk` gives the files of the directory `dir` for
+    /// `ecosystem`, as positions (`walked`), walked the first time they are asked for.
+    fn walked<'e>(
+        &self,
+        ecosystem: &'static str,
+        exports: &'e [Export],
+        (n, dir): (usize, &str),
+        walk: impl FnOnce(&'e [Manifest]) -> Positions,
+    ) -> Vec<&'e Entry> {
+        let manifests = &exports[n].manifests;
+        let mut walked = self.walked.borrow_mut();
+        let key = (ecosystem, n, dir.to_string());
+        let found = walked.entry(key).or_insert_with(|| walk(manifests));
+        (found.iter())
+            .map(|&(i, j)| &manifests[i].summary.dependencies[j])
+            .collect()
     }
 
     /// Providers of a literal name, or candidates of an uncertain coordinate, sorted.
@@ -1032,7 +1078,7 @@ impl Providers {
         }
         let name = &entry.name;
         let mut found: Vec<_> = self
-            .0
+            .by_name
             .iter()
             .filter(|((kind, provided), _)| {
                 *kind == ecosystem.name() && ecosystem.fits(name, provided)
@@ -1045,7 +1091,7 @@ impl Providers {
 
     /// The providers of the package `name` of the ecosystem named `ecosystem`.
     fn of(&self, ecosystem: &'static str, name: &str) -> &[(usize, usize)] {
-        (self.0.get(&(ecosystem, name.to_string()))).map_or(&[], Vec::as_slice)
+        (self.by_name.get(&(ecosystem, name.to_string()))).map_or(&[], Vec::as_slice)
     }
 }
 

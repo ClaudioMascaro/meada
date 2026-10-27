@@ -2390,6 +2390,11 @@ sample.pom.xml
   "dependencies": [
     {
       "field": "dependencies",
+      "name": "example:fixtures",
+      "private": true
+    },
+    {
+      "field": "dependencies",
       "name": "example:shared*",
       "range": "${release}",
       "via": "computed"
@@ -2462,6 +2467,12 @@ sample.csproj
   "dependencies": [
     {
       "field": "PackageReference",
+      "name": "Example.Analyzers",
+      "range": "1.0",
+      "private": true
+    },
+    {
+      "field": "PackageReference",
       "name": "Example.Json",
       "range": "[1.0,2.0)"
     },
@@ -2471,7 +2482,33 @@ sample.csproj
       "via": "path src/Core/Core.csproj"
     }
   ],
-  "project": true
+  "project": true,
+  "properties": {
+    "PackageId": "Example.Kit",
+    "Version": "1.2.0"
+  }
+}
+
+sample.Directory.Build.props
+{
+  "dependencies": [
+    {
+      "field": "PackageReference",
+      "name": "Example.Analyzers",
+      "range": "1.0",
+      "private": true
+    },
+    {
+      "field": "ProjectReference",
+      "name": "..\\Core\\Core.csproj"
+    }
+  ],
+  "import": {
+    "Above": ""
+  },
+  "properties": {
+    "AssemblyName": "Example.$(MSBuildProjectName)"
+  }
 }
 
 sample.tsconfig.json

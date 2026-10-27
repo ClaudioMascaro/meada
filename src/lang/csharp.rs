@@ -14,6 +14,7 @@ use super::{
     LanguagePack, Layout, Modules, Param, Part, Receiver, Step, Ty, Value, children, named, text,
 };
 use crate::dotnet::msbuild::{self, Using};
+use crate::dotnet::references;
 use crate::{Result, qualify};
 
 /// How many named types may enclose a definition. Deeper bodies keep their enclosing symbol.
@@ -85,9 +86,14 @@ impl LanguagePack for CSharp {
         ]
     }
 
-    /// Every project file: an SDK-style one is a project (`join`).
+    /// Every project file (an SDK-style one is a project, `join`), and the props files MSBuild
+    /// imports into the projects below them.
     fn config_files(&self) -> &'static [&'static str] {
-        &["**/*.csproj", "**/appsettings.json"]
+        &[
+            "**/*.csproj",
+            "**/Directory.Build.props",
+            "**/appsettings.json",
+        ]
     }
 
     fn modules(
@@ -138,16 +144,36 @@ impl LanguagePack for CSharp {
     /// its target's name. Each file's `Facts::unit` is its project, whose files alone the parts
     /// of a partial type come from.
     fn join(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Join {
-        // Each project's directory (`a/b/`, empty at the root) and what its file adds.
-        let projects: Vec<(String, Vec<Using>)> = (configs.iter())
+        // The props files by path, each read once (`None` when unreadable, which hides the
+        // files above it all the same).
+        let props: HashMap<&str, Option<msbuild::Props>> = (configs.iter())
+            .filter(|(path, _)| msbuild::is_props(path))
+            .map(|(path, src)| (*path, msbuild::props(path, src)))
+            .collect();
+        // Each project file with its directory (`a/b/`, empty at the root), read once under
+        // the props files MSBuild imports into it.
+        let read: Vec<(&str, String, msbuild::Project)> = (configs.iter())
             .filter(|(path, _)| path.ends_with(".csproj"))
             .filter_map(|(path, src)| {
-                let dir = path
-                    .rsplit_once('/')
-                    .map_or(String::new(), |(d, _)| format!("{d}/"));
-                Some((dir, msbuild::read(src)?.usings))
+                let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
+                let imports = |p: &str| props.get(p).map(|read| read.as_ref()?.import.clone());
+                let above = msbuild::chain(dir, imports);
+                let above: Vec<&msbuild::Props> = (above.iter())
+                    .filter_map(|p| props[p.as_str()].as_ref())
+                    .collect();
+                let dir = if dir.is_empty() {
+                    String::new()
+                } else {
+                    format!("{dir}/")
+                };
+                Some((*path, dir, msbuild::read(src, &above)?))
             })
             .collect();
+        // Each project's directory and what its file adds.
+        let projects: Vec<(String, Vec<Using>)> = (read.iter())
+            .map(|(_, dir, project)| (dir.clone(), project.usings.clone()))
+            .collect();
+        let unit_references = unit_references(&read);
         // Each project's usings, by its directory, or a file's in none by its path. Their order
         // says nothing: the globs combine, and two aliases of one name are no C#.
         let mut usings: BTreeMap<String, BTreeSet<Using>> = BTreeMap::new();
@@ -194,6 +220,7 @@ impl LanguagePack for CSharp {
                     import.name = Imported::Qualified;
                 }
             }
+            facts.unit_references = unit_references.get(&unit).cloned().unwrap_or_default();
             facts.unit = unit;
         })
     }
@@ -210,6 +237,41 @@ fn owner<'p>(projects: &'p [(String, Vec<Using>)], path: &str) -> (String, &'p [
         .map_or((path.to_string(), &[][..]), |(_, (dir, own))| {
             (dir.clone(), own.as_slice())
         })
+}
+
+/// The projects each project directory references (`Facts::unit_references`), as the directories
+/// of the `.csproj` files its `ProjectReference`s reach in the repository (`references`), nearest
+/// first, none its own. A project at the root has no directory to name, so it is never listed.
+/// The first project file of a directory stands for it, as in `owner`.
+fn unit_references(read: &[(&str, String, msbuild::Project)]) -> BTreeMap<String, Vec<String>> {
+    let units: HashMap<&str, &str> = (read.iter())
+        .map(|(path, dir, _)| (*path, dir.as_str()))
+        .collect();
+    let located: HashMap<&str, Vec<(String, bool)>> = (read.iter())
+        .map(|(path, dir, project)| {
+            let from = dir.trim_end_matches('/');
+            let to = (project.projects.iter())
+                .filter_map(|r| Some((references::located(from, &r.include)?, r.private)));
+            (*path, to.collect())
+        })
+        .collect();
+    let mut out = BTreeMap::new();
+    for (path, unit, _) in read {
+        let walked = references::referenced(path, |from| {
+            (located.get(from).into_iter().flatten())
+                .map(|(to, private)| (to.as_str(), *private))
+                .collect()
+        });
+        let mut found: Vec<String> = Vec::new();
+        for to in walked {
+            let Some(&dir) = units.get(to) else { continue };
+            if !dir.is_empty() && dir != unit && !found.iter().any(|f| f == dir) {
+                found.push(dir.to_string());
+            }
+        }
+        out.entry(unit.clone()).or_insert(found);
+    }
+    out
 }
 
 /// A using directive as `Facts::project` spells it: `A.B`, `static A.B` or `X = A.B`.
@@ -1001,7 +1063,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 // (`lambdas`): a kind may claim it as a handler, and it folds into the symbol
                 // around it otherwise. Its parameters hide outer names in it, and what it
                 // returns is its own.
-                if inline(defining, &scope, &classes) {
+                let own = inline(defining, &scope, &classes);
+                if own {
                     inner = Rc::new(qualify(&scope, &format!("@{}", node.start_byte())));
                     facts.defs.push(Def {
                         name: inner.as_ref().clone(),
@@ -1028,9 +1091,24 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         locals.push(unknown(text(p, src)));
                     }
                     list => {
-                        for (name, _, _) in parameters_of(list, src) {
+                        // A parameter with a written type types its receiver as a method's
+                        // does; an implicit one has none.
+                        for (name, class) in parameter_classes(list, src, &generics) {
                             bind_unknown(&mut bound, definitions, &inner, &name);
-                            locals.push(unknown(&name));
+                            // In a scope of its own the parameter hides a field of the same
+                            // name, as a method's does: it is no local read as the field.
+                            let receiver = Receiver {
+                                scope: inner.as_ref().clone(),
+                                name,
+                                class,
+                            };
+                            match own {
+                                true => facts.receivers.push(receiver),
+                                false => locals.push(Receiver {
+                                    class: Class::Unknown,
+                                    ..receiver
+                                }),
+                            }
                         }
                     }
                 }
@@ -1308,8 +1386,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
     facts.bound = bound;
     facts.bound.extend(through);
     facts.externs = outside.into_iter().collect();
-    // A using of the namespace takes its types, internal ones too (they are the assembly's),
-    // never the names the file's own usings bind.
+    // A using of the namespace takes its types, internal ones too (they are the assembly's:
+    // `Resolver::hidden` keeps them to its files), never the names the file's own usings bind.
     facts.star = super::Star::Only(
         (facts.exports.iter())
             .filter_map(|e| match e {
@@ -1505,7 +1583,8 @@ fn parameter_classes(list: Option<Node>, src: &[u8], generics: &[String]) -> Vec
 /// its underlying one.
 fn class_of(ty: Node, src: &[u8], generics: &[String]) -> Class {
     let ty = match ty.kind() {
-        "nullable_type" => ty.child_by_field_name("type").unwrap_or(ty),
+        // `ref` of a lambda parameter's type is part of the type node, not a modifier.
+        "nullable_type" | "ref_type" => ty.child_by_field_name("type").unwrap_or(ty),
         _ => ty,
     };
     if !matches!(
@@ -1743,6 +1822,9 @@ thread_local! {
 // (`CODING_STANDARDS.md`): the kind decides whether the `Environment` is the framework's.
 const ENVIRONMENT_READ: &str = "GetEnvironmentVariable";
 
+/// The methods of `System.String` that trim it: called on a read, they leave it the read.
+const TRIMS: &[&str] = &["Trim", "TrimEnd", "TrimStart"];
+
 /// `callee` and `key` as a read in the scope `parse` is reading.
 fn read(callee: String, key: String) -> Part {
     let scope = SCOPE.with_borrow_mut(|(scope, shared)| {
@@ -1900,12 +1982,26 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
         "this" => Value::Ref("this".into()),
         "invocation_expression" => {
             let function = node.child_by_field_name("function");
+            // `nameof(Shop.Orders)` is the last identifier of its argument, as written.
+            if let Some(f) = function
+                && f.kind() == "identifier"
+                && text(f, src) == "nameof"
+                && let Some(name) = named(node.child_by_field_name("arguments").unwrap_or(node))
+                    .find(|n| n.kind() == "argument")
+                    .and_then(|a| named(a).next())
+                    .map(|e| callee(e, src))
+                    .and_then(|c| c.rsplit('.').next().map(str::to_string))
+                    .filter(|n| !n.is_empty() && n.chars().all(|c| c.is_alphanumeric() || c == '_'))
+            {
+                return Value::Str(vec![Part::Text(name)]);
+            }
             let object = function
                 .filter(|f| f.kind() == "member_access_expression")
                 .and_then(|f| f.child_by_field_name("expression"));
             let receiver = object.map(|n| value(n, src, depth + 1));
             let member = function.and_then(|f| f.child_by_field_name("name"));
-            // A member called on a read is the read with the member, for the kind to judge.
+            // A member called on a read is the read with the member, for the kind to judge,
+            // unless it only trims the string (`System.String`, the language's own runtime).
             if let (
                 Some(member),
                 Some(Part::Read {
@@ -1916,7 +2012,10 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 }),
             ) = (member, receiver.as_ref().and_then(read_of))
             {
-                then.push(text(member, src).to_string());
+                let member = text(member, src);
+                if !TRIMS.contains(&member) {
+                    then.push(member.to_string());
+                }
                 return Value::Str(vec![Part::Read {
                     scope,
                     callee,
@@ -2109,6 +2208,31 @@ mod tests {
             .collect()
     }
 
+    #[test]
+    fn nameof_is_the_last_identifier_of_its_argument() {
+        let name = |arg: &str| {
+            let src = format!("class C {{ void M() {{ F({arg}); }} }}");
+            let facts = CSharp.parse("C.cs", src.as_bytes()).unwrap();
+            match &facts.calls[0].args[..] {
+                [Value::Str(parts)] => match &parts[..] {
+                    [Part::Text(t)] => Some(t.clone()),
+                    _ => None,
+                },
+                _ => None,
+            }
+        };
+        for (arg, expected) in [
+            ("nameof(Orders)", "Orders"),
+            ("nameof(Shop.Orders.Topic)", "Topic"),
+            ("nameof(List<int>)", "List"),
+        ] {
+            assert_eq!(name(arg).as_deref(), Some(expected), "{arg}");
+        }
+        for arg in ["x.nameof(Orders)", "nameof(1)"] {
+            assert_eq!(name(arg), None, "{arg}");
+        }
+    }
+
     /// A chain of calls costs its length: each call's receiver is read to `VALUE_DEPTH` at most,
     /// not through every link below it.
     #[test]
@@ -2178,7 +2302,7 @@ mod tests {
     }
 
     /// The pack reads no library: a member called on a read is the read with the members it
-    /// calls, which the kind judges, and `string.Empty` is a name like `String.Empty`.
+    /// calls (a trim leaves it the read), which the kind judges, and `string.Empty` is a name like `String.Empty`.
     #[test]
     fn a_member_called_on_a_read_and_string_empty_are_left_to_the_kind() {
         let source = "class C { void M() { \
@@ -2203,8 +2327,24 @@ mod tests {
             (callee.as_str(), key.as_str()),
             ("Environment.GetEnvironmentVariable", "X")
         );
-        assert_eq!(then, &["TrimEnd", "ToLower"]);
+        assert_eq!(then, &["ToLower"]);
         assert_eq!(empty, "string.Empty");
+    }
+
+    /// The trims of `System.String` are the pack's runtime: a read they trim is still the read.
+    #[test]
+    fn a_trim_called_on_a_read_leaves_it_the_read() {
+        let source = "class C { void M() { \
+                      H.Get(Environment.GetEnvironmentVariable(\"X\").Trim().TrimStart('/')); } }";
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        let call = facts.calls.iter().find(|c| c.callee == "H.Get").unwrap();
+        let [Value::Str(read)] = &call.args[..] else {
+            panic!("{}", call.args.len())
+        };
+        assert!(
+            matches!(&read[..], [Part::Read { then, .. }] if then.is_empty()),
+            "{read:?}"
+        );
     }
 
     /// Top-level statements are a synthetic `Main`, a program, unless the file declares a type

@@ -466,3 +466,213 @@ fn edited_and_added_projects_refresh_like_a_cold_workspace() {
     change_projects(&cold);
     assert_eq!(refreshed, exports(&cold));
 }
+
+#[test]
+fn a_file_sees_the_references_its_project_references_pass_on() {
+    let [_, app] = workspace("nuget_packages_transitive");
+    // App -> Lib, of the app's repository; Lib -> Money, and Kit, privately.
+    let lib = "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup>\n\
+               <PackageReference Include=\"Example.Money\" />\n\
+               <PackageReference Include=\"Example.Kit\" PrivateAssets=\"all\" />\n\
+               </ItemGroup></Project>";
+    write(&app, "src/Lib/Lib.csproj", lib);
+    let project = "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup>\n\
+                   <ProjectReference Include=\"..\\Lib\\Lib.csproj\" />\n\
+                   </ItemGroup></Project>";
+    write(&app, "src/App/App.csproj", project);
+    let user = |ns: &str| {
+        format!(
+            "using Example.Money;\nusing Example.Kit.Pricing;\n\nnamespace Example.{ns};\n\npublic class Uses\n{{\n    public void Go()\n    {{\n        Currency.Cents(1);\n        Order.Of(1);\n    }}\n}}\n"
+        )
+    };
+    write(&app, "src/Lib/Uses.cs", &user("Lib"));
+    write(&app, "src/App/Uses.cs", &user("App"));
+    let (export, json) = export(&app);
+    let cents = "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)";
+    let of = format!("{KIT_ORDER}.Of(int)");
+    let at = |ns: &str, call: &str| calls(&json, &format!("Example.{ns}.Uses.Go()::{call}#0"));
+    assert_eq!(at("Lib", "Currency.Cents"), [(cents, "exact")], "{export}");
+    assert_eq!(at("Lib", "Order.Of"), [(&of[..], "exact")], "{export}");
+    // Through `import namespace`, as from Lib; the private reference stays Lib's.
+    assert_eq!(at("App", "Currency.Cents"), [(cents, "exact")], "{export}");
+    assert!(at("App", "Order.Of").is_empty(), "{export}");
+    let reason = (json["links"].as_array().unwrap().iter())
+        .find(|l| {
+            l["consumer"]
+                .as_str()
+                .unwrap()
+                .ends_with("App.Uses.Go()::Currency.Cents#0")
+        })
+        .map(|l| l["reason"].as_str().unwrap());
+    assert!(
+        reason.is_some_and(|r| r.ends_with("; import namespace")),
+        "{export}"
+    );
+}
+
+/// A project of the app that names no reference, and a call in it on `Money`'s type.
+fn tool(app: &Path) {
+    write(
+        app,
+        "src/Tool/Tool.csproj",
+        "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>",
+    );
+    let run = "using Example.Money;\n\nnamespace Example.App.Tool;\n\npublic class Run\n{\n    public string Go() => Currency.Cents(1);\n}\n";
+    write(app, "src/Tool/Run.cs", run);
+}
+
+const CENTS: &str =
+    "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)";
+
+fn tool_calls(json: &Value) -> Vec<(&str, &str)> {
+    calls(json, "Example.App.Tool.Run.Go()::Currency.Cents#0")
+}
+
+/// A `Directory.Build.props` gives the projects below it its `PackageReference`s and
+/// `ProjectReference`s (relative to each project), the nearest hiding the ones above unless it
+/// imports them; the props file itself declares none.
+#[test]
+fn a_directory_build_props_gives_its_references_to_the_projects_below_it() {
+    let [_, app] = workspace("nuget_packages_props");
+    tool(&app);
+    let (text, json) = export(&app);
+    assert!(tool_calls(&json).is_empty(), "{text}");
+    let package =
+        "<Project><ItemGroup><PackageReference Include=\"Example.Money\" /></ItemGroup></Project>";
+    write(&app, "Directory.Build.props", package);
+    let (text, json) = export(&app);
+    assert_eq!(tool_calls(&json), [(CENTS, "exact")], "{text}");
+    let declared: Vec<_> = declared(&json)
+        .iter()
+        .map(|l| l["consumer"].as_str().unwrap())
+        .collect();
+    assert!(
+        declared
+            .iter()
+            .all(|c| !c.contains("Directory.Build.props")),
+        "{text}"
+    );
+    // A project reference, written relative to the project, not to the props file.
+    let project = "<Project><ItemGroup><ProjectReference Include=\"..\\..\\..\\dotnet-lib\\src\\Money\\Money.csproj\" /></ItemGroup></Project>";
+    write(&app, "Directory.Build.props", project);
+    let (text, json) = export(&app);
+    assert_eq!(tool_calls(&json), [(CENTS, "exact")], "{text}");
+    // The nearest hides it; with the import, both apply.
+    write(&app, "src/Directory.Build.props", "<Project></Project>");
+    let (text, json) = export(&app);
+    assert!(tool_calls(&json).is_empty(), "{text}");
+    let import = "<Project><Import Project=\"$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))\" /></Project>";
+    write(&app, "src/Directory.Build.props", import);
+    let (text, json) = export(&app);
+    assert_eq!(tool_calls(&json), [(CENTS, "exact")], "{text}");
+}
+
+/// Editing only a `Directory.Build.props` changes the next answer, as a cold index gives it.
+#[test]
+fn an_edited_directory_build_props_refreshes_like_a_cold_workspace() {
+    let package =
+        "<Project><ItemGroup><PackageReference Include=\"Example.Money\" /></ItemGroup></Project>";
+    let setup = |repos: &[PathBuf; 2]| {
+        tool(&repos[1]);
+        write(&repos[1], "Directory.Build.props", package);
+    };
+    let edit = |repos: &[PathBuf; 2]| {
+        edit(
+            repos[1].join("Directory.Build.props"),
+            "Example.Money",
+            "Example.Kit",
+        );
+    };
+    let warm = workspace("nuget_packages_props_refresh");
+    setup(&warm);
+    age(warm[0].parent().unwrap());
+    let before = export(&warm[1]);
+    assert_eq!(tool_calls(&before.1), [(CENTS, "exact")], "{}", before.0);
+    edit(&warm);
+    let refreshed = export(&warm[1]);
+    assert!(tool_calls(&refreshed.1).is_empty(), "{}", refreshed.0);
+    let cold = workspace("nuget_packages_props_cold");
+    setup(&cold);
+    edit(&cold);
+    assert_eq!(refreshed.0, export(&cold[1]).0);
+}
+
+/// A receiver typed only by a declaration (a parameter, a field, a typed local), with no call
+/// naming the type, links through the package `using` as a call head does; a type the
+/// repository declares itself wins, and one no package provides stays outside.
+#[test]
+fn a_receiver_typed_by_a_declaration_links_through_a_package_using() {
+    let [_, app] = workspace("nuget_packages_declared");
+    let file = |name: &str, kind: &str, using: &str, body: &str| {
+        let text = format!(
+            "{using}namespace Example.App.Web;\n\npublic class {name}\n{{\n{kind}{body}}}\n"
+        );
+        write(&app, &format!("src/Web/{name}.cs"), &text);
+    };
+    let kit = "using Example.Kit.Pricing;\n\n";
+    file(
+        "ByParam",
+        "",
+        kit,
+        "    public int Run(Order o) => o.Total();\n",
+    );
+    file(
+        "ByField",
+        "",
+        kit,
+        "    private Order _o;\n    public int Run() => _o.Total();\n",
+    );
+    file(
+        "ByLocal",
+        "",
+        kit,
+        "    public Order Get() => null;\n    public int Run()\n    {\n        Order o = Get();\n        return o.Total();\n    }\n",
+    );
+    file(
+        "ByProperty",
+        "",
+        kit,
+        "    public Order O { get; }\n    public int Run() => O.Total();\n",
+    );
+    file(
+        "Stranger",
+        "",
+        "using Example.Nowhere;\n\n",
+        "    public int Run(Order o) => o.Total();\n",
+    );
+    // The repository declares `Order` too, in the namespace of the file: it wins.
+    write(
+        &app,
+        "src/Web/Own.cs",
+        "using Example.Kit.Pricing;\n\nnamespace Example.App.Own;\n\npublic class Order\n{\n    public int Total() => 1;\n}\n\npublic class Own\n{\n    public int Run(Order o) => o.Total();\n}\n",
+    );
+    let (text, json) = export(&app);
+    let provider = format!("{KIT_ORDER}.Total()");
+    for suffix in [
+        "ByParam.Run(Order)::o.Total#0",
+        "ByField.Run()::_o.Total#0",
+        "ByLocal.Run()::o.Total#0",
+        "ByProperty.Run()::O.Total#0",
+    ] {
+        let found = calls(&json, suffix);
+        assert_eq!(found, [(&provider[..], "exact")], "{suffix}: {text}");
+    }
+    assert!(
+        calls(&json, "Stranger.Run(Order)::o.Total#0").is_empty(),
+        "{text}"
+    );
+    assert!(
+        calls(&json, "Own.Run(Order)::o.Total#0").is_empty(),
+        "{text}"
+    );
+    let own = (json["calls"].as_array().unwrap().iter())
+        .find(|c| {
+            c["id"]
+                .as_str()
+                .unwrap()
+                .ends_with("Own.Run(Order)::o.Total#0")
+        })
+        .map(|c| (c["target"].as_str(), c["level"].as_str()));
+    let target = "example.com/dotnet/app::src/Web/Own.cs::Example.App.Own.Order.Total()";
+    assert_eq!(own, Some((Some(target), Some("exact"))), "{text}");
+}

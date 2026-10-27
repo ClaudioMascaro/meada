@@ -316,6 +316,10 @@ fn methods(
     (ids, opaque)
 }
 
+/// The longest chain of modules of one repository `Maven::entries` follows.
+// ponytail: real builds nest a few modules deep; this bounds the walk over a hostile one.
+const MODULE_DEPTH: usize = 32;
+
 pub struct Maven;
 
 impl Ecosystem for Maven {
@@ -364,19 +368,68 @@ impl Ecosystem for Maven {
     fn imports<'a>(&self, code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
         imports(code, path, call, &["java.", "kotlin."])
     }
-    /// Every artifact the manifests holding the file depend on, nearest first, once each; the
-    /// import's class stands for the subpath.
+    /// Every artifact the manifests holding the file depend on, then those each module of the
+    /// repository a dependency names passes on (`Entry::private`), through the ones that pass on,
+    /// nearest first, once each (the nearer entry wins); the import's class stands for the subpath.
     fn entries<'e>(
         &self,
         exports: &'e [Export],
-        _providers: &Providers,
+        providers: &Providers,
         (n, from): (usize, &str),
         specifier: &str,
     ) -> Vec<(&'e Entry, String)> {
-        let mut seen = HashSet::new();
-        (holding(&exports[n].manifests, from, self).into_iter())
-            .flat_map(|m| &m.summary.dependencies)
-            .filter(|e| seen.insert(e.name.as_str()))
+        let found = providers.walked(
+            self.name(),
+            exports,
+            (n, bare_directory(from)),
+            |manifests| {
+                let at = |m: &Manifest| manifests.iter().position(|x| std::ptr::eq(x, m));
+                let own: Vec<usize> = holding(manifests, from, self)
+                    .into_iter()
+                    .filter_map(at)
+                    .collect();
+                let dependencies = |i: usize| manifests[i].summary.dependencies.iter().enumerate();
+                let mut found: Vec<(usize, usize)> = (own.iter())
+                    .flat_map(|&i| dependencies(i).map(move |(j, _)| (i, j)))
+                    .collect();
+                // ponytail: a module is its own `pom.xml`, without its parent's dependencies, and a
+                // Gradle dependency is not followed (`project(..)` is not read, and an `implementation`
+                // one does not pass on).
+                let mut modules: HashMap<&str, Vec<usize>> = HashMap::new();
+                for (i, m) in (manifests.iter().enumerate())
+                    .filter(|(_, m)| m.path.rsplit('/').next() == Some("pom.xml"))
+                {
+                    if let Some(name) = &m.summary.name {
+                        modules.entry(name).or_default().push(i);
+                    }
+                }
+                let entry = |(i, j): (usize, usize)| &manifests[i].summary.dependencies[j];
+                let mut walked: HashSet<usize> = own.into_iter().collect();
+                let mut level = found.clone();
+                for _ in 0..MODULE_DEPTH {
+                    let next: Vec<(usize, usize)> = (level.iter().copied())
+                        .filter(|&e| !entry(e).private && entry(e).via.is_none())
+                        .flat_map(|e| modules.get(entry(e).name.as_str()).into_iter().flatten())
+                        .filter(|&&i| walked.insert(i))
+                        .flat_map(|&i| {
+                            (dependencies(i))
+                                .filter(|(_, e)| !e.private)
+                                .map(move |(j, _)| (i, j))
+                        })
+                        .collect();
+                    if next.is_empty() {
+                        break;
+                    }
+                    found.extend(&next);
+                    level = next;
+                }
+                let mut seen = HashSet::new();
+                (found.into_iter())
+                    .filter(|&e| seen.insert(entry(e).name.as_str()))
+                    .collect()
+            },
+        );
+        (found.into_iter())
             .map(|e| (e, specifier.to_string()))
             .collect()
     }
@@ -809,5 +862,75 @@ mod tests {
         let root = manifest("pom.xml", &["src/test/java"], &["src/test/java"]);
         assert!(tested(&root, "src/test/java/a/B.java"));
         assert!(!tested(&root, "models/src/main/java/a/B.java"));
+    }
+
+    /// The names of the entries `Maven::entries` gives a file of module `app`, in a repository
+    /// whose modules are `poms`, as `(module, pom.xml dependencies)`.
+    fn entries(poms: &[(&str, &str)]) -> Vec<String> {
+        let manifests = (poms.iter())
+            .map(|(module, deps)| {
+                let src = format!("<project><groupId>g</groupId><artifactId>{module}</artifactId><dependencies>{deps}</dependencies></project>");
+                Manifest {
+                    path: format!("{module}/pom.xml"),
+                    summary: Maven.read("pom.xml", src.as_bytes()),
+                }
+            })
+            .collect();
+        let exports = [Export {
+            manifests,
+            ..Export::default()
+        }];
+        let providers = Providers::new(&exports);
+        (Maven
+            .entries(&exports, &providers, (0, "app/src/main/java/A.java"), "c")
+            .iter())
+        .map(|(e, _)| format!("{}{}", e.name, e.range.as_deref().unwrap_or("")))
+        .collect()
+    }
+
+    fn dep(artifact: &str, more: &str) -> String {
+        format!(
+            "<dependency><groupId>g</groupId><artifactId>{artifact}</artifactId>{more}</dependency>"
+        )
+    }
+
+    #[test]
+    fn a_module_passes_on_its_compile_dependencies_and_the_nearer_entry_wins() {
+        let app = [dep("lib", ""), dep("x", "<version>1</version>")].concat();
+        let lib = [
+            dep("x", "<version>2</version>"),
+            dep("y", ""),
+            dep("t", "<scope>test</scope>"),
+            dep("o", "<optional>true</optional>"),
+        ]
+        .concat();
+        let found = entries(&[("app", &app), ("lib", &lib), ("y", &dep("z", ""))]);
+        assert_eq!(found, ["g:lib", "g:x1", "g:y", "g:z"]);
+        // A module reached only through a `test` dependency passes nothing on.
+        let found = entries(&[("app", &dep("lib", "<scope>test</scope>")), ("lib", &lib)]);
+        assert_eq!(found, ["g:lib"]);
+    }
+
+    #[test]
+    fn a_module_cycle_and_a_chain_past_the_depth_bound_are_walked_in_linear_time() {
+        let names: Vec<String> = (0..2000).map(|i| format!("m{i}")).collect();
+        // A chain from app that closes into a cycle back to app.
+        let deps: Vec<String> = (0..names.len())
+            .map(|i| dep(names.get(i + 1).map_or("app", |n| n.as_str()), ""))
+            .collect();
+        let first = dep("m0", "");
+        let mut poms = vec![("app", first.as_str())];
+        poms.extend(
+            names
+                .iter()
+                .zip(&deps)
+                .map(|(n, d)| (n.as_str(), d.as_str())),
+        );
+        let start = std::time::Instant::now();
+        let found = entries(&poms);
+        assert!(start.elapsed().as_secs() < 2, "{:?}", start.elapsed());
+        assert_eq!(found.len(), MODULE_DEPTH + 1);
+        let found = entries(&[("app", &dep("a", "")), ("a", &dep("app", ""))]);
+        assert_eq!(found, ["g:a", "g:app"]);
     }
 }

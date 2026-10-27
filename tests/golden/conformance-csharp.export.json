@@ -71,7 +71,7 @@
     },
     {
       "path": "src/Acme.Api/Remote.cs",
-      "hash": "5b4e7c8f7b407bf81f48af8e5e86be376dc230d5e1c9543735c3b2093b649f5b"
+      "hash": "759c1a39cf052fc811857d470e8682c6c2e5705b0a6ec0807379db0f1d4d65b7"
     },
     {
       "path": "src/Acme.Api/Shadows.cs",
@@ -1428,6 +1428,22 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IHealthApi",
+      "span": {
+        "path": "src/Acme.Api/Remote.cs",
+        "start": 726,
+        "end": 809
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IHealthApi.Ping()",
+      "span": {
+        "path": "src/Acme.Api/Remote.cs",
+        "start": 768,
+        "end": 803
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi",
       "span": {
         "path": "src/Acme.Api/Remote.cs",
@@ -1460,6 +1476,22 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IOrdersApi",
+      "span": {
+        "path": "src/Acme.Api/Remote.cs",
+        "start": 815,
+        "end": 921
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IOrdersApi.List()",
+      "span": {
+        "path": "src/Acme.Api/Remote.cs",
+        "start": 870,
+        "end": 915
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IReportsApi",
       "span": {
         "path": "src/Acme.Api/Remote.cs",
@@ -1479,24 +1511,24 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.Inventory",
       "span": {
         "path": "src/Acme.Api/Remote.cs",
-        "start": 699,
-        "end": 1096
+        "start": 992,
+        "end": 1495
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.Inventory.AddReports(IServiceCollection)",
       "span": {
         "path": "src/Acme.Api/Remote.cs",
-        "start": 917,
-        "end": 1090
+        "start": 1316,
+        "end": 1489
       }
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.Inventory.Find(string)",
       "span": {
         "path": "src/Acme.Api/Remote.cs",
-        "start": 852,
-        "end": 907
+        "start": 1251,
+        "end": 1306
       }
     },
     {
@@ -5194,6 +5226,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IHealthApi::Get#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IHealthApi",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Remote.cs",
+        "start": 769,
+        "end": 781
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi::Delete#0",
       "caller": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi",
       "target": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Delete(string)",
@@ -5227,6 +5270,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IOrdersApi::Get#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IOrdersApi",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Remote.cs",
+        "start": 871,
+        "end": 885
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IReportsApi::Get#0",
       "caller": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IReportsApi",
       "target": null,
@@ -5244,8 +5298,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Remote.cs",
-        "start": 1012,
-        "end": 1050
+        "start": 1411,
+        "end": 1449
       }
     },
     {
@@ -5255,8 +5309,8 @@
       "level": "exact",
       "span": {
         "path": "src/Acme.Api/Remote.cs",
-        "start": 892,
-        "end": 906
+        "start": 1291,
+        "end": 1305
       }
     },
     {
@@ -5266,8 +5320,19 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Remote.cs",
-        "start": 774,
-        "end": 841
+        "start": 1067,
+        "end": 1134
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.Inventory::RestService.For#1",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.Inventory",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Remote.cs",
+        "start": 1183,
+        "end": 1240
       }
     },
     {
@@ -6873,12 +6938,8 @@
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::shelf.Stock#1",
       "caller": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
-      "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate.Stock()",
-        "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf.Stock()"
-      ],
+      "target": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate.Stock()",
+      "level": "exact",
       "span": {
         "path": "src/Acme.Web/Program.cs",
         "start": 1193,
@@ -7543,6 +7604,11 @@
       "via": "host:wrapped.example.com"
     },
     {
+      "contract": "http::GET::/ping",
+      "site": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IHealthApi.Ping()",
+      "via": "host:orders.example.com"
+    },
+    {
       "contract": "http::POST::/api/items",
       "site": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Add(string)",
       "via": "host:inventory.example.com"
@@ -7556,6 +7622,11 @@
       "contract": "http::GET::/api/items/{}",
       "site": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Item(string)",
       "via": "host:inventory.example.com"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IOrdersApi.List()",
+      "via": "host:orders.example.com"
     },
     {
       "contract": "http::GET::/reports",
@@ -7841,6 +7912,7 @@
         "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
         "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Admin.Map(RouteGroupBuilder)",
         "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Reports.Group(WebApplication)",
+        "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate.Stock()",
         "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf",
         "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf.Stock()",
         "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder)",
@@ -10346,6 +10418,29 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IHealthApi.Ping()",
+      "kind": "export",
+      "label": "Acme.Api.Remote.IHealthApi.Ping()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IHealthApi.Ping()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IHealthApi.Ping()",
+          "mark": "no-provider",
+          "contract": "http::GET::/ping"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Add(string)",
       "kind": "export",
       "label": "Acme.Api.Remote.IInventoryApi.Add(string)",
@@ -10365,6 +10460,29 @@
           "node": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Add(string)",
           "mark": "no-provider",
           "contract": "http::POST::/api/items"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IOrdersApi.List()",
+      "kind": "export",
+      "label": "Acme.Api.Remote.IOrdersApi.List()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IOrdersApi.List()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IOrdersApi.List()",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
         }
       ]
     },
@@ -11481,14 +11599,9 @@
         {
           "depth": 1,
           "repository": "example.com/acme/conformance",
-          "level": "ambiguous",
+          "level": "exact",
           "via": "call",
-          "node": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main::shelf.Stock#1",
-          "mark": "ambiguous",
-          "candidates": [
-            "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate.Stock()",
-            "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf.Stock()"
-          ]
+          "node": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate.Stock()"
         }
       ]
     },

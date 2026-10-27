@@ -146,8 +146,10 @@ fn bases<'a>(
             let Some(made) = code.definition(path, &stored.scope, api) else {
                 continue;
             };
-            let key = (made.path, made.name);
-            if !interfaces.contains_key(&key) {
+            let served: Vec<_> = (inherited(code, made.path, made.name).into_iter())
+                .filter(|k| interfaces.contains_key(k))
+                .collect();
+            if served.is_empty() {
                 continue;
             }
             // A base a wrapper's caller passes is read at each caller (`None` climbs).
@@ -157,19 +159,53 @@ fn bases<'a>(
                 Some(Value::Str(p)) => Some(p.clone()),
                 _ => Some(vec![Part::Hole]),
             };
-            let entry = out.entry(key).or_default();
             for base in code.expand(Expand::Call(path, n), &read) {
                 let parts = match reads.value(code, path, Value::Str(base.found)) {
                     Value::Str(parts) => parts,
                     _ => vec![Part::Hole],
                 };
-                if !entry.contains(&parts) {
-                    entry.push(parts);
+                for &key in &served {
+                    let entry = out.entry(key).or_default();
+                    if !entry.contains(&parts) {
+                        entry.push(parts.clone());
+                    }
                 }
             }
         }
     }
     out
+}
+
+/// How many levels of written bases `For<Api>` reaches.
+// ponytail: real interfaces extend a few others; this bounds a crafted chain.
+const BASE_DEPTH: usize = 32;
+
+/// The interface `name` of `path` and the repository interfaces it extends, directly or through
+/// others, by file and name: bounded by `BASE_DEPTH`, each once (a cycle ends). A base outside
+/// the repository resolves to no definition and adds nothing.
+fn inherited<'a>(code: &Code<'a>, path: &'a str, name: &'a str) -> Vec<(&'a str, &'a str)> {
+    let mut seen = vec![(path, name)];
+    let mut level = vec![(path, name)];
+    for _ in 0..BASE_DEPTH {
+        let mut next = Vec::new();
+        for (path, name) in level {
+            let Some(def) = code.files()[path].defs.iter().find(|d| d.name == name) else {
+                continue;
+            };
+            for base in &def.bases {
+                let Some(t) = code.definition(path, crate::parent(name), base) else {
+                    continue;
+                };
+                let key = (t.path, t.name);
+                if !seen.contains(&key) {
+                    seen.push(key);
+                    next.push(key);
+                }
+            }
+        }
+        level = next;
+    }
+    seen
 }
 
 /// The URL of the path `route` (from the root) of a Refit with `base`: the base, its own path
@@ -360,6 +396,94 @@ mod tests {
                 None,
                 "A.IApi.Item(int)".into()
             )]
+        );
+    }
+
+    /// The consumers of `ping` by `(host, the interface that declares it)`.
+    fn pings(sources: &[(&str, &str)]) -> Vec<(Option<String>, String)> {
+        (sent(sources, &[]).into_iter())
+            .filter(|(c, ..)| c.as_deref() == Some("http::GET::/ping"))
+            .map(|(_, v, at)| (v, at))
+            .collect()
+    }
+
+    fn files(interfaces: &str, makers: &str) -> String {
+        format!(
+            "using Refit;\nusing System.Threading.Tasks;\nnamespace A;\n{interfaces}\n\
+             public class Make {{ void Run() {{ {makers} }} }}\n"
+        )
+    }
+
+    const BASE: &str = "public interface IBase { [Get(\"/ping\")] Task Ping(); }\n";
+
+    #[test]
+    fn a_for_gives_its_base_to_the_endpoints_its_interface_inherits() {
+        let ifaces = format!(
+            "{BASE}public interface IOrders : IBase {{ [Get(\"/orders\")] Task List(); }}\n\
+             public interface IEmpty : IBase {{ }}\n\
+             public interface IOut : Elsewhere.IThing {{ }}\n"
+        );
+        let host = |h: &str| Some(format!("host:{h}"));
+        let src = files(
+            &ifaces,
+            "RestService.For<IOrders>(\"https://o.example.com\");",
+        );
+        assert_eq!(
+            pings(&[("A/A.cs", &src)]),
+            [(host("o.example.com"), "A.IBase.Ping()".into())]
+        );
+        // No endpoint of its own, and a base from outside the repository adds nothing.
+        let src = files(
+            &ifaces,
+            "RestService.For<IEmpty>(\"https://e.example.com\"); RestService.For<IOut>(\"https://x.example.com\");",
+        );
+        assert_eq!(
+            pings(&[("A/A.cs", &src)]),
+            [(host("e.example.com"), "A.IBase.Ping()".into())]
+        );
+        // Two interfaces sharing a base: one consumer per base.
+        let src = files(
+            &ifaces,
+            "RestService.For<IOrders>(\"https://o.example.com\"); RestService.For<IEmpty>(\"https://e.example.com\");",
+        );
+        assert_eq!(
+            pings(&[("A/A.cs", &src)]),
+            [
+                (host("e.example.com"), "A.IBase.Ping()".into()),
+                (host("o.example.com"), "A.IBase.Ping()".into()),
+            ]
+        );
+    }
+
+    #[test]
+    fn the_walk_over_bases_ends_on_a_cycle_and_at_the_bound() {
+        let host = Some("host:o.example.com".to_string());
+        let make = "RestService.For<I0>(\"https://o.example.com\");";
+        // `IBase : I0` would close a cycle: it ends, with the base kept.
+        let cyclic = "public interface IBase : I0 { [Get(\"/ping\")] Task Ping(); }\n\
+             public interface I0 : IBase { }\n";
+        let src = files(cyclic, make);
+        assert_eq!(
+            pings(&[("A/A.cs", &src)]),
+            [(host.clone(), "A.IBase.Ping()".into())]
+        );
+        // A chain `I0 : I1 : ... : In` whose last link declares the endpoint.
+        let chain = |n: usize| {
+            let mut s = String::new();
+            for i in 0..n {
+                s += &format!("public interface I{i} : I{} {{ }}\n", i + 1);
+            }
+            s + &format!("public interface I{n} {{ [Get(\"/ping\")] Task Ping(); }}\n")
+        };
+        let reached = files(&chain(BASE_DEPTH), make);
+        assert_eq!(
+            pings(&[("A/A.cs", &reached)]),
+            [(host, format!("A.I{BASE_DEPTH}.Ping()"))]
+        );
+        let past = files(&chain(BASE_DEPTH + 1), make);
+        assert_eq!(
+            pings(&[("A/A.cs", &past)]),
+            [(None, format!("A.I{}.Ping()", BASE_DEPTH + 1))]
         );
     }
 }

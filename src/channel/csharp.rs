@@ -640,6 +640,13 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_nameof_topic_is_the_name_it_spells() {
+        let body = "IProducer<string, string> _producer;\n\
+            void Send() { _producer.Produce(nameof(Orders), null); }\n";
+        assert_eq!(lines(KAFKA, body), ["kafka Orders producer"]);
+    }
+
     /// `lines`, with the position an inline handler is named after masked.
     fn masked(lines: Vec<String>) -> Vec<String> {
         let mask = |line: String| {

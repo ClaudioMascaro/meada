@@ -1,5 +1,5 @@
 <project>
   <parent><groupId>example</groupId><artifactId>parent</artifactId><version>1.0</version></parent>
   <artifactId>models</artifactId>
-  <dependencies><dependency><groupId>example</groupId><artifactId>shared${suffix}</artifactId><version>${release}</version></dependency></dependencies>
+  <dependencies><dependency><groupId>example</groupId><artifactId>shared${suffix}</artifactId><version>${release}</version></dependency><dependency><groupId>example</groupId><artifactId>fixtures</artifactId><scope>test</scope></dependency></dependencies>
 </project>

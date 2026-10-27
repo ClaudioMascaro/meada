@@ -923,7 +923,9 @@ one for the area a change touches.
   `engine.rs`, `items.rs`, `decisions.rs`, `trace.rs`, `entry.rs` or the extraction loop of
   `index.rs` names a kind, and a kind's rule stays in its own file, with the library forms it reads in each
   language (one module per language: `http/<language>.rs`, `channel/<language>.rs`), never in
-  the pack. Three questions are
+  the pack, whose `&[&str]` tables are only `syntax`, `runtime` (the language's own library that
+  value evaluation passes through) or a decided `exception`, each listed with its class by a test
+  in `lang/mod.rs` (`CODING_STANDARDS.md`). Three questions are
   required: `prefix`, `extract` (receives `Code`, never the syntax tree, and `Indexed`, what the
   index read of the repository besides: the manifests and tsconfigs, the exported rows, the
   files of every pack and the bytes of the config files the packs list (`Indexed::configs`,
@@ -1035,9 +1037,32 @@ one for the area a change touches.
 - `dotnet/` holds what the .NET pack and ecosystems share (spec #28), as `jvm/` does for the
   JVM: `dotnet/msbuild.rs` reads an SDK-style project file (`msbuild::read`: whether it is a
   project and, if so, its `Using`s (the SDK's implicit usings among them), its `PackageId`,
-  `AssemblyName` and version, and its `PackageReference` and `ProjectReference` items), which the
-  C# pack's `join` and the NuGet ecosystem (#116) both read; a second reader of project files is
-  a finding. `xml.rs` holds the bounds every XML build file reader shares
+  `AssemblyName` and version, and its `PackageReference` and `ProjectReference` items, each
+  with whether it is private: a `PrivateAssets` naming `all` or `compile`, or computed, keeps it
+  from passing on), which the C# pack's `join` and the NuGet ecosystem (#116) both read; a second
+  reader of project files is a finding. `msbuild::read` takes the `Directory.Build.props` files
+  MSBuild imports into the project (#381), each read once by `msbuild::props` (a file of more than
+  `PROPS_ITEMS` (256) usings and references reads as unreadable, so what it copies into each
+  project stays bounded), evaluated before it: `msbuild::chain` finds them
+  (the nearest at or above the project's directory, then each it imports with
+  `GetPathOfFileAbove('Directory.Build.props', ...)` or a relative path, outer first, up to
+  `PROPS_DEPTH` (8) and not one twice), items add up, the project's property wins, a `<Using
+  Remove>` drops what the files before it added, and an unreadable file adds nothing but still hides
+  those above it. The pack's `join` reads them as configuration files (`**/Directory.Build.props`)
+  and the NuGet ecosystem keeps one as a manifest that is no project: `Nuget::inherit` gives its
+  `PackageReference` and `ProjectReference` entries (a `ProjectReference` relative to the project,
+  as MSBuild evaluates it; one on `$(MSBuildThisFileDirectory)` is computed) to the projects below
+  it and empties the file's own, so they declare them and it declares none, and names each
+  project with the package properties the chain writes under the project's own
+  (`msbuild::package`, from `Summary::properties`): a computed id from either makes no provider.
+  `dotnet/references.rs` (#369) walks a repository's
+  `ProjectReference`s: `located` turns an `Include` into the project file's path in the
+  repository, and `referenced` gives the projects a project references directly or through the
+  projects those reference, nearest first (breadth first), each once, following a private
+  reference from the start project alone and stopping at a project already found and past
+  `REFERENCE_DEPTH` (32), so each project's references are read once. It takes a project's
+  references through a function over what its read yields, so NuGet's `entries` (from the
+  manifests' entries) and the C# resolver (from `msbuild::read`) walk the same graph. `xml.rs` holds the bounds every XML build file reader shares
   (`within_limits`, `XML_NODES`), owned by neither ecosystem: `jvm/maven.rs` and
   `dotnet/msbuild.rs` both check them before roxmltree parses.
 - New **Go router** (spec #25; net/http, gin, echo, chi and gorilla): a row of `ROUTERS` in
@@ -1249,7 +1274,13 @@ one for the area a change touches.
     class lookup, the family walk and the argument-count pick are the same code; `declaring`
     counts a file only for the ecosystem whose `sources()` has its extension; `entries` is the
     references of the nearest SDK-style `.csproj` above the file (`owner`, `Summary::project`,
-    as the pack's `join`); the three provider loops keep the providers an entry's `reaches`
+    as the pack's `join`), then those that pass on (`Entry::private` false) of each project of
+    its repository it references (`references::referenced`), nearest first, the nearer entry
+    winning a name; Maven's is the dependencies of the poms holding the file, then those that
+    pass on (a `compile` scope, the default, not `optional`) of each module of the repository a
+    `pom.xml` names by its coordinate, through the dependencies that pass on, nearest first and
+    at most `MODULE_DEPTH` (32) modules deep (a module is its own `pom.xml`, without its
+    parent's dependencies, and a Gradle dependency is not followed); the three provider loops keep the providers an entry's `reaches`
     lets through, as the default `resolutions` does, so a `ProjectReference` pins its project;
     the shared code names no ecosystem: each passes its platform prefixes (`java.`, `kotlin.`
     for Maven, `System.` for NuGet) to `imports`, and the class tables take every ecosystem's
@@ -1677,8 +1708,10 @@ one for the area a change touches.
   keeps the methods with a `Binds::Instance` first parameter alone (`inferred`, or `ambiguous`
   with every one that fits). With an opaque base, or on a type's name (`Teller.Missing()`),
   or a bare call, the call resolves to nothing, and so does a method of the repository that
-  is no extension. A receiver without a written type (`var x = Make()` of unknown result, a
-  lambda parameter, a type parameter) keeps the broad name match. The extensions are not
+  is no extension. A receiver without a written type (`var x = Make()` of unknown result, an
+  implicitly typed lambda parameter, a type parameter) keeps the broad name match; so does a
+  lambda parameter written with `in` or `out` (#379), which tree-sitter-c-sharp 0.23.5 does not
+  parse (an `ERROR` node). The extensions are not
   looked up: an extension method called as `x.M()` is never `exact`, one called as `Ext.M(x)`
   is. A local a call from outside initialized (`var app = builder.Build()`, `var b =
   WebApplication.CreateBuilder(args)`) is from outside too (`Resolver::outside_result`): the
@@ -1778,8 +1811,12 @@ one for the area a change touches.
   literal group, root project name and included project names/directories in `Summary::build`),
   of each SDK-style `.csproj` (spec #28: the package id, else assembly name, else file name, the
   literal version, each `PackageReference` with its range as written, each `ProjectReference`
-  as a `path` folded from the project's directory, and `Summary::project`, the mark that it is
-  an SDK-style project that owns its files), the `tsconfig.json` rows
+  as a `path` folded from the project's directory, each with `Entry::private` when it does not
+  pass on (#369), the package properties as written (`Summary::properties`, #381), and
+  `Summary::project`, the mark that it is an SDK-style project that owns its files) and of each
+  `Directory.Build.props` (#381: its `PackageReference`s, its `ProjectReference`s by the path as
+  written, its package properties and the props file it imports, `Summary::import`), the
+  `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition, constant, type or file they name), the `families` table (spec #26: each public
   Java class's ancestors past it, `Resolver::ancestries`, a repository class by file and name and
@@ -1974,7 +2011,11 @@ qualification budget does (ADR 0017).
   conformance test writes one type in 64 files and in 65. Definitions of one name in files of
   several units (C# projects) bind, from a file of one of those units, to its own unit's
   (`Resolver::in_unit`, at the end of `resolve_as`), as the compiler prefers the project's type
-  to a reference's; from a file of no such unit the name stays `ambiguous`.
+  to a reference's; from a file of a unit that declares none of them, the name binds to the
+  one defining unit among those its project references, directly or through the references
+  that pass on (`Facts::unit_references`, from the walk of `dotnet::references`;
+  `Resolver::in_references`), and stays `ambiguous` with several or none, since a project
+  not referenced may still be visible through references not read.
 
 - `lang/csharp.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the C# pack as they bound the Java pack's, with the same
@@ -1988,8 +2029,11 @@ qualification budget does (ADR 0017).
   through the file (`Binding::of_namespace`) only when no file has that namespace as package,
   and by full name otherwise; the global namespace's types are seen only from the global
   namespace. A project file is SDK-style when its `Project` has an `Sdk` attribute, an `Sdk`
-  element or an `Import` with an `Sdk` (any case); its properties are read as written, with no `Condition`, import or
-  `Directory.Build.props`, and the nearest project directory owns a file (MSBuild items that
+  element or an `Import` with an `Sdk` (any case); its properties are read as written, with no `Condition` and no import
+  but a parent `Directory.Build.props` (`Directory.Build.targets` and `Directory.Packages.props`
+  stay unread; the props chain is followed `PROPS_DEPTH` (8) files up, and a props file of
+  more than `PROPS_ITEMS` (256) usings and references adds nothing, as an unreadable one:
+  `dotnet/msbuild.rs`), and the nearest project directory owns a file (MSBuild items that
   include or remove files are not read; two project files in one directory take the first).
   Implicit usings add the SDK's own list for `Microsoft.NET.Sdk`, plus `.Web`'s and
   `.Worker`'s; other SDKs add the base list. `.sln` files are not read: they only group
@@ -2007,13 +2051,17 @@ qualification budget does (ADR 0017).
   A configuration read is decided with the project of the file that holds the call, the
   constructor or the registration it is read for (`http/csharp/reads.rs`), so a client in a
   library project reads the library's `appsettings.json`, never the consuming app's.
-  An `internal` type joins its namespace's star for the whole repository, so a file of another
-  project links to it as to a public one. A repository extension method wins over an outside
+  An `internal` type (one with no access modifier too) links from its own project's files
+  alone (`Resolver::hidden`); `InternalsVisibleTo` is not read, so a friend project's calls to
+  it get no link. From a file of another project it is not there at all, so a type of its
+  name a using brings binds even from a file of its namespace. A repository extension method wins over an outside
   type's instance member of the same name (`sb.Append("x")` beside a
   `static StringBuilder Append(this StringBuilder b, string s)`), where C# picks the member
-  (ADR 0018). Only the nearest project's references are read (`package/nuget.rs`): the
-  `PackageReference`s of a project a `ProjectReference` names are not followed. Generated files
-  under `obj/` are indexed when no ignore file lists them.
+  (ADR 0018). A file sees what the projects of its repository its project references pass on up
+  to `REFERENCE_DEPTH` (32) projects deep (`dotnet/references.rs`), and nothing that a project
+  of another repository references. A lambda parameter written with `in` or `out` (`(in Order
+  o) => o.Total()`) types nothing (#379): tree-sitter-c-sharp 0.23.5 reads the list as an
+  `ERROR` node, so its receiver keeps the broad name match.
 
 - `snapshot/pull.rs`: a generation's bundles hold at most `GENERATION_BYTES_MAX` (256 GiB)
   together, as the document records their sizes (checked before any download) and as the
@@ -2398,7 +2446,9 @@ qualification budget does (ADR 0017).
   attribute is no type; `Hiding`, shared with the controllers, says a class of the repository
   named `GetAttribute` hides it) and a path from the root is a consumer at its definition
   (`Site::Def`), as Retrofit's are. Its bases are the first arguments of each framework
-  `RestService.For<Api>(base)` whose first type argument names the interface, read with
+  `RestService.For<Api>(base)` whose first type argument names the interface or one that
+  extends it (#367: the interfaces `Def::bases` reach, up to `BASE_DEPTH` (32) levels, each
+  once), read with
   `Expand::Call` (a wrapper's callers pass it) and the reads decided in the file of `For`; one
   consumer per base, and an interface no `For` makes has an unknown base. The route follows the
   base's own path (Refit appends it). `AddRefitClient` and `For` given an `HttpClient` are not
@@ -2415,9 +2465,9 @@ qualification budget does (ADR 0017).
   into the URL like any other. The reads of one node share one `Arc` of their scope. The pack
   folds `??` chains (the first operand a read and no other operand a read, so the reads count
   across the whole chain; past `VALUE_DEPTH` operands it is unknown), `!` around it, and keeps
-  the members called on it in `then`. `Reads::value` in the kind turns the part into `Env`,
-  `EnvOr` or `Hole` with the resolver: a read whose `then` holds a member other than `Trim`,
-  `TrimStart` and `TrimEnd` (`TRIMS`) is a hole, `Environment.GetEnvironmentVariable` is the
+  the members called on it in `then`, except the trims of `System.String` (`Trim`, `TrimStart`,
+  `TrimEnd`: `TRIMS`, the language's own runtime), which leave it the read. `Reads::value` in the kind turns the part into `Env`,
+  `EnvOr` or `Hole` with the resolver: a read whose `then` holds a member is a hole, `Environment.GetEnvironmentVariable` is the
   framework's `System.Environment` (a repository type of that name hides it, through
   `names::spellings`), and `x[".."]` is a configuration when `x` is declared `IConfiguration`
   (`Code::written`, confirmed through the usings) or is `builder.Configuration` of a
@@ -3187,4 +3237,7 @@ qualification budget does (ADR 0017).
   "1")`, a `group` set only in `subprojects`/`allprojects`, and a top-level `val group`. A
   `group` reset in `afterEvaluate` is not seen, and `publishing { artifactId = .. }` is
   ignored, so the announced package may differ from the published one. JVM coordinate names share
-  `package::MAX_NAME` (214 bytes). These readers never run Maven, Gradle or a JDK.
+  `package::MAX_NAME` (214 bytes). These readers never run Maven, Gradle or a JDK. A file sees
+  what the modules of its repository it depends on pass on up to `MODULE_DEPTH` (32) modules
+  deep (`package/maven.rs`); a module's parent pom adds nothing to what it passes on, and a
+  Gradle dependency passes nothing on.

@@ -837,6 +837,14 @@ mod tests {
     }
 
     #[test]
+    fn a_nameof_path_part_is_a_known_segment() {
+        let body = format!(
+            "{CLIENT}Task<string> Orders() => _http.GetStringAsync(\"https://w.example.com/api/\" + nameof(Orders));\n"
+        );
+        assert_eq!(contracts(&body), ["http::GET::/api/Orders"]);
+    }
+
+    #[test]
     fn a_field_set_in_the_constructor_is_still_the_client_of_a_wrapper() {
         let body = "private readonly HttpClient _http;\n\
             public C(HttpClient http) { this._http = http; }\n\

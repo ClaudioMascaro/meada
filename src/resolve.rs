@@ -317,6 +317,9 @@ pub struct Resolver<'a> {
     unordered_globs: bool,
     qualified_types: bool,
     consts: HashMap<&'a str, HashSet<&'a str>>,
+    /// The types each file of a compilation keeps to it (`Facts::private` of a file with a
+    /// `Facts::unit`), for `hidden`.
+    internal: HashMap<&'a str, HashSet<&'a str>>,
     /// The names some file of the repository writes through a selector (`cfg.Base = ..`): a
     /// constant marked `.Name` (Go). A variable of such a name holds no one value.
     written: HashSet<&'a str>,
@@ -616,6 +619,10 @@ impl<'a> Resolver<'a> {
                 (*path, names)
             })
             .collect();
+        let internal = (files.iter())
+            .filter(|(_, facts)| !facts.unit.is_empty() && !facts.private.is_empty())
+            .map(|(path, facts)| (*path, facts.private.iter().map(String::as_str).collect()))
+            .collect();
         let locals = files
             .iter()
             .map(|(path, facts)| (*path, facts.locals.iter().map(String::as_str).collect()))
@@ -718,6 +725,7 @@ impl<'a> Resolver<'a> {
             qualified_types: language.qualified_types(),
             written,
             consts,
+            internal,
             locals,
             receivers,
             params,
@@ -1093,7 +1101,13 @@ impl<'a> Resolver<'a> {
             None => Binding::Unknown,
             Some(head) => {
                 let seen = &mut self.seen(path, scope);
-                let receiver = match (on, call.on) {
+                // A member read between the call and the member called (`make().x.save()`) is
+                // the receiver, not the call's result: the walk answered it, or no one does.
+                let (on, inner) = match head.contains('.') {
+                    true => (None, None),
+                    false => (on, call.on),
+                };
+                let receiver = match (on, inner) {
                     (Some(known), _) => known,
                     (None, Some(inner)) => self.result_of(path, inner, work),
                     (None, None) => self.resolve_as(path, scope, head, seen, work, Reading::Value),
@@ -1610,7 +1624,7 @@ impl<'a> Resolver<'a> {
             (binding, members) = found;
         }
         let found = self.walk(binding, members, seen, work, reading);
-        self.in_unit(path, found)
+        self.in_unit(path, self.accessible(path, found))
     }
 
     /// `binding`'s dotted `members`, each looked up in what the one before gives (`member` for
@@ -2310,6 +2324,9 @@ impl<'a> Resolver<'a> {
         if let Some(reaches) = &self.reaches {
             found.retain(|t| reaches(path, t.path));
         }
+        if self.files.get(path).is_some_and(|f| !f.unit.is_empty()) {
+            found.retain(|t| !self.hidden(path, *t));
+        }
         if let Some(arity) = arity {
             found.retain(|t| (self.arities.get(t)).is_none_or(|n| n.fits_call(arity, on_receiver)));
         }
@@ -2618,6 +2635,49 @@ impl<'a> Resolver<'a> {
         one(found.collect())
     }
 
+    /// `found` without the definitions `path` may not reach (`hidden`): nothing when none is
+    /// left, the one left when one is.
+    fn accessible(&self, path: &'a str, found: Binding<'a>) -> Binding<'a> {
+        let all = match found {
+            Binding::Def(t) if self.hidden(path, t) => return Binding::Unknown,
+            Binding::Several(all) => all,
+            found => return found,
+        };
+        let left: Vec<Target<'a>> = (all.iter().copied())
+            .filter(|t| !self.hidden(path, *t))
+            .collect();
+        match left[..] {
+            _ if left.len() == all.len() => Binding::Several(all),
+            [] => Binding::Unknown,
+            [one] => Binding::Def(one),
+            _ => Binding::Several(left),
+        }
+    }
+
+    /// Whether `t` is, or is declared in, a type its file keeps to its compilation
+    /// (`Facts::private` of a file with a `Facts::unit`: C#'s `internal` types) and `path` is
+    /// in another one. A file in no project (its own unit) neither hides nor is hidden.
+    // ponytail: `InternalsVisibleTo` is not read, so a friend project gets no link.
+    fn hidden(&self, path: &str, t: Target) -> bool {
+        let (Some(from), Some(at)) = (self.files.get(path), self.files.get(t.path)) else {
+            return false;
+        };
+        if from.unit == at.unit || from.unit == path || at.unit == t.path {
+            return false;
+        }
+        let Some(internal) = self.internal.get(t.path) else {
+            return false;
+        };
+        let mut name = t.name;
+        while !name.is_empty() {
+            if internal.contains(name) {
+                return true;
+            }
+            name = crate::parent(name);
+        }
+        false
+    }
+
     /// `found`, when files define its name apart (`Several`), narrowed to the definitions of the
     /// compilation of `path` (`Facts::unit`, C#'s project) if it holds any: the compiler prefers
     /// a type its own project declares to one of the same name a reference or another project
@@ -2631,9 +2691,25 @@ impl<'a> Resolver<'a> {
         let kept: Vec<Target<'a>> = all.iter().filter(own).copied().collect();
         match kept[..] {
             _ if unit.is_empty() => Binding::Several(all),
-            [] => Binding::Several(all),
+            [] => self.in_references(path, all),
             [one] => Binding::Def(one),
             _ => Binding::Several(kept),
+        }
+    }
+
+    /// `all`, the definitions of a name in compilations other than `path`'s (`in_unit`), as the
+    /// one that is in the compilations `path`'s references reach (`Facts::unit_references`)
+    /// when it is the only one there, else as they are: a compilation that is not referenced
+    /// may still be visible through references not read (`Directory.Build.targets`, a `Condition`).
+    fn in_references(&self, path: &'a str, all: Vec<Target<'a>>) -> Binding<'a> {
+        let reached = |t: &&Target| {
+            let unit = self.files.get(t.path).map_or("", |f| f.unit.as_str());
+            (self.files.get(path)).is_some_and(|f| f.unit_references.iter().any(|r| r == unit))
+        };
+        let mut referenced = all.iter().filter(reached);
+        match (referenced.next(), referenced.next()) {
+            (Some(&one), None) => Binding::Def(one),
+            _ => Binding::Several(all),
         }
     }
 
@@ -2879,6 +2955,8 @@ impl<'a> Resolver<'a> {
             let bound = self.resolve_as(path, scope, target, seen, work, Reading::Alias);
             let found = self.through_glob(bound, *inside, name, work, seen);
             let found = found.of_namespace(self, self.glob_namespace(path, target));
+            // A definition `path` may not reach is not there: the lookup goes on past it.
+            let found = self.accessible(path, found);
             seen.depth -= 1;
             if seen.cut {
                 return Some(Binding::Unknown);
@@ -4422,11 +4500,24 @@ impl<'a> Code<'a> {
         let r = self.resolver;
         let (seen, work) = (&mut r.seen(path, scope), &mut Work::default());
         let found = r.resolve_as(path, scope, written, seen, work, Reading::Path);
+        let head = written.split('.').next().unwrap_or(written);
         let Binding::External(package, imported) = found else {
-            return None;
+            // A bare written type no import names: the on-demand imports may bring it, as
+            // they do a call head (`Code::outside`).
+            let candidates = match (found, r.unordered_globs && !seen.cut) {
+                (Binding::Unknown, true) => r.on_demand(path, head),
+                _ => Vec::new(),
+            };
+            return (!candidates.is_empty()).then(|| Outside {
+                imported: None,
+                spelled: written.to_string(),
+                direct: false,
+                candidates: (candidates.into_iter())
+                    .map(|s| format!("{s}.{written}"))
+                    .collect(),
+            });
         };
         let name = written.rsplit('.').next()?;
-        let head = written.split('.').next().unwrap_or(written);
         let (spelled, candidates) = match (imported, written.contains('.')) {
             // A single-type import (Java's `import a.B;`) is of the type itself.
             (Imported::Qualified, false) => (package.to_string(), Vec::new()),
@@ -8950,18 +9041,26 @@ mod csharp_tests {
             .into_iter()
             .map(|p| (p, PROJECT))
             .collect();
+        resolved_in(files, &configs)
+    }
+
+    /// `resolved` over the project files `configs`.
+    fn resolved_in(
+        files: &[(&str, &str)],
+        configs: &[(&str, &[u8])],
+    ) -> Vec<(String, String, &'static str, Vec<String>)> {
         let mut parsed: Vec<(&str, Facts)> = (files.iter())
             .map(|(p, s)| (*p, CSharp.parse(p, s.as_bytes()).unwrap()))
             .collect();
         let join = {
             let raw: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
-            CSharp.join(&configs, &raw)
+            CSharp.join(configs, &raw)
         };
         for (path, facts) in &mut parsed {
             join(path, facts);
         }
         let files: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
-        let layout = CSharp.layout(&configs, &files).unwrap();
+        let layout = CSharp.layout(configs, &files).unwrap();
         let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &CSharp);
         let paths = |ts: &[Target]| ts.iter().map(|t| t.path.to_string()).collect();
         let mut out = Vec::new();
@@ -8978,6 +9077,48 @@ mod csharp_tests {
             }
         }
         out
+    }
+
+    /// A lambda parameter with a written type types its receiver as a method's does, in every
+    /// shape of the parameter; an implicit one keeps the broad name match, and a field of the
+    /// same name is neither changed by it nor changes it.
+    #[test]
+    fn a_typed_lambda_parameter_types_its_receiver() {
+        // The lambda's call, then the field's: `(level, target path)` of each.
+        let calls = |body: &str| {
+            let src = format!(
+                "class U {{ Bin shelf; void M() {{ {body} }} void N() => shelf.Stock(); }}"
+            );
+            let found = resolved(&[
+                ("App/C.cs", "class Crate { public int Stock() => 1; }"),
+                ("App/B.cs", "class Bin { public int Stock() => 2; }"),
+                ("App/U.cs", &src),
+            ]);
+            let of = |from: usize| {
+                let at: Vec<_> = found.iter().filter(|c| c.1 == "shelf.Stock").collect();
+                (at[from].2, at[from].3.clone())
+            };
+            (of(0), of(1))
+        };
+        for body in [
+            "Func<Crate,int> f = (Crate shelf) => shelf.Stock();",
+            "Func<Crate,int> f = (Crate shelf) => { return shelf.Stock(); };",
+            "Func<int,Crate,int> f = (int n, Crate shelf) => shelf.Stock();",
+            "Func<Crate,int> f = ([Attr] Crate shelf) => shelf.Stock();",
+            "Func<Crate,int> f = (ref Crate shelf) => shelf.Stock();",
+            "Func<Crate,int> f = delegate (Crate shelf) { return shelf.Stock(); };",
+            "app.MapPost(\"/\", ([FromBody] Crate shelf) => shelf.Stock());",
+        ] {
+            let (lambda, field) = calls(body);
+            assert_eq!(lambda, ("exact", vec!["App/C.cs".to_string()]), "{body}");
+            assert_eq!(field, ("exact", vec!["App/B.cs".to_string()]), "{body}");
+        }
+        for body in [
+            "Func<Crate,int> f = shelf => shelf.Stock();",
+            "Func<Crate,int> f = (shelf) => shelf.Stock();",
+        ] {
+            assert_eq!(calls(body).0.0, "ambiguous", "{body}");
+        }
     }
 
     /// A type two projects of the repository declare under one qualified name binds, from a
@@ -9018,5 +9159,396 @@ mod csharp_tests {
                 ("Order.Of", "ambiguous", both)
             ]
         );
+    }
+
+    /// A project file with the `ProjectReference`s `refs`, each `(include, attributes)`.
+    fn project(refs: &[(&str, &str)]) -> Vec<u8> {
+        let items: String = (refs.iter())
+            .map(|(to, attrs)| format!("<ProjectReference Include=\"{to}\" {attrs} />"))
+            .collect();
+        format!("<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup>{items}</ItemGroup></Project>")
+            .into_bytes()
+    }
+
+    /// Where `Order.Of()` of `App/Run.cs` binds when `Kit` and `Kit2` declare `Order`, with the
+    /// project files `projects` (`App` and `Mid` as the case writes them): the level and files.
+    fn order_called(projects: &[(&str, Vec<u8>)]) -> (&'static str, Vec<String>) {
+        let mut configs: Vec<(&str, &[u8])> = vec![
+            ("Kit/Kit.csproj", PROJECT),
+            ("Kit2/Kit2.csproj", PROJECT),
+            ("Mid/Mid.csproj", PROJECT),
+            ("App/App.csproj", PROJECT),
+        ];
+        for (path, src) in projects {
+            configs.retain(|(p, _)| p != path);
+            configs.push((path, src));
+        }
+        let app = "namespace Q;\nusing P;\nclass Run { void F() { Order.Of(); } }\n";
+        let found = resolved_in(
+            &[
+                ("Kit/Order.cs", ORDER),
+                ("Kit2/Order.cs", ORDER),
+                ("App/Run.cs", app),
+            ],
+            &configs,
+        );
+        let (_, _, level, targets) = (found.into_iter())
+            .find(|(p, callee, ..)| p == "App/Run.cs" && callee == "Order.Of")
+            .unwrap();
+        (level, targets)
+    }
+
+    /// A name several projects declare binds, from a file of a project that declares none, to
+    /// the one project it references, directly or through the references that pass on; several
+    /// referenced, or none, stay ambiguous, and a cycle ends.
+    #[test]
+    fn a_type_two_projects_declare_binds_to_the_one_project_the_caller_references() {
+        let kit = vec!["Kit/Order.cs".to_string()];
+        let both = vec!["Kit/Order.cs".to_string(), "Kit2/Order.cs".to_string()];
+        let to = |reference: &str, attrs: &str| project(&[(reference, attrs)]);
+        let app_kit = || ("App/App.csproj", to("..\\Kit\\Kit.csproj", ""));
+        assert_eq!(order_called(&[app_kit()]), ("exact", kit.clone()));
+        let through = |attrs: &str| {
+            [
+                ("App/App.csproj", to("..\\Mid\\Mid.csproj", "")),
+                ("Mid/Mid.csproj", to("..\\Kit\\Kit.csproj", attrs)),
+            ]
+        };
+        assert_eq!(order_called(&through("")), ("exact", kit.clone()));
+        assert_eq!(
+            order_called(&through("PrivateAssets=\"all\"")),
+            ("ambiguous", both.clone())
+        );
+        let twice = project(&[("..\\Kit\\Kit.csproj", ""), ("..\\Kit2\\Kit2.csproj", "")]);
+        assert_eq!(
+            order_called(&[("App/App.csproj", twice)]),
+            ("ambiguous", both.clone())
+        );
+        // Neither, or a project that is no `.csproj` of the repository.
+        assert_eq!(order_called(&[]), ("ambiguous", both.clone()));
+        let outside = to("..\\Other\\Other.csproj", "");
+        assert_eq!(
+            order_called(&[("App/App.csproj", outside)]),
+            ("ambiguous", both)
+        );
+        // A name only a project the caller does not reference declares keeps its link.
+        let configs: [(&str, &[u8]); 2] = [
+            ("Kit/Kit.csproj", PROJECT),
+            ("App/App.csproj", &to("..\\Kit2\\Kit2.csproj", "")),
+        ];
+        let app = "namespace Q;\nusing P;\nclass Run { void F() { Order.Of(); } }\n";
+        let found = resolved_in(&[("Kit/Order.cs", ORDER), ("App/Run.cs", app)], &configs);
+        assert_eq!(found[0].2, "exact");
+        // A cycle that does not reach `Kit2` ends and binds `Kit`.
+        let cycle = [
+            ("App/App.csproj", to("..\\Mid\\Mid.csproj", "")),
+            (
+                "Mid/Mid.csproj",
+                project(&[("..\\App\\App.csproj", ""), ("..\\Kit\\Kit.csproj", "")]),
+            ),
+        ];
+        assert_eq!(order_called(&cycle), ("exact", kit));
+    }
+
+    /// A props file with the items `body`.
+    fn props(body: &str) -> Vec<u8> {
+        format!("<Project><ItemGroup>{body}</ItemGroup></Project>").into_bytes()
+    }
+
+    /// How `Order.Of()` of `App/Run.cs` (which names no namespace) resolves, with the project
+    /// files of `Kit` and `App` and the props files `props` besides: its level.
+    fn order_through(props: &[(&str, Vec<u8>)]) -> &'static str {
+        let mut configs: Vec<(&str, &[u8])> =
+            vec![("Kit/Kit.csproj", PROJECT), ("App/App.csproj", PROJECT)];
+        configs.extend(props.iter().map(|(path, src)| (*path, src.as_slice())));
+        let app = "namespace Q;\nclass Run { void F() { Order.Of(); } }\n";
+        let found = resolved_in(&[("Kit/Order.cs", ORDER), ("App/Run.cs", app)], &configs);
+        (found.into_iter())
+            .find(|(p, callee, ..)| p == "App/Run.cs" && callee == "Order.Of")
+            .unwrap()
+            .2
+    }
+
+    /// A `Directory.Build.props` adds its usings to the projects below it; the nearest one hides
+    /// the outer, which applies only when the nearest imports it, and a file past the size limit
+    /// adds nothing.
+    #[test]
+    fn a_directory_build_props_adds_its_usings_to_the_projects_below_it() {
+        let root = ("Directory.Build.props", props("<Using Include=\"P\" />"));
+        assert_eq!(order_through(&[]), "unresolved");
+        assert_eq!(order_through(std::slice::from_ref(&root)), "exact");
+        let inner = |body: &str| ("App/Directory.Build.props", props(body));
+        assert_eq!(order_through(&[root.clone(), inner("")]), "unresolved");
+        let import = "</ItemGroup><Import Project=\"$([MSBuild]::GetPathOfFileAbove(\
+            'Directory.Build.props', '$(MSBuildThisFileDirectory)../'))\" /><ItemGroup>";
+        assert_eq!(order_through(&[root.clone(), inner(import)]), "exact");
+        // A self-import ends, and a file past the limit contributes nothing.
+        let own = inner(&import.replace("../", ""));
+        assert_eq!(order_through(&[root.clone(), own]), "unresolved");
+        let big = format!(
+            "<Project><!--{}--></Project>",
+            "x".repeat(crate::lang::MAX_BYTES)
+        );
+        let big = ("Directory.Build.props", big.into_bytes());
+        assert_eq!(order_through(&[big]), "unresolved");
+        // The project removes what the props file added.
+        let removing = "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><Using Remove=\"P\" /></ItemGroup></Project>";
+        let configs: [(&str, &[u8]); 3] = [
+            ("Kit/Kit.csproj", PROJECT),
+            ("App/App.csproj", removing.as_bytes()),
+            ("Directory.Build.props", &root.1),
+        ];
+        let app = "namespace Q;\nclass Run { void F() { Order.Of(); } }\n";
+        let found = resolved_in(&[("Kit/Order.cs", ORDER), ("App/Run.cs", app)], &configs);
+        assert_eq!(found[0].2, "unresolved");
+    }
+
+    /// A `ProjectReference` of a `Directory.Build.props` is one of each project below it, written
+    /// relative to the project, and counts as one of its project file.
+    #[test]
+    fn a_project_reference_of_a_directory_build_props_binds_like_one_of_the_project() {
+        let both = vec!["Kit/Order.cs".to_string(), "Kit2/Order.cs".to_string()];
+        let kit = vec!["Kit/Order.cs".to_string()];
+        let props = |to: &str| {
+            let item = format!("<ProjectReference Include=\"{to}\" />");
+            ("Directory.Build.props", props(&item))
+        };
+        assert_eq!(
+            order_called(&[props("..\\Kit\\Kit.csproj")]),
+            ("exact", kit.clone())
+        );
+        // Relative to the props file, it would name `Kit.csproj` of the root: no project.
+        assert_eq!(
+            order_called(&[props("Kit\\Kit.csproj")]),
+            ("ambiguous", both.clone())
+        );
+        // The project's own reference comes with it, and the props file's passes on.
+        let to_mid = project(&[("..\\Mid\\Mid.csproj", "")]);
+        let mid = ("Mid/Mid.csproj", project(&[("..\\Kit\\Kit.csproj", "")]));
+        let own = ("App/App.csproj", to_mid);
+        assert_eq!(
+            order_called(&[mid, own, props("..\\Kit2\\Kit2.csproj")]),
+            ("ambiguous", both)
+        );
+    }
+
+    /// How the `Save` called in `use_it` (in `App`) resolves, with `Repo` (whose `Make` gives a
+    /// `Repo`, and whose members are `members`) and `Store` (`Save` and a `Next` of its own
+    /// type) in `Kit`: the level and the files of its targets.
+    fn save_called(members: &str, use_it: &str) -> (&'static str, Vec<String>) {
+        let repo = format!(
+            "public class Repo {{ {members} public void Save() {{}} \
+             public static Repo Make() => new(); }}"
+        );
+        let store = "public class Store { public void Save() {} public Store Next; }";
+        let app = format!("class U {{ void M() {{ {use_it} }} }}");
+        let found = resolved(&[("Kit/R.cs", &repo), ("Kit/S.cs", store), ("App/U.cs", &app)]);
+        let (_, _, level, targets) = (found.into_iter())
+            .find(|(p, callee, ..)| p == "App/U.cs" && callee.ends_with(".Save"))
+            .unwrap();
+        (level, targets)
+    }
+
+    /// A member read between a call and the member called is the receiver, not the call's
+    /// result: the field's written type owns the member, and an unread one leaves a name match,
+    /// never the class of the call.
+    #[test]
+    fn a_member_step_after_a_call_is_the_receiver_not_the_call_s_class() {
+        let both = ["Kit/R.cs", "Kit/S.cs"].map(String::from).to_vec();
+        let store = vec!["Kit/S.cs".to_string()];
+        for (members, use_it, expected) in [
+            (
+                "public dynamic x;",
+                "Repo.Make().x.Save();",
+                ("ambiguous", &both),
+            ),
+            (
+                "public dynamic X { get; }",
+                "Repo.Make().X.Save();",
+                ("ambiguous", &both),
+            ),
+            (
+                "public dynamic a;",
+                "Repo.Make().a.Next.Save();",
+                ("ambiguous", &both),
+            ),
+            (
+                "public dynamic x;",
+                "Repo.Make()?.x.Save();",
+                ("ambiguous", &both),
+            ),
+            (
+                "public dynamic x;",
+                "Repo.Make().x?.Save();",
+                ("ambiguous", &both),
+            ),
+            (
+                "public Store x;",
+                "Repo.Make().x.Save();",
+                ("exact", &store),
+            ),
+            (
+                "public Store X { get; }",
+                "Repo.Make().X.Save();",
+                ("exact", &store),
+            ),
+            (
+                "public Store a;",
+                "Repo.Make().a.Next.Save();",
+                ("exact", &store),
+            ),
+            (
+                "public Store x;",
+                "Repo.Make()?.x.Save();",
+                ("exact", &store),
+            ),
+            (
+                "public Store x;",
+                "Repo.Make().x?.Save();",
+                ("exact", &store),
+            ),
+        ] {
+            let (level, targets) = save_called(members, use_it);
+            assert_eq!((level, &targets), expected, "{members} {use_it}");
+        }
+    }
+
+    /// With no step between them, the call's result owns the member called.
+    #[test]
+    fn a_call_made_on_a_call_result_directly_narrows_to_its_class() {
+        let repo = vec!["Kit/R.cs".to_string()];
+        for use_it in ["Repo.Make().Save();", "Repo.Make()?.Save();"] {
+            let (level, targets) = save_called("public dynamic x;", use_it);
+            assert_eq!((level, &targets), ("exact", &repo), "{use_it}");
+        }
+    }
+
+    /// The calls `found` holds in `path`: `(callee, level, targets' paths)`.
+    fn calls_in(
+        found: &[(String, String, &'static str, Vec<String>)],
+        path: &str,
+    ) -> Vec<(String, &'static str, Vec<String>)> {
+        (found.iter())
+            .filter(|(p, ..)| p == path)
+            .map(|(_, callee, level, targets)| (callee.clone(), *level, targets.clone()))
+            .collect()
+    }
+
+    const USE_TAX: &str = "using Shop; class U { void M() { new Tax().Apply(); Tax.Of(); } }";
+
+    /// A `Shop.Tax` declared with `access` (`internal`, or none at namespace level): `Apply` and
+    /// a static `Of`.
+    fn tax(access: &str) -> String {
+        format!(
+            "namespace Shop; {access} class Tax {{ public void Apply() {{}} \
+             public static void Of() {{}} }}"
+        )
+    }
+
+    /// An `internal` type, written so or with no access modifier, is its project's alone: a
+    /// file of another project gets no link to it nor to its members.
+    #[test]
+    fn an_internal_type_links_from_its_own_project_alone() {
+        for access in ["internal", ""] {
+            let found = resolved(&[("Kit/Tax.cs", &tax(access)), ("App/Use.cs", USE_TAX)]);
+            assert_eq!(
+                calls_in(&found, "App/Use.cs"),
+                [
+                    ("(expression).Apply".to_string(), "unresolved", vec![]),
+                    ("Tax".to_string(), "unresolved", vec![]),
+                    ("Tax.Of".to_string(), "unresolved", vec![]),
+                ],
+                "{access:?}"
+            );
+        }
+    }
+
+    /// From another project, a public type of the internal one's name is the one found; from a
+    /// file of each of two projects with an internal type of one name, its project's own.
+    #[test]
+    fn a_name_an_internal_type_hides_binds_to_the_type_the_file_sees() {
+        let kit2 = vec!["Kit2/Tax.cs".to_string()];
+        let found = resolved(&[
+            ("Kit/Tax.cs", &tax("internal")),
+            ("Kit2/Tax.cs", &tax("public")),
+            ("App/Use.cs", USE_TAX),
+        ]);
+        assert_eq!(
+            calls_in(&found, "App/Use.cs"),
+            [
+                ("(expression).Apply".to_string(), "inferred", kit2.clone()),
+                ("Tax".to_string(), "exact", kit2.clone()),
+                ("Tax.Of".to_string(), "exact", kit2),
+            ]
+        );
+        let found = resolved(&[
+            ("Kit/Tax.cs", &tax("internal")),
+            ("Kit2/Tax.cs", &tax("internal")),
+            ("Kit/Use.cs", USE_TAX),
+            ("Kit2/Use.cs", USE_TAX),
+        ]);
+        for project in ["Kit", "Kit2"] {
+            let own = vec![format!("{project}/Tax.cs")];
+            assert_eq!(
+                calls_in(&found, &format!("{project}/Use.cs")),
+                [
+                    ("(expression).Apply".to_string(), "inferred", own.clone()),
+                    ("Tax".to_string(), "exact", own.clone()),
+                    ("Tax.Of".to_string(), "exact", own),
+                ]
+            );
+        }
+    }
+
+    /// An internal type of the file's namespace in another project binds as if it did not
+    /// exist: the lookup goes on to the type a using brings.
+    #[test]
+    fn a_hidden_type_of_the_file_s_namespace_lets_a_using_bind_the_name() {
+        let billing = vec!["Kit2/Tax.cs".to_string()];
+        let public = tax("public").replace("namespace Shop;", "namespace Billing;");
+        let found = resolved(&[
+            ("Kit/Tax.cs", &tax("internal")),
+            ("Kit2/Tax.cs", &public),
+            (
+                "App/Use.cs",
+                &format!("namespace Shop; {}", USE_TAX.replace("Shop", "Billing")),
+            ),
+        ]);
+        assert_eq!(
+            calls_in(&found, "App/Use.cs"),
+            [
+                (
+                    "(expression).Apply".to_string(),
+                    "inferred",
+                    billing.clone()
+                ),
+                ("Tax".to_string(), "exact", billing.clone()),
+                ("Tax.Of".to_string(), "exact", billing),
+            ]
+        );
+    }
+
+    /// Whether a definition is hidden from a file of another project looks its type up among
+    /// the file's internal types at once: scanning them for each call took the calls times the
+    /// types.
+    #[test]
+    fn a_file_of_many_internal_types_hides_them_in_linear_time() {
+        let n = 30_000;
+        let internal: String = (0..n)
+            .map(|i| format!("internal class I{i} {{}}\n"))
+            .collect();
+        let kit = format!(
+            "namespace Shop;\n{internal}public class P {{ public static void M() {{}} }}\n"
+        );
+        let calls: String = (0..n).map(|_| "P.M();\n").collect();
+        let app = format!("using Shop;\nclass U {{ void F() {{\n{calls}}} }}\n");
+        let start = std::time::Instant::now();
+        let found = resolved(&[("Kit/T.cs", &kit), ("App/U.cs", &app)]);
+        let took = start.elapsed();
+        let exact = (found.iter()).filter(|(p, callee, level, _)| {
+            p == "App/U.cs" && callee == "P.M" && *level == "exact"
+        });
+        assert_eq!(exact.count(), n);
+        assert!(took.as_secs() < 20, "{took:?}");
     }
 }

@@ -794,3 +794,50 @@ fn trace_down_crosses_the_package_hop_and_onward() {
         .unwrap();
     assert_golden("jvm-client.trace-down.txt", &down);
 }
+
+#[test]
+fn a_module_sees_the_dependencies_a_module_it_depends_on_passes_on() {
+    let [_, _, client, _] = workspace("jvm_packages_modules");
+    // Module app -> module lib, of one repository; lib -> models, and kit for its tests.
+    fs::remove_file(client.join("pom.xml")).unwrap();
+    let pom = |artifact: &str, deps: &str| {
+        format!(
+            "<project><groupId>example</groupId><artifactId>{artifact}</artifactId><version>1.0</version><dependencies>{deps}</dependencies></project>"
+        )
+    };
+    let dep = |artifact: &str, more: &str| {
+        format!(
+            "<dependency><groupId>example</groupId><artifactId>{artifact}</artifactId>{more}</dependency>"
+        )
+    };
+    fs::create_dir_all(client.join("lib")).unwrap();
+    let lib = [dep("models", ""), dep("kit", "<scope>test</scope>")].concat();
+    fs::write(client.join("lib/pom.xml"), pom("lib", &lib)).unwrap();
+    let dir = client.join("app/src/main/java/example/app");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(client.join("app/pom.xml"), pom("app", &dep("lib", ""))).unwrap();
+    let user = "package example.app;\n\nimport example.models.Order;\nimport example.shared.Stamp;\n\npublic class Use {\n    public void run() {\n        Order.of(1);\n        Stamp.now();\n    }\n}\n";
+    fs::write(dir.join("Use.java"), user).unwrap();
+    let export = Engine::open(&client).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let at = |call: &str| -> Vec<(&str, &str)> {
+        (json["links"].as_array().unwrap().iter())
+            .filter(|l| l["consumer"].as_str().unwrap().ends_with(call))
+            .map(|l| {
+                (
+                    l["provider"].as_str().unwrap(),
+                    l["level"].as_str().unwrap(),
+                )
+            })
+            .collect()
+    };
+    let order = format!("{MODELS}models/Order.java::example.models.Order.of(int)");
+    assert_eq!(at("run()::Order.of#0"), [(&order[..], "exact")], "{export}");
+    // Kit declares a `Stamp` too, but lib's `test` dependency does not pass on.
+    let stamp = format!("{MODELS}shared/Stamp.java::example.shared.Stamp.now()");
+    assert_eq!(
+        at("run()::Stamp.now#0"),
+        [(&stamp[..], "exact")],
+        "{export}"
+    );
+}
