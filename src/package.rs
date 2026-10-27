@@ -398,6 +398,10 @@ pub struct Summary {
     /// NuGet only: the `.csproj` is an SDK-style project, the only kind that bounds a package.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub project: bool,
+    /// NuGet only: the props file a `Directory.Build.props` imports, until the seam's `inherit`
+    /// gives its entries to the projects below it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub import: Option<crate::dotnet::msbuild::Import>,
 }
 
 /// One dependency entry of a manifest. `name` is the package the entry names.

@@ -4,6 +4,8 @@
 //! project file is read by `dotnet::msbuild`, the reader the C# pack shares. The module answers
 //! the trait's questions as follows:
 //!
+//! - `read` and `inherit`: a `Directory.Build.props` is a manifest that is no project; its
+//!   references go to the projects below it (`msbuild::chain`), which then declare them.
 //! - `entries`: the references of the nearest project holding the file, then those the projects
 //!   it references in its repository pass on (`dotnet::references`), nearest first, once each.
 //! - `reaches`: a `ProjectReference` (an entry with a `path` source, as Cargo's) only the project
@@ -18,7 +20,7 @@
 //!   `exports` rows give its public types, among the files of the projects the file depends on,
 //!   and the method is picked by name and argument count. `import namespace` is the reason.
 //!
-//! Package ids are matched without case; neither `Directory.Packages.props` nor a feed is read.
+//! Package ids are matched without case; neither `Directory.Build.targets`, `Directory.Packages.props` nor a feed is read.
 
 use super::maven;
 use super::{
@@ -62,6 +64,32 @@ fn project(dir: &str, reference: &msbuild::Reference) -> Option<Entry> {
     })
 }
 
+/// What the props file at `path` adds to the projects below it: its `PackageReference`s, its
+/// `ProjectReference`s named by the path as written (relative to the project they reach, so
+/// `inherit` locates them), and the props file it imports.
+fn props(path: &str, src: &[u8]) -> Summary {
+    let Some(msbuild::Props { project, import }) = msbuild::props(path, src) else {
+        return Summary::default();
+    };
+    let packages = (project.packages.iter()).filter(|r| literal(&r.include));
+    let projects =
+        (project.projects.iter()).filter(|r| references::located("", &r.include).is_some());
+    let entry = |field: &str, r: &msbuild::Reference| Entry {
+        field: field.to_string(),
+        name: r.include.clone(),
+        range: r.version.clone().filter(|_| field == PACKAGE),
+        private: r.private,
+        ..Entry::default()
+    };
+    Summary {
+        dependencies: (packages.map(|r| entry(PACKAGE, r)))
+            .chain(projects.map(|r| entry(PROJECT, r)))
+            .collect(),
+        import,
+        ..Summary::default()
+    }
+}
+
 /// The project file of the repository the `ProjectReference` entry names.
 fn in_repository(entry: &Entry) -> Option<&str> {
     let at = entry.via.as_deref()?.strip_prefix("path ")?;
@@ -80,13 +108,18 @@ impl Ecosystem for Nuget {
     }
 
     fn is_manifest(&self, file_name: &str) -> bool {
-        file_name.ends_with(EXTENSION)
+        file_name.ends_with(EXTENSION) || file_name == msbuild::PROPS
     }
 
     /// The project's id and version as it writes them (a computed one makes no provider), and its
-    /// references. Hostile bytes, and a file with no SDK, read as empty.
+    /// references. Hostile bytes, and a file with no SDK, read as empty. A `Directory.Build.props`
+    /// reads as the references it adds to the projects below it and the props file it imports,
+    /// which `inherit` gives them.
     fn read(&self, path: &str, src: &[u8]) -> Summary {
-        let Some(project_file) = msbuild::read(src) else {
+        if path.rsplit('/').next() == Some(msbuild::PROPS) {
+            return props(path, src);
+        }
+        let Some(project_file) = msbuild::read(src, &[]) else {
             return Summary::default();
         };
         let id = (project_file.package_id.clone())
@@ -215,6 +248,42 @@ impl Ecosystem for Nuget {
         import: (&str, &str),
     ) -> bool {
         maven::declares(self, exports, providers, at, from, import)
+    }
+
+    /// Each project takes the references of the props files MSBuild imports into it
+    /// (`msbuild::chain`), outer first, ahead of its own; the props files keep none.
+    fn inherit(&self, manifests: &mut [Manifest]) {
+        let is_props = |path: &str| path.rsplit('/').next() == Some(msbuild::PROPS);
+        let mut props: HashMap<String, (Option<msbuild::Import>, Vec<Entry>)> = HashMap::new();
+        for m in manifests.iter_mut().filter(|m| is_props(&m.path)) {
+            let entries = std::mem::take(&mut m.summary.dependencies);
+            props.insert(m.path.clone(), (m.summary.import.clone(), entries));
+        }
+        if props.is_empty() {
+            return;
+        }
+        for m in manifests.iter_mut().filter(|m| m.summary.project) {
+            let dir = bare_directory(&m.path);
+            let above = msbuild::chain(dir, |p| props.get(p).map(|(import, _)| import.clone()));
+            let inherited = (above.iter())
+                .flat_map(|p| &props[p.as_str()].1)
+                .filter_map(|e| {
+                    if e.field != PROJECT {
+                        return Some(e.clone());
+                    }
+                    let include = msbuild::Reference {
+                        include: e.name.clone(),
+                        private: e.private,
+                        ..msbuild::Reference::default()
+                    };
+                    project(dir, &include)
+                });
+            let own = std::mem::take(&mut m.summary.dependencies);
+            let mut all: Vec<Entry> = inherited.chain(own).collect();
+            all.sort_by(|a, b| (&a.field, &a.name, &a.via).cmp(&(&b.field, &b.name, &b.via)));
+            all.dedup();
+            m.summary.dependencies = all;
+        }
     }
 
     /// Each `ProjectReference` to a project of another repository takes that project's id, which
@@ -446,5 +515,52 @@ mod tests {
         let own = (Some("path Kit/Kit.csproj"), None);
         assert!(!Nuget.reaches(own, at("lib", "/w/lib"), kit));
         assert!(Nuget.reaches((None, Some("1")), at("lib", "/w/lib"), kit));
+    }
+
+    /// A props file keeps its references and import until `inherit` gives the references to the
+    /// projects below it, the outer file's too, beside their own; the props files keep none.
+    #[test]
+    fn inherit_gives_a_props_file_s_references_to_the_projects_below_it() {
+        let item = "<Project><ItemGroup><PackageReference Include=\"P\" Version=\"1\" />\
+                    <ProjectReference Include=\"..\\Lib\\Lib.csproj\" /></ItemGroup>";
+        let above = "<Import Project=\"$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', \
+                     '$(MSBuildThisFileDirectory)../'))\" /></Project>";
+        let manifest = |path: &str, src: &str| Manifest {
+            path: path.to_string(),
+            summary: read(path, src),
+        };
+        let own = "<Project Sdk=\"S\"><ItemGroup><PackageReference Include=\"Q\" /></ItemGroup></Project>";
+        let mut manifests = vec![
+            manifest(
+                "Directory.Build.props",
+                "<Project><ItemGroup><PackageReference Include=\"Outer\" /></ItemGroup></Project>",
+            ),
+            manifest("src/Directory.Build.props", &format!("{item}{above}")),
+            manifest("src/App/App.csproj", own),
+            manifest("other/Other.csproj", own),
+        ];
+        assert_eq!(manifests[1].summary.dependencies.len(), 2);
+        Nuget.inherit(&mut manifests);
+        let names = |m: &Manifest| {
+            (m.summary.dependencies.iter())
+                .map(|e| (e.name.clone(), e.via.clone()))
+                .collect::<Vec<_>>()
+        };
+        let lib = Some("path src/Lib/Lib.csproj".to_string());
+        let expected = [("Outer", None), ("P", None), ("Q", None), ("Lib", lib)];
+        assert_eq!(
+            names(&manifests[2]),
+            expected.map(|(n, via)| (n.to_string(), via))
+        );
+        assert_eq!(names(&manifests[3]).len(), 2);
+        assert!(
+            manifests[..2]
+                .iter()
+                .all(|m| m.summary.dependencies.is_empty())
+        );
+        // Only a project owns files; a props file is no package.
+        assert!(!Nuget.owns(&manifests[1]) && Nuget.owns(&manifests[2]));
+        assert_eq!(read("Directory.Build.props", "<Project/>").name, None);
+        assert_eq!(read("Directory.Build.props", "not xml"), Summary::default());
     }
 }

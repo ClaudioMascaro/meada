@@ -1038,7 +1038,18 @@ one for the area a change touches.
   `AssemblyName` and version, and its `PackageReference` and `ProjectReference` items, each
   with whether it is private: a `PrivateAssets` naming `all` or `compile`, or computed, keeps it
   from passing on), which the C# pack's `join` and the NuGet ecosystem (#116) both read; a second
-  reader of project files is a finding. `dotnet/references.rs` (#369) walks a repository's
+  reader of project files is a finding. `msbuild::read` takes the bytes of the `Directory.Build.props`
+  files MSBuild imports into the project (#381), evaluated before it: `msbuild::chain` finds them
+  (the nearest at or above the project's directory, then each it imports with
+  `GetPathOfFileAbove('Directory.Build.props', ...)` or a relative path, outer first, up to
+  `PROPS_DEPTH` (8) and not one twice), items add up, the project's property wins, a `<Using
+  Remove>` drops what the files before it added, and an unreadable file adds nothing but still hides
+  those above it. The pack's `join` reads them as configuration files (`**/Directory.Build.props`)
+  and the NuGet ecosystem keeps one as a manifest that is no project: `Nuget::inherit` gives its
+  `PackageReference` and `ProjectReference` entries (a `ProjectReference` relative to the project,
+  as MSBuild evaluates it; one on `$(MSBuildThisFileDirectory)` is computed) to the projects below
+  it and empties the file's own, so they declare them and it declares none; its `PackageId`,
+  `AssemblyName` and version are not given to NuGet's providers. `dotnet/references.rs` (#369) walks a repository's
   `ProjectReference`s: `located` turns an `Include` into the project file's path in the
   repository, and `referenced` gives the projects a project references directly or through the
   projects those reference, nearest first (breadth first), each once, following a private
@@ -2006,8 +2017,9 @@ qualification budget does (ADR 0017).
   through the file (`Binding::of_namespace`) only when no file has that namespace as package,
   and by full name otherwise; the global namespace's types are seen only from the global
   namespace. A project file is SDK-style when its `Project` has an `Sdk` attribute, an `Sdk`
-  element or an `Import` with an `Sdk` (any case); its properties are read as written, with no `Condition`, import or
-  `Directory.Build.props`, and the nearest project directory owns a file (MSBuild items that
+  element or an `Import` with an `Sdk` (any case); its properties are read as written, with no `Condition` and no import
+  but a parent `Directory.Build.props` (`Directory.Build.targets` and `Directory.Packages.props`
+  stay unread; the props chain is followed `PROPS_DEPTH` (8) files up, `dotnet/msbuild.rs`), and the nearest project directory owns a file (MSBuild items that
   include or remove files are not read; two project files in one directory take the first).
   Implicit usings add the SDK's own list for `Microsoft.NET.Sdk`, plus `.Web`'s and
   `.Worker`'s; other SDKs add the base list. `.sln` files are not read: they only group

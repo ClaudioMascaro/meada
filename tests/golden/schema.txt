@@ -2485,6 +2485,25 @@ sample.csproj
   "project": true
 }
 
+sample.Directory.Build.props
+{
+  "dependencies": [
+    {
+      "field": "PackageReference",
+      "name": "Example.Analyzers",
+      "range": "1.0",
+      "private": true
+    },
+    {
+      "field": "ProjectReference",
+      "name": "..\\Core\\Core.csproj"
+    }
+  ],
+  "import": {
+    "Above": ""
+  }
+}
+
 sample.tsconfig.json
 {
   "out_dir": "./dist",

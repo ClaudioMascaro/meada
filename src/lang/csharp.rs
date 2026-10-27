@@ -86,9 +86,14 @@ impl LanguagePack for CSharp {
         ]
     }
 
-    /// Every project file: an SDK-style one is a project (`join`).
+    /// Every project file (an SDK-style one is a project, `join`), and the props files MSBuild
+    /// imports into the projects below them.
     fn config_files(&self) -> &'static [&'static str] {
-        &["**/*.csproj", "**/appsettings.json"]
+        &[
+            "**/*.csproj",
+            "**/Directory.Build.props",
+            "**/appsettings.json",
+        ]
     }
 
     fn modules(
@@ -139,14 +144,29 @@ impl LanguagePack for CSharp {
     /// its target's name. Each file's `Facts::unit` is its project, whose files alone the parts
     /// of a partial type come from.
     fn join(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Join {
-        // Each project file with its directory (`a/b/`, empty at the root), read once.
+        // The props files by path, with what each imports (none when unreadable, which hides
+        // the files above it all the same).
+        let props: HashMap<&str, (&[u8], Option<msbuild::Import>)> = (configs.iter())
+            .filter(|(path, _)| path.rsplit('/').next() == Some(msbuild::PROPS))
+            .map(|(path, src)| {
+                let import = msbuild::props(path, src).and_then(|p| p.import);
+                (*path, (*src, import))
+            })
+            .collect();
+        // Each project file with its directory (`a/b/`, empty at the root), read once under
+        // the props files MSBuild imports into it.
         let read: Vec<(&str, String, msbuild::Project)> = (configs.iter())
             .filter(|(path, _)| path.ends_with(".csproj"))
             .filter_map(|(path, src)| {
-                let dir = path
-                    .rsplit_once('/')
-                    .map_or(String::new(), |(d, _)| format!("{d}/"));
-                Some((*path, dir, msbuild::read(src)?))
+                let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
+                let above = msbuild::chain(dir, |p| props.get(p).map(|(_, import)| import.clone()));
+                let above: Vec<&[u8]> = above.iter().map(|p| props[p.as_str()].0).collect();
+                let dir = if dir.is_empty() {
+                    String::new()
+                } else {
+                    format!("{dir}/")
+                };
+                Some((*path, dir, msbuild::read(src, &above)?))
             })
             .collect();
         // Each project's directory and what its file adds.

@@ -2689,7 +2689,7 @@ impl<'a> Resolver<'a> {
     /// `all`, the definitions of a name in compilations other than `path`'s (`in_unit`), as the
     /// one that is in the compilations `path`'s references reach (`Facts::unit_references`)
     /// when it is the only one there, else as they are: a compilation that is not referenced
-    /// may still be visible through references not read (`Directory.Build.props`, a `Condition`).
+    /// may still be visible through references not read (`Directory.Build.targets`, a `Condition`).
     fn in_references(&self, path: &'a str, all: Vec<Target<'a>>) -> Binding<'a> {
         let reached = |t: &&Target| {
             let unit = self.files.get(t.path).map_or("", |f| f.unit.as_str());
@@ -9180,6 +9180,88 @@ mod csharp_tests {
             ),
         ];
         assert_eq!(order_called(&cycle), ("exact", kit));
+    }
+
+    /// A props file with the items `body`.
+    fn props(body: &str) -> Vec<u8> {
+        format!("<Project><ItemGroup>{body}</ItemGroup></Project>").into_bytes()
+    }
+
+    /// How `Order.Of()` of `App/Run.cs` (which names no namespace) resolves, with the project
+    /// files of `Kit` and `App` and the props files `props` besides: its level.
+    fn order_through(props: &[(&str, Vec<u8>)]) -> &'static str {
+        let mut configs: Vec<(&str, &[u8])> =
+            vec![("Kit/Kit.csproj", PROJECT), ("App/App.csproj", PROJECT)];
+        configs.extend(props.iter().map(|(path, src)| (*path, src.as_slice())));
+        let app = "namespace Q;\nclass Run { void F() { Order.Of(); } }\n";
+        let found = resolved_in(&[("Kit/Order.cs", ORDER), ("App/Run.cs", app)], &configs);
+        (found.into_iter())
+            .find(|(p, callee, ..)| p == "App/Run.cs" && callee == "Order.Of")
+            .unwrap()
+            .2
+    }
+
+    /// A `Directory.Build.props` adds its usings to the projects below it; the nearest one hides
+    /// the outer, which applies only when the nearest imports it, and a file past the size limit
+    /// adds nothing.
+    #[test]
+    fn a_directory_build_props_adds_its_usings_to_the_projects_below_it() {
+        let root = ("Directory.Build.props", props("<Using Include=\"P\" />"));
+        assert_eq!(order_through(&[]), "unresolved");
+        assert_eq!(order_through(std::slice::from_ref(&root)), "exact");
+        let inner = |body: &str| ("App/Directory.Build.props", props(body));
+        assert_eq!(order_through(&[root.clone(), inner("")]), "unresolved");
+        let import = "</ItemGroup><Import Project=\"$([MSBuild]::GetPathOfFileAbove(\
+            'Directory.Build.props', '$(MSBuildThisFileDirectory)../'))\" /><ItemGroup>";
+        assert_eq!(order_through(&[root.clone(), inner(import)]), "exact");
+        // A self-import ends, and a file past the limit contributes nothing.
+        let own = inner(&import.replace("../", ""));
+        assert_eq!(order_through(&[root.clone(), own]), "unresolved");
+        let big = format!(
+            "<Project><!--{}--></Project>",
+            "x".repeat(crate::lang::MAX_BYTES)
+        );
+        let big = ("Directory.Build.props", big.into_bytes());
+        assert_eq!(order_through(&[big]), "unresolved");
+        // The project removes what the props file added.
+        let removing = "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><Using Remove=\"P\" /></ItemGroup></Project>";
+        let configs: [(&str, &[u8]); 3] = [
+            ("Kit/Kit.csproj", PROJECT),
+            ("App/App.csproj", removing.as_bytes()),
+            ("Directory.Build.props", &root.1),
+        ];
+        let app = "namespace Q;\nclass Run { void F() { Order.Of(); } }\n";
+        let found = resolved_in(&[("Kit/Order.cs", ORDER), ("App/Run.cs", app)], &configs);
+        assert_eq!(found[0].2, "unresolved");
+    }
+
+    /// A `ProjectReference` of a `Directory.Build.props` is one of each project below it, written
+    /// relative to the project, and counts as one of its project file.
+    #[test]
+    fn a_project_reference_of_a_directory_build_props_binds_like_one_of_the_project() {
+        let both = vec!["Kit/Order.cs".to_string(), "Kit2/Order.cs".to_string()];
+        let kit = vec!["Kit/Order.cs".to_string()];
+        let props = |to: &str| {
+            let item = format!("<ProjectReference Include=\"{to}\" />");
+            ("Directory.Build.props", props(&item))
+        };
+        assert_eq!(
+            order_called(&[props("..\\Kit\\Kit.csproj")]),
+            ("exact", kit.clone())
+        );
+        // Relative to the props file, it would name `Kit.csproj` of the root: no project.
+        assert_eq!(
+            order_called(&[props("Kit\\Kit.csproj")]),
+            ("ambiguous", both.clone())
+        );
+        // The project's own reference comes with it, and the props file's passes on.
+        let to_mid = project(&[("..\\Mid\\Mid.csproj", "")]);
+        let mid = ("Mid/Mid.csproj", project(&[("..\\Kit\\Kit.csproj", "")]));
+        let own = ("App/App.csproj", to_mid);
+        assert_eq!(
+            order_called(&[mid, own, props("..\\Kit2\\Kit2.csproj")]),
+            ("ambiguous", both)
+        );
     }
 
     /// How the `Save` called in `use_it` (in `App`) resolves, with `Repo` (whose `Make` gives a
