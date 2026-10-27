@@ -1708,8 +1708,10 @@ one for the area a change touches.
   keeps the methods with a `Binds::Instance` first parameter alone (`inferred`, or `ambiguous`
   with every one that fits). With an opaque base, or on a type's name (`Teller.Missing()`),
   or a bare call, the call resolves to nothing, and so does a method of the repository that
-  is no extension. A receiver without a written type (`var x = Make()` of unknown result, a
-  implicitly typed lambda parameter, a type parameter) keeps the broad name match. The extensions are not
+  is no extension. A receiver without a written type (`var x = Make()` of unknown result, an
+  implicitly typed lambda parameter, a type parameter) keeps the broad name match; so does a
+  lambda parameter written with `in` or `out` (#379), which tree-sitter-c-sharp 0.23.5 does not
+  parse (an `ERROR` node). The extensions are not
   looked up: an extension method called as `x.M()` is never `exact`, one called as `Ext.M(x)`
   is. A local a call from outside initialized (`var app = builder.Build()`, `var b =
   WebApplication.CreateBuilder(args)`) is from outside too (`Resolver::outside_result`): the
@@ -1809,8 +1811,12 @@ one for the area a change touches.
   literal group, root project name and included project names/directories in `Summary::build`),
   of each SDK-style `.csproj` (spec #28: the package id, else assembly name, else file name, the
   literal version, each `PackageReference` with its range as written, each `ProjectReference`
-  as a `path` folded from the project's directory, and `Summary::project`, the mark that it is
-  an SDK-style project that owns its files), the `tsconfig.json` rows
+  as a `path` folded from the project's directory, each with `Entry::private` when it does not
+  pass on (#369), the package properties as written (`Summary::properties`, #381), and
+  `Summary::project`, the mark that it is an SDK-style project that owns its files) and of each
+  `Directory.Build.props` (#381: its `PackageReference`s, its `ProjectReference`s by the path as
+  written, its package properties and the props file it imports, `Summary::import`), the
+  `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition, constant, type or file they name), the `families` table (spec #26: each public
   Java class's ancestors past it, `Resolver::ancestries`, a repository class by file and name and
@@ -2053,7 +2059,9 @@ qualification budget does (ADR 0017).
   `static StringBuilder Append(this StringBuilder b, string s)`), where C# picks the member
   (ADR 0018). A file sees what the projects of its repository its project references pass on up
   to `REFERENCE_DEPTH` (32) projects deep (`dotnet/references.rs`), and nothing that a project
-  of another repository references.
+  of another repository references. A lambda parameter written with `in` or `out` (`(in Order
+  o) => o.Total()`) types nothing (#379): tree-sitter-c-sharp 0.23.5 reads the list as an
+  `ERROR` node, so its receiver keeps the broad name match.
 
 - `snapshot/pull.rs`: a generation's bundles hold at most `GENERATION_BYTES_MAX` (256 GiB)
   together, as the document records their sizes (checked before any download) and as the
