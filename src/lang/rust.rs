@@ -534,6 +534,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                             }
                             facts.calls.push(Call {
                                 arity: None,
+                                labels: None,
                                 constructs: false,
                                 scope: scope.clone(),
                                 callee: callee.unwrap_or_default(),
@@ -750,6 +751,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 held.push(Held { at, node, put });
                 facts.calls.push(Call {
                     arity: None,
+                    labels: None,
                     constructs: false,
                     scope: scope.clone(),
                     callee,
@@ -1330,6 +1332,7 @@ fn parameters(function: Node, src: &[u8]) -> Vec<Parameter> {
         let param = |name: &str, binds| Param {
             name: name.to_string(),
             binds,
+            label: None,
             default: None,
             fields: Vec::new(),
         };

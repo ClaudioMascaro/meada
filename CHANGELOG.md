@@ -60,6 +60,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Swift language pack (spec #29, #117): `.swift` files without a Swift toolchain or Xcode. Each
+  SwiftPM target of `Package.swift` is a module (one module without it); types, protocols,
+  functions, methods and initializers are symbols named with their argument labels
+  (`OrderService.place(order:quantity:)`), with an extension's members under the extended type.
+  Unqualified, `self`, static and initializer calls resolve within the module and the modules
+  it imports, narrowed by argument labels; a tie is `ambiguous`.
 - `Directory.Build.props` files apply to the C# projects below them as MSBuild imports them
   (the nearest one, then those it imports with `GetPathOfFileAbove` or a relative path): their
   `<Using>` items, `PackageReference`s and `ProjectReference`s, and the `PackageId`,

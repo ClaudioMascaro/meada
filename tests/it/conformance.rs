@@ -3229,7 +3229,7 @@ fn conform(fixture: &str, symbols: &[&str], programs: &[&str], calls: &[Expected
     expected.sort();
     assert_eq!(actual, expected, "definitions of {fixture}");
 
-    let actual: Vec<&str> = (json["processes"].as_array().unwrap().iter())
+    let actual: Vec<&str> = (json["processes"].as_array().into_iter().flatten())
         .filter(|p| p["kind"] == "program")
         .map(|p| p["entry_point"].as_str().unwrap())
         .collect();
@@ -11888,5 +11888,293 @@ fn go_kafka_writer_topic_written_after_the_literal_is_unresolved() {
     assert_eq!(
         producers,
         pairs(&[("channel::kafka", "writer.go::Produce::w.WriteMessages#0")])
+    );
+}
+
+/// `conform` with owned ids, as the Swift tests build them.
+fn conform_owned(fixture: &str, symbols: &[String], calls: &[(String, Option<&str>, Vec<String>)]) {
+    let symbols: Vec<&str> = symbols.iter().map(String::as_str).collect();
+    let targets: Vec<Vec<&str>> = (calls.iter())
+        .map(|(_, _, t)| t.iter().map(String::as_str).collect())
+        .collect();
+    let calls: Vec<ExpectedCall> = (calls.iter().zip(&targets))
+        .map(|((id, level, _), targets)| (id.as_str(), *level, targets.as_slice()))
+        .collect();
+    conform(fixture, &symbols, &[], &calls);
+}
+
+/// A SwiftPM repository with two targets (spec #29, #117): each target is a module, a member an
+/// extension declares belongs to the extended type, argument labels tell overloads apart, and
+/// an import reaches the public declarations of the module it names.
+#[test]
+fn swift() {
+    let store = |file: &str, name: &str| format!("Sources/Store/{file}::{name}");
+    let order = |name: &str| store("Order.swift", name);
+    let pricing = |name: &str| store("Order+Pricing.swift", name);
+    let service = |name: &str| store("OrderService.swift", name);
+    let checkout = |file: &str, name: &str| format!("Sources/Checkout/{file}::{name}");
+    let symbols = [
+        order("Order"),
+        order("Order.init(id:)"),
+        order("Order.Line"),
+        order("Order.Line.total()"),
+        order("format(order:)"),
+        order("format(id:)"),
+        order("log(_:)"),
+        pricing("Order.price(quantity:)"),
+        pricing("Order.discount(quantity:)"),
+        pricing("Order.Line.doubled()"),
+        service("Notifier"),
+        service("Notifier.notify(order:)"),
+        service("Notifier.notifyAll(orders:)"),
+        service("OrderService"),
+        service("OrderService.init()"),
+        service("OrderService.init(retries:)"),
+        service("OrderService.place(order:)"),
+        service("OrderService.place(order:quantity:)"),
+        service("OrderService.place(_:)"),
+        service("OrderService.audit(_:Order)"),
+        service("OrderService.audit(_:String)"),
+        service("OrderService.validate(order:)"),
+        service("OrderService.retry(times:_:)"),
+        service("OrderService.run()"),
+        service("Reporter"),
+        service("Reporter.report()"),
+        service("Reporter.summary()"),
+        checkout("Checkout.swift", "Checkout"),
+        checkout("Checkout.swift", "Checkout.run()"),
+        checkout("Summary.swift", "summarize()"),
+        checkout("Summary.swift", "log(level:)"),
+    ];
+    let one = |t: String| vec![t];
+    let run = |callee: &str| checkout("Checkout.swift", &format!("Checkout.run()::{callee}"));
+    let place = |callee: &str| service(&format!("OrderService.place(order:quantity:)::{callee}"));
+    let calls = vec![
+        // A member of an extension calls one of the same extension, and through `self` one of
+        // another; an extension of a nested type calls a member the type declares elsewhere.
+        (
+            pricing("Order.price(quantity:)::discount#0"),
+            EXACT,
+            one(pricing("Order.discount(quantity:)")),
+        ),
+        (
+            pricing("Order.discount(quantity:)::self.price#0"),
+            EXACT,
+            one(pricing("Order.price(quantity:)")),
+        ),
+        (
+            pricing("Order.Line.doubled()::total#0"),
+            EXACT,
+            one(order("Order.Line.total()")),
+        ),
+        // A function of another file of the module, from a protocol's default implementation.
+        (
+            service("Notifier.notify(order:)::log#0"),
+            EXACT,
+            one(order("log(_:)")),
+        ),
+        // A protocol extension calls the protocol's requirement.
+        (
+            service("Notifier.notifyAll(orders:)::notify#0"),
+            EXACT,
+            one(service("Notifier.notify(order:)")),
+        ),
+        (
+            service("OrderService.init(retries:)::self.init#0"),
+            EXACT,
+            one(service("OrderService.init()")),
+        ),
+        // Labels pick one overload of three.
+        (
+            service("OrderService.place(order:)::place#0"),
+            EXACT,
+            one(service("OrderService.place(order:quantity:)")),
+        ),
+        // Two overloads with the same labels tie.
+        (
+            place("audit#0"),
+            AMBIGUOUS,
+            vec![
+                service("OrderService.audit(_:Order)"),
+                service("OrderService.audit(_:String)"),
+            ],
+        ),
+        // `self` reaches the requirement of a protocol the class conforms to.
+        (
+            place("self.notify#0"),
+            EXACT,
+            one(service("Notifier.notify(order:)")),
+        ),
+        // A receiver whose type is not read matches by name and labels.
+        (
+            place("order.price#0"),
+            INFERRED,
+            one(pricing("Order.price(quantity:)")),
+        ),
+        (
+            place("OrderService.validate#0"),
+            EXACT,
+            one(service("OrderService.validate(order:)")),
+        ),
+        (
+            service("OrderService.place(_:)::place#0"),
+            EXACT,
+            one(service("OrderService.place(order:)")),
+        ),
+        (
+            service("OrderService.place(_:)::Order#0"),
+            EXACT,
+            one(order("Order.init(id:)")),
+        ),
+        // A trailing closure takes the last parameter, past one with a default value.
+        (
+            service("OrderService.run()::retry#0"),
+            EXACT,
+            one(service("OrderService.retry(times:_:)")),
+        ),
+        (
+            service("OrderService.run()::retry#1"),
+            EXACT,
+            one(service("OrderService.retry(times:_:)")),
+        ),
+        // A call in a closure belongs to the function around it.
+        (
+            service("OrderService.run()::log#0"),
+            EXACT,
+            one(order("log(_:)")),
+        ),
+        // A base from outside the repository may declare the member: a name match.
+        (
+            service("Reporter.report()::summary#0"),
+            INFERRED,
+            one(service("Reporter.summary()")),
+        ),
+        // Across the import: a public initializer and function, the module's name as a
+        // qualifier, and an internal function the import does not reach.
+        (
+            checkout("Checkout.swift", "Checkout::OrderService#0"),
+            EXACT,
+            one(service("OrderService.init(retries:)")),
+        ),
+        (run("Order#0"), EXACT, one(order("Order.init(id:)"))),
+        (
+            run("service.place#0"),
+            INFERRED,
+            one(service("OrderService.place(order:)")),
+        ),
+        (run("format#0"), EXACT, one(order("format(order:)"))),
+        (run("format#1"), None, vec![]),
+        (run("Store.format#0"), EXACT, one(order("format(order:)"))),
+        // The file's own module first: its `log(level:)`, not the import's `log(_:)`.
+        (
+            run("summarize#0"),
+            EXACT,
+            one(checkout("Summary.swift", "summarize()")),
+        ),
+        (
+            checkout("Summary.swift", "summarize()::log#0"),
+            EXACT,
+            one(checkout("Summary.swift", "log(level:)")),
+        ),
+        (run("missing#0"), None, vec![]),
+    ];
+    conform_owned("conformance-swift", &symbols, &calls);
+}
+
+/// A repository without `Package.swift` is one module (spec #29, #117).
+#[test]
+fn swift_without_a_package_manifest() {
+    let item = |name: &str| format!("Sources/Model/Item.swift::{name}");
+    let display = |name: &str| format!("Sources/Model/Item+Display.swift::{name}");
+    let loader = |name: &str| format!("Sources/Loading/FileLoader.swift::{name}");
+    let main = |name: &str| format!("Sources/main.swift::{name}");
+    let symbols = [
+        item("Item"),
+        item("Item.label()"),
+        item("Item.Size"),
+        item("Item.Size.scaled(by:)"),
+        item("Loader"),
+        item("Loader.load(from:)"),
+        item("render(_:)"),
+        display("Item.display()"),
+        display("Item.Size.doubled()"),
+        loader("FileLoader"),
+        loader("FileLoader.load(from:)"),
+        loader("FileLoader.load(from:limit:)"),
+        loader("FileLoader.report(_:)"),
+    ];
+    let one = |t: String| vec![t];
+    let limit = |callee: &str| loader(&format!("FileLoader.load(from:limit:)::{callee}"));
+    let report = |callee: &str| loader(&format!("FileLoader.report(_:)::{callee}"));
+    let calls = vec![
+        (
+            item("render(_:)::item.label#0"),
+            INFERRED,
+            one(item("Item.label()")),
+        ),
+        (
+            display("Item.display()::label#0"),
+            EXACT,
+            one(item("Item.label()")),
+        ),
+        (
+            display("Item.Size.doubled()::scaled#0"),
+            EXACT,
+            one(item("Item.Size.scaled(by:)")),
+        ),
+        // A type that declares no initializer is what its name constructs.
+        (
+            loader("FileLoader.load(from:)::Item#0"),
+            EXACT,
+            one(item("Item")),
+        ),
+        (
+            limit("load#0"),
+            EXACT,
+            one(loader("FileLoader.load(from:)")),
+        ),
+        (
+            limit("report#0"),
+            EXACT,
+            one(loader("FileLoader.report(_:)")),
+        ),
+        (limit("print#0"), None, vec![]),
+        (limit("Array#0"), None, vec![]),
+        // A parameter and a local hide the functions of their names in the whole function.
+        (report("format#0"), None, vec![]),
+        (report("render#0"), None, vec![]),
+        (report("render#1"), None, vec![]),
+        (report("Item#0"), EXACT, one(item("Item"))),
+        (
+            report("item.display#0"),
+            INFERRED,
+            one(display("Item.display()")),
+        ),
+        (main("FileLoader#0"), EXACT, one(loader("FileLoader"))),
+        (
+            main("loader.load#0"),
+            INFERRED,
+            one(loader("FileLoader.load(from:limit:)")),
+        ),
+        (main("render#0"), EXACT, one(item("render(_:)"))),
+    ];
+    conform_owned("conformance-swift-app", &symbols, &calls);
+}
+
+/// `search` finds a member an extension declares, under the extended type, and `context` on
+/// a method lists its callers and callees with their levels (spec #29, #117).
+#[test]
+fn swift_search_finds_an_extension_member_and_context_lists_callers_and_callees() {
+    let repo = fixture_repo("swift_queries", "conformance-swift", Some(ORIGIN));
+    let engine = Engine::open(&repo).unwrap();
+    assert_golden(
+        "conformance-swift.search-price.txt",
+        &engine.search("price", Some("symbol"), None).unwrap(),
+    );
+    assert_golden(
+        "conformance-swift.context-place.txt",
+        &engine
+            .context("OrderService.place(order:quantity:)", None)
+            .unwrap(),
     );
 }

@@ -307,6 +307,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 .map(|(name, _, _)| Param {
                     name,
                     binds: Binds::Any,
+                    label: None,
                     default: None,
                     fields: Vec::new(),
                 })
@@ -977,6 +978,7 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
         scope: scope.to_string(),
         callee,
         arity: None,
+        labels: None,
         constructs: false,
         range,
         args: Vec::new(),

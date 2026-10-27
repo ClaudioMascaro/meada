@@ -1,6 +1,6 @@
 # Capabilities and limits
 
-Meada 0.1 indexes TypeScript, JavaScript, Python, Rust, Go, Java, Kotlin and C#. It finds calls in code and connects repositories through HTTP, packages and messaging channels. Each link reports its confidence level.
+Meada 0.1 indexes TypeScript, JavaScript, Python, Rust, Go, Java, Kotlin, C# and Swift. It finds calls in code and connects repositories through HTTP, packages and messaging channels. Each link reports its confidence level.
 
 Server mode includes the [console](console.md), [snapshots](snapshots.md), [retention](generations.md) and [managed workspace](workspaces.md) through optional modules. The console has an editor, diff, playground and graph. [Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/) and [Helm](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/) provide deployment examples.
 
@@ -15,6 +15,7 @@ Server mode includes the [console](console.md), [snapshots](snapshots.md), [rete
 | Java | `.java`, resolved by their `package` declarations |
 | Kotlin | `.kt` and `.kts` (but `build.gradle.kts` and `settings.gradle.kts`), resolved by their `package` declarations |
 | C# | `.cs`, grouped into projects by SDK-style `.csproj` files and resolved by their `namespace` declarations |
+| Swift | `.swift` (except `Package.swift`), grouped into modules by the targets of `Package.swift` |
 
 ### Rust
 
@@ -61,6 +62,12 @@ Each SDK-style `.csproj` (one with an `Sdk`) is a project and holds the `.cs` fi
 `using`, `using static`, aliases (`using X = A.B`) and `global using` resolve through the namespaces of every project; a `global using`, the `.csproj`'s `<Using>` items and enabled implicit usings (`ImplicitUsings`) apply to every file of the project, and to it alone. Bare, `this`, `base`, static (`Type.Method()`) and `using static` calls are `exact` when argument count leaves one method, counting `params` and parameters with default values; overloads with the same argument count stay `ambiguous`. Types outside the repository stay external. Calls on a receiver of a written type do not resolve through that type yet. The items (`<Using>`, `PackageReference`, `ProjectReference`) and properties of a `Directory.Build.props` apply to the projects below it as if written in the `.csproj`, evaluated before the project's own (the nearest `props` hides those above it unless it imports its parent with `GetPathOfFileAbove`); a `ProjectReference` there is relative to each project, and one built on `$(MSBuildThisFileDirectory)` counts as computed. A `props` file with more than 256 `<Using>` items and references is not read. `nameof(x)` is the text of the last identifier of `x` (`nameof(Orders.Topic)` is `"Topic"`), so a channel name or a URL part written with it is known.
 
 Public types and their public or protected members form the exported surface. Indexing needs no .NET SDK or MSBuild and runs no repository code.
+
+### Swift
+
+Each target of `Package.swift` (`.target`, `.executableTarget`, `.testTarget`, `.macro`, `.plugin`) is a module holding the `.swift` files under its literal `path:`, or under `Sources/<name>` by default; the files outside every target, all of them in a repository without `Package.swift`, form one module. Meada reads classes, structs, enums, actors and protocols, nested ones included (`Outer.Inner`), and functions, methods and initializers named with their argument labels (`OrderService.place(order:quantity:)`, `init(baseURL:)`); two declarations of one body with the same labels carry their types too (`audit(_:Order)`). The members of an extension belong to the extended type, in any file of the module, and those of a protocol extension are the default implementations of its requirements. The calls inside a closure belong to the symbol around it.
+
+Names resolve within the file's module first, then within the modules it imports (`import Store`), through their `public` and `open` declarations; a module that is no target of the repository is external, and an `internal` declaration exists only in its module. Unqualified, `self`, static (`Type.method()`) and initializer calls (`Type(...)`, or the type itself when it declares no initializer) are `exact` when one declaration fits the labels, counting parameters with default values, variadic ones and trailing closures; overloads with the same labels stay `ambiguous`. A call on a receiver whose type is not read resolves by name and labels (`inferred` or `ambiguous`). As in Java, a type with a base from outside the repository (`NSObject`, `Codable`) gets no `exact` calls to its own overloads. Indexing needs no Swift toolchain or Xcode.
 
 ## HTTP and contract documents
 

@@ -811,7 +811,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
 /// members around it, inherited and companion ones included, come before the names outside the
 /// class. Unless a binding of the code around it holds what it invokes: a local, a parameter, a
 /// property, a constant of its name in any scope from the call's out.
-fn bare_calls(facts: &mut Facts) {
+pub(super) fn bare_calls(facts: &mut Facts) {
     let locals: HashSet<&str> = facts.locals.iter().map(String::as_str).collect();
     let consts: HashSet<&str> = facts.consts.iter().map(|c| c.name.as_str()).collect();
     let properties: HashSet<(&str, &str)> = (facts.receivers.iter())
@@ -960,6 +960,7 @@ fn constructor(node: Node, src: &[u8]) -> Option<Vec<Param>> {
             } else {
                 Binds::Any
             },
+            label: None,
             default: None,
             fields: Vec::new(),
         });
@@ -1047,6 +1048,7 @@ fn parameters(
                 params.push(Param {
                     name: name.map_or("", |n| text(n, src)).to_string(),
                     binds: if vararg { Binds::Rest } else { Binds::Any },
+                    label: None,
                     default: None,
                     fields: Vec::new(),
                 });
@@ -1441,7 +1443,7 @@ fn import(node: Node, src: &[u8], facts: &mut Facts) {
     });
 }
 
-fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
+pub(super) fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
     let alias = format!("@glob{}", facts.imports.len());
     facts.imports.push(Import {
         local: alias.clone(),
@@ -1517,6 +1519,7 @@ fn call(node: Node, src: &[u8], scope: &str, implicit: Implicit, lambdas: bool) 
         scope: scope.to_string(),
         callee,
         arity: Some(args.len()),
+        labels: None,
         constructs: false,
         range: node.byte_range(),
         args: Vec::new(),
@@ -1844,6 +1847,7 @@ fn annotations_of<'s>(modifiers: Node, src: &'s [u8], scope: &str) -> Vec<(Call,
             scope: scope.to_string(),
             callee: name,
             arity: None,
+            labels: None,
             constructs: false,
             range: annotation.byte_range(),
             args: positional,

@@ -197,6 +197,7 @@ impl LanguagePack for Python {
                         let (args, kwargs) = arguments(node, src);
                         facts.calls.push(Call {
                             arity: None,
+                            labels: None,
                             constructs: false,
                             scope: scope.clone(),
                             callee,
@@ -711,6 +712,7 @@ fn params(node: Node, method: bool, src: &[u8]) -> Vec<Param> {
         out.push(Param {
             name: text(name, src).to_string(),
             binds,
+            label: None,
             default: default.map(|d| value(d, src)),
             fields: Vec::new(),
         });

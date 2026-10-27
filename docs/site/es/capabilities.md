@@ -1,6 +1,6 @@
 # Capacidades y límites
 
-Meada 0.1 indexa TypeScript, JavaScript, Python, Rust, Go, Java, Kotlin y C#. Encuentra llamadas en el código y conecta repositorios mediante HTTP, paquetes y canales de mensajes. Cada vínculo indica su nivel de certeza.
+Meada 0.1 indexa TypeScript, JavaScript, Python, Rust, Go, Java, Kotlin, C# y Swift. Encuentra llamadas en el código y conecta repositorios mediante HTTP, paquetes y canales de mensajes. Cada vínculo indica su nivel de certeza.
 
 El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [retención](generations.md) y [workspace gestionado](workspaces.md) mediante módulos opcionales. La consola tiene editor, diff, playground y grafo. [Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/) y [Helm](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/) ofrecen ejemplos de despliegue.
 
@@ -15,6 +15,7 @@ El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [rete
 | Java | `.java`, resueltos por sus declaraciones de `package` |
 | Kotlin | `.kt` y `.kts` (salvo `build.gradle.kts` y `settings.gradle.kts`), resueltos por sus declaraciones de `package` |
 | C# | `.cs`, agrupados en proyectos por los `.csproj` de estilo SDK y resueltos por sus `namespace` |
+| Swift | `.swift` (salvo `Package.swift`), agrupados en módulos por los targets de `Package.swift` |
 
 ### Rust
 
@@ -61,6 +62,12 @@ Cada `.csproj` de estilo SDK (con `Sdk`) es un proyecto y contiene los `.cs` de 
 `using`, `using static`, los alias (`using X = A.B`) y `global using` se resuelven por los namespaces de todos los proyectos; un `global using`, los `<Using>` del `.csproj` y los implicit usings activados (`ImplicitUsings`) valen en todos los archivos del proyecto, y solo en él. Las llamadas sin receptor, con `this`, `base`, estáticas (`Tipo.Metodo()`) y por `using static` son `exact` cuando la cantidad de argumentos deja un solo método, contando `params` y los parámetros con valor por defecto; las sobrecargas con la misma cantidad quedan `ambiguous`. Los tipos de fuera del repositorio siguen siendo externos. Las llamadas sobre un receptor de tipo escrito todavía no se resuelven por ese tipo. Los elementos (`<Using>`, `PackageReference`, `ProjectReference`) y las propiedades de un `Directory.Build.props` valen en los proyectos que tiene debajo como si estuvieran en el `.csproj`, evaluados antes que los de este (el `props` más cercano oculta los de arriba, salvo que importe a su padre con `GetPathOfFileAbove`); un `ProjectReference` ahí es relativo a cada proyecto, y uno construido sobre `$(MSBuildThisFileDirectory)` cuenta como calculado. Un `props` con más de 256 `<Using>` y referencias no se lee. `nameof(x)` vale el texto del último identificador de `x` (`nameof(Pedidos.Topico)` es `"Topico"`), así que un nombre de canal o una parte de URL escritos con él son conocidos.
 
 Los tipos públicos y sus miembros públicos o protegidos forman la superficie exportada. La indexación no necesita .NET SDK ni MSBuild y no ejecuta código del repositorio.
+
+### Swift
+
+Cada target de `Package.swift` (`.target`, `.executableTarget`, `.testTarget`, `.macro`, `.plugin`) es un módulo con los `.swift` de su `path:` literal, o de `Sources/<nombre>` por defecto; los archivos fuera de todo target, todos en un repositorio sin `Package.swift`, forman un solo módulo. Meada lee clases, structs, enums, actors y protocolos, también anidados (`Externa.Interna`), y funciones, métodos e inicializadores con las etiquetas de sus argumentos en el nombre (`OrderService.place(order:quantity:)`, `init(baseURL:)`); dos declaraciones de un mismo cuerpo con las mismas etiquetas llevan también sus tipos (`audit(_:Order)`). Los miembros de una extensión son del tipo extendido, en cualquier archivo del módulo, y los de una extensión de protocolo son las implementaciones por defecto de sus requisitos. Las llamadas de una closure pertenecen al símbolo que la contiene.
+
+Los nombres se resuelven primero en el módulo del archivo y después en los módulos que importa (`import Store`), por sus declaraciones `public` y `open`; un módulo que no es target del repositorio es externo, y una declaración `internal` solo existe en su módulo. Las llamadas sin receptor, con `self`, estáticas (`Tipo.metodo()`) y de inicializador (`Tipo(...)`, o el propio tipo cuando no declara inicializador) son `exact` cuando queda una declaración por las etiquetas, contando parámetros con valor por defecto, variádicos y closures finales; las sobrecargas con las mismas etiquetas quedan `ambiguous`. Una llamada en un receptor de tipo no leído se resuelve por nombre y etiquetas (`inferred` o `ambiguous`). Como en Java, un tipo con una base de fuera del repositorio (`NSObject`, `Codable`) no tiene llamadas `exact` a sus propias sobrecargas. La indexación no necesita toolchain de Swift ni Xcode.
 
 ## HTTP y documentos de contrato
 
