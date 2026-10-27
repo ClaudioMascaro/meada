@@ -1308,8 +1308,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
     facts.bound = bound;
     facts.bound.extend(through);
     facts.externs = outside.into_iter().collect();
-    // A using of the namespace takes its types, internal ones too (they are the assembly's),
-    // never the names the file's own usings bind.
+    // A using of the namespace takes its types, internal ones too (they are the assembly's:
+    // `Resolver::hidden` keeps them to its files), never the names the file's own usings bind.
     facts.star = super::Star::Only(
         (facts.exports.iter())
             .filter_map(|e| match e {
