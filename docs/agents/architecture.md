@@ -1723,6 +1723,27 @@ one for the area a change touches.
   blocks (`Facts::constructors`, also the family `Type.init` for `self.init(..)`), or the type
   itself when it declares none (a memberwise initializer). Bare calls are Kotlin's
   (`bare_calls`).
+  Method calls on a receiver (spec #29, #118) use the seams Java's and C#'s do, with no new
+  one. The pack writes `Facts::receivers` from the written type of a stored property, a
+  parameter (scope: the function's labelled name) and a `let` or `var` of code or the top level
+  (`Class::Type`; `T?`, `any P` and `some P` are `T` and `P`; an array, tuple, function type,
+  variadic or type parameter is no class). A function's own type parameters are read while
+  parsing; those of a type and the associated types of a protocol are `Def::type_params`, and
+  `join` unsets the class of a receiver scoped in the type or in an extension of it, in any
+  file, whose type is named alike; a call `T()` of such a name constructs nothing
+  (`Call::constructs` unset, here and in `parse`). A `let` or `var` of code is a receiver only directly in the
+  body of a function, method or initializer (or at the top level of a file): in a nested
+  block, a closure, an accessor, a deinitializer or a subscript it only hides its name
+  (`Facts::locals`), since its scope is the function's, the type's or the file's and the name
+  would reach code outside it. Without a written type, the class is the one an initializer
+  constructs (`Type(..)`, through `try` and `await`: `Class::Named`). A name bound twice in a scope with two classes, or also
+  by a binding with no written class (`Facts::locals`: a closure parameter, an `if let` or
+  `guard let`, a `for` or `case` pattern), is unknown for the whole scope. `member` walks the
+  family and its blocks upward only, so a protocol-typed receiver stops at the requirement, and
+  the labels narrow as they do for a bare call. A receiver of unread type (a call result, a
+  closure parameter, an element) is the name match `matched` makes by base name and labels. A
+  standard-library type no import names resolves to nothing, so a receiver of one is a name
+  match too (no pack-side list of the library).
   C# method calls (spec #28, #108) use the seams Java's do and add none but one flag. The pack
   writes `Facts::receivers` from the declared type of a field, a property, a parameter
   (primary constructors' too), a local with an explicit type, a `foreach`, `out` or pattern
@@ -2064,8 +2085,10 @@ qualification budget does (ADR 0017).
   name a target alike (one module), `@testable import` (no `internal` access), a closure,
   deinitializer, subscript or accessor (their calls and locals are the enclosing symbol's, so
   an accessor's local hides its name in the whole type), an operator
-  function, enum cases, `Self` as a type's name, and the protocols a conformed protocol
-  inherits when the conformance is written on an extension. As in Java, an outside base
+  function, enum cases, `Self` as a type's name, a local typed by a call result or a closure
+  parameter's type (#118), a typed local of a nested block, closure or accessor (a name match
+  where Java and C# keep it function-wide), and the
+  protocols a conformed protocol inherits when the conformance is written on an extension. As in Java, an outside base
   (`NSObject`, `Codable`, a raw value type) keeps a type's own overloads from `exact` (#353).
 - `lang/csharp.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the C# pack as they bound the Java pack's, with the same

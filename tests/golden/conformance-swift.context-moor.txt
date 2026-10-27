@@ -1,0 +1,9 @@
+example.com/acme/conformance Sources/Store/Dispatch.swift:24-24 Boat.moor()
+community: Sources/Store#4
+processes: none
+func moor() {}
+callers:
+example.com/acme/conformance Sources/Store/Dispatch.swift:48 Depot.dispatch(parcel:via:other:wrapped:ships:)
+example.com/acme/conformance Sources/Store/Dispatch.swift:49 Depot.dispatch(parcel:via:other:wrapped:ships:) [inferred: one method named moor]
+example.com/acme/conformance Sources/Store/Dispatch.swift:53 Depot.dispatch(parcel:via:other:wrapped:ships:) [inferred: one method named moor]
+callees: none

@@ -2277,7 +2277,29 @@ sample.swift
       "name": "limit"
     }
   ],
-  "receivers": [],
+  "receivers": [
+    {
+      "scope": "Order.init(id:)",
+      "name": "id",
+      "class": {
+        "Type": "String"
+      }
+    },
+    {
+      "scope": "Order.place(order:quantity:_:)",
+      "name": "o",
+      "class": {
+        "Type": "Order"
+      }
+    },
+    {
+      "scope": "Order.place(order:quantity:_:)",
+      "name": "quantity",
+      "class": {
+        "Type": "Int"
+      }
+    }
+  ],
   "impls": [
     {
       "scope": "Order",

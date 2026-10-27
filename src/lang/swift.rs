@@ -60,12 +60,38 @@ impl LanguagePack for Swift {
     /// Each file's module (`Facts::unit`, whose `internal` declarations no other module sees)
     /// and the module's own names, which come before what an import brings: the inside glob,
     /// read first as the last import.
-    fn join(&self, configs: &[(&str, &[u8])], _files: &BTreeMap<&str, &Facts>) -> Join {
+    fn join(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Join {
         let targets = targets(configs);
+        // The type parameters and associated types of each type, in whichever file declares it:
+        // an extension's body sees those of the type it extends.
+        let mut generics: HashMap<String, HashSet<String>> = HashMap::new();
+        for def in files.values().flat_map(|f| &f.defs) {
+            if !def.type_params.is_empty() {
+                (generics.entry(def.name.clone()).or_default())
+                    .extend(def.type_params.iter().cloned());
+            }
+        }
         Box::new(move |path, facts| {
             let module = module_of(&targets, path);
             wildcard(module, true, facts);
             facts.unit = module.to_string();
+            for call in facts.calls.iter_mut().filter(|c| c.constructs) {
+                let ty = head(&call.callee);
+                let held =
+                    enclosing(&call.scope).any(|t| generics.get(t).is_some_and(|g| g.contains(ty)));
+                call.constructs = !held;
+            }
+            for receiver in &mut facts.receivers {
+                let (Class::Type(ty) | Class::Named(ty)) = &receiver.class else {
+                    continue;
+                };
+                let ty = head(ty);
+                if enclosing(&receiver.scope)
+                    .any(|t| generics.get(t).is_some_and(|g| g.contains(ty)))
+                {
+                    receiver.class = Class::Unknown;
+                }
+            }
         })
     }
 
@@ -163,6 +189,20 @@ enum Place {
     Code,
 }
 
+/// The type parameters and associated types a declaration brings, and those of the
+/// declarations around it.
+#[derive(Default)]
+struct Generics {
+    names: HashSet<String>,
+    outer: Option<Rc<Generics>>,
+}
+
+impl Generics {
+    fn holds(&self, name: &str) -> bool {
+        self.names.contains(name) || self.outer.as_ref().is_some_and(|o| o.holds(name))
+    }
+}
+
 struct Visit<'t> {
     node: Node<'t>,
     /// The definition around the node, empty at the top level.
@@ -176,6 +216,11 @@ struct Visit<'t> {
     /// `scope` with every function named by its labels alone (`Signature::name`), which the
     /// first walk of `parse` names them all by.
     plain: Rc<String>,
+    /// The type parameters and associated types of the declarations around the node.
+    generics: Rc<Generics>,
+    /// Whether the node is, or is directly in, the body of a function the walk defines: the
+    /// statements of that body, not the ones nested in a block, a closure or an accessor.
+    body: bool,
 }
 
 /// A function, method or initializer's parameters: each with its argument label, and the
@@ -184,6 +229,8 @@ struct Signature {
     base: String,
     params: Vec<Param>,
     types: Vec<String>,
+    /// What each parameter's written type says it holds.
+    classes: Vec<Class>,
 }
 
 impl Signature {
@@ -250,6 +297,8 @@ fn walk(
         ceiling: Access::Public,
         depth: 0,
         plain: Rc::new(String::new()),
+        generics: Rc::default(),
+        body: false,
     }];
     while let Some(Visit {
         node,
@@ -259,6 +308,8 @@ fn walk(
         ceiling,
         depth,
         plain,
+        generics,
+        body,
     }) = stack.pop()
     {
         let charge = if stores(node.kind()) { scope.len() } else { 0 };
@@ -271,6 +322,8 @@ fn walk(
         budget = left;
         let defining = depth < DEFINITION_DEPTH;
         let (mut inner, mut inner_place, mut inner_plain) = (scope.clone(), place, plain.clone());
+        let mut inner_generics = generics.clone();
+        let mut defines_body = false;
         let (mut inner_default, mut inner_ceiling, mut nested) = (default, ceiling, depth);
         let mut pushed: Vec<Node> = named(node).collect();
         match node.kind() {
@@ -282,6 +335,8 @@ fn walk(
                 let name = type_name(name, src);
                 let written = access(node, src);
                 let bases = bases(node, src);
+                inner_generics = with_generics(&generics, node, src);
+                let type_params = own_generics(node, src);
                 if extension {
                     // Members of an extension are the extended type's, wherever it is declared.
                     if place != Place::Top {
@@ -314,9 +369,10 @@ fn walk(
                         facts.interfaces.push(inner.as_ref().clone());
                     }
                     if defined.insert(inner.as_ref().clone()) {
-                        facts
-                            .defs
-                            .push(definition(&inner, Kind::Class, node.byte_range(), bases));
+                        facts.defs.push(Def {
+                            type_params,
+                            ..definition(&inner, Kind::Class, node.byte_range(), bases)
+                        });
                         publish(&mut facts, place, own, &inner, &name);
                     }
                 }
@@ -327,10 +383,11 @@ fn walk(
                 if defining =>
             {
                 inner_place = Place::Code;
-                let signature = signature(node, src);
+                inner_generics = with_generics(&generics, node, src);
+                let signature = signature(node, src, &inner_generics);
                 let init = signature.as_ref().is_some_and(|s| s.base == "init");
                 let Some(signature) = signature.filter(|_| !init || place == Place::Type) else {
-                    stack_children(&mut stack, &pushed, &scope, &plain, depth);
+                    stack_children(&mut stack, &pushed, &scope, &plain, &inner_generics, depth);
                     continue;
                 };
                 inner_plain = Rc::new(qualify(&plain, &signature.name(false)));
@@ -342,9 +399,17 @@ fn walk(
                 let own = access(node, src).unwrap_or(default).min(ceiling);
                 // A protocol extension's default implementation shares the requirement's name.
                 if !defined.insert(inner.as_ref().clone()) {
-                    stack_children(&mut stack, &pushed, &inner, &inner_plain, nested);
+                    stack_children(
+                        &mut stack,
+                        &pushed,
+                        &inner,
+                        &inner_plain,
+                        &inner_generics,
+                        nested,
+                    );
                     continue;
                 }
+                defines_body = true;
                 let kind = match place {
                     Place::Type => Kind::Method,
                     _ => Kind::Function,
@@ -362,6 +427,15 @@ fn walk(
                         .entry(scope.as_ref().clone())
                         .or_default()
                         .push(inner.as_ref().clone());
+                }
+                for (param, class) in signature.params.iter().zip(signature.classes) {
+                    if class != Class::Unknown {
+                        facts.receivers.push(Receiver {
+                            scope: inner.as_ref().clone(),
+                            name: param.name.clone(),
+                            class,
+                        });
+                    }
                 }
                 facts.defs.push(Def {
                     params: signature.params,
@@ -389,13 +463,26 @@ fn walk(
                             .is_some_and(|m| text(m, src) == "let")
                 });
                 let own = access(node, src).unwrap_or(default).min(ceiling);
-                for name in bound(node, src) {
+                let names = bound(node, src);
+                // A typed local is a receiver of its function alone when it is directly in the
+                // function's body: in a nested block, a closure or an accessor its name would
+                // reach code outside it (an accessor's and a closure's scope is the type's or the
+                // file's), so it only hides the name.
+                let top =
+                    place == Place::Top && node.parent().is_some_and(|p| p.kind() == "source_file");
+                let typed_here = top || (body && depth < DEFINITION_DEPTH);
+                let class = match names.len() {
+                    1 => declared(node, src, &generics),
+                    _ => Class::Unknown,
+                };
+                for name in names {
+                    let receiver = Receiver {
+                        scope: scope.as_ref().clone(),
+                        name: name.clone(),
+                        class: class.clone(),
+                    };
                     match place {
-                        Place::Type => facts.receivers.push(Receiver {
-                            scope: scope.as_ref().clone(),
-                            name,
-                            class: Class::Unknown,
-                        }),
+                        Place::Type => facts.receivers.push(receiver),
                         Place::Top if constant => {
                             facts.consts.push(Const {
                                 name: name.clone(),
@@ -404,6 +491,13 @@ fn walk(
                                 scope: None,
                             });
                             publish(&mut facts, place, own, &name, &name);
+                            if class != Class::Unknown && top {
+                                facts.receivers.push(receiver);
+                            }
+                        }
+                        // A typed local or global is a receiver, an untyped one hides its name.
+                        _ if class != Class::Unknown && typed_here => {
+                            facts.receivers.push(receiver)
                         }
                         _ => facts.locals.push(qualify(&scope, &name)),
                     }
@@ -424,7 +518,9 @@ fn walk(
             "call_expression" | "constructor_expression" => {
                 // `f(a) { }` may parse as a call of `f(a)`: it is one call of `f`.
                 let (function, suffixes) = parts(node);
-                if let Some(at) = call(function, &suffixes, node, src, &scope) {
+                if let Some(mut at) = call(function, &suffixes, node, src, &scope) {
+                    // A type parameter is no type of the repository: `T()` constructs none.
+                    at.constructs &= !generics.holds(head(&at.callee));
                     facts.calls.push(at);
                 }
                 pushed = std::iter::once(function)
@@ -434,6 +530,14 @@ fn walk(
             _ => {}
         }
         for &child in pushed.iter().rev() {
+            let child_body = match node.kind() {
+                "function_declaration" | "protocol_function_declaration" | "init_declaration" => {
+                    defines_body && child.kind() == "function_body"
+                }
+                "function_body" => body && child.kind() == "statements",
+                "statements" => body,
+                _ => false,
+            };
             stack.push(Visit {
                 node: child,
                 scope: inner.clone(),
@@ -442,6 +546,8 @@ fn walk(
                 ceiling: inner_ceiling,
                 depth: nested,
                 plain: inner_plain.clone(),
+                generics: inner_generics.clone(),
+                body: child_body,
             });
         }
     }
@@ -460,6 +566,7 @@ fn walk(
     bare_calls(&mut facts);
     facts.locals.sort();
     facts.locals.dedup();
+    facts.receivers = one_class_each(std::mem::take(&mut facts.receivers), &facts.locals);
     let private: HashSet<&str> = facts.private.iter().map(String::as_str).collect();
     facts.star = Star::Only(
         (facts.exports.iter())
@@ -481,6 +588,7 @@ fn stack_children<'t>(
     children: &[Node<'t>],
     scope: &Rc<String>,
     plain: &Rc<String>,
+    generics: &Rc<Generics>,
     depth: usize,
 ) {
     for &node in children.iter().rev() {
@@ -492,6 +600,8 @@ fn stack_children<'t>(
             ceiling: Access::Private,
             depth,
             plain: plain.clone(),
+            generics: generics.clone(),
+            body: false,
         });
     }
 }
@@ -554,7 +664,7 @@ fn import(node: Node, src: &[u8], facts: &mut Facts) {
 }
 
 /// A function, method or initializer's name and parameters. `None` for an operator.
-fn signature(node: Node, src: &[u8]) -> Option<Signature> {
+fn signature(node: Node, src: &[u8], generics: &Generics) -> Option<Signature> {
     let base = match node.kind() {
         "init_declaration" => "init".to_string(),
         _ => {
@@ -565,7 +675,7 @@ fn signature(node: Node, src: &[u8]) -> Option<Signature> {
             unbacktick(text(name, src))
         }
     };
-    let (mut params, mut types) = (Vec::new(), Vec::new());
+    let (mut params, mut types, mut classes) = (Vec::new(), Vec::new(), Vec::new());
     for child in children(node) {
         match child.kind() {
             "parameter" => {
@@ -586,6 +696,12 @@ fn signature(node: Node, src: &[u8]) -> Option<Signature> {
                 });
                 let ty = names.get(1).map_or("", |t| text(*t, src));
                 types.push(ty.split_whitespace().collect());
+                classes.push(match variadic {
+                    true => Class::Unknown,
+                    false => names
+                        .get(1)
+                        .map_or(Class::Unknown, |t| class_of(*t, src, generics)),
+                });
             }
             // A default value follows its parameter.
             "=" => {
@@ -600,6 +716,7 @@ fn signature(node: Node, src: &[u8]) -> Option<Signature> {
         base,
         params,
         types,
+        classes,
     })
 }
 
@@ -641,6 +758,125 @@ fn type_name(node: Node, src: &[u8]) -> String {
             .join("."),
         _ => String::new(),
     }
+}
+
+/// What a written type says a value holds: an instance of the type it names, through `?`,
+/// `any` and `some`. An array, a tuple or a function type holds no instance of a type's members.
+fn class_of(node: Node, src: &[u8], generics: &Generics) -> Class {
+    match node.kind() {
+        "user_type" => match type_name(node, src) {
+            name if name.is_empty() => Class::Unknown,
+            // A type parameter is no type of the repository, whatever a type is called there.
+            name if generics.holds(head(&name)) => Class::Unknown,
+            name => Class::Type(name),
+        },
+        "optional_type" => (node.child_by_field_name("wrapped"))
+            .map_or(Class::Unknown, |t| class_of(t, src, generics)),
+        "existential_type" | "opaque_type" => named(node)
+            .next()
+            .map_or(Class::Unknown, |t| class_of(t, src, generics)),
+        _ => Class::Unknown,
+    }
+}
+
+/// The type parameters a declaration brings (`<T: P>`) and, for a protocol, its associated
+/// types.
+fn own_generics(node: Node, src: &[u8]) -> Vec<String> {
+    let own = children(node).filter(|c| c.kind() == "type_parameters");
+    let parameters = own.flat_map(named).filter_map(|p| named(p).next());
+    let body = named(node).find(|n| n.kind() == "protocol_body");
+    let associated = (body.into_iter().flat_map(named))
+        .filter(|n| n.kind() == "associatedtype_declaration")
+        .filter_map(|n| n.child_by_field_name("name"));
+    parameters
+        .chain(associated)
+        .map(|n| unbacktick(text(n, src)))
+        .collect()
+}
+
+/// `generics` with those of the declaration `node`.
+fn with_generics(generics: &Rc<Generics>, node: Node, src: &[u8]) -> Rc<Generics> {
+    let names: HashSet<String> = own_generics(node, src).into_iter().collect();
+    match names.is_empty() {
+        true => generics.clone(),
+        false => Rc::new(Generics {
+            names,
+            outer: Some(generics.clone()),
+        }),
+    }
+}
+
+/// What a property or a local holds as far as its declaration says: its written type, else the
+/// type its initializer constructs (`Type(..)`, through `try` and `await`).
+fn declared(node: Node, src: &[u8], generics: &Generics) -> Class {
+    let annotation = named(node).find(|n| n.kind() == "type_annotation");
+    if let Some(annotation) = annotation {
+        return (annotation.child_by_field_name("name"))
+            .map_or(Class::Unknown, |t| class_of(t, src, generics));
+    }
+    let mut value = node.child_by_field_name("value");
+    while let Some(inner) =
+        value.filter(|v| matches!(v.kind(), "try_expression" | "await_expression"))
+    {
+        value = inner.child_by_field_name("expr");
+    }
+    let Some(value) =
+        value.filter(|v| matches!(v.kind(), "call_expression" | "constructor_expression"))
+    else {
+        return Class::Unknown;
+    };
+    let (function, suffixes) = parts(value);
+    match call(function, &suffixes, value, src, "") {
+        Some(made) if made.constructs && !generics.holds(head(&made.callee)) => {
+            Class::Named(made.callee)
+        }
+        _ => Class::Unknown,
+    }
+}
+
+/// The receivers with one class per scope and name: a name bound twice to other classes, or
+/// also by a binding with no written class (`locals`), holds no known one.
+fn one_class_each(receivers: Vec<Receiver>, locals: &[String]) -> Vec<Receiver> {
+    let mut at: HashMap<(String, String), usize> = HashMap::new();
+    let mut kept: Vec<Receiver> = Vec::new();
+    for mut receiver in receivers {
+        if locals
+            .binary_search(&qualify(&receiver.scope, &receiver.name))
+            .is_ok()
+        {
+            receiver.class = Class::Unknown;
+        }
+        match at.get(&(receiver.scope.clone(), receiver.name.clone())) {
+            Some(&n) if kept[n].class != receiver.class => kept[n].class = Class::Unknown,
+            Some(_) => {}
+            None => {
+                at.insert((receiver.scope.clone(), receiver.name.clone()), kept.len());
+                kept.push(receiver);
+            }
+        }
+    }
+    kept
+}
+
+/// `scope` and each definition around it: its prefixes cut at a dot outside the parentheses
+/// of a function's labels (`Page.show(_:Outer.Item)` is cut at `Page`).
+fn enclosing(scope: &str) -> impl Iterator<Item = &str> {
+    let mut depth = 0usize;
+    let cuts = scope.char_indices().filter_map(move |(at, c)| {
+        match c {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            '.' if depth == 0 => return Some(at),
+            _ => {}
+        }
+        None
+    });
+    cuts.map(|at| &scope[..at]).chain([scope])
+}
+
+/// The first segment of a dotted name.
+fn head(name: &str) -> &str {
+    name.split('.').next().unwrap_or_default()
 }
 
 fn unbacktick(name: &str) -> String {
