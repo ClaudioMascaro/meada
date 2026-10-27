@@ -519,11 +519,14 @@ fn walk(
                             }
                         }
                         // A typed local or global is a receiver, an untyped one hides its name.
-                        _ if class != Class::Unknown && typed_here => {
-                            facts.receivers.push(receiver)
-                        }
+                        // A `let` of one name holds the call or the name it is given, a
+                        // constructed one too (`let router = Router()`): the value flow follows
+                        // it to the library type.
                         _ => {
-                            // A `let` of one name holds the call or the name it is given.
+                            let typed = class != Class::Unknown && typed_here;
+                            if typed {
+                                facts.receivers.push(receiver);
+                            }
                             if let (Some(value @ (Value::Call(_) | Value::Ref(_))), true, true) =
                                 (&held, constant, defining)
                             {
@@ -534,7 +537,9 @@ fn walk(
                                     value: value.clone(),
                                 });
                             }
-                            facts.locals.push(qualify(&scope, &name));
+                            if !typed {
+                                facts.locals.push(qualify(&scope, &name));
+                            }
                         }
                     }
                 }

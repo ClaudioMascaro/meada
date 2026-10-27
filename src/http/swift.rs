@@ -1,5 +1,6 @@
-//! Swift HTTP providers (spec #29): Vapor's routes in `vapor`.
+//! Swift HTTP providers (spec #29): Vapor's routes in `vapor`, Hummingbird's in `hummingbird`.
 
+mod hummingbird;
 mod vapor;
 
 use super::{PARAM, normalize_path};
@@ -8,7 +9,9 @@ use crate::resolve::Code;
 
 /// The providers of the Swift files of the repository.
 pub(super) fn providers(code: &Code) -> Vec<Found> {
-    vapor::providers(code)
+    let mut found = vapor::providers(code, &vapor::VAPOR);
+    found.extend(vapor::providers(code, &hummingbird::HUMMINGBIRD));
+    found
 }
 
 /// `path` as the trunk reads it, a `*` or a `**` segment too a parameter (Vapor's `.anything` and
