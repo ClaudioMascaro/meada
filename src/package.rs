@@ -43,6 +43,8 @@ use crate::workspace::Repository;
 
 mod cargo;
 mod go;
+#[cfg(test)]
+mod hostile;
 mod maven;
 mod npm;
 mod nuget;
