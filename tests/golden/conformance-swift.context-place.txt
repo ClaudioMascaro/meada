@@ -11,7 +11,9 @@ callers:
 example.com/acme/conformance Sources/Store/OrderService.swift:27 OrderService.place(order:)
 callees:
 example.com/acme/conformance Sources/Store/OrderService.swift:45 OrderService.validate(order:)
-example.com/acme/conformance Sources/Store/Order+Pricing.swift:2 Order.price(quantity:) [inferred: one method named price]
+example.com/acme/conformance Sources/Store/Order+Pricing.swift:6 Order.price(quantity:) [inferred: one method named price]
 example.com/acme/conformance Sources/Store/OrderService.swift:4 Notifier.notify(order:)
-example.com/acme/conformance Sources/Store/OrderService.swift:41 OrderService.audit(_:Order) [ambiguous: 2 functions or classes named audit]
-example.com/acme/conformance Sources/Store/OrderService.swift:43 OrderService.audit(_:String) [ambiguous: 2 functions or classes named audit]
+example.com/acme/conformance Sources/Store/OrderService+Audit.swift:2 OrderService.audit(_:) [ambiguous: 4 functions or classes named audit]
+example.com/acme/conformance Sources/Store/OrderService.swift:68 OrderService.audit(_:Bool) [ambiguous: 4 functions or classes named audit]
+example.com/acme/conformance Sources/Store/OrderService.swift:41 OrderService.audit(_:Order) [ambiguous: 4 functions or classes named audit]
+example.com/acme/conformance Sources/Store/OrderService.swift:43 OrderService.audit(_:String) [ambiguous: 4 functions or classes named audit]

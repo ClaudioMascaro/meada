@@ -115,33 +115,34 @@ impl LanguagePack for Swift {
         true
     }
 
+    fn namespaced(&self) -> bool {
+        false
+    }
+
     /// A type's conformances may be written in any order.
     fn unordered_bases(&self) -> bool {
         true
     }
 }
 
-/// Every target the manifests declare, as its module name and its directory with a trailing
-/// `/` (empty at the root).
-fn targets(configs: &[(&str, &[u8])]) -> Vec<(String, String)> {
+/// The module of each target directory the manifests declare (empty at the root); of two
+/// targets of one directory, the last by name.
+fn targets(configs: &[(&str, &[u8])]) -> HashMap<String, String> {
     (configs.iter())
         .filter(|(path, _)| !Swift.is_code(path))
         .flat_map(|(path, src)| manifest::targets(path, src))
-        .map(|t| match t.dir.is_empty() {
-            true => (t.name, String::new()),
-            false => (t.name, format!("{}/", t.dir)),
-        })
+        .map(|t| (t.dir, t.name))
         .collect()
 }
 
 /// The module of the file `path`: the target whose directory holds it, the deepest one when
-/// several do, else `NO_TARGET`.
+/// several do, else `NO_TARGET`. Its directories are looked up, so the cost is the path's depth.
 // ponytail: two packages of the repository that name a target alike make one module of both.
-fn module_of<'t>(targets: &'t [(String, String)], path: &str) -> &'t str {
-    (targets.iter())
-        .filter(|(_, dir)| path.starts_with(dir.as_str()))
-        .max_by_key(|(_, dir)| dir.len())
-        .map_or(NO_TARGET, |(name, _)| name.as_str())
+fn module_of<'t>(targets: &'t HashMap<String, String>, path: &str) -> &'t str {
+    let dirs = (path.rmatch_indices('/').map(|(at, _)| &path[..at])).chain([""]);
+    dirs.into_iter()
+        .find_map(|dir| targets.get(dir))
+        .map_or(NO_TARGET, String::as_str)
 }
 
 /// Swift's access levels, least first (`open` is `public`).
@@ -172,8 +173,9 @@ struct Visit<'t> {
     ceiling: Access,
     /// How many definitions enclose the node.
     depth: usize,
-    /// The node whose child it is, by its id (`Node::parent` costs the tree's depth).
-    parent: usize,
+    /// `scope` with every function named by its labels alone (`Signature::name`), which the
+    /// first walk of `parse` names them all by.
+    plain: Rc<String>,
 }
 
 /// A function, method or initializer's parameters: each with its argument label, and the
@@ -186,7 +188,8 @@ struct Signature {
 
 impl Signature {
     /// `base(label:label:)`, or with each label's type (`audit(_:Order)`) when another
-    /// declaration of the same body has the same labels.
+    /// declaration of the same scope in the file (a type and its extensions alike) has the same
+    /// labels and other types.
     fn name(&self, typed: bool) -> String {
         let labels = self
             .params
@@ -210,11 +213,30 @@ fn parse(src: &[u8]) -> Result<Facts> {
         .parse(src, None)
         .ok_or("tree-sitter returned no tree")?;
     let root = tree.root_node();
+    // The first walk finds the functions of one scope with the same labels and other types
+    // (a type's body and its extensions in the file alike); the second names those with types.
+    let mut signatures = HashMap::new();
+    walk(root, src, &HashSet::new(), &mut signatures);
+    let typed: HashSet<String> = (signatures.into_iter())
+        .filter(|(_, types)| types.len() > 1)
+        .map(|(name, _)| name)
+        .collect();
+    Ok(walk(root, src, &typed, &mut HashMap::new()))
+}
+
+/// The facts of the file `root`, naming the functions of `typed` (by `Visit::plain` name) with
+/// their parameters' types too, and recording in `signatures` the types of each function by
+/// that name.
+fn walk(
+    root: Node,
+    src: &[u8],
+    typed: &HashSet<String>,
+    signatures: &mut HashMap<String, HashSet<Vec<String>>>,
+) -> Facts {
     let mut facts = Facts::default();
     for node in named(root).filter(|n| n.kind() == "import_declaration") {
         import(node, src, &mut facts);
     }
-    let collisions = collisions(root, src);
     // The function families (`Facts::overloads`) of the top level, each with the widest
     // access of its functions.
     let mut families: BTreeMap<String, Access> = BTreeMap::new();
@@ -227,7 +249,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         default: Access::Internal,
         ceiling: Access::Public,
         depth: 0,
-        parent: 0,
+        plain: Rc::new(String::new()),
     }];
     while let Some(Visit {
         node,
@@ -236,19 +258,19 @@ fn parse(src: &[u8]) -> Result<Facts> {
         default,
         ceiling,
         depth,
-        parent,
+        plain,
     }) = stack.pop()
     {
         let charge = if stores(node.kind()) { scope.len() } else { 0 };
         let Some(left) = budget.checked_sub(charge) else {
-            return Ok(Facts {
+            return Facts {
                 unbuilt: true,
                 ..Facts::default()
-            });
+            };
         };
         budget = left;
         let defining = depth < DEFINITION_DEPTH;
-        let (mut inner, mut inner_place) = (scope.clone(), place);
+        let (mut inner, mut inner_place, mut inner_plain) = (scope.clone(), place, plain.clone());
         let (mut inner_default, mut inner_ceiling, mut nested) = (default, ceiling, depth);
         let mut pushed: Vec<Node> = named(node).collect();
         match node.kind() {
@@ -266,6 +288,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         continue;
                     }
                     inner = Rc::new(name.clone());
+                    inner_plain = inner.clone();
                     inner_default = written.unwrap_or(Access::Internal);
                     inner_ceiling = Access::Public;
                     let blocks = std::iter::once(None).chain(bases.into_iter().map(Some));
@@ -279,6 +302,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     }
                 } else {
                     inner = Rc::new(qualify(&scope, &name));
+                    inner_plain = Rc::new(qualify(&plain, &name));
                     let own = written.unwrap_or(default).min(ceiling);
                     let protocol = node.kind() == "protocol_declaration";
                     // A protocol's requirements have its access.
@@ -306,17 +330,19 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 let signature = signature(node, src);
                 let init = signature.as_ref().is_some_and(|s| s.base == "init");
                 let Some(signature) = signature.filter(|_| !init || place == Place::Type) else {
-                    stack_children(&mut stack, &pushed, &scope, depth, node.id());
+                    stack_children(&mut stack, &pushed, &scope, &plain, depth);
                     continue;
                 };
-                let plain = signature.name(false);
-                let typed = collisions.get(&(parent, plain)).is_some_and(|n| *n > 1);
+                inner_plain = Rc::new(qualify(&plain, &signature.name(false)));
+                (signatures.entry(inner_plain.as_ref().clone()).or_default())
+                    .insert(signature.types.clone());
+                let typed = typed.contains(inner_plain.as_str());
                 inner = Rc::new(qualify(&scope, &signature.name(typed)));
                 nested += 1;
                 let own = access(node, src).unwrap_or(default).min(ceiling);
                 // A protocol extension's default implementation shares the requirement's name.
                 if !defined.insert(inner.as_ref().clone()) {
-                    stack_children(&mut stack, &pushed, &inner, nested, node.id());
+                    stack_children(&mut stack, &pushed, &inner, &inner_plain, nested);
                     continue;
                 }
                 let kind = match place {
@@ -415,7 +441,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 default: inner_default,
                 ceiling: inner_ceiling,
                 depth: nested,
-                parent: node.id(),
+                plain: inner_plain.clone(),
             });
         }
     }
@@ -445,17 +471,17 @@ fn parse(src: &[u8]) -> Result<Facts> {
             })
             .collect(),
     );
-    Ok(facts)
+    facts
 }
 
-/// Pushes the `children` of a function's declaration (of the node `parent`) to be visited in
-/// source order, as its code, under `scope`.
+/// Pushes the `children` of a function's declaration to be visited in source order, as its
+/// code, under `scope` (`plain`).
 fn stack_children<'t>(
     stack: &mut Vec<Visit<'t>>,
     children: &[Node<'t>],
     scope: &Rc<String>,
+    plain: &Rc<String>,
     depth: usize,
-    parent: usize,
 ) {
     for &node in children.iter().rev() {
         stack.push(Visit {
@@ -465,7 +491,7 @@ fn stack_children<'t>(
             default: Access::Private,
             ceiling: Access::Private,
             depth,
-            parent,
+            plain: plain.clone(),
         });
     }
 }
@@ -525,28 +551,6 @@ fn import(node: Node, src: &[u8], facts: &mut Facts) {
         name: Imported::Namespace,
     });
     wildcard(&module, false, facts);
-}
-
-/// How many function declarations of each body (by its node) share a name and labels: those
-/// that do are named with their types too (`Signature::name`).
-fn collisions(root: Node, src: &[u8]) -> HashMap<(usize, String), usize> {
-    let mut counts = HashMap::new();
-    let mut pending = vec![root];
-    while let Some(parent) = pending.pop() {
-        for node in named(parent) {
-            pending.push(node);
-            if matches!(
-                node.kind(),
-                "function_declaration" | "protocol_function_declaration" | "init_declaration"
-            ) && let Some(signature) = signature(node, src)
-            {
-                *counts
-                    .entry((parent.id(), signature.name(false)))
-                    .or_insert(0) += 1;
-            }
-        }
-    }
-    counts
 }
 
 /// A function, method or initializer's name and parameters. `None` for an operator.
@@ -890,6 +894,23 @@ mod tests {
         .map(|d| d.name)
         .collect();
         assert_eq!(names, ["S", "S.audit(_:Order)", "S.audit(_:[String:Int])"]);
+    }
+
+    #[test]
+    fn a_type_and_its_extension_in_one_file_are_one_scope_for_names() {
+        let names =
+            |src: &str| -> Vec<String> { facts(src).defs.into_iter().map(|d| d.name).collect() };
+        assert_eq!(
+            names(
+                "class S { func audit(_ o: Order) {} }\nextension S { func audit(_ id: String) {} }\n"
+            ),
+            ["S", "S.audit(_:Order)", "S.audit(_:String)"]
+        );
+        // A protocol extension's default body of a requirement is that requirement.
+        assert_eq!(
+            names("protocol P { func f(x: Int) }\nextension P { func f(x: Int) {} }\n"),
+            ["P", "P.f(x:)"]
+        );
     }
 
     #[test]

@@ -1,1 +1,1 @@
-example.com/acme/conformance Sources/Store/Order+Pricing.swift:2 Order.price(quantity:)
+example.com/acme/conformance Sources/Store/Order+Pricing.swift:6 Order.price(quantity:)

@@ -116,6 +116,13 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether a type's qualified name starts with the namespace an on-demand import names
+    /// (Java's `p.Own`, C#'s namespaces), so a glob of a namespace takes the types declared in
+    /// it alone (`Binding::of_namespace`). A Swift module is no part of its types' names.
+    fn namespaced(&self) -> bool {
+        true
+    }
+
     /// A keyword naming the base of the enclosing class, such as `super`: what its members
     /// are is not resolved, except an overload family (`Facts::overloads`), read through the
     /// class's family past the class itself.

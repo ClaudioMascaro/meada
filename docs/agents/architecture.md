@@ -1686,34 +1686,43 @@ one for the area a change touches.
   classes declared in that namespace alone (`Binding::of_namespace`), since a C# file's group
   is its first namespace's and it may declare types in another; the C# layout names such a file
   for each other namespace it declares types in, when no file has that namespace as package.
-  Only a pack whose type names carry their namespace (`qualified_types`) has that check: a
-  Swift module is no part of its types' names.
+  A pack whose type names carry no namespace turns that check off (`LanguagePack::namespaced`,
+  false for Swift: a module is no part of its types' names).
   The Swift pack (spec #29, #117; `lang/swift.rs`) reads `Package.swift` with the same grammar
   (`lang/swift/manifest.rs`: every `.target`, `.executableTarget`, `.testTarget`, `.macro` and
-  `.plugin` call with a literal `name:`, under its literal `path:` or the default directory)
-  as a config file (`**/Package.swift`, no code: `is_code`). Each target is a module of the
-  files under its directory, the deepest one when several hold a file, and the files no target
-  holds (all of them without a manifest) are one module no import names. The layout shares a
-  module's scope among its files (`Layout::shared`) and names it by its first file; `join` sets
-  each file's `Facts::unit` to its module, so `internal` declarations (`Facts::private`) stay
-  in it (`Resolver::hidden`), and appends the module's own inside glob after the imports, so
-  its names come before an import's. `import M` is a namespace import of `M` and an outside
-  glob of it, which takes `M`'s public names (`Facts::star`). A function's name carries its
-  argument labels (`place(order:quantity:)`, `init(baseURL:)`, `_` for none); two
-  declarations of one body with the same labels carry each label's written type too
-  (`audit(_:Order)`). Each `Param::label` and each `Call::labels` (`_` for an unlabelled
-  argument, empty for a trailing closure) is kept with the facts, and `Arity` narrows an
-  overload family by them (`labelled`: in order, past parameters with a default value, a
-  variadic one taking the unlabelled arguments after its first, a trailing closure any label),
-  so a tie is `ambiguous` with each overload. An extension is no definition but a
-  `Facts::impls` block of the extended type, one more per protocol it writes (`Impl::of`):
-  `Resolver::overloaded` reads a class's blocks after the class, in any file, then a block's
-  protocol with that protocol's inherent blocks (its default implementations), and a protocol
-  from outside the repository is an opaque base. A protocol extension's member of the
-  requirement's name in the requirement's file is that one definition. A capitalized callee
-  (`Order(id:)`, `Order.Line()`) constructs (`Call::constructs`): the type's initializers
-  (`Facts::constructors`, also the family `Type.init` for `self.init(..)`), or the type itself
-  when it declares none (a memberwise initializer). Bare calls are Kotlin's (`bare_calls`).
+  `.plugin` call with a literal `name:` outside a `dependencies:` argument, under its literal
+  `path:` inside the package or the default directory) as a config file (`**/Package.swift`,
+  no code: `is_code`). Each target is a module of the files under its directory, the deepest
+  one when several hold a file (looked up by the file's directories, so the cost is the path's
+  depth), and the files no target holds (all of them without a manifest) are one module no
+  import names. The layout shares a module's scope among its files (`Layout::shared`), whose
+  top-level overload families are one family across its files (`Group::families`,
+  `Resolver::family_at`), and names it by its first file; `join` sets each file's
+  `Facts::unit` to its module, so `internal` declarations (`Facts::private`) stay in it
+  (`Resolver::hidden`), and appends the module's own inside glob after the imports, so its
+  names come before an import's. `import M` is a namespace import of `M` and an outside glob
+  of it, which takes `M`'s public names (`Facts::star`). A function's name carries its
+  argument labels (`place(order:quantity:)`, `init(baseURL:)`, `_` for none); declarations of
+  one scope in a file (a type's body and its extensions alike) with the same labels and other
+  types carry each label's written type too (`audit(_:Order)`): `parse` walks the file twice,
+  the first time to find them. Each `Param::label` and each `Call::labels` (`_` for an
+  unlabelled argument, empty for a trailing closure) is kept with the facts, and `Arity`
+  narrows an overload family by them (`labelled`: in order, past parameters with a default
+  value, a variadic one taking the unlabelled arguments after its first, a trailing closure any
+  label), so a tie is `ambiguous` with each overload. An extension is no definition but a
+  `Facts::impls` block of the extended type, one more per protocol it writes (`Impl::of`).
+  `Resolver::overloaded` reads one level per class of the family, the class with its blocks in
+  any file (two declarations of one signature there are two overloads, but for a protocol a
+  block's member of a requirement's signature is its default body), then one level per
+  protocol a block conforms to, with that protocol's inherent blocks; a signature an earlier
+  level declares overrides a later one. A protocol from outside the repository a block conforms
+  to makes the family opaque (`Resolver::opaque`, which `inherited` and `matched` read as an
+  opaque base). A protocol extension's member of the requirement's signature in the
+  requirement's file is that one definition. A capitalized callee (`Order(id:)`,
+  `Order.Line()`) constructs (`Call::constructs`): the type's initializers in its body and its
+  blocks (`Facts::constructors`, also the family `Type.init` for `self.init(..)`), or the type
+  itself when it declares none (a memberwise initializer). Bare calls are Kotlin's
+  (`bare_calls`).
   C# method calls (spec #28, #108) use the seams Java's do and add none but one flag. The pack
   writes `Facts::receivers` from the declared type of a field, a property, a parameter
   (primary constructors' too), a local with an explicit type, a `foreach`, `out` or pattern

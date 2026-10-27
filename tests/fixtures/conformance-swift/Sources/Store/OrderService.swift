@@ -63,3 +63,7 @@ public final class Reporter: NSObject {
 
     func summary() {}
 }
+
+extension OrderService {
+    func audit(_ flag: Bool) {}
+}

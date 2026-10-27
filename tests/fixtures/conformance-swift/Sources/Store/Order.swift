@@ -21,3 +21,5 @@ func format(id: String) -> String {
 }
 
 func log(_ message: String) {}
+
+public func log(level: Int) {}

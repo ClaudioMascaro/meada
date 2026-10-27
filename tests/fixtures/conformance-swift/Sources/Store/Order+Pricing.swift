@@ -1,4 +1,8 @@
 extension Order {
+    public init(json: String) {
+        self.init(id: json)
+    }
+
     public func price(quantity: Int) -> Int {
         return discount(quantity: quantity)
     }

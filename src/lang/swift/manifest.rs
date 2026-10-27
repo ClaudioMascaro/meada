@@ -15,7 +15,8 @@ pub struct Target {
 
 /// The targets the manifest at `path` declares: every `.target`, `.executableTarget`,
 /// `.testTarget`, `.macro` and `.plugin` call written in it, wherever it sits (a variable may
-/// hold the list), with a literal `name:`. Its `path:` names its directory when it is a literal
+/// hold the list) but in a `dependencies:` argument (`.target(name:)` there names a
+/// dependency), with a literal `name:`. Its `path:` names its directory when it is a literal
 /// inside the package, else the default one (`Sources/<name>`, `Tests/<name>` for a test target,
 /// `Plugins/<name>` for a plugin).
 // ponytail: `sources:` and `exclude:` are not read; every file under the directory is the
@@ -33,10 +34,15 @@ pub fn targets(path: &str, src: &[u8]) -> Vec<Target> {
     };
     let package = path.rsplit_once('/').map_or("", |(dir, _)| dir);
     let mut found = Vec::new();
-    let mut pending = vec![tree.root_node()];
-    while let Some(node) = pending.pop() {
-        pending.extend(named(node));
-        if node.kind() != "call_expression" {
+    // Each node with whether a `dependencies:` argument holds it.
+    let mut pending = vec![(tree.root_node(), false)];
+    while let Some((node, dependency)) = pending.pop() {
+        let label = (node.kind() == "value_argument")
+            .then(|| node.child_by_field_name("name"))
+            .flatten();
+        let inner = dependency || label.is_some_and(|l| text(l, src) == "dependencies");
+        pending.extend(named(node).map(|n| (n, inner)));
+        if node.kind() != "call_expression" || dependency {
             continue;
         }
         let Some(defaults) = named(node).next().and_then(|f| defaults(f, src)) else {
@@ -113,4 +119,57 @@ fn literal(node: Node, src: &[u8]) -> Option<String> {
 /// Whether a relative directory stays inside the package: no root, no `..`.
 fn inside(dir: &str) -> bool {
     !dir.starts_with('/') && !dir.split('/').any(|s| s == "..")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn read(path: &str, src: &str) -> Vec<(String, String)> {
+        (targets(path, src.as_bytes()).into_iter())
+            .map(|t| (t.name, t.dir))
+            .collect()
+    }
+
+    #[test]
+    fn each_target_kind_has_its_default_directory_under_its_package() {
+        let src = r#"let package = Package(name: "P", targets: [
+            .target(name: "Core", dependencies: [.target(name: "Base"), "Kit"]),
+            .executableTarget(name: "App"),
+            .testTarget(name: "CoreTests", dependencies: ["Core"]),
+            .plugin(name: "Gen", capability: .buildTool()),
+            .macro(name: "Macros"),
+        ])"#;
+        let owned = |pairs: &[(&str, &str)]| -> Vec<(String, String)> {
+            (pairs.iter())
+                .map(|(n, d)| (n.to_string(), d.to_string()))
+                .collect()
+        };
+        assert_eq!(
+            read("pkg/Package.swift", src),
+            owned(&[
+                ("Gen", "pkg/Plugins/Gen"),
+                ("App", "pkg/Sources/App"),
+                ("Core", "pkg/Sources/Core"),
+                ("Macros", "pkg/Sources/Macros"),
+                ("CoreTests", "pkg/Tests/CoreTests"),
+            ])
+        );
+    }
+
+    #[test]
+    fn a_literal_path_inside_the_package_names_the_directory() {
+        let src = r#"let targets: [Target] = [
+            .target(name: "Root", path: "."),
+            .target(name: "Lib", path: "./Code/Lib/"),
+            .target(name: "Up", path: "../Other"),
+            .target(name: "Abs", path: "/tmp/x"),
+            .target(name: "Computed", path: base + "/x"),
+            .target(name: base + "Name"),
+        ]"#;
+        let found = read("Package.swift", src);
+        let owned = |n: &str, d: &str| (n.to_string(), d.to_string());
+        assert_eq!(found, [owned("Root", ""), owned("Lib", "Code/Lib")]);
+        assert_eq!(read("a/Package.swift", src)[0], owned("Root", "a"));
+    }
 }

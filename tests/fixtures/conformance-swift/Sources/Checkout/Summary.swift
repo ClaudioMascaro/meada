@@ -1,3 +1,5 @@
+import Store
+
 func summarize() {
     log(level: 1)
 }

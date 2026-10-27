@@ -16,6 +16,7 @@ use super::{Ecosystem, Export, Manifest, Providers, read_manifest};
 use crate::dotnet::{appsettings, msbuild};
 use crate::jvm::spring;
 use crate::lang::csharp::CSharp;
+use crate::lang::swift::Swift;
 use crate::lang::{Facts, LanguagePack, MAX_BYTES};
 
 /// The time of the whole table. A row takes about a second in debug; a reader that does work per
@@ -527,7 +528,32 @@ fn probes() -> Vec<Probe> {
             let settings = appsettings::Settings::read(&[("appsettings.json", &file(text))]);
             settings.get("", "A").map_or(0, str::len)
         }),
+        // Swift: `Package.swift`, read by the pack's `join` for every file of the repository.
+        ("Package.swift: many targets", || {
+            let targets = fill(1, |i| {
+                format!(".target(name: \"T{i}\", path: \"S/T{i}\"),\n")
+            });
+            swift_modules(format!("let package = Package(targets: [{targets}])"))
+        }),
+        ("Package.swift: deep nesting", || {
+            let nest = "[".repeat(NESTING) + ".target(name: \"T\")" + &"]".repeat(NESTING);
+            swift_modules(format!("let package = Package(targets: {nest})"))
+        }),
     ]
+}
+
+/// The size of the imports the Swift pack's `join` gives each of `IMPORTS` files under the
+/// manifest `text`, deep in the tree.
+fn swift_modules(text: String) -> usize {
+    let manifest = file(text);
+    let join = Swift.join(&[("Package.swift", &manifest)], &BTreeMap::new());
+    (0..IMPORTS)
+        .map(|i| {
+            let mut facts = Facts::default();
+            join(&format!("S/T{i}/{}/a.swift", "d/".repeat(64)), &mut facts);
+            facts.imports.len() + facts.unit.len()
+        })
+        .sum()
 }
 
 /// Every reader, given a file built to explode, returns within `BUDGET` and gives back no more

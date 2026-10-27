@@ -9,3 +9,7 @@ extension Item.Size {
         return scaled(by: 2)
     }
 }
+
+func render(_ size: Item.Size) -> String {
+    return ""
+}

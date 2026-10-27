@@ -6,6 +6,7 @@ struct Checkout {
 
     func run() {
         let order = Order(id: "1")
+        _ = Order(json: "{}")
         _ = service.place(order: order)
         _ = format(order: order)
         _ = format(id: "1")

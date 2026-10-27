@@ -11912,6 +11912,7 @@ fn swift() {
     let order = |name: &str| store("Order.swift", name);
     let pricing = |name: &str| store("Order+Pricing.swift", name);
     let service = |name: &str| store("OrderService.swift", name);
+    let probe = |name: &str| store("Probe.swift", name);
     let checkout = |file: &str, name: &str| format!("Sources/Checkout/{file}::{name}");
     let symbols = [
         order("Order"),
@@ -11921,6 +11922,8 @@ fn swift() {
         order("format(order:)"),
         order("format(id:)"),
         order("log(_:)"),
+        order("log(level:)"),
+        pricing("Order.init(json:)"),
         pricing("Order.price(quantity:)"),
         pricing("Order.discount(quantity:)"),
         pricing("Order.Line.doubled()"),
@@ -11935,12 +11938,24 @@ fn swift() {
         service("OrderService.place(_:)"),
         service("OrderService.audit(_:Order)"),
         service("OrderService.audit(_:String)"),
+        service("OrderService.audit(_:Bool)"),
+        store("OrderService+Audit.swift", "OrderService.audit(_:)"),
         service("OrderService.validate(order:)"),
         service("OrderService.retry(times:_:)"),
         service("OrderService.run()"),
         service("Reporter"),
         service("Reporter.report()"),
         service("Reporter.summary()"),
+        probe("Pinger"),
+        probe("Pinger.ping()"),
+        probe("Pinger.trace()"),
+        probe("Tracer"),
+        probe("Probe"),
+        probe("Probe.run()"),
+        probe("Bag"),
+        probe("Bag.run()"),
+        probe("describe()"),
+        store("Probe+Tracer.swift", "Probe.trace()"),
         checkout("Checkout.swift", "Checkout"),
         checkout("Checkout.swift", "Checkout.run()"),
         checkout("Summary.swift", "summarize()"),
@@ -11990,14 +12005,41 @@ fn swift() {
             EXACT,
             one(service("OrderService.place(order:quantity:)")),
         ),
-        // Two overloads with the same labels tie.
+        // Overloads with the same labels tie: in the type's body, in its extension of the same
+        // file (all three named with their types) and in one of another file.
         (
             place("audit#0"),
             AMBIGUOUS,
             vec![
+                store("OrderService+Audit.swift", "OrderService.audit(_:)"),
+                service("OrderService.audit(_:Bool)"),
                 service("OrderService.audit(_:Order)"),
                 service("OrderService.audit(_:String)"),
             ],
+        ),
+        // An initializer an extension declares in another file is the type's.
+        (
+            pricing("Order.init(json:)::self.init#0"),
+            EXACT,
+            one(order("Order.init(id:)")),
+        ),
+        // A protocol an extension conforms to: its requirement; the type's own member, from a
+        // later extension of another file, before that protocol's default body; and an outside
+        // protocol keeps a bare name from the top-level function.
+        (
+            probe("Probe.run()::ping#0"),
+            EXACT,
+            one(probe("Pinger.ping()")),
+        ),
+        (
+            probe("Probe.run()::trace#0"),
+            EXACT,
+            one(store("Probe+Tracer.swift", "Probe.trace()")),
+        ),
+        (
+            probe("Bag.run()::describe#0"),
+            INFERRED,
+            one(probe("describe()")),
         ),
         // `self` reaches the requirement of a protocol the class conforms to.
         (
@@ -12057,6 +12099,7 @@ fn swift() {
             one(service("OrderService.init(retries:)")),
         ),
         (run("Order#0"), EXACT, one(order("Order.init(id:)"))),
+        (run("Order#1"), EXACT, one(pricing("Order.init(json:)"))),
         (
             run("service.place#0"),
             INFERRED,
@@ -12065,7 +12108,7 @@ fn swift() {
         (run("format#0"), EXACT, one(order("format(order:)"))),
         (run("format#1"), None, vec![]),
         (run("Store.format#0"), EXACT, one(order("format(order:)"))),
-        // The file's own module first: its `log(level:)`, not the import's `log(_:)`.
+        // The file's own module first: its `log(level:)`, not the imported module's public one.
         (
             run("summarize#0"),
             EXACT,
@@ -12088,6 +12131,7 @@ fn swift_without_a_package_manifest() {
     let display = |name: &str| format!("Sources/Model/Item+Display.swift::{name}");
     let loader = |name: &str| format!("Sources/Loading/FileLoader.swift::{name}");
     let main = |name: &str| format!("Sources/main.swift::{name}");
+    let shadows = |name: &str| format!("Sources/Shadows.swift::{name}");
     let symbols = [
         item("Item"),
         item("Item.label()"),
@@ -12096,12 +12140,25 @@ fn swift_without_a_package_manifest() {
         item("Loader"),
         item("Loader.load(from:)"),
         item("render(_:)"),
+        item("renderAll()"),
         display("Item.display()"),
         display("Item.Size.doubled()"),
+        display("render(_:)"),
         loader("FileLoader"),
         loader("FileLoader.load(from:)"),
         loader("FileLoader.load(from:limit:)"),
         loader("FileLoader.report(_:)"),
+        loader("render(count:)"),
+        shadows("shadow()"),
+        shadows("error()"),
+        shadows("Choice"),
+        shadows("closures(_:)"),
+        shadows("optionals(_:)"),
+        shadows("guarded(_:)"),
+        shadows("loops(_:)"),
+        shadows("caught()"),
+        shadows("cases(_:)"),
+        shadows("work()"),
     ];
     let one = |t: String| vec![t];
     let limit = |callee: &str| loader(&format!("FileLoader.load(from:limit:)::{callee}"));
@@ -12156,8 +12213,32 @@ fn swift_without_a_package_manifest() {
             INFERRED,
             one(loader("FileLoader.load(from:limit:)")),
         ),
-        (main("render#0"), EXACT, one(item("render(_:)"))),
+        // The top-level functions of a name in the module's files are one family.
+        (
+            main("render#0"),
+            AMBIGUOUS,
+            vec![display("render(_:)"), item("render(_:)")],
+        ),
+        (
+            item("renderAll()::render#0"),
+            EXACT,
+            one(loader("render(count:)")),
+        ),
     ];
+    // Each binding form hides the function of its name in its scope: a call of it is a name
+    // match.
+    let mut calls = calls;
+    for (scope, callee, target) in [
+        ("closures(_:)", "shadow", "shadow()"),
+        ("optionals(_:)", "shadow", "shadow()"),
+        ("guarded(_:)", "shadow", "shadow()"),
+        ("loops(_:)", "shadow", "shadow()"),
+        ("caught()", "error", "error()"),
+        ("cases(_:)", "shadow", "shadow()"),
+    ] {
+        let id = shadows(&format!("{scope}::{callee}#0"));
+        calls.push((id, INFERRED, one(shadows(target))));
+    }
     conform_owned("conformance-swift-app", &symbols, &calls);
 }
 

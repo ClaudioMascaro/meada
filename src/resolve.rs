@@ -316,6 +316,8 @@ pub struct Resolver<'a> {
     members_in_scope: bool,
     unordered_globs: bool,
     qualified_types: bool,
+    /// The pack's `LanguagePack::namespaced`.
+    namespaced: bool,
     consts: HashMap<&'a str, HashSet<&'a str>>,
     /// The types each file of a compilation keeps to it (`Facts::private` of a file with a
     /// `Facts::unit`), for `hidden`.
@@ -515,6 +517,9 @@ struct Group<'a> {
     /// Where in `files` sit the files that name each name in their exports, and those with a
     /// star export.
     exporting: Named<'a>,
+    /// The top-level overload families (`Facts::overloads`), by name, with the functions of
+    /// every file of the group: one family, as Swift's module scope makes it.
+    families: HashMap<&'a str, Vec<Target<'a>>>,
 }
 
 /// An extension function (`Facts::extensions`): the scope it is written in (its file's package
@@ -587,7 +592,7 @@ impl<'a> Resolver<'a> {
                 })
                 .collect()
         };
-        let overloads = families(|f| &f.overloads);
+        let overloads: HashMap<&str, HashMap<&str, Vec<Target>>> = families(|f| &f.overloads);
         let constructors = families(|f| &f.constructors);
         let statics = files
             .iter()
@@ -633,11 +638,23 @@ impl<'a> Resolver<'a> {
                 }
                 sharing.insert(path, groups.len());
             }
+            // The top-level function families of the group, each with the functions every file
+            // of it declares under that name.
+            let mut families: HashMap<&str, Vec<Target>> = HashMap::new();
+            for &path in &members {
+                for (&alias, targets) in &overloads[path] {
+                    if !alias.contains('.') {
+                        families.entry(alias).or_default().extend(targets);
+                    }
+                }
+            }
+            families.values_mut().for_each(|f| f.sort());
             groups.push(Group {
                 files: members,
                 tops,
                 methods,
                 exporting,
+                families,
             });
         }
         let mut parts: HashMap<(&str, &str), Vec<&str>> = HashMap::new();
@@ -784,6 +801,7 @@ impl<'a> Resolver<'a> {
             members_in_scope: language.members_in_scope(),
             unordered_globs: language.unordered_globs(),
             qualified_types: language.qualified_types(),
+            namespaced: language.namespaced(),
             written,
             consts,
             internal,
@@ -1069,10 +1087,17 @@ impl<'a> Resolver<'a> {
                 } else {
                     (&self.overloads, Binding::Unknown)
                 };
-                let all: Vec<Target> = (self.parts(t).into_iter())
-                    .flat_map(|part| families[part.path].get(part.name).into_iter().flatten())
+                // A block of the type (Swift's extension, in any file) adds to its families.
+                let blocks = self.impls.get(&t).into_iter().flatten();
+                let scopes = (self.parts(t).into_iter())
+                    .map(|part| (part.path, part.name))
+                    .chain(blocks.map(|b| (b.path, b.scope)));
+                let mut all: Vec<Target> = scopes
+                    .flat_map(|(path, scope)| families[path].get(scope).into_iter().flatten())
                     .copied()
                     .collect();
+                all.sort();
+                all.dedup();
                 match all.is_empty() {
                     true => absent,
                     false => Binding::Several(all),
@@ -1256,7 +1281,7 @@ impl<'a> Resolver<'a> {
         match within[..] {
             [one] => narrowed(one, all.len()),
             [_, _, ..] => Resolution::Ambiguous(within),
-            [] if bare && family.iter().any(|a| matches!(a, Ancestor::Opaque(_))) => {
+            [] if bare && self.opaque(&family) => {
                 // What the scope would bind with the family's base read as declaring nothing:
                 // that base may declare the name and hide it.
                 let found = self.resolve_as(
@@ -1273,10 +1298,7 @@ impl<'a> Resolver<'a> {
                     _ => Resolution::Unresolved,
                 }
             }
-            [] if self.extension_methods
-                && on_instance
-                && !family.iter().any(|a| matches!(a, Ancestor::Opaque(_))) =>
-            {
+            [] if self.extension_methods && on_instance && !self.opaque(&family) => {
                 one_of(extensions(&all))
             }
             [] => Resolution::Unresolved,
@@ -2013,6 +2035,9 @@ impl<'a> Resolver<'a> {
     fn overloaded(&self, family: &[Ancestor<'a>], member: &str) -> Option<Binding<'a>> {
         let (mut found, mut signatures, mut opaque) = (Vec::new(), HashSet::new(), false);
         let blocks = |c: Target<'a>| self.impls.get(&c).into_iter().flatten();
+        // Each class with its blocks is one level, in family order; then each protocol a block
+        // conforms to, with its own blocks.
+        let (mut levels, mut conformed) = (Vec::new(), Vec::new());
         for ancestor in self.with_parts(family).iter() {
             let Ancestor::Class(c) = *ancestor else {
                 opaque = true;
@@ -2022,15 +2047,28 @@ impl<'a> Resolver<'a> {
             for b in blocks(c) {
                 scopes.push((b.path, b.scope));
                 match b.of {
-                    Some(p) => {
-                        scopes.push((p.path, p.name));
-                        let inherent = blocks(p).filter(|pb| !pb.of_trait);
-                        scopes.extend(inherent.map(|pb| (pb.path, pb.scope)));
-                    }
+                    Some(p) => conformed.push(p),
                     None => opaque |= b.of_trait,
                 }
             }
-            for (path, scope) in scopes {
+            levels.push((c, scopes));
+        }
+        for p in conformed {
+            let inherent = blocks(p).filter(|pb| !pb.of_trait);
+            let scopes =
+                std::iter::once((p.path, p.name)).chain(inherent.map(|b| (b.path, b.scope)));
+            levels.push((p, scopes.collect()));
+        }
+        for (class, scopes) in levels {
+            // A signature an earlier level declares is overridden there. Within a level, one
+            // the class declares twice is two overloads (types the labels do not tell), but a
+            // protocol extension's member of a requirement's signature is its default body.
+            let protocol = self.files[class.path]
+                .interfaces
+                .iter()
+                .any(|i| i == class.name);
+            let mut level: Vec<(&str, usize, Target<'a>)> = Vec::new();
+            for (at, (path, scope)) in scopes.into_iter().enumerate() {
                 if self.overloads[path].is_empty() {
                     continue;
                 }
@@ -2042,16 +2080,24 @@ impl<'a> Resolver<'a> {
                     continue;
                 };
                 for t in all {
-                    if self.extends(*t) {
+                    let signature = t.name.strip_prefix(scope).unwrap_or(t.name);
+                    let required = || level.iter().any(|(s, a, _)| *s == signature && *a == 0);
+                    if self.extends(*t)
+                        || signatures.contains(signature)
+                        || (protocol && at > 0 && required())
+                    {
                         continue;
                     }
-                    if signatures.insert(t.name.strip_prefix(scope).unwrap_or(t.name)) {
-                        found.push(*t);
-                    }
+                    level.push((signature, at, *t));
                 }
+            }
+            for (signature, _, t) in level {
+                signatures.insert(signature);
+                found.push(t);
             }
         }
         found.sort();
+        found.dedup();
         match found[..] {
             [] => None,
             _ if opaque => Some(Binding::Unknown),
@@ -2108,6 +2154,18 @@ impl<'a> Resolver<'a> {
             .filter(|found| !matches!(found, Binding::Unknown))
     }
 
+    /// Whether a member of `family` may come from outside the repository: a base whose members
+    /// are not known, or a protocol from outside that a block of one of its classes conforms
+    /// to (Swift's `extension S: Sequence`).
+    fn opaque(&self, family: &[Ancestor<'a>]) -> bool {
+        family.iter().any(|a| match a {
+            Ancestor::Opaque(_) => true,
+            Ancestor::Class(c) => {
+                (self.impls.get(c).into_iter().flatten()).any(|b| b.of_trait && b.of.is_none())
+            }
+        })
+    }
+
     /// What a bare method name written in the body of class `class` of `path` names
     /// (`Reading::Method`): the overloads its family declares (`overloaded`). Unknown when the
     /// family is absent, or when none declares it and a base whose members are not known may,
@@ -2120,11 +2178,7 @@ impl<'a> Resolver<'a> {
             return Some(Binding::Unknown);
         };
         match self.overloaded(family, name) {
-            None if self.implicit.contains(&name)
-                || family.iter().any(|a| matches!(a, Ancestor::Opaque(_))) =>
-            {
-                Some(Binding::Unknown)
-            }
+            None if self.implicit.contains(&name) || self.opaque(family) => Some(Binding::Unknown),
             None => {
                 let class = Target { path, name: class };
                 let companion = self.companion(class, &mut Work::default())?;
@@ -2557,12 +2611,9 @@ impl<'a> Resolver<'a> {
                             }
                         }
                         if reading != Reading::Type
-                            && let Some(overloads) = self.overloads[path].get(candidate.as_str())
+                            && let Some(found) = self.family_at(path, s, &candidate)
                         {
-                            return match overloads[..] {
-                                [one] => Binding::Def(one),
-                                _ => Binding::Several(overloads.clone()),
-                            };
+                            return found;
                         }
                         if let Some(found) = self.imported_at(path, s, name, seen) {
                             let method = matches!(found, Binding::Def(t) if self.defs[t.path][t.name].kind == Kind::Method)
@@ -2594,11 +2645,8 @@ impl<'a> Resolver<'a> {
                 return Binding::Def(Target { path, name });
             }
             let read = reading.read() && self.members_in_scope;
-            if !read && let Some(overloads) = self.overloads[path].get(candidate.as_str()) {
-                return match overloads[..] {
-                    [one] => Binding::Def(one),
-                    _ => Binding::Several(overloads.clone()),
-                };
+            if !read && let Some(found) = self.family_at(path, s, &candidate) {
+                return found;
             }
             // A field a class body sees may be its base's (`protected Repo repo`), before an
             // outer class's.
@@ -2645,6 +2693,20 @@ impl<'a> Resolver<'a> {
             }
             found => found,
         }
+    }
+
+    /// The overload family `candidate` that the scope `scope` of `path` declares: at the top
+    /// level, of every file of its group (`Layout::shared`), which share that scope.
+    fn family_at(&self, path: &'a str, scope: &str, candidate: &str) -> Option<Binding<'a>> {
+        let group = (self.shared.get(path)).filter(|_| scope.is_empty());
+        let found = match group.and_then(|&g| self.groups[g].families.get(candidate)) {
+            Some(all) => all,
+            None => self.overloads[path].get(candidate)?,
+        };
+        Some(match found[..] {
+            [one] => Binding::Def(one),
+            _ => Binding::Several(found.clone()),
+        })
     }
 
     /// Whether a function or lambda around the block `block`, up to a class or the top level,
@@ -2944,11 +3006,10 @@ impl<'a> Resolver<'a> {
     }
 
     /// The namespace a glob of `path` whose target is the import `target` takes the names of
-    /// (`wildcard`'s `Imported::Namespace` source), if it is one, in a language whose type names
-    /// carry their namespace (`qualified_types`: Java's packages, C#'s namespaces). A Swift
-    /// module is no part of its types' names.
+    /// (`wildcard`'s `Imported::Namespace` source), if it is one, where the pack's type names
+    /// carry their namespace (`LanguagePack::namespaced`).
     fn glob_namespace(&self, path: &'a str, target: &str) -> Option<&'a str> {
-        if !self.qualified_types {
+        if !self.namespaced {
             return None;
         }
         let imports = &self.files[path].imports;

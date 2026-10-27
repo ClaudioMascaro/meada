@@ -18,3 +18,7 @@ final class FileLoader: Loader {
         _ = render(Item(name: "y"))
     }
 }
+
+func render(count: Int) -> String {
+    return ""
+}

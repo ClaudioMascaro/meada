@@ -23,3 +23,7 @@ protocol Loader {
 func render(_ item: Item) -> String {
     return item.label()
 }
+
+func renderAll() {
+    _ = render(count: 2)
+}
