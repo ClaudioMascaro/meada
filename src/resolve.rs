@@ -4487,11 +4487,24 @@ impl<'a> Code<'a> {
         let r = self.resolver;
         let (seen, work) = (&mut r.seen(path, scope), &mut Work::default());
         let found = r.resolve_as(path, scope, written, seen, work, Reading::Path);
+        let head = written.split('.').next().unwrap_or(written);
         let Binding::External(package, imported) = found else {
-            return None;
+            // A bare written type no import names: the on-demand imports may bring it, as
+            // they do a call head (`Code::outside`).
+            let candidates = match (found, r.unordered_globs && !seen.cut) {
+                (Binding::Unknown, true) => r.on_demand(path, head),
+                _ => Vec::new(),
+            };
+            return (!candidates.is_empty()).then(|| Outside {
+                imported: None,
+                spelled: written.to_string(),
+                direct: false,
+                candidates: (candidates.into_iter())
+                    .map(|s| format!("{s}.{written}"))
+                    .collect(),
+            });
         };
         let name = written.rsplit('.').next()?;
-        let head = written.split('.').next().unwrap_or(written);
         let (spelled, candidates) = match (imported, written.contains('.')) {
             // A single-type import (Java's `import a.B;`) is of the type itself.
             (Imported::Qualified, false) => (package.to_string(), Vec::new()),
