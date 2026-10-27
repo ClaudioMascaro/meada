@@ -1404,7 +1404,7 @@ fn definition(name: &str, kind: Kind, range: Range<usize>, bases: Vec<String>) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lang::Part;
+    use crate::lang::{Invocation, Part};
 
     fn facts(src: &str) -> Facts {
         parse(src.as_bytes(), false).unwrap()
@@ -1659,40 +1659,62 @@ mod tests {
         assert_eq!(method("d"), Some(false));
     }
 
-    /// Members assigned through many names are read in one pass: no pair of a name and a member
-    /// is compared.
+    /// A name bound twice in a scope holds no one value once a member is assigned through it.
     #[test]
-    fn many_names_and_many_members_stay_linear() {
-        let (names, per) = (12_000, 4);
-        let mut source = String::from("func f() {\n");
-        for n in 0..names {
-            source += &format!("  var r{n} = URLRequest(url: u)\n");
-        }
-        for n in 0..names {
-            for m in 0..per {
-                source += &format!("  r{n}.a{m} = 1\n");
-            }
-        }
-        source += "  var s = URLRequest(url: u)\n  var s = URLRequest(url: u)\n  s.httpMethod = \"GET\"\n}\n";
+    fn a_name_bound_twice_holds_no_value_once_a_member_is_assigned() {
+        let facts = facts(
+            "func f() {\n  var s = URLRequest(url: u)\n  var s = URLRequest(url: u)\n  \
+             s.httpMethod = \"GET\"\n  var r = URLRequest(url: u)\n  r.a = 1\n}\n",
+        );
+        let held = |name: &str| -> Vec<&Value> {
+            (facts.bound.iter().filter(|b| b.name == name))
+                .map(|b| &b.value)
+                .collect()
+        };
+        assert!(held("s").iter().all(|v| matches!(v, Value::Unknown)));
+        let assigned = |v: &Value| match v {
+            Value::Call(c) => c.kwargs.iter().any(|(k, _)| k == "a="),
+            _ => false,
+        };
+        assert!(matches!(held("r")[..], [v] if assigned(v)));
+    }
+
+    /// Members assigned through many names are read in one pass: no pair of a name and a member
+    /// is compared (a scan of the bindings per member takes seconds here).
+    #[test]
+    fn many_names_and_many_members_are_assigned_in_linear_time() {
+        let (names, per) = (12_000, 2);
+        let call = |n: usize| Invocation {
+            callee: format!("Make{n}"),
+            receiver: None,
+            args: Vec::new(),
+            kwargs: Vec::new(),
+            range: 0..0,
+        };
+        let mut bound: Vec<Bound> = (0..names)
+            .map(|n| Bound {
+                scope: "f".into(),
+                within: "f".into(),
+                name: format!("r{n}"),
+                value: Value::Call(call(n)),
+            })
+            .collect();
+        let members = (0..names * per)
+            .map(|at| Member {
+                scope: "f.@1".into(),
+                head: format!("r{}", at / per),
+                member: format!("a{}", at % per),
+                value: Value::Unknown,
+                direct: true,
+            })
+            .collect();
         let started = std::time::Instant::now();
-        let facts = facts(&source);
-        assert!(started.elapsed() < std::time::Duration::from_secs(10));
-        // A name bound twice in a scope holds no one value once a member is assigned.
+        assign_members(&mut bound, members);
+        let took = started.elapsed();
         assert!(
-            facts
-                .bound
-                .iter()
-                .filter(|b| b.name == "s")
-                .all(|b| matches!(b.value, Value::Unknown))
+            (bound.iter()).all(|b| matches!(&b.value, Value::Call(c) if c.kwargs.len() == per))
         );
-        assert_eq!(
-            facts
-                .bound
-                .iter()
-                .filter(|b| b.name.starts_with('r'))
-                .count(),
-            names
-        );
+        assert!(took < std::time::Duration::from_secs(1), "{took:?}");
     }
 
     #[test]
