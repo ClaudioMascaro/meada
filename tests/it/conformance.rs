@@ -11913,6 +11913,8 @@ fn swift() {
     let pricing = |name: &str| store("Order+Pricing.swift", name);
     let service = |name: &str| store("OrderService.swift", name);
     let probe = |name: &str| store("Probe.swift", name);
+    let dispatch = |name: &str| store("Dispatch.swift", name);
+    const DISPATCH: &str = "dispatch(parcel:via:other:wrapped:ships:)";
     let checkout = |file: &str, name: &str| format!("Sources/Checkout/{file}::{name}");
     let symbols = [
         order("Order"),
@@ -11956,6 +11958,23 @@ fn swift() {
         probe("Bag.run()"),
         probe("describe()"),
         store("Probe+Tracer.swift", "Probe.trace()"),
+        dispatch("Carrier"),
+        dispatch("Carrier.ship(parcel:)"),
+        dispatch("Parcel"),
+        dispatch("Crate"),
+        dispatch("Truck"),
+        dispatch("Truck.ship(parcel:)"),
+        dispatch("Truck.ship(parcel:fast:)"),
+        dispatch("Truck.load(_:Parcel)"),
+        dispatch("Truck.load(_:Crate)"),
+        dispatch("Boat"),
+        dispatch("Boat.ship(parcel:)"),
+        dispatch("Boat.moor()"),
+        dispatch("Depot"),
+        dispatch("Depot.init(truck:carrier:)"),
+        dispatch(&format!("Depot.{DISPATCH}")),
+        dispatch("Depot.again(lorry:)"),
+        dispatch("Depot.lookup()"),
         checkout("Checkout.swift", "Checkout"),
         checkout("Checkout.swift", "Checkout.run()"),
         checkout("Summary.swift", "summarize()"),
@@ -12047,10 +12066,10 @@ fn swift() {
             EXACT,
             one(service("Notifier.notify(order:)")),
         ),
-        // A receiver whose type is not read matches by name and labels.
+        // A parameter typed in the source reaches the method of its type.
         (
             place("order.price#0"),
-            INFERRED,
+            EXACT,
             one(pricing("Order.price(quantity:)")),
         ),
         (
@@ -12102,7 +12121,7 @@ fn swift() {
         (run("Order#1"), EXACT, one(pricing("Order.init(json:)"))),
         (
             run("service.place#0"),
-            INFERRED,
+            EXACT,
             one(service("OrderService.place(order:)")),
         ),
         (run("format#0"), EXACT, one(order("format(order:)"))),
@@ -12121,6 +12140,71 @@ fn swift() {
         ),
         (run("missing#0"), None, vec![]),
     ];
+    let mut calls = calls;
+    let depot = |callee: &str| dispatch(&format!("Depot.{DISPATCH}::{callee}"));
+    let ship = dispatch("Truck.ship(parcel:)");
+    let fast = dispatch("Truck.ship(parcel:fast:)");
+    let moor = dispatch("Boat.moor()");
+    let every_ship = vec![
+        dispatch("Boat.ship(parcel:)"),
+        dispatch("Carrier.ship(parcel:)"),
+        ship.clone(),
+    ];
+    calls.extend([
+        // A property, a parameter, an optional one and a local with a written type reach their
+        // type's method; the labels pick the overload of the type.
+        (depot("truck.ship#0"), EXACT, one(ship.clone())),
+        (depot("self.truck.ship#0"), EXACT, one(fast.clone())),
+        (depot("lorry.ship#0"), EXACT, one(ship.clone())),
+        (depot("wrapped.ship#0"), EXACT, one(ship.clone())),
+        (depot("local.ship#0"), EXACT, one(ship.clone())),
+        // A local initialized with `Type(..)` and a property initialized so are of that type;
+        // the overloads of one label tie.
+        (
+            depot("made.load#0"),
+            AMBIGUOUS,
+            vec![
+                dispatch("Truck.load(_:Crate)"),
+                dispatch("Truck.load(_:Parcel)"),
+            ],
+        ),
+        (depot("Truck#0"), EXACT, one(dispatch("Truck"))),
+        (depot("boat.moor#0"), EXACT, one(moor.clone())),
+        (dispatch("Depot::Boat#0"), EXACT, one(dispatch("Boat"))),
+        // A protocol-typed receiver stops at the requirement, whatever conforms to it.
+        (
+            depot("carrier.ship#0"),
+            EXACT,
+            one(dispatch("Carrier.ship(parcel:)")),
+        ),
+        (
+            depot("other.ship#0"),
+            EXACT,
+            one(dispatch("Carrier.ship(parcel:)")),
+        ),
+        // A receiver whose type is not read matches by name and labels.
+        (depot("ships.first.moor#0"), INFERRED, one(moor.clone())),
+        (depot("lookup#0"), EXACT, one(dispatch("Depot.lookup()"))),
+        (depot("found.ship#0"), AMBIGUOUS, every_ship.clone()),
+        (depot("found.ship#1"), INFERRED, one(fast)),
+        (depot("found.moor#0"), INFERRED, one(moor)),
+        // A name bound twice with other types in one function has no type.
+        (
+            dispatch("Depot.again(lorry:)::lorry.ship#0"),
+            AMBIGUOUS,
+            every_ship,
+        ),
+        (
+            dispatch("Depot.again(lorry:)::Boat#0"),
+            EXACT,
+            one(dispatch("Boat")),
+        ),
+        (
+            dispatch("Depot.again(lorry:)::Parcel#0"),
+            EXACT,
+            one(dispatch("Parcel")),
+        ),
+    ]);
     conform_owned("conformance-swift", &symbols, &calls);
 }
 
@@ -12132,6 +12216,7 @@ fn swift_without_a_package_manifest() {
     let loader = |name: &str| format!("Sources/Loading/FileLoader.swift::{name}");
     let main = |name: &str| format!("Sources/main.swift::{name}");
     let shadows = |name: &str| format!("Sources/Shadows.swift::{name}");
+    let receivers = |name: &str| format!("Sources/Receivers.swift::{name}");
     let symbols = [
         item("Item"),
         item("Item.label()"),
@@ -12159,6 +12244,11 @@ fn swift_without_a_package_manifest() {
         shadows("caught()"),
         shadows("cases(_:)"),
         shadows("work()"),
+        receivers("outside(_:_:_:_:)"),
+        receivers("hidden(_:_:)"),
+        receivers("rebound(_:)"),
+        receivers("typed(_:)"),
+        receivers("generic(_:)"),
     ];
     let one = |t: String| vec![t];
     let limit = |callee: &str| loader(&format!("FileLoader.load(from:limit:)::{callee}"));
@@ -12166,7 +12256,7 @@ fn swift_without_a_package_manifest() {
     let calls = vec![
         (
             item("render(_:)::item.label#0"),
-            INFERRED,
+            EXACT,
             one(item("Item.label()")),
         ),
         (
@@ -12210,7 +12300,7 @@ fn swift_without_a_package_manifest() {
         (main("FileLoader#0"), EXACT, one(loader("FileLoader"))),
         (
             main("loader.load#0"),
-            INFERRED,
+            EXACT,
             one(loader("FileLoader.load(from:limit:)")),
         ),
         // The top-level functions of a name in the module's files are one family.
@@ -12225,9 +12315,69 @@ fn swift_without_a_package_manifest() {
             one(loader("render(count:)")),
         ),
     ];
+    let mut calls = calls;
+    let outside = |callee: &str| receivers(&format!("outside(_:_:_:_:)::{callee}"));
+    calls.extend([
+        // A standard-library type no import names is no type Meada finds: a name match.
+        (outside("name.label#0"), INFERRED, one(item("Item.label()"))),
+        // A protocol-typed receiver stops at the requirement; a class-typed one resolves its
+        // labels; a nested type is read as written.
+        (
+            outside("loader.load#0"),
+            EXACT,
+            one(item("Loader.load(from:)")),
+        ),
+        (
+            outside("file.load#0"),
+            EXACT,
+            one(loader("FileLoader.load(from:)")),
+        ),
+        (
+            outside("file.load#1"),
+            EXACT,
+            one(loader("FileLoader.load(from:limit:)")),
+        ),
+        (
+            outside("size.scaled#0"),
+            EXACT,
+            one(item("Item.Size.scaled(by:)")),
+        ),
+        // A name a closure parameter, a `guard let` or a type parameter binds again in the
+        // function has no known type there.
+        (
+            receivers("hidden(_:_:)::item.label#0"),
+            INFERRED,
+            one(item("Item.label()")),
+        ),
+        (
+            receivers("hidden(_:_:)::item.display#0"),
+            INFERRED,
+            one(display("Item.display()")),
+        ),
+        (
+            receivers("rebound(_:)::item.label#0"),
+            INFERRED,
+            one(item("Item.label()")),
+        ),
+        (
+            receivers("generic(_:)::item.label#0"),
+            INFERRED,
+            one(item("Item.label()")),
+        ),
+        // A local hides the global of its name, and is of its own type.
+        (
+            receivers("typed(_:)::loader.report#0"),
+            EXACT,
+            one(loader("FileLoader.report(_:)")),
+        ),
+        (
+            receivers("typed(_:)::item.label#0"),
+            EXACT,
+            one(item("Item.label()")),
+        ),
+    ]);
     // Each binding form hides the function of its name in its scope: a call of it is a name
     // match.
-    let mut calls = calls;
     for (scope, callee, target) in [
         ("closures(_:)", "shadow", "shadow()"),
         ("optionals(_:)", "shadow", "shadow()"),
@@ -12243,7 +12393,7 @@ fn swift_without_a_package_manifest() {
 }
 
 /// `search` finds a member an extension declares, under the extended type, and `context` on
-/// a method lists its callers and callees with their levels (spec #29, #117).
+/// a method lists its callers and callees with their levels (spec #29, #117, #118).
 #[test]
 fn swift_search_finds_an_extension_member_and_context_lists_callers_and_callees() {
     let repo = fixture_repo("swift_queries", "conformance-swift", Some(ORIGIN));
@@ -12257,5 +12407,14 @@ fn swift_search_finds_an_extension_member_and_context_lists_callers_and_callees(
         &engine
             .context("OrderService.place(order:quantity:)", None)
             .unwrap(),
+    );
+    // Callers through a typed receiver are `exact`; a receiver of unread type matches the name.
+    assert_golden(
+        "conformance-swift.context-ship.txt",
+        &engine.context("Truck.ship(parcel:)", None).unwrap(),
+    );
+    assert_golden(
+        "conformance-swift.context-moor.txt",
+        &engine.context("Boat.moor()", None).unwrap(),
     );
 }
