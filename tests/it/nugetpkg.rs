@@ -509,3 +509,90 @@ fn a_file_sees_the_references_its_project_references_pass_on() {
         "{export}"
     );
 }
+
+/// A project of the app that names no reference, and a call in it on `Money`'s type.
+fn tool(app: &Path) {
+    write(
+        app,
+        "src/Tool/Tool.csproj",
+        "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>",
+    );
+    let run = "using Example.Money;\n\nnamespace Example.App.Tool;\n\npublic class Run\n{\n    public string Go() => Currency.Cents(1);\n}\n";
+    write(app, "src/Tool/Run.cs", run);
+}
+
+const CENTS: &str =
+    "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)";
+
+fn tool_calls(json: &Value) -> Vec<(&str, &str)> {
+    calls(json, "Example.App.Tool.Run.Go()::Currency.Cents#0")
+}
+
+/// A `Directory.Build.props` gives the projects below it its `PackageReference`s and
+/// `ProjectReference`s (relative to each project), the nearest hiding the ones above unless it
+/// imports them; the props file itself declares none.
+#[test]
+fn a_directory_build_props_gives_its_references_to_the_projects_below_it() {
+    let [_, app] = workspace("nuget_packages_props");
+    tool(&app);
+    let (text, json) = export(&app);
+    assert!(tool_calls(&json).is_empty(), "{text}");
+    let package =
+        "<Project><ItemGroup><PackageReference Include=\"Example.Money\" /></ItemGroup></Project>";
+    write(&app, "Directory.Build.props", package);
+    let (text, json) = export(&app);
+    assert_eq!(tool_calls(&json), [(CENTS, "exact")], "{text}");
+    let declared: Vec<_> = declared(&json)
+        .iter()
+        .map(|l| l["consumer"].as_str().unwrap())
+        .collect();
+    assert!(
+        declared
+            .iter()
+            .all(|c| !c.contains("Directory.Build.props")),
+        "{text}"
+    );
+    // A project reference, written relative to the project, not to the props file.
+    let project = "<Project><ItemGroup><ProjectReference Include=\"..\\..\\..\\dotnet-lib\\src\\Money\\Money.csproj\" /></ItemGroup></Project>";
+    write(&app, "Directory.Build.props", project);
+    let (text, json) = export(&app);
+    assert_eq!(tool_calls(&json), [(CENTS, "exact")], "{text}");
+    // The nearest hides it; with the import, both apply.
+    write(&app, "src/Directory.Build.props", "<Project></Project>");
+    let (text, json) = export(&app);
+    assert!(tool_calls(&json).is_empty(), "{text}");
+    let import = "<Project><Import Project=\"$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))\" /></Project>";
+    write(&app, "src/Directory.Build.props", import);
+    let (text, json) = export(&app);
+    assert_eq!(tool_calls(&json), [(CENTS, "exact")], "{text}");
+}
+
+/// Editing only a `Directory.Build.props` changes the next answer, as a cold index gives it.
+#[test]
+fn an_edited_directory_build_props_refreshes_like_a_cold_workspace() {
+    let package =
+        "<Project><ItemGroup><PackageReference Include=\"Example.Money\" /></ItemGroup></Project>";
+    let setup = |repos: &[PathBuf; 2]| {
+        tool(&repos[1]);
+        write(&repos[1], "Directory.Build.props", package);
+    };
+    let edit = |repos: &[PathBuf; 2]| {
+        edit(
+            repos[1].join("Directory.Build.props"),
+            "Example.Money",
+            "Example.Kit",
+        );
+    };
+    let warm = workspace("nuget_packages_props_refresh");
+    setup(&warm);
+    age(warm[0].parent().unwrap());
+    let before = export(&warm[1]);
+    assert_eq!(tool_calls(&before.1), [(CENTS, "exact")], "{}", before.0);
+    edit(&warm);
+    let refreshed = export(&warm[1]);
+    assert!(tool_calls(&refreshed.1).is_empty(), "{}", refreshed.0);
+    let cold = workspace("nuget_packages_props_cold");
+    setup(&cold);
+    edit(&cold);
+    assert_eq!(refreshed.0, export(&cold[1]).0);
+}
