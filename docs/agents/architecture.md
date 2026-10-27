@@ -218,8 +218,11 @@ one for the area a change touches.
   `render.rs`: the source files an answer reads (`Files`, `source`), re-exporting
   `meada-core`'s budget and line helpers. `mcp.rs`: three read-only tools, one definition over
   two transports: stdio, about the client's first `file://` root or the server's cwd without
-  roots (also for an answer with no local root; a client that fails or does not answer
-  `roots/list` within `ROOTS_TIMEOUT`, 5 s, gets the last root it sent, else a tool error),
+  roots (also for an answer with no local root). On protocol 2026-07-28 and later the call
+  answers `InputRequiredResult` asking for `roots` and the retry carries them (SEP-2322,
+  `Root::Ask`); earlier protocols get `roots/list`, waited for `ROOTS_TIMEOUT`, 5 s. A failed
+  answer (a retry with `roots` missing or malformed included) gets the last root the client
+  sent, else a tool error,
   and in server mode streamable HTTP (`meada mcp --listen`,
   stateless, JSON responses on a hyper listener), one endpoint per repository of the manifest at `/<identity>`, a 404
   listing the identities served elsewhere (with `--generations`, `listen_generations` makes
