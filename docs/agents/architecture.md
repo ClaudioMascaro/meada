@@ -1766,7 +1766,15 @@ one for the area a change touches.
   name or a member chain as `Value::Ref`, an implicit member as `Value::Member` with no type
   (`.post`), a postfix `!` as its target, `a + b` as a string of both, an array as a list and a
   call as `Value::Call` (its labelled arguments in `Invocation::kwargs`, spec #29, #121), read to
-  `VALUE_DEPTH` (32). A closure written in code (not in a
+  `VALUE_DEPTH` (32).
+  `ProcessInfo.processInfo.environment["X"]` (spec #29, #122) is `Str([Env(X)])` (`env_read`),
+  through a postfix `!`, parentheses, `trimmingCharacters`, `replacingOccurrences`, `lowercased`
+  and `uppercased` (a `ProcessInfo` in an argument makes a hole), and a `??` whose fallback is a
+  text-only literal (any other fallback is a `Hole`: which value is the base is unknown); it
+  is also the one value an interpolation may hold besides a name. The pack decides by the
+  spelling alone, as Go's and Rust's do; a repository type named `ProcessInfo` is not looked for. Vapor's
+  `Environment.get` and an optional binding are no reads. `http` takes the leading `Env` as the
+  `base_url_env` variable, as for every language. A closure written in code (not in a
   type's property initializer) is a `Kind::Inline` definition named `<scope>.@<offset>`, and the
   calls and names inside it belong to that scope. `Facts::bound` holds a `let` or `var` of one name given
   a call, a name or a string (#121), and drops the name when another binding of the
@@ -2556,7 +2564,7 @@ qualification budget does (ADR 0017).
   assignment, `HTTPClientRequest(url:)` from `method`, Alamofire from `method:`; GET when absent.
   Not read: `dataTask(with:)`, `AF.download` and `AF.upload`, a request mutated through an
   `inout` or an alias, a request with `url` assigned afterwards (unknown URL), a method that is
-  not one of the HTTP verbs, and a base URL from `ProcessInfo.processInfo.environment` (#122).
+  not one of the HTTP verbs.
 - `http/csharp/clients.rs` (spec #28, #111): an `HttpClient` call is a consumer when its method
   is in `CLIENT_METHODS` (`GetAsync` to `PutAsJsonAsync`) or is `SendAsync`, and its receiver is
   an `HttpClient`: `Code::written` gives the type text written for a field, a parameter or a

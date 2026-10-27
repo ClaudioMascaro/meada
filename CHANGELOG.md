@@ -92,6 +92,13 @@ All notable changes to Meada are recorded here. The format follows
   constants (`static let` too) from other files and modules; a wrapper at any depth is a
   consumer, and a URL that cannot be read is an unresolved consumer, shown in the export and in
   `context`. The stored Swift facts change, so existing indexes are rebuilt.
+- Swift base URLs from the environment (spec #29, #122): `ProcessInfo.processInfo.environment["X"]`
+  at the start of a URL is the base URL variable `X` and maps through `base_url_env`, also
+  through `!`, parentheses, `??` fallbacks that are plain literals and string methods such as
+  `trimmingCharacters`; a second read, any other fallback, a key that is no literal and Vapor's
+  `Environment.get` leave the base unknown. A Swift repository joins a TypeScript workspace with
+  the same `meada.toml` keys, and `trace` follows the chain across both boundaries. The stored
+  Swift facts change, so existing indexes are rebuilt.
 - Swift program entry points (spec #29, #123): a type marked `@main` (through its `main()`
   method when it declares one) and the top-level code of a `main.swift` file, a symbol named
   `main` that owns the calls written there, each start a process. The stored Swift facts
