@@ -1,9 +1,10 @@
 //! The MCP server: a thin adapter over the query engine (ADR 0008), over two transports that
 //! share one tool definition. No tool writes. Over stdio (`serve`) it answers about the
-//! client's first root, and the only write is the index refresh every query does first;
-//! stdout is the protocol channel, so anything else goes to stderr. Over streamable HTTP
-//! (`listen`, server mode, ADR 0011) it serves one endpoint per repository of a workspace
-//! manifest and only reads.
+//! client's first root (asked through a multi round-trip request, SEP-2322, on protocol
+//! 2026-07-28 and later, else through `roots/list`), and the only write is the index refresh
+//! every query does first; stdout is the protocol channel, so anything else goes to stderr.
+//! Over streamable HTTP (`listen`, server mode, ADR 0011) it serves one endpoint per
+//! repository of a workspace manifest and only reads.
 
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -19,15 +20,15 @@ use hyper_util::rt::{TokioIo, TokioTimer};
 use percent_encoding::percent_decode_str;
 #[expect(
     deprecated,
-    reason = "roots are deprecated by SEP-2577 and still what Claude Code sends (see `root_dir`)"
+    reason = "roots are deprecated by SEP-2577; still how Claude Code gives the session's directory (see `root_dir`)"
 )]
-use rmcp::model::ListRootsRequest;
+use rmcp::model::{ListRootsRequest, ListRootsResult};
 use rmcp::{
     RoleServer, ServerHandler, ServiceError, ServiceExt,
-    handler::server::{router::tool::ToolRouter, wrapper::Parameters},
+    handler::server::{router::tool::ToolRouter, tool::InputResponses, wrapper::Parameters},
     model::{
-        CallToolResult, ClientResult, ContentBlock, Implementation, ServerCapabilities,
-        ServerConfig, ServerRequest,
+        CallToolResponse, CallToolResult, ClientResult, ContentBlock, Implementation, InputRequest,
+        InputRequiredResult, ProtocolVersion, ServerCapabilities, ServerConfig, ServerRequest,
     },
     service::{PeerRequestOptions, RequestContext},
     tool, tool_handler, tool_router,
@@ -199,24 +200,27 @@ enum Source {
 
 impl Meada {
     /// Opens the engine where `source` says and runs `ask`; over stdio it refreshes the index
-    /// first, and a client that fails `roots/list` or does not answer in time gets its last root,
-    /// or a tool error when it sent none. In server mode the workspace holds what the request's
-    /// `Pass` may read, and a call without one (never routed) is a tool error. The engine blocks
-    /// (SQLite, and a read that meets a commit waits up to the busy timeout), so it runs where
-    /// the runtime expects blocking work.
+    /// first, after `root_dir` found the client's root: a 2026-07-28 client is first answered
+    /// with `InputRequiredResult` asking for it (`input` carries the retry's answer), and one
+    /// whose answer fails gets its last root, or a tool error when it sent none. In server mode
+    /// the workspace holds what the request's `Pass` may read, and a call without one (never
+    /// routed) is a tool error. The engine blocks (SQLite, and a read that meets a commit waits
+    /// up to the busy timeout), so it runs where the runtime expects blocking work.
     async fn answer(
         &self,
         ctx: RequestContext<RoleServer>,
+        input: InputResponses,
         ask: impl FnOnce(&Engine) -> crate::Result<String>,
-    ) -> CallToolResult {
+    ) -> CallToolResponse {
         let pass = (ctx.extensions.get::<hyper::http::request::Parts>())
             .and_then(|parts| parts.extensions.get::<Pass>());
         let open = match (&self.source, pass) {
-            (Source::Roots { last_root }, _) => match root_dir(&ctx, last_root).await {
-                Ok(dir) => tokio::task::block_in_place(|| Engine::open(&dir)),
-                Err(why) => return self.result(Err(why)),
+            (Source::Roots { last_root }, _) => match root_dir(&ctx, input.0, last_root).await {
+                Ok(Root::Dir(dir)) => tokio::task::block_in_place(|| Engine::open(&dir)),
+                Ok(Root::Ask(ask)) => return ask.into(),
+                Err(why) => return self.result(Err(why)).into(),
             },
-            (_, None) => return self.result(Err(Msg::NotAdmitted.text())),
+            (_, None) => return self.result(Err(Msg::NotAdmitted.text())).into(),
             (
                 Source::Served {
                     listed,
@@ -235,7 +239,7 @@ impl Meada {
             }
         };
         let answer = tokio::task::block_in_place(|| open.and_then(|engine| ask(&engine)));
-        self.result(answer.map_err(|e| e.to_string()))
+        self.result(answer.map_err(|e| e.to_string())).into()
     }
 
     /// `answer` as the tool's result, an error as a tool error. A `named` generation's result
@@ -263,51 +267,88 @@ impl Meada {
 #[cfg(feature = "snapshot")]
 const GENERATION_META: &str = "meada/generation";
 
+/// What `root_dir` found: the directory, or the round trip to ask the client for it.
+enum Root {
+    Dir(PathBuf),
+    Ask(InputRequiredResult),
+}
+
 /// The directory to answer about: the client's first `file://` root, or the server's current
-/// directory. Asked on every call, so `roots/list_changed` needs no cache to invalidate. When
-/// the client declares roots but fails `roots/list` (an error answer, a closed transport, an
-/// unexpected response) or does not answer within [`ROOTS_TIMEOUT`], the last root it sent is
-/// used, with one line on stderr; without one, the call fails: the server's directory may be
-/// another checkout than the client's session. An answer with no local root means the server's
+/// directory. Asked on every call, so `roots/list_changed` needs no cache to invalidate. On a
+/// connection of protocol 2026-07-28 or later the client drops server requests, so the call
+/// answers `InputRequiredResult` asking for `roots` and the retry carries them (SEP-2322,
+/// [`Root::Ask`]); earlier protocols get a `roots/list` request, waited for up to
+/// [`ROOTS_TIMEOUT`]. A client without the `roots` capability gets the server's directory. When
+/// the answer fails (an error, a closed transport, an unexpected response, no answer in time,
+/// or a retry whose `roots` is missing or malformed), the last root the client sent is used,
+/// with one line on stderr; without one, the call fails: the server's directory may be another
+/// checkout than the client's session. An answer with no local root means the server's
 /// directory, as without the capability (#285).
 #[expect(
     deprecated,
-    reason = "roots are deprecated by SEP-2577 and still what Claude Code sends; the cwd fallback keeps the server working once clients drop them"
+    reason = "roots are deprecated by SEP-2577; still how Claude Code gives the session's directory, now through the multi round-trip request of the 2026-07-28 era"
 )]
 async fn root_dir(
     ctx: &RequestContext<RoleServer>,
+    input: Option<rmcp::model::InputResponses>,
     last_root: &Mutex<Option<PathBuf>>,
-) -> Result<PathBuf, String> {
+) -> Result<Root, String> {
     let cwd = || PathBuf::from(".");
     if ctx.client_capabilities().is_none_or(|c| c.roots.is_none()) {
-        return Ok(cwd());
+        return Ok(Root::Dir(cwd()));
     }
-    let request = ServerRequest::ListRootsRequest(ListRootsRequest {
-        method: Default::default(),
-        extensions: Default::default(),
-    });
-    let sent = ctx
-        .peer
-        .send_request_with_option(request, PeerRequestOptions::with_timeout(ROOTS_TIMEOUT))
-        .await;
-    let response = match sent {
-        Ok(handle) => handle.await_response().await,
-        Err(e) => Err(e),
-    };
-    let why = match response {
-        Ok(ClientResult::ListRootsResult(result)) => {
-            let root = result.roots.iter().find_map(|r| file_path(&r.uri));
-            *last_root.lock().unwrap() = root.clone();
-            return Ok(root.unwrap_or_else(cwd));
+    let round_trip = ctx
+        .protocol_version()
+        .is_some_and(|v| v >= ProtocolVersion::V_2026_07_28);
+    let roots = if round_trip {
+        // That era drops server requests: ask in the result, read the retry's `roots`.
+        let Some(input) = input else {
+            let request = InputRequest::ListRoots(ListRootsRequest {
+                method: Default::default(),
+                extensions: Default::default(),
+            });
+            return Ok(Root::Ask(InputRequiredResult::from_input_requests(
+                [("roots".to_string(), request)].into(),
+            )));
+        };
+        match input.get("roots") {
+            None => Err("sent no roots/list answer".to_string()),
+            Some(answer) => serde_json::from_value::<ListRootsResult>(answer.clone())
+                .map_err(|e| format!("sent a malformed roots/list answer: {e}")),
         }
-        Err(ServiceError::Timeout { .. }) => {
-            format!(
+    } else {
+        let request = ServerRequest::ListRootsRequest(ListRootsRequest {
+            method: Default::default(),
+            extensions: Default::default(),
+        });
+        let sent = ctx
+            .peer
+            .send_request_with_option(request, PeerRequestOptions::with_timeout(ROOTS_TIMEOUT))
+            .await;
+        let response = match sent {
+            Ok(handle) => handle.await_response().await,
+            Err(e) => Err(e),
+        };
+        match response {
+            Ok(ClientResult::ListRootsResult(result)) => Ok(result),
+            Err(ServiceError::Timeout { .. }) => Err(format!(
                 "did not answer roots/list within {} s",
                 ROOTS_TIMEOUT.as_secs()
-            )
+            )),
+            Err(e) => Err(format!("failed roots/list: {e}")),
+            Ok(_) => Err(format!(
+                "failed roots/list: {}",
+                ServiceError::UnexpectedResponse
+            )),
         }
-        Err(e) => format!("failed roots/list: {e}"),
-        Ok(_) => format!("failed roots/list: {}", ServiceError::UnexpectedResponse),
+    };
+    let why = match roots {
+        Ok(result) => {
+            let root = result.roots.iter().find_map(|r| file_path(&r.uri));
+            *last_root.lock().unwrap() = root.clone();
+            return Ok(Root::Dir(root.unwrap_or_else(cwd)));
+        }
+        Err(why) => why,
     };
     // Copied out, so a blocked stderr cannot hold the lock other calls wait on.
     let last = last_root.lock().unwrap().clone();
@@ -319,7 +360,7 @@ async fn root_dir(
         "meada: the client {why}, using the last root it sent: {}",
         root.display()
     );
-    Ok(root)
+    Ok(Root::Dir(root))
 }
 
 /// The absolute path of a `file://` URI, percent-decoded; `None` for any other scheme and for
@@ -347,8 +388,9 @@ impl Meada {
         &self,
         Parameters(args): Parameters<SearchArgs>,
         ctx: RequestContext<RoleServer>,
-    ) -> CallToolResult {
-        self.answer(ctx, |engine| args.ask(engine)).await
+        input: InputResponses,
+    ) -> CallToolResponse {
+        self.answer(ctx, input, |engine| args.ask(engine)).await
     }
 
     #[tool(
@@ -358,8 +400,9 @@ impl Meada {
         &self,
         Parameters(args): Parameters<ContextArgs>,
         ctx: RequestContext<RoleServer>,
-    ) -> CallToolResult {
-        self.answer(ctx, |engine| args.ask(engine)).await
+        input: InputResponses,
+    ) -> CallToolResponse {
+        self.answer(ctx, input, |engine| args.ask(engine)).await
     }
 
     #[tool(
@@ -369,12 +412,14 @@ impl Meada {
         &self,
         Parameters(args): Parameters<TraceArgs>,
         ctx: RequestContext<RoleServer>,
-    ) -> CallToolResult {
+        input: InputResponses,
+    ) -> CallToolResponse {
         let served = !matches!(self.source, Source::Roots { .. });
         if let Err(why) = args.checked(served) {
-            return self.result(Err(why));
+            return self.result(Err(why)).into();
         }
-        self.answer(ctx, |engine| args.ask(engine, served)).await
+        self.answer(ctx, input, |engine| args.ask(engine, served))
+            .await
     }
 }
 
