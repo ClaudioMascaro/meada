@@ -250,7 +250,7 @@ fn env(value: Value) -> Value {
 }
 
 /// The parts of `value` when it is one environment read.
-fn read(value: &Value) -> Option<&[Part]> {
+pub(super) fn read(value: &Value) -> Option<&[Part]> {
     match value {
         Value::Str(p) if matches!(p[..], [Part::Env(_) | Part::Hole]) => Some(p),
         _ => None,

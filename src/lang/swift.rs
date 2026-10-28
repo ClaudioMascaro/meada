@@ -770,6 +770,20 @@ fn walk(
                 for name in bound(node, src) {
                     facts.locals.push(qualify(&scope, &name));
                 }
+                // An `if let` or `guard let` of one environment read binds it as a `let` does.
+                if defining
+                    && place != Place::Top
+                    && matches!(node.kind(), "if_statement" | "guard_statement")
+                {
+                    for (name, value) in optional_reads(node, src, ctx(&scope, defining, &types)) {
+                        facts.bound.push(Bound {
+                            scope: scope.as_ref().clone(),
+                            within: scope.as_ref().clone(),
+                            name,
+                            value,
+                        });
+                    }
+                }
             }
             "lambda_literal" => {
                 inner_place = Place::Code;
@@ -1537,6 +1551,34 @@ fn unbacktick(name: &str) -> String {
     name.trim_matches('`').to_string()
 }
 
+/// The `let name = <environment read>` bindings of the condition list of an `if` or `guard`.
+/// The grammar flattens the list: a `let`'s pattern, its name, then `=` and the initializer; a
+/// `var`, a shorthand `let name` or any other initializer binds no read.
+fn optional_reads(node: Node, src: &[u8], ctx: Ctx) -> Vec<(String, Value)> {
+    let mut out = Vec::new();
+    let mut cursor = node.walk();
+    for name in node.children_by_field_name("bound_identifier", &mut cursor) {
+        let (Some(pattern), Some(eq), Some(init)) = (
+            name.prev_sibling(),
+            name.next_sibling(),
+            name.next_named_sibling(),
+        ) else {
+            continue;
+        };
+        if pattern.kind() == "value_binding_pattern"
+            && text(pattern, src) == "let"
+            && pattern.prev_sibling().is_none_or(|p| p.kind() != "case")
+            && eq.kind() == "="
+        {
+            let value = values::value(init, src, ctx);
+            if values::read(&value).is_some() {
+                out.push((unbacktick(text(name, src)), value));
+            }
+        }
+    }
+    out
+}
+
 /// The names a declaration or a statement binds in its own node: a property's or a
 /// condition's `let x`, a pattern of one name (`for (i, item) in`, `case let .some(q)`), a
 /// closure's parameter, a `catch`'s implicit `error`.
@@ -2138,6 +2180,21 @@ mod tests {
             .map(|b| (b.scope.as_str(), b.name.as_str()))
             .collect();
         assert_eq!(held, [("g()", "x"), ("g()", "u"), ("g()", "y")]);
+    }
+
+    #[test]
+    fn only_an_optional_let_of_one_read_is_bound() {
+        let env = "ProcessInfo.processInfo.environment[\"X\"]";
+        let bounds = |cond: &str| facts(&format!("func f() {{ {cond} {{ }} }}\n")).bound.len();
+        assert_eq!(bounds(&format!("if let a = {env}")), 1);
+        for hidden in [
+            format!("if var a = {env}"),
+            format!("while let a = {env}"),
+            format!("if case let a = {env}"),
+            "if let a".to_string(),
+        ] {
+            assert_eq!(bounds(&hidden), 0, "{hidden}");
+        }
     }
 
     #[test]
