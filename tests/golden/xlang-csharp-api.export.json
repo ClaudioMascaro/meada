@@ -41,7 +41,8 @@
         "path": "Clients/AuditClient.cs",
         "start": 121,
         "end": 450
-      }
+      },
+      "hash": "7e82652a6e2401bcbbba477b23e4a2f29934e39130a430819d7d7df68e119d19"
     },
     {
       "id": "example.com/xlang-csharp/api::Clients/AuditClient.cs::Api.Clients.AuditClient.AuditClient(IConfiguration)",
@@ -49,7 +50,8 @@
         "path": "Clients/AuditClient.cs",
         "start": 256,
         "end": 335
-      }
+      },
+      "hash": "e42430ba7157a5960c004309debca3fd8de2da48d706fab8a1018e6a06161796"
     },
     {
       "id": "example.com/xlang-csharp/api::Clients/AuditClient.cs::Api.Clients.AuditClient.Record()",
@@ -57,7 +59,8 @@
         "path": "Clients/AuditClient.cs",
         "start": 341,
         "end": 448
-      }
+      },
+      "hash": "289e07486fe2efd9bf00acf407437c2b079ee08af1ee82817e840f16db343a04"
     },
     {
       "id": "example.com/xlang-csharp/api::Clients/CatalogClient.cs::Api.Clients.CatalogClient",
@@ -65,7 +68,8 @@
         "path": "Clients/CatalogClient.cs",
         "start": 232,
         "end": 450
-      }
+      },
+      "hash": "2ca85b4800621ce916a3eaf4ac51fc8f4c4007a7f5471d3c8b619762d9854d88"
     },
     {
       "id": "example.com/xlang-csharp/api::Clients/CatalogClient.cs::Api.Clients.CatalogClient.CatalogClient(HttpClient)",
@@ -73,7 +77,8 @@
         "path": "Clients/CatalogClient.cs",
         "start": 305,
         "end": 376
-      }
+      },
+      "hash": "88cb06297c47481ff6ebbef1de531cc84f50f9208605cbef721e6d894dc7bf2e"
     },
     {
       "id": "example.com/xlang-csharp/api::Clients/CatalogClient.cs::Api.Clients.CatalogClient.Products()",
@@ -81,7 +86,8 @@
         "path": "Clients/CatalogClient.cs",
         "start": 382,
         "end": 448
-      }
+      },
+      "hash": "13fee307165a998c57473859d586a59aaa21abf4002daae2d3d38b7ffd745f3d"
     },
     {
       "id": "example.com/xlang-csharp/api::Clients/PriceClient.cs::Api.Clients.PriceClient",
@@ -89,7 +95,8 @@
         "path": "Clients/PriceClient.cs",
         "start": 185,
         "end": 486
-      }
+      },
+      "hash": "edf0341cbcb917728058333178fd74f94b863342abaa446d5816c496af260f8c"
     },
     {
       "id": "example.com/xlang-csharp/api::Clients/PriceClient.cs::Api.Clients.PriceClient.PriceClient(IConfiguration)",
@@ -97,7 +104,8 @@
         "path": "Clients/PriceClient.cs",
         "start": 275,
         "end": 392
-      }
+      },
+      "hash": "a0132c3496f9ac31553ff505a276d08e3f18604eb26ecbee17f899fa276b7597"
     },
     {
       "id": "example.com/xlang-csharp/api::Clients/PriceClient.cs::Api.Clients.PriceClient.PriceOf(string)",
@@ -105,7 +113,8 @@
         "path": "Clients/PriceClient.cs",
         "start": 398,
         "end": 484
-      }
+      },
+      "hash": "f0fbca66733555e18d05d8244dab1658782eb69f2589f23bb9850c22b0be9a33"
     },
     {
       "id": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient",
@@ -113,7 +122,8 @@
         "path": "Clients/SiteClient.cs",
         "start": 118,
         "end": 499
-      }
+      },
+      "hash": "66da27f2a300ad139ad0b953d4147098b572ca4c306babc309eebb2fcd5eb5d9"
     },
     {
       "id": "example.com/xlang-csharp/api::Clients/SiteClient.cs::Api.Clients.SiteClient.Pages(string)",
@@ -121,7 +131,8 @@
         "path": "Clients/SiteClient.cs",
         "start": 213,
         "end": 497
-      }
+      },
+      "hash": "c9ef50331cbacdc58a3940f4b7f55e20b5b857404e4ef2f8adf091b4471e1458"
     },
     {
       "id": "example.com/xlang-csharp/api::Clients/StockClient.cs::Api.Clients.StockClient",
@@ -129,7 +140,8 @@
         "path": "Clients/StockClient.cs",
         "start": 110,
         "end": 422
-      }
+      },
+      "hash": "68c031255a442d1100f406b05ff906ca16da827ad5bb1ef42a87d0f5b9240366"
     },
     {
       "id": "example.com/xlang-csharp/api::Clients/StockClient.cs::Api.Clients.StockClient.Level()",
@@ -137,7 +149,8 @@
         "path": "Clients/StockClient.cs",
         "start": 206,
         "end": 420
-      }
+      },
+      "hash": "f508adc524bf969745adf93db63fc6f55e1b018a373d9c946148c596d66c005e"
     },
     {
       "id": "example.com/xlang-csharp/api::Controllers/OrdersController.cs::Api.Controllers.OrdersController",
@@ -145,7 +158,8 @@
         "path": "Controllers/OrdersController.cs",
         "start": 80,
         "end": 841
-      }
+      },
+      "hash": "ad7b2cc90ca2ce524b28febe83542e804b305b980ac13500d75fd13d333374b1"
     },
     {
       "id": "example.com/xlang-csharp/api::Controllers/OrdersController.cs::Api.Controllers.OrdersController.OrdersController(PriceClient,StockClient,AuditClient)",
@@ -153,7 +167,8 @@
         "path": "Controllers/OrdersController.cs",
         "start": 292,
         "end": 459
-      }
+      },
+      "hash": "614febf479279cccba8f19f27a0d4d280bc258ae3be163b3f40c7eb22aa0280a"
     },
     {
       "id": "example.com/xlang-csharp/api::Controllers/OrdersController.cs::Api.Controllers.OrdersController.Reserve()",
@@ -161,7 +176,8 @@
         "path": "Controllers/OrdersController.cs",
         "start": 713,
         "end": 839
-      }
+      },
+      "hash": "28d6cd1d141e65ec56724a62029d10624a7ef76bf40c2f899e6f34ef157bacf2"
     },
     {
       "id": "example.com/xlang-csharp/api::Controllers/OrdersController.cs::Api.Controllers.OrdersController.Status(string)",
@@ -169,7 +185,8 @@
         "path": "Controllers/OrdersController.cs",
         "start": 525,
         "end": 644
-      }
+      },
+      "hash": "487d942b27241728349b5019af7578af978323aa5ebc004126ed2532c0669f1a"
     },
     {
       "id": "example.com/xlang-csharp/api::Messaging/ShipmentListener.cs::Api.Messaging.ShipmentListener",
@@ -177,7 +194,8 @@
         "path": "Messaging/ShipmentListener.cs",
         "start": 182,
         "end": 469
-      }
+      },
+      "hash": "e3ea31eb22920515385e0f6a83246147de6e23a80fd30576a963197aa8d5188c"
     },
     {
       "id": "example.com/xlang-csharp/api::Messaging/ShipmentListener.cs::Api.Messaging.ShipmentListener.OnShipment()",
@@ -185,7 +203,8 @@
         "path": "Messaging/ShipmentListener.cs",
         "start": 384,
         "end": 467
-      }
+      },
+      "hash": "7a649d7633dae8ccdacd2596dff1ddba4d058e14288bcea2e57dad557bc614f3"
     },
     {
       "id": "example.com/xlang-csharp/api::Messaging/ShipmentListener.cs::Api.Messaging.ShipmentListener.ShipmentListener(IConsumer<string,string>)",
@@ -193,7 +212,8 @@
         "path": "Messaging/ShipmentListener.cs",
         "start": 277,
         "end": 378
-      }
+      },
+      "hash": "f8dcea97500e636e3e30616704e5a7dc2e2e1fad38f767d29686ff4b4c12f697"
     },
     {
       "id": "example.com/xlang-csharp/api::Program.cs::Main",
@@ -201,7 +221,8 @@
         "path": "Program.cs",
         "start": 0,
         "end": 781
-      }
+      },
+      "hash": "cce2afd6568a0dd3333988b4c4f81e5e79d4ba31a082ce8535919fefad0f4075"
     }
   ],
   "calls": [

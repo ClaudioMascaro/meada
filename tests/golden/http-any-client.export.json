@@ -13,7 +13,8 @@
         "path": "src/client.ts",
         "start": 616,
         "end": 698
-      }
+      },
+      "hash": "f32392fb36bfb2508883d37973e47448810507b9f81e49e5f01925b54190233c"
     },
     {
       "id": "example.com/acme/client::src/client.ts::cancel",
@@ -21,7 +22,8 @@
         "path": "src/client.ts",
         "start": 251,
         "end": 348
-      }
+      },
+      "hash": "e38c38864a52c01c066228350b1242f222e4bf3250eb7df2b93e4d5ba9230769"
     },
     {
       "id": "example.com/acme/client::src/client.ts::ping",
@@ -29,7 +31,8 @@
         "path": "src/client.ts",
         "start": 92,
         "end": 164
-      }
+      },
+      "hash": "8cb110745e299dbc1be2cade4c2b44d4dddd238de3bda04d3de5bf9e9856bdc9"
     },
     {
       "id": "example.com/acme/client::src/client.ts::restock",
@@ -37,7 +40,8 @@
         "path": "src/client.ts",
         "start": 415,
         "end": 517
-      }
+      },
+      "hash": "644012a301a0f7afa44a0f1b9514c4cd00c8e3ce89443b7057f61b3d7de3e877"
     }
   ],
   "calls": [

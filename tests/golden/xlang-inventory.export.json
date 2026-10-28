@@ -25,7 +25,8 @@
         "path": "inventory/events.py",
         "start": 64,
         "end": 110
-      }
+      },
+      "hash": "06d60c7f7b0128e633e926b1742822a0afe0f9b51f8fb2603739bd19ac1297f8"
     },
     {
       "id": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
@@ -33,7 +34,8 @@
         "path": "inventory/events.py",
         "start": 113,
         "end": 464
-      }
+      },
+      "hash": "45b0a2a94f715ecf1ef6475cad3a5acb35ad57db2b4bef5241c83a9ce4d58ccf"
     },
     {
       "id": "example.com/xlang/inventory::inventory/jobs.py::refresh_prices",
@@ -41,7 +43,8 @@
         "path": "inventory/jobs.py",
         "start": 29,
         "end": 197
-      }
+      },
+      "hash": "12fa6eaa87cd464216c9a6f3ee6176d114e04058ca871686487afe7b768dceb9"
     },
     {
       "id": "example.com/xlang/inventory::inventory/jobs.py::restock",
@@ -49,7 +52,8 @@
         "path": "inventory/jobs.py",
         "start": 329,
         "end": 614
-      }
+      },
+      "hash": "f905e7d4a1e5d366399964c727d755c8569ba3b78b5f31775d60e991c8c6cd96"
     },
     {
       "id": "example.com/xlang/inventory::inventory/jobs.py::warm",
@@ -57,7 +61,8 @@
         "path": "inventory/jobs.py",
         "start": 200,
         "end": 326
-      }
+      },
+      "hash": "e980c674a85949be1329b1389b39c42d378fe101d22952124ded860f5cd0e8d6"
     },
     {
       "id": "example.com/xlang/inventory::inventory/main.py::audit",
@@ -65,7 +70,8 @@
         "path": "inventory/main.py",
         "start": 586,
         "end": 748
-      }
+      },
+      "hash": "7008d64e613fab1b76cee9e697fcf5c209847b9be2443752ad2603aa82e2ad0b"
     },
     {
       "id": "example.com/xlang/inventory::inventory/main.py::reserve",
@@ -73,7 +79,8 @@
         "path": "inventory/main.py",
         "start": 334,
         "end": 583
-      }
+      },
+      "hash": "5e7b8a9fc2dd1d6c806354a9d2a1f345aa51ff79127b1296331fd483bbf3b99b"
     },
     {
       "id": "example.com/xlang/inventory::inventory/main.py::stock_level",
@@ -81,7 +88,8 @@
         "path": "inventory/main.py",
         "start": 161,
         "end": 331
-      }
+      },
+      "hash": "ab88a4c2fc2214e53a7f19ce459847c5d270c613bb590efe3eff0f3965df68a3"
     }
   ],
   "calls": [

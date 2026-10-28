@@ -21,7 +21,8 @@
         "path": "src/bullmq.ts",
         "start": 575,
         "end": 695
-      }
+      },
+      "hash": "c88e958160757dc93b315267ce3f7ca4d8da5b4f1fac9711400a4387b0ee6244"
     },
     {
       "id": "example.com/jobs/api::src/bullmq.ts::remember",
@@ -29,7 +30,8 @@
         "path": "src/bullmq.ts",
         "start": 449,
         "end": 498
-      }
+      },
+      "hash": "0d907d12cdbdee54412fb7292752a85119d7a7d110a79d1b5a983f6ac7ad8c7d"
     },
     {
       "id": "example.com/jobs/api::src/bullmq.ts::requestReport",
@@ -37,7 +39,8 @@
         "path": "src/bullmq.ts",
         "start": 333,
         "end": 403
-      }
+      },
+      "hash": "e793d6f0de4b0358e5b1d8ea8d9ae63ccaf1a1cd6c5b6a91acbb96bc6b634228"
     },
     {
       "id": "example.com/jobs/api::src/bullmq.ts::sendInvoice",
@@ -45,7 +48,8 @@
         "path": "src/bullmq.ts",
         "start": 704,
         "end": 767
-      }
+      },
+      "hash": "2e424ca81f45ef61198b53984fcd13781632bd914307013c267f85c35a64baa3"
     },
     {
       "id": "example.com/jobs/api::src/bullmq.ts::sendWelcome",
@@ -53,7 +57,8 @@
         "path": "src/bullmq.ts",
         "start": 243,
         "end": 324
-      }
+      },
+      "hash": "6bedc1cd679303ed56b9d37d9ca80c39b659cedca37beae1003ac4abc720fa4e"
     },
     {
       "id": "example.com/jobs/api::src/ioredis.ts::appendOrder",
@@ -61,7 +66,8 @@
         "path": "src/ioredis.ts",
         "start": 65,
         "end": 152
-      }
+      },
+      "hash": "e6f916c2ff197b7ed32ad2af0b73ab4b71795ce8f5b4fa4007a5fa4385e3a3ce"
     },
     {
       "id": "example.com/jobs/api::src/ioredis.ts::appendRefund",
@@ -69,7 +75,8 @@
         "path": "src/ioredis.ts",
         "start": 161,
         "end": 250
-      }
+      },
+      "hash": "d3184ae37c20b3f98e624402315fb3a7f4f10907ade8d681c4331e16c8d31d84"
     },
     {
       "id": "example.com/jobs/api::src/noderedis.ts::appendShipment",
@@ -77,7 +84,8 @@
         "path": "src/noderedis.ts",
         "start": 78,
         "end": 170
-      }
+      },
+      "hash": "e4dd2162f524947a82c8d174cd7a59f40ce3d72c0151eb2ce6d51f03534164c0"
     }
   ],
   "calls": [

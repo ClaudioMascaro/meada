@@ -33,7 +33,8 @@
         "path": "src/main/java/example/batch/Wild.java",
         "start": 72,
         "end": 212
-      }
+      },
+      "hash": "63545f669754d0fdd1d8dee32adfcb30738a800ac5e2377d51ca4b4ed28a4050"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/batch/Wild.java::example.batch.Wild.both()",
@@ -41,7 +42,8 @@
         "path": "src/main/java/example/batch/Wild.java",
         "start": 96,
         "end": 150
-      }
+      },
+      "hash": "ad146c18ec760023d5e3ab22232e00fa66bf6cde7fc1ffcd48e6ba9cef025abd"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/batch/Wild.java::example.batch.Wild.one()",
@@ -49,7 +51,8 @@
         "path": "src/main/java/example/batch/Wild.java",
         "start": 156,
         "end": 210
-      }
+      },
+      "hash": "23fcbb7480cca73f5d465c0c8746605633e943352c75ff220867eb0295b7e6ab"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk",
@@ -57,7 +60,8 @@
         "path": "src/main/java/example/web/Bulk.java",
         "start": 88,
         "end": 246
-      }
+      },
+      "hash": "bc8fdb77da4327fa92631a22fb2ff621b30ebb2301595fea28c2ddffffef86c0"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.prepared()",
@@ -65,7 +69,8 @@
         "path": "src/main/java/example/web/Bulk.java",
         "start": 199,
         "end": 244
-      }
+      },
+      "hash": "b7bc8264308665eec735de3a217062c4b3de6d14add3a5f1eba2db2934071e5e"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Bulk.java::example.web.Bulk.total(int)",
@@ -73,7 +78,8 @@
         "path": "src/main/java/example/web/Bulk.java",
         "start": 112,
         "end": 193
-      }
+      },
+      "hash": "d231212397b0aa10b19985f4cfb2e878759bffb71be4ec07ccc62f43d525b15b"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout",
@@ -81,7 +87,8 @@
         "path": "src/main/java/example/web/Checkout.java",
         "start": 142,
         "end": 663
-      }
+      },
+      "hash": "5a0a0f5c341d7d84e9aa4ee0e98d9726faefbaec1d4fa6282124b85fc7ef4811"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.create()",
@@ -89,7 +96,8 @@
         "path": "src/main/java/example/web/Checkout.java",
         "start": 349,
         "end": 407
-      }
+      },
+      "hash": "a59b281a3fac0f5b30772e057870e928268e7ed927404a64d5f240f90768122a"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.external()",
@@ -97,7 +105,8 @@
         "path": "src/main/java/example/web/Checkout.java",
         "start": 610,
         "end": 661
-      }
+      },
+      "hash": "8ddd914a0bde3f0e43b1ec553dae81ace3e727a4384cce32a75cedbe845c59b0"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.later()",
@@ -105,7 +114,8 @@
         "path": "src/main/java/example/web/Checkout.java",
         "start": 476,
         "end": 535
-      }
+      },
+      "hash": "621e33fe960add4e61557be1db53c702501ecfb9da0f49ef1ae1da1d5475fd3c"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.pay(int)",
@@ -113,7 +123,8 @@
         "path": "src/main/java/example/web/Checkout.java",
         "start": 170,
         "end": 343
-      }
+      },
+      "hash": "6d70b978eddbc68f68199d6397fa0d110b8232e5b8ae77410520925df60c10bf"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.sample()",
@@ -121,7 +132,8 @@
         "path": "src/main/java/example/web/Checkout.java",
         "start": 541,
         "end": 604
-      }
+      },
+      "hash": "d31bc433194ada0bf2f9e513811d76eec09cc67bc6b453b0a45f828121c3eeaf"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Checkout.java::example.web.Checkout.stamp()",
@@ -129,7 +141,8 @@
         "path": "src/main/java/example/web/Checkout.java",
         "start": 413,
         "end": 470
-      }
+      },
+      "hash": "581d07c2cdc849ff4e15dd61498fbea978357130d01d1f7725b79a8aa69b8d8b"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family",
@@ -137,7 +150,8 @@
         "path": "src/main/java/example/web/Family.java",
         "start": 108,
         "end": 536
-      }
+      },
+      "hash": "3c6424df7a041ca3efd0beb99bbe59eb3958c6df10665e4ae9e179a79eee33b4"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.coded(Event)",
@@ -145,7 +159,8 @@
         "path": "src/main/java/example/web/Family.java",
         "start": 408,
         "end": 474
-      }
+      },
+      "hash": "4c0757bb593f9fdfe1bd186a5eca8a758d26d24a4d444af10c1f815d0996b262"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.find(Repo)",
@@ -153,7 +168,8 @@
         "path": "src/main/java/example/web/Family.java",
         "start": 134,
         "end": 200
-      }
+      },
+      "hash": "86639e7f063bf51a7e50d7de8667e088b09614b18bd247b7b77a356dc11fc136"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.made()",
@@ -161,7 +177,8 @@
         "path": "src/main/java/example/web/Family.java",
         "start": 206,
         "end": 261
-      }
+      },
+      "hash": "2e877fe947a92ce6315c703a707f04ece2c974b7ef4b3bf7d75728b3131f5220"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.named(Repo)",
@@ -169,7 +186,8 @@
         "path": "src/main/java/example/web/Family.java",
         "start": 267,
         "end": 333
-      }
+      },
+      "hash": "84e79fadeca2713bc1dfd608086bd8fdb202dae45fe4b95906068d6f9f40c3eb"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.noted()",
@@ -177,7 +195,8 @@
         "path": "src/main/java/example/web/Family.java",
         "start": 480,
         "end": 534
-      }
+      },
+      "hash": "a32717e5072018d2e7ad769748fad33aa20907705881455269a487efa443c986"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Family.java::example.web.Family.sized(Repo)",
@@ -185,7 +204,8 @@
         "path": "src/main/java/example/web/Family.java",
         "start": 339,
         "end": 402
-      }
+      },
+      "hash": "b36c4f29815971741d726e6ed9e4b84d73789d07b9d5f7e34dc2d82a109c4b59"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Ledger.java::example.web.Ledger",
@@ -193,7 +213,8 @@
         "path": "src/main/java/example/web/Ledger.java",
         "start": 22,
         "end": 111
-      }
+      },
+      "hash": "495b296fbf9b4d5a25400ec6bf45e278e85522fb03c8c19524a3c6927332c452"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Ledger.java::example.web.Ledger.of(int)",
@@ -201,7 +222,8 @@
         "path": "src/main/java/example/web/Ledger.java",
         "start": 48,
         "end": 109
-      }
+      },
+      "hash": "a3db45dc6ead4f7ac0fc10916655cb1b9b7d359b7fcc19a6db6c247772ac7da2"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes",
@@ -209,7 +231,8 @@
         "path": "src/main/java/example/web/Probes.java",
         "start": 48,
         "end": 366
-      }
+      },
+      "hash": "0818c9da1d48e1e54fcb464a826969d8efcc30d1b858df17c9ae7d80be43856a"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.hidden(java.util.Optional<Integer>)",
@@ -217,7 +240,8 @@
         "path": "src/main/java/example/web/Probes.java",
         "start": 138,
         "end": 229
-      }
+      },
+      "hash": "7b44c0566612c1c3b0160c4696ea7d4504e4e6da366b518045f08a0433842f21"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.local()",
@@ -225,7 +249,8 @@
         "path": "src/main/java/example/web/Probes.java",
         "start": 235,
         "end": 364
-      }
+      },
+      "hash": "ffdc49cfa4285354807309a83aaeb71815bd460f2dd62eb1905dcfadda5c079c"
     },
     {
       "id": "example.com/jvm/client::src/main/java/example/web/Probes.java::example.web.Probes.shadowed()",
@@ -233,7 +258,8 @@
         "path": "src/main/java/example/web/Probes.java",
         "start": 74,
         "end": 132
-      }
+      },
+      "hash": "803c403aef0ea48c14cc35122a6d47e9ddcb5611f7a31f9c8fda4527a28e2117"
     }
   ],
   "calls": [

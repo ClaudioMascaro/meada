@@ -17,7 +17,8 @@
         "path": "src/unlinked.ts",
         "start": 265,
         "end": 374
-      }
+      },
+      "hash": "1361c6b444a92dce12a44c2517d1b97ee31154855be43c97a3d47bb68abe16db"
     },
     {
       "id": "example.com/acme/web::src/unlinked.ts::dynamic",
@@ -25,7 +26,8 @@
         "path": "src/unlinked.ts",
         "start": 142,
         "end": 202
-      }
+      },
+      "hash": "9438c69de186930884afe2fbce89be427b7970b1b76e996a70258bc1cd8a7ec5"
     },
     {
       "id": "example.com/acme/web::src/unlinked.ts::invoices",
@@ -33,7 +35,8 @@
         "path": "src/unlinked.ts",
         "start": 738,
         "end": 822
-      }
+      },
+      "hash": "15f638b1bf4800e09eca360639043831b0b8c9b10282f0610e0d4c8f51118b4f"
     },
     {
       "id": "example.com/acme/web::src/unlinked.ts::local",
@@ -41,7 +44,8 @@
         "path": "src/unlinked.ts",
         "start": 917,
         "end": 973
-      }
+      },
+      "hash": "6de3b0e7571d788859c8a55866b2e91e074006b8e43297d2fc723ffa2c0fbc77"
     },
     {
       "id": "example.com/acme/web::src/unlinked.ts::logo",
@@ -49,7 +53,8 @@
         "path": "src/unlinked.ts",
         "start": 412,
         "end": 496
-      }
+      },
+      "hash": "949109a364b210af454848c46c59cbbd841edcef595c2574ac79124e42415837"
     },
     {
       "id": "example.com/acme/web::src/unlinked.ts::missingRoute",
@@ -57,7 +62,8 @@
         "path": "src/unlinked.ts",
         "start": 1013,
         "end": 1099
-      }
+      },
+      "hash": "db6ec7a87aa5aa7f17233bf0b24adfbf3f1a70866fd2a1ca1861cc10e7570109"
     },
     {
       "id": "example.com/acme/web::src/unlinked.ts::other",
@@ -65,7 +71,8 @@
         "path": "src/unlinked.ts",
         "start": 597,
         "end": 677
-      }
+      },
+      "hash": "3797178497c53e913dd70ad381979b86aeb851a45a5c2c13c9fba71f02495ece"
     },
     {
       "id": "example.com/acme/web::src/users.ts::createUser",
@@ -73,7 +80,8 @@
         "path": "src/users.ts",
         "start": 601,
         "end": 767
-      }
+      },
+      "hash": "d63835fdf2719a927b2955c9c2f7f1f2f87834076ede9d25457562f549bbb975"
     },
     {
       "id": "example.com/acme/web::src/users.ts::getUser",
@@ -81,7 +89,8 @@
         "path": "src/users.ts",
         "start": 431,
         "end": 539
-      }
+      },
+      "hash": "0e6ce216af211d4629cffd496e04a2055410a993fb9c085d317b0c88952a1343"
     },
     {
       "id": "example.com/acme/web::src/users.ts::health",
@@ -89,7 +98,8 @@
         "path": "src/users.ts",
         "start": 1057,
         "end": 1223
-      }
+      },
+      "hash": "9502b1c3ec2013c21888f5803d230d23b7f14ce4a7df03429bf315828089c781"
     },
     {
       "id": "example.com/acme/web::src/users.ts::listUsers",
@@ -97,7 +107,8 @@
         "path": "src/users.ts",
         "start": 57,
         "end": 140
-      }
+      },
+      "hash": "d38cac281be3bf0c2afe25163ca7bb11893c46bad72257d195b4947dd08c2109"
     },
     {
       "id": "example.com/acme/web::src/users.ts::removeUser",
@@ -105,7 +116,8 @@
         "path": "src/users.ts",
         "start": 235,
         "end": 358
-      }
+      },
+      "hash": "b43d6216ad0f5db9011b58736fdec64e50a20473e0b686abff7f7918db63f66d"
     },
     {
       "id": "example.com/acme/web::src/users.ts::report",
@@ -113,7 +125,8 @@
         "path": "src/users.ts",
         "start": 834,
         "end": 987
-      }
+      },
+      "hash": "daf2b65739eb4c6b8a544b6b32894b171adca60ac31f0b973732e1f04a1fe725"
     }
   ],
   "calls": [

@@ -1127,6 +1127,7 @@ mod tests {
                 .map(|n| Symbol {
                     id: id(n),
                     span: span(),
+                    hash: String::new(),
                 })
                 .collect(),
             calls: (0..length)

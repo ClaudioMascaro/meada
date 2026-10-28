@@ -6,6 +6,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `search` with kind `duplicate` lists the symbols whose text is the same in two or more places
+  of the workspace, across repositories or within one: groups of exact copies (no
+  normalisation), longest first, found by a member's name or path. Each symbol stores the BLAKE3
+  of its span's bytes and the export's `symbols` carry it as `hash`. The index schema version
+  changes, so existing indexes are rebuilt.
+
 ### Changed
 
 - A call that decorates a definition (a Java or Kotlin annotation, a C# attribute, a Python

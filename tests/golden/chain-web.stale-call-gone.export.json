@@ -25,7 +25,8 @@
         "path": "src/api/client.ts",
         "start": 127,
         "end": 223
-      }
+      },
+      "hash": "5cc3a63c2d48ea68365d5e97e54a4425c16d6ce5399c954dae54469e16e91111"
     },
     {
       "id": "example.com/chain/web::src/dashboard.ts::cancel",
@@ -33,7 +34,8 @@
         "path": "src/dashboard.ts",
         "start": 221,
         "end": 278
-      }
+      },
+      "hash": "6853a73487aac428d6245d07b3367abdba51a9bb33aea1cffa6de594ea3fd352"
     },
     {
       "id": "example.com/chain/web::src/dashboard.ts::dashboard",
@@ -41,7 +43,8 @@
         "path": "src/dashboard.ts",
         "start": 102,
         "end": 212
-      }
+      },
+      "hash": "c787308f2bdd2b995362f3de89985285809d0eb8afc7afb0405916b9dc5dba9d"
     },
     {
       "id": "example.com/chain/web::src/orders.ts::cancelOrder",
@@ -49,7 +52,8 @@
         "path": "src/orders.ts",
         "start": 247,
         "end": 335
-      }
+      },
+      "hash": "812f86061cffadd47e9768c5d0b144b0168b84a42ecb87ac795b018f50b1717d"
     },
     {
       "id": "example.com/chain/web::src/orders.ts::createOrder",
@@ -57,7 +61,8 @@
         "path": "src/orders.ts",
         "start": 344,
         "end": 429
-      }
+      },
+      "hash": "e595d56f62921c79a2ab608d90418961f78b0eb203eff42361a170452bd18446"
     },
     {
       "id": "example.com/chain/web::src/orders.ts::listOrders",
@@ -65,7 +70,8 @@
         "path": "src/orders.ts",
         "start": 182,
         "end": 238
-      }
+      },
+      "hash": "6e3d64ac3f76355e2d40bc2ad7802e07734c283a7fd5dc716feb989af0f9fada"
     }
   ],
   "calls": [

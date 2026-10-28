@@ -21,7 +21,8 @@
         "path": "src/draft.ts",
         "start": 0,
         "end": 31
-      }
+      },
+      "hash": "eae48d38274aa8a3582e08954eb714a0dcbb3a373aca1a066a0b3a9ef031b06e"
     },
     {
       "id": "example.com/acme/web::src/math.ts::add",
@@ -29,7 +30,8 @@
         "path": "src/math.ts",
         "start": 7,
         "end": 69
-      }
+      },
+      "hash": "beb026d45b5453e22280376d33db706bcd873e40cf9d0077a27f5dea02414fd1"
     },
     {
       "id": "example.com/acme/web::src/math.ts::outer",
@@ -37,7 +39,8 @@
         "path": "src/math.ts",
         "start": 222,
         "end": 333
-      }
+      },
+      "hash": "7acba1e95898e5f58c5586056b9f7600880e5de23c4f18a46d5ea7dd0331a650"
     },
     {
       "id": "example.com/acme/web::src/math.ts::outer.inner",
@@ -45,7 +48,8 @@
         "path": "src/math.ts",
         "start": 251,
         "end": 303
-      }
+      },
+      "hash": "2d1183bd5c0d76eaa3755a2d618ed42ea3162cacd1dde7c521ae39c381f639e8"
     },
     {
       "id": "example.com/acme/web::src/math.ts::sum",
@@ -53,7 +57,8 @@
         "path": "src/math.ts",
         "start": 78,
         "end": 220
-      }
+      },
+      "hash": "58a1c407b01421d5744e226ce5d773b0351ccc90f3f8167dbfdd77334a1306c7"
     },
     {
       "id": "example.com/acme/web::src/view.tsx::Badge",
@@ -61,7 +66,8 @@
         "path": "src/view.tsx",
         "start": 71,
         "end": 145
-      }
+      },
+      "hash": "aea9d084ed1aee19de24772c1bbbfbccff795426f87d9eee32471b5a779b4def"
     },
     {
       "id": "example.com/acme/web::src/view.tsx::label",
@@ -69,7 +75,8 @@
         "path": "src/view.tsx",
         "start": 0,
         "end": 62
-      }
+      },
+      "hash": "1ce7ce8c84c23e72ae36a76d714511b526bf73e3cdecfd78de41bcd3ef7fd8d0"
     }
   ],
   "calls": [

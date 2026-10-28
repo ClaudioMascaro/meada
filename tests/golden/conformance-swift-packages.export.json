@@ -33,7 +33,8 @@
         "path": "one/Sources/App/App.swift",
         "start": 0,
         "end": 56
-      }
+      },
+      "hash": "e879ecb9bd15e839d9f32d2f6e8de8e6083edf0e925588dcd9efda7febecf38c"
     },
     {
       "id": "example.com/acme/conformance::one/Sources/App/App.swift::secret()",
@@ -41,7 +42,8 @@
         "path": "one/Sources/App/App.swift",
         "start": 58,
         "end": 107
-      }
+      },
+      "hash": "3d527bdb2f2962e09699ef3a09ac8994982b50f91643c967eaf6bc599410698e"
     },
     {
       "id": "example.com/acme/conformance::one/Sources/App/App.swift::start()",
@@ -49,7 +51,8 @@
         "path": "one/Sources/App/App.swift",
         "start": 109,
         "end": 219
-      }
+      },
+      "hash": "3c824b0dfde98fc7c3b4ff18ab055cfb7993fd4c21dc7acf668910c0d058f82c"
     },
     {
       "id": "example.com/acme/conformance::one/Tests/AppTests/AppTests.swift::check()",
@@ -57,7 +60,8 @@
         "path": "one/Tests/AppTests/AppTests.swift",
         "start": 22,
         "end": 132
-      }
+      },
+      "hash": "8e32630dabc697871b02e9af3e105bba4c88ae5dd0e47deb3797ebefa79f61c9"
     },
     {
       "id": "example.com/acme/conformance::plain/Sources/App/App.swift::buildApplication()",
@@ -65,7 +69,8 @@
         "path": "plain/Sources/App/App.swift",
         "start": 0,
         "end": 56
-      }
+      },
+      "hash": "e879ecb9bd15e839d9f32d2f6e8de8e6083edf0e925588dcd9efda7febecf38c"
     },
     {
       "id": "example.com/acme/conformance::plain/Sources/App/App.swift::secret()",
@@ -73,7 +78,8 @@
         "path": "plain/Sources/App/App.swift",
         "start": 58,
         "end": 107
-      }
+      },
+      "hash": "3d527bdb2f2962e09699ef3a09ac8994982b50f91643c967eaf6bc599410698e"
     },
     {
       "id": "example.com/acme/conformance::plain/Sources/App/App.swift::start()",
@@ -81,7 +87,8 @@
         "path": "plain/Sources/App/App.swift",
         "start": 109,
         "end": 219
-      }
+      },
+      "hash": "3c824b0dfde98fc7c3b4ff18ab055cfb7993fd4c21dc7acf668910c0d058f82c"
     },
     {
       "id": "example.com/acme/conformance::plain/Tests/AppTests/AppTests.swift::check()",
@@ -89,7 +96,8 @@
         "path": "plain/Tests/AppTests/AppTests.swift",
         "start": 12,
         "end": 65
-      }
+      },
+      "hash": "57547cee6d4cc0d937b445faf04a1b4be860888efa34dc1c3b49479f8b315709"
     },
     {
       "id": "example.com/acme/conformance::two/Sources/App/App.swift::buildApplication()",
@@ -97,7 +105,8 @@
         "path": "two/Sources/App/App.swift",
         "start": 0,
         "end": 56
-      }
+      },
+      "hash": "e879ecb9bd15e839d9f32d2f6e8de8e6083edf0e925588dcd9efda7febecf38c"
     },
     {
       "id": "example.com/acme/conformance::two/Sources/App/App.swift::secret()",
@@ -105,7 +114,8 @@
         "path": "two/Sources/App/App.swift",
         "start": 58,
         "end": 107
-      }
+      },
+      "hash": "3d527bdb2f2962e09699ef3a09ac8994982b50f91643c967eaf6bc599410698e"
     },
     {
       "id": "example.com/acme/conformance::two/Sources/App/App.swift::start()",
@@ -113,7 +123,8 @@
         "path": "two/Sources/App/App.swift",
         "start": 109,
         "end": 219
-      }
+      },
+      "hash": "3c824b0dfde98fc7c3b4ff18ab055cfb7993fd4c21dc7acf668910c0d058f82c"
     },
     {
       "id": "example.com/acme/conformance::two/Tests/AppTests/AppTests.swift::check()",
@@ -121,7 +132,8 @@
         "path": "two/Tests/AppTests/AppTests.swift",
         "start": 22,
         "end": 132
-      }
+      },
+      "hash": "8e32630dabc697871b02e9af3e105bba4c88ae5dd0e47deb3797ebefa79f61c9"
     }
   ],
   "calls": [

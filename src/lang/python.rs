@@ -113,6 +113,7 @@ impl LanguagePack for Python {
                             type_params: Vec::new(),
                             result: None,
                             suspends: false,
+                            hash: String::new(),
                         });
                         facts.programs.push(MAIN.to_string());
                     }
@@ -161,6 +162,7 @@ impl LanguagePack for Python {
                                 type_params: Vec::new(),
                                 result: None,
                                 suspends: false,
+                                hash: String::new(),
                             });
                         }
                         if !is_class {

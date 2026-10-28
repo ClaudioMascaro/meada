@@ -1,0 +1,4 @@
+3 copies
+example.com/duplicates/a src/legacy.ts:1 slug
+example.com/duplicates/a src/util.ts:1 slug
+example.com/duplicates/b src/util.ts:1 slug

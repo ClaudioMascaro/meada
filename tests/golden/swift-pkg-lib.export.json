@@ -17,7 +17,8 @@
         "path": "Sources/KitMoney/Money.swift",
         "start": 0,
         "end": 197
-      }
+      },
+      "hash": "50950a651fc54475bdb5c406ccea500914ad188ee9338219403070fc97e4cc77"
     },
     {
       "id": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.init(cents:)",
@@ -25,7 +26,8 @@
         "path": "Sources/KitMoney/Money.swift",
         "start": 53,
         "end": 111
-      }
+      },
+      "hash": "29cf97d5ea7cb224dad3d145e8c8ccea06085348d2f4820a9431c7b033afab7c"
     },
     {
       "id": "example.com/swift/lib::Sources/KitMoney/Money.swift::Money.of(cents:)",
@@ -33,7 +35,8 @@
         "path": "Sources/KitMoney/Money.swift",
         "start": 117,
         "end": 195
-      }
+      },
+      "hash": "b99875dd293dc41cba5d6b339841705126b394afcea5b814b873ac27db3f1b1d"
     },
     {
       "id": "example.com/swift/lib::Sources/Shared/Shared.swift::shout(_:)",
@@ -41,7 +44,8 @@
         "path": "Sources/Shared/Shared.swift",
         "start": 0,
         "end": 69
-      }
+      },
+      "hash": "2fc968db1cfd0b071f06951fd7a6017b7a330a7f390fe9292fe791c3085488ca"
     }
   ],
   "calls": [

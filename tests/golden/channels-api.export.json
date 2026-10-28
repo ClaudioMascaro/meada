@@ -33,7 +33,8 @@
         "path": "src/amqp.ts",
         "start": 537,
         "end": 766
-      }
+      },
+      "hash": "ac2c08607e0b18390d9445d28424c6cbd31871f9d24e4177d2b5205840a1a07b"
     },
     {
       "id": "example.com/channels/api::src/amqp.ts::dispatch",
@@ -41,7 +42,8 @@
         "path": "src/amqp.ts",
         "start": 836,
         "end": 923
-      }
+      },
+      "hash": "307ff0202be3d76f4a82aa8823b5a46b26ffc04b4e4dcd4614c22354ec593f6f"
     },
     {
       "id": "example.com/channels/api::src/amqp.ts::kafkaOrder",
@@ -49,7 +51,8 @@
         "path": "src/amqp.ts",
         "start": 347,
         "end": 459
-      }
+      },
+      "hash": "217a347633894d5e3f6c005aeda1eaf1bdb0565eb83aee424989eff1cc336a82"
     },
     {
       "id": "example.com/channels/api::src/amqp.ts::queueOrder",
@@ -57,7 +60,8 @@
         "path": "src/amqp.ts",
         "start": 247,
         "end": 338
-      }
+      },
+      "hash": "2c1818cc162c85e7bb462f99e9ecb7e82317f99d5623822667898d5fe9bef344"
     },
     {
       "id": "example.com/channels/api::src/audit.ts::auditLog",
@@ -65,7 +69,8 @@
         "path": "src/audit.ts",
         "start": 44,
         "end": 230
-      }
+      },
+      "hash": "9cc814df4f1f01fb6f06160eaba310a76c0660cb78abaf6126b62201cc10d93f"
     },
     {
       "id": "example.com/channels/api::src/audit.ts::auditLog.kafka audit.log",
@@ -73,7 +78,8 @@
         "path": "src/audit.ts",
         "start": 151,
         "end": 221
-      }
+      },
+      "hash": "eb278e79ded673a1648b5ca27eb8c9a2fcd9ed6ac9f43fe6e86be37a1b80c9c6"
     },
     {
       "id": "example.com/channels/api::src/audit.ts::store",
@@ -81,7 +87,8 @@
         "path": "src/audit.ts",
         "start": 232,
         "end": 281
-      }
+      },
+      "hash": "8f785bfb613af90d79e9db8a82b7409263e5cb092f6301a8aee309a2386e7c97"
     },
     {
       "id": "example.com/channels/api::src/dynamic.ts::announce",
@@ -89,7 +96,8 @@
         "path": "src/dynamic.ts",
         "start": 322,
         "end": 451
-      }
+      },
+      "hash": "acacb2dc8b86fd45d1d621bdf98fa89057699c5f6075c1de9c9900775723ffe1"
     },
     {
       "id": "example.com/channels/api::src/dynamic.ts::currentRegion",
@@ -97,7 +105,8 @@
         "path": "src/dynamic.ts",
         "start": 453,
         "end": 496
-      }
+      },
+      "hash": "c5630e7247b5bebd5f8497606b4631529042cdfb89b3ea96befd4faacd979c53"
     },
     {
       "id": "example.com/channels/api::src/dynamic.ts::replay",
@@ -105,7 +114,8 @@
         "path": "src/dynamic.ts",
         "start": 137,
         "end": 261
-      }
+      },
+      "hash": "73e139cef1cb69dce8a8009afb9adb68bf78952519603cb676012876834c25df"
     },
     {
       "id": "example.com/channels/api::src/orders.ts::audit",
@@ -113,7 +123,8 @@
         "path": "src/orders.ts",
         "start": 727,
         "end": 843
-      }
+      },
+      "hash": "5ca92851b25b5c0f0f8fd5b655c14619f491c7d2cd949d1dfad41e64e7b2edbb"
     },
     {
       "id": "example.com/channels/api::src/orders.ts::createOrder",
@@ -121,7 +132,8 @@
         "path": "src/orders.ts",
         "start": 158,
         "end": 286
-      }
+      },
+      "hash": "bf44706e22a7caa593ef7d698c388d98bbe94c6b7cf9f4af1660afeecdf1069f"
     },
     {
       "id": "example.com/channels/api::src/orders.ts::invoice",
@@ -129,7 +141,8 @@
         "path": "src/orders.ts",
         "start": 344,
         "end": 466
-      }
+      },
+      "hash": "dc8791d807c9c2048f82c6773b677597ab71b3333f26fcff4eb9c01dfa0010f3"
     },
     {
       "id": "example.com/channels/api::src/orders.ts::mail",
@@ -137,7 +150,8 @@
         "path": "src/orders.ts",
         "start": 994,
         "end": 1062
-      }
+      },
+      "hash": "4abfa5349c03889bac6ec399795308ebffc8d76d76793a2d917a88dd7d759a38"
     },
     {
       "id": "example.com/channels/api::src/orders.ts::mailer.send",
@@ -145,7 +159,8 @@
         "path": "src/orders.ts",
         "start": 923,
         "end": 981
-      }
+      },
+      "hash": "585a4dfd61708fd857eef9dc9d5df6523e2aa82edf572658845820a028c82f7f"
     },
     {
       "id": "example.com/channels/api::src/orders.ts::ship",
@@ -153,7 +168,8 @@
         "path": "src/orders.ts",
         "start": 534,
         "end": 648
-      }
+      },
+      "hash": "89a02aed34b96a0807659ed8b2e18daaf281eb79d1602a4c6ddbb0c1f6969ded"
     }
   ],
   "calls": [

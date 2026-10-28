@@ -37,7 +37,8 @@
         "path": "api/client.go",
         "start": 57,
         "end": 87
-      }
+      },
+      "hash": "7337890bf1f729b80e7566d166d79ccb77fac2e66392f1d33a2ade1e99519258"
     },
     {
       "id": "example.com/gopkg/lib::api/client.go::Client.Create",
@@ -45,7 +46,8 @@
         "path": "api/client.go",
         "start": 226,
         "end": 301
-      }
+      },
+      "hash": "8baa190b7bd2f89987f826534ccd5af8fd5827861980ccdbeef5c2021d962f1a"
     },
     {
       "id": "example.com/gopkg/lib::api/client.go::NewClient",
@@ -53,7 +55,8 @@
         "path": "api/client.go",
         "start": 119,
         "end": 196
-      }
+      },
+      "hash": "7c6cff0644bcdfdf398f3295970b15642328c4d0712a4dc0497a022ff53c2f7d"
     },
     {
       "id": "example.com/gopkg/lib::api/dup_a.go::Dup",
@@ -61,7 +64,8 @@
         "path": "api/dup_a.go",
         "start": 82,
         "end": 95
-      }
+      },
+      "hash": "f73d1fbc4ddecdce6ad0e7e809701a6041210d341bba652ff6715ad381e2a10b"
     },
     {
       "id": "example.com/gopkg/lib::api/dup_b.go::Dup",
@@ -69,7 +73,8 @@
         "path": "api/dup_b.go",
         "start": 82,
         "end": 95
-      }
+      },
+      "hash": "f73d1fbc4ddecdce6ad0e7e809701a6041210d341bba652ff6715ad381e2a10b"
     },
     {
       "id": "example.com/gopkg/lib::cmd/app/main.go::main",
@@ -77,7 +82,8 @@
         "path": "cmd/app/main.go",
         "start": 52,
         "end": 86
-      }
+      },
+      "hash": "98de7b90aac7790068c5604b2e147c96aeaebe7e1535b3b23aad20bf2877e435"
     },
     {
       "id": "example.com/gopkg/lib::extras/extras.go::Boost",
@@ -85,7 +91,8 @@
         "path": "extras/extras.go",
         "start": 35,
         "end": 74
-      }
+      },
+      "hash": "96f171b9b21c7ed5793c3e549d451fd0a4a86abdfa237669409af9dd7c5b26cc"
     },
     {
       "id": "example.com/gopkg/lib::text/helper_test.go::Helper",
@@ -93,7 +100,8 @@
         "path": "text/helper_test.go",
         "start": 88,
         "end": 134
-      }
+      },
+      "hash": "264f0ecb185242bb6958b0abe1dbe54e75648554170f92fa96f9be1d0cf09ebc"
     },
     {
       "id": "example.com/gopkg/lib::text/text.go::Greet",
@@ -101,7 +109,8 @@
         "path": "text/text.go",
         "start": 53,
         "end": 118
-      }
+      },
+      "hash": "932e27d7736fee3d76a5331f6c8f7097e810cb28a467d2c001fa717fd9e54cae"
     },
     {
       "id": "example.com/gopkg/lib::text/text.go::Shout",
@@ -109,7 +118,8 @@
         "path": "text/text.go",
         "start": 147,
         "end": 205
-      }
+      },
+      "hash": "93bfa135bb7d5c202a8e6a19764f01e16142feb9574fdaa0cb48d7b1f6fd2c57"
     }
   ],
   "calls": [

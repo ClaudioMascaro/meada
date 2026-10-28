@@ -538,6 +538,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 returns: None,
                 type_params: Vec::new(),
                 suspends: false,
+                hash: String::new(),
                 // The declared return type of a method or a local function.
                 result: match (kind, constructor) {
                     (Kind::Method | Kind::Function, false) => (node.child_by_field_name("returns"))
@@ -1108,6 +1109,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         type_params: Vec::new(),
                         result: None,
                         suspends: false,
+                        hash: String::new(),
                     });
                     nested += 1;
                 }
@@ -1190,6 +1192,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 type_params: Vec::new(),
                 result: None,
                 suspends: false,
+                hash: String::new(),
             });
             facts.programs.push(MAIN.to_string());
         }

@@ -29,7 +29,8 @@
         "path": "src/audit.rs",
         "start": 51,
         "end": 246
-      }
+      },
+      "hash": "ac519601b1b1a6d2a15872d7891b2e2907d48b3571c979d1ad81e1a62c7b211f"
     },
     {
       "id": "example.com/xlang-rust/api::src/events.rs::apply_shipment",
@@ -37,7 +38,8 @@
         "path": "src/events.rs",
         "start": 108,
         "end": 130
-      }
+      },
+      "hash": "5dd8e852097f103e638b96846b881cc121370695dac75cb51bcac89c93ff9d0a"
     },
     {
       "id": "example.com/xlang-rust/api::src/events.rs::consume_shipments",
@@ -45,7 +47,8 @@
         "path": "src/events.rs",
         "start": 207,
         "end": 639
-      }
+      },
+      "hash": "be57d8fd3d98d2e3c20e9580145b09be3b562dc2ae5fcf58cf4a20f8d4e02b9f"
     },
     {
       "id": "example.com/xlang-rust/api::src/main.rs::audit",
@@ -53,7 +56,8 @@
         "path": "src/main.rs",
         "start": 0,
         "end": 10
-      }
+      },
+      "hash": "b7851358993014ecc4cb314c82e78230b1508b085cdc37246a9eca6bb6234837"
     },
     {
       "id": "example.com/xlang-rust/api::src/main.rs::events",
@@ -61,7 +65,8 @@
         "path": "src/main.rs",
         "start": 11,
         "end": 22
-      }
+      },
+      "hash": "0494fe1e1f5d74cd2d484a1ceba517d65ec490f5f2d013f15a8246ac565eb40d"
     },
     {
       "id": "example.com/xlang-rust/api::src/main.rs::main",
@@ -69,7 +74,8 @@
         "path": "src/main.rs",
         "start": 64,
         "end": 224
-      }
+      },
+      "hash": "baeb034b4a2779f2577f45d9f6c097134fef2526979b238681cf958a8992a549"
     },
     {
       "id": "example.com/xlang-rust/api::src/main.rs::orders",
@@ -77,7 +83,8 @@
         "path": "src/main.rs",
         "start": 23,
         "end": 34
-      }
+      },
+      "hash": "2a80eade737054faf75ebbdb6686ee79814e2f8a4d6331cc51dc2930d03faa42"
     },
     {
       "id": "example.com/xlang-rust/api::src/main.rs::pricing",
@@ -85,7 +92,8 @@
         "path": "src/main.rs",
         "start": 35,
         "end": 47
-      }
+      },
+      "hash": "ca5aed100abc0fd3b92af02afef17ce4af7be304808a893a621de1a387bf9472"
     },
     {
       "id": "example.com/xlang-rust/api::src/orders.rs::reserve",
@@ -93,7 +101,8 @@
         "path": "src/orders.rs",
         "start": 325,
         "end": 388
-      }
+      },
+      "hash": "0182efd7d6d6b15f4aea01ea823a603aee5f0a6a745907ebf1e8510322b90b15"
     },
     {
       "id": "example.com/xlang-rust/api::src/orders.rs::router",
@@ -101,7 +110,8 @@
         "path": "src/orders.rs",
         "start": 97,
         "end": 236
-      }
+      },
+      "hash": "68aee932462a79004b2db287651b4a64948849e8fb5edc74846d5cfc07771a5b"
     },
     {
       "id": "example.com/xlang-rust/api::src/orders.rs::status",
@@ -109,7 +119,8 @@
         "path": "src/orders.rs",
         "start": 238,
         "end": 323
-      }
+      },
+      "hash": "2470fdfb060bc56c5542f51b94394255b1c4d5227a3553d6cfe4abd11c0cabe4"
     },
     {
       "id": "example.com/xlang-rust/api::src/pricing.rs::price_of",
@@ -117,7 +128,8 @@
         "path": "src/pricing.rs",
         "start": 64,
         "end": 284
-      }
+      },
+      "hash": "0dcc17aa5449e5c0e0c7185ad8816cfed10d25b18562b8bf1ac4b045e01ddb3d"
     },
     {
       "id": "example.com/xlang-rust/api::src/pricing.rs::promotions",
@@ -125,7 +137,8 @@
         "path": "src/pricing.rs",
         "start": 326,
         "end": 458
-      }
+      },
+      "hash": "60156a266394f4253b3170d5d5dcb59a705ca229c9e61056fc99709c483f4559"
     }
   ],
   "calls": [

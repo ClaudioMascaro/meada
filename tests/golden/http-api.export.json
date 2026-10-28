@@ -37,7 +37,8 @@
         "path": "app/(admin)/api/reports/[...slug]/route.ts",
         "start": 7,
         "end": 59
-      }
+      },
+      "hash": "9d21b597cb7691cb42738687cdfa814ae9f380d9c16ffbc36c714d4045b079d0"
     },
     {
       "id": "example.com/acme/api::app/api/users/[id]/route.ts::DELETE",
@@ -45,7 +46,8 @@
         "path": "app/api/users/[id]/route.ts",
         "start": 197,
         "end": 264
-      }
+      },
+      "hash": "faca87de7d42a78e255370272ea9917380d4d021930e66c6230ed4c95986f46b"
     },
     {
       "id": "example.com/acme/api::app/api/users/[id]/route.ts::GET",
@@ -53,7 +55,8 @@
         "path": "app/api/users/[id]/route.ts",
         "start": 58,
         "end": 187
-      }
+      },
+      "hash": "9f4397cbed8e331c583f6736fe8b972ab8740a7ec26e6ee839715f9a7eb484f4"
     },
     {
       "id": "example.com/acme/api::app/api/users/route.ts::GET",
@@ -61,7 +64,8 @@
         "path": "app/api/users/route.ts",
         "start": 49,
         "end": 113
-      }
+      },
+      "hash": "78c1fa4b8d7642c786fca66339be536b3edcb29f75ff7ac0f3808ea50f26989e"
     },
     {
       "id": "example.com/acme/api::app/api/users/route.ts::POST",
@@ -69,7 +73,8 @@
         "path": "app/api/users/route.ts",
         "start": 122,
         "end": 226
-      }
+      },
+      "hash": "5522e4cee71b73a17de7e003b2132687c9622cfaa001d7ecce6431eae546661e"
     },
     {
       "id": "example.com/acme/api::app/page.tsx::GET",
@@ -77,7 +82,8 @@
         "path": "app/page.tsx",
         "start": 130,
         "end": 163
-      }
+      },
+      "hash": "96de07ebecbd07bf70c5c09900b7ad19647588927822732d9c54402b4697c1cf"
     },
     {
       "id": "example.com/acme/api::app/page.tsx::Home",
@@ -85,7 +91,8 @@
         "path": "app/page.tsx",
         "start": 75,
         "end": 121
-      }
+      },
+      "hash": "5437ee0a202f275f9eed3f27ecc0119e97acb1859db4a6e43f6ef68cca06a21e"
     },
     {
       "id": "example.com/acme/api::lib/db.ts::query",
@@ -93,7 +100,8 @@
         "path": "lib/db.ts",
         "start": 7,
         "end": 77
-      }
+      },
+      "hash": "8833b2c32a32e544556ac1a5c0fbbfbc4f7be91a9ed804dbd475d88710ee8ccf"
     },
     {
       "id": "example.com/acme/api::lib/log.js::withLogging",
@@ -101,7 +109,8 @@
         "path": "lib/log.js",
         "start": 7,
         "end": 80
-      }
+      },
+      "hash": "91d6a9c69d73e9bc13c7af209c3e334656766f159eb764261e17f3038a55c3c4"
     }
   ],
   "calls": [

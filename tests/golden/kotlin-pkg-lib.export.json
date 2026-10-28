@@ -49,7 +49,8 @@
         "path": "core/loose/dev/kt/core/Loose.kt",
         "start": 21,
         "end": 50
-      }
+      },
+      "hash": "290ec97ce5e1c0709f83e5243ebd064d98f1bc09ffb9c9ab0a09b85963072c5f"
     },
     {
       "id": "example.com/kotlin/lib::core/src/check/kotlin/dev/kt/core/Checks.kt::dev.kt.core.checked()",
@@ -57,7 +58,8 @@
         "path": "core/src/check/kotlin/dev/kt/core/Checks.kt",
         "start": 21,
         "end": 52
-      }
+      },
+      "hash": "dc1a3fe83089dfe8a691bac825b939ced0c3b0719aa63c0a51a90acb30a5e851"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box",
@@ -65,7 +67,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Box.kt",
         "start": 21,
         "end": 146
-      }
+      },
+      "hash": "a7052b928ea2459870e32689e16c3324d2d5d80bb1e81dbb9b30b17a641a7c9b"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.Companion",
@@ -73,7 +76,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Box.kt",
         "start": 83,
         "end": 144
-      }
+      },
+      "hash": "f6b62ba9197b6981ae22e2113c9a3b366e719c2da218324d0e8d79896848e619"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.Companion.of(Int)",
@@ -81,7 +85,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Box.kt",
         "start": 110,
         "end": 138
-      }
+      },
+      "hash": "80e0f6fb8ca1a1875cbdaa6f794b7312e5d246e460fa97ba598d917a7d50c29b"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Box.kt::dev.kt.core.Box.of(Int)",
@@ -89,7 +94,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Box.kt",
         "start": 49,
         "end": 77
-      }
+      },
+      "hash": "80e0f6fb8ca1a1875cbdaa6f794b7312e5d246e460fa97ba598d917a7d50c29b"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.String.shout()",
@@ -97,7 +103,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
         "start": 164,
         "end": 210
-      }
+      },
+      "hash": "8376bf841d5877e0d5544fd912578612e05780cc8867bdff3ba76c66e2b9239b"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String)",
@@ -105,7 +112,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
         "start": 21,
         "end": 70
-      }
+      },
+      "hash": "3a589013a9dc47758aa7bbf7c29d1cbaee605cd7f501f1602629e9f97631986f"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.greet(String,Int)",
@@ -113,7 +121,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
         "start": 72,
         "end": 162
-      }
+      },
+      "hash": "787c33710d4fcaa0d85e69ac8a3fba6685034fe1c7433e7b42b7912856072e44"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.hidden()",
@@ -121,7 +130,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
         "start": 241,
         "end": 283
-      }
+      },
+      "hash": "ab421a902fb652ed729119e99e94dc9891a6cb311c5ab3501b9cf66b59129203"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.many(vararg String)",
@@ -129,7 +139,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
         "start": 446,
         "end": 494
-      }
+      },
+      "hash": "14ce8aeb5401339d1e21742f516674f2a4f2dc3676f3a62dbdd041f1ffab5864"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.pick(Int,Int)",
@@ -137,7 +148,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
         "start": 360,
         "end": 401
-      }
+      },
+      "hash": "34f0c7972611cfa33aed2b5ab58aa260bb3d115258c8ef0ec008c77fc5005396"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.pick(String)",
@@ -145,7 +157,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
         "start": 403,
         "end": 444
-      }
+      },
+      "hash": "52024df245d614020b15d6468bbfa49ba62244a341860f6fdd8a1227e6a79e51"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Core.kt::dev.kt.core.probe()",
@@ -153,7 +166,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Core.kt",
         "start": 212,
         "end": 239
-      }
+      },
+      "hash": "9d377decb73251197d8c23e8520b4d01f6f9a5b293636aaed743d98317bc11db"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money",
@@ -161,7 +175,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
         "start": 21,
         "end": 224
-      }
+      },
+      "hash": "a3859489df9d757fe15a96814df2fe9bb8612923de92be4e4956b1988d69b241"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.Companion",
@@ -169,7 +184,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
         "start": 149,
         "end": 222
-      }
+      },
+      "hash": "c1424784ef21df9b2f27b83ab14d3b657dc85ca3fbac447bb5790ec0793a72c3"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.Companion.of(Int)",
@@ -177,7 +193,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
         "start": 176,
         "end": 216
-      }
+      },
+      "hash": "05f720b6e6614680ae48a1d859c02178e788e5b5769ce214a13e9d612666fe7e"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.format()",
@@ -185,7 +202,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
         "start": 226,
         "end": 275
-      }
+      },
+      "hash": "2b9681dd9baed4217075d7915d0fd8f21cd29b82a32119d293594e7ad0125b0c"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.plus(Money)",
@@ -193,7 +211,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
         "start": 55,
         "end": 113
-      }
+      },
+      "hash": "2e175beaf2df80d093a2cb43fb7227ea858dc19ad729a7d979d019df4d9633ae"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.stamp()",
@@ -201,7 +220,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
         "start": 277,
         "end": 310
-      }
+      },
+      "hash": "61dce57a1f5af5f6e515ba156de936ac569d61c85dd40b08e86203160e98e705"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/Money.kt::dev.kt.core.Money.total()",
@@ -209,7 +229,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/Money.kt",
         "start": 119,
         "end": 143
-      }
+      },
+      "hash": "9ecebfa7d54b980008452c9003deff823c0af2532fa7ce3fce97faaa46fb92ef"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Money.label()",
@@ -217,7 +238,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/MoneyExt.kt",
         "start": 208,
         "end": 243
-      }
+      },
+      "hash": "1beadfeaa1e6f4bf42ba38cadcd9c2a5f43e0f0b1f9a9d1b231fce0707851b96"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Money.total()",
@@ -225,7 +247,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/MoneyExt.kt",
         "start": 284,
         "end": 310
-      }
+      },
+      "hash": "aff2680fdeccfd1acd048c05d798c870a72609e91a0457a6b5a89907f07d40ec"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/MoneyExt.kt::dev.kt.core.Thing.render()",
@@ -233,7 +256,8 @@
         "path": "core/src/main/kotlin/dev/kt/core/MoneyExt.kt",
         "start": 245,
         "end": 282
-      }
+      },
+      "hash": "dba66a7700d0faa9ec04f58619cf8837a8a37d2c5d820eb2f1d15fb755725253"
     },
     {
       "id": "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/other/Other.kt::dev.kt.other.String.shout()",
@@ -241,7 +265,8 @@
         "path": "core/src/main/kotlin/dev/kt/other/Other.kt",
         "start": 22,
         "end": 55
-      }
+      },
+      "hash": "7ccd3d657d447d2e94c12f7c35085ab930bcd7bac963797f14f1bea70812882c"
     },
     {
       "id": "example.com/kotlin/lib::core/src/test/kotlin/dev/kt/core/Samples.kt::dev.kt.core.sample()",
@@ -249,7 +274,8 @@
         "path": "core/src/test/kotlin/dev/kt/core/Samples.kt",
         "start": 21,
         "end": 51
-      }
+      },
+      "hash": "2e20ab1ec537b4f15a79ea39b2131a6a454a9156c165633b875f7fe7eae361d9"
     },
     {
       "id": "example.com/kotlin/lib::core/src/test/kotlin/shared/dev/kt/core/Extras.kt::dev.kt.core.extras()",
@@ -257,7 +283,8 @@
         "path": "core/src/test/kotlin/shared/dev/kt/core/Extras.kt",
         "start": 21,
         "end": 51
-      }
+      },
+      "hash": "bc1a7658b77525f522be9d71a5a513c1d5970ac8deb5766804577e58344ed542"
     },
     {
       "id": "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp",
@@ -265,7 +292,8 @@
         "path": "util/src/main/kotlin/dev/kt/shared/Shared.kt",
         "start": 23,
         "end": 73
-      }
+      },
+      "hash": "6e7ac20c66fe01cd088885c4069d13b2c9425b94be45d2da005a18bd23bc33da"
     },
     {
       "id": "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()",
@@ -273,7 +301,8 @@
         "path": "util/src/main/kotlin/dev/kt/shared/Shared.kt",
         "start": 42,
         "end": 71
-      }
+      },
+      "hash": "afa6f549ed9d988fe8fd282e84554c08428efd35df0250a7dc1849739afcd760"
     },
     {
       "id": "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()",
@@ -281,7 +310,8 @@
         "path": "util/src/main/kotlin/dev/kt/shared/Shared.kt",
         "start": 75,
         "end": 110
-      }
+      },
+      "hash": "7fd574f2750e1026e7c192a8b2fce78f6ba2f68ceda878b1fb9ac9535135119e"
     }
   ],
   "calls": [

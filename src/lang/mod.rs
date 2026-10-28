@@ -328,6 +328,14 @@ pub fn known_outside(language: &dyn LanguagePack) -> Vec<KnownEntry> {
         .collect()
 }
 
+/// Sets each definition's `hash` to the BLAKE3 of the exact bytes of its range in `src`.
+pub fn hash_spans(facts: &mut Facts, src: &[u8]) {
+    for def in &mut facts.defs {
+        let text = src.get(def.range.clone()).unwrap_or_default();
+        def.hash = blake3::hash(text).to_hex().to_string();
+    }
+}
+
 pub fn pack(index: usize) -> &'static dyn LanguagePack {
     PACKS[index]
 }
@@ -765,6 +773,9 @@ pub struct Def {
     /// A call fits the function only when written under `await` (Swift's `async`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub suspends: bool,
+    /// The BLAKE3 of the exact bytes of `range`, in hex; empty until `hash_spans` fills it.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub hash: String,
 }
 
 #[derive(Serialize, Deserialize)]

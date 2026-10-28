@@ -21,7 +21,8 @@
         "path": "src/users.ts",
         "start": 502,
         "end": 616
-      }
+      },
+      "hash": "2150dccd1e447e80b029acb83c4d185a4af82fd0f75b935a04f2eedf2faf1de5"
     },
     {
       "id": "example.com/acme/paths::src/users.ts::getUser",
@@ -29,7 +30,8 @@
         "path": "src/users.ts",
         "start": 362,
         "end": 424
-      }
+      },
+      "hash": "a1eb31fc47c815ecbc5af7232e386be4d1f5f84b324df96d597b2b2f752df1ba"
     },
     {
       "id": "example.com/acme/paths::src/users.ts::listUsers",
@@ -37,7 +39,8 @@
         "path": "src/users.ts",
         "start": 205,
         "end": 269
-      }
+      },
+      "hash": "d75bdd5addadfd511133124989f61e09772a353c3146f2fb99fc1122434446a9"
     }
   ],
   "calls": [

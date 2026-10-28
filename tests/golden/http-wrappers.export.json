@@ -17,7 +17,8 @@
         "path": "src/http.ts",
         "start": 610,
         "end": 698
-      }
+      },
+      "hash": "4e3779643583393bde2de76ac1c0f1b6ff0ee535458b7224cf1a403264bb72e3"
     },
     {
       "id": "example.com/acme/admin::src/http.ts::get",
@@ -25,7 +26,8 @@
         "path": "src/http.ts",
         "start": 263,
         "end": 317
-      }
+      },
+      "hash": "c546b34066b82d3d9915e60c5a8f41dd5b052506f143d9972fd6515894d492fa"
     },
     {
       "id": "example.com/acme/admin::src/http.ts::remove",
@@ -33,7 +35,8 @@
         "path": "src/http.ts",
         "start": 326,
         "end": 393
-      }
+      },
+      "hash": "fa7718dc596c065d114ca21b501e93e44077b15ed4d5173fd52349bfe883f4a6"
     },
     {
       "id": "example.com/acme/admin::src/http.ts::request",
@@ -41,7 +44,8 @@
         "path": "src/http.ts",
         "start": 127,
         "end": 223
-      }
+      },
+      "hash": "5cc3a63c2d48ea68365d5e97e54a4425c16d6ce5399c954dae54469e16e91111"
     },
     {
       "id": "example.com/acme/admin::src/http.ts::retry",
@@ -49,7 +53,8 @@
         "path": "src/http.ts",
         "start": 478,
         "end": 608
-      }
+      },
+      "hash": "420678eb0076ec28c842b753fa9378f9d715e3ea985f8d778c676e54292d240d"
     },
     {
       "id": "example.com/acme/admin::src/users.ts::deleteUser",
@@ -57,7 +62,8 @@
         "path": "src/users.ts",
         "start": 237,
         "end": 309
-      }
+      },
+      "hash": "69fc77c978c20ddc35ad06ccc12afbb895b28e1299962c427849ee36ceafa090"
     },
     {
       "id": "example.com/acme/admin::src/users.ts::listUsers",
@@ -65,7 +71,8 @@
         "path": "src/users.ts",
         "start": 110,
         "end": 162
-      }
+      },
+      "hash": "c922a27d3ddaf63c5b9e4161f7cf1b46c0a10a27217b8683c4d3638aa2136b67"
     },
     {
       "id": "example.com/acme/admin::src/users.ts::listUsersPatiently",
@@ -73,7 +80,8 @@
         "path": "src/users.ts",
         "start": 544,
         "end": 610
-      }
+      },
+      "hash": "9a2277f2e7d3050847619e691105127d83f277fb1bed44c7a5ed9f25ecf1e36c"
     },
     {
       "id": "example.com/acme/admin::src/users.ts::listUsersTyped",
@@ -81,7 +89,8 @@
         "path": "src/users.ts",
         "start": 366,
         "end": 468
-      }
+      },
+      "hash": "3c36cbead78bfe60698bbc1c24ce26d7f4a46425ecb18b8388e1f2fbf5e4c89a"
     }
   ],
   "calls": [

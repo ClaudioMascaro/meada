@@ -7028,6 +7028,7 @@ mod tests {
             type_params: Vec::new(),
             result: None,
             suspends: false,
+            hash: String::new(),
         }
     }
 

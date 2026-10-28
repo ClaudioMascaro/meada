@@ -37,7 +37,8 @@
         "path": "app/api/audit/route.ts",
         "start": 7,
         "end": 70
-      }
+      },
+      "hash": "ee63adc2d7a4d8221fd00c4c29d779176bd5eb283b40a4f854cf252d3cb4556a"
     },
     {
       "id": "example.com/xlang/storefront::app/api/health/route.ts::GET",
@@ -45,7 +46,8 @@
         "path": "app/api/health/route.ts",
         "start": 7,
         "end": 69
-      }
+      },
+      "hash": "71ca2cf6fe888ffa66f83b20651b5e62239997ccc7b97449780b435a00734ab6"
     },
     {
       "id": "example.com/xlang/storefront::app/api/prices/[sku]/route.ts::GET",
@@ -53,7 +55,8 @@
         "path": "app/api/prices/[sku]/route.ts",
         "start": 7,
         "end": 145
-      }
+      },
+      "hash": "97f4c5fffc953a966e45f167020216909ea40b6dcf006fcd3ea5e696f5dc13b8"
     },
     {
       "id": "example.com/xlang/storefront::app/api/promotions/route.ts::GET",
@@ -61,7 +64,8 @@
         "path": "app/api/promotions/route.ts",
         "start": 7,
         "end": 59
-      }
+      },
+      "hash": "9d21b597cb7691cb42738687cdfa814ae9f380d9c16ffbc36c714d4045b079d0"
     },
     {
       "id": "example.com/xlang/storefront::src/events.ts::announceRestock",
@@ -69,7 +73,8 @@
         "path": "src/events.ts",
         "start": 218,
         "end": 346
-      }
+      },
+      "hash": "976e107073ea3c6f4a1908ad20a83d907d880006a0883b27bc05a1117124aeb1"
     },
     {
       "id": "example.com/xlang/storefront::src/inventory.ts::reserveStock",
@@ -77,7 +82,8 @@
         "path": "src/inventory.ts",
         "start": 219,
         "end": 329
-      }
+      },
+      "hash": "ec500accea32b3f941eb9a4dcfc4bce22b9d49f27da20facf229dbcbe7f080c9"
     },
     {
       "id": "example.com/xlang/storefront::src/inventory.ts::stockLevel",
@@ -85,7 +91,8 @@
         "path": "src/inventory.ts",
         "start": 87,
         "end": 168
-      }
+      },
+      "hash": "58c434a23e3eaa549bd6bf3e2da1904029db6d25fd197026069501cbb168508a"
     },
     {
       "id": "example.com/xlang/storefront::src/sync.ts::syncInventory",
@@ -93,7 +100,8 @@
         "path": "src/sync.ts",
         "start": 64,
         "end": 159
-      }
+      },
+      "hash": "4c6a0e77f09f8911d602f283ef4eb1f520a5cceda8e76e9f50c46092a3a56f70"
     }
   ],
   "calls": [

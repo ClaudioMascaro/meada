@@ -52,7 +52,8 @@ struct SearchArgs {
     /// name), `document` (an OpenAPI or AsyncAPI file, by path or title), `package` (by name,
     /// with its consumers), `drift` (fields consumers read that a route lacks, by route or field
     /// path), `community` (by name), `process` (by its entry point's label, with the
-    /// `process::` identity `trace` starts from), or `ambiguous` or `unresolved` (open items,
+    /// `process::` identity `trace` starts from), `duplicate` (symbols with identical text in
+    /// two or more places, by name or path), or `ambiguous` or `unresolved` (open items,
     /// with the `meada decide` command for each).
     kind: Option<String>,
     /// Token budget for the answer (default 2000).
