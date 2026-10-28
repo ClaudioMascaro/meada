@@ -224,6 +224,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // file assigns holds no one value, so its bound is dropped (`Facts::bound`).
     let mut initialized: Vec<Bound> = Vec::new();
     let mut reassigned: BTreeSet<String> = BTreeSet::new();
+    let mut seen = Declared::new();
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
         node,
@@ -655,7 +656,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 }
                 let write = match left {
                     Some(n) if n.kind() == "identifier" => {
-                        (!declared_before(n, src)).then_some((n, true))
+                        (!declared_before(n, src, &mut seen)).then_some((n, true))
                     }
                     Some(n) if n.kind() == "field_access" => {
                         let this = n
@@ -938,22 +939,25 @@ fn assignments(
     }
 }
 
+/// The names the children of a node declare, each with the offset of the first child that does.
+type Declared = BTreeMap<usize, BTreeMap<String, usize>>;
+
 /// Whether the identifier `name` is a local or a parameter declared before it, in a block
-/// around it, a loop, a `catch`, a `try` resource, a lambda or the method.
+/// around it, a loop, a `catch`, a `try` resource, a lambda or the method. `seen` holds what
+/// each block declares, read once, so a block of thousands of statements costs its width.
 // ponytail: a pattern variable (`o instanceof Foo base`) and a local of an earlier `case` group
 // are not read, so an assignment to either counts as a write of a field of that name.
-fn declared_before(name: Node, src: &[u8]) -> bool {
+fn declared_before(name: Node, src: &[u8], seen: &mut Declared) -> bool {
     let wanted = text(name, src);
     let mut child = name;
     while let Some(parent) = child.parent() {
         if parent.kind() == "class_body" {
             return false;
         }
-        let mut before = named(parent).take_while(|n| n.id() != child.id());
-        if before.any(|s| declares(parent, s, wanted, src))
-            || (parent.kind() == "compact_constructor_declaration")
-                && formal_parameters(parent).any(|p| declares(parent, p, wanted, src))
-        {
+        let names = seen
+            .entry(parent.id())
+            .or_insert_with(|| declared_in(parent, src));
+        if names.get(wanted).is_some_and(|&at| at < child.start_byte()) {
             return true;
         }
         child = parent;
@@ -961,18 +965,43 @@ fn declared_before(name: Node, src: &[u8]) -> bool {
     false
 }
 
-/// Whether `sibling`, a child of `parent`, declares the name `wanted`.
-fn declares(parent: Node, sibling: Node, wanted: &str, src: &[u8]) -> bool {
-    let is = |n: Option<Node>| n.is_some_and(|n| text(n, src) == wanted);
+/// The names the children of `parent` declare, and a compact constructor's parameters.
+fn declared_in(parent: Node, src: &[u8]) -> BTreeMap<String, usize> {
+    let mut names = BTreeMap::new();
+    if parent.kind() == "compact_constructor_declaration" {
+        for p in formal_parameters(parent) {
+            declares(parent, p, src, &mut |n| {
+                names.insert(n.to_string(), 0);
+            });
+        }
+    }
+    for s in named(parent) {
+        declares(parent, s, src, &mut |n| {
+            names.entry(n.to_string()).or_insert(s.start_byte());
+        });
+    }
+    names
+}
+
+/// Tells `out` each name `sibling`, a child of `parent`, declares.
+fn declares(parent: Node, sibling: Node, src: &[u8], out: &mut dyn FnMut(&str)) {
     match sibling.kind() {
-        "local_variable_declaration" | "spread_parameter" => named(sibling)
-            .filter(|n| n.kind() == "variable_declarator")
-            .any(|d| is(d.child_by_field_name("name"))),
+        "local_variable_declaration" | "spread_parameter" => {
+            for d in named(sibling).filter(|n| n.kind() == "variable_declarator") {
+                if let Some(n) = d.child_by_field_name("name") {
+                    out(text(n, src));
+                }
+            }
+        }
         "formal_parameter" | "catch_formal_parameter" | "resource" => {
-            is(sibling.child_by_field_name("name"))
+            if let Some(n) = sibling.child_by_field_name("name") {
+                out(text(n, src));
+            }
         }
         "formal_parameters" | "inferred_parameters" | "resource_specification" => {
-            named(sibling).any(|n| declares(sibling, n, wanted, src))
+            for n in named(sibling) {
+                declares(sibling, n, src, out);
+            }
         }
         // A lambda's parameter, or a loop's variable.
         "identifier" => {
@@ -985,9 +1014,11 @@ fn declares(parent: Node, sibling: Node, wanted: &str, src: &[u8]) -> bool {
                 "inferred_parameters" => true,
                 _ => false,
             };
-            declared && is(Some(sibling))
+            if declared {
+                out(text(sibling, src));
+            }
         }
-        _ => false,
+        _ => {}
     }
 }
 
@@ -1405,6 +1436,18 @@ mod tests {
             .collect();
         marks.sort();
         marks
+    }
+
+    /// A block of thousands of assignments costs its width: what a block declares is read once.
+    #[test]
+    fn a_block_of_many_assignments_is_read_in_linear_time() {
+        let body = "a = 1;\n".repeat(50_000);
+        let src = format!("class C {{ int a; void f() {{ {body} }} }}");
+        let start = std::time::Instant::now();
+        let mut marks = writes(&src);
+        marks.dedup();
+        assert_eq!(marks, [".a@C"]);
+        assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
     }
 
     #[test]

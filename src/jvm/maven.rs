@@ -39,17 +39,28 @@ fn text(at: Node<'_, '_>) -> Option<String> {
 // ponytail: real poms nest a few; this bounds the stack over a hostile chain.
 const PROPERTY_DEPTH: usize = 16;
 
+/// How many properties `fill` reads in one pom, all its dependencies together.
+// ponytail: a real pom reads a few dozen; this bounds a hostile one whose dependencies each walk
+// a wide web of properties. Past it a hole stays as written, so the coordinate stays computed.
+pub const FILL_BUDGET: usize = 100_000;
+
 /// `value` with each `${name}` that `lookup` gives a literal replaced by it, through the
 /// properties that name properties. A hole whose value has a hole left, or a value longer than a
-/// package name, stays as written. Each property is read once per call, a cycle included.
-pub fn fill<'a>(value: &str, lookup: &impl Fn(&str) -> Option<&'a str>) -> String {
-    fill_to(value, lookup, &mut HashMap::new(), PROPERTY_DEPTH)
+/// package name, stays as written. Each property is read once per call, a cycle included, and
+/// every read is charged to `budget`.
+pub fn fill<'a>(
+    value: &str,
+    lookup: &impl Fn(&str) -> Option<&'a str>,
+    budget: &mut usize,
+) -> String {
+    fill_to(value, lookup, &mut HashMap::new(), budget, PROPERTY_DEPTH)
 }
 
 fn fill_to<'a>(
     value: &str,
     lookup: &impl Fn(&str) -> Option<&'a str>,
     read: &mut HashMap<String, Option<String>>,
+    budget: &mut usize,
     depth: usize,
 ) -> String {
     let mut out = String::new();
@@ -64,10 +75,13 @@ fn fill_to<'a>(
         if !read.contains_key(name) {
             // Marked read before it is, so a property naming itself finds no literal.
             read.insert(name.to_string(), None);
-            let literal = (depth > 0)
+            let literal = (depth > 0 && *budget > 0)
                 .then(|| lookup(name))
                 .flatten()
-                .map(|v| fill_to(v, lookup, read, depth - 1))
+                .map(|v| {
+                    *budget -= 1;
+                    fill_to(v, lookup, read, budget, depth - 1)
+                })
                 .filter(|v| !v.contains("${") && v.len() <= crate::package::MAX_NAME);
             read.insert(name.to_string(), literal);
         }
@@ -158,6 +172,7 @@ pub fn read(src: &[u8]) -> Summary {
     let parent = child(project, "parent")
         .and_then(|p| field(p, "groupId").zip(field(p, "artifactId")))
         .and_then(|(g, a)| super::coordinate(&g, &a));
+    let mut budget = FILL_BUDGET;
     let lookup = |name: &str| match name {
         "project.groupId" => group.as_deref(),
         "project.artifactId" => artifact.as_deref(),
@@ -174,7 +189,10 @@ pub fn read(src: &[u8]) -> Summary {
             else {
                 continue;
             };
-            let (group, artifact) = (fill(&group, &lookup), fill(&artifact, &lookup));
+            let (group, artifact) = (
+                fill(&group, &lookup, &mut budget),
+                fill(&artifact, &lookup, &mut budget),
+            );
             let Some((name, computed)) = named(&group, &artifact) else {
                 continue;
             };
@@ -314,6 +332,18 @@ mod tests {
         );
         let body = format!("{properties}{}", dependency("example", "${self}"));
         assert_eq!(dependencies(&project("", &body)).len(), 1);
+    }
+
+    #[test]
+    fn the_properties_a_pom_reads_are_charged_to_one_budget() {
+        let lookup = |name: &str| match name {
+            "a" => Some("${b}"),
+            "b" => Some("${c}"),
+            "c" => Some("x"),
+            _ => None,
+        };
+        assert_eq!(fill("${a}", &lookup, &mut 3), "x");
+        assert_eq!(fill("${a}", &lookup, &mut 2), "${a}");
     }
 
     #[test]

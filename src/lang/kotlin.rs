@@ -270,6 +270,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     // a bare `f` no local or parameter declares), and the properties by the class `Marked`
     // names, which `Code::field_written_in` is asked about.
     let mut writes: Vec<(String, String, bool)> = Vec::new();
+    let mut seen = Declared::new();
     let mut members: BTreeSet<(String, String)> = BTreeSet::new();
     let mut classes: BTreeSet<String> = BTreeSet::new();
     let mut locals: Vec<Receiver> = Vec::new();
@@ -725,7 +726,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                         .any(|op| step.starts_with(op) || step.ends_with(op));
                     node.child_by_field_name("argument").filter(|_| step)
                 };
-                if let Some((name, own)) = target.and_then(|t| write_target(t, src)) {
+                if let Some((name, own)) = target.and_then(|t| write_target(t, src, &mut seen)) {
                     // The `this` and the members of a lambda or an object literal are not the
                     // class's.
                     let own = own && !opaque && implicit == Implicit::Enclosing;
@@ -1751,9 +1752,9 @@ fn template(parts: &mut Vec<Part>, text: &str) {
 /// one that can be a property, and whether it may be a property of the class around it: a bare
 /// name no local or parameter declared before it, or `this.name`; the last of any other path
 /// (`o.base`) is one of another object.
-fn write_target<'t>(target: Node<'t>, src: &[u8]) -> Option<(Node<'t>, bool)> {
+fn write_target<'t>(target: Node<'t>, src: &[u8], seen: &mut Declared) -> Option<(Node<'t>, bool)> {
     match target.kind() {
-        "identifier" => (!declared_before(target, src)).then_some((target, true)),
+        "identifier" => (!declared_before(target, src, seen)).then_some((target, true)),
         "navigation_expression" => {
             let parts: Vec<Node> = named(target).collect();
             let name = parts.last().filter(|n| n.kind() == "identifier")?;
@@ -1764,11 +1765,15 @@ fn write_target<'t>(target: Node<'t>, src: &[u8]) -> Option<(Node<'t>, bool)> {
     }
 }
 
+/// The names the children of a node declare, each with the offset of the first child that does.
+type Declared = BTreeMap<usize, BTreeMap<String, usize>>;
+
 /// Whether the identifier `name` is a local or a parameter declared before it, in a block
-/// around it, a loop, a `catch`, a lambda or the function.
+/// around it, a loop, a `catch`, a lambda or the function. `seen` holds what each block
+/// declares, read once, so a block of thousands of statements costs its width.
 // ponytail: a local of the script around it is not read, so an assignment to one counts as a
 // write of a property of that name.
-fn declared_before(name: Node, src: &[u8]) -> bool {
+fn declared_before(name: Node, src: &[u8], seen: &mut Declared) -> bool {
     let wanted = text(name, src);
     let mut child = name;
     while let Some(parent) = child.parent() {
@@ -1778,27 +1783,48 @@ fn declared_before(name: Node, src: &[u8]) -> bool {
         if outer(parent) {
             return false;
         }
-        let mut before = named(parent).take_while(|n| n.id() != child.id());
-        if !member && before.any(|s| declares(parent, s, wanted, src)) {
-            return true;
+        if !member {
+            let names = seen
+                .entry(parent.id())
+                .or_insert_with(|| declared_in(parent, src));
+            if names.get(wanted).is_some_and(|&at| at < child.start_byte()) {
+                return true;
+            }
         }
         child = parent;
     }
     false
 }
 
-/// Whether `sibling`, a child of `parent`, declares the name `wanted`.
-fn declares(parent: Node, sibling: Node, wanted: &str, src: &[u8]) -> bool {
+/// The names the children of `parent` declare.
+fn declared_in(parent: Node, src: &[u8]) -> BTreeMap<String, usize> {
+    let mut names = BTreeMap::new();
+    for s in named(parent) {
+        declares(parent, s, src, &mut |n| {
+            names.entry(n.to_string()).or_insert(s.start_byte());
+        });
+    }
+    names
+}
+
+/// Tells `out` each name `sibling`, a child of `parent`, declares.
+fn declares(parent: Node, sibling: Node, src: &[u8], out: &mut dyn FnMut(&str)) {
     match sibling.kind() {
-        "variable_declaration" | "parameter" => named(sibling)
-            .next()
-            .is_some_and(|i| i.kind() == "identifier" && text(i, src) == wanted),
+        "variable_declaration" | "parameter" => {
+            if let Some(i) = named(sibling).next().filter(|i| i.kind() == "identifier") {
+                out(text(i, src));
+            }
+        }
         "property_declaration"
         | "multi_variable_declaration"
         | "function_value_parameters"
-        | "lambda_parameters" => named(sibling).any(|n| declares(sibling, n, wanted, src)),
-        "identifier" => parent.kind() == "catch_block" && text(sibling, src) == wanted,
-        _ => false,
+        | "lambda_parameters" => {
+            for n in named(sibling) {
+                declares(sibling, n, src, out);
+            }
+        }
+        "identifier" if parent.kind() == "catch_block" => out(text(sibling, src)),
+        _ => {}
     }
 }
 
@@ -2964,6 +2990,18 @@ class A {
             .collect();
         marks.sort();
         marks
+    }
+
+    /// A block of thousands of assignments costs its width: what a block declares is read once.
+    #[test]
+    fn a_block_of_many_assignments_is_read_in_linear_time() {
+        let body = "a = 1\n".repeat(50_000);
+        let src = format!("package a\nclass C {{ var a = 0\n fun f() {{\n{body} }} }}");
+        let start = std::time::Instant::now();
+        let mut marks = writes(&src);
+        marks.dedup();
+        assert_eq!(marks, [".a@a.C"]);
+        assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
     }
 
     #[test]
