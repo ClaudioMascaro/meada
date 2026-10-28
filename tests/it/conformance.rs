@@ -1502,6 +1502,7 @@ fn kotlin() {
             "src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
             "src/main/kotlin/example/Members.kt::example.util()",
             "src/main/kotlin/example/Members.kt::example.Init",
+            "src/main/kotlin/example/Members.kt::example.Init.Init()",
             "src/main/kotlin/example/Members.kt::example.Level",
             "src/main/kotlin/example/Members.kt::example.Level.label()",
             "src/main/kotlin/example/Members.kt::example.Twin",
@@ -1912,6 +1913,20 @@ fn kotlin() {
             "src/main/kotlin/example/stars/Base.kt::example.stars.Face.face()",
             "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub",
             "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Parcel(String,String)",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.Maker()",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.Maker(Parcel)",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.assemble()",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Plain",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two(String)",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two()",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(Int)",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(String)",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()",
             "src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base",
             "src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base.mark(Int)",
             "src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both",
@@ -2668,6 +2683,53 @@ fn kotlin() {
                 "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::Base#0",
                 EXACT,
                 &["src/main/kotlin/example/stars/Base.kt::example.stars.Base"],
+            ),
+            // Each constructor, the primary one and the secondary ones, is a callable of the
+            // class's name: a call narrows among them by argument count.
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.assemble()::Parcel#0",
+                EXACT,
+                &["src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel"],
+            ),
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Plain#0",
+                EXACT,
+                &["src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Plain"],
+            ),
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Two#0",
+                EXACT,
+                &["src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two(String)"],
+            ),
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Two#1",
+                EXACT,
+                &["src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two()"],
+            ),
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Parcel#0",
+                EXACT,
+                &["src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel"],
+            ),
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Parcel#1",
+                EXACT,
+                &[
+                    "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Parcel(String,String)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Parcel.Maker#0",
+                EXACT,
+                &["src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.Maker()"],
+            ),
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Same#0",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(Int)",
+                    "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(String)",
+                ],
             ),
             // An explicit import wins over a star import; two star imports that give one name
             // leave it ambiguous, and the members of a base so named unknown.

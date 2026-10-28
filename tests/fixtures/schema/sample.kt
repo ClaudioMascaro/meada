@@ -15,3 +15,7 @@ internal fun helper(): Store = Store.open()
 expect class Clock
 
 actual class Timer
+
+class Pair2 {
+    constructor(a: Int) {}
+}

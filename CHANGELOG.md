@@ -8,6 +8,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Kotlin class with a secondary constructor is constructible: each constructor, the primary
+  one and each secondary one, is a callable of the class's name with its own parameter list, and
+  a call narrows among them by argument count (`exact` when one fits, `ambiguous` when two take
+  that count). Before, the class left the callables of its name and every construction stayed
+  unresolved (okhttp's `Request.Builder()`).
 - A Rust method called on another call's result (`Router::new().route(..)`, also through
   `.await` and parentheses) resolves within the family of the inner target's written result,
   `exact` when one member fits. Before, it was a name match among every method of its name

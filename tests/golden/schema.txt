@@ -1633,11 +1633,37 @@ sample.kt
         "end": 300
       },
       "params": []
+    },
+    {
+      "name": "example.Pair2",
+      "kind": "Class",
+      "range": {
+        "start": 302,
+        "end": 344
+      },
+      "params": []
+    },
+    {
+      "name": "example.Pair2.Pair2(Int)",
+      "kind": "Method",
+      "range": {
+        "start": 320,
+        "end": 342
+      },
+      "params": [
+        {
+          "name": "a",
+          "binds": "Any"
+        }
+      ]
     }
   ],
   "overloads": {
     "example.Clock": [
       "example.Clock"
+    ],
+    "example.Pair2": [
+      "example.Pair2.Pair2(Int)"
     ],
     "example.Store": [
       "example.Store"
@@ -1898,6 +1924,18 @@ sample.kt
         "exported": "example.Timer",
         "local": "example.Timer"
       }
+    },
+    {
+      "Local": {
+        "exported": "Pair2",
+        "local": "example.Pair2"
+      }
+    },
+    {
+      "Local": {
+        "exported": "example.Pair2",
+        "local": "example.Pair2"
+      }
     }
   ],
   "star": {
@@ -1909,7 +1947,9 @@ sample.kt
       "Clock",
       "example.Clock",
       "Timer",
-      "example.Timer"
+      "example.Timer",
+      "Pair2",
+      "example.Pair2"
     ]
   },
   "calls": [
@@ -1958,6 +1998,13 @@ sample.kt
     {
       "scope": "example.Store.save(Int,vararg String)",
       "name": "id",
+      "class": {
+        "Type": "Int"
+      }
+    },
+    {
+      "scope": "example.Pair2",
+      "name": "a",
       "class": {
         "Type": "Int"
       }
