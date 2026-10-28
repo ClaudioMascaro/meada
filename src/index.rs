@@ -45,7 +45,9 @@ pub(crate) fn schema_version() -> i32 {
 /// (names, specifiers and byte ranges, no source text); `files.resolved` is the BLAKE3 of the
 /// file's resolved symbol and call rows, empty for a file its pack leaves out (`Layout::members`: a
 /// Rust file no `mod` reaches), which has no rows and is no file of the export. `calls.narrowed` is 1 for an
-/// `inferred` call a family or scope narrowed from several definitions of its name. `calls.target` holds the one definition an `exact` or
+/// `inferred` call a family or scope narrowed from several definitions of its name.
+/// `calls.decorates` is the identity of the definition an annotation, attribute or decorator call
+/// decorates, NULL for an ordinary call. `calls.target` holds the one definition an `exact` or
 /// `inferred` call reaches; an `ambiguous` call has no target and lists every definition that
 /// fits in `candidates`. An unresolved consumer's `contracts` row keeps the `method` it calls
 /// with, when readable, and the literal `fragments` of its URL path as a JSON array (NULL when
@@ -97,7 +99,8 @@ CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NU
 CREATE INDEX symbols_path ON symbols (path);
 CREATE TABLE calls (
     id TEXT NOT NULL, caller TEXT NOT NULL, target TEXT, level TEXT,
-    path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, narrowed INTEGER NOT NULL
+    path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, narrowed INTEGER NOT NULL,
+    decorates TEXT
 );
 CREATE INDEX calls_path ON calls (path);
 CREATE TABLE candidates (call TEXT NOT NULL, target TEXT NOT NULL);
@@ -556,6 +559,9 @@ struct Resolved {
     /// An `inferred` match narrowed to one of several definitions of its name.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     narrowed: bool,
+    /// The definition an annotation, attribute or decorator call decorates.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    decorates: Option<String>,
 }
 
 /// The symbol and call rows of one file, before they are written.
@@ -937,7 +943,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         }
         for row in &rows.calls {
             tx.execute(
-                "INSERT INTO calls VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                "INSERT INTO calls VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                 params![
                     row.id,
                     row.caller,
@@ -946,7 +952,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
                     path,
                     row.start,
                     row.end,
-                    row.narrowed
+                    row.narrowed,
+                    row.decorates
                 ],
             )?;
             for candidate in &row.candidates {
@@ -1636,6 +1643,10 @@ fn resolve_file<'a>(
                 end: call.range.end as i64,
                 candidates,
                 narrowed,
+                decorates: call
+                    .decorates
+                    .as_deref()
+                    .map(|d| format!("{identity}::{path}::{}", names.scope(path, d))),
             }
         })
         .collect();
@@ -1908,7 +1919,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
     }
     let calls = db
         .prepare(&format!(
-            "SELECT id, caller, target, level, path, start, end, narrowed FROM {schema}.calls \
+            "SELECT id, caller, target, level, path, start, end, narrowed, decorates FROM {schema}.calls \
              ORDER BY id, path, start, end"
         ))?
         .query_map([], |r| {
@@ -1924,6 +1935,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
                     .and_then(Level::parse),
                 span: span(r, 4)?,
                 narrowed: r.get(7)?,
+                decorates: r.get(8)?,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;

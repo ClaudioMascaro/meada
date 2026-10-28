@@ -25,7 +25,10 @@ São três ferramentas, sempre em inglês, e nenhuma escreve:
   pelo nome; com o tipo `ambiguous` ou `unresolved`, lista os itens abertos
   (veja Decisões);
 - `context` descreve um símbolo: o trecho de código lido do disco, quem o chama, quem ele
-  chama e os contratos que ele toca; num recurso (`resource::postgres::orders`), lista quem
+  chama e os contratos que ele toca; as anotações, atributos e decoradores escritos sobre uma
+  definição (`@Override`, `[Fact]`, `@app.get("/x")`) são chamadas do escopo que a envolve, e por
+  isso o `context` as lista à parte, na seção `annotations:`, cada uma com a definição que ela
+  decora (o ponto de chamada do export traz isso em `decorates`); num recurso (`resource::postgres::orders`), lista quem
   escreve e quem lê, com o símbolo e a linha, ou `(repository-level)` para o repositório
   inteiro; num canal (`channel::kafka::orders.created`), lista produtores e consumidores,
   inclusive os que chegam a ele por um curinga ou por um binding, com o nível e o motivo, e um

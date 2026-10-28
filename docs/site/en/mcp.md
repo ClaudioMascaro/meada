@@ -25,7 +25,10 @@ There are three tools, always in English, and none of them writes:
   with the kind `ambiguous` or `unresolved`, it lists the open items (see
   Decisions);
 - `context` describes one symbol: its code read from disk, its callers, its callees and the
-  contracts it touches; on a resource (`resource::postgres::orders`), it lists who writes and
+  contracts it touches; the annotations, attributes and decorators written on a definition (`@Override`,
+  `[Fact]`, `@app.get("/x")`) are calls of the enclosing scope, so `context` lists them apart,
+  in an `annotations:` section, each with the definition it decorates (the export's call site
+  carries it as `decorates`); on a resource (`resource::postgres::orders`), it lists who writes and
   who reads it, with the symbol and line, or `(repository-level)` for the whole repository; on
   a channel (`channel::kafka::orders.created`), it lists producers and consumers, those that
   reach it through a wildcard or a binding included, with the level and the reason, and a side

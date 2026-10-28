@@ -1998,7 +1998,8 @@ one for the area a change touches.
   chained call is made on (`Call::on`), whether a Swift call is written under `await` and
   whether a function needs one (`Call::awaited`, `Def::suspends`), the modules a Swift file imports
   `@testable` and the names only their file sees (`Facts::testable`, `Facts::confined`), whether an `inferred` call was narrowed from several
-  definitions of its name (`calls.narrowed`), callable-to-signature and
+  definitions of its name (`calls.narrowed`), the definition a decorating call decorates (`calls.decorates`, the
+  call site's `decorates`), callable-to-signature and
   static-member names (`Facts::overloads`, `Facts::constructors` and
   `Facts::statics`), the namespaces and types a C# file's `global using` directives name
   (`Facts::project`, names as `Facts::imports` holds them), the qualified names of the types a C#

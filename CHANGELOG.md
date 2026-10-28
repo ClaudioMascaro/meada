@@ -6,6 +6,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- A call that decorates a definition (a Java or Kotlin annotation, a C# attribute, a Python
+  decorator, a Rust route attribute) carries the definition in the index and in the export's call
+  site (`decorates`), and `context` lists it in an `annotations:` section instead of among the
+  callees of its enclosing class or package. Targets, levels and callers do not change. The index
+  schema version changes, so existing indexes are rebuilt.
+
 ### Fixed
 
 - Imports of a project under a nested `pyproject.toml` resolve: the nearest manifest above an

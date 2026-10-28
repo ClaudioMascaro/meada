@@ -6218,7 +6218,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 2301,
         "end": 2308
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.open()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::Legacy.make#0",
@@ -6849,7 +6850,8 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 1146,
         "end": 1448
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing::RabbitListener#1",
@@ -6860,7 +6862,8 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 1492,
         "end": 1538
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing::RabbitListener#2",
@@ -6871,7 +6874,8 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 1581,
         "end": 1618
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRepo(Order)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.notifyCustomer(String)::jms.convertAndSend#0",
@@ -7055,7 +7059,8 @@
         "path": "src/main/kotlin/example/channels/Delivery.kt",
         "start": 830,
         "end": 873
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.onNotification(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.Holder.viaExtension()::kafka.send#0",
@@ -7308,7 +7313,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 1146,
         "end": 1221
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales::KafkaListener#1",
@@ -7319,7 +7325,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 1262,
         "end": 1311
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onMissing(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales::KafkaListener#2",
@@ -7330,7 +7337,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 1355,
         "end": 1414
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onShipped(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales::KafkaListener#3",
@@ -7341,7 +7349,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 1458,
         "end": 1549
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onEurope(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()::Consumer.from#0",
@@ -8817,7 +8826,8 @@
         "path": "src/main/kotlin/example/declarative/Archive.kt",
         "start": 161,
         "end": 181
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive.find(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal::DELETE#0",
@@ -8828,7 +8838,8 @@
         "path": "src/main/kotlin/example/declarative/Archive.kt",
         "start": 312,
         "end": 335
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal.drop(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes::PUT#0",
@@ -8839,7 +8850,8 @@
         "path": "src/main/kotlin/example/declarative/Archive.kt",
         "start": 502,
         "end": 515
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes.save()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere.notes()::retrofit.create#0",
@@ -8917,7 +8929,8 @@
         "path": "src/main/kotlin/example/declarative/Ledger.kt",
         "start": 249,
         "end": 269
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.entry(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger::POST#0",
@@ -8928,7 +8941,8 @@
         "path": "src/main/kotlin/example/declarative/Ledger.kt",
         "start": 327,
         "end": 343
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.record()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan::GET#0",
@@ -8939,7 +8953,8 @@
         "path": "src/main/kotlin/example/declarative/Orphan.kt",
         "start": 147,
         "end": 162
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan.get()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified::retrofit2.http.GET#0",
@@ -8950,7 +8965,8 @@
         "path": "src/main/kotlin/example/declarative/Qualified.kt",
         "start": 112,
         "end": 136
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified.a()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.archive()::retrofit.create#0",
@@ -11942,7 +11958,8 @@
         "path": "src/main/kotlin/example/web/HealthController.kt",
         "start": 478,
         "end": 498
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.live()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web::RequestMapping#0",
@@ -11953,7 +11970,8 @@
         "path": "src/main/kotlin/example/web/HealthController.kt",
         "start": 370,
         "end": 396
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web::RestController#0",
@@ -11964,7 +11982,8 @@
         "path": "src/main/kotlin/example/web/HealthController.kt",
         "start": 354,
         "end": 369
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::DeleteMapping#0",
@@ -11975,7 +11994,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 1060,
         "end": 1083
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.remove()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::GetMapping#0",
@@ -11986,7 +12006,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 696,
         "end": 707
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.list()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::GetMapping#1",
@@ -11997,7 +12018,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 741,
         "end": 762
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.fetch(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::PatchMapping#0",
@@ -12008,7 +12030,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 994,
         "end": 1026
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.flag()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::PostMapping#0",
@@ -12019,7 +12042,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 827,
         "end": 867
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::PutMapping#0",
@@ -12030,7 +12054,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 903,
         "end": 957
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.replace()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::RequestMapping#0",
@@ -12041,7 +12066,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 1109,
         "end": 1194
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.several()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::RequestMapping#1",
@@ -12052,7 +12078,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 1231,
         "end": 1297
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.single()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::RequestMapping#2",
@@ -12063,7 +12090,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 1333,
         "end": 1356
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.any()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web::RequestMapping#0",
@@ -12074,7 +12102,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 579,
         "end": 602
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web::RestController#0",
@@ -12085,7 +12114,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 563,
         "end": 578
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web.PageController::GetMapping#0",
@@ -12096,7 +12126,8 @@
         "path": "src/main/kotlin/example/web/PageController.kt",
         "start": 168,
         "end": 194
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web.PageController.page()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web::Controller#0",
@@ -12107,7 +12138,8 @@
         "path": "src/main/kotlin/example/web/PageController.kt",
         "start": 129,
         "end": 140
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web.PageController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController::GetMapping#0",
@@ -12118,7 +12150,8 @@
         "path": "src/main/kotlin/example/web/StarController.kt",
         "start": 139,
         "end": 158
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.one()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController::RequestMapping#0",
@@ -12129,7 +12162,8 @@
         "path": "src/main/kotlin/example/web/StarController.kt",
         "start": 191,
         "end": 247
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.removeAll()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web::RequestMapping#0",
@@ -12140,7 +12174,8 @@
         "path": "src/main/kotlin/example/web/StarController.kt",
         "start": 87,
         "end": 111
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web::RestController#0",
@@ -12151,7 +12186,8 @@
         "path": "src/main/kotlin/example/web/StarController.kt",
         "start": 71,
         "end": 86
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()::arrayOf#0",
@@ -12184,7 +12220,8 @@
         "path": "src/main/kotlin/example/web/VarargController.kt",
         "start": 397,
         "end": 420
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController::PostMapping#0",
@@ -12195,7 +12232,8 @@
         "path": "src/main/kotlin/example/web/VarargController.kt",
         "start": 454,
         "end": 495
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController::RequestMapping#0",
@@ -12206,7 +12244,8 @@
         "path": "src/main/kotlin/example/web/VarargController.kt",
         "start": 531,
         "end": 598
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web::RequestMapping#0",
@@ -12217,7 +12256,8 @@
         "path": "src/main/kotlin/example/web/VarargController.kt",
         "start": 340,
         "end": 367
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web::RestController#0",
@@ -12228,7 +12268,8 @@
         "path": "src/main/kotlin/example/web/VarargController.kt",
         "start": 324,
         "end": 339
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController"
     }
   ],
   "providers": [

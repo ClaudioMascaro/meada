@@ -276,7 +276,8 @@
         "path": "src/main/kotlin/com/example/api/AuditClient.kt",
         "start": 321,
         "end": 331
-      }
+      },
+      "decorates": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/AuditClient.kt::com.example.api.AuditClient"
     },
     {
       "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/InventoryClient.kt::com.example.api.InventoryClient.left(String)::client.get#0",
@@ -331,7 +332,8 @@
         "path": "src/main/kotlin/com/example/api/Ledger.kt",
         "start": 284,
         "end": 307
-      }
+      },
+      "decorates": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.LedgerApi.entry(String)"
     },
     {
       "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/Ledger.kt::com.example.api.Ledgers.api()::(call_expression).baseUrl#0",
@@ -408,7 +410,8 @@
         "path": "src/main/kotlin/com/example/api/MirrorClient.kt",
         "start": 358,
         "end": 368
-      }
+      },
+      "decorates": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/MirrorClient.kt::com.example.api.MirrorClient"
     },
     {
       "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/PriceClient.kt::com.example.api.PriceClient.priceOf(String)::client.get#0",
@@ -441,7 +444,8 @@
         "path": "src/main/kotlin/com/example/api/PriceClient.kt",
         "start": 365,
         "end": 375
-      }
+      },
+      "decorates": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/PriceClient.kt::com.example.api.PriceClient"
     },
     {
       "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/PromotionClient.kt::com.example.api.PromotionClient.current()::client.get#0",
@@ -474,7 +478,8 @@
         "path": "src/main/kotlin/com/example/api/PromotionClient.kt",
         "start": 323,
         "end": 333
-      }
+      },
+      "decorates": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/PromotionClient.kt::com.example.api.PromotionClient"
     },
     {
       "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/ReportClient.kt::com.example.api.ReportClient.send()::client.get#0",
@@ -683,7 +688,8 @@
         "path": "src/main/kotlin/com/example/api/ShipmentListener.kt",
         "start": 201,
         "end": 249
-      }
+      },
+      "decorates": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/ShipmentListener.kt::com.example.api.ShipmentListener.onShipment(String)"
     },
     {
       "id": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/StockClient.kt::com.example.api.StockClient.level()::client.get#0",
@@ -716,7 +722,8 @@
         "path": "src/main/kotlin/com/example/api/StockClient.kt",
         "start": 319,
         "end": 329
-      }
+      },
+      "decorates": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/StockClient.kt::com.example.api.StockClient"
     }
   ],
   "providers": [

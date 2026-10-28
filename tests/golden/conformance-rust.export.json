@@ -6077,7 +6077,8 @@
         "path": "crates/actix/src/accounts.rs",
         "start": 373,
         "end": 411
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/accounts.rs::remove"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::api::(call_expression).service#0",
@@ -6165,7 +6166,8 @@
         "path": "crates/actix/src/accounts.rs",
         "start": 62,
         "end": 81
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/accounts.rs::list"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::get#1",
@@ -6176,7 +6178,8 @@
         "path": "crates/actix/src/accounts.rs",
         "start": 155,
         "end": 179
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/accounts.rs::show"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::get#2",
@@ -6187,7 +6190,8 @@
         "path": "crates/actix/src/accounts.rs",
         "start": 639,
         "end": 665
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/accounts.rs::files"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::list::(call_expression).finish#0",
@@ -6220,7 +6224,8 @@
         "path": "crates/actix/src/accounts.rs",
         "start": 272,
         "end": 292
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/accounts.rs::create"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::remove::(call_expression).finish#0",
@@ -6253,7 +6258,8 @@
         "path": "crates/actix/src/accounts.rs",
         "start": 494,
         "end": 559
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/accounts.rs::sync"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::show::(call_expression).finish#0",
@@ -6341,7 +6347,8 @@
         "path": "crates/actix/src/admin.rs",
         "start": 812,
         "end": 832
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/admin.rs::dashboard"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/admin.rs::get#1",
@@ -6352,7 +6359,8 @@
         "path": "crates/actix/src/admin.rs",
         "start": 858,
         "end": 874
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/admin.rs::audit"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/admin.rs::get#2",
@@ -6363,7 +6371,8 @@
         "path": "crates/actix/src/admin.rs",
         "start": 896,
         "end": 917
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/admin.rs::unreadable"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/admin.rs::more::extras#0",
@@ -6891,7 +6900,8 @@
         "path": "crates/actix/src/macros.rs",
         "start": 194,
         "end": 217
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/macros.rs::via_services"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/macros.rs::get#1",
@@ -6902,7 +6912,8 @@
         "path": "crates/actix/src/macros.rs",
         "start": 250,
         "end": 268
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/macros.rs::via_vec"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/macros.rs::get#2",
@@ -6913,7 +6924,8 @@
         "path": "crates/actix/src/macros.rs",
         "start": 296,
         "end": 317
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/macros.rs::via_cfg_if"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/macros.rs::listed::app.service#0",
@@ -7177,7 +7189,8 @@
         "path": "crates/actix/src/stray.rs",
         "start": 707,
         "end": 740
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/stray.rs::plain"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/stray.rs::get#0",
@@ -7188,7 +7201,8 @@
         "path": "crates/actix/src/stray.rs",
         "start": 98,
         "end": 119
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/stray.rs::lonely"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/stray.rs::get#1",
@@ -7199,7 +7213,8 @@
         "path": "crates/actix/src/stray.rs",
         "start": 210,
         "end": 225
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/stray.rs::held"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/stray.rs::get#2",
@@ -7210,7 +7225,8 @@
         "path": "crates/actix/src/stray.rs",
         "start": 441,
         "end": 460
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/stray.rs::shadowed"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/stray.rs::get#3",
@@ -7221,7 +7237,8 @@
         "path": "crates/actix/src/stray.rs",
         "start": 951,
         "end": 967
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/stray.rs::bound"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/stray.rs::get#4",
@@ -7232,7 +7249,8 @@
         "path": "crates/actix/src/stray.rs",
         "start": 1334,
         "end": 1350
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/actix/src/stray.rs::early"
     },
     {
       "id": "example.com/acme/conformance::crates/actix/src/stray.rs::plug::holder.app.service#0",
@@ -7375,7 +7393,8 @@
         "path": "crates/flat/pages.rs",
         "start": 0,
         "end": 15
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/flat/pages.rs::page"
     },
     {
       "id": "example.com/acme/conformance::crates/greeter/src/main.rs::get#0",
@@ -7386,7 +7405,8 @@
         "path": "crates/greeter/src/main.rs",
         "start": 197,
         "end": 208
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/greeter/src/main.rs::index"
     },
     {
       "id": "example.com/acme/conformance::crates/greeter/src/main.rs::rocket::(call_expression).mount#0",
@@ -7419,7 +7439,8 @@
         "path": "crates/greeter/src/names.rs",
         "start": 0,
         "end": 17
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/greeter/src/names.rs::named"
     },
     {
       "id": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::amounts::i.amount#0",
@@ -7463,7 +7484,8 @@
         "path": "crates/rocket/src/joined.rs",
         "start": 175,
         "end": 194
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/rocket/src/joined.rs::joined_a"
     },
     {
       "id": "example.com/acme/conformance::crates/rocket/src/joined.rs::get#1",
@@ -7474,7 +7496,8 @@
         "path": "crates/rocket/src/joined.rs",
         "start": 217,
         "end": 236
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/rocket/src/joined.rs::joined_b"
     },
     {
       "id": "example.com/acme/conformance::crates/rocket/src/joined.rs::get#2",
@@ -7485,7 +7508,8 @@
         "path": "crates/rocket/src/joined.rs",
         "start": 259,
         "end": 280
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/rocket/src/joined.rs::documented"
     },
     {
       "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket::(array_expression).concat#0",
@@ -7606,7 +7630,8 @@
         "path": "crates/rocket/src/pages.rs",
         "start": 18,
         "end": 29
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/rocket/src/pages.rs::index"
     },
     {
       "id": "example.com/acme/conformance::crates/rocket/src/pages.rs::get#1",
@@ -7617,7 +7642,8 @@
         "path": "crates/rocket/src/pages.rs",
         "start": 77,
         "end": 93
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/rocket/src/pages.rs::about"
     },
     {
       "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::get#0",
@@ -7628,7 +7654,8 @@
         "path": "crates/rocket/src/posts.rs",
         "start": 66,
         "end": 77
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/rocket/src/posts.rs::list"
     },
     {
       "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::get#1",
@@ -7639,7 +7666,8 @@
         "path": "crates/rocket/src/posts.rs",
         "start": 96,
         "end": 111
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/rocket/src/posts.rs::show"
     },
     {
       "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::get#2",
@@ -7650,7 +7678,8 @@
         "path": "crates/rocket/src/posts.rs",
         "start": 199,
         "end": 227
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/rocket/src/posts.rs::search"
     },
     {
       "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::get#3",
@@ -7661,7 +7690,8 @@
         "path": "crates/rocket/src/posts.rs",
         "start": 276,
         "end": 301
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/rocket/src/posts.rs::files"
     },
     {
       "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::get#4",
@@ -7672,7 +7702,8 @@
         "path": "crates/rocket/src/posts.rs",
         "start": 334,
         "end": 353
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/rocket/src/posts.rs::old"
     },
     {
       "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::post#0",
@@ -7683,7 +7714,8 @@
         "path": "crates/rocket/src/posts.rs",
         "start": 137,
         "end": 166
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/rocket/src/posts.rs::create"
     },
     {
       "id": "example.com/acme/conformance::crates/rocket/src/stray.rs::base::(call_expression).unwrap_or_default#0",
@@ -7716,7 +7748,8 @@
         "path": "crates/rocket/src/stray.rs",
         "start": 92,
         "end": 108
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/rocket/src/stray.rs::lonely"
     },
     {
       "id": "example.com/acme/conformance::crates/rocket/src/stray.rs::get#1",
@@ -7727,7 +7760,8 @@
         "path": "crates/rocket/src/stray.rs",
         "start": 191,
         "end": 207
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/rocket/src/stray.rs::moved"
     },
     {
       "id": "example.com/acme/conformance::crates/rocket/src/stray.rs::get#2",
@@ -7738,7 +7772,8 @@
         "path": "crates/rocket/src/stray.rs",
         "start": 391,
         "end": 407
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/rocket/src/stray.rs::local"
     },
     {
       "id": "example.com/acme/conformance::crates/rocket/src/stray.rs::rocket.local.get#0",
@@ -7749,7 +7784,8 @@
         "path": "crates/rocket/src/stray.rs",
         "start": 485,
         "end": 516
-      }
+      },
+      "decorates": "example.com/acme/conformance::crates/rocket/src/stray.rs::three"
     },
     {
       "id": "example.com/acme/conformance::crates/scratch/src/lib.rs::reach::ledger_core.post#0",

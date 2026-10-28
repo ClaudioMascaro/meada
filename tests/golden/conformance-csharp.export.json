@@ -5020,7 +5020,8 @@
         "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
         "start": 263,
         "end": 277
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.OldController.Old()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy::ApiController#0",
@@ -5031,7 +5032,8 @@
         "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
         "start": 179,
         "end": 192
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.OldController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy::Route#0",
@@ -5042,7 +5044,8 @@
         "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
         "start": 195,
         "end": 210
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.OldController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Parts.cs::Acme.Api.Edges.PartsController::HttpGet#0",
@@ -5053,7 +5056,8 @@
         "path": "src/Acme.Api/ControllerEdges.Parts.cs",
         "start": 121,
         "end": 136
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Parts.cs::Acme.Api.Edges.PartsController.Part()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController::HttpGet#0",
@@ -5064,7 +5068,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 1320,
         "end": 1327
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController.All()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::ActionName#0",
@@ -5075,7 +5080,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 412,
         "end": 430
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.FinishAsync()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::ActionName#1",
@@ -5086,7 +5092,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 489,
         "end": 511
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Skipped()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::HttpGet#0",
@@ -5097,7 +5104,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 348,
         "end": 355
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.ListAsync()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::HttpGet#1",
@@ -5108,7 +5116,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 403,
         "end": 410
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.FinishAsync()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::HttpGet#2",
@@ -5119,7 +5128,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 480,
         "end": 487
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Skipped()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::HttpGet#3",
@@ -5130,7 +5140,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 568,
         "end": 585
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Helper()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::HttpGet#4",
@@ -5141,7 +5152,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 630,
         "end": 649
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Internal()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::NonAction#0",
@@ -5152,7 +5164,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 557,
         "end": 566
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Helper()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PagesController::HttpGet#0",
@@ -5163,7 +5176,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 831,
         "end": 838
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PagesController.Index()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.RootController::HttpGet#0",
@@ -5174,7 +5188,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 989,
         "end": 996
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.RootController.Index()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges::ApiController#0",
@@ -5185,7 +5200,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 1198,
         "end": 1211
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges::Route#0",
@@ -5196,7 +5212,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 246,
         "end": 282
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges::Route#1",
@@ -5207,7 +5224,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 918,
         "end": 927
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.RootController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges::Route#2",
@@ -5218,7 +5236,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 1218,
         "end": 1245
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges::Route#3",
@@ -5229,7 +5248,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 1468,
         "end": 1495
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PartsController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpDelete#0",
@@ -5240,7 +5260,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 587,
         "end": 606
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Remove(int?)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpGet#0",
@@ -5251,7 +5272,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 314,
         "end": 321
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.List()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpGet#1",
@@ -5262,7 +5284,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 356,
         "end": 375
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Get(int)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpGet#2",
@@ -5273,7 +5296,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 808,
         "end": 826
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Health()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpGet#3",
@@ -5284,7 +5308,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 863,
         "end": 890
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Status(int?)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpHead#0",
@@ -5295,7 +5320,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 650,
         "end": 658
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Probe()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpOptions#0",
@@ -5306,7 +5332,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 694,
         "end": 705
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Allowed()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpPatch#0",
@@ -5317,7 +5344,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 519,
         "end": 545
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Touch(int)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpPost#0",
@@ -5328,7 +5356,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 415,
         "end": 423
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Create()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpPut#0",
@@ -5339,7 +5368,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 460,
         "end": 475
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Replace(int)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::Route#0",
@@ -5350,7 +5380,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 1003,
         "end": 1024
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Anything()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.PingController::HttpGet#0",
@@ -5361,7 +5392,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 1268,
         "end": 1283
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.PingController.Pong()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.UsersController::HttpGet#0",
@@ -5372,7 +5404,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 1439,
         "end": 1455
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.UsersController.List()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api::ApiController#0",
@@ -5383,7 +5416,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 217,
         "end": 230
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api::Route#0",
@@ -5394,7 +5428,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 233,
         "end": 258
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api::Route#1",
@@ -5405,7 +5440,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 1488,
         "end": 1499
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.ApiBase"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Booth.Open()::teller.Current#0",
@@ -5603,7 +5639,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 769,
         "end": 781
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IHealthApi.Ping()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi::Delete#0",
@@ -5614,7 +5651,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 396,
         "end": 418
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Delete(string)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi::Get#0",
@@ -5625,7 +5663,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 269,
         "end": 288
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Item(string)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi::Post#0",
@@ -5636,7 +5675,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 339,
         "end": 353
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Add(string)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IOrdersApi::Get#0",
@@ -5647,7 +5687,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 871,
         "end": 885
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IOrdersApi.List()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IReportsApi::Get#0",
@@ -5658,7 +5699,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 578,
         "end": 593
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IReportsApi.All()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.Inventory.AddReports(IServiceCollection)::services.AddRefitClient#0",
@@ -6983,7 +7025,8 @@
         "path": "src/Acme.Core/Orders/Shipping.cs",
         "start": 165,
         "end": 209
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Track()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders::Serializable#0",
@@ -6994,7 +7037,8 @@
         "path": "src/Acme.Core/Orders/Shipping.cs",
         "start": 30,
         "end": 42
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Flush()::SaveAll#0",
