@@ -1163,6 +1163,10 @@ fn bare_calls(facts: &mut Facts) {
     }
 }
 
+/// The head of a call on an implicit member (Swift's `.make()`): no declaration binds it, so the
+/// call resolves by name and labels, as one on a receiver of unknown type, among methods alone.
+pub const IMPLICIT_HEAD: &str = "(implicit)";
+
 /// Imports every name `source` exports (a Java or Kotlin package, a Swift module) on demand: a
 /// namespace import of it under an alias and a glob of that alias, `inside` when the names are
 /// the file's own package's.

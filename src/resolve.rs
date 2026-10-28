@@ -2737,6 +2737,11 @@ impl<'a> Resolver<'a> {
             found.extend(self.by_name.get(&(false, last)).into_iter().flatten());
             found.sort();
         }
+        // The member of a contextual type (`.make()`) is no function: a free one of its name
+        // is not what it reaches. Every initializer answers `.init`, so a match tells nothing.
+        if callee.starts_with(crate::lang::IMPLICIT_HEAD) {
+            found.retain(|t| last != "init" && self.defs[t.path][t.name].kind == Kind::Method);
+        }
         if let Some(reaches) = &self.reaches {
             found.retain(|t| reaches(path, t.path));
         }

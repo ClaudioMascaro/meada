@@ -1404,8 +1404,8 @@ fn call(function: Node, suffixes: &[Node], node: Node, src: &[u8], scope: &str) 
     })
 }
 
-/// A called expression as a dotted name (`a.b.c`, `self.f`, `super.init`); a part that is no
-/// name is `(<node kind>)`, and so is a chain longer than `PATH_DEPTH`. `x!` and `x?` are `x`.
+/// A called expression as a dotted name (`a.b.c`, `self.f`, `super.init`, `(implicit).f` for
+/// `.f`); a part that is no name is `(<node kind>)`, and so is a chain longer than `PATH_DEPTH`. `x!` and `x?` are `x`.
 fn callee(node: Node, src: &[u8]) -> String {
     let mut segments: Vec<String> = Vec::new();
     let mut at = node;
@@ -1444,6 +1444,17 @@ fn callee(node: Node, src: &[u8]) -> String {
                     break;
                 }
             },
+            // `.name`, a member of the contextual type: a head no declaration binds.
+            "prefix_expression" if text(at, src).starts_with('.') => {
+                match at.child_by_field_name("target") {
+                    Some(t) if t.kind() == "simple_identifier" => {
+                        segments.push(unbacktick(text(t, src)));
+                        segments.push(crate::lang::IMPLICIT_HEAD.into());
+                    }
+                    _ => segments.push("(prefix_expression)".into()),
+                }
+                break;
+            }
             kind => {
                 segments.push(format!("({kind})"));
                 break;
