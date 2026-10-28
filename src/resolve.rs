@@ -9426,6 +9426,9 @@ mod tests {
                  func hash(into hasher: inout Hasher) {}
              }
              func runPoint(p: Point, h: inout Hasher) { _ = p.scaled(by: 2); p.hash(into: &h) }
+             struct Late { func scaled(by k: Int) -> Late { self } }
+             extension Late: Hashable { func hash(into hasher: inout Hasher) {} }
+             func runLate(l: Late, h: inout Hasher) { _ = l.scaled(by: 2); l.hash(into: &h) }
              final class Mixed: Sendable, CustomDebugStringConvertible { func go() {} }
              func runMixed(m: Mixed) { m.go() }",
         );
@@ -9448,6 +9451,18 @@ mod tests {
         // strict rule stands.
         assert_eq!(calls["runPoint(p:h:) p.hash"], "inferred Point.hash(into:)");
         assert_eq!(calls["runMixed(m:) m.go"], "inferred Mixed.go()");
+        // A listed conformance written on an extension counts the same.
+        assert_eq!(calls["runLate(l:h:) l.scaled"], "exact Late.scaled(by:)");
+        assert_eq!(calls["runLate(l:h:) l.hash"], "inferred Late.hash(into:)");
+        // A repository protocol named like a listed one is a repository base: no name is hidden.
+        let own = pack_calls(
+            &crate::lang::swift::Swift,
+            "A.swift",
+            "protocol Hashable {}
+             struct Own: Hashable { func hash(into n: inout Int) {} }
+             func run(o: Own, n: inout Int) { o.hash(into: &n) }",
+        );
+        assert_eq!(own["run(o:n:) o.hash"], "exact Own.hash(into:)");
     }
 
     /// A bare call a nested class does not answer climbs to the class around it: past that

@@ -1468,17 +1468,16 @@ mod tests {
         parse(src.as_bytes(), true).unwrap()
     }
 
-    /// The standard-library protocols whose members are known, with the names each declares
-    /// (issue #409): a change to the table is a change to what stays opaque.
+    /// The known outside types, in order, with the names each declares (issue #409): the
+    /// standard library's protocols, the raw value types and Vapor's `RouteCollection`. A change
+    /// to the table, a duplicate entry included, is a change to what stays opaque.
     #[test]
-    fn the_known_outside_table_pins_the_standard_protocols() {
-        let table: HashMap<_, _> = Swift.known_outside().iter().copied().collect();
-        let none: &[&str] = &[];
-        for (protocol, names) in [
-            ("Swift.Sendable", none),
+    fn the_known_outside_table_is_pinned() {
+        let expected: super::super::KnownOutside = &[
+            ("Swift.Sendable", &[]),
             ("Swift.Error", &["localizedDescription"]),
-            ("Swift.Equatable", none),
-            ("Swift.Comparable", none),
+            ("Swift.Equatable", &[]),
+            ("Swift.Comparable", &[]),
             ("Swift.Hashable", &["hash(into:)", "hashValue"]),
             ("Swift.Encodable", &["encode(to:)"]),
             ("Swift.Decodable", &["init(from:)"]),
@@ -1486,15 +1485,15 @@ mod tests {
             ("Swift.Identifiable", &["id"]),
             ("Swift.CustomStringConvertible", &["description"]),
             ("Swift.CaseIterable", &["allCases"]),
+            ("Swift.String", &["rawValue", "init(rawValue:)"]),
+            ("Swift.Int", &["rawValue", "init(rawValue:)"]),
+            ("Swift.UInt", &["rawValue", "init(rawValue:)"]),
+            ("Swift.Double", &["rawValue", "init(rawValue:)"]),
+            ("Swift.Float", &["rawValue", "init(rawValue:)"]),
+            ("Swift.Character", &["rawValue", "init(rawValue:)"]),
             ("Vapor.RouteCollection", &["boot(routes:)"]),
-        ] {
-            assert_eq!(table.get(protocol), Some(&names), "{protocol}");
-        }
-        for raw in ["String", "Int", "UInt", "Double", "Float", "Character"] {
-            let names: &[&str] = &["rawValue", "init(rawValue:)"];
-            assert_eq!(table.get(format!("Swift.{raw}").as_str()), Some(&names));
-        }
-        assert_eq!(table.len(), 18);
+        ];
+        assert_eq!(Swift.known_outside(), expected);
     }
 
     #[test]
