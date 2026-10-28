@@ -1905,6 +1905,31 @@ fn kotlin() {
             "src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere.notes()",
             "src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan",
             "src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan.get()",
+            "src/main/kotlin/example/stars/Base.kt::example.stars.Base",
+            "src/main/kotlin/example/stars/Base.kt::example.stars.Base.mark(Int)",
+            "src/main/kotlin/example/stars/Base.kt::example.stars.Base.runIt(Int,()->Unit)",
+            "src/main/kotlin/example/stars/Base.kt::example.stars.Face",
+            "src/main/kotlin/example/stars/Base.kt::example.stars.Face.face()",
+            "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub",
+            "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()",
+            "src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base",
+            "src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base.mark(Int)",
+            "src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both",
+            "src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()",
+            "src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two",
+            "src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two.go()",
+            "src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock",
+            "src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+            "src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock",
+            "src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+            "src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()",
+            "src/jsMain/kotlin/example/platform/Clock.kt::example.platform.Clock",
+            "src/jsMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+            "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named",
+            "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()",
+            "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)",
+            "src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred",
+            "src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred.go()",
         ],
         &["src/main/kotlin/example/Main.kt::example.main(Array<String>)"],
         &[
@@ -2615,6 +2640,99 @@ fn kotlin() {
                 EXACT,
                 &[
                     "src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.record()",
+                ],
+            ),
+            // A base, an interface and a constructor named through a star import resolve as
+            // under a single-type import (#402); the call in the lambda stays a name match (#404).
+            (
+                "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::mark#0",
+                EXACT,
+                &["src/main/kotlin/example/stars/Base.kt::example.stars.Base.mark(Int)"],
+            ),
+            (
+                "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::runIt#0",
+                EXACT,
+                &["src/main/kotlin/example/stars/Base.kt::example.stars.Base.runIt(Int,()->Unit)"],
+            ),
+            (
+                "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::(anonymous).mark#0",
+                INFERRED,
+                &["src/main/kotlin/example/stars/Base.kt::example.stars.Base.mark(Int)"],
+            ),
+            (
+                "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::face#0",
+                EXACT,
+                &["src/main/kotlin/example/stars/Base.kt::example.stars.Face.face()"],
+            ),
+            (
+                "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::Base#0",
+                EXACT,
+                &["src/main/kotlin/example/stars/Base.kt::example.stars.Base"],
+            ),
+            // An explicit import wins over a star import; two star imports that give one name
+            // leave it ambiguous, and the members of a base so named unknown.
+            (
+                "src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()::Base#0",
+                EXACT,
+                &["src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base"],
+            ),
+            (
+                "src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()::mark#0",
+                EXACT,
+                &[
+                    "src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base.mark(Int)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two.go()::Base#0",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/stars/Base.kt::example.stars.Base",
+                    "src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two.go()::mark#0",
+                None,
+                &[],
+            ),
+            // An `expect` class and its `actual` ones are one class, the `expect` one, under a
+            // single-type and a star import, as a base and as a receiver; a member only an
+            // `actual` declares is a name match.
+            (
+                "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()::mark#0",
+                EXACT,
+                &[
+                    "src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()::Clock#0",
+                EXACT,
+                &["src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock"],
+            ),
+            (
+                "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()::tick#0",
+                INFERRED,
+                &["src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()"],
+            ),
+            (
+                "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)::clock.mark#0",
+                EXACT,
+                &[
+                    "src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)::clock.tick#0",
+                INFERRED,
+                &["src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()"],
+            ),
+            (
+                "src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred.go()::mark#0",
+                EXACT,
+                &[
+                    "src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
                 ],
             ),
         ],

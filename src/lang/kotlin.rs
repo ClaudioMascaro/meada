@@ -242,9 +242,10 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         package,
         ..Facts::default()
     };
-    // Globs are read the latest first, and one `inside` stops the reading: the file's own
-    // package comes first, then the star imports, which see `internal` declarations, then the
-    // default imports. Explicit imports come before any glob.
+    // Globs are read the latest first: the file's own package comes first and stops the
+    // reading, then the star imports, which see `internal` declarations and combine (two that
+    // give a name leave it ambiguous), then the default imports. Explicit imports come before
+    // any glob.
     for package in DEFAULT_IMPORTS {
         wildcard(package, false, &mut facts);
     }
@@ -363,6 +364,11 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     )
                 };
                 facts.defs.push(def);
+                match platform(node, src) {
+                    Some("expect") => facts.expect.push(inner.as_ref().clone()),
+                    Some("actual") => facts.actual.push(inner.as_ref().clone()),
+                    _ => {}
+                }
                 if children(node).any(|c| c.kind() == "interface") {
                     facts.interfaces.push(inner.as_ref().clone());
                 }
@@ -918,6 +924,14 @@ fn own_access(node: Node, src: &[u8]) -> Access {
         Some("internal") => Access::Internal,
         _ => Access::Public,
     }
+}
+
+/// The declaration's `expect` or `actual` modifier, if it writes one.
+fn platform<'s>(node: Node, src: &'s [u8]) -> Option<&'s str> {
+    (named(node).filter(|n| n.kind() == "modifiers"))
+        .flat_map(named)
+        .find(|n| n.kind() == "platform_modifier")
+        .map(|n| text(n, src))
 }
 
 /// The primary constructor's parameters of a class that declares no other constructor; `None`

@@ -1733,7 +1733,17 @@ one for the area a change touches.
   linearizes the bases every part writes (`bases`), a name the parts' files export binds the
   asking file's own part, else the first by path (`exports`), several parts a name binds
   construct the first (`one_type`), and a constructor call takes the constructors of every part.
-  Classes of one name that are not parts of one type stay several, `ambiguous`. A glob of a
+  Classes of one name that are not parts of one type stay several, `ambiguous`, but for a Kotlin
+  `expect` class and `actual` ones of its name (`Facts::expect`, `Facts::actual`), which
+  `one_type` makes the `expect` one wherever the name binds them all (`exports`, a constructor
+  call): a base or a receiver so named reads the `expect` class's family, and a member only an
+  `actual` declares is a name match (`Resolver::matched` reads the `actual` classes of each
+  `expect` one of the family, `Resolver::actuals`, and `lacks` holds no `expect` class closed).
+  Where globs combine (`unordered_globs`), an `inside` glob
+  that gives the name comes before the other globs of its scope, and the `inside` ones combine
+  with each other (Kotlin's written star imports, which see `internal` members), but for the
+  file's own package's (`Resolver::own_glob`), which stops the reading: a name two Kotlin star
+  imports give is `ambiguous`. A glob of a
   namespace (`wildcard`'s `Imported::Namespace` source, `Resolver::glob_namespace`) takes the
   classes declared in that namespace alone (`Binding::of_namespace`), since a C# file's group
   is its first namespace's and it may declare types in another; the C# layout names such a file
@@ -1939,7 +1949,8 @@ one for the area a change touches.
   static-member names (`Facts::overloads`, `Facts::constructors` and
   `Facts::statics`), the namespaces and types a C# file's `global using` directives name
   (`Facts::project`, names as `Facts::imports` holds them), the qualified names of the types a C#
-  file declares in `partial` parts (`Facts::partial`), the size of the budget a file exhausted
+  file declares in `partial` parts (`Facts::partial`), the qualified names of the classes a
+  Kotlin file declares `expect` or `actual` (`Facts::expect`, `Facts::actual`), the size of the budget a file exhausted
   (`Facts::budget`, which `meada status` names), the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP

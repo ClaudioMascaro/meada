@@ -453,6 +453,13 @@ pub struct Facts {
     /// one such name in the files of one `unit` are one type (`Resolver::parts`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub partial: Vec<String>,
+    /// The classes the file declares `expect` (Kotlin), by qualified name: one with the
+    /// `actual` classes of its name is one class, the `expect` one (`Resolver::one_type`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub expect: Vec<String>,
+    /// The classes the file declares `actual` (Kotlin), by qualified name.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub actual: Vec<String>,
     /// The compilation the file belongs to, which `LanguagePack::join` sets (C#'s project):
     /// the parts of a partial type come from one. Not kept in the index: it is joined again.
     #[serde(skip)]

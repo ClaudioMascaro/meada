@@ -8,6 +8,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Kotlin `expect` class and its `actual` classes of one name are one class, the `expect` one:
+  as a base, a constructor or a written type the name binds it, so the members it declares
+  resolve `exact` on its subclasses. Before, the name bound every declaration, ambiguously, and
+  a subclass's bare calls of the base's members stayed unresolved. A member only an `actual`
+  declares stays a name match. A name two Kotlin star
+  imports both give is `ambiguous`; before, the last import gave it.
 - A C# type of a namespace around the file's (`Acme.Query` from `Acme.Query.Internal`) binds
   without a `using`, as a static call's receiver, a constructor and a base: the innermost
   namespace first, and before a type a `using` brings. Before, the name stayed unresolved, or

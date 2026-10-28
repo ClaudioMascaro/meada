@@ -425,6 +425,8 @@ pub struct Resolver<'a> {
     /// unit (`Facts::unit`), sorted, by unit and name: one type, whose members and bases are
     /// all of theirs.
     parts: HashMap<(&'a str, &'a str), Vec<&'a str>>,
+    /// The files of each class declared `actual` (`Facts::actual`), by qualified name.
+    actuals: HashMap<&'a str, Vec<&'a str>>,
 }
 
 /// Whether `inner` is a class nested directly in the class `outer`.
@@ -716,6 +718,12 @@ impl<'a> Resolver<'a> {
                 parts.entry(key).or_default().push(path);
             }
         }
+        let mut actuals: HashMap<&str, Vec<&str>> = HashMap::new();
+        for (&path, facts) in files {
+            for name in &facts.actual {
+                actuals.entry(name.as_str()).or_default().push(path);
+            }
+        }
         parts.retain(|_, paths| {
             paths.dedup();
             (2..=TYPE_PARTS).contains(&paths.len())
@@ -901,6 +909,7 @@ impl<'a> Resolver<'a> {
             shared: sharing,
             groups,
             parts,
+            actuals,
         };
         let mut work = Work::default();
         for (path, facts) in files {
@@ -1357,10 +1366,16 @@ impl<'a> Resolver<'a> {
         let Some((family, owned)) = family else {
             return one_of(all);
         };
-        let classes: HashSet<&Target<'a>> = (family.iter())
+        // A Kotlin `expect` class stands for its `actual` ones too, which may declare more.
+        let classes: HashSet<Target<'a>> = (family.iter())
             .filter_map(|a| match a {
-                Ancestor::Class(c) => Some(c),
+                Ancestor::Class(c) => Some(*c),
                 Ancestor::Opaque(_) => None,
+            })
+            .flat_map(|c| {
+                let actuals = self.actuals.get(c.name).filter(|_| self.is_expect(c));
+                let actuals = actuals.into_iter().flatten();
+                std::iter::once(c).chain(actuals.map(move |&path| Target { path, name: c.name }))
             })
             .collect();
         let declared = |t: &Target<'a>| {
@@ -1702,7 +1717,8 @@ impl<'a> Resolver<'a> {
         let found = self.resolve_as(path, &call.scope, head, seen, work, reading);
         let found = self.instance(found, work);
         let enclosing = head == "self" || Some(head) == self.receiver;
-        matches!(found, Binding::Def(t) | Binding::Instance(t) if self.is_class(t))
+        // A Kotlin `expect` class stands for its `actual` ones, which may declare more.
+        matches!(found, Binding::Def(t) | Binding::Instance(t) if self.is_class(t) && !self.is_expect(t))
             || (enclosing && self.in_outside_block(path, &call.scope))
     }
 
@@ -2412,13 +2428,33 @@ impl<'a> Resolver<'a> {
         std::borrow::Cow::Owned(parts.collect())
     }
 
-    /// One class for `all` when they are the parts of one type (`parts`): the first part.
+    /// One class for `all` when they are the parts of one type (`parts`): the first part; or
+    /// when they are a Kotlin `expect` class and `actual` ones of its name (`Facts::expect`):
+    /// the `expect` one, whatever the source set asking.
     fn one_type(&self, all: &[Target<'a>]) -> Option<Target<'a>> {
         let first = *all.iter().min()?;
-        let paths = self.parts_of(first)?;
-        all.iter()
-            .all(|t| t.name == first.name && paths.contains(&t.path))
-            .then_some(first)
+        if let Some(paths) = self.parts_of(first) {
+            return (all.iter())
+                .all(|t| t.name == first.name && paths.contains(&t.path))
+                .then_some(first);
+        }
+        let mut expect = all.iter().filter(|t| self.is_expect(**t));
+        let (Some(&expect), None) = (expect.next(), expect.next()) else {
+            return None;
+        };
+        let actual = |t: &Target| {
+            self.actuals
+                .get(t.name)
+                .is_some_and(|a| a.contains(&t.path))
+        };
+        (all.iter())
+            .all(|t| *t == expect || (t.name == expect.name && actual(t)))
+            .then_some(expect)
+    }
+
+    /// Whether `t` is a class its file declares `expect` (`Facts::expect`).
+    fn is_expect(&self, t: Target<'a>) -> bool {
+        (self.files.get(t.path)).is_some_and(|f| f.expect.iter().any(|n| n == t.name))
     }
 
     /// `member` of `class` in its blocks (`Facts::impls`): the inherent blocks' first, else the
@@ -3208,9 +3244,11 @@ impl<'a> Resolver<'a> {
     /// (`wildcard`'s `Imported::Namespace` source), if it is one, where the pack's type names
     /// carry their namespace (`LanguagePack::namespaced`).
     fn glob_namespace(&self, path: &'a str, target: &str) -> Option<&'a str> {
-        if !self.namespaced {
-            return None;
-        }
+        self.namespaced.then(|| self.glob_source(path, target))?
+    }
+
+    /// The `Imported::Namespace` source of the glob of `path` whose target is `target`.
+    fn glob_source(&self, path: &'a str, target: &str) -> Option<&'a str> {
         let imports = &self.files[path].imports;
         (self.by_local[path].of(target).iter().rev())
             .map(|&at| &imports[at])
@@ -3277,7 +3315,10 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
     ) -> Option<Binding<'a>> {
         let imports = &self.files[path].imports;
-        let mut candidates = Vec::new();
+        // Where globs combine, the `inside` ones that give the name come before the others,
+        // and combine with each other (Kotlin's written star imports, which see `internal`
+        // members), but for the file's own package's, which stops the reading.
+        let (mut candidates, mut inside_found) = (Vec::new(), Vec::new());
         for &at in self.by_local[path]
             .of(&crate::qualify(scope, "*"))
             .iter()
@@ -3294,6 +3335,9 @@ impl<'a> Resolver<'a> {
             };
             if public && !re_exports {
                 continue;
+            }
+            if !*inside && !inside_found.is_empty() {
+                break;
             }
             if seen.depth >= LINK_DEPTH {
                 self.cut_link(seen);
@@ -3323,13 +3367,26 @@ impl<'a> Resolver<'a> {
                     | Binding::External(..)
                     | Binding::Module(_)
             ) {
-                if !self.unordered_globs || *inside {
-                    return Some(found);
+                match (self.unordered_globs, *inside) {
+                    (false, _) => return Some(found),
+                    (true, true) if inside_found.is_empty() && self.own_glob(path, target) => {
+                        return Some(found);
+                    }
+                    (true, true) => inside_found.push(found),
+                    (true, false) => candidates.push(found),
                 }
-                candidates.push(found);
             }
         }
-        alternatives(candidates)
+        alternatives(match inside_found.is_empty() {
+            true => candidates,
+            false => inside_found,
+        })
+    }
+
+    /// Whether the glob of `path` whose target is the import `target` takes the file's own
+    /// package (`wildcard`'s `Imported::Namespace` source).
+    fn own_glob(&self, path: &'a str, target: &str) -> bool {
+        self.glob_source(path, target) == Some(self.files[path].package.as_str())
     }
 
     /// What the callee-like name `target` written in `scope` gives (a `use` path): its head
@@ -10526,5 +10583,99 @@ mod csharp_tests {
                 ("Util.Go".to_string(), "exact", o),
             ]
         );
+    }
+}
+
+#[cfg(test)]
+mod kotlin_tests {
+    use super::*;
+    use crate::lang::LanguagePack;
+    use crate::lang::java::Java;
+    use crate::lang::kotlin::Kotlin;
+
+    /// How each call of the Kotlin `files` resolves, with Java's resolver as the index builds
+    /// it: `path scope callee` to the level and each target's `path::name`.
+    fn resolved(files: &[(&str, &str)]) -> BTreeMap<String, String> {
+        let parsed: Vec<(&str, Facts)> = (files.iter())
+            .map(|(p, s)| (*p, Kotlin.parse(p, s.as_bytes()).unwrap()))
+            .collect();
+        let files: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let layout = Java.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
+        let at = |t: &Target| format!("{}::{}", t.path, t.name);
+        let mut out = BTreeMap::new();
+        for (&path, facts) in &files {
+            for call in &facts.calls {
+                let found = match resolver.call(path, call) {
+                    Resolution::Exact(t) => format!("exact {}", at(&t)),
+                    Resolution::Inferred(t) | Resolution::Narrowed(t) => {
+                        format!("inferred {}", at(&t))
+                    }
+                    Resolution::Ambiguous(ts) => {
+                        format!(
+                            "ambiguous {}",
+                            ts.iter().map(at).collect::<Vec<_>>().join(" ")
+                        )
+                    }
+                    Resolution::Unresolved => "none".to_string(),
+                };
+                out.insert(format!("{path} {} {}", call.scope, call.callee), found);
+            }
+        }
+        out
+    }
+
+    /// A class of the file's own package hides one a star import gives, and two star imports
+    /// that give one name leave it ambiguous, as the compiler finds it.
+    #[test]
+    fn the_own_package_comes_before_star_imports_and_two_stars_are_ambiguous() {
+        let base = |package: &str| format!("package {package}\nopen class Base\n");
+        let (t, v) = (base("t"), base("v"));
+        let own = "package u\nimport t.*\nclass Base\nfun go() { Base() }\n";
+        let two = "package w\nimport t.*\nimport v.*\nfun go() { Base() }\n";
+        let found = resolved(&[
+            ("t/Base.kt", &t),
+            ("v/Base.kt", &v),
+            ("u/U.kt", own),
+            ("w/W.kt", two),
+        ]);
+        assert_eq!(found["u/U.kt u.go() Base"], "exact u/U.kt::u.Base");
+        assert_eq!(
+            found["w/W.kt w.go() Base"],
+            "ambiguous t/Base.kt::t.Base v/Base.kt::v.Base"
+        );
+    }
+
+    /// An `expect` class and `actual` ones of its name are the `expect` one; two `expect`
+    /// classes of one name, or one beside a class that is no `actual`, stay several. A member
+    /// only an `actual` declares is a name match on a receiver of the class.
+    #[test]
+    fn an_expect_class_and_its_actuals_are_the_expect_one() {
+        let class = |modifier: &str| {
+            format!(
+                "package e\n{modifier} open class C() {{ fun m(n: Int) {{}} fun own() {{}} }}\n"
+            )
+        };
+        let (expect, actual, plain) = (class("expect"), class("actual"), class(""));
+        let user = "package u\nimport e.C\nfun go(c: C) { C(); c.m(1); c.own() }\n";
+        let level = |files: &[(&str, &str)], callee: &str| {
+            resolved(files)[&format!("u/U.kt u.go(C) {callee}")].clone()
+        };
+        let one = [("a/C.kt", &*expect), ("b/C.kt", &*actual), ("u/U.kt", user)];
+        assert_eq!(level(&one, "C"), "exact a/C.kt::e.C");
+        assert_eq!(level(&one, "c.m"), "exact a/C.kt::e.C.m(Int)");
+        assert_eq!(level(&one, "c.own"), "exact a/C.kt::e.C.own()");
+        let actual_only = class("actual").replace("fun own() {}", "fun more() {}");
+        let user_more = user.replace("c.own()", "c.more()");
+        let more = [
+            ("a/C.kt", &*expect),
+            ("b/C.kt", &*actual_only),
+            ("u/U.kt", &*user_more),
+        ];
+        assert_eq!(level(&more, "c.more"), "inferred b/C.kt::e.C.more()");
+        for other in [&expect, &plain] {
+            let two = [("a/C.kt", &*expect), ("b/C.kt", &**other), ("u/U.kt", user)];
+            assert_eq!(level(&two, "C"), "ambiguous a/C.kt::e.C b/C.kt::e.C");
+        }
     }
 }
