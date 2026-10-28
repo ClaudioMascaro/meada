@@ -93,6 +93,12 @@ impl LanguagePack for Kotlin {
         true
     }
 
+    /// Kotlin's own outside types the Java pack's table (the JDK's, which Kotlin files resolve
+    /// with) lacks.
+    fn known_outside(&self) -> &'static [(&'static str, &'static [&'static str])] {
+        &[("kotlin.Comparable", &["compareTo"])]
+    }
+
     /// Spring's base configuration, as the Java pack lists it: a Kotlin-only repository gives
     /// `@Value` its keys too.
     fn config_files(&self) -> &'static [&'static str] {

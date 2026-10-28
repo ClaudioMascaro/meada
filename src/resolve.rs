@@ -372,6 +372,8 @@ pub struct Resolver<'a> {
     outside_blocks: bool,
     /// The pack's `LanguagePack::implicit_members`.
     implicit: &'static [&'static str],
+    /// The pack's known outside members (`lang::known_outside`).
+    known: Vec<(&'static str, &'static [&'static str])>,
     /// The pack's names bound everywhere (`LanguagePack::globals`).
     globals: &'static [&'static str],
     /// The call sites whose single target is each definition, `exact`, sorted. One only a name
@@ -581,12 +583,14 @@ struct Extension<'a> {
 }
 
 /// A block of members of a class (`lang::Impl`): its file and scope, and for a trait's block,
-/// the trait when it is a class of the repository.
+/// the trait when it is a class of the repository, else its name as the file's imports spell it
+/// (`outside`).
 struct Block<'a> {
     path: &'a str,
     scope: &'a str,
     of_trait: bool,
     of: Option<Target<'a>>,
+    outside: Option<String>,
 }
 
 impl<'a> Resolver<'a> {
@@ -872,6 +876,7 @@ impl<'a> Resolver<'a> {
             extension_methods: language.extension_methods(),
             outside_blocks: language.outside_blocks(),
             implicit: language.implicit_members(),
+            known: crate::lang::known_outside(language),
             globals: language.globals(),
             callers: HashMap::new(),
             extension_callers: HashMap::new(),
@@ -951,11 +956,16 @@ impl<'a> Resolver<'a> {
                 {
                     continue;
                 }
+                let of = block.of.as_deref().and_then(class);
+                let outside = (block.of.as_deref())
+                    .filter(|_| of.is_none())
+                    .map(|p| resolver.imported_name(path, &block.within, p));
                 impls.entry(ty).or_default().push(Block {
                     path,
                     scope: &block.scope,
                     of_trait: block.of.is_some(),
-                    of: block.of.as_deref().and_then(class),
+                    of,
+                    outside,
                 });
             }
             // An extension's block says what `this` is in it too; the functions it declares are
@@ -1378,7 +1388,7 @@ impl<'a> Resolver<'a> {
         match within[..] {
             [one] => narrowed(one, all.len()),
             [_, _, ..] => Resolution::Ambiguous(within),
-            [] if bare && self.opaque(&family) => {
+            [] if bare && self.opaque(&family, callee) => {
                 // What the scope would bind with the family's base read as declaring nothing:
                 // that base may declare the name and hide it.
                 let found = self.resolve_as(
@@ -1395,7 +1405,7 @@ impl<'a> Resolver<'a> {
                     _ => Resolution::Unresolved,
                 }
             }
-            [] if self.extension_methods && on_instance && !self.opaque(&family) => {
+            [] if self.extension_methods && on_instance && !self.opaque(&family, callee) => {
                 one_of(extensions(&all))
             }
             [] => Resolution::Unresolved,
@@ -1584,8 +1594,7 @@ impl<'a> Resolver<'a> {
                 Some((level, place, e.target))
             })
             .collect();
-        let known = (family.as_ref())
-            .is_some_and(|f| f.iter().all(|a| matches!(a, Ancestor::Class(_))))
+        let known = family.as_ref().is_some_and(|f| !self.opaque(f, name))
             && !self.implicit.contains(&name);
         let first = applicable.iter().map(|a| a.0).min()?;
         let nearest = (applicable.iter())
@@ -2079,8 +2088,10 @@ impl<'a> Resolver<'a> {
             return found;
         }
         for ancestor in self.with_parts(&family).iter() {
-            let Ancestor::Class(c) = *ancestor else {
-                return Binding::Unknown;
+            let c = match ancestor {
+                Ancestor::Class(c) => *c,
+                Ancestor::Opaque(o) if !self.hides(o, member) => continue,
+                Ancestor::Opaque(_) => return Binding::Unknown,
             };
             if let Some(found) = self.block_member(c, member) {
                 return found;
@@ -2119,16 +2130,17 @@ impl<'a> Resolver<'a> {
     /// The overloads of `member` a family declares (`Facts::overloads`), as `member` reads a
     /// name: in family order, each written signature from the first class that declares it,
     /// so a class's `f(int)` overrides its base's and keeps the base's `f()`. `None` when no
-    /// class declares one; unknown when the family has a base whose members are not known
-    /// anywhere, since overloads merge across the family and that base may declare or override
-    /// any of them (Opaque outside, strict: #353 tracks a relaxation). Other bindings of the
-    /// name (a field) are not methods and do not join the family, nor does a Kotlin extension
-    /// written in its class's file (`fun Foo.x()` beside `class Foo`, a function named under
-    /// the class): it is reached through `Resolver::extensions` alone, after the members.
+    /// class declares one; unknown when the family has a base anywhere that may declare
+    /// `member` (`hides`), since overloads merge across the family and that base may declare or
+    /// override any of its overloads (Opaque outside, with Known outside members). Other
+    /// bindings of the name (a field) are not methods and do not join the family, nor does a
+    /// Kotlin extension written in its class's file (`fun Foo.x()` beside `class Foo`, a
+    /// function named under the class): it is reached through `Resolver::extensions` alone,
+    /// after the members.
     /// A class's blocks (`Facts::impls`: Swift's extensions, in any file) declare overloads
     /// after the class itself, and a block's protocol (`Impl::of`) after them, with that
     /// protocol's own inherent blocks (its default implementations); a protocol from outside the
-    /// repository is an opaque base.
+    /// repository is an opaque base for the names it may declare.
     fn overloaded(&self, family: &[Ancestor<'a>], member: &str) -> Option<Binding<'a>> {
         let (mut found, mut signatures, mut opaque) = (Vec::new(), HashSet::new(), false);
         let blocks = |c: Target<'a>| self.impls.get(&c).into_iter().flatten();
@@ -2136,17 +2148,18 @@ impl<'a> Resolver<'a> {
         // conforms to, with its own blocks.
         let (mut levels, mut conformed) = (Vec::new(), Vec::new());
         for ancestor in self.with_parts(family).iter() {
-            let Ancestor::Class(c) = *ancestor else {
-                opaque = true;
-                continue;
+            let c = match ancestor {
+                Ancestor::Class(c) => *c,
+                Ancestor::Opaque(o) => {
+                    opaque |= self.hides(o, member);
+                    continue;
+                }
             };
             let mut scopes = vec![(c.path, c.name)];
             for b in blocks(c) {
                 scopes.push((b.path, b.scope));
-                match b.of {
-                    Some(p) => conformed.push(p),
-                    None => opaque |= b.of_trait,
-                }
+                conformed.extend(b.of);
+                opaque |= (b.outside.as_deref()).is_some_and(|o| self.hides(o, member));
             }
             levels.push((c, scopes));
         }
@@ -2231,8 +2244,10 @@ impl<'a> Resolver<'a> {
             return Some(Binding::Unknown);
         };
         for ancestor in self.with_parts(family).iter() {
-            let Ancestor::Class(c) = *ancestor else {
-                return Some(Binding::Unknown);
+            let c = match ancestor {
+                Ancestor::Class(c) => *c,
+                Ancestor::Opaque(o) if !self.hides(o, name) => continue,
+                Ancestor::Opaque(_) => return Some(Binding::Unknown),
             };
             let qualified = format!("{}.{name}", c.name);
             if let Some(constant) = self.consts[c.path].get(qualified.as_str()) {
@@ -2251,16 +2266,34 @@ impl<'a> Resolver<'a> {
             .filter(|found| !matches!(found, Binding::Unknown))
     }
 
-    /// Whether a member of `family` may come from outside the repository: a base whose members
-    /// are not known, or a protocol from outside that a block of one of its classes conforms
-    /// to (Swift's `extension S: Sequence`).
-    fn opaque(&self, family: &[Ancestor<'a>]) -> bool {
+    /// Whether the member `name` (or the last name of a callee, `this.f`) of `family` may come
+    /// from outside the repository: a base that may declare it (`hides`), or a protocol from
+    /// outside that may and that a block of one of its classes conforms to (Swift's
+    /// `extension S: Sequence`).
+    fn opaque(&self, family: &[Ancestor<'a>], name: &str) -> bool {
+        let name = name.rsplit('.').next().unwrap_or(name);
         family.iter().any(|a| match a {
-            Ancestor::Opaque(_) => true,
-            Ancestor::Class(c) => {
-                (self.impls.get(c).into_iter().flatten()).any(|b| b.of_trait && b.of.is_none())
-            }
+            Ancestor::Opaque(o) => self.hides(o, name),
+            Ancestor::Class(c) => (self.impls.get(c).into_iter().flatten())
+                .any(|b| (b.outside.as_deref()).is_some_and(|o| self.hides(o, name))),
         })
+    }
+
+    /// Whether the outside type `outside` (an opaque base or protocol, as `imported_name`
+    /// spells it) may declare the member `name`: no known outside type matches it, or one that
+    /// declares `name` does (Known outside members, `docs/adr/0019-known-outside-members.md`).
+    /// A type matches by its qualified name, or a bare `outside` by its last name; a Swift
+    /// member is compared without its labels, so `hash(into:)` keeps every `hash` opaque.
+    fn hides(&self, outside: &str, name: &str) -> bool {
+        let base = |n: &'static str| n.split('(').next().unwrap_or(n);
+        let name = name.split('(').next().unwrap_or(name);
+        let known = || {
+            (self.known.iter()).filter(|(ty, _)| {
+                *ty == outside || (!outside.contains('.') && ty.rsplit('.').next() == Some(outside))
+            })
+        };
+        known().next().is_none()
+            || known().any(|(_, members)| members.iter().any(|m| base(m) == name))
     }
 
     /// What a bare method name written in the body of class `class` of `path` names
@@ -2275,7 +2308,9 @@ impl<'a> Resolver<'a> {
             return Some(Binding::Unknown);
         };
         match self.overloaded(family, name) {
-            None if self.implicit.contains(&name) || self.opaque(family) => Some(Binding::Unknown),
+            None if self.implicit.contains(&name) || self.opaque(family, name) => {
+                Some(Binding::Unknown)
+            }
             None => {
                 let class = Target { path, name: class };
                 let companion = self.companion(class, &mut Work::default())?;
@@ -9279,6 +9314,44 @@ mod tests {
             calls["p.Names.run(Names) n.add"],
             "inferred p.Names.add(String)"
         );
+    }
+
+    /// Known outside members: a base whose members the pack knows hides those names alone.
+    #[test]
+    fn a_known_outside_base_hides_only_the_names_it_declares() {
+        let calls = java_calls(
+            "package p;
+             import java.io.Serializable;
+             class Ticket implements Serializable, Comparable<Ticket> {
+                 void open() {} void open(int n) {}
+                 public int compareTo(Ticket t) { return 0; }
+                 void run(Ticket t) { t.open(1); open(); this.open(1); }
+                 void cmp(Ticket t) { t.compareTo(t); compareTo(t); }
+                 void none(Ticket t) { t.missing(); }
+             }
+             class Late extends Ticket { void go() { open(1); } }
+             class Other implements com.x.Serializable { void f() {} void g() { f(); } }
+             class Both implements Serializable, Remote { void f() {} void g() { f(); } }",
+        );
+        assert_eq!(
+            calls["p.Ticket.run(Ticket) t.open"],
+            "exact p.Ticket.open(int)"
+        );
+        assert_eq!(calls["p.Ticket.run(Ticket) open"], "exact p.Ticket.open()");
+        assert_eq!(
+            calls["p.Ticket.run(Ticket) this.open"],
+            "exact p.Ticket.open(int)"
+        );
+        // `Comparable` declares `compareTo`: the strict rule stands for it.
+        let compare = "inferred p.Ticket.compareTo(Ticket)";
+        assert_eq!(calls["p.Ticket.cmp(Ticket) t.compareTo"], compare);
+        assert_eq!(calls["p.Ticket.cmp(Ticket) compareTo"], compare);
+        assert_eq!(calls["p.Ticket.none(Ticket) t.missing"], "none");
+        // Through lineage; a written qualified name of another package, or an unlisted base,
+        // stays opaque.
+        assert_eq!(calls["p.Late.go() open"], "exact p.Ticket.open(int)");
+        assert_eq!(calls["p.Other.g() f"], "inferred p.Other.f()");
+        assert_eq!(calls["p.Both.g() f"], "inferred p.Both.f()");
     }
 
     #[test]

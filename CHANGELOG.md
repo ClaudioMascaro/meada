@@ -8,6 +8,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Java, Kotlin, C# or Swift class whose outside bases are all platform types with known
+  members (`Serializable`, `Comparable`, `IDisposable`, `Hashable`, `Codable`, an enum's raw
+  value type, Vapor's `RouteCollection`) resolves calls to its own members at `exact`; only the
+  names those types declare (`compareTo`, `Dispose`, `hash(into:)`) stay name matches. Any other
+  outside base keeps the strict rule (ADR 0019). A helper a `RouteCollection` calls from `boot`
+  now serves its routes under the collection's prefix.
+
 - A C# file of a few hundred KB (an Entity Framework model snapshot) is no longer dropped
   silently: the qualification budget is charged for enclosing names past 256 bytes, not for every
   node, so a generated file reads whole. A file the budget still drops (a long namespace repeated

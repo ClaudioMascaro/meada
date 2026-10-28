@@ -39,6 +39,13 @@ is looked up. The index keeps the family of each public class whose overloads me
 overloads of the whole family; an ancestor from outside the repository is opaque.
 _Avoid_: hierarchy, inheritance chain
 
+**Known outside members**:
+The member names an outside type declares, when they are a fixed fact of its platform
+(`Serializable` declares none, `Comparable` declares `compareTo`), listed by its language pack. An
+ancestor of a family that is such a type is opaque only for the names it declares: a call to any
+other name resolves as if the family had no outside base (ADR 0019).
+_Avoid_: whitelist, transparent bases
+
 **Injector**:
 What a contract kind reads off an annotation written on a field or a parameter while it folds a
 value (`resolve::Inject`): Spring's `@Value("${key}")` holds the key's value from the module's

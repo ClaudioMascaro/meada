@@ -93,6 +93,19 @@ impl LanguagePack for CSharp {
         ]
     }
 
+    /// The BCL types whose members are few and fixed; the table grows with evidence from the
+    /// dogfood repositories, never by guess (ADR 0019).
+    fn known_outside(&self) -> &'static [(&'static str, &'static [&'static str])] {
+        &[
+            ("System.IDisposable", &["Dispose"]),
+            ("System.IAsyncDisposable", &["DisposeAsync"]),
+            ("System.IEquatable", &["Equals"]),
+            ("System.IComparable", &["CompareTo"]),
+            ("System.Collections.IEnumerable", &["GetEnumerator"]),
+            ("System.Collections.Generic.IEnumerable", &["GetEnumerator"]),
+        ]
+    }
+
     /// Every project file (an SDK-style one is a project, `join`), and the props files MSBuild
     /// imports into the projects below them.
     fn config_files(&self) -> &'static [&'static str] {
