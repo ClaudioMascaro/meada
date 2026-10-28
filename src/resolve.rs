@@ -8100,6 +8100,65 @@ mod tests {
     }
 
     #[test]
+    fn a_glob_gives_a_type_as_it_gives_a_function() {
+        // The lookup that lost a path's head: a Rust glob took the types of the module it
+        // names as a namespace's, and a type's name carries none (`LanguagePack::namespaced`).
+        let parsed = parsed(&[(
+            "main.rs",
+            "pub struct Def;\npub fn free() {}\nmod inner { use super::*; }\n",
+        )]);
+        let map: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let r = resolver(&map);
+        for name in ["Def", "free"] {
+            let seen = &mut r.seen("main.rs", "inner");
+            let found = r.globs("main.rs", "inner", name, false, seen);
+            assert!(
+                matches!(found, Some(Binding::Def(t)) if t.path == "main.rs" && t.name == name),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_path_head_a_glob_gives_is_found_through_it() {
+        let found = calls(&[(
+            "main.rs",
+            "pub struct Def;\nimpl Def { pub fn new() -> Self { Def } }\npub fn free() {}\n\
+             mod inner { use super::*; fn a() { Def::new(); } fn b() { free(); } }\n\
+             mod own { use super::*; struct Def; impl Def { fn new() -> Self { Def } }\n\
+             fn a() { Def::new(); } }\n\
+             mod ext { use serde::*; fn a() { Ext::new(); } }\n",
+        )]);
+        assert_eq!(found["main.rs inner.a Def.new"], "exact main.rs::Def.new");
+        assert_eq!(found["main.rs inner.b free"], "exact main.rs::free");
+        // An item of the module wins over the glob.
+        assert_eq!(found["main.rs own.a Def.new"], "exact main.rs::own.Def.new");
+        // A glob of a crate outside the repository gives nothing.
+        assert_eq!(found["main.rs ext.a Ext.new"], "none");
+    }
+
+    #[test]
+    fn a_path_head_a_glob_of_a_module_by_path_gives_is_found_through_it() {
+        // axum's routing tests: the parent imports the type by name, the tests glob the parent.
+        let found = calls(&[
+            ("main.rs", "mod a;\nmod x;\nfn main() {}\n"),
+            (
+                "x.rs",
+                "pub struct Def;\nimpl Def { pub fn new() -> Self { Def } }\n\
+                 mod named { use crate::x::*; fn h() { Def::new(); } }\n",
+            ),
+            (
+                "a.rs",
+                "use crate::x::Def;\nmod tests { use super::*; fn f() { Def::new(); }\n\
+                 mod deep { use super::super::*; fn g() { Def::new(); } } }\n",
+            ),
+        ]);
+        assert_eq!(found["x.rs named.h Def.new"], "exact x.rs::Def.new");
+        assert_eq!(found["a.rs tests.f Def.new"], "exact x.rs::Def.new");
+        assert_eq!(found["a.rs tests.deep.g Def.new"], "exact x.rs::Def.new");
+    }
+
+    #[test]
     fn a_pub_use_in_a_module_written_in_place_is_a_member_of_it() {
         let found = calls(&[
             (

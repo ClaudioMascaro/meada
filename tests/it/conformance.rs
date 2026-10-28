@@ -6827,6 +6827,23 @@ fn rust() {
             "api/src/main.rs::elsewhere",
             "api/src/main.rs::extras",
             "api/src/main.rs::gated",
+            "api/src/main.rs::globbed",
+            "api/src/globbed.rs::Def",
+            "api/src/globbed.rs::Def.new",
+            "api/src/globbed.rs::free",
+            "api/src/globbed.rs::inner",
+            "api/src/globbed.rs::inner.make",
+            "api/src/globbed.rs::inner.open",
+            "api/src/globbed.rs::inner.deep",
+            "api/src/globbed.rs::inner.deep.open",
+            "api/src/globbed.rs::named",
+            "api/src/globbed.rs::named.make",
+            "api/src/globbed.rs::own",
+            "api/src/globbed.rs::own.Def",
+            "api/src/globbed.rs::own.Def.new",
+            "api/src/globbed.rs::own.make",
+            "api/src/globbed.rs::outside",
+            "api/src/globbed.rs::outside.make",
             "api/src/main.rs::imp",
             "api/src/main.rs::mock",
             "api/src/main.rs::native",
@@ -7217,6 +7234,40 @@ fn rust() {
             // module's own `compute`.
             // `#[cfg(test)] use crate::mock::client;` binds nothing: the production client.
             // A module a test build compiles is indexed: `th` is declared under `any(test, ..)`.
+            // A glob gives a path's head as it gives a name called: through `super::*`, a
+            // parent's named import, `super::super::*` and `crate::<path>::*`, after the
+            // module's own items. A glob of an outside crate gives nothing.
+            (
+                "api/src/globbed.rs::inner.make::free#0",
+                EXACT,
+                &["api/src/globbed.rs::free"],
+            ),
+            (
+                "api/src/globbed.rs::inner.make::Def.new#0",
+                EXACT,
+                &["api/src/globbed.rs::Def.new"],
+            ),
+            (
+                "api/src/globbed.rs::inner.open::Store.new#0",
+                EXACT,
+                &["api/src/store.rs::Store.new"],
+            ),
+            (
+                "api/src/globbed.rs::inner.deep.open::Store.new#0",
+                EXACT,
+                &["api/src/store.rs::Store.new"],
+            ),
+            (
+                "api/src/globbed.rs::named.make::Def.new#0",
+                EXACT,
+                &["api/src/globbed.rs::Def.new"],
+            ),
+            (
+                "api/src/globbed.rs::own.make::Def.new#0",
+                EXACT,
+                &["api/src/globbed.rs::own.Def.new"],
+            ),
+            ("api/src/globbed.rs::outside.make::Ext.new#0", None, &[]),
             (
                 "api/src/gated.rs::caller::th.Client.new#0",
                 EXACT,

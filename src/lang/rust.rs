@@ -118,6 +118,12 @@ impl LanguagePack for Rust {
         true
     }
 
+    /// A type's name is its path in its file (`inner.Def`), never the module a glob names
+    /// (`super`, `crate::x`): a glob takes its types as it takes its functions.
+    fn namespaced(&self) -> bool {
+        false
+    }
+
     fn modules(
         &self,
         configs: &[(&str, &[u8])],
