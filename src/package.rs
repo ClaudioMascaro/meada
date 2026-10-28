@@ -35,7 +35,7 @@ use crate::contract::{ContractKind, Found, Hit, Level, Link, Role, Search, Site}
 use crate::entry;
 use crate::index::{self, CallSite, Consumer, Export, Indexed, Provider};
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
-use crate::lang::{Call, MAX_BYTES, python};
+use crate::lang::{Call, MAX_BYTES};
 use crate::literals::Literals;
 use crate::render::{Files, label, rank, section};
 use crate::resolve::{Ancestry, Code, Exported, Flexible};
@@ -153,6 +153,12 @@ trait Ecosystem {
         true
     }
 
+    /// The files that may be the member `name` of the whole file `file` when `file` exports no
+    /// such name, in the order they are tried: none.
+    fn submodule(&self, _file: &str, _name: &str) -> Vec<String> {
+        Vec::new()
+    }
+
     /// The ways an import of `subpath` of the package at `manifest` may be followed: Node's
     /// rule (`ways`).
     fn ways(&self, manifest: &Manifest, subpath: &str) -> Vec<(How, Vec<String>)> {
@@ -186,7 +192,7 @@ trait Ecosystem {
                 targets,
             });
         };
-        let id = at.reach(repository, &file, chain, known)?;
+        let id = at.reach(self, repository, &file, chain, known)?;
         Some(Resolved {
             how,
             level,
@@ -1027,7 +1033,7 @@ impl<'e> Provided<'e> {
                     .iter()
                     .any(|e| e.name.as_deref() == head)
             })
-            .filter_map(|path| self.reach(repository, path, chain, known))
+            .filter_map(|path| self.reach(ecosystem, repository, path, chain, known))
             .collect();
         ids.sort();
         ids.dedup();
@@ -1036,18 +1042,19 @@ impl<'e> Provided<'e> {
 
     /// The symbol `chain` names as exported by `file`: the head is what the file exports, and
     /// each further name a member of that definition or a name the whole file exports.
-    fn reach(
+    fn reach<E: Ecosystem + ?Sized>(
         &self,
+        ecosystem: &E,
         repository: &str,
         file: &str,
         chain: &str,
         known: &dyn Fn(&str) -> bool,
     ) -> Option<String> {
         let mut names = chain.split('.');
-        let mut at = self.member(file, names.next()?)?;
+        let mut at = self.member(ecosystem, file, names.next()?)?;
         for member in names {
             at = match at {
-                (file, None) => self.member(&file, member)?,
+                (file, None) => self.member(ecosystem, &file, member)?,
                 (file, Some(def)) => (file, Some(format!("{def}.{member}"))),
             };
         }
@@ -1059,17 +1066,16 @@ impl<'e> Provided<'e> {
     }
 
     /// What `name` names as a member of the whole file `file`: what it exports (`lookup`), or,
-    /// for a Python package's `__init__.py` that exports no such name, its submodule `name`
-    /// (`pkg/name.py` or `pkg/name/__init__.py`), as `import pkg` then `pkg.name.f()` reaches it.
-    fn member(&self, file: &str, name: &str) -> Option<(String, Option<String>)> {
+    /// when it exports no such name, the first of the files the ecosystem names for it
+    /// (`Ecosystem::submodule`) that the provider indexes.
+    fn member<E: Ecosystem + ?Sized>(
+        &self,
+        ecosystem: &E,
+        file: &str,
+        name: &str,
+    ) -> Option<(String, Option<String>)> {
         self.lookup(file, name, 0, &mut HashSet::new()).or_else(|| {
-            let dir = match file {
-                "__init__.py" => "",
-                file => file.strip_suffix("/__init__.py")?,
-            };
-            let module = python::files(dir, name);
-            let found = module
-                .into_iter()
+            let found = (ecosystem.submodule(file, name).into_iter())
                 .find(|f| self.files.contains(f.as_str()))?;
             Some((found, None))
         })
@@ -3008,6 +3014,23 @@ mod tests {
         assert!(lookup(&provided(&found), "0.ts", "f").is_some());
         let past = chain(MAX_REEXPORTS + 1);
         assert_eq!(lookup(&provided(&past), "0.ts", "f"), None);
+    }
+
+    #[test]
+    fn an_ecosystem_without_a_submodule_rule_reaches_no_submodule() {
+        assert!(Npm.submodule("pkg/__init__.py", "api").is_empty());
+        let rows = [row(
+            "pkg/api.py",
+            Some("fetch"),
+            Some("pkg/api.py"),
+            Some("fetch"),
+        )];
+        let mut p = provided(&rows);
+        p.files = ["pkg/__init__.py", "pkg/api.py"].into_iter().collect();
+        assert_eq!(
+            p.reach(&Npm, "r", "pkg/__init__.py", "api.fetch", &|_| true),
+            None
+        );
     }
 
     #[test]
