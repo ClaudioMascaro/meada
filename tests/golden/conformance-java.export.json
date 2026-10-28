@@ -42,6 +42,10 @@
       "hash": "81fdcf704e3c82a4e6cecc3761dc7b02677db43c19b2cf9a3ac54a2da1341ae3"
     },
     {
+      "path": "maven/api/src/main/java/example/calls/Ticket.java",
+      "hash": "796c7d744335891ca9267383a31dd1537906b77c448a59465a7aff9e15ace64c"
+    },
+    {
       "path": "maven/api/src/main/java/example/channels/Billing.java",
       "hash": "489fb361b1e682ac123fafd16cc8bd714bb66ce4257ef29f50f23731a247bd08"
     },
@@ -805,6 +809,46 @@
         "path": "maven/api/src/main/java/example/calls/Store.java",
         "start": 81,
         "end": 109
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket",
+      "span": {
+        "path": "maven/api/src/main/java/example/calls/Ticket.java",
+        "start": 282,
+        "end": 583
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.compareTo(Ticket)",
+      "span": {
+        "path": "maven/api/src/main/java/example/calls/Ticket.java",
+        "start": 412,
+        "end": 460
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open()",
+      "span": {
+        "path": "maven/api/src/main/java/example/calls/Ticket.java",
+        "start": 352,
+        "end": 373
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open(int)",
+      "span": {
+        "path": "maven/api/src/main/java/example/calls/Ticket.java",
+        "start": 378,
+        "end": 407
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)",
+      "span": {
+        "path": "maven/api/src/main/java/example/calls/Ticket.java",
+        "start": 465,
+        "end": 581
       }
     },
     {
@@ -2542,6 +2586,50 @@
         "path": "maven/api/src/main/java/example/calls/Repo.java",
         "start": 132,
         "end": 147
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)::open#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open()",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/calls/Ticket.java",
+        "start": 520,
+        "end": 526
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)::t.compareTo#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.compareTo(Ticket)",
+      "level": "inferred",
+      "span": {
+        "path": "maven/api/src/main/java/example/calls/Ticket.java",
+        "start": 536,
+        "end": 553
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)::t.missing#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/calls/Ticket.java",
+        "start": 563,
+        "end": 574
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)::t.open#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open(int)",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/calls/Ticket.java",
+        "start": 501,
+        "end": 510
       }
     },
     {
@@ -4939,6 +5027,15 @@
       ]
     },
     {
+      "name": "maven/api/src/main/java/example/calls#4",
+      "members": [
+        "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.compareTo(Ticket)",
+        "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open()",
+        "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open(int)",
+        "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)"
+      ]
+    },
+    {
       "name": "maven/api/src/main/java/example/channels",
       "members": [
         "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.loop(Object)",
@@ -5764,6 +5861,41 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.send(String,int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)",
+      "kind": "export",
+      "label": "example.calls.Ticket.use(Ticket)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.compareTo(Ticket)"
         }
       ]
     },

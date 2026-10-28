@@ -34,7 +34,11 @@ a review finding.
   the same name bound as before.
 - **Opaque outside.** A base class or a receiver whose class comes from outside the repository
   stays opaque: its members resolve to nothing, and reaching it before a repository class in the
-  method order leaves the member unknown.
+  method order leaves the member unknown. The one exception is a base the pack lists among its
+  known outside members (`LanguagePack::known_outside`: `Serializable`, `Comparable`,
+  `IDisposable`, `Hashable`), opaque only for the names it declares: for any other name its
+  family resolves as one without bases (decided in `docs/adr/0019-known-outside-members.md`). A
+  change to the rule has a fixture case with a listed base, a listed name and an unlisted base.
 - **Unread mounts.** A router, blueprint or URLconf whose mount Meada does not read (an import
   that does not resolve, an `include()` or `include_router` whose argument cannot be read)
   yields no provider for that mount: its routes are neither guessed at the root nor under a
@@ -135,8 +139,12 @@ in the same change:
   form and not a table: Java's and Kotlin's `System.getenv` (`getenv` in `lang/java.rs` and
   `lang/kotlin.rs`) and C#'s `GetEnvironmentVariable` (`ENVIRONMENT_READ` in `lang/csharp.rs`,
   which leaves the kind to decide whether the `Environment` is the framework's); C# also keeps
-  the trims of `System.String` (`TRIMS`) as runtime. Two exceptions are pending (#383): the
+  the trims of `System.String` (`TRIMS`) as runtime. The tables of known outside members
+  (`LanguagePack::known_outside`) are runtime, apart from Swift's entry for Vapor's
+  `RouteCollection`, an exception decided in ADR 0019. Two exceptions are pending (#383): the
   TypeScript pack's `RESPONSES` (Next.js `NextResponse`) and `INFERS` (zod and io-ts) in
   `lang/ts/types.rs`, type reads it makes at parse time. The test in `lang/mod.rs`
-  (`every_str_table_in_a_pack_is_listed_with_its_class`) lists every such table with its class,
-  so a new one is a decision visible in review: a table anywhere else in a pack is a finding.
+  (`every_str_table_in_a_pack_is_listed_with_its_class`) lists every such `&[&str]` table named
+  by a `const` or `static` with its class (a `known_outside` table is a literal its method
+  returns), so a new one is a decision visible in review: a table anywhere else in a pack is a
+  finding.

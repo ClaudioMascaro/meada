@@ -1615,9 +1615,30 @@ sample.kt
         "end": 260
       },
       "params": []
+    },
+    {
+      "name": "example.Clock",
+      "kind": "Class",
+      "range": {
+        "start": 262,
+        "end": 280
+      },
+      "params": []
+    },
+    {
+      "name": "example.Timer",
+      "kind": "Class",
+      "range": {
+        "start": 282,
+        "end": 300
+      },
+      "params": []
     }
   ],
   "overloads": {
+    "example.Clock": [
+      "example.Clock"
+    ],
     "example.Store": [
       "example.Store"
     ],
@@ -1626,6 +1647,9 @@ sample.kt
     ],
     "example.Store.save": [
       "example.Store.save(Int,vararg String)"
+    ],
+    "example.Timer": [
+      "example.Timer"
     ],
     "example.helper": [
       "example.helper()"
@@ -1850,6 +1874,30 @@ sample.kt
         "exported": "example.helper",
         "local": "example.helper"
       }
+    },
+    {
+      "Local": {
+        "exported": "Clock",
+        "local": "example.Clock"
+      }
+    },
+    {
+      "Local": {
+        "exported": "example.Clock",
+        "local": "example.Clock"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Timer",
+        "local": "example.Timer"
+      }
+    },
+    {
+      "Local": {
+        "exported": "example.Timer",
+        "local": "example.Timer"
+      }
     }
   ],
   "star": {
@@ -1857,7 +1905,11 @@ sample.kt
       "Store",
       "example.Store",
       "Store.Companion",
-      "example.Store.Companion"
+      "example.Store.Companion",
+      "Clock",
+      "example.Clock",
+      "Timer",
+      "example.Timer"
     ]
   },
   "calls": [
@@ -1922,7 +1974,13 @@ sample.kt
   "hidden": [
     "example.helper"
   ],
-  "package": "example"
+  "package": "example",
+  "expect": [
+    "example.Clock"
+  ],
+  "actual": [
+    "example.Timer"
+  ]
 }
 
 sample.cs
@@ -2022,7 +2080,7 @@ sample.cs
       "name": "Namespace"
     },
     {
-      "local": "*",
+      "local": "Example.*",
       "source": "",
       "name": {
         "Glob": {

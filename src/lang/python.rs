@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ops::Range;
+use std::rc::Rc;
 
 use tree_sitter::{Node, Parser};
 
@@ -386,7 +387,7 @@ impl LanguagePack for Python {
                 let dir = importer.rsplit_once('/').map_or("", |(dir, _)| dir);
                 let mut parts: Vec<&str> = dir.split('/').filter(|p| !p.is_empty()).collect();
                 let Some(keep) = parts.len().checked_sub(dots - 1) else {
-                    return Vec::new();
+                    return Rc::default();
                 };
                 parts.truncate(keep);
                 vec![parts.join("/")]

@@ -56,6 +56,19 @@ const DEFAULT_IMPORTS: &[&str] = &[
     "kotlin.text",
 ];
 
+/// The names `Comparable` declares, with the standard library's extensions on it.
+const COMPARABLE: &[&str] = &[
+    "compareTo",
+    "coerceAtLeast",
+    "coerceAtMost",
+    "coerceIn",
+    "rangeTo",
+    "rangeUntil",
+];
+
+/// The names `AutoCloseable` and `Closeable` declare, with the standard library's `use`.
+const CLOSEABLE: &[&str] = &["close", "use"];
+
 unsafe extern "C" {
     /// The vendored grammar's constructor, which `build.rs` compiles (ADR 0017).
     fn tree_sitter_kotlin() -> *const ();
@@ -91,6 +104,19 @@ impl LanguagePack for Kotlin {
 
     fn extension_functions(&self) -> bool {
         true
+    }
+
+    /// Kotlin's own outside types the Java pack's table (the JDK's, which Kotlin files resolve
+    /// with) lacks, and the standard library's extension functions on the JDK's: a call no own
+    /// overload fits by type takes them, so they count as names the type declares.
+    fn known_outside(&self) -> super::KnownOutside {
+        &[
+            ("kotlin.Comparable", COMPARABLE),
+            ("java.lang.Comparable", COMPARABLE),
+            ("java.lang.AutoCloseable", CLOSEABLE),
+            ("java.io.Closeable", CLOSEABLE),
+            ("kotlin.AutoCloseable", CLOSEABLE),
+        ]
     }
 
     /// Spring's base configuration, as the Java pack lists it: a Kotlin-only repository gives
@@ -209,9 +235,10 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         package,
         ..Facts::default()
     };
-    // Globs are read the latest first, and one `inside` stops the reading: the file's own
-    // package comes first, then the star imports, which see `internal` declarations, then the
-    // default imports. Explicit imports come before any glob.
+    // Globs are read the latest first: the file's own package comes first and stops the
+    // reading, then the star imports, which see `internal` declarations and combine (two that
+    // give a name leave it ambiguous), then the default imports. Explicit imports come before
+    // any glob.
     for package in DEFAULT_IMPORTS {
         wildcard(package, false, &mut facts);
     }
@@ -330,6 +357,11 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     )
                 };
                 facts.defs.push(def);
+                match platform(node, src) {
+                    Some("expect") => facts.expect.push(inner.as_ref().clone()),
+                    Some("actual") => facts.actual.push(inner.as_ref().clone()),
+                    _ => {}
+                }
                 if children(node).any(|c| c.kind() == "interface") {
                     facts.interfaces.push(inner.as_ref().clone());
                 }
@@ -885,6 +917,14 @@ fn own_access(node: Node, src: &[u8]) -> Access {
         Some("internal") => Access::Internal,
         _ => Access::Public,
     }
+}
+
+/// The declaration's `expect` or `actual` modifier, if it writes one.
+fn platform<'s>(node: Node, src: &'s [u8]) -> Option<&'s str> {
+    (named(node).filter(|n| n.kind() == "modifiers"))
+        .flat_map(named)
+        .find(|n| n.kind() == "platform_modifier")
+        .map(|n| text(n, src))
 }
 
 /// The primary constructor's parameters of a class that declares no other constructor; `None`

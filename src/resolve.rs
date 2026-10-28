@@ -372,6 +372,8 @@ pub struct Resolver<'a> {
     outside_blocks: bool,
     /// The pack's `LanguagePack::implicit_members`.
     implicit: &'static [&'static str],
+    /// The pack's known outside members (`lang::known_outside`).
+    known: Vec<crate::lang::KnownEntry>,
     /// The pack's names bound everywhere (`LanguagePack::globals`).
     globals: &'static [&'static str],
     /// The call sites whose single target is each definition, `exact`, sorted. One only a name
@@ -423,6 +425,8 @@ pub struct Resolver<'a> {
     /// unit (`Facts::unit`), sorted, by unit and name: one type, whose members and bases are
     /// all of theirs.
     parts: HashMap<(&'a str, &'a str), Vec<&'a str>>,
+    /// The files of each class declared `actual` (`Facts::actual`), by qualified name.
+    actuals: HashMap<&'a str, Vec<&'a str>>,
 }
 
 /// Whether `inner` is a class nested directly in the class `outer`.
@@ -581,12 +585,14 @@ struct Extension<'a> {
 }
 
 /// A block of members of a class (`lang::Impl`): its file and scope, and for a trait's block,
-/// the trait when it is a class of the repository.
+/// the trait when it is a class of the repository, else its name as the file's imports spell it
+/// (`outside`).
 struct Block<'a> {
     path: &'a str,
     scope: &'a str,
     of_trait: bool,
     of: Option<Target<'a>>,
+    outside: Option<String>,
 }
 
 impl<'a> Resolver<'a> {
@@ -710,6 +716,12 @@ impl<'a> Resolver<'a> {
             for name in &facts.partial {
                 let key = (facts.unit.as_str(), name.as_str());
                 parts.entry(key).or_default().push(path);
+            }
+        }
+        let mut actuals: HashMap<&str, Vec<&str>> = HashMap::new();
+        for (&path, facts) in files {
+            for name in &facts.actual {
+                actuals.entry(name.as_str()).or_default().push(path);
             }
         }
         parts.retain(|_, paths| {
@@ -872,6 +884,7 @@ impl<'a> Resolver<'a> {
             extension_methods: language.extension_methods(),
             outside_blocks: language.outside_blocks(),
             implicit: language.implicit_members(),
+            known: crate::lang::known_outside(language),
             globals: language.globals(),
             callers: HashMap::new(),
             extension_callers: HashMap::new(),
@@ -896,6 +909,7 @@ impl<'a> Resolver<'a> {
             shared: sharing,
             groups,
             parts,
+            actuals,
         };
         let mut work = Work::default();
         for (path, facts) in files {
@@ -951,11 +965,16 @@ impl<'a> Resolver<'a> {
                 {
                     continue;
                 }
+                let of = block.of.as_deref().and_then(class);
+                let outside = (block.of.as_deref())
+                    .filter(|_| of.is_none())
+                    .map(|p| resolver.imported_name(path, &block.within, p));
                 impls.entry(ty).or_default().push(Block {
                     path,
                     scope: &block.scope,
                     of_trait: block.of.is_some(),
-                    of: block.of.as_deref().and_then(class),
+                    of,
+                    outside,
                 });
             }
             // An extension's block says what `this` is in it too; the functions it declares are
@@ -1347,10 +1366,16 @@ impl<'a> Resolver<'a> {
         let Some((family, owned)) = family else {
             return one_of(all);
         };
-        let classes: HashSet<&Target<'a>> = (family.iter())
+        // A Kotlin `expect` class stands for its `actual` ones too, which may declare more.
+        let classes: HashSet<Target<'a>> = (family.iter())
             .filter_map(|a| match a {
-                Ancestor::Class(c) => Some(c),
+                Ancestor::Class(c) => Some(*c),
                 Ancestor::Opaque(_) => None,
+            })
+            .flat_map(|c| {
+                let actuals = self.actuals.get(c.name).filter(|_| self.is_expect(c));
+                let actuals = actuals.into_iter().flatten();
+                std::iter::once(c).chain(actuals.map(move |&path| Target { path, name: c.name }))
             })
             .collect();
         let declared = |t: &Target<'a>| {
@@ -1378,9 +1403,11 @@ impl<'a> Resolver<'a> {
         match within[..] {
             [one] => narrowed(one, all.len()),
             [_, _, ..] => Resolution::Ambiguous(within),
-            [] if bare && self.opaque(&family) => {
+            [] if bare
+                && (self.opaque(&family, callee) || self.outer_opaque(path, scope, callee)) =>
+            {
                 // What the scope would bind with the family's base read as declaring nothing:
-                // that base may declare the name and hide it.
+                // that base, or the base of a class around it, may declare the name and hide it.
                 let found = self.resolve_as(
                     path,
                     scope,
@@ -1395,7 +1422,7 @@ impl<'a> Resolver<'a> {
                     _ => Resolution::Unresolved,
                 }
             }
-            [] if self.extension_methods && on_instance && !self.opaque(&family) => {
+            [] if self.extension_methods && on_instance && !self.opaque(&family, callee) => {
                 one_of(extensions(&all))
             }
             [] => Resolution::Unresolved,
@@ -1584,8 +1611,7 @@ impl<'a> Resolver<'a> {
                 Some((level, place, e.target))
             })
             .collect();
-        let known = (family.as_ref())
-            .is_some_and(|f| f.iter().all(|a| matches!(a, Ancestor::Class(_))))
+        let known = family.as_ref().is_some_and(|f| !self.opaque(f, name))
             && !self.implicit.contains(&name);
         let first = applicable.iter().map(|a| a.0).min()?;
         let nearest = (applicable.iter())
@@ -1691,7 +1717,8 @@ impl<'a> Resolver<'a> {
         let found = self.resolve_as(path, &call.scope, head, seen, work, reading);
         let found = self.instance(found, work);
         let enclosing = head == "self" || Some(head) == self.receiver;
-        matches!(found, Binding::Def(t) | Binding::Instance(t) if self.is_class(t))
+        // A Kotlin `expect` class stands for its `actual` ones, which may declare more.
+        matches!(found, Binding::Def(t) | Binding::Instance(t) if self.is_class(t) && !self.is_expect(t))
             || (enclosing && self.in_outside_block(path, &call.scope))
     }
 
@@ -2079,8 +2106,10 @@ impl<'a> Resolver<'a> {
             return found;
         }
         for ancestor in self.with_parts(&family).iter() {
-            let Ancestor::Class(c) = *ancestor else {
-                return Binding::Unknown;
+            let c = match ancestor {
+                Ancestor::Class(c) => *c,
+                Ancestor::Opaque(o) if !self.may_declare(o, member) => continue,
+                Ancestor::Opaque(_) => return Binding::Unknown,
             };
             if let Some(found) = self.block_member(c, member) {
                 return found;
@@ -2119,16 +2148,17 @@ impl<'a> Resolver<'a> {
     /// The overloads of `member` a family declares (`Facts::overloads`), as `member` reads a
     /// name: in family order, each written signature from the first class that declares it,
     /// so a class's `f(int)` overrides its base's and keeps the base's `f()`. `None` when no
-    /// class declares one; unknown when the family has a base whose members are not known
-    /// anywhere, since overloads merge across the family and that base may declare or override
-    /// any of them (Opaque outside, strict: #353 tracks a relaxation). Other bindings of the
-    /// name (a field) are not methods and do not join the family, nor does a Kotlin extension
-    /// written in its class's file (`fun Foo.x()` beside `class Foo`, a function named under
-    /// the class): it is reached through `Resolver::extensions` alone, after the members.
+    /// class declares one; unknown when the family has a base anywhere that may declare
+    /// `member` (`may_declare`), since overloads merge across the family and that base may declare or
+    /// override any of its overloads (Opaque outside, with Known outside members). Other
+    /// bindings of the name (a field) are not methods and do not join the family, nor does a
+    /// Kotlin extension written in its class's file (`fun Foo.x()` beside `class Foo`, a
+    /// function named under the class): it is reached through `Resolver::extensions` alone,
+    /// after the members.
     /// A class's blocks (`Facts::impls`: Swift's extensions, in any file) declare overloads
     /// after the class itself, and a block's protocol (`Impl::of`) after them, with that
     /// protocol's own inherent blocks (its default implementations); a protocol from outside the
-    /// repository is an opaque base.
+    /// repository is an opaque base for the names it may declare.
     fn overloaded(&self, family: &[Ancestor<'a>], member: &str) -> Option<Binding<'a>> {
         let (mut found, mut signatures, mut opaque) = (Vec::new(), HashSet::new(), false);
         let blocks = |c: Target<'a>| self.impls.get(&c).into_iter().flatten();
@@ -2136,17 +2166,19 @@ impl<'a> Resolver<'a> {
         // conforms to, with its own blocks.
         let (mut levels, mut conformed) = (Vec::new(), Vec::new());
         for ancestor in self.with_parts(family).iter() {
-            let Ancestor::Class(c) = *ancestor else {
-                opaque = true;
-                continue;
+            let c = match ancestor {
+                Ancestor::Class(c) => *c,
+                Ancestor::Opaque(o) => {
+                    opaque |= self.may_declare(o, member);
+                    continue;
+                }
             };
+            opaque |= self.actual_adds(c, member);
             let mut scopes = vec![(c.path, c.name)];
             for b in blocks(c) {
                 scopes.push((b.path, b.scope));
-                match b.of {
-                    Some(p) => conformed.push(p),
-                    None => opaque |= b.of_trait,
-                }
+                conformed.extend(b.of);
+                opaque |= (b.outside.as_deref()).is_some_and(|o| self.may_declare(o, member));
             }
             levels.push((c, scopes));
         }
@@ -2231,8 +2263,10 @@ impl<'a> Resolver<'a> {
             return Some(Binding::Unknown);
         };
         for ancestor in self.with_parts(family).iter() {
-            let Ancestor::Class(c) = *ancestor else {
-                return Some(Binding::Unknown);
+            let c = match ancestor {
+                Ancestor::Class(c) => *c,
+                Ancestor::Opaque(o) if !self.may_declare(o, name) => continue,
+                Ancestor::Opaque(_) => return Some(Binding::Unknown),
             };
             let qualified = format!("{}.{name}", c.name);
             if let Some(constant) = self.consts[c.path].get(qualified.as_str()) {
@@ -2251,16 +2285,57 @@ impl<'a> Resolver<'a> {
             .filter(|found| !matches!(found, Binding::Unknown))
     }
 
-    /// Whether a member of `family` may come from outside the repository: a base whose members
-    /// are not known, or a protocol from outside that a block of one of its classes conforms
-    /// to (Swift's `extension S: Sequence`).
-    fn opaque(&self, family: &[Ancestor<'a>]) -> bool {
+    /// Whether the member `name` (or the last name of a callee, `this.f`) of `family` may come
+    /// from outside the repository: a base that may declare it (`may_declare`), or a protocol from
+    /// outside that may and that a block of one of its classes conforms to (Swift's
+    /// `extension S: Sequence`).
+    fn opaque(&self, family: &[Ancestor<'a>], name: &str) -> bool {
+        let name = name.rsplit('.').next().unwrap_or(name);
         family.iter().any(|a| match a {
-            Ancestor::Opaque(_) => true,
-            Ancestor::Class(c) => {
-                (self.impls.get(c).into_iter().flatten()).any(|b| b.of_trait && b.of.is_none())
-            }
+            Ancestor::Opaque(o) => self.may_declare(o, name),
+            Ancestor::Class(c) => (self.impls.get(c).into_iter().flatten())
+                .any(|b| (b.outside.as_deref()).is_some_and(|o| self.may_declare(o, name))),
         })
+    }
+
+    /// Whether a class around the class of `scope` of `path` has a family that may take `name`
+    /// from outside (`opaque`): a bare call that its own class does not answer climbs there.
+    fn outer_opaque(&self, path: &'a str, scope: &str, name: &str) -> bool {
+        let Binding::Def(class) = self.class(path, scope) else {
+            return false;
+        };
+        let mut at = crate::parent(class.name);
+        while !at.is_empty() {
+            if let Some((name_at, def)) = self.defs[path].get_key_value(at)
+                && def.kind == Kind::Class
+                && let Some(Some(family)) = self.families.get(&Target {
+                    path,
+                    name: name_at,
+                })
+                && self.opaque(family, name)
+            {
+                return true;
+            }
+            at = crate::parent(at);
+        }
+        false
+    }
+
+    /// Whether the outside type `outside` (an opaque base or protocol, as `imported_name`
+    /// spells it) may declare the member `name`: no known outside type matches it, or one that
+    /// declares `name` does (Known outside members, `docs/adr/0019-known-outside-members.md`).
+    /// A type matches by its qualified name, or a bare `outside` by its last name; a Swift
+    /// member is compared without its labels, so `hash(into:)` keeps every `hash` opaque.
+    fn may_declare(&self, outside: &str, name: &str) -> bool {
+        let base = |n: &'static str| n.split('(').next().unwrap_or(n);
+        let name = name.split('(').next().unwrap_or(name);
+        let known = || {
+            (self.known.iter()).filter(|(ty, _)| {
+                *ty == outside || (!outside.contains('.') && ty.rsplit('.').next() == Some(outside))
+            })
+        };
+        known().next().is_none()
+            || known().any(|(_, members)| members.iter().any(|m| base(m) == name))
     }
 
     /// What a bare method name written in the body of class `class` of `path` names
@@ -2275,7 +2350,9 @@ impl<'a> Resolver<'a> {
             return Some(Binding::Unknown);
         };
         match self.overloaded(family, name) {
-            None if self.implicit.contains(&name) || self.opaque(family) => Some(Binding::Unknown),
+            None if self.implicit.contains(&name) || self.opaque(family, name) => {
+                Some(Binding::Unknown)
+            }
             None => {
                 let class = Target { path, name: class };
                 let companion = self.companion(class, &mut Work::default())?;
@@ -2352,13 +2429,52 @@ impl<'a> Resolver<'a> {
         std::borrow::Cow::Owned(parts.collect())
     }
 
-    /// One class for `all` when they are the parts of one type (`parts`): the first part.
+    /// One class for `all` when they are the parts of one type (`parts`): the first part; or
+    /// when they are a Kotlin `expect` class and `actual` ones of its name (`Facts::expect`):
+    /// the `expect` one, whatever the source set asking.
     fn one_type(&self, all: &[Target<'a>]) -> Option<Target<'a>> {
         let first = *all.iter().min()?;
-        let paths = self.parts_of(first)?;
-        all.iter()
-            .all(|t| t.name == first.name && paths.contains(&t.path))
-            .then_some(first)
+        if let Some(paths) = self.parts_of(first) {
+            return (all.iter())
+                .all(|t| t.name == first.name && paths.contains(&t.path))
+                .then_some(first);
+        }
+        let mut expect = all.iter().filter(|t| self.is_expect(**t));
+        let (Some(&expect), None) = (expect.next(), expect.next()) else {
+            return None;
+        };
+        let actual = |t: &Target| {
+            self.actuals
+                .get(t.name)
+                .is_some_and(|a| a.contains(&t.path))
+        };
+        (all.iter())
+            .all(|t| *t == expect || (t.name == expect.name && actual(t)))
+            .then_some(expect)
+    }
+
+    /// Whether an `actual` class of `expect` class `c` declares an overload of `member` that `c`
+    /// does not: a call `c`'s overloads alone answer may reach it, so it is a name match.
+    fn actual_adds(&self, c: Target<'a>, member: &str) -> bool {
+        if !self.is_expect(c) {
+            return false;
+        }
+        let qualified = format!("{}.{member}", c.name);
+        let signatures = |path: &'a str| {
+            (self.overloads.get(path))
+                .and_then(|o| o.get(qualified.as_str()))
+                .into_iter()
+                .flatten()
+                .map(|t| t.name)
+        };
+        let own: HashSet<&str> = signatures(c.path).collect();
+        (self.actuals.get(c.name).into_iter().flatten())
+            .any(|&path| signatures(path).any(|s| !own.contains(s)))
+    }
+
+    /// Whether `t` is a class its file declares `expect` (`Facts::expect`).
+    fn is_expect(&self, t: Target<'a>) -> bool {
+        (self.files.get(t.path)).is_some_and(|f| f.expect.iter().any(|n| n == t.name))
     }
 
     /// `member` of `class` in its blocks (`Facts::impls`): the inherent blocks' first, else the
@@ -2947,11 +3063,28 @@ impl<'a> Resolver<'a> {
     /// `found`, when files define its name apart (`Several`), narrowed to the definitions of the
     /// compilation of `path` (`Facts::unit`, C#'s project) if it holds any: the compiler prefers
     /// a type its own project declares to one of the same name a reference or another project
-    /// brings. A file of no compilation, or one that defines none of them, keeps them all.
+    /// brings. A file of no compilation, or one that defines none of them, keeps them all, and
+    /// so do the overloads of one family's member, which merge across compilations (a Swift
+    /// extension in a test module beside the type's own in its library, a base of another
+    /// project): methods narrow only when two of their types share a name (`Kit/Order.Of` and
+    /// `Kit2/Order.Of`).
     fn in_unit(&self, path: &'a str, found: Binding<'a>) -> Binding<'a> {
         let Binding::Several(all) = found else {
             return found;
         };
+        let owner = |t: &Target<'a>| {
+            let scope = crate::parent(t.name);
+            (self.blocks.get(&(t.path, scope)).copied()).unwrap_or(Target {
+                path: t.path,
+                name: scope,
+            })
+        };
+        let owners: HashSet<Target<'a>> = all.iter().map(owner).collect();
+        let methods = (all.iter()).all(|t| self.defs[t.path][t.name].kind == Kind::Method);
+        let apart = (owners.iter()).any(|a| owners.iter().any(|b| a.name == b.name && a != b));
+        if methods && !apart {
+            return Binding::Several(all);
+        }
         let unit = self.files.get(path).map_or("", |f| f.unit.as_str());
         let own = |t: &&Target| self.files.get(t.path).is_some_and(|f| f.unit == unit);
         let kept: Vec<Target<'a>> = all.iter().filter(own).copied().collect();
@@ -3131,9 +3264,11 @@ impl<'a> Resolver<'a> {
     /// (`wildcard`'s `Imported::Namespace` source), if it is one, where the pack's type names
     /// carry their namespace (`LanguagePack::namespaced`).
     fn glob_namespace(&self, path: &'a str, target: &str) -> Option<&'a str> {
-        if !self.namespaced {
-            return None;
-        }
+        self.namespaced.then(|| self.glob_source(path, target))?
+    }
+
+    /// The `Imported::Namespace` source of the glob of `path` whose target is `target`.
+    fn glob_source(&self, path: &'a str, target: &str) -> Option<&'a str> {
         let imports = &self.files[path].imports;
         (self.by_local[path].of(target).iter().rev())
             .map(|&at| &imports[at])
@@ -3200,7 +3335,10 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
     ) -> Option<Binding<'a>> {
         let imports = &self.files[path].imports;
-        let mut candidates = Vec::new();
+        // Where globs combine, the `inside` ones that give the name come before the others,
+        // and combine with each other (Kotlin's written star imports, which see `internal`
+        // members), but for the file's own package's, which stops the reading.
+        let (mut candidates, mut inside_found) = (Vec::new(), Vec::new());
         for &at in self.by_local[path]
             .of(&crate::qualify(scope, "*"))
             .iter()
@@ -3217,6 +3355,9 @@ impl<'a> Resolver<'a> {
             };
             if public && !re_exports {
                 continue;
+            }
+            if !*inside && !inside_found.is_empty() {
+                break;
             }
             if seen.depth >= LINK_DEPTH {
                 self.cut_link(seen);
@@ -3246,13 +3387,26 @@ impl<'a> Resolver<'a> {
                     | Binding::External(..)
                     | Binding::Module(_)
             ) {
-                if !self.unordered_globs || *inside {
-                    return Some(found);
+                match (self.unordered_globs, *inside) {
+                    (false, _) => return Some(found),
+                    (true, true) if inside_found.is_empty() && self.own_glob(path, target) => {
+                        return Some(found);
+                    }
+                    (true, true) => inside_found.push(found),
+                    (true, false) => candidates.push(found),
                 }
-                candidates.push(found);
             }
         }
-        alternatives(candidates)
+        alternatives(match inside_found.is_empty() {
+            true => candidates,
+            false => inside_found,
+        })
+    }
+
+    /// Whether the glob of `path` whose target is the import `target` takes the file's own
+    /// package (`wildcard`'s `Imported::Namespace` source).
+    fn own_glob(&self, path: &'a str, target: &str) -> bool {
+        self.glob_source(path, target) == Some(self.files[path].package.as_str())
     }
 
     /// What the callee-like name `target` written in `scope` gives (a `use` path): its head
@@ -3308,16 +3462,21 @@ impl<'a> Resolver<'a> {
         name: &'a Imported,
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
+        match name {
+            Imported::Path(target) => return self.alias(path, scope, target, seen),
+            Imported::Glob { .. } => return Binding::Unknown,
+            _ => {}
+        }
         let found = match (name, self.module(path, source)) {
-            (Imported::Path(target), _) => return self.alias(path, scope, target, seen),
-            (Imported::Glob { .. }, _) => return Binding::Unknown,
             (_, None) => Binding::External(source, name),
             (Imported::Namespace, Some(module)) => Binding::Module(module),
             (Imported::Qualified, Some(module)) => self.export(module, source, seen),
             (Imported::Name(name) | Imported::Member { name, .. }, Some(module)) => {
                 self.export(module, name, seen)
             }
-            (Imported::All, Some(_)) => Binding::Unknown,
+            (Imported::All | Imported::Path(_) | Imported::Glob { .. }, Some(_)) => {
+                Binding::Unknown
+            }
         };
         if let Imported::Member { module, .. } = name
             && matches!(found, Binding::Unknown | Binding::External(..))
@@ -3507,6 +3666,11 @@ impl<'a> Resolver<'a> {
         let mut given = (index.stars.iter())
             .filter_map(|&at| self.gives(path, &exports[at], name, seen, value));
         let Some(first) = given.next() else {
+            // A namespace (Java's package, C#'s) exports its types alone: a file's on-demand
+            // imports are its own.
+            if self.unordered_globs && self.namespaced {
+                return None;
+            }
             return self.globs(path, "", name, false, seen);
         };
         match given.all(|other| same(&first, &other)) {
@@ -7765,7 +7929,7 @@ mod tests {
         for reverse in [false, true] {
             let facts = Python.parse("a.py", chain(n, reverse).as_bytes()).unwrap();
             let files = BTreeMap::from([("a.py", &facts)]);
-            let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+            let resolver = Resolver::new(&files, Box::new(|_, _| std::rc::Rc::default()), &Python);
             let exact = |class: usize| {
                 let scope = format!("C{class}.go");
                 let call = facts.calls.iter().find(|c| c.scope == scope).unwrap();
@@ -7792,11 +7956,11 @@ mod tests {
     fn resolver<'a>(files: &'a BTreeMap<&'a str, &'a Facts>) -> Resolver<'a> {
         use crate::lang::rust::Rust;
         let modules: Modules = Box::new(|from, specifier| match (specifier, from) {
-            ("crate", _) => vec!["main.rs".into()],
-            ("self", from) => vec![from.into()],
-            ("super", "c.rs") => vec!["b.rs".into()],
-            ("super", "b.rs") => vec!["a.rs".into()],
-            ("super", _) => vec!["main.rs".into()],
+            ("crate", _) => ["main.rs".into()].into(),
+            ("self", from) => [from.into()].into(),
+            ("super", "c.rs") => ["b.rs".into()].into(),
+            ("super", "b.rs") => ["a.rs".into()].into(),
+            ("super", _) => ["main.rs".into()].into(),
             (s, _) => (s.strip_prefix("mod ").into_iter())
                 .map(|m| format!("{m}.rs"))
                 .collect(),
@@ -7956,6 +8120,91 @@ mod tests {
     }
 
     #[test]
+    fn a_glob_gives_a_type_as_it_gives_a_function() {
+        // The lookup that lost a path's head: a Rust glob took the types of the module it
+        // names as a namespace's, and a type's name carries none (`LanguagePack::namespaced`).
+        let parsed = parsed(&[(
+            "main.rs",
+            "pub struct Def;\npub fn free() {}\nmod inner { use super::*; }\n",
+        )]);
+        let map: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let r = resolver(&map);
+        for name in ["Def", "free"] {
+            let seen = &mut r.seen("main.rs", "inner");
+            let found = r.globs("main.rs", "inner", name, false, seen);
+            assert!(
+                matches!(found, Some(Binding::Def(t)) if t.path == "main.rs" && t.name == name),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_path_head_a_glob_gives_is_found_through_it() {
+        let found = calls(&[(
+            "main.rs",
+            "pub struct Def;\nimpl Def { pub fn new() -> Self { Def } }\npub fn free() {}\n\
+             mod inner { use super::*; fn a() { Def::new(); } fn b() { free(); } }\n\
+             mod own { use super::*; struct Def; impl Def { fn new() -> Self { Def } }\n\
+             fn a() { Def::new(); } }\n\
+             mod ext { use serde::*; fn a() { Ext::new(); } }\n",
+        )]);
+        assert_eq!(found["main.rs inner.a Def.new"], "exact main.rs::Def.new");
+        assert_eq!(found["main.rs inner.b free"], "exact main.rs::free");
+        // An item of the module wins over the glob.
+        assert_eq!(found["main.rs own.a Def.new"], "exact main.rs::own.Def.new");
+        // A glob of a crate outside the repository gives nothing.
+        assert_eq!(found["main.rs ext.a Ext.new"], "none");
+    }
+
+    #[test]
+    fn a_path_head_a_glob_of_a_file_module_gives_is_found_through_it() {
+        // axum's routing tests: the parent imports the type by name, the tests glob the parent.
+        let found = calls(&[
+            ("main.rs", "mod a;\nmod x;\nfn main() {}\n"),
+            (
+                "x.rs",
+                "pub struct Def;\nimpl Def { pub fn new() -> Self { Def } }\n\
+                 struct Priv;\nimpl Priv { pub fn new() -> Self { Priv } }\n\
+                 mod named { use crate::x::*; fn h() { Def::new(); } }\n",
+            ),
+            (
+                "a.rs",
+                "use crate::x::Def;\nmod tests { use super::*; fn f() { Def::new(); }\n\
+                 mod deep { use super::super::*; fn g() { Def::new(); } } }\n\
+                 mod sibling { use crate::x::*; fn p() { Priv::new(); } }\n",
+            ),
+        ]);
+        assert_eq!(found["x.rs named.h Def.new"], "exact x.rs::Def.new");
+        assert_eq!(found["a.rs tests.f Def.new"], "exact x.rs::Def.new");
+        assert_eq!(found["a.rs tests.deep.g Def.new"], "exact x.rs::Def.new");
+        // A private type is not the glob's outside its module.
+        assert_eq!(found["a.rs sibling.p Priv.new"], "none");
+    }
+
+    #[test]
+    fn a_path_head_two_globs_give_is_read_as_a_name_called_is() {
+        let found = calls(&[
+            (
+                "main.rs",
+                "mod x;\nmod y;\nmod m { use crate::x::*; use crate::y::*;\n\
+             fn f() { Def::new(); free(); } }\n",
+            ),
+            (
+                "x.rs",
+                "pub struct Def;\nimpl Def { pub fn new() -> Self { Def } }\npub fn free() {}\n",
+            ),
+            (
+                "y.rs",
+                "pub struct Def;\nimpl Def { pub fn new() -> Self { Def } }\npub fn free() {}\n",
+            ),
+        ]);
+        // The latest glob, for both.
+        assert_eq!(found["main.rs m.f Def.new"], "exact y.rs::Def.new");
+        assert_eq!(found["main.rs m.f free"], "exact y.rs::free");
+    }
+
+    #[test]
     fn a_pub_use_in_a_module_written_in_place_is_a_member_of_it() {
         let found = calls(&[
             (
@@ -8047,7 +8296,7 @@ mod tests {
             );
             let facts = Python.parse("a.py", src.as_bytes()).unwrap();
             let files = BTreeMap::from([("a.py", &facts)]);
-            let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+            let resolver = Resolver::new(&files, Box::new(|_, _| std::rc::Rc::default()), &Python);
             let call = facts.calls.iter().find(|c| c.callee == "x0.m").unwrap();
             matches!(resolver.call("a.py", call), Resolution::Exact(t) if t.name == "K.C.m")
         };
@@ -8082,7 +8331,7 @@ mod tests {
             };
             let facts = Python.parse("a.py", src.as_bytes()).unwrap();
             let files = BTreeMap::from([("a.py", &facts)]);
-            let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+            let resolver = Resolver::new(&files, Box::new(|_, _| std::rc::Rc::default()), &Python);
             let call = facts.calls.iter().find(|c| c.callee == "z.m").unwrap();
             let found = resolver.call("a.py", call);
             assert!(
@@ -8117,7 +8366,7 @@ mod tests {
             };
             let facts = Python.parse("a.py", src.as_bytes()).unwrap();
             let files = BTreeMap::from([("a.py", &facts)]);
-            let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+            let resolver = Resolver::new(&files, Box::new(|_, _| std::rc::Rc::default()), &Python);
             for callee in ["k.m", "z.m"] {
                 let call = facts.calls.iter().find(|c| c.callee == callee).unwrap();
                 let found = resolver.call("a.py", call);
@@ -9227,13 +9476,17 @@ mod tests {
 
     /// What each call of one Java file resolves to, by `scope callee`: the level and target.
     fn java_calls(src: &str) -> BTreeMap<String, String> {
-        use crate::lang::java::Java;
-        let facts = Java.parse("A.java", src.as_bytes()).unwrap();
-        let files = BTreeMap::from([("A.java", &facts)]);
-        let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Java);
+        pack_calls(&crate::lang::java::Java, "A.java", src)
+    }
+
+    /// What each call of the one file `path` of `pack` resolves to, by `scope callee`.
+    fn pack_calls(pack: &dyn LanguagePack, path: &str, src: &str) -> BTreeMap<String, String> {
+        let facts = pack.parse(path, src.as_bytes()).unwrap();
+        let files = BTreeMap::from([(path, &facts)]);
+        let resolver = Resolver::new(&files, Box::new(|_, _| std::rc::Rc::default()), pack);
         let mut out = BTreeMap::new();
         for call in &facts.calls {
-            let found = match resolver.call("A.java", call) {
+            let found = match resolver.call(path, call) {
                 Resolution::Exact(t) => format!("exact {}", t.name),
                 Resolution::Inferred(t) | Resolution::Narrowed(t) => format!("inferred {}", t.name),
                 Resolution::Ambiguous(all) => {
@@ -9245,6 +9498,50 @@ mod tests {
             out.insert(format!("{} {}", call.scope, call.callee), found);
         }
         out
+    }
+
+    /// A call on another call's result is typed by the inner target's written result, through
+    /// `.await` and parentheses; after `?` that result is the `Result` or `Option` around the
+    /// value, so the call stays the name match it was.
+    #[test]
+    fn a_rust_call_after_try_on_a_call_stays_a_name_match() {
+        let calls = pack_calls(
+            &crate::lang::rust::Rust,
+            "src/lib.rs",
+            "use anyhow::Result;
+             pub struct Cfg;
+             impl Cfg { pub fn port(&self) {} }
+             pub struct Other;
+             impl Other { pub fn port(&self) {} }
+             pub fn load() -> Result<Cfg> { todo!() }
+             pub fn opt() -> Option<Cfg> { todo!() }
+             pub fn cfg() -> Cfg { Cfg }
+             pub fn a() -> Result<()> { load()?.port(); Ok(()) }
+             pub fn b() -> Option<()> { opt()?.port(); None }
+             pub async fn c() { (cfg()).port(); }",
+        );
+        let both = "ambiguous Cfg.port Other.port";
+        assert_eq!(calls["a (try_expression).port"], both);
+        assert_eq!(calls["b (try_expression).port"], both);
+        assert_eq!(calls["c (parenthesized_expression).port"], "exact Cfg.port");
+    }
+
+    /// `T::new().m().m()..`: each Rust call is made on the one before and typed by its exact
+    /// target's written result (`Self`), so a link reads the links below it to `RECEIVER_DEPTH`
+    /// at most: the chain costs its length, not a factor per link.
+    #[test]
+    fn a_rust_chain_of_calls_on_call_results_is_read_in_linear_time() {
+        let n = 4 * RECEIVER_DEPTH;
+        let src = format!(
+            "pub struct T;\nimpl T {{ pub fn new() -> Self {{ T }} pub fn m(self) -> Self {{ self }} }}\n\
+             pub fn f() {{ T::new(){}; }}\n",
+            ".m()".repeat(n)
+        );
+        let start = std::time::Instant::now();
+        let calls = pack_calls(&crate::lang::rust::Rust, "src/lib.rs", &src);
+        let took = start.elapsed();
+        assert_eq!(calls["f T.new"], "exact T.new");
+        assert!(took.as_secs() < 10, "{took:?}");
     }
 
     #[test]
@@ -9279,6 +9576,133 @@ mod tests {
             calls["p.Names.run(Names) n.add"],
             "inferred p.Names.add(String)"
         );
+    }
+
+    /// Known outside members: a base whose members the pack knows hides those names alone.
+    #[test]
+    fn a_known_outside_base_hides_only_the_names_it_declares() {
+        let calls = java_calls(
+            "package p;
+             import java.io.Serializable;
+             class Ticket implements Serializable, Comparable<Ticket> {
+                 void open() {} void open(int n) {}
+                 public int compareTo(Ticket t) { return 0; }
+                 void run(Ticket t) { t.open(1); open(); this.open(1); }
+                 void cmp(Ticket t) { t.compareTo(t); compareTo(t); }
+                 void none(Ticket t) { t.missing(); }
+             }
+             class Late extends Ticket { void go() { open(1); } }
+             class Other implements com.x.Serializable { void f() {} void g() { f(); } }
+             class Both implements Serializable, Remote { void f() {} void g() { f(); } }",
+        );
+        assert_eq!(
+            calls["p.Ticket.run(Ticket) t.open"],
+            "exact p.Ticket.open(int)"
+        );
+        assert_eq!(calls["p.Ticket.run(Ticket) open"], "exact p.Ticket.open()");
+        assert_eq!(
+            calls["p.Ticket.run(Ticket) this.open"],
+            "exact p.Ticket.open(int)"
+        );
+        // `Comparable` declares `compareTo`: the strict rule stands for it.
+        let compare = "inferred p.Ticket.compareTo(Ticket)";
+        assert_eq!(calls["p.Ticket.cmp(Ticket) t.compareTo"], compare);
+        assert_eq!(calls["p.Ticket.cmp(Ticket) compareTo"], compare);
+        assert_eq!(calls["p.Ticket.none(Ticket) t.missing"], "none");
+        // Through lineage; a written qualified name of another package, or an unlisted base,
+        // stays opaque.
+        assert_eq!(calls["p.Late.go() open"], "exact p.Ticket.open(int)");
+        assert_eq!(calls["p.Other.g() f"], "inferred p.Other.f()");
+        assert_eq!(calls["p.Both.g() f"], "inferred p.Both.f()");
+    }
+
+    /// A Swift family whose outside bases are all listed protocols (`Sendable`, `Hashable`)
+    /// resolves the names they do not declare as if it had no outside base, the members of a
+    /// repository protocol's extension included (issue #409).
+    #[test]
+    fn listed_swift_protocols_hide_only_the_names_they_declare() {
+        let calls = pack_calls(
+            &crate::lang::swift::Swift,
+            "A.swift",
+            "protocol Builder { func add(_ x: Int) }
+             protocol Service {}
+             extension Builder {
+                 func get(_ path: String..., note: String? = nil, use closure: (Int) -> Int) -> Int { 0 }
+                 func get(_ path: [String], note: String? = nil, use closure: (Int) -> Int) -> Int { 0 }
+             }
+             final class App: Sendable, Service {}
+             extension App: Builder { func add(_ x: Int) {} }
+             final class Plain: Service {}
+             extension Plain: Builder { func add(_ x: Int) {} }
+             func f(_ x: Int) -> Int { x }
+             func trail(app: App, plain: Plain) { app.get(\"a\", \"b\") { _ in 1 }; plain.get(\"a\", \"b\") { _ in 1 } }
+             func use(app: App, plain: Plain) { app.get(\"a\", use: f); plain.get(\"a\", use: f); app.add(1); plain.add(1) }
+             struct Point: Hashable {
+                 func scaled(by k: Int) -> Point { self }
+                 func hash(into hasher: inout Hasher) {}
+             }
+             func runPoint(p: Point, h: inout Hasher) { _ = p.scaled(by: 2); p.hash(into: &h) }
+             struct Late { func scaled(by k: Int) -> Late { self } }
+             extension Late: Hashable { func hash(into hasher: inout Hasher) {} }
+             func runLate(l: Late, h: inout Hasher) { _ = l.scaled(by: 2); l.hash(into: &h) }
+             final class Mixed: Sendable, CustomDebugStringConvertible { func go() {} }
+             func runMixed(m: Mixed) { m.go() }",
+        );
+        let variadic = "Builder.get(_:String,note:String?,use:(Int)->Int)";
+        let both =
+            format!("ambiguous {variadic} Builder.get(_:[String],note:String?,use:(Int)->Int)");
+        for receiver in ["app", "plain"] {
+            let trail = format!("trail(app:plain:) {receiver}.get");
+            assert_eq!(calls[&trail], format!("exact {variadic}"), "{receiver}");
+            assert_eq!(
+                calls[&format!("use(app:plain:) {receiver}.get")],
+                both,
+                "{receiver}"
+            );
+        }
+        assert_eq!(calls["use(app:plain:) app.add"], "exact App.add(_:)");
+        assert_eq!(calls["use(app:plain:) plain.add"], "exact Plain.add(_:)");
+        assert_eq!(calls["runPoint(p:h:) p.scaled"], "exact Point.scaled(by:)");
+        // `Hashable` declares `hash(into:)`, and `CustomDebugStringConvertible` is unlisted: the
+        // strict rule stands.
+        assert_eq!(calls["runPoint(p:h:) p.hash"], "inferred Point.hash(into:)");
+        assert_eq!(calls["runMixed(m:) m.go"], "inferred Mixed.go()");
+        // A listed conformance written on an extension counts the same.
+        assert_eq!(calls["runLate(l:h:) l.scaled"], "exact Late.scaled(by:)");
+        assert_eq!(calls["runLate(l:h:) l.hash"], "inferred Late.hash(into:)");
+        // A repository protocol named like a listed one is a repository base: no name is hidden.
+        let own = pack_calls(
+            &crate::lang::swift::Swift,
+            "A.swift",
+            "protocol Hashable {}
+             struct Own: Hashable { func hash(into n: inout Int) {} }
+             func run(o: Own, n: inout Int) { o.hash(into: &n) }",
+        );
+        assert_eq!(own["run(o:n:) o.hash"], "exact Own.hash(into:)");
+    }
+
+    /// A bare call a nested class does not answer climbs to the class around it: past that
+    /// class's opaque base it is a name match, whatever the nested class's own bases are.
+    #[test]
+    fn a_bare_call_past_an_outer_opaque_base_is_a_name_match() {
+        let calls = java_calls(
+            "package p;
+             abstract class Listing extends ArrayList<String> {
+                 void own() {}
+                 class Plain { void run() { own(); } }
+                 class Task implements Runnable { public void run() { own(); } }
+             }
+             class Mine { void own() {} class Plain { void run() { own(); } } }",
+        );
+        assert_eq!(
+            calls["p.Listing.Plain.run() own"],
+            "inferred p.Listing.own()"
+        );
+        assert_eq!(
+            calls["p.Listing.Task.run() own"],
+            "inferred p.Listing.own()"
+        );
+        assert_eq!(calls["p.Mine.Plain.run() own"], "exact p.Mine.own()");
     }
 
     #[test]
@@ -9424,7 +9848,7 @@ mod tests {
                    class C(B, A):\n    def go(self): self.f()\n";
         let facts = Python.parse("a.py", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("a.py", &facts)]);
-        let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+        let resolver = Resolver::new(&files, Box::new(|_, _| std::rc::Rc::default()), &Python);
         let call = facts.calls.iter().find(|c| c.scope == "C.go").unwrap();
         assert!(matches!(resolver.call("a.py", call), Resolution::Exact(t) if t.name == "B.f"));
     }
@@ -9511,6 +9935,42 @@ mod csharp_tests {
             layout.shared,
             &CSharp,
         ))
+    }
+
+    /// How long the 10000 unbound calls of a file that imports `P` take when `P` holds `files`
+    /// files: the fastest of three passes, against a loaded runner.
+    fn unbound_calls_against(files: usize) -> std::time::Duration {
+        let calls: String = (0..10_000).map(|i| format!("Missing{i}();\n")).collect();
+        let app = format!("using P;\nnamespace Q;\nclass C {{ void F() {{\n{calls}}} }}\n");
+        let mut sources: Vec<(String, String)> = (0..files)
+            .map(|i| {
+                let source = format!("namespace P;\npublic class T{i} {{}}\n");
+                (format!("P/T{i}.cs"), source)
+            })
+            .collect();
+        sources.push(("App/C.cs".into(), app));
+        let sources: Vec<(&str, &str)> = sources.iter().map(|(p, s)| (&**p, &**s)).collect();
+        with_resolver(&sources, &[("App/App.csproj", PROJECT)], |resolver| {
+            let facts = resolver.files["App/C.cs"];
+            let pass = || {
+                let start = std::time::Instant::now();
+                for call in &facts.calls {
+                    let found = resolver.call("App/C.cs", call);
+                    assert!(matches!(found, Resolution::Unresolved));
+                }
+                start.elapsed()
+            };
+            (0..3).map(|_| pass()).min().unwrap()
+        })
+    }
+
+    #[test]
+    fn unbound_calls_cost_the_same_whatever_the_namespaces_they_import_hold() {
+        let (one, many) = (unbound_calls_against(1), unbound_calls_against(4000));
+        // Each lookup copied the namespace's file list, about 0.17 us per file: 4000 files made
+        // a debug build several times slower (50 files, as on bitwarden, only 1.4 times in a
+        // release build, too close to the noise to pin).
+        assert!(many < one * 3 / 2, "{one:?} {many:?}");
     }
 
     /// `resolved` over the project files `configs`.
@@ -9697,6 +10157,38 @@ mod csharp_tests {
         ] {
             assert_eq!(calls(body).0.0, "ambiguous", "{body}");
         }
+    }
+
+    /// Known outside members: `IDisposable` hides `Dispose` alone, while `IEnumerable` stays
+    /// opaque, since LINQ's extension methods (`Contains`) answer a call no own overload fits.
+    #[test]
+    fn a_known_base_hides_its_names_and_ienumerable_stays_opaque() {
+        let src = "using System;\nusing System.Collections.Generic;\nnamespace P;\n\
+                   class Lease : IDisposable { public void Open(int n) { } public void Dispose() { } \
+                   void Run() { this.Open(1); this.Dispose(); } }\n\
+                   class Bag : IEnumerable<int> { public bool Contains(string k) => true; \
+                   void Run() { this.Contains(1); } }\n";
+        let found = resolved(&[("App/Lease.cs", src)]);
+        let level = |callee: &str| (found.iter()).find(|c| c.1 == callee).map(|c| c.2).unwrap();
+        assert_eq!(level("this.Open"), "exact");
+        assert_eq!(level("this.Dispose"), "inferred");
+        assert_eq!(level("this.Contains"), "inferred");
+    }
+
+    /// The overloads of one family merge across projects: a base's overload in another project
+    /// is no type the caller's project hides, so the call is `ambiguous` by count, never the
+    /// derived class's `exact`.
+    #[test]
+    fn a_family_s_overloads_in_another_project_stay_candidates() {
+        let base = "namespace P;\npublic class Base { public void F(int n) { } }\n";
+        let app = "namespace Q;\nusing P;\nclass Derived : Base { public void F(string s) { } \
+                   void Run(Derived d) { d.F(1); } }\n";
+        let found = resolved(&[("Kit/Base.cs", base), ("App/Derived.cs", app)]);
+        let call = (found.iter())
+            .find(|(_, callee, ..)| callee == "d.F")
+            .unwrap();
+        let both = vec!["App/Derived.cs".to_string(), "Kit/Base.cs".to_string()];
+        assert_eq!((call.2, call.3.clone()), ("ambiguous", both));
     }
 
     /// A type two projects of the repository declare under one qualified name binds, from a
@@ -10128,5 +10620,221 @@ mod csharp_tests {
         });
         assert_eq!(exact.count(), n);
         assert!(took.as_secs() < 20, "{took:?}");
+    }
+
+    /// What `Gen.M` (`Util.Go(); new Util();`, in `namespace Acme.Query.Internal`, or `block`
+    /// nested) binds `Util` to among `files`, and the family of `Sub : Util`: the paths of
+    /// `Util.Go`'s and `Util`'s targets, then the ancestor `Sub` names.
+    fn enclosing(files: &[(&str, &str)], usings: &str, block: bool) -> (Vec<String>, String) {
+        let body = "public class Gen { void M() { Util.Go(); new Util(); } }\n\
+                    public class Sub : Util { }\n";
+        let source = match block {
+            true => format!(
+                "{usings}namespace Acme {{ namespace Query {{ namespace Internal {{\n{body}}} }} }}\n"
+            ),
+            false => format!("{usings}namespace Acme.Query.Internal;\n{body}"),
+        };
+        let mut all = files.to_vec();
+        all.push(("App/Gen.cs", &source));
+        let found = resolved(&all);
+        let calls = (calls_in(&found, "App/Gen.cs").into_iter())
+            .map(|(callee, level, targets)| format!("{callee} {level} {}", targets.join(" ")))
+            .collect();
+        let configs = [("App/App.csproj", PROJECT)];
+        let family = families_in(&all, &configs)["Acme.Query.Internal.Sub"].clone();
+        (calls, family.unwrap_or_default().join(" "))
+    }
+
+    /// `Util`, with a static `Go`, declared in `namespace ns` (file-scoped).
+    fn util(ns: &str) -> String {
+        format!("namespace {ns};\npublic class Util {{ public static void Go() {{ }} }}\n")
+    }
+
+    /// A type of a namespace enclosing the file's binds without a using, as C# looks a name up
+    /// in each enclosing namespace: a static call's receiver, a constructor and a base alike,
+    /// whether the namespace is file-scoped or written as nested blocks.
+    #[test]
+    fn a_type_of_an_enclosing_namespace_binds_without_a_using() {
+        let query = util("Acme.Query");
+        for block in [false, true] {
+            let found = enclosing(&[("App/Util.cs", &query)], "", block);
+            let with_using = enclosing(&[("App/Util.cs", &query)], "using Acme.Query;\n", block);
+            assert_eq!(
+                found,
+                (
+                    vec![
+                        "Util.Go exact App/Util.cs".to_string(),
+                        "Util exact App/Util.cs".to_string(),
+                    ],
+                    "Acme.Query.Internal.Sub Acme.Query.Util".to_string(),
+                ),
+                "block: {block}"
+            );
+            assert_eq!(found, with_using, "block: {block}");
+        }
+    }
+
+    /// The enclosing namespaces are read the innermost first, and before the file's usings: of
+    /// three `Util`s, the nearest namespace's binds, and a using's never does.
+    #[test]
+    fn the_innermost_enclosing_namespace_binds_before_outer_ones_and_usings() {
+        let (inner, query, acme, other) = (
+            util("Acme.Query.Internal"),
+            util("Acme.Query"),
+            util("Acme"),
+            util("Other"),
+        );
+        let cases: [(&[(&str, &str)], &str); 3] = [
+            (&[("App/A.cs", &acme), ("App/Q.cs", &query)], "App/Q.cs"),
+            (
+                &[
+                    ("App/A.cs", &acme),
+                    ("App/I.cs", &inner),
+                    ("App/Q.cs", &query),
+                ],
+                "App/I.cs",
+            ),
+            (&[("App/A.cs", &acme), ("App/O.cs", &other)], "App/A.cs"),
+        ];
+        for block in [false, true] {
+            for (files, wanted) in cases {
+                let (calls, _) = enclosing(files, "using Other;\n", block);
+                let names: Vec<&str> = files.iter().map(|f| f.0).collect();
+                assert_eq!(
+                    calls,
+                    [
+                        format!("Util.Go exact {wanted}"),
+                        format!("Util exact {wanted}")
+                    ],
+                    "{names:?}, block: {block}"
+                );
+            }
+        }
+    }
+
+    /// A namespace declared beside the one around the code, in the same file, does not enclose
+    /// it: its types are not seen, and the namespaces around the code still bind theirs.
+    #[test]
+    fn a_sibling_namespace_of_the_file_does_not_enclose_the_code() {
+        let (acme, other) = (util("Acme"), util("Other"));
+        let source = "namespace Acme.Query { public class Gen { void M() { Util.Go(); } } }\n\
+                    namespace Other.Query { public class Gen { void M() { Util.Go(); } } }\n";
+        let found = resolved(&[
+            ("App/A.cs", &acme),
+            ("App/O.cs", &other),
+            ("App/Gen.cs", source),
+        ]);
+        let (a, o) = (vec!["App/A.cs".to_string()], vec!["App/O.cs".to_string()]);
+        assert_eq!(
+            calls_in(&found, "App/Gen.cs"),
+            [
+                ("Util.Go".to_string(), "exact", a),
+                ("Util.Go".to_string(), "exact", o),
+            ]
+        );
+    }
+}
+
+#[cfg(test)]
+mod kotlin_tests {
+    use super::*;
+    use crate::lang::LanguagePack;
+    use crate::lang::java::Java;
+    use crate::lang::kotlin::Kotlin;
+
+    /// How each call of the Kotlin `files` resolves, with Java's resolver as the index builds
+    /// it: `path scope callee` to the level and each target's `path::name`.
+    fn resolved(files: &[(&str, &str)]) -> BTreeMap<String, String> {
+        let parsed: Vec<(&str, Facts)> = (files.iter())
+            .map(|(p, s)| (*p, Kotlin.parse(p, s.as_bytes()).unwrap()))
+            .collect();
+        let files: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let layout = Java.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
+        let at = |t: &Target| format!("{}::{}", t.path, t.name);
+        let mut out = BTreeMap::new();
+        for (&path, facts) in &files {
+            for call in &facts.calls {
+                let found = match resolver.call(path, call) {
+                    Resolution::Exact(t) => format!("exact {}", at(&t)),
+                    Resolution::Inferred(t) | Resolution::Narrowed(t) => {
+                        format!("inferred {}", at(&t))
+                    }
+                    Resolution::Ambiguous(ts) => {
+                        format!(
+                            "ambiguous {}",
+                            ts.iter().map(at).collect::<Vec<_>>().join(" ")
+                        )
+                    }
+                    Resolution::Unresolved => "none".to_string(),
+                };
+                out.insert(format!("{path} {} {}", call.scope, call.callee), found);
+            }
+        }
+        out
+    }
+
+    /// A class of the file's own package hides one a star import gives, and two star imports
+    /// that give one name leave it ambiguous, as the compiler finds it.
+    #[test]
+    fn the_own_package_comes_before_star_imports_and_two_stars_are_ambiguous() {
+        let base = |package: &str| format!("package {package}\nopen class Base\n");
+        let (t, v) = (base("t"), base("v"));
+        let own = "package u\nimport t.*\nclass Base\nfun go() { Base() }\n";
+        let two = "package w\nimport t.*\nimport v.*\nfun go() { Base() }\n";
+        let found = resolved(&[
+            ("t/Base.kt", &t),
+            ("v/Base.kt", &v),
+            ("u/U.kt", own),
+            ("w/W.kt", two),
+        ]);
+        assert_eq!(found["u/U.kt u.go() Base"], "exact u/U.kt::u.Base");
+        assert_eq!(
+            found["w/W.kt w.go() Base"],
+            "ambiguous t/Base.kt::t.Base v/Base.kt::v.Base"
+        );
+    }
+
+    /// An `expect` class and `actual` ones of its name are the `expect` one; two `expect`
+    /// classes of one name, or one beside a class that is no `actual`, stay several. A member
+    /// only an `actual` declares is a name match on a receiver of the class.
+    #[test]
+    fn an_expect_class_and_its_actuals_are_the_expect_one() {
+        let class = |modifier: &str| {
+            format!(
+                "package e\n{modifier} open class C() {{ fun m(n: Int) {{}} fun own() {{}} }}\n"
+            )
+        };
+        let (expect, actual, plain) = (class("expect"), class("actual"), class(""));
+        let user = "package u\nimport e.C\nfun go(c: C) { C(); c.m(1); c.own() }\n";
+        let level = |files: &[(&str, &str)], callee: &str| {
+            resolved(files)[&format!("u/U.kt u.go(C) {callee}")].clone()
+        };
+        let one = [("a/C.kt", &*expect), ("b/C.kt", &*actual), ("u/U.kt", user)];
+        assert_eq!(level(&one, "C"), "exact a/C.kt::e.C");
+        assert_eq!(level(&one, "c.m"), "exact a/C.kt::e.C.m(Int)");
+        assert_eq!(level(&one, "c.own"), "exact a/C.kt::e.C.own()");
+        let actual_only = class("actual").replace("fun own() {}", "fun more() {}");
+        let user_more = user.replace("c.own()", "c.more()");
+        let more = [
+            ("a/C.kt", &*expect),
+            ("b/C.kt", &*actual_only),
+            ("u/U.kt", &*user_more),
+        ];
+        assert_eq!(level(&more, "c.more"), "inferred b/C.kt::e.C.more()");
+        // An overload only the `actual` adds may be the one called: a name match.
+        let overloaded = actual.replace("fun own() {}", "fun own() {} fun m(s: String) {}");
+        let added = [
+            ("a/C.kt", &*expect),
+            ("b/C.kt", &*overloaded),
+            ("u/U.kt", user),
+        ];
+        assert_ne!(level(&added, "c.m"), "exact a/C.kt::e.C.m(Int)");
+        assert!(!level(&added, "c.m").starts_with("none"));
+        assert_eq!(level(&added, "c.own"), "exact a/C.kt::e.C.own()");
+        for other in [&expect, &plain] {
+            let two = [("a/C.kt", &*expect), ("b/C.kt", &**other), ("u/U.kt", user)];
+            assert_eq!(level(&two, "C"), "ambiguous a/C.kt::e.C b/C.kt::e.C");
+        }
     }
 }

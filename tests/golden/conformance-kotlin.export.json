@@ -10,6 +10,18 @@
       "hash": "578a47f0aacb99c3295e62c42712d646e8a7fbb40ffde6f0c7d669e554761ca7"
     },
     {
+      "path": "src/commonMain/kotlin/example/platform/Clock.kt",
+      "hash": "84af94c5c027d8d8175220b3846feae85089757e2c3611f5f857f144dde79acb"
+    },
+    {
+      "path": "src/jsMain/kotlin/example/platform/Clock.kt",
+      "hash": "12cac2f6ea498c44a06c10250d91694849c32484fd63257b3a13b77856e0f2b1"
+    },
+    {
+      "path": "src/jvmMain/kotlin/example/platform/Clock.kt",
+      "hash": "b76e766b620ad36c549fe8d368fd08c5878b3324ece890ff6035b457dd51066f"
+    },
+    {
       "path": "src/main/java/example/legacy/Gauges.java",
       "hash": "b54a4145857677e59bb5f4ee7e582291ec40c3d5a64ded85b192812a14186ea8"
     },
@@ -20,6 +32,10 @@
     {
       "path": "src/main/java/example/legacy/Port.java",
       "hash": "0300caf3e8bcc396f76650c2140dee55420fdbb887865908388b19f31f17badb"
+    },
+    {
+      "path": "src/main/kotlin/example/Known.kt",
+      "hash": "af6bd27f90099407732520c2c6de5f4f7d46e185bafa74ffce131f68d41dfc60"
     },
     {
       "path": "src/main/kotlin/example/Main.kt",
@@ -206,6 +222,34 @@
       "hash": "2f58922ed5028153cb6f5ce6ae32a302a5880d134fd9d9314a5389527b4ac854"
     },
     {
+      "path": "src/main/kotlin/example/platform/named/Named.kt",
+      "hash": "5e8c9c6d03a584cf1998bc3147ccf6669b940737510ccea582151d5ff7e60794"
+    },
+    {
+      "path": "src/main/kotlin/example/platform/star/Starred.kt",
+      "hash": "a6ec9bd117c72bd8857ee18dab62c4d7a6ccbb35e258c8c2def85f0f7c5d7e65"
+    },
+    {
+      "path": "src/main/kotlin/example/stars/Base.kt",
+      "hash": "706583812e088e4fde44b1b41f2575ed371f6aabbd9363299c495727a76c72ab"
+    },
+    {
+      "path": "src/main/kotlin/example/stars/both/Both.kt",
+      "hash": "224f1bf4e6a0e54b46380b4ae25732271e454a6dd76057234876d21324a55c86"
+    },
+    {
+      "path": "src/main/kotlin/example/stars/other/Base.kt",
+      "hash": "0ebffa320b102d41f0df36ee6aa6ecd3d151fcff64d68f6cb8b4b99a4e82178b"
+    },
+    {
+      "path": "src/main/kotlin/example/stars/sub/Sub.kt",
+      "hash": "32dd6ef1fdd63b6d404672addb185a1a09366fe9f08bc678586318101ce9d9aa"
+    },
+    {
+      "path": "src/main/kotlin/example/stars/two/Two.kt",
+      "hash": "8bb2eeccc3b77f1c4e271063d219b1ab5dbd667874aee5a873b93412097473d3"
+    },
+    {
       "path": "src/main/kotlin/example/util/Hidden.kt",
       "hash": "2acfe339079125679b23b7a0e12a312b0334abc1cb4c61e01460573155995480"
     },
@@ -245,6 +289,62 @@
         "path": "scripts/seed.kts",
         "start": 59,
         "end": 93
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock",
+      "span": {
+        "path": "src/commonMain/kotlin/example/platform/Clock.kt",
+        "start": 26,
+        "end": 76
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+      "span": {
+        "path": "src/commonMain/kotlin/example/platform/Clock.kt",
+        "start": 58,
+        "end": 74
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/jsMain/kotlin/example/platform/Clock.kt::example.platform.Clock",
+      "span": {
+        "path": "src/jsMain/kotlin/example/platform/Clock.kt",
+        "start": 26,
+        "end": 105
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/jsMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+      "span": {
+        "path": "src/jsMain/kotlin/example/platform/Clock.kt",
+        "start": 77,
+        "end": 103
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock",
+      "span": {
+        "path": "src/jvmMain/kotlin/example/platform/Clock.kt",
+        "start": 26,
+        "end": 124
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+      "span": {
+        "path": "src/jvmMain/kotlin/example/platform/Clock.kt",
+        "start": 77,
+        "end": 103
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()",
+      "span": {
+        "path": "src/jvmMain/kotlin/example/platform/Clock.kt",
+        "start": 109,
+        "end": 122
       }
     },
     {
@@ -301,6 +401,46 @@
         "path": "src/main/java/example/legacy/Port.java",
         "start": 163,
         "end": 241
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket",
+      "span": {
+        "path": "src/main/kotlin/example/Known.kt",
+        "start": 274,
+        "end": 524
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)",
+      "span": {
+        "path": "src/main/kotlin/example/Known.kt",
+        "start": 442,
+        "end": 522
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.compareTo(Ticket)",
+      "span": {
+        "path": "src/main/kotlin/example/Known.kt",
+        "start": 390,
+        "end": 436
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.open()",
+      "span": {
+        "path": "src/main/kotlin/example/Known.kt",
+        "start": 328,
+        "end": 347
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.open(Int)",
+      "span": {
+        "path": "src/main/kotlin/example/Known.kt",
+        "start": 353,
+        "end": 384
       }
     },
     {
@@ -3320,6 +3460,150 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named",
+      "span": {
+        "path": "src/main/kotlin/example/platform/named/Named.kt",
+        "start": 194,
+        "end": 366
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()",
+      "span": {
+        "path": "src/main/kotlin/example/platform/named/Named.kt",
+        "start": 222,
+        "end": 285
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)",
+      "span": {
+        "path": "src/main/kotlin/example/platform/named/Named.kt",
+        "start": 291,
+        "end": 364
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred",
+      "span": {
+        "path": "src/main/kotlin/example/platform/star/Starred.kt",
+        "start": 58,
+        "end": 122
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred.go()",
+      "span": {
+        "path": "src/main/kotlin/example/platform/star/Starred.kt",
+        "start": 88,
+        "end": 120
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base",
+      "span": {
+        "path": "src/main/kotlin/example/stars/Base.kt",
+        "start": 23,
+        "end": 115
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base.mark(Int)",
+      "span": {
+        "path": "src/main/kotlin/example/stars/Base.kt",
+        "start": 45,
+        "end": 64
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base.runIt(Int,()->Unit)",
+      "span": {
+        "path": "src/main/kotlin/example/stars/Base.kt",
+        "start": 70,
+        "end": 113
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Face",
+      "span": {
+        "path": "src/main/kotlin/example/stars/Base.kt",
+        "start": 117,
+        "end": 153
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Face.face()",
+      "span": {
+        "path": "src/main/kotlin/example/stars/Base.kt",
+        "start": 138,
+        "end": 151
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both",
+      "span": {
+        "path": "src/main/kotlin/example/stars/both/Both.kt",
+        "start": 131,
+        "end": 206
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()",
+      "span": {
+        "path": "src/main/kotlin/example/stars/both/Both.kt",
+        "start": 157,
+        "end": 204
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base",
+      "span": {
+        "path": "src/main/kotlin/example/stars/other/Base.kt",
+        "start": 29,
+        "end": 72
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base.mark(Int)",
+      "span": {
+        "path": "src/main/kotlin/example/stars/other/Base.kt",
+        "start": 51,
+        "end": 70
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub",
+      "span": {
+        "path": "src/main/kotlin/example/stars/sub/Sub.kt",
+        "start": 144,
+        "end": 273
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()",
+      "span": {
+        "path": "src/main/kotlin/example/stars/sub/Sub.kt",
+        "start": 175,
+        "end": 271
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two",
+      "span": {
+        "path": "src/main/kotlin/example/stars/two/Two.kt",
+        "start": 139,
+        "end": 213
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two.go()",
+      "span": {
+        "path": "src/main/kotlin/example/stars/two/Two.kt",
+        "start": 164,
+        "end": 211
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.FilePrivate",
       "span": {
         "path": "src/main/kotlin/example/util/Hidden.kt",
@@ -3728,6 +4012,50 @@
         "path": "src/main/java/example/legacy/Port.java",
         "start": 224,
         "end": 234
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)::open#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.open()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/Known.kt",
+        "start": 482,
+        "end": 488
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)::t.compareTo#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.compareTo(Ticket)",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/Known.kt",
+        "start": 491,
+        "end": 508
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)::t.missing#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/Known.kt",
+        "start": 511,
+        "end": 522
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)::t.open#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.open(Int)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/Known.kt",
+        "start": 470,
+        "end": 479
       }
     },
     {
@@ -10371,6 +10699,188 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()::Clock#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()",
+      "target": "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/platform/named/Named.kt",
+        "start": 272,
+        "end": 279
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()::mark#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()",
+      "target": "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/platform/named/Named.kt",
+        "start": 241,
+        "end": 248
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()::tick#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()",
+      "target": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/platform/named/Named.kt",
+        "start": 257,
+        "end": 263
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)::clock.mark#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)",
+      "target": "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/platform/named/Named.kt",
+        "start": 324,
+        "end": 337
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)::clock.tick#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)",
+      "target": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/platform/named/Named.kt",
+        "start": 346,
+        "end": 358
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred.go()::mark#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred.go()",
+      "target": "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/platform/star/Starred.kt",
+        "start": 107,
+        "end": 114
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()::Base#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/stars/both/Both.kt",
+        "start": 192,
+        "end": 198
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()::mark#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base.mark(Int)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/stars/both/Both.kt",
+        "start": 176,
+        "end": 183
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::(anonymous).mark#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base.mark(Int)",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/stars/sub/Sub.kt",
+        "start": 218,
+        "end": 225
+      },
+      "narrowed": true
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::(call_expression).mark#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base.mark(Int)",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/stars/sub/Sub.kt",
+        "start": 251,
+        "end": 265
+      },
+      "narrowed": true
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::Base#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/stars/sub/Sub.kt",
+        "start": 251,
+        "end": 257
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::face#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Face.face()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/stars/sub/Sub.kt",
+        "start": 236,
+        "end": 242
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::mark#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base.mark(Int)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/stars/sub/Sub.kt",
+        "start": 194,
+        "end": 201
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::runIt#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base.runIt(Int,()->Unit)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/stars/sub/Sub.kt",
+        "start": 210,
+        "end": 227
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two.go()::Base#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two.go()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base",
+        "example.com/acme/conformance::src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/stars/two/Two.kt",
+        "start": 199,
+        "end": 205
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two.go()::mark#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two.go()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/stars/two/Two.kt",
+        "start": 183,
+        "end": 190
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.shared()::closed#0",
       "caller": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.shared()",
       "target": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.closed()",
@@ -11491,6 +12001,17 @@
   ],
   "communities": [
     {
+      "name": "src/commonMain/kotlin/example/platform",
+      "members": [
+        "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock",
+        "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+        "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()",
+        "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()",
+        "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)",
+        "example.com/acme/conformance::src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred.go()"
+      ]
+    },
+    {
       "name": "src/main/java/example/legacy",
       "members": [
         "example.com/acme/conformance::src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)",
@@ -11523,6 +12044,15 @@
     {
       "name": "src/main/kotlin/example#10",
       "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.Companion.m()",
+        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.m()",
+        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.own()",
+        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.twins(Twin)"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/example#11",
+      "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Any.toJson()",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.CharSequence.blankish()",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.T.logged()",
@@ -11530,7 +12060,7 @@
       ]
     },
     {
-      "name": "src/main/kotlin/example#11",
+      "name": "src/main/kotlin/example#12",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.clear()",
@@ -11554,7 +12084,7 @@
       ]
     },
     {
-      "name": "src/main/kotlin/example#12",
+      "name": "src/main/kotlin/example#13",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Map.Entry.entryLabel()",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Outside.items()",
@@ -11563,7 +12093,7 @@
       ]
     },
     {
-      "name": "src/main/kotlin/example#13",
+      "name": "src/main/kotlin/example#14",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.String.loud()",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.asserted(Cache?)",
@@ -11577,14 +12107,14 @@
       ]
     },
     {
-      "name": "src/main/kotlin/example#14",
+      "name": "src/main/kotlin/example#15",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.localFirst(Cache)",
         "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.localFirst(Cache).size()"
       ]
     },
     {
-      "name": "src/main/kotlin/example#15",
+      "name": "src/main/kotlin/example#16",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Marker"
       ]
@@ -11616,52 +12146,52 @@
     {
       "name": "src/main/kotlin/example#3",
       "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)",
+        "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.compareTo(Ticket)",
+        "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.open()",
+        "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.open(Int)"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/example#4",
+      "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Runner",
         "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.main(Array<String>)"
       ]
     },
     {
-      "name": "src/main/kotlin/example#4",
+      "name": "src/main/kotlin/example#5",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Base.log(String)",
         "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Derived.go()"
       ]
     },
     {
-      "name": "src/main/kotlin/example#5",
+      "name": "src/main/kotlin/example#6",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Derived.Companion.origin()",
         "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Derived.first()"
       ]
     },
     {
-      "name": "src/main/kotlin/example#6",
+      "name": "src/main/kotlin/example#7",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Logged.go()",
         "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.log(String)"
       ]
     },
     {
-      "name": "src/main/kotlin/example#7",
+      "name": "src/main/kotlin/example#8",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Logged.own()",
         "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Logged.self()"
       ]
     },
     {
-      "name": "src/main/kotlin/example#8",
+      "name": "src/main/kotlin/example#9",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.go()",
         "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.own()"
-      ]
-    },
-    {
-      "name": "src/main/kotlin/example#9",
-      "members": [
-        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.Companion.m()",
-        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.m()",
-        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.own()",
-        "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.twins(Twin)"
       ]
     },
     {
@@ -11858,6 +12388,24 @@
       ]
     },
     {
+      "name": "src/main/kotlin/example/stars",
+      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base",
+        "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base.mark(Int)",
+        "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base.runIt(Int,()->Unit)",
+        "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Face.face()",
+        "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/example/stars/other",
+      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()",
+        "example.com/acme/conformance::src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base",
+        "example.com/acme/conformance::src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base.mark(Int)"
+      ]
+    },
+    {
       "name": "src/main/kotlin/example/util",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Point.norm()",
@@ -11968,6 +12516,69 @@
     }
   ],
   "processes": [
+    {
+      "entry_point": "example.com/acme/conformance::src/jsMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+      "kind": "export",
+      "label": "example.platform.Clock.mark(Int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/jsMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+      "kind": "export",
+      "label": "example.platform.Clock.mark(Int)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)",
+      "kind": "export",
+      "label": "example.Ticket.check(Ticket)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.open(Int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.open()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.compareTo(Ticket)"
+        }
+      ]
+    },
     {
       "entry_point": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.main(Array<String>)",
       "kind": "program",
@@ -17594,6 +18205,186 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/main/kotlin/example/other/Others.kt::example.other.String.reversed()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()",
+      "kind": "export",
+      "label": "example.platform.named.Named.go()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)",
+      "kind": "export",
+      "label": "example.platform.named.Named.hold(Clock)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred.go()",
+      "kind": "export",
+      "label": "example.platform.star.Starred.go()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred.go()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()",
+      "kind": "export",
+      "label": "example.stars.both.Both.go()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base.mark(Int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()",
+      "kind": "export",
+      "label": "example.stars.sub.Sub.go()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base.mark(Int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base.runIt(Int,()->Unit)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Face.face()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two.go()",
+      "kind": "export",
+      "label": "example.stars.two.Two.go()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two.go()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two.go()::Base#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base",
+            "example.com/acme/conformance::src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base"
+          ]
         }
       ]
     },

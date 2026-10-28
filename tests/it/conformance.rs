@@ -85,6 +85,11 @@ fn java() {
             "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.use()",
             "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.Task",
             "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.Task.run()",
+            "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket",
+            "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open()",
+            "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open(int)",
+            "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.compareTo(Ticket)",
+            "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)",
             "maven/api/src/main/java/example/calls/Client.java::example.calls.Client",
             "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.make()",
             "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.chained()",
@@ -319,6 +324,29 @@ const JAVA_CALLS: &[ExpectedCall] = &[
         "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.Task.run()::own#0",
         INFERRED,
         &["maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.own()"],
+    ),
+    // Known outside members: `Serializable` and `Comparable` hide `compareTo` alone.
+    (
+        "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)::t.open#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open(int)"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)::open#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open()"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)::t.compareTo#0",
+        INFERRED,
+        &[
+            "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.compareTo(Ticket)",
+        ],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)::t.missing#0",
+        None,
+        &[],
     ),
     (
         "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)::repo.save#0",
@@ -1464,6 +1492,11 @@ fn kotlin() {
             "src/main/kotlin/example/Members.kt::example.Quiet",
             "src/main/kotlin/example/Members.kt::example.Quiet.go()",
             "src/main/kotlin/example/Members.kt::example.Quiet.own()",
+            "src/main/kotlin/example/Known.kt::example.Ticket",
+            "src/main/kotlin/example/Known.kt::example.Ticket.open()",
+            "src/main/kotlin/example/Known.kt::example.Ticket.open(Int)",
+            "src/main/kotlin/example/Known.kt::example.Ticket.compareTo(Ticket)",
+            "src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)",
             "src/main/kotlin/example/Members.kt::example.Quiet.make()",
             "src/main/kotlin/example/Members.kt::example.Quiet.Companion",
             "src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
@@ -1872,6 +1905,31 @@ fn kotlin() {
             "src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere.notes()",
             "src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan",
             "src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan.get()",
+            "src/main/kotlin/example/stars/Base.kt::example.stars.Base",
+            "src/main/kotlin/example/stars/Base.kt::example.stars.Base.mark(Int)",
+            "src/main/kotlin/example/stars/Base.kt::example.stars.Base.runIt(Int,()->Unit)",
+            "src/main/kotlin/example/stars/Base.kt::example.stars.Face",
+            "src/main/kotlin/example/stars/Base.kt::example.stars.Face.face()",
+            "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub",
+            "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()",
+            "src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base",
+            "src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base.mark(Int)",
+            "src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both",
+            "src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()",
+            "src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two",
+            "src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two.go()",
+            "src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock",
+            "src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+            "src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock",
+            "src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+            "src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()",
+            "src/jsMain/kotlin/example/platform/Clock.kt::example.platform.Clock",
+            "src/jsMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+            "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named",
+            "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()",
+            "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)",
+            "src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred",
+            "src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred.go()",
         ],
         &["src/main/kotlin/example/Main.kt::example.main(Array<String>)"],
         &[
@@ -2122,6 +2180,27 @@ fn kotlin() {
                 "src/main/kotlin/example/Members.kt::example.Logged.go()::log#0",
                 INFERRED,
                 &["src/main/kotlin/example/Members.kt::example.log(String)"],
+            ),
+            // Known outside members: `Serializable` and `Comparable` hide `compareTo` alone.
+            (
+                "src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)::t.open#0",
+                EXACT,
+                &["src/main/kotlin/example/Known.kt::example.Ticket.open(Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)::open#0",
+                EXACT,
+                &["src/main/kotlin/example/Known.kt::example.Ticket.open()"],
+            ),
+            (
+                "src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)::t.compareTo#0",
+                INFERRED,
+                &["src/main/kotlin/example/Known.kt::example.Ticket.compareTo(Ticket)"],
+            ),
+            (
+                "src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)::t.missing#0",
+                None,
+                &[],
             ),
             (
                 "src/main/kotlin/example/util/Hidden.kt::example.util.viaPackage()::tool#0",
@@ -2561,6 +2640,99 @@ fn kotlin() {
                 EXACT,
                 &[
                     "src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.record()",
+                ],
+            ),
+            // A base, an interface and a constructor named through a star import resolve as
+            // under a single-type import (#402); the call in the lambda stays a name match (#404).
+            (
+                "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::mark#0",
+                EXACT,
+                &["src/main/kotlin/example/stars/Base.kt::example.stars.Base.mark(Int)"],
+            ),
+            (
+                "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::runIt#0",
+                EXACT,
+                &["src/main/kotlin/example/stars/Base.kt::example.stars.Base.runIt(Int,()->Unit)"],
+            ),
+            (
+                "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::(anonymous).mark#0",
+                INFERRED,
+                &["src/main/kotlin/example/stars/Base.kt::example.stars.Base.mark(Int)"],
+            ),
+            (
+                "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::face#0",
+                EXACT,
+                &["src/main/kotlin/example/stars/Base.kt::example.stars.Face.face()"],
+            ),
+            (
+                "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::Base#0",
+                EXACT,
+                &["src/main/kotlin/example/stars/Base.kt::example.stars.Base"],
+            ),
+            // An explicit import wins over a star import; two star imports that give one name
+            // leave it ambiguous, and the members of a base so named unknown.
+            (
+                "src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()::Base#0",
+                EXACT,
+                &["src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base"],
+            ),
+            (
+                "src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()::mark#0",
+                EXACT,
+                &[
+                    "src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base.mark(Int)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two.go()::Base#0",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/stars/Base.kt::example.stars.Base",
+                    "src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two.go()::mark#0",
+                None,
+                &[],
+            ),
+            // An `expect` class and its `actual` ones are one class, the `expect` one, under a
+            // single-type and a star import, as a base and as a receiver; a member only an
+            // `actual` declares is a name match.
+            (
+                "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()::mark#0",
+                EXACT,
+                &[
+                    "src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()::Clock#0",
+                EXACT,
+                &["src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock"],
+            ),
+            (
+                "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()::tick#0",
+                INFERRED,
+                &["src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()"],
+            ),
+            (
+                "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)::clock.mark#0",
+                EXACT,
+                &[
+                    "src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)::clock.tick#0",
+                INFERRED,
+                &["src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()"],
+            ),
+            (
+                "src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred.go()::mark#0",
+                EXACT,
+                &[
+                    "src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
                 ],
             ),
         ],
@@ -3275,6 +3447,7 @@ fn csharp() {
     let service = |name: &str| orders("OrderService.cs", &format!("OrderService{name}"));
     let store = |name: &str| core("Store/Repository.cs", &format!("Acme.Core.Store.{name}"));
     let shadows = |name: &str| api("Shadows.cs", &format!("Acme.Api.{name}"));
+    let enclosing = |file: &str, name: &str| api(&format!("Enclosing/{file}"), name);
     let symbols = [
         format("Format"),
         format("Format.Upper(string)"),
@@ -3349,6 +3522,12 @@ fn csharp() {
         api("Opaque.cs", "Acme.Api.Board"),
         api("Board.Show.cs", "Acme.Api.Board"),
         api("Board.Show.cs", "Acme.Api.Board.Show()"),
+        api("Known.cs", "Acme.Api.Lease"),
+        api("Known.cs", "Acme.Api.Lease.Open()"),
+        api("Known.cs", "Acme.Api.Lease.Open(int)"),
+        api("Known.cs", "Acme.Api.Lease.Dispose()"),
+        api("Known.cs", "Acme.Api.Lease.CompareTo(object)"),
+        api("Known.cs", "Acme.Api.Lease.Use(Lease)"),
         api("Controllers.cs", "Acme.Api.OrdersController"),
         api("Controllers.cs", "Acme.Api.OrdersController.List()"),
         api("Controllers.cs", "Acme.Api.OrdersController.Get(int)"),
@@ -3417,6 +3596,27 @@ fn csharp() {
         api("Namespaces.cs", "Acme.Api.Outside.Run()"),
         api("Inside.cs", "Acme.Api.Inside"),
         api("Inside.cs", "Acme.Api.Inside.Run()"),
+        enclosing("Util.cs", "Acme.Query.Util"),
+        enclosing("Util.cs", "Acme.Query.Util.Go()"),
+        enclosing("Util.cs", "Acme.Query.Util.Hello()"),
+        enclosing("Outer.cs", "Acme.Util"),
+        enclosing("Outer.cs", "Acme.Util.Go()"),
+        enclosing("Outer.cs", "Acme.Util.Hello()"),
+        enclosing("Other.cs", "Other.Util"),
+        enclosing("Other.cs", "Other.Util.Go()"),
+        enclosing("Internal/Gen.cs", "Acme.Query.Internal.Gen"),
+        enclosing("Internal/Gen.cs", "Acme.Query.Internal.Gen.M()"),
+        enclosing("Internal/Gen.cs", "Acme.Query.Internal.Sub"),
+        enclosing("Internal/Gen.cs", "Acme.Query.Internal.Sub.N()"),
+        enclosing("Used.cs", "Acme.Query.Imports.Used"),
+        enclosing("Used.cs", "Acme.Query.Imports.Used.M()"),
+        enclosing("Block/Util.cs", "Acme.Block.Util"),
+        enclosing("Block/Util.cs", "Acme.Block.Util.Go()"),
+        enclosing("Block/Util.cs", "Acme.Block.Util.Hello()"),
+        enclosing("Block/Internal/Gen.cs", "Acme.Block.Internal.Gen"),
+        enclosing("Block/Internal/Gen.cs", "Acme.Block.Internal.Gen.M()"),
+        enclosing("Block/Internal/Gen.cs", "Acme.Block.Internal.Sub"),
+        enclosing("Block/Internal/Gen.cs", "Acme.Block.Internal.Sub.N()"),
         orders("Routes.cs", "Routes"),
         api("Channels.cs", "Acme.Api.Channels.Topics"),
         api("Channels.cs", "Acme.Api.Channels.KafkaSales"),
@@ -3890,6 +4090,34 @@ fn csharp() {
             INFERRED,
             vec![upper.clone()],
         ),
+        // Known outside members: `IDisposable` and `IComparable` hide `Dispose` and `CompareTo`
+        // alone.
+        (
+            format!("{}::l.Open#0", api("Known.cs", "Acme.Api.Lease.Use(Lease)")),
+            EXACT,
+            vec![api("Known.cs", "Acme.Api.Lease.Open(int)")],
+        ),
+        (
+            format!("{}::Open#0", api("Known.cs", "Acme.Api.Lease.Use(Lease)")),
+            EXACT,
+            vec![api("Known.cs", "Acme.Api.Lease.Open()")],
+        ),
+        (
+            format!(
+                "{}::l.Dispose#0",
+                api("Known.cs", "Acme.Api.Lease.Use(Lease)")
+            ),
+            INFERRED,
+            vec![api("Known.cs", "Acme.Api.Lease.Dispose()")],
+        ),
+        (
+            format!(
+                "{}::l.Missing#0",
+                api("Known.cs", "Acme.Api.Lease.Use(Lease)")
+            ),
+            None,
+            vec![],
+        ),
         // A type of a second namespace in a file binds under that namespace alone.
         (
             format!(
@@ -3909,6 +4137,65 @@ fn csharp() {
                 "Text/Nested.cs",
                 "Acme.Core.Outer.Inner.Second.Make()",
             )],
+        ),
+        // A type of a namespace around the file's binds without a using, the innermost
+        // namespace's first and before a using's (#420): as a static call's receiver, a
+        // constructor and a base, in a file-scoped namespace and in nested blocks alike.
+        (
+            format!(
+                "{}::Util.Go#0",
+                enclosing("Internal/Gen.cs", "Acme.Query.Internal.Gen.M()")
+            ),
+            EXACT,
+            vec![enclosing("Util.cs", "Acme.Query.Util.Go()")],
+        ),
+        (
+            format!(
+                "{}::Util#0",
+                enclosing("Internal/Gen.cs", "Acme.Query.Internal.Gen.M()")
+            ),
+            EXACT,
+            vec![enclosing("Util.cs", "Acme.Query.Util")],
+        ),
+        (
+            format!(
+                "{}::Hello#0",
+                enclosing("Internal/Gen.cs", "Acme.Query.Internal.Sub.N()")
+            ),
+            EXACT,
+            vec![enclosing("Util.cs", "Acme.Query.Util.Hello()")],
+        ),
+        (
+            format!(
+                "{}::Util.Go#0",
+                enclosing("Used.cs", "Acme.Query.Imports.Used.M()")
+            ),
+            EXACT,
+            vec![enclosing("Util.cs", "Acme.Query.Util.Go()")],
+        ),
+        (
+            format!(
+                "{}::Util.Go#0",
+                enclosing("Block/Internal/Gen.cs", "Acme.Block.Internal.Gen.M()")
+            ),
+            EXACT,
+            vec![enclosing("Block/Util.cs", "Acme.Block.Util.Go()")],
+        ),
+        (
+            format!(
+                "{}::Util#0",
+                enclosing("Block/Internal/Gen.cs", "Acme.Block.Internal.Gen.M()")
+            ),
+            EXACT,
+            vec![enclosing("Block/Util.cs", "Acme.Block.Util")],
+        ),
+        (
+            format!(
+                "{}::Hello#0",
+                enclosing("Block/Internal/Gen.cs", "Acme.Block.Internal.Sub.N()")
+            ),
+            EXACT,
+            vec![enclosing("Block/Util.cs", "Acme.Block.Util.Hello()")],
         ),
         // Acme.Core's global usings stop at its project: a bare call no family declares and a
         // type name nothing binds resolve to nothing.
@@ -6535,11 +6822,47 @@ fn rust() {
             "api/src/bin/tool.rs::helper",
             "api/src/bin/tool.rs::helper.go",
             "api/src/bin/tool.rs::main",
+            "api/src/main.rs::chains",
+            "api/src/chains.rs::Router",
+            "api/src/chains.rs::Router.new",
+            "api/src/chains.rs::Router.route",
+            "api/src/chains.rs::Plain",
+            "api/src/chains.rs::Plain.new",
+            "api/src/chains.rs::Plain.route",
+            "api/src/chains.rs::Other",
+            "api/src/chains.rs::Other.route",
+            "api/src/chains.rs::make",
+            "api/src/chains.rs::chained",
+            "api/src/chains.rs::chained_plain",
+            "api/src/chains.rs::bound",
+            "api/src/chains.rs::bound_plain",
+            "api/src/chains.rs::awaited",
+            "api/src/chains.rs::outside",
+            "api/src/chains.rs::parenthesized",
             "api/src/main.rs::below",
             "api/src/main.rs::below.go",
             "api/src/main.rs::elsewhere",
             "api/src/main.rs::extras",
             "api/src/main.rs::gated",
+            "api/src/main.rs::globbed",
+            "api/src/globbed.rs::Def",
+            "api/src/globbed.rs::Def.new",
+            "api/src/globbed.rs::free",
+            "api/src/globbed.rs::inner",
+            "api/src/globbed.rs::inner.make",
+            "api/src/globbed.rs::inner.open",
+            "api/src/globbed.rs::inner.deep",
+            "api/src/globbed.rs::inner.deep.open",
+            "api/src/globbed.rs::named",
+            "api/src/globbed.rs::named.make",
+            "api/src/globbed.rs::own",
+            "api/src/globbed.rs::own.Def",
+            "api/src/globbed.rs::own.Def.new",
+            "api/src/globbed.rs::own.make",
+            "api/src/globbed.rs::renamed",
+            "api/src/globbed.rs::renamed.make",
+            "api/src/globbed.rs::outside",
+            "api/src/globbed.rs::outside.make",
             "api/src/main.rs::imp",
             "api/src/main.rs::mock",
             "api/src/main.rs::native",
@@ -6926,6 +7249,45 @@ fn rust() {
                 EXACT,
                 &["api/src/main.rs::inner.helper"],
             ),
+            // A glob gives a path's head as it gives a name called: through `super::*`, a
+            // parent's named import, `super::super::*` and `crate::<path>::*`, after the
+            // module's own items and named imports. A glob of an outside crate gives nothing.
+            (
+                "api/src/globbed.rs::inner.make::free#0",
+                EXACT,
+                &["api/src/globbed.rs::free"],
+            ),
+            (
+                "api/src/globbed.rs::inner.make::Def.new#0",
+                EXACT,
+                &["api/src/globbed.rs::Def.new"],
+            ),
+            (
+                "api/src/globbed.rs::inner.open::Store.new#0",
+                EXACT,
+                &["api/src/store.rs::Store.new"],
+            ),
+            (
+                "api/src/globbed.rs::inner.deep.open::Store.new#0",
+                EXACT,
+                &["api/src/store.rs::Store.new"],
+            ),
+            (
+                "api/src/globbed.rs::named.make::Def.new#0",
+                EXACT,
+                &["api/src/globbed.rs::Def.new"],
+            ),
+            (
+                "api/src/globbed.rs::own.make::Def.new#0",
+                EXACT,
+                &["api/src/globbed.rs::own.Def.new"],
+            ),
+            (
+                "api/src/globbed.rs::renamed.make::Def.new#0",
+                EXACT,
+                &["api/src/store.rs::Store.new"],
+            ),
+            ("api/src/globbed.rs::outside.make::Ext.new#0", None, &[]),
             // `super::` out of an inline module is read from the file's top, past the
             // module's own `compute`.
             // `#[cfg(test)] use crate::mock::client;` binds nothing: the production client.
@@ -7128,7 +7490,7 @@ fn rust() {
             ),
             (
                 "crates/billing/src/billing.rs::total::(call_expression).amount#0",
-                INFERRED,
+                EXACT,
                 &["crates/billing/src/invoice.rs::Invoice.amount"],
             ),
             // A name match keeps to the crates the caller reaches: its own and the libraries it
@@ -7550,6 +7912,53 @@ fn rust() {
             // `self` of a block of a type from outside the repository is opaque.
             (
                 "crates/worker/src/derived.rs::Client.ApiExt.api::self.clone#0",
+                None,
+                &[],
+            ),
+            // A call on another call's result is typed by the written result of the inner one.
+            (
+                "api/src/chains.rs::chained::(call_expression).route#0",
+                EXACT,
+                &["api/src/chains.rs::Router.route"],
+            ),
+            (
+                "api/src/chains.rs::chained::(call_expression).route#1",
+                EXACT,
+                &["api/src/chains.rs::Router.route"],
+            ),
+            (
+                "api/src/chains.rs::chained_plain::(call_expression).route#0",
+                EXACT,
+                &["api/src/chains.rs::Plain.route"],
+            ),
+            (
+                "api/src/chains.rs::chained_plain::(call_expression).route#1",
+                EXACT,
+                &["api/src/chains.rs::Plain.route"],
+            ),
+            (
+                "api/src/chains.rs::bound::r.route#0",
+                EXACT,
+                &["api/src/chains.rs::Router.route"],
+            ),
+            (
+                "api/src/chains.rs::bound_plain::r.route#0",
+                EXACT,
+                &["api/src/chains.rs::Plain.route"],
+            ),
+            (
+                "api/src/chains.rs::awaited::(await_expression).route#0",
+                EXACT,
+                &["api/src/chains.rs::Router.route"],
+            ),
+            (
+                "api/src/chains.rs::parenthesized::(parenthesized_expression).route#0",
+                EXACT,
+                &["api/src/chains.rs::Router.route"],
+            ),
+            // An inner call outside the repository leaves the outer one as it was: unresolved.
+            (
+                "api/src/chains.rs::outside::(call_expression).route#0",
                 None,
                 &[],
             ),
@@ -11963,6 +12372,15 @@ fn swift() {
         service("Reporter"),
         service("Reporter.report()"),
         service("Reporter.summary()"),
+        store("Tag.swift", "Tag"),
+        store("Tag.swift", "Tag.open()"),
+        store("Tag.swift", "Tag.open(seat:)"),
+        store("Tag.swift", "Tag.hash(into:)"),
+        store("Tag.swift", "Tag.use(_:)"),
+        store("Tag.swift", "Status"),
+        store("Tag.swift", "Status.label()"),
+        store("Tag.swift", "Status.label(upper:)"),
+        store("Tag.swift", "Status.shout()"),
         probe("Pinger"),
         probe("Pinger.ping()"),
         probe("Pinger.trace()"),
@@ -11971,6 +12389,8 @@ fn swift() {
         probe("Probe.run()"),
         probe("Bag"),
         probe("Bag.run()"),
+        probe("Sack"),
+        probe("Sack.run()"),
         probe("describe()"),
         store("Probe+Tracer.swift", "Probe.trace()"),
         dispatch("Carrier"),
@@ -11992,6 +12412,8 @@ fn swift() {
         dispatch("Depot.lookup()"),
         checkout("Checkout.swift", "Checkout"),
         checkout("Checkout.swift", "Checkout.run()"),
+        checkout("Tagging.swift", "Tag.open(label:)"),
+        checkout("Tagging.swift", "tagging(_:)"),
         checkout("Summary.swift", "summarize()"),
         checkout("Summary.swift", "log(level:)"),
         checkout("Routes.swift", "routes(_:)"),
@@ -12009,6 +12431,7 @@ fn swift() {
         checkout("Routes.swift", "mountAudit(under:).GET /api/v1/audit/log"),
         checkout("Routes.swift", "orphan(_:)"),
         checkout("Routes.swift", "unlisted(_:)"),
+        checkout("Routes.swift", "unlisted(_:).GET /api/v1/unlisted"),
         checkout("Routes.swift", "nest(_:).GET /loop/leaf"),
         checkout("Routes.swift", "mount(admin:_:)"),
         checkout("Routes.swift", "mount(admin:_:).GET /admin/stats"),
@@ -12041,6 +12464,7 @@ fn swift() {
         ),
         checkout("Routes.swift", "OrderController.list(req:)"),
         checkout("Routes.swift", "OrderController.show(req:)"),
+        checkout("Routes.swift", "OrderController.tally()"),
         checkout("Gateway.swift", "gateway()"),
         checkout("Gateway.swift", "gateway().GET /health"),
         checkout("Gateway.swift", "gateway().POST /v1/items"),
@@ -12165,7 +12589,8 @@ fn swift() {
         ),
         // A protocol an extension conforms to: its requirement; the type's own member, from a
         // later extension of another file, before that protocol's default body; and an outside
-        // protocol keeps a bare name from the top-level function.
+        // protocol keeps a bare name from the top-level function, unless the pack knows it
+        // declares no such name (`CustomStringConvertible`, Known outside members).
         (
             probe("Probe.run()::ping#0"),
             EXACT,
@@ -12178,6 +12603,11 @@ fn swift() {
         ),
         (
             probe("Bag.run()::describe#0"),
+            EXACT,
+            one(probe("describe()")),
+        ),
+        (
+            probe("Sack.run()::describe#0"),
             INFERRED,
             one(probe("describe()")),
         ),
@@ -12230,6 +12660,41 @@ fn swift() {
             service("Reporter.report()::summary#0"),
             INFERRED,
             one(service("Reporter.summary()")),
+        ),
+        // Known outside members: `Hashable` and `Codable` hide `hash`, `encode` and `init`
+        // alone, a raw value type and `CaseIterable` their own names, and `RouteCollection`
+        // `boot`.
+        (
+            store("Tag.swift", "Tag.use(_:)::t.open#0"),
+            EXACT,
+            one(store("Tag.swift", "Tag.open(seat:)")),
+        ),
+        (
+            store("Tag.swift", "Tag.use(_:)::open#0"),
+            EXACT,
+            one(store("Tag.swift", "Tag.open()")),
+        ),
+        (
+            store("Tag.swift", "Tag.use(_:)::t.hash#0"),
+            INFERRED,
+            one(store("Tag.swift", "Tag.hash(into:)")),
+        ),
+        (store("Tag.swift", "Tag.use(_:)::t.missing#0"), None, vec![]),
+        // The overloads of a member merge across modules.
+        (
+            checkout("Tagging.swift", "tagging(_:)::tag.open#0"),
+            EXACT,
+            one(store("Tag.swift", "Tag.open(seat:)")),
+        ),
+        (
+            store("Tag.swift", "Status.shout()::label#0"),
+            EXACT,
+            one(store("Tag.swift", "Status.label(upper:)")),
+        ),
+        (
+            checkout("Routes.swift", "OrderController.boot(routes:)::tally#0"),
+            EXACT,
+            one(checkout("Routes.swift", "OrderController.tally()")),
         ),
         // Across the import: a public initializer and function, the module's name as a
         // qualifier, and an internal function the import does not reach.

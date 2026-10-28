@@ -4,6 +4,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ops::Range;
+use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
 use tree_sitter::Node;
@@ -118,7 +119,8 @@ pub trait LanguagePack {
 
     /// Whether a type's qualified name starts with the namespace an on-demand import names
     /// (Java's `p.Own`, C#'s namespaces), so a glob of a namespace takes the types declared in
-    /// it alone (`Binding::of_namespace`). A Swift module is no part of its types' names.
+    /// it alone (`Binding::of_namespace`). A Swift module is no part of its types' names, and a
+    /// Rust type's name is its path in its file.
     fn namespaced(&self) -> bool {
         true
     }
@@ -142,6 +144,16 @@ pub trait LanguagePack {
     /// bare call of one that the class's family does not declare is unknown, and the climb to
     /// outer classes and imports stops there.
     fn implicit_members(&self) -> &'static [&'static str] {
+        &[]
+    }
+
+    /// Outside types whose declared member names are a fixed fact of the platform (Known
+    /// outside members, `docs/adr/0019-known-outside-members.md`): each type's qualified name
+    /// and the names it declares, empty for a marker, a name spelled as the pack spells a
+    /// member (with its labels in Swift). Such a base hides from its family only the names it
+    /// declares; any other outside base may hide every name (Opaque outside). The `Resolver`
+    /// of a pack reads the tables of the packs that resolve with it too.
+    fn known_outside(&self) -> KnownOutside {
         &[]
     }
 
@@ -207,8 +219,9 @@ pub trait LanguagePack {
 
 /// The repository-relative paths an import of a specifier (second argument) from a file
 /// (first argument) may name, most likely first. The shared side takes the first one that
-/// the pack parses.
-pub type Modules = Box<dyn Fn(&str, &str) -> Vec<String>>;
+/// the pack parses. A namespace's list is shared, not copied, so a lookup costs the same
+/// whatever the namespace holds.
+pub type Modules = Box<dyn Fn(&str, &str) -> Rc<[String]>>;
 
 /// What `LanguagePack::join` does to a file's facts (second argument), by its path (first).
 pub type Join = Box<dyn Fn(&str, &mut Facts)>;
@@ -267,6 +280,13 @@ pub fn names_config(pattern: &str, file: &str) -> bool {
     }
 }
 
+/// One known outside type (`LanguagePack::known_outside`): its qualified name and the member
+/// names it declares.
+pub type KnownEntry = (&'static str, &'static [&'static str]);
+
+/// A pack's table of known outside types.
+pub type KnownOutside = &'static [KnownEntry];
+
 /// The index of the pack that parses `path`, if any.
 pub fn pack_for(path: &str) -> Option<usize> {
     let (_, extension) = path.rsplit_once('.')?;
@@ -282,6 +302,17 @@ pub fn resolver_of(index: usize) -> usize {
     (PACKS[index].resolves_with())
         .and_then(|with| (PACKS.iter()).position(|p| p.extensions() == with.extensions()))
         .unwrap_or(index)
+}
+
+/// The known outside members (`LanguagePack::known_outside`) the `Resolver` of `language` reads:
+/// its own, then those of every pack that resolves with it (Kotlin's, with Java's).
+pub fn known_outside(language: &dyn LanguagePack) -> Vec<KnownEntry> {
+    let with = |p: &&dyn LanguagePack| {
+        (p.resolves_with()).is_some_and(|w| w.extensions() == language.extensions())
+    };
+    (std::iter::once(language).chain(PACKS.iter().copied().filter(with)))
+        .flat_map(|p| p.known_outside().iter().copied())
+        .collect()
 }
 
 pub fn pack(index: usize) -> &'static dyn LanguagePack {
@@ -423,6 +454,13 @@ pub struct Facts {
     /// one such name in the files of one `unit` are one type (`Resolver::parts`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub partial: Vec<String>,
+    /// The classes the file declares `expect` (Kotlin), by qualified name: one with the
+    /// `actual` classes of its name is one class, the `expect` one (`Resolver::one_type`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub expect: Vec<String>,
+    /// The classes the file declares `actual` (Kotlin), by qualified name.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub actual: Vec<String>,
     /// The compilation the file belongs to, which `LanguagePack::join` sets (C#'s project):
     /// the parts of a partial type come from one. Not kept in the index: it is joined again.
     #[serde(skip)]
@@ -1151,6 +1189,8 @@ mod tests {
         ("go/build.rs:ARCHITECTURES", "runtime"),
         ("go/build.rs:SYSTEMS", "runtime"),
         ("go/values.rs:METHODS", "exception"),
+        ("kotlin.rs:CLOSEABLE", "runtime"),
+        ("kotlin.rs:COMPARABLE", "runtime"),
         ("kotlin.rs:DECLARATION_KEYWORDS", "syntax"),
         ("kotlin.rs:DEFAULT_IMPORTS", "runtime"),
         ("kotlin.rs:FIELD_TARGETS", "syntax"),

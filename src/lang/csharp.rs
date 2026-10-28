@@ -93,6 +93,19 @@ impl LanguagePack for CSharp {
         ]
     }
 
+    /// The BCL types whose members are few and fixed; the table grows with evidence from the
+    /// dogfood repositories, never by guess (ADR 0019). `IEnumerable` is left out: the LINQ
+    /// extension methods every file sees (`Contains`, `Count`, `First`) answer a call no own
+    /// overload fits by type.
+    fn known_outside(&self) -> super::KnownOutside {
+        &[
+            ("System.IDisposable", &["Dispose"]),
+            ("System.IAsyncDisposable", &["DisposeAsync"]),
+            ("System.IEquatable", &["Equals"]),
+            ("System.IComparable", &["CompareTo"]),
+        ]
+    }
+
     /// Every project file (an SDK-style one is a project, `join`), and the props files MSBuild
     /// imports into the projects below them.
     fn config_files(&self) -> &'static [&'static str] {
@@ -135,6 +148,10 @@ impl LanguagePack for CSharp {
                     .push(path.to_string());
             }
         }
+        let others: BTreeMap<String, Rc<[String]>> = others
+            .into_iter()
+            .map(|(ns, paths)| (ns, paths.into()))
+            .collect();
         let modules = layout.modules;
         Ok(Layout {
             modules: Box::new(move |from, name| match modules(from, name) {
@@ -305,7 +322,7 @@ fn spell(using: &Using) -> String {
 /// of its name.
 fn apply(using: &Using, facts: &mut Facts) {
     match using {
-        Using::Namespace(ns) => wildcard(ns, false, facts),
+        Using::Namespace(ns) => wildcard(ns, None, facts),
         Using::Static(ty) => {
             let alias = format!("@static{}", facts.imports.len());
             facts.imports.push(Import {
@@ -331,7 +348,9 @@ fn apply(using: &Using, facts: &mut Facts) {
     }
 }
 
-fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
+/// A glob of the namespace `source`'s types: a using's at the top level (`None`), or the inside
+/// one that the code in the namespace `scope` reads.
+fn wildcard(source: &str, scope: Option<&str>, facts: &mut Facts) {
     let alias = format!("@glob{}", facts.imports.len());
     facts.imports.push(Import {
         local: alias.clone(),
@@ -339,11 +358,11 @@ fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
         name: Imported::Namespace,
     });
     facts.imports.push(Import {
-        local: "*".into(),
+        local: qualify(scope.unwrap_or(""), "*"),
         source: String::new(),
         name: Imported::Glob {
             path: alias,
-            inside,
+            inside: scope.is_some(),
             public: false,
         },
     });
@@ -1221,17 +1240,16 @@ fn parse(src: &[u8]) -> Result<Facts> {
         }
         stack.extend(visits.into_iter().rev());
     }
-    // The namespaces around the file's code see their types without a using, the innermost
-    // first (an inside glob of each, the outermost written first); the usings come after.
+    // The code in each namespace sees the types of it and of the namespaces around it without a
+    // using: an inside glob of each, scoped at that namespace, so the climb from a scope reads
+    // the innermost first and the file's usings, at the top level, after them all.
     let enclosing: BTreeSet<&str> = (namespaces.iter())
         .flat_map(|ns| {
             (ns.match_indices('.').map(|(at, _)| &ns[..at])).chain(std::iter::once(ns.as_str()))
         })
         .collect();
-    let mut enclosing: Vec<&str> = enclosing.into_iter().collect();
-    enclosing.sort_by_key(|ns| (ns.matches('.').count(), *ns));
     for ns in enclosing {
-        wildcard(ns, true, &mut facts);
+        wildcard(ns, Some(ns), &mut facts);
     }
     for using in usings {
         apply(&using, &mut facts);

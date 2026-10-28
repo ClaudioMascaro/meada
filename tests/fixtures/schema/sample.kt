@@ -11,3 +11,7 @@ class Store(val name: String = "store") {
 }
 
 internal fun helper(): Store = Store.open()
+
+expect class Clock
+
+actual class Timer

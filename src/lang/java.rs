@@ -76,6 +76,21 @@ impl LanguagePack for Java {
         ]
     }
 
+    /// The JDK types whose members are few and fixed; the table grows with evidence from the
+    /// dogfood repositories, never by guess (ADR 0019).
+    fn known_outside(&self) -> super::KnownOutside {
+        &[
+            ("java.io.Serializable", &[]),
+            ("java.lang.Cloneable", &[]),
+            ("java.util.RandomAccess", &[]),
+            ("java.util.EventListener", &[]),
+            ("java.lang.Runnable", &["run"]),
+            ("java.lang.Comparable", &["compareTo"]),
+            ("java.lang.AutoCloseable", &["close"]),
+            ("java.io.Closeable", &["close"]),
+        ]
+    }
+
     /// What the kinds read through `Indexed::configs`: Spring's base configuration, which its
     /// reader lists (`jvm::spring::CONFIG_FILES`).
     fn config_files(&self) -> &'static [&'static str] {
@@ -124,13 +139,14 @@ impl LanguagePack for Java {
         // A package keeps its files against a top-level declaration of its name (`fun util()`
         // beside package `util`), whose import then binds nothing; a type wins over both, as
         // before (Java forbids a type and a package of one name).
-        let modules: BTreeMap<String, Vec<String>> = (tops.into_iter())
+        let modules: BTreeMap<String, Rc<[String]>> = (tops.into_iter())
             .chain(
                 packages
                     .iter()
                     .map(|(name, paths)| (name.clone(), paths.clone())),
             )
             .chain(types)
+            .map(|(name, paths)| (name, paths.into()))
             .collect();
         Ok(Layout {
             members: None,

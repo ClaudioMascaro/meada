@@ -19,7 +19,7 @@
     },
     {
       "path": "Sources/Checkout/Routes.swift",
-      "hash": "33258cce4b93d765974bd4782262fff05bc389ac4361fb585f3d0d8e7b5d8534"
+      "hash": "0612a1d6d942ec0a7df34ef4370320a9d6bd4f898a21d958e807ef589469a6c2"
     },
     {
       "path": "Sources/Checkout/Server.swift",
@@ -28,6 +28,10 @@
     {
       "path": "Sources/Checkout/Summary.swift",
       "hash": "ddc43419ae51aba6eaa09999f70bab40d0c4446b1986a76a34c958ded460a0cb"
+    },
+    {
+      "path": "Sources/Checkout/Tagging.swift",
+      "hash": "2a07474ccc9110f88328fa2a10fd5769a66a61049b13a0bb7930f93cadca14cc"
     },
     {
       "path": "Sources/Checkout/Ui.swift",
@@ -67,7 +71,11 @@
     },
     {
       "path": "Sources/Store/Probe.swift",
-      "hash": "5b58ff32f9886027773d9578870bd01eed3d720239081a50579254573723330e"
+      "hash": "65059213e92f9cee4cb36fee39158f911e227213243df246382919f902101806"
+    },
+    {
+      "path": "Sources/Store/Tag.swift",
+      "hash": "a7b2c17a8f466692d21cc1e2f8556f65e0c91ec080c169d2c212f23df31e4830"
     },
     {
       "path": "Sources/Tool/Cli.swift",
@@ -504,7 +512,7 @@
       "span": {
         "path": "Sources/Checkout/Routes.swift",
         "start": 2197,
-        "end": 2671
+        "end": 2856
       }
     },
     {
@@ -512,7 +520,7 @@
       "span": {
         "path": "Sources/Checkout/Routes.swift",
         "start": 2243,
-        "end": 2546
+        "end": 2566
       }
     },
     {
@@ -535,40 +543,48 @@
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.list(req:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 2552,
-        "end": 2606
+        "start": 2737,
+        "end": 2791
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.show(req:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 2612,
-        "end": 2669
+        "start": 2797,
+        "end": 2854
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.tally()",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 2694,
+        "end": 2731
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::explicit(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3481,
-        "end": 3594
+        "start": 3697,
+        "end": 3810
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mount(admin:_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3207,
-        "end": 3308
+        "start": 3423,
+        "end": 3524
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mount(admin:_:).GET /admin/stats",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3288,
-        "end": 3306
+        "start": 3504,
+        "end": 3522
       }
     },
     {
@@ -615,24 +631,24 @@
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::orphan(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 2978,
-        "end": 3063
+        "start": 3194,
+        "end": 3279
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::pick(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3882,
-        "end": 3980
+        "start": 4098,
+        "end": 4196
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::pick(_:).GET /pick/one",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3959,
-        "end": 3978
+        "start": 4175,
+        "end": 4194
       }
     },
     {
@@ -719,40 +735,40 @@
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::secured(on:_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3310,
-        "end": 3433
+        "start": 3526,
+        "end": 3649
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::secured(on:_:).GET /api/v1/sec/secured",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3411,
-        "end": 3431
+        "start": 3627,
+        "end": 3647
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::shadowedByIf(_:_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4415,
-        "end": 4585
+        "start": 4631,
+        "end": 4801
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::shadowedByLet(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4069,
-        "end": 4264
+        "start": 4285,
+        "end": 4480
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::shadowedByLoop(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4266,
-        "end": 4413
+        "start": 4482,
+        "end": 4629
       }
     },
     {
@@ -783,16 +799,24 @@
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::spin(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3664,
-        "end": 3753
+        "start": 3880,
+        "end": 3969
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 2830,
-        "end": 2921
+        "start": 3046,
+        "end": 3137
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:).GET /api/v1/unlisted",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 3114,
+        "end": 3135
       }
     },
     {
@@ -825,6 +849,22 @@
         "path": "Sources/Checkout/Summary.swift",
         "start": 14,
         "end": 52
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Tagging.swift::Tag.open(label:)",
+      "span": {
+        "path": "Sources/Checkout/Tagging.swift",
+        "start": 183,
+        "end": 210
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Tagging.swift::tagging(_:)",
+      "span": {
+        "path": "Sources/Checkout/Tagging.swift",
+        "start": 214,
+        "end": 264
       }
     },
     {
@@ -1316,6 +1356,22 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Sack",
+      "span": {
+        "path": "Sources/Store/Probe.swift",
+        "start": 408,
+        "end": 465
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Sack.run()",
+      "span": {
+        "path": "Sources/Store/Probe.swift",
+        "start": 426,
+        "end": 463
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Tracer",
       "span": {
         "path": "Sources/Store/Probe.swift",
@@ -1329,6 +1385,78 @@
         "path": "Sources/Store/Probe.swift",
         "start": 320,
         "end": 338
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Status",
+      "span": {
+        "path": "Sources/Store/Tag.swift",
+        "start": 623,
+        "end": 813
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Status.label()",
+      "span": {
+        "path": "Sources/Store/Tag.swift",
+        "start": 686,
+        "end": 715
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Status.label(upper:)",
+      "span": {
+        "path": "Sources/Store/Tag.swift",
+        "start": 720,
+        "end": 760
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Status.shout()",
+      "span": {
+        "path": "Sources/Store/Tag.swift",
+        "start": 766,
+        "end": 811
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag",
+      "span": {
+        "path": "Sources/Store/Tag.swift",
+        "start": 239,
+        "end": 528
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.hash(into:)",
+      "span": {
+        "path": "Sources/Store/Tag.swift",
+        "start": 336,
+        "end": 375
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.open()",
+      "span": {
+        "path": "Sources/Store/Tag.swift",
+        "start": 282,
+        "end": 296
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.open(seat:)",
+      "span": {
+        "path": "Sources/Store/Tag.swift",
+        "start": 301,
+        "end": 331
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.use(_:)",
+      "span": {
+        "path": "Sources/Store/Tag.swift",
+        "start": 381,
+        "end": 526
       }
     },
     {
@@ -3088,10 +3216,21 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)::tally#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.tally()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 2553,
+        "end": 2560
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)::unlisted#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)",
       "target": "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:)",
-      "level": "inferred",
+      "level": "exact",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
         "start": 2451,
@@ -3105,8 +3244,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3555,
-        "end": 3575
+        "start": 3771,
+        "end": 3791
       }
     },
     {
@@ -3116,8 +3255,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3269,
-        "end": 3306
+        "start": 3485,
+        "end": 3522
       }
     },
     {
@@ -3182,8 +3321,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3021,
-        "end": 3061
+        "start": 3237,
+        "end": 3277
       }
     },
     {
@@ -3193,8 +3332,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3924,
-        "end": 3978
+        "start": 4140,
+        "end": 4194
       }
     },
     {
@@ -3204,8 +3343,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3924,
-        "end": 3947
+        "start": 4140,
+        "end": 4163
       }
     },
     {
@@ -3776,8 +3915,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3389,
-        "end": 3431
+        "start": 3605,
+        "end": 3647
       }
     },
     {
@@ -3787,8 +3926,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4491,
-        "end": 4508
+        "start": 4707,
+        "end": 4724
       }
     },
     {
@@ -3798,8 +3937,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4541,
-        "end": 4577
+        "start": 4757,
+        "end": 4793
       }
     },
     {
@@ -3809,8 +3948,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4123,
-        "end": 4140
+        "start": 4339,
+        "end": 4356
       }
     },
     {
@@ -3820,8 +3959,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4179,
-        "end": 4215
+        "start": 4395,
+        "end": 4431
       }
     },
     {
@@ -3831,8 +3970,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4226,
-        "end": 4262
+        "start": 4442,
+        "end": 4478
       }
     },
     {
@@ -3842,8 +3981,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4321,
-        "end": 4338
+        "start": 4537,
+        "end": 4554
       }
     },
     {
@@ -3853,8 +3992,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4369,
-        "end": 4405
+        "start": 4585,
+        "end": 4621
       }
     },
     {
@@ -3875,8 +4014,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3722,
-        "end": 3751
+        "start": 3938,
+        "end": 3967
       }
     },
     {
@@ -3886,8 +4025,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3722,
-        "end": 3734
+        "start": 3938,
+        "end": 3950
       }
     },
     {
@@ -3897,8 +4036,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 2875,
-        "end": 2919
+        "start": 3091,
+        "end": 3135
       }
     },
     {
@@ -3943,6 +4082,17 @@
         "path": "Sources/Checkout/Summary.swift",
         "start": 37,
         "end": 50
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Tagging.swift::tagging(_:)::tag.open#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Tagging.swift::tagging(_:)",
+      "target": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.open(seat:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Tagging.swift",
+        "start": 245,
+        "end": 262
       }
     },
     {
@@ -4475,7 +4625,7 @@
       "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Bag.run()::describe#0",
       "caller": "example.com/acme/conformance::Sources/Store/Probe.swift::Bag.run()",
       "target": "example.com/acme/conformance::Sources/Store/Probe.swift::describe()",
-      "level": "inferred",
+      "level": "exact",
       "span": {
         "path": "Sources/Store/Probe.swift",
         "start": 257,
@@ -4502,6 +4652,83 @@
         "path": "Sources/Store/Probe.swift",
         "start": 174,
         "end": 181
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Probe.swift::Sack.run()::describe#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Probe.swift::Sack.run()",
+      "target": "example.com/acme/conformance::Sources/Store/Probe.swift::describe()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Store/Probe.swift",
+        "start": 447,
+        "end": 457
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Status.shout()::label#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Tag.swift::Status.shout()",
+      "target": "example.com/acme/conformance::Sources/Store/Tag.swift::Status.label(upper:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Tag.swift",
+        "start": 791,
+        "end": 809
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.use(_:)::Hasher#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.use(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Store/Tag.swift",
+        "start": 462,
+        "end": 470
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.use(_:)::open#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.use(_:)",
+      "target": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.open()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Tag.swift",
+        "start": 434,
+        "end": 440
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.use(_:)::t.hash#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.use(_:)",
+      "target": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.hash(into:)",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Store/Tag.swift",
+        "start": 479,
+        "end": 500
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.use(_:)::t.missing#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.use(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Store/Tag.swift",
+        "start": 509,
+        "end": 520
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.use(_:)::t.open#0",
+      "caller": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.use(_:)",
+      "target": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.open(seat:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Store/Tag.swift",
+        "start": 410,
+        "end": 425
       }
     },
     {
@@ -4562,6 +4789,10 @@
       "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.show(req:)"
     },
     {
+      "contract": "http::GET::/api/v1/beta/unlisted",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:).GET /api/v1/unlisted"
+    },
+    {
       "contract": "http::GET::/api/v1/ex/explicit",
       "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).GET /api/v1/ex/explicit"
     },
@@ -4584,6 +4815,10 @@
     {
       "contract": "http::GET::/api/v1/shared/hammer",
       "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::routes(_:).GET /api/v1/shared/hammer"
+    },
+    {
+      "contract": "http::GET::/api/v1/unlisted",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:).GET /api/v1/unlisted"
     },
     {
       "contract": "http::GET::/api/v1/users/{}",
@@ -4951,6 +5186,7 @@
       "name": "Sources/Checkout#8",
       "members": [
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)",
+        "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.tally()",
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:)"
       ]
     },
@@ -4965,8 +5201,24 @@
     {
       "name": "Sources/Store#10",
       "members": [
+        "example.com/acme/conformance::Sources/Store/Probe+Tracer.swift::Probe.trace()",
+        "example.com/acme/conformance::Sources/Store/Probe.swift::Pinger.ping()",
+        "example.com/acme/conformance::Sources/Store/Probe.swift::Probe.run()"
+      ]
+    },
+    {
+      "name": "Sources/Store#11",
+      "members": [
         "example.com/acme/conformance::Sources/Store/Probe.swift::Bag.run()",
+        "example.com/acme/conformance::Sources/Store/Probe.swift::Sack.run()",
         "example.com/acme/conformance::Sources/Store/Probe.swift::describe()"
+      ]
+    },
+    {
+      "name": "Sources/Store#12",
+      "members": [
+        "example.com/acme/conformance::Sources/Store/Tag.swift::Status.label(upper:)",
+        "example.com/acme/conformance::Sources/Store/Tag.swift::Status.shout()"
       ]
     },
     {
@@ -4986,6 +5238,16 @@
     {
       "name": "Sources/Store#3",
       "members": [
+        "example.com/acme/conformance::Sources/Checkout/Tagging.swift::tagging(_:)",
+        "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.hash(into:)",
+        "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.open()",
+        "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.open(seat:)",
+        "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.use(_:)"
+      ]
+    },
+    {
+      "name": "Sources/Store#4",
+      "members": [
         "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat",
         "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot",
         "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.again(lorry:)",
@@ -4993,7 +5255,7 @@
       ]
     },
     {
-      "name": "Sources/Store#4",
+      "name": "Sources/Store#5",
       "members": [
         "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat.moor()",
         "example.com/acme/conformance::Sources/Store/Dispatch.swift::Carrier.ship(parcel:)",
@@ -5005,14 +5267,14 @@
       ]
     },
     {
-      "name": "Sources/Store#5",
+      "name": "Sources/Store#6",
       "members": [
         "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.Line.doubled()",
         "example.com/acme/conformance::Sources/Store/Order.swift::Order.Line.total()"
       ]
     },
     {
-      "name": "Sources/Store#6",
+      "name": "Sources/Store#7",
       "members": [
         "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.discount(quantity:)",
         "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.price(quantity:)",
@@ -5026,25 +5288,17 @@
       ]
     },
     {
-      "name": "Sources/Store#7",
+      "name": "Sources/Store#8",
       "members": [
         "example.com/acme/conformance::Sources/Store/Order.swift::log(level:)",
         "example.com/acme/conformance::Sources/Tool/Cli.swift::Cli.main()"
       ]
     },
     {
-      "name": "Sources/Store#8",
+      "name": "Sources/Store#9",
       "members": [
         "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter.report()",
         "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter.summary()"
-      ]
-    },
-    {
-      "name": "Sources/Store#9",
-      "members": [
-        "example.com/acme/conformance::Sources/Store/Probe+Tracer.swift::Probe.trace()",
-        "example.com/acme/conformance::Sources/Store/Probe.swift::Pinger.ping()",
-        "example.com/acme/conformance::Sources/Store/Probe.swift::Probe.run()"
       ]
     }
   ],
@@ -5579,6 +5833,34 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::showUser(req:)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:).GET /api/v1/unlisted::http::GET::/api/v1/beta/unlisted",
+      "kind": "route",
+      "label": "GET /api/v1/beta/unlisted",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:).GET /api/v1/unlisted"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:).GET /api/v1/unlisted::http::GET::/api/v1/unlisted",
+      "kind": "route",
+      "label": "GET /api/v1/unlisted",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:).GET /api/v1/unlisted"
         }
       ]
     },

@@ -8,6 +8,43 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Rust method called on another call's result (`Router::new().route(..)`, also through
+  `.await` and parentheses) resolves within the family of the inner target's written result,
+  `exact` when one member fits. Before, it was a name match among every method of its name
+  (axum's `.route` after `Router::new()`). After `?` the call stays a name match: the written
+  result is the `Result` or `Option` around the value.
+- A Rust type a glob import brings (`use super::*;`, `use crate::x::*;`) heads a path called,
+  as a function it brings is called: `Def::new()` under `use super::*;` resolves `exact`, also
+  when the parent imports `Def` by name. Before, a glob gave its functions alone and the call
+  stayed unresolved (axum's `Router::new()` and actix-web's `ResourceDef::new()` in their test
+  modules).
+- A Kotlin `expect` class and its `actual` classes of one name are one class, the `expect` one:
+  as a base, a constructor or a written type the name binds it, so the members it declares
+  resolve `exact` on its subclasses. Before, the name bound every declaration, ambiguously, and
+  a subclass's bare calls of the base's members stayed unresolved. A member only an `actual`
+  declares stays a name match, as does a call an `actual`'s own overload of the name may
+  answer. A name two Kotlin star imports both give is `ambiguous`; before, the last import gave
+  it.
+- A Kotlin class a star import brings (`import t.*`) binds as a base, a constructor and a
+  written type, and its members resolve on a subclass. Before, the file's own package was
+  asked first and its reading also took the file's star imports, whose answer it then dropped,
+  so the name stayed unresolved.
+- A C# type of a namespace around the file's (`Acme.Query` from `Acme.Query.Internal`) binds
+  without a `using`, as a static call's receiver, a constructor and a base: the innermost
+  namespace first, and before a type a `using` brings. Before, the name stayed unresolved, or
+  bound to a farther namespace's type of the same name. A namespace declared beside the code's
+  in the same file does not enclose it.
+- A Java, Kotlin, C# or Swift class whose outside bases are all platform types with known
+  members (`Serializable`, `Comparable`, `IDisposable`, `Hashable`, `Codable`, an enum's raw
+  value type, Vapor's `RouteCollection`) resolves calls to its own members at `exact`; only the
+  names those types declare (`compareTo`, `Dispose`, `hash(into:)`) stay name matches. Any other
+  outside base keeps the strict rule (ADR 0019). A helper a `RouteCollection` calls from `boot`
+  now serves its routes under the collection's prefix.
+- The overloads of a member stay candidates across projects and modules: a C# call that fits a
+  base's overload in another project no longer links `exact` to the derived class's own, and a
+  Swift call through a type extended in a test module still reaches the type's overloads in
+  its library.
+
 - A C# file of a few hundred KB (an Entity Framework model snapshot) is no longer dropped
   silently: the qualification budget is charged for enclosing names past 256 bytes, not for every
   node, so a generated file reads whole. A file the budget still drops (a long namespace repeated

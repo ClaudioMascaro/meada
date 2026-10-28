@@ -2,6 +2,7 @@ mod extras;
 #[cfg(not(target_has_atomic = "64"))]
 mod fallback;
 mod gated;
+mod globbed;
 mod imp;
 mod launch;
 #[cfg(test)]
@@ -11,6 +12,7 @@ mod native;
 mod real;
 #[cfg(feature = "metrics")]
 mod metrics;
+mod chains;
 mod methods;
 mod prelude;
 mod ring;
