@@ -561,7 +561,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         let dimensions = declaration.child_by_field_name("dimensions").is_some();
                         let initial = declaration.child_by_field_name("value");
                         bind(name, typed(initial, dimensions));
-                        if let Some(initial) = initial {
+                        // An initializer block's local sits in its class's scope, which a method
+                        // of the class reads through: it is no bound.
+                        if let Some(initial) = initial.filter(|_| !initializer) {
                             initialized.push(Bound {
                                 scope: scope.as_ref().clone(),
                                 within: scope.as_ref().clone(),
@@ -782,22 +784,21 @@ fn parse(src: &[u8]) -> Result<Facts> {
     for local in &locals {
         *declared.entry((&local.scope, &local.name)).or_default() += 1;
     }
-    let field_names: BTreeSet<&str> = fields.iter().map(|(_, name)| name.as_str()).collect();
+    let field_hides = |name: &str, scope: &str| {
+        (fields.iter()).any(|(at, field)| field == name && encloses(at, scope))
+    };
     facts.bound = (initialized.into_iter())
         .filter(|b| {
             declared.get(&(b.scope.as_str(), b.name.as_str())) == Some(&1)
                 && !reassigned.contains(&b.name)
-                && !(field_names.contains(b.name.as_str())
-                    && fields
-                        .iter()
-                        .any(|(at, name)| *name == b.name && encloses(at, &b.scope)))
+                && !field_hides(&b.name, &b.scope)
         })
         .collect();
     for mut local in locals {
         if let Class::Result(n) = local.class {
             local.class = call_at(&results[n]).map_or(Class::Unknown, Class::Result);
         }
-        if (fields.iter()).any(|(at, name)| *name == local.name && encloses(at, &local.scope)) {
+        if field_hides(&local.name, &local.scope) {
             local.class = Class::Unknown;
         }
         facts.receivers.push(local);
@@ -1444,5 +1445,51 @@ mod tests {
         assert_eq!(writes(src), [".base"]);
         let src = "class C { void m() { java.util.function.BiConsumer<String, String> f = (url, x) -> { url = null; }; } }";
         assert_eq!(writes(src), Vec::<String>::new());
+    }
+
+    /// A local with no initializer, a loop variable, a `try` resource, a `catch` parameter and a
+    /// lambda parameter are no bounds, and one sharing the name of a bound leaves it unread.
+    #[test]
+    fn a_local_is_bound_only_when_declared_once_with_an_initializer() {
+        let held = |body: &str| {
+            let src = format!("package a;\nclass C {{ void f() {{\n{body}\n}} }}\n");
+            let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
+            facts.bound.into_iter().map(|b| b.name).collect::<Vec<_>>()
+        };
+        assert_eq!(held("String a = x(); int b = 1, c;"), ["a", "b"]);
+        // An initializer block's local is keyed by its class, which methods read through.
+        let src = "class C { { String a = x(); } }";
+        assert!(
+            Java.parse("a/C.java", src.as_bytes())
+                .unwrap()
+                .bound
+                .is_empty()
+        );
+        assert_eq!(held("String a; a = x();"), Vec::<String>::new());
+        assert_eq!(
+            held("for (String a : xs) { use(a); }"),
+            Vec::<String>::new()
+        );
+        assert_eq!(held("try (R a = open()) { use(a); }"), Vec::<String>::new());
+        assert_eq!(
+            held("try { x(); } catch (E a) { use(a); }"),
+            Vec::<String>::new()
+        );
+        assert_eq!(held("xs.forEach(a -> use(a));"), Vec::<String>::new());
+        assert_eq!(
+            held("if (o instanceof T a) { use(a); }"),
+            Vec::<String>::new()
+        );
+        assert_eq!(held("String a = x(); a += y();"), Vec::<String>::new());
+        assert_eq!(held("int a = 0; a++;"), Vec::<String>::new());
+        assert_eq!(held("int a = 0; --a;"), Vec::<String>::new());
+        assert_eq!(
+            held("String a = x(); run(() -> { a = y(); });"),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            held("String a = x(); for (String a : xs) {}"),
+            Vec::<String>::new()
+        );
     }
 }

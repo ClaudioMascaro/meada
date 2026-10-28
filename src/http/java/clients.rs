@@ -1055,44 +1055,6 @@ mod tests {
         }
     }
 
-    /// A local with no initializer, a loop variable, a `try` resource, a `catch` parameter and a
-    /// lambda parameter are no bounds, and one sharing the name of a bound leaves it unread.
-    #[test]
-    fn a_local_that_is_not_declared_with_an_initializer_is_no_bound() {
-        let held = |body: &str| {
-            let src = format!("package a;\nclass C {{ void f() {{\n{body}\n}} }}\n");
-            let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
-            facts.bound.into_iter().map(|b| b.name).collect::<Vec<_>>()
-        };
-        assert_eq!(held("String a = x(); int b = 1, c;"), ["a", "b"]);
-        assert_eq!(held("String a; a = x();"), Vec::<String>::new());
-        assert_eq!(
-            held("for (String a : xs) { use(a); }"),
-            Vec::<String>::new()
-        );
-        assert_eq!(held("try (R a = open()) { use(a); }"), Vec::<String>::new());
-        assert_eq!(
-            held("try { x(); } catch (E a) { use(a); }"),
-            Vec::<String>::new()
-        );
-        assert_eq!(held("xs.forEach(a -> use(a));"), Vec::<String>::new());
-        assert_eq!(
-            held("if (o instanceof T a) { use(a); }"),
-            Vec::<String>::new()
-        );
-        assert_eq!(held("String a = x(); a += y();"), Vec::<String>::new());
-        assert_eq!(held("int a = 0; a++;"), Vec::<String>::new());
-        assert_eq!(held("int a = 0; --a;"), Vec::<String>::new());
-        assert_eq!(
-            held("String a = x(); run(() -> { a = y(); });"),
-            Vec::<String>::new()
-        );
-        assert_eq!(
-            held("String a = x(); for (String a : xs) {}"),
-            Vec::<String>::new()
-        );
-    }
-
     /// A chain of locals each holding the one before is followed up to the value flow's depth,
     /// and no further: a hostile file of them is read in bounded time.
     #[test]

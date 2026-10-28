@@ -8,6 +8,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Java local declared with an initializer and never assigned again in its file is followed into
+  its value, as a Kotlin `val` is: `String base = System.getenv("WEB_URL");` then
+  `rest.getForObject(base + "/api", ..)` carries `env:WEB_URL`, so `base_url_env` maps it to its
+  peer, and a local `WebClient` made by `WebClient.create("https://x")` has that host. A local the
+  file assigns, one sharing its name with another binding or a field of its class, one in an
+  initializer block and one in an anonymous class's method stay unread.
 - A Java call with two or more arguments to a varargs method (`any(String... parts)`) reaches it:
   a spread parameter takes any number of arguments, as Kotlin's `vararg` does, and the method is
   among the functions of the `flexible` table.
