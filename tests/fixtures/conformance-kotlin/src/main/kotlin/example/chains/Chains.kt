@@ -5,14 +5,28 @@ class Lid {
 }
 
 class Box {
+    val lid: Lid = Lid()
+
     fun unlatch(): Lid = Lid()
 }
+
+fun Box.stamp() {}
+
+fun Lid.stamp() {}
 
 class Epoch {
     fun toEpochMilli(): Long = 0
 }
 
+class Crate<T> {
+    fun peek(): Lid = Lid()
+}
+
 fun make(): Box = Box()
+
+fun crate(): Crate<Int> = Crate()
+
+fun maker(): () -> Box = ::make
 
 fun find(): Box? = null
 
@@ -29,4 +43,8 @@ fun use() {
     g().unlatch()
     pick<Box>().unlatch()
     now().toEpochMilli()
+    make()!!.unlatch()
+    make().lid.stamp()
+    crate().peek()
+    maker().unlatch()
 }

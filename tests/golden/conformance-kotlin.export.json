@@ -71,7 +71,7 @@
     },
     {
       "path": "src/main/kotlin/example/chains/Chains.kt",
-      "hash": "c43d0dfffab350fb3c609bad6473e1df388d466f7b1f2231aa479ef583846544"
+      "hash": "8858511b5e016e634ea82d0d85d9f684f4e98912cb3e72014649989386651566"
     },
     {
       "path": "src/main/kotlin/example/channels/Billing.kt",
@@ -1536,31 +1536,55 @@
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 58,
-        "end": 102
+        "end": 128
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Box.stamp()",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 130,
+        "end": 148
       }
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 74,
-        "end": 100
+        "start": 100,
+        "end": 126
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Crate",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 220,
+        "end": 266
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Crate.peek()",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 241,
+        "end": 264
       }
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Epoch",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 104,
-        "end": 152
+        "start": 170,
+        "end": 218
       }
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Epoch.toEpochMilli()",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 122,
-        "end": 150
+        "start": 188,
+        "end": 216
       }
     },
     {
@@ -1580,51 +1604,75 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Lid.stamp()",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 150,
+        "end": 168
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.crate()",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 293,
+        "end": 326
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.find()",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 179,
-        "end": 202
+        "start": 361,
+        "end": 384
       }
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.g()",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 204,
-        "end": 219
+        "start": 386,
+        "end": 401
       }
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.make()",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 154,
-        "end": 177
+        "start": 268,
+        "end": 291
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.maker()",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 328,
+        "end": 359
       }
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.now()",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 249,
-        "end": 286
+        "start": 431,
+        "end": 468
       }
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.pick()",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 221,
-        "end": 247
+        "start": 403,
+        "end": 429
       }
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 288,
-        "end": 441
+        "start": 470,
+        "end": 710
       }
     },
     {
@@ -6208,8 +6256,41 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 95,
-        "end": 100
+        "start": 121,
+        "end": 126
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Box::Lid#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Box",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Lid",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 89,
+        "end": 94
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Crate.peek()::Lid#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Crate.peek()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Lid",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 259,
+        "end": 264
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.crate()::Crate#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.crate()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Crate",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 319,
+        "end": 326
       }
     },
     {
@@ -6219,8 +6300,8 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 214,
-        "end": 219
+        "start": 396,
+        "end": 401
       }
     },
     {
@@ -6230,8 +6311,8 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 172,
-        "end": 177
+        "start": 286,
+        "end": 291
       }
     },
     {
@@ -6241,8 +6322,8 @@
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 280,
-        "end": 286
+        "start": 462,
+        "end": 468
       }
     },
     {
@@ -6252,8 +6333,8 @@
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 241,
-        "end": 247
+        "start": 423,
+        "end": 429
       }
     },
     {
@@ -6263,8 +6344,34 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 304,
-        "end": 328
+        "start": 486,
+        "end": 510
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).lid.stamp#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Box.stamp()",
+        "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Lid.stamp()"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 649,
+        "end": 667
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).peek#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Crate.peek()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 672,
+        "end": 686
       }
     },
     {
@@ -6274,8 +6381,8 @@
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 419,
-        "end": 439
+        "start": 601,
+        "end": 621
       }
     },
     {
@@ -6285,8 +6392,8 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 304,
-        "end": 320
+        "start": 486,
+        "end": 502
       }
     },
     {
@@ -6296,8 +6403,8 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 333,
-        "end": 348
+        "start": 515,
+        "end": 530
       }
     },
     {
@@ -6307,8 +6414,8 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 353,
-        "end": 370
+        "start": 535,
+        "end": 552
       }
     },
     {
@@ -6318,8 +6425,8 @@
       "level": "inferred",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 375,
-        "end": 388
+        "start": 557,
+        "end": 570
       }
     },
     {
@@ -6329,8 +6436,30 @@
       "level": "inferred",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 393,
-        "end": 414
+        "start": 575,
+        "end": 596
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#5",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 626,
+        "end": 644
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#6",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 691,
+        "end": 708
       }
     },
     {
@@ -6340,8 +6469,19 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 333,
-        "end": 338
+        "start": 515,
+        "end": 520
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()::crate#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.crate()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 672,
+        "end": 679
       }
     },
     {
@@ -6351,8 +6491,8 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 353,
-        "end": 359
+        "start": 535,
+        "end": 541
       }
     },
     {
@@ -6362,8 +6502,8 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 375,
-        "end": 378
+        "start": 557,
+        "end": 560
       }
     },
     {
@@ -6373,8 +6513,41 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 304,
-        "end": 310
+        "start": 486,
+        "end": 492
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()::make#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.make()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 626,
+        "end": 632
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()::make#2",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.make()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 649,
+        "end": 655
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()::maker#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.maker()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/chains/Chains.kt",
+        "start": 691,
+        "end": 698
       }
     },
     {
@@ -6384,8 +6557,8 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 419,
-        "end": 424
+        "start": 601,
+        "end": 606
       }
     },
     {
@@ -6395,8 +6568,8 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/chains/Chains.kt",
-        "start": 393,
-        "end": 404
+        "start": 575,
+        "end": 586
       }
     },
     {
@@ -12722,11 +12895,15 @@
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Box",
         "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()",
+        "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Crate",
+        "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Crate.peek()",
         "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Lid",
         "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Lid.latch()",
+        "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.crate()",
         "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.find()",
         "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.g()",
         "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.make()",
+        "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.maker()",
         "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.now()",
         "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.pick()",
         "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()"
@@ -14915,6 +15092,14 @@
           "node": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Box"
         },
         {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Lid",
+          "mark": "seen"
+        },
+        {
           "depth": 1,
           "repository": "example.com/acme/conformance",
           "level": "exact",
@@ -14957,6 +15142,54 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.now()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).lid.stamp#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Box.stamp()",
+            "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Lid.stamp()"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Crate.peek()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Lid",
+          "mark": "seen"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.crate()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Crate"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.maker()"
         }
       ]
     },

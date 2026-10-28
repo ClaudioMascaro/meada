@@ -1599,10 +1599,7 @@ sample.kt
         "start": 153,
         "end": 213
       },
-      "params": [],
-      "result": {
-        "Type": "Companion"
-      }
+      "params": []
     },
     {
       "name": "example.Store.Companion.open()",

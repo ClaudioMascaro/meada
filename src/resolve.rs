@@ -1578,10 +1578,12 @@ impl<'a> Resolver<'a> {
             None => self.class(path, scope),
             Some(head) if Some(head) == self.receiver => self.class(path, scope),
             Some(head) if Some(head) == self.base_receiver => return None,
-            Some(head) => match (on, call.on) {
-                (Some(known), _) => known,
-                (None, Some(inner)) => self.result_of(path, inner, work),
-                (None, None) => {
+            // A member read between the call and the call made (`make().x.tag()`) is the
+            // receiver, not the call's result.
+            Some(head) => match (head.contains('.'), on, call.on) {
+                (false, Some(known), _) => known,
+                (false, None, Some(inner)) => self.result_of(path, inner, work),
+                (true, ..) | (false, None, None) => {
                     let seen = &mut self.seen(path, scope);
                     let found = self.resolve_as(path, scope, head, seen, work, Reading::Value);
                     // A type's name calls its companion or its statics.
@@ -6399,6 +6401,26 @@ mod tests {
             .collect();
         found.sort();
         found
+    }
+
+    #[test]
+    fn a_kotlin_chain_of_calls_past_the_receiver_depth_resolves_each_call_once() {
+        use crate::lang::kotlin::Kotlin;
+        // As Java's: every call reads the result of the one it is made on once.
+        let calls = ".m()".repeat(RECEIVER_DEPTH + 16);
+        let src = format!("package a\nimport b.outside\nfun f() {{ outside(){calls} }}\n");
+        let facts = Kotlin.parse("a/C.kt", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("a/C.kt", &facts)]);
+        let layout = Kotlin.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Kotlin);
+        let chained = facts.calls.iter().filter(|c| c.on.is_some()).count();
+        assert!(chained > RECEIVER_DEPTH, "{chained} calls on calls");
+        for call in &facts.calls {
+            assert!(!matches!(
+                resolver.call("a/C.kt", call),
+                Resolution::Exact(_)
+            ));
+        }
     }
 
     #[test]

@@ -1933,6 +1933,12 @@ fn kotlin() {
             "src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()",
             "src/main/kotlin/example/chains/Chains.kt::example.chains.Epoch",
             "src/main/kotlin/example/chains/Chains.kt::example.chains.Epoch.toEpochMilli()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Box.stamp()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Crate",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Crate.peek()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.crate()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.maker()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Lid.stamp()",
             "src/main/kotlin/example/chains/Chains.kt::example.chains.make()",
             "src/main/kotlin/example/chains/Chains.kt::example.chains.find()",
             "src/main/kotlin/example/chains/Chains.kt::example.chains.g()",
@@ -2776,6 +2782,31 @@ fn kotlin() {
                 "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).toEpochMilli#0",
                 None,
                 &[],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#5",
+                EXACT,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
+            ),
+            // A type with arguments names its class; a function type names none.
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).peek#0",
+                EXACT,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Crate.peek()"],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#6",
+                INFERRED,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
+            ),
+            // A property read between the calls is the receiver, not the first call's result.
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).lid.stamp#0",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/chains/Chains.kt::example.chains.Box.stamp()",
+                    "src/main/kotlin/example/chains/Chains.kt::example.chains.Lid.stamp()",
+                ],
             ),
             // An explicit import wins over a star import; two star imports that give one name
             // leave it ambiguous, and the members of a base so named unknown.

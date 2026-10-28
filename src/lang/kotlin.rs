@@ -270,6 +270,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     let mut locals: Vec<Receiver> = Vec::new();
     // The `val`s of unknown class a `Bound` was recorded for, by qualified name.
     let mut vals: Vec<String> = Vec::new();
+    // Each call made on a call, with the range of the call it is made on.
     let mut chains: Vec<(usize, Range<usize>)> = Vec::new();
     // The receivers of tracked lambdas, by the lambda's node.
     let mut tracked: HashMap<usize, Tracked> = HashMap::new();
@@ -350,7 +351,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 }
                 let def = Def {
                     bases,
-                    result: Some(Class::Type(name.clone())),
+                    result: (node.kind() == "class_declaration").then(|| Class::Type(name.clone())),
                     ..definition(
                         &inner,
                         Kind::Class,
@@ -423,11 +424,11 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 } else {
                     Kind::Function
                 };
-                let result = returned(node).map_or(Class::Unknown, |t| {
-                    class_of(t, src, &inner_generics, &mut outside)
-                });
+                let result = (returned(node))
+                    .map(|t| class_of(t, src, &inner_generics, &mut outside))
+                    .filter(|c| matches!(c, Class::Type(_)));
                 facts.defs.push(Def {
-                    result: Some(result).filter(|c| matches!(c, Class::Type(_))),
+                    result,
                     ..definition(&inner, kind, node.byte_range(), params)
                 });
                 let family = qualify(&scope, &base);
