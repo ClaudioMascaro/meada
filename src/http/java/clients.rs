@@ -17,9 +17,9 @@
 //! `@Value("${key}")` field or constructor parameter holds comes from the module's
 //! configuration (`jvm::spring::inject`, through `Code::expand_with`), and
 //! `System.getenv("X")` is the variable `X`.
-// ponytail: a client or a builder held in a local is read by its written type alone (a
-// WebClient's base unknown, a builder not at all); constants, `final` fields and chains written
-// in place are read through.
+// ponytail: a builder held in a local is not read (a WebClient's base is, as are constants and
+// `final` fields and chains written in place); a local the file assigns holds no one value, and
+// a read kept in a local and passed through a string method on another line is not followed.
 
 use super::super::{based, consumer, fetches};
 use super::{folded_local, made, member_of};
@@ -438,9 +438,10 @@ fn makes<'a>(code: &Code<'a>, path: &'a str, index: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::jvm::names::LOCAL_DEPTH;
     use crate::lang::LanguagePack;
     use crate::lang::java::Java;
-    use crate::resolve::Resolver;
+    use crate::resolve::{EVAL_DEPTH, Resolver};
     use std::collections::BTreeMap;
 
     /// A consumer as `(contract, via, method)`, the method only for an unresolved one.
@@ -998,6 +999,119 @@ mod tests {
                 via("http::GET::/w", "host:lit.example.com"),
             ]
         );
+    }
+
+    /// A local declared once with an initializer holds its value, as an inline read does; one the
+    /// file assigns, or a field of its class shares the name of, holds no one value.
+    #[test]
+    fn a_local_holding_an_environment_read_carries_it_as_the_base() {
+        let body = format!(
+            "{REST}void f() {{\n\
+             String base = System.getenv(\"WEB_URL\");\n\
+             rest.getForObject(base + \"/a\", String.class);\n}}\n\
+             void g() {{\n\
+             URI url = URI.create(System.getenv(\"WEB_URL\") + \"/b\");\n\
+             rest.getForObject(url, String.class);\n}}"
+        );
+        assert_eq!(
+            sent(&body),
+            [
+                via("http::GET::/a", "env:WEB_URL"),
+                via("http::GET::/b", "env:WEB_URL")
+            ]
+        );
+        // A `var` local too.
+        let var = body
+            .replace("String base", "var base")
+            .replace("URI url", "var url");
+        assert_eq!(sent(&var), sent(&body));
+        let assigned = format!("{body}\nvoid h(String o) {{ base = o; }}");
+        assert_eq!(
+            sent(&assigned),
+            [to("http::GET::/a"), via("http::GET::/b", "env:WEB_URL")]
+        );
+        let shared = format!("{body}\nString url;");
+        assert_eq!(
+            sent(&shared),
+            [open(Some("GET")), via("http::GET::/a", "env:WEB_URL")]
+        );
+        let again = format!(
+            "{REST}void f() {{\n\
+             String base = System.getenv(\"WEB_URL\");\n\
+             if (rest != null) {{ String base = \"x\"; }}\n\
+             rest.getForObject(base + \"/a\", String.class);\n}}"
+        );
+        assert_eq!(sent(&again), [to("http::GET::/a")]);
+        // A lambda parameter or a `catch` parameter of its name hides the bound too.
+        for other in [
+            "xs.forEach(base -> use(base));",
+            "try { x(); } catch (E base) {}",
+        ] {
+            let body = format!(
+                "{REST}void f() {{\nString base = System.getenv(\"WEB_URL\");\n{other}\n\
+                 rest.getForObject(base + \"/a\", String.class);\n}}"
+            );
+            assert_eq!(sent(&body), [to("http::GET::/a")], "{other}");
+        }
+    }
+
+    /// A local with no initializer, a loop variable, a `try` resource, a `catch` parameter and a
+    /// lambda parameter are no bounds, and one sharing the name of a bound leaves it unread.
+    #[test]
+    fn a_local_that_is_not_declared_with_an_initializer_is_no_bound() {
+        let held = |body: &str| {
+            let src = format!("package a;\nclass C {{ void f() {{\n{body}\n}} }}\n");
+            let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
+            facts.bound.into_iter().map(|b| b.name).collect::<Vec<_>>()
+        };
+        assert_eq!(held("String a = x(); int b = 1, c;"), ["a", "b"]);
+        assert_eq!(held("String a; a = x();"), Vec::<String>::new());
+        assert_eq!(
+            held("for (String a : xs) { use(a); }"),
+            Vec::<String>::new()
+        );
+        assert_eq!(held("try (R a = open()) { use(a); }"), Vec::<String>::new());
+        assert_eq!(
+            held("try { x(); } catch (E a) { use(a); }"),
+            Vec::<String>::new()
+        );
+        assert_eq!(held("xs.forEach(a -> use(a));"), Vec::<String>::new());
+        assert_eq!(
+            held("if (o instanceof T a) { use(a); }"),
+            Vec::<String>::new()
+        );
+        assert_eq!(held("String a = x(); a += y();"), Vec::<String>::new());
+        assert_eq!(held("int a = 0; a++;"), Vec::<String>::new());
+        assert_eq!(held("int a = 0; --a;"), Vec::<String>::new());
+        assert_eq!(
+            held("String a = x(); run(() -> { a = y(); });"),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            held("String a = x(); for (String a : xs) {}"),
+            Vec::<String>::new()
+        );
+    }
+
+    /// A chain of locals each holding the one before is followed up to the value flow's depth,
+    /// and no further: a hostile file of them is read in bounded time.
+    #[test]
+    fn a_chain_of_value_locals_is_bounded() {
+        let chain = |locals: usize| {
+            let held: String = (1..locals)
+                .map(|i| format!("String s{i} = s{};\n", i - 1))
+                .collect();
+            format!(
+                "{REST}void f() {{\nString s0 = System.getenv(\"WEB_URL\");\n{held}\
+                 rest.getForObject(s{} + \"/a\", String.class);\n}}",
+                locals - 1
+            )
+        };
+        assert_eq!(
+            sent(&chain(LOCAL_DEPTH + 1)),
+            [via("http::GET::/a", "env:WEB_URL")]
+        );
+        assert_eq!(sent(&chain(EVAL_DEPTH * 4)), [to("http::GET::/a")]);
     }
 
     #[test]

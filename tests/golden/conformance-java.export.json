@@ -66,6 +66,10 @@
       "hash": "51e8ce3fc7e9b0c6556417394162079e103cffdae95b5ab80b2f54a95ae9b303"
     },
     {
+      "path": "maven/api/src/main/java/example/clients/Bases.java",
+      "hash": "10c0086fe8adfae1076ba75b780e3b255ec444496642c7e2e25170480abec65f"
+    },
+    {
       "path": "maven/api/src/main/java/example/clients/Injected.java",
       "hash": "e0de97c5824025bb623486684903688c66ff11fc5b158c714b511a5e52d3516f"
     },
@@ -84,6 +88,10 @@
     {
       "path": "maven/api/src/main/java/example/clients/Reactive.java",
       "hash": "877db54406c5079f5a283d146fadfa1685e3fc2236de5263c94fa4e849b3cb88"
+    },
+    {
+      "path": "maven/api/src/main/java/example/clients/Reassigned.java",
+      "hash": "aca05a3bda118f0372ea13325b8e187abcd3b0dc2dcebde1f97360cb024134b4"
     },
     {
       "path": "maven/api/src/main/java/example/clients/Rest.java",
@@ -1152,6 +1160,38 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Bases.java",
+        "start": 242,
+        "end": 669
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.Bases(RestTemplate)",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Bases.java",
+        "start": 305,
+        "end": 370
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.client()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Bases.java",
+        "start": 519,
+        "end": 667
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.local()",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Bases.java",
+        "start": 376,
+        "end": 513
+      }
+    },
+    {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected",
       "span": {
         "path": "maven/api/src/main/java/example/clients/Injected.java",
@@ -1277,6 +1317,30 @@
         "path": "maven/api/src/main/java/example/clients/Reactive.java",
         "start": 366,
         "end": 447
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reassigned.java",
+        "start": 168,
+        "end": 489
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.Reassigned(RestTemplate)",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reassigned.java",
+        "start": 236,
+        "end": 306
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.send(String)",
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reassigned.java",
+        "start": 312,
+        "end": 487
       }
     },
     {
@@ -3289,6 +3353,72 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.client()::(method_invocation).retrieve#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.client()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Bases.java",
+        "start": 618,
+        "end": 660
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.client()::(method_invocation).uri#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.client()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Bases.java",
+        "start": 618,
+        "end": 649
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.client()::WebClient.create#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.client()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Bases.java",
+        "start": 569,
+        "end": 608
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.client()::client.get#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.client()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Bases.java",
+        "start": 618,
+        "end": 630
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.local()::System.getenv#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.local()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Bases.java",
+        "start": 420,
+        "end": 444
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.local()::rest.getForObject#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.local()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Bases.java",
+        "start": 454,
+        "end": 506
+      }
+    },
+    {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()::rest.getForObject#0",
       "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()",
       "target": null,
@@ -3671,6 +3801,28 @@
         "path": "maven/api/src/main/java/example/clients/Reactive.java",
         "start": 198,
         "end": 247
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.send(String)::System.getenv#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.send(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reassigned.java",
+        "start": 367,
+        "end": 391
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.send(String)::rest.getForObject#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.send(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/clients/Reassigned.java",
+        "start": 423,
+        "end": 480
       }
     },
     {
@@ -5169,6 +5321,16 @@
       "via": null
     },
     {
+      "contract": "http::GET::/api/client",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.client()::(method_invocation).uri#0",
+      "via": "host:example.org"
+    },
+    {
+      "contract": "http::GET::/api/local",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.local()::rest.getForObject#0",
+      "via": "env:WEB_URL"
+    },
+    {
       "contract": "http::GET::/a",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()::rest.getForObject#0",
       "via": "host:literal.example.com"
@@ -5224,6 +5386,11 @@
       "via": "host:orders.example.com"
     },
     {
+      "contract": "http::GET::/api/reassigned",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.send(String)::rest.getForObject#0",
+      "via": null
+    },
+    {
       "contract": "http::POST::/api/orders/new",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.create()::rest.postForObject#0",
       "via": null
@@ -5261,7 +5428,7 @@
     {
       "contract": "http::GET::/java/typed",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Typed.java::example.clients.Typed.typed()::(method_invocation).uri#0",
-      "via": null
+      "via": "host:example.org"
     },
     {
       "contract": "http::GET::/invoices/{}",
@@ -6849,6 +7016,66 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.Bases(RestTemplate)",
+      "kind": "export",
+      "label": "example.clients.Bases.Bases(RestTemplate)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.Bases(RestTemplate)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.client()",
+      "kind": "export",
+      "label": "example.clients.Bases.client()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.client()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.client()::(method_invocation).uri#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/api/client"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.local()",
+      "kind": "export",
+      "label": "example.clients.Bases.local()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.local()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.local()::rest.getForObject#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/api/local"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.Injected(RestTemplate)",
       "kind": "export",
       "label": "example.clients.Injected.Injected(RestTemplate)",
@@ -7038,6 +7265,43 @@
           "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.flag()::(method_invocation).uri#0",
           "mark": "no-provider",
           "contract": "http::PATCH::/orders/1/flag"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.Reassigned(RestTemplate)",
+      "kind": "export",
+      "label": "example.clients.Reassigned.Reassigned(RestTemplate)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.Reassigned(RestTemplate)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.send(String)",
+      "kind": "export",
+      "label": "example.clients.Reassigned.send(String)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.send(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.send(String)::rest.getForObject#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/api/reassigned"
         }
       ]
     },
