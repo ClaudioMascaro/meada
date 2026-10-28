@@ -6,15 +6,16 @@ This project does not run a decider inside the MCP server, not even one that onl
 
 ## Why this is out of scope
 
-- **ADR 0002, invariant 2:** only `meada decide` sends a code excerpt to a model. A server that
-  calls a gateway on every answer would be a second path, even when the gateway is the
-  operator's own.
-- **ADR 0002, invariant 6:** answers depend on no model. A suggestion in an answer makes the
-  answer depend on one, and on its availability, latency and rate limits.
-- **ADR 0006 and ADR 0011:** the server never runs `decide`, and only `decide` writes
-  decisions. A suggest-only module would keep the second rule and break the first.
-- **ADR 0008:** the surface is three tools. A suggestion costs either a fourth tool or a field
-  in every `trace` or `context` answer, paid in tool-description tokens by every client.
+ADR 0002, invariant 2, says only `meada decide` sends a code excerpt to a model. A server that
+calls a gateway on every answer would be a second path, even when the gateway is the operator's
+own. Invariant 6 says answers depend on no model; a suggestion in an answer makes the answer
+depend on one, and on its availability, latency and rate limits.
+
+ADR 0006 and ADR 0011 say the server never runs `decide`, and only `decide` writes decisions. A
+suggest-only module would keep the second rule and break the first.
+
+ADR 0008 fixes the surface at three tools. A suggestion costs either a fourth tool or a field in
+every `trace` or `context` answer, paid in tool-description tokens by every client.
 
 The recipe that already works gives the same outcome as a reviewable diff: `meada decide
 --decider` runs as a step on a clone, against the operator's gateway, and the resulting

@@ -80,7 +80,7 @@ refused.
 ## Decide in a pipeline
 
 The server runs no model (invariants 2 and 6 of [ADR 0002](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0002-product-invariants.md); the
-reasoning is in `.out-of-scope/server-side-decider.md`). Open items are decided where
+reasoning is in [`.out-of-scope/server-side-decider.md`](https://github.com/ClaudioMascaro/meada/blob/main/.out-of-scope/server-side-decider.md)). Open items are decided where
 [`meada decide --decider`](decisions.md#model-decider) already runs, as a step on a clone of
 the repository (a CI job, a workflow activity), against your own model gateway:
 

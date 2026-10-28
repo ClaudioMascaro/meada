@@ -80,7 +80,7 @@ os blocos do manifesto são ignorados (o `meada status` os nomeia). Um espelho �
 ## Decidir em um pipeline
 
 O servidor não roda modelo (invariantes 2 e 6 do [ADR 0002](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0002-product-invariants.md); a
-justificativa está em `.out-of-scope/server-side-decider.md`). Os itens abertos são decididos onde
+justificativa está em [`.out-of-scope/server-side-decider.md`](https://github.com/ClaudioMascaro/meada/blob/main/.out-of-scope/server-side-decider.md)). Os itens abertos são decididos onde
 [`meada decide --decider`](decisions.md#decisor-por-modelo) já roda, como um passo em um clone do
 repositório (um job de CI, uma activity de workflow), contra o seu próprio gateway de modelos:
 
@@ -94,7 +94,7 @@ meada decide --decider
 
 1. O passo grava `meada.decisions.toml` no clone.
 2. Abre um pull request com esse arquivo: uma pessoa revisa cada saída do modelo como um diff.
-3. Depois do merge, o job de fetch atualiza o mirror e `meada index --workspace <manifesto>`
+3. Depois do merge, o job de fetch atualiza o espelho e `meada index --workspace <manifesto>`
    reaplica as decisões no índice.
 4. O servidor as serve como `decided`. Ele lê `meada.decisions.toml` uma vez, na partida;
-   reinicie-o depois que o mirror receber o arquivo novo.
+   reinicie-o depois que o espelho receber o arquivo novo.
