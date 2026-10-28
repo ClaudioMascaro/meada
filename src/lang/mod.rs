@@ -1189,6 +1189,8 @@ mod tests {
         ("go/build.rs:ARCHITECTURES", "runtime"),
         ("go/build.rs:SYSTEMS", "runtime"),
         ("go/values.rs:METHODS", "exception"),
+        ("kotlin.rs:CLOSEABLE", "runtime"),
+        ("kotlin.rs:COMPARABLE", "runtime"),
         ("kotlin.rs:DECLARATION_KEYWORDS", "syntax"),
         ("kotlin.rs:DEFAULT_IMPORTS", "runtime"),
         ("kotlin.rs:FIELD_TARGETS", "syntax"),
