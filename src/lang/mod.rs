@@ -1298,7 +1298,7 @@ mod tests {
         ("ts.rs:EXTENSIONS", "syntax"),
         ("ts.rs:FUNCTIONS", "syntax"),
         ("ts.rs:STRING_METHODS", "runtime"),
-        // Type reads the pack makes at parse time, pending #383.
+        // Decided exception (#383): the pack unwraps a declared return type at parse time.
         ("ts/types.rs:INFERS", "exception"),
         ("ts/types.rs:RESPONSES", "exception"),
         ("ts/uses.rs:ELEMENT_METHODS", "runtime"),
