@@ -12,8 +12,9 @@ use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Annotated, Binds, Bound, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation,
-    Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker, Ty, Value,
+    Annotated, Binds, Bound, Call, Class, Closure, Const, Def, Export, Facts, Import, Imported,
+    Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker, Ty,
+    Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -532,8 +533,9 @@ pub(crate) fn labelled(params: &[Param], labels: &[String]) -> bool {
 /// the arguments of a call with `labels` in order, as Swift matches them: each argument goes to
 /// a parameter of its label, a parameter with a default value or a variadic one may take none,
 /// a variadic one takes the unlabelled arguments after its first, and a trailing closure (an
-/// empty label) takes the first parameter that cannot be left out, else any. `None` when the
-/// call does not fit, or weighs more than `LABELLED_CELLS`.
+/// empty label) takes the first parameter that accepts one (`Param::closure`) and cannot be
+/// left out, else any that accepts one. `None` when the call does not fit, or weighs more than
+/// `LABELLED_CELLS`.
 fn labelled_args(params: &[Param], labels: &[String]) -> Option<Vec<Option<usize>>> {
     let skips = |p: &Param| matches!(p.binds, Binds::Optional | Binds::Rest);
     // The ends of the arguments `p` may take from the `j`th on: one of its label, then for a
@@ -543,6 +545,9 @@ fn labelled_args(params: &[Param], labels: &[String]) -> Option<Vec<Option<usize
             return j..j;
         };
         if first != p.label.as_deref().unwrap_or("_") && !first.is_empty() {
+            return j..j;
+        }
+        if first.is_empty() && p.closure == Closure::Refuses {
             return j..j;
         }
         let mut k = j + 1;
@@ -1234,9 +1239,11 @@ impl<'a> Resolver<'a> {
                     .collect();
                 all.sort();
                 all.dedup();
+                // An initializer the type's compilation keeps to itself is no candidate from
+                // another one, as a member is not (`accessible`).
                 match all.is_empty() {
                     true => absent,
-                    false => Binding::Several(all),
+                    false => self.accessible(path, Binding::Several(all)),
                 }
             }
             found => found,
@@ -7198,6 +7205,24 @@ mod tests {
             labelled_args(&params, &strings(&["a"])),
             Some(vec![None, Some(0)])
         );
+        // A trailing closure skips a parameter whose type refuses one (`Param::closure`), and
+        // fits nothing when every parameter left refuses it.
+        let refusing = |label: &str, binds| Param {
+            closure: Closure::Refuses,
+            ..labelled_param(label, binds)
+        };
+        let params = [
+            labelled_param("_", any),
+            refusing("animation", optional),
+            labelled_param("assert", optional),
+        ];
+        assert_eq!(
+            labelled_args(&params, &strings(&["_", ""])),
+            Some(vec![Some(0), None, Some(1)])
+        );
+        let params = [labelled_param("_", any), refusing("animation", optional)];
+        assert_eq!(labelled_args(&params, &strings(&["_", ""])), None);
+        assert!(labelled_args(&params, &strings(&["_"])).is_some());
         // A call too wide to weigh fits nothing.
         let wide = |n: usize| -> (Vec<Param>, Vec<String>) {
             (
@@ -7219,6 +7244,7 @@ mod tests {
             label: None,
             default: None,
             fields: Vec::new(),
+            closure: Default::default(),
         }
     }
 

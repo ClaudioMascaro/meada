@@ -425,6 +425,12 @@ pub struct Facts {
     /// The interfaces of the file (Java's `interface`), by qualified name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub interfaces: Vec<String>,
+    /// The type aliases of the file whose target is a function type (Swift's `typealias
+    /// Handler = (Int) -> Void`), by qualified name: a parameter written as one takes a
+    /// trailing closure (`Closure::Named`). An alias of a named type is an import
+    /// (`Imported::Path`) instead.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub closures: Vec<String>,
     /// Whether the file is left out of the build for the target: a Rust file that opens with an
     /// inner `#![cfg(..)]` that is false (as if no `mod` reached it), a Go file whose build
     /// constraints exclude it.
@@ -754,6 +760,30 @@ pub struct Param {
     /// The names an object pattern binds, in order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fields: Vec<Field>,
+    /// Whether a trailing closure (Swift's `f(a) { }`, an empty `Call::labels` entry) may fill
+    /// it, as its written type says.
+    #[serde(default, skip_serializing_if = "Closure::takes")]
+    pub closure: Closure,
+}
+
+/// Whether a trailing closure may fill a parameter (`Param::closure`).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub enum Closure {
+    /// It may: a function type, a type parameter, or a pack that does not tell.
+    #[default]
+    Takes,
+    /// It may not: any other written type, a named one outside the repository included.
+    Refuses,
+    /// Written as this name, which `LanguagePack::join` reads among the repository's aliases of
+    /// a function type (Swift's `typealias Handler = (Int) -> Void`): `Takes` when one is so
+    /// named, else `Refuses`. The resolver reads one left as `Takes`.
+    Named(String),
+}
+
+impl Closure {
+    fn takes(&self) -> bool {
+        *self == Closure::Takes
+    }
 }
 
 /// Which argument of a call binds a parameter. A positional argument binds the parameters that

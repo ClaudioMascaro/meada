@@ -8,6 +8,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Swift receiver whose written type is a `typealias` (`store: StoreOf<Feature>`, optional or
+  not, on a parameter, a property or a local) is typed as the alias's target, through an alias of
+  an alias; a cycle of aliases types nothing and an alias of an outside type leaves the receiver
+  outside. An initializer another module keeps to itself (`internal`) is no longer a candidate
+  of a constructor call there. A trailing closure fills only a parameter whose written type is a
+  function type (also optional or `@escaping`), a generic parameter or a repository `typealias`
+  of a function type, so `store.send(.action) { }` no longer weighs the `animation:` overload.
+  The stored facts of a Swift file gain each parameter's `closure` and the file's `closures`, so
+  an existing index is rebuilt.
+
 - A Swift call on an implicit member (`.make()`, `wait(.seconds(1))`) keeps its member name under
   the head `(implicit)`, instead of the placeholder `(prefix_expression)`, and resolves by name
   and labels among methods (`inferred` or `ambiguous`), never to a free function or a type of

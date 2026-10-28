@@ -719,6 +719,7 @@ fn params(node: Node, method: bool, src: &[u8]) -> Vec<Param> {
             label: None,
             default: default.map(|d| value(d, src)),
             fields: Vec::new(),
+            closure: Default::default(),
         });
     }
     out

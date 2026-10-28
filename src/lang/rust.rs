@@ -1367,6 +1367,7 @@ fn parameters(function: Node, src: &[u8]) -> Vec<Parameter> {
             label: None,
             default: None,
             fields: Vec::new(),
+            closure: Default::default(),
         };
         match node.kind() {
             "self_parameter" => out.push(Parameter {

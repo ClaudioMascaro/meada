@@ -14018,3 +14018,92 @@ fn swift_an_implicit_member_call_resolves_by_name() {
         ],
     );
 }
+
+/// Swift calls through a `typealias`, a hidden initializer and a trailing closure (issue #411):
+/// a receiver written as an alias is typed as its target (through an alias of an alias, an
+/// optional and a property), a cycle of aliases types nothing and an alias of an outside type
+/// leaves its receiver outside; an initializer another module keeps to itself is no candidate;
+/// a trailing closure fills only a parameter whose written type is a function type, a generic
+/// parameter or a repository alias of a function type.
+#[test]
+fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
+    let lib = |name: &str| format!("Sources/Lib/Lib.swift::{name}");
+    let app = |name: &str| format!("Sources/App/main.swift::{name}");
+    let aliases = |name: &str| format!("Sources/App/Aliases.swift::{name}");
+    let symbols = [
+        lib("Reduce"),
+        lib("Reduce.init(internal:)"),
+        lib("Reduce.init(_:(S,A)->Int)"),
+        lib("Reduce.init(_:someReducer)"),
+        lib("Reducer"),
+        lib("Store"),
+        lib("Store.send(_:)"),
+        lib("inside()"),
+        aliases("Feature"),
+        aliases("Feature.tap()"),
+        app("main"),
+        app("use(_:_:_:_:)"),
+        app("cycle(_:_:)"),
+        app("Sender"),
+        app("Sender.send(_:animation:)"),
+        app("Sender.send(_:assert:)"),
+        app("Sender.on(_:h:)"),
+        app("Sender.on(_:n:)"),
+        app("run(_:)"),
+        app("trailing(_:)"),
+        app("hidden(_:)"),
+    ];
+    let symbols: Vec<&str> = symbols.iter().map(String::as_str).collect();
+    let (send, init, internal) = (
+        lib("Store.send(_:)"),
+        lib("Reduce.init(_:(S,A)->Int)"),
+        lib("Reduce.init(internal:)"),
+    );
+    let use_ = |callee: &str| app(&format!("use(_:_:_:_:)::{callee}"));
+    let trailing = |callee: &str| app(&format!("trailing(_:)::{callee}"));
+    let calls: Vec<(String, Option<&str>, Vec<String>)> = vec![
+        (use_("typed.send#0"), EXACT, vec![send.clone()]),
+        (use_("aliased.send#0"), EXACT, vec![send.clone()]),
+        (use_("maybe.send#0"), EXACT, vec![send.clone()]),
+        (use_("again.send#0"), EXACT, vec![send.clone()]),
+        (use_("Reduce#0"), EXACT, vec![init.clone()]),
+        (
+            lib("Reduce.init(_:(S,A)->Int)::self.init#0"),
+            EXACT,
+            vec![internal.clone()],
+        ),
+        (lib("inside()::Reduce#0"), EXACT, vec![internal]),
+        (aliases("Feature.tap()::store.send#0"), EXACT, vec![send]),
+        (app("cycle(_:_:)::a.spin#0"), None, vec![]),
+        (app("cycle(_:_:)::anim.spin#0"), None, vec![]),
+        (
+            trailing("x.send#0"),
+            EXACT,
+            vec![app("Sender.send(_:assert:)")],
+        ),
+        (
+            trailing("x.send#1"),
+            AMBIGUOUS,
+            vec![
+                app("Sender.send(_:animation:)"),
+                app("Sender.send(_:assert:)"),
+            ],
+        ),
+        (trailing("x.on#0"), EXACT, vec![app("Sender.on(_:h:)")]),
+        (trailing("run#0"), EXACT, vec![app("run(_:)")]),
+        // An alias its module keeps to itself types nothing in another module.
+        (app("hidden(_:)::x.send#0"), None, vec![]),
+    ];
+    let targets: Vec<Vec<&str>> = (calls.iter())
+        .map(|(_, _, t)| t.iter().map(String::as_str).collect())
+        .collect();
+    let calls: Vec<ExpectedCall> = (calls.iter().zip(&targets))
+        .map(|((call, level, _), targets)| (call.as_str(), *level, targets.as_slice()))
+        .collect();
+    conform(
+        "conformance-swift-alias",
+        &symbols,
+        &["Sources/App/main.swift::main"],
+        &calls,
+    );
+}

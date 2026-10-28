@@ -13,6 +13,11 @@ extension Order: Codable {
 
 let limit = 10
 
+public typealias Handler = (Int) -> Void
+typealias Orders = Order
+
+func on(_ handler: Handler? = nil) {}
+
 func settle() async {
     await flush()
 }

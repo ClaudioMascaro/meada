@@ -988,6 +988,7 @@ fn params(list: Option<Node>, src: &[u8]) -> Vec<Param> {
         label: None,
         default: None,
         fields: Vec::new(),
+        closure: Default::default(),
     };
     let mut out = Vec::new();
     for declaration in list.into_iter().flat_map(named) {
