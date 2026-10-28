@@ -7,7 +7,7 @@ use rusqlite::Connection;
 
 use crate::contract::{self, ContractKind, Hit, KINDS, Level, Link, Role, Search, View};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
-use crate::index::{CallSite, Export, State, Symbol, schema};
+use crate::index::{CallSite, Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::{Fix, Msg};
 use crate::render::{
@@ -19,13 +19,10 @@ use crate::{Result, decisions, document, drift_view, index, items, render, repo,
 use meada_core::context::{self, shape_lines};
 use meada_core::search;
 
-/// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
-const MAX_PEERS: usize = 10;
-
 pub struct Engine {
-    /// The index of the repository where Meada runs, with every other repository of the
-    /// workspace attached as `peer<n>`, `n` its position in `workspace.repos`.
-    db: Connection,
+    /// The index of each repository of the workspace, one connection each (SQLite attaches at
+    /// most 10 databases to one), in `workspace.repos` order: the first is where Meada runs.
+    dbs: Vec<Connection>,
     workspace: Workspace,
     root: PathBuf,
     identity: String,
@@ -102,14 +99,12 @@ impl Engine {
     /// Opens every index of `workspace` read-only; `fix` says where an index that cannot be
     /// read is fixed.
     fn read(workspace: Workspace, fix: Fix) -> Result<Self> {
-        fits(&workspace)?;
-        let repos: Vec<(&Path, &str)> = (workspace.repos.iter())
-            .map(|r| (r.index.as_path(), r.identity.as_str()))
-            .collect();
-        let db = index::open_read(&repos, fix)?;
+        let dbs = (workspace.repos.iter())
+            .map(|r| index::open_read(&r.index, &r.identity, fix))
+            .collect::<Result<_>>()?;
         let here = &workspace.repos[0];
         Ok(Self {
-            db,
+            dbs,
             root: here.root.clone(),
             identity: here.identity.clone(),
             workspace,
@@ -120,20 +115,13 @@ impl Engine {
     /// Opens every index of `workspace` where its repository says it lives
     /// (`Repository::index`).
     fn over(workspace: Workspace) -> Result<Self> {
-        fits(&workspace)?;
-        // Opening builds a missing index, or rebuilds one of another schema, before it is
-        // attached.
-        for peer in &workspace.repos[1..] {
-            index::open(&peer.index, &peer.root, &peer.identity, &peer.config.serve)?;
-        }
+        // Opening builds a missing index, or rebuilds one of another schema.
+        let dbs = (workspace.repos.iter())
+            .map(|r| index::open(&r.index, &r.root, &r.identity, &r.config.serve))
+            .collect::<Result<_>>()?;
         let here = &workspace.repos[0];
-        let db = index::open(&here.index, &here.root, &here.identity, &here.config.serve)?;
-        for (n, peer) in workspace.repos.iter().enumerate().skip(1) {
-            let path = peer.index.to_str().ok_or("index path is not UTF-8")?;
-            db.execute(&format!("ATTACH DATABASE ?1 AS peer{n}"), [path])?;
-        }
         Ok(Self {
-            db,
+            dbs,
             root: here.root.clone(),
             identity: here.identity.clone(),
             workspace,
@@ -155,7 +143,7 @@ impl Engine {
             index::refresh(&db, &peer.root, &peer.identity, &peer.config.serve)?;
         }
         let here = &self.workspace.repos[0];
-        index::refresh(&self.db, &self.root, &self.identity, &here.config.serve)
+        index::refresh(&self.dbs[0], &self.root, &self.identity, &here.config.serve)
     }
 
     /// The canonical export of the repository where Meada runs: its whole index, plus the
@@ -183,10 +171,9 @@ impl Engine {
     /// The index content of every repository of the workspace, with the contracts its
     /// `meada.toml` declares, in workspace order.
     fn exports(&self) -> Result<Vec<Export>> {
-        let repos = self.workspace.repos.iter().enumerate();
-        let mut exports = repos
-            .map(|(n, m)| {
-                let mut export = index::export(&self.db, &schema(n), &m.identity)?;
+        let mut exports = (self.dbs.iter().zip(&self.workspace.repos))
+            .map(|(db, m)| {
+                let mut export = index::export(db, &m.identity)?;
                 export.root = m.root.clone();
                 for kind in contract::KINDS {
                     kind.declare(m, &mut export);
@@ -1231,7 +1218,7 @@ fn check_served(listed: &Manifest, manifest: &Path) -> Result<()> {
     let shown = manifest.display().to_string();
     let problems: Vec<String> = (listed.entries.iter())
         .filter_map(|l| match &l.repository {
-            Ok(r) => (index::open_read(&[(&r.index, &r.identity)], Fix::Index(&shown)))
+            Ok(r) => (index::open_read(&r.index, &r.identity, Fix::Index(&shown)))
                 .err()
                 .map(|e| e.to_string()),
             Err(problem) => Some(format!("{}: {problem}", l.repo)),
@@ -1289,7 +1276,7 @@ pub fn served_generation(manifest: &Path) -> Result<(PathBuf, Vec<String>)> {
             repo::trust(&r.root);
             match r.recheck() {
                 Err(problem) => Some(format!("{}: {problem}", l.repo)),
-                Ok(()) => (index::open_read(&[(&r.index, &r.identity)], fix))
+                Ok(()) => (index::open_read(&r.index, &r.identity, fix))
                     .and_then(|_| index::vet(&r.index, &r.identity, fix))
                     .err()
                     .map(|e| e.to_string()),
@@ -1414,21 +1401,6 @@ pub(crate) fn kind_words() -> impl Iterator<Item = &'static str> {
         .chain(["document"])
         .chain(kinds(true))
         .chain(WORDS_AFTER)
-}
-
-/// Refuses a workspace larger than one connection attaches.
-fn fits(workspace: &Workspace) -> Result<()> {
-    if workspace.repos.len() > MAX_PEERS + 1 {
-        // ponytail: one connection attaches every peer, so a workspace reads at most 10
-        // peers; batched ATTACH (detach one batch of peers, attach the next) lifts it.
-        return Err(Msg::TooManyRepos {
-            found: workspace.repos.len(),
-            max: MAX_PEERS + 1,
-        }
-        .text()
-        .into());
-    }
-    Ok(())
 }
 
 /// `to` as a path from `from`, with `/` separators: `.`, `../api`.

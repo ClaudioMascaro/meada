@@ -322,46 +322,24 @@ pub fn vet(index: &Path, repo: &str, fix: Fix) -> Result<()> {
     }
 }
 
-/// Opens the indexes of `repos` (index path, repository identity) read-only, as server mode
-/// reads (ADR 0011): the first as `main`, each other attached as `schema(n)`. Nothing is
-/// created, rebuilt or written. A missing index, one of another schema, one a commit left
-/// interrupted, or one a commit in progress keeps locked past the busy timeout is an error
-/// naming its repository, all but the last with its fix (`Fix`).
-pub fn open_read(repos: &[(&Path, &str)], fix: Fix) -> Result<Connection> {
-    let [(index, repo), ..] = repos else {
-        return Err("no repository to open".into());
-    };
+/// Opens the index at `index` of the repository `repo` read-only, as server mode reads it
+/// (ADR 0011). Nothing is created, rebuilt or written. A missing index, one of another schema,
+/// one a commit left interrupted, or one a commit in progress keeps locked past the busy
+/// timeout is an error naming the repository, all but the last with its fix (`Fix`).
+pub fn open_read(index: &Path, repo: &str, fix: Fix) -> Result<Connection> {
     let db = read_only(index).map_err(|e| unreadable(e, index, repo, fix))?;
-    for (n, (index, repo)) in repos.iter().enumerate().skip(1) {
-        let path = index.to_str().ok_or("index path is not UTF-8")?;
-        (db.execute(&format!("ATTACH DATABASE ?1 AS {}", schema(n)), [path]))
-            .map_err(|e| unreadable(e, index, repo, fix))?;
-    }
     // One read transaction, held until the connection closes (and then rolled back, nothing
-    // being written): its first read of each index takes the lock a commit waits on, so every
-    // answer read through it sees each index as one commit left it (ADR 0011).
+    // being written): its first read takes the lock a commit waits on, so every answer read
+    // through it sees the index as one commit left it (ADR 0011).
     db.execute_batch("BEGIN DEFERRED")?;
-    for (n, (index, repo)) in repos.iter().enumerate() {
-        check_read(&db, &schema(n), index, repo, fix)?;
-    }
+    check_read(&db, index, repo, fix)?;
     Ok(db)
 }
 
-/// The schema the index of the `n`th repository of a workspace is read as: `main`, `peer<n>`.
-pub fn schema(n: usize) -> String {
-    if n == 0 {
-        "main".into()
-    } else {
-        format!("peer{n}")
-    }
-}
-
 /// The schema version check of a read-only open; the first read, so the one that waits.
-fn check_read(db: &Connection, schema: &str, index: &Path, repo: &str, fix: Fix) -> Result<()> {
-    let version = (db.query_row(&format!("PRAGMA {schema}.user_version"), [], |r| {
-        r.get::<_, i32>(0)
-    }))
-    .map_err(|e| unreadable(e, index, repo, fix))?;
+fn check_read(db: &Connection, index: &Path, repo: &str, fix: Fix) -> Result<()> {
+    let version = (db.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0)))
+        .map_err(|e| unreadable(e, index, repo, fix))?;
     if version != schema_version() {
         return Err(Msg::IndexOtherVersion { repo, fix }.text().into());
     }
@@ -1875,13 +1853,11 @@ fn stored_shape(json: Option<String>) -> Option<Shape> {
     serde_json::from_str(&json?).ok()
 }
 
-/// The index content of the repository attached as `schema`, every list sorted. Links are
+/// The index content of the repository `db` holds, every list sorted. Links are
 /// left empty: they span repositories, so the engine adds them.
-pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
+pub fn export(db: &Connection, identity: &str) -> Result<Export> {
     let files = db
-        .prepare(&format!(
-            "SELECT path, hash FROM {schema}.files WHERE resolved != '' ORDER BY path"
-        ))?
+        .prepare("SELECT path, hash FROM files WHERE resolved != '' ORDER BY path")?
         .query_map([], |r| {
             Ok(File {
                 path: r.get(0)?,
@@ -1891,11 +1867,11 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         .collect::<rusqlite::Result<_>>()?;
     // A dropped file has no symbols, so only those files' (small) facts are searched.
     let dropped = db
-        .prepare(&format!(
-            "SELECT path, facts FROM {schema}.files WHERE NOT EXISTS \
-             (SELECT 1 FROM {schema}.symbols s WHERE s.path = files.path) \
-             AND instr(facts, '\"budget\":') > 0 ORDER BY path"
-        ))?
+        .prepare(
+            "SELECT path, facts FROM files WHERE NOT EXISTS \
+             (SELECT 1 FROM symbols s WHERE s.path = files.path) \
+             AND instr(facts, '\"budget\":') > 0 ORDER BY path",
+        )?
         .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
         .collect::<rusqlite::Result<Vec<_>>>()?
         .into_iter()
@@ -1905,9 +1881,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         })
         .collect();
     let symbols = db
-        .prepare(&format!(
-            "SELECT id, path, start, end, hash FROM {schema}.symbols ORDER BY id, path, start, end"
-        ))?
+        .prepare("SELECT id, path, start, end, hash FROM symbols ORDER BY id, path, start, end")?
         .query_map([], |r| {
             Ok(Symbol {
                 id: r.get(0)?,
@@ -1918,19 +1892,17 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         .collect::<rusqlite::Result<_>>()?;
     let mut candidates: HashMap<String, Vec<String>> = HashMap::new();
     for row in db
-        .prepare(&format!(
-            "SELECT call, target FROM {schema}.candidates ORDER BY call, target"
-        ))?
+        .prepare("SELECT call, target FROM candidates ORDER BY call, target")?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
     {
         let (call, target) = row?;
         candidates.entry(call).or_default().push(target);
     }
     let calls = db
-        .prepare(&format!(
-            "SELECT id, caller, target, level, path, start, end, narrowed, decorates FROM {schema}.calls \
-             ORDER BY id, path, start, end"
-        ))?
+        .prepare(
+            "SELECT id, caller, target, level, path, start, end, narrowed, decorates FROM calls \
+             ORDER BY id, path, start, end",
+        )?
         .query_map([], |r| {
             let id: String = r.get(0)?;
             Ok(CallSite {
@@ -1949,10 +1921,10 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         })?
         .collect::<rusqlite::Result<_>>()?;
     let providers = db
-        .prepare(&format!(
-            "SELECT contract, site, shape FROM {schema}.contracts WHERE role = 'provider' \
-             ORDER BY contract, site"
-        ))?
+        .prepare(
+            "SELECT contract, site, shape FROM contracts WHERE role = 'provider' \
+             ORDER BY contract, site",
+        )?
         .query_map([], |r| {
             Ok(Provider {
                 contract: r.get(0)?,
@@ -1963,10 +1935,10 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         })?
         .collect::<rusqlite::Result<_>>()?;
     let consumers = db
-        .prepare(&format!(
-            "SELECT contract, site, via, method, fragments, shape FROM {schema}.contracts \
-             WHERE role = 'consumer' ORDER BY site, contract, via"
-        ))?
+        .prepare(
+            "SELECT contract, site, via, method, fragments, shape FROM contracts \
+             WHERE role = 'consumer' ORDER BY site, contract, via",
+        )?
         .query_map([], |r| {
             let fragments: Option<String> = r.get(4)?;
             Ok(Consumer {
@@ -1984,10 +1956,10 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         })?
         .collect::<rusqlite::Result<_>>()?;
     let bindings = db
-        .prepare(&format!(
-            "SELECT contract, via, method, site FROM {schema}.contracts \
-             WHERE role = 'binding' ORDER BY contract, via, method, site"
-        ))?
+        .prepare(
+            "SELECT contract, via, method, site FROM contracts \
+             WHERE role = 'binding' ORDER BY contract, via, method, site",
+        )?
         .query_map([], |r| {
             Ok(Binding {
                 contract: r.get(0)?,
@@ -1998,9 +1970,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         })?
         .collect::<rusqlite::Result<_>>()?;
     let rows: Vec<(String, String)> = db
-        .prepare(&format!(
-            "SELECT path, summary FROM {schema}.documents ORDER BY path"
-        ))?
+        .prepare("SELECT path, summary FROM documents ORDER BY path")?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
     let documents = (rows.into_iter())
@@ -2012,10 +1982,10 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         })
         .collect::<Result<_>>()?;
     let publishes = db
-        .prepare(&format!(
-            "SELECT via, method, site FROM {schema}.contracts \
-             WHERE role = 'publish' ORDER BY via, method, site"
-        ))?
+        .prepare(
+            "SELECT via, method, site FROM contracts \
+             WHERE role = 'publish' ORDER BY via, method, site",
+        )?
         .query_map([], |r| {
             Ok(Publish {
                 exchange: r.get(0)?,
@@ -2025,9 +1995,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         })?
         .collect::<rusqlite::Result<_>>()?;
     let rows: Vec<(String, String)> = db
-        .prepare(&format!(
-            "SELECT path, summary FROM {schema}.manifests ORDER BY path"
-        ))?
+        .prepare("SELECT path, summary FROM manifests ORDER BY path")?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
     let (manifests, tsconfigs) = read_manifests(rows)?;
@@ -2036,10 +2004,10 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
     let import_calls = match manifests.is_empty() {
         true => Vec::new(),
         false => db
-            .prepare(&format!(
-                "SELECT site, path, via, method FROM {schema}.contracts \
-                 WHERE role = 'import' ORDER BY site, via, method"
-            ))?
+            .prepare(
+                "SELECT site, path, via, method FROM contracts \
+                 WHERE role = 'import' ORDER BY site, via, method",
+            )?
             .query_map([], |r| {
                 Ok(ImportCall {
                     site: r.get(0)?,
@@ -2054,10 +2022,10 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
     let exported = match provides {
         false => Vec::new(),
         true => db
-            .prepare(&format!(
-                "SELECT path, name, file, target FROM {schema}.exports \
-                 ORDER BY path, name, file, target"
-            ))?
+            .prepare(
+                "SELECT path, name, file, target FROM exports \
+                 ORDER BY path, name, file, target",
+            )?
             .query_map([], |r| {
                 Ok(Exported {
                     path: r.get(0)?,
@@ -2071,9 +2039,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
     let ancestries = match provides {
         false => Vec::new(),
         true => db
-            .prepare(&format!(
-                "SELECT path, class, ancestors FROM {schema}.families ORDER BY path, class"
-            ))?
+            .prepare("SELECT path, class, ancestors FROM families ORDER BY path, class")?
             .query_map([], |r| {
                 let ancestors: Option<String> = r.get(2)?;
                 Ok(Ancestry {
@@ -2088,9 +2054,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
     let flexible = match provides {
         false => Vec::new(),
         true => db
-            .prepare(&format!(
-                "SELECT path, name, least, most FROM {schema}.flexible ORDER BY path, name"
-            ))?
+            .prepare("SELECT path, name, least, most FROM flexible ORDER BY path, name")?
             .query_map([], |r| {
                 Ok(Flexible {
                     path: r.get(0)?,
@@ -2104,10 +2068,10 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
     let shapes = match provides {
         false => Vec::new(),
         true => db
-            .prepare(&format!(
-                "SELECT path, method, via, shape FROM {schema}.contracts \
-                 WHERE role = 'shape' ORDER BY path, method, via"
-            ))?
+            .prepare(
+                "SELECT path, method, via, shape FROM contracts \
+                 WHERE role = 'shape' ORDER BY path, method, via",
+            )?
             .query_map([], |r| {
                 Ok((
                     r.get(0)?,
@@ -2130,9 +2094,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
     };
     let mut communities: Vec<Community> = Vec::new();
     for row in db
-        .prepare(&format!(
-            "SELECT name, member FROM {schema}.communities ORDER BY name, member"
-        ))?
+        .prepare("SELECT name, member FROM communities ORDER BY name, member")?
         .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get(1)?)))?
     {
         let (name, member) = row?;
@@ -2145,9 +2107,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         }
     }
     let entry_points = db
-        .prepare(&format!(
-            "SELECT identity, kind, label, site FROM {schema}.entry_points ORDER BY identity"
-        ))?
+        .prepare("SELECT identity, kind, label, site FROM entry_points ORDER BY identity")?
         .query_map([], |r| {
             Ok((r.get(0)?, r.get::<_, String>(1)?, r.get(2)?, r.get(3)?))
         })?
@@ -2257,7 +2217,7 @@ mod tests {
 
     /// The index of `REPO` at `index`, opened as server mode reads it.
     fn read(index: &Path) -> crate::Result<Connection> {
-        open_read(&[(index, REPO)], Fix::Index(MANIFEST))
+        open_read(index, REPO, Fix::Index(MANIFEST))
     }
 
     fn communities(db: &Connection) -> i64 {

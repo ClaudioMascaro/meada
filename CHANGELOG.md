@@ -16,6 +16,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- A workspace of any number of repositories opens and answers: each index is read through its
+  own connection, so the limit of eleven repositories (SQLite attaches ten databases to one
+  connection) and its error are gone. Answers and exports of a workspace of eleven or fewer
+  are unchanged.
 - A call that decorates a definition (a Java or Kotlin annotation, a C# attribute, a Python
   decorator, a Rust route attribute) carries the definition in the index and in the export's call
   site (`decorates`), and `context` lists it in an `annotations:` section instead of among the

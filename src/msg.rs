@@ -101,10 +101,6 @@ pub enum Msg<'a> {
         target: &'a str,
         peer: &'a str,
     },
-    TooManyRepos {
-        found: usize,
-        max: usize,
-    },
     ViaUnmatched {
         contract: &'a str,
         via: &'a str,
@@ -1027,10 +1023,6 @@ impl Msg<'_> {
             Msg::WaitingDecision { call, target, peer } => pick(
                 format!("decision waiting on missing peer {peer}: {call} -> {target}"),
                 format!("decisão aguardando o par ausente {peer}: {call} -> {target}"),
-            ),
-            Msg::TooManyRepos { found, max } => pick(
-                format!("the workspace has {found} repositories; v0.1 reads at most {max}"),
-                format!("o workspace tem {found} repositórios; a v0.1 lê no máximo {max}"),
             ),
             Msg::ViaUnmatched { contract, via } => pick(
                 format!("{contract}: `via` {via} matches no symbol, ignored"),

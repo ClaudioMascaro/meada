@@ -611,6 +611,76 @@ fn a_grant_scopes_the_workspace_of_a_generation() {
     }
 }
 
+/// A grant of three of twelve repositories reads those three, and a grant of all of them reads
+/// the whole chain: past ten repositories the grant still decides what an answer exposes.
+fn wide_grants(dir: &Path, manifest: &str, issuer: &Issuer, signing: &EncodingKey) {
+    append(dir, manifest, &issuer.base);
+    let server = if manifest == MANIFEST {
+        start(dir)
+    } else {
+        crate::serving::serve(dir, manifest)
+    };
+    let first = crate::wide::identity(0);
+    let read = |granted: usize| {
+        let all: Vec<String> = (0..granted).map(crate::wide::identity).collect();
+        let all: Vec<&str> = all.iter().map(String::as_str).collect();
+        let token = sign(
+            signing,
+            "k1",
+            Algorithm::ES256,
+            &claims(&issuer.base, &first, &all),
+        );
+        let call = Some(("trace", json!({"from": "hop0"})));
+        traced(&ask(
+            &format!("{}/{first}", server.url),
+            Some(&token),
+            &[],
+            call,
+        ))
+    };
+    let some = read(3);
+    assert!(some.contains(&crate::wide::identity(2)), "{some}");
+    for n in 3..crate::wide::REPOS {
+        let left = crate::wide::identity(n);
+        assert!(!some.contains(&left), "{left} in: {some}");
+    }
+    let every = read(crate::wide::REPOS);
+    assert!(
+        every.contains(&crate::wide::identity(crate::wide::REPOS - 1)),
+        "{every}"
+    );
+}
+
+/// The same over twelve repositories: the manifest, then (feature `snapshot`) a generation.
+#[test]
+fn a_grant_scopes_a_workspace_past_ten_repositories() {
+    let (signing, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let (dir, listed) = crate::wide::repos("oidc_wide");
+    let entries: Vec<_> = listed
+        .iter()
+        .map(|(i, p)| (i.as_str(), p.as_str()))
+        .collect();
+    crate::manifest::list(&dir, &entries, false);
+    assert!(run(&dir, "index").2);
+    wide_grants(&dir, MANIFEST, &issuer, &signing);
+}
+
+#[cfg(feature = "snapshot")]
+#[test]
+fn a_grant_scopes_a_generation_past_ten_repositories() {
+    let (signing, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let (dir, listed) = crate::wide::repos("oidc_wide_generation");
+    let entries: Vec<_> = listed
+        .iter()
+        .map(|(i, p)| (i.as_str(), p.as_str()))
+        .collect();
+    crate::manifest::list(&dir, &entries, false);
+    let (manifest, _) = crate::serving::hand_node_of(&dir, &entries);
+    wide_grants(&dir, &manifest, &issuer, &signing);
+}
+
 /// The group `append_groups` maps to `WEB`, and one it leaves unmapped.
 const MAPPED: &str = "team-web-7c1d";
 const UNMAPPED: &str = "team-none-5e2a";

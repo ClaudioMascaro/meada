@@ -370,10 +370,17 @@ const HAND: &str = "00000000000000aa";
 /// to it and its `local_dir`.
 pub(crate) fn hand_node(case: &str) -> (PathBuf, String, PathBuf) {
     let dir = chain_manifest(case);
-    assert!(run(&dir, "index").2, "index");
-    let (manifest, local) = named_node(&dir, "hand", "http://127.0.0.1:1", "meada-hand");
+    let (manifest, local) = hand_node_of(&dir, &CHAIN);
+    (dir, manifest, local)
+}
+
+/// `hand_node` over `repos` (identity, directory in `dir`), listed and indexed in `dir` already.
+/// Returns the node's manifest relative to `dir` and its `local_dir`.
+pub(crate) fn hand_node_of(dir: &Path, repos: &[(&str, &str)]) -> (String, PathBuf) {
+    assert!(run(dir, "index").2, "index");
+    let (manifest, local) = named_node(dir, "hand", "http://127.0.0.1:1", "meada-hand");
     let mut repositories = Vec::new();
-    for (n, (repo, path)) in CHAIN.iter().enumerate() {
+    for (n, (repo, path)) in repos.iter().enumerate() {
         let bundle = format!("{n:016x}");
         let to = local.join(HAND).join(&bundle);
         fs::create_dir_all(&to).unwrap();
@@ -398,7 +405,7 @@ pub(crate) fn hand_node(case: &str) -> (PathBuf, String, PathBuf) {
     let document = serde_json::to_vec(&document).unwrap();
     fs::write(local.join(HAND).join("generation.json"), document).unwrap();
     fs::write(local.join("current"), format!("{HAND} 0\n")).unwrap();
-    (dir, manifest, local)
+    (manifest, local)
 }
 
 /// A node whose current generation stops being servable answers every request 503 with a fixed

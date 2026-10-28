@@ -49,6 +49,7 @@ mod swiftpkg;
 mod trace;
 mod ui;
 mod urls;
+mod wide;
 mod workspace;
 mod xlang;
 

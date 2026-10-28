@@ -148,7 +148,7 @@ impl Console {
                 Ok(repo) => crate::index::with_busy_timeout(crate::engine::PROBE_BUSY, || {
                     let provenance = crate::index::provenance(&repo.index).ok();
                     let head = crate::repo::head(&repo.root).ok();
-                    let behind = crate::index::open_read(&[(&repo.index, &repo.identity)], crate::msg::Fix::Index(&self.file.display().to_string()))
+                    let behind = crate::index::open_read(&repo.index, &repo.identity, crate::msg::Fix::Index(&self.file.display().to_string()))
                         .and_then(|db| crate::index::fresh(&db, &repo.root, &repo.identity, &repo.config.serve)).ok().map(|fresh| !fresh || provenance.as_ref().and_then(|(_, commit)| commit.as_ref()).zip(head.as_ref()).is_some_and(|(indexed, head)| indexed != head));
                     json!({"identity": entry.repo, "head": head, "indexed_commit": provenance.as_ref().and_then(|(_, head)| head.clone()),
                         "schema": provenance.map(|(schema, _)| schema), "behind": behind})
