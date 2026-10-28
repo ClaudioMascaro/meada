@@ -5044,7 +5044,7 @@ impl<'a> Code<'a> {
 
     /// Whether the type the source writes, `written` in `scope` of `path`, is one the repository
     /// defines.
-    fn is_defined(&self, path: &'a str, scope: &'a str, written: &'a str) -> bool {
+    fn is_repository_type(&self, path: &'a str, scope: &'a str, written: &'a str) -> bool {
         let r = self.resolver;
         let (seen, work) = (&mut r.seen(path, scope), &mut Work::default());
         matches!(
@@ -5074,7 +5074,7 @@ impl<'a> Code<'a> {
             Class::Type(written) => {
                 let outside = self.outside_written(at, within, written);
                 // A type of the repository is an answer with no spelling.
-                if outside.is_none() && !self.is_defined(at, within, written) {
+                if outside.is_none() && !self.is_repository_type(at, within, written) {
                     return None;
                 }
                 Some((Form::Type, outside, Vec::new()))
@@ -5099,6 +5099,7 @@ impl<'a> Code<'a> {
                 let (receiver, member) = callee.rsplit_once('.')?;
                 let (form, outside, mut steps) = self.declared(at, within, receiver, depth + 1)?;
                 steps.push(member);
+                // A method of a value of a repository type names nothing outside.
                 Some((form, Some(outside?), steps))
             }
             _ => None,

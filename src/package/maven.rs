@@ -550,7 +550,9 @@ pub(super) fn imports<'a>(
     if let (false, Some((receiver, method))) = (call.constructs, callee.rsplit_once('.')) {
         let origins = code.origins(path, &call.scope, Of::Name(receiver), Follow::Declarations);
         let origin = (origins.into_iter().next())
-            .filter(|o| o.form == Form::Type && o.routes.iter().all(|r| r.steps.is_empty()));
+            .filter(|o| o.form == Form::Type && o.routes.iter().all(|r| r.steps.is_empty()))
+            // A type of the repository is no answer here: the lookup below runs as before.
+            .filter(|o| o.outside.is_some());
         // A type of the repository: its members and extensions are the repository's.
         local = origin.as_ref().is_some_and(|o| o.outside.is_none());
         typed = (origin.and_then(|o| o.outside)).map_or_else(Vec::new, Outside::spellings);
