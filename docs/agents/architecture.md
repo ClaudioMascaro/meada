@@ -806,7 +806,9 @@ one for the area a change touches.
 - Symbol: `<repository>::<path>::<qualified name>` (`Class.method`, `outer.inner`).
 - Call site: `<caller>::<normalized callee>#<ordinal>`; a top-level call's caller is
   `<repository>::<path>`. The normalized callee keeps identifier and member chains only; any
-  other expression becomes `(<node kind>)`. A Rust path is dotted like a chain (`crate::a::f`
+  other expression becomes `(<node kind>)`, except Swift's implicit member `.f(..)`, which is
+  `(implicit).f` (`lang::IMPLICIT_HEAD`: the resolver matches it among methods by name and labels,
+  and leaves `init` unresolved). A Rust path is dotted like a chain (`crate::a::f`
   is `crate.a.f`, `Type::new` is `Type.new`); its `self::` and a `super::` that stays in the
   file are read from the file's top under the keyword `mod` (`self::f` in `inner` is
   `mod.inner.f`, `super::f` out of `inner` is `mod.f`).

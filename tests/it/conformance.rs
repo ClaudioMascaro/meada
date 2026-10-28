@@ -13961,3 +13961,60 @@ class Unbound : BaseController() { @GetMapping(\"/{id}\") fun get(): String = \"
         ])
     );
 }
+
+/// A Swift call through an implicit member (`.make()`) keeps its member name under a head no
+/// declaration binds: it resolves by name and labels, never `exact` and never to a free
+/// function of that name; an implicit initializer stays unresolved (issue #407).
+#[test]
+fn swift_an_implicit_member_call_resolves_by_name() {
+    conform(
+        "conformance-swift-implicit",
+        &[
+            "Sources/Implicit.swift::Duration",
+            "Sources/Implicit.swift::wait(_:)",
+            "Sources/Implicit.swift::seconds(_:)",
+            "Sources/Implicit.swift::sleepy()",
+            "Sources/Implicit.swift::Config",
+            "Sources/Implicit.swift::Config.init(x:)",
+            "Sources/Implicit.swift::Config.make()",
+            "Sources/Implicit.swift::Config.build()",
+            "Sources/Implicit.swift::Other",
+            "Sources/Implicit.swift::Other.make()",
+            "Sources/Implicit.swift::configure()",
+            "Sources/Implicit.swift::fresh()",
+            "Sources/Implicit.swift::swapped()",
+        ],
+        &[],
+        &[
+            (
+                "Sources/Implicit.swift::sleepy()::wait#0",
+                EXACT,
+                &["Sources/Implicit.swift::wait(_:)"],
+            ),
+            (
+                "Sources/Implicit.swift::sleepy()::(implicit).seconds#0",
+                None,
+                &[],
+            ),
+            (
+                "Sources/Implicit.swift::configure()::(implicit).make#0",
+                AMBIGUOUS,
+                &[
+                    "Sources/Implicit.swift::Config.make()",
+                    "Sources/Implicit.swift::Other.make()",
+                ],
+            ),
+            (
+                "Sources/Implicit.swift::configure()::(implicit).build#0",
+                INFERRED,
+                &["Sources/Implicit.swift::Config.build()"],
+            ),
+            (
+                "Sources/Implicit.swift::fresh()::(implicit).init#0",
+                None,
+                &[],
+            ),
+            ("Sources/Implicit.swift::swapped()::swap#0", None, &[]),
+        ],
+    );
+}
