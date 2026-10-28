@@ -1030,7 +1030,8 @@ one for the area a change touches.
   other part unknown. The list of Spring's config files is the reader's too
   (`spring::CONFIG_FILES`), which the Java pack returns as its `config_files`. `names.rs`
   holds the name questions the JVM and C# kinds share: `one` (exactly one spelling in the kind's
-  table), `known` (a name an import binds), `spellings`, `typed` and `declared` (the outside type
+  table), `known` (a name an import binds), `annotation` (`known` for an annotation's callee, which no
+  field of an outside base hides, #354), `spellings`, `typed` and `declared` (the outside type
   the source writes for a name), `in_full` and `is_type` (a type written in full is the
   library's unless a definition of the repository binds that very name, as a compiler prefers
   the source's type; else the one spelling the usings give it, one rule for every C# kind) and
@@ -2554,8 +2555,8 @@ qualification budget does (ADR 0017).
   field pass, so an opaque ancestor hides no import from an annotation, and single-type and
   on-demand imports agree. The one miss, accepted and not detected, is a member type of the
   outside base named like the annotation (JLS 6.4.1 would put it before the import); the same
-  reading serves the declarative clients and the channel listeners, in Java and Kotlin. A fully qualified annotation without an import
-  (`@javax.ws.rs.GET`) and annotations an implementation inherits from an interface are not read.
+  reading serves the declarative clients and the channel listeners, in Java and Kotlin. A fully
+  qualified annotation without an import (`@javax.ws.rs.GET`) and annotations an implementation inherits from an interface are not read.
 - `http/csharp.rs` (spec #28, #109): an ASP.NET Core controller route is read from `Call::decorates`
   on a method of a class that is a controller: `[ApiController]`, or a base that `Code::outside`
   says is `Microsoft.AspNetCore.Mvc.ControllerBase` or `Controller`. The pack ships syntax only,

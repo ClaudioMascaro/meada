@@ -217,7 +217,7 @@ enum Reading {
     /// a receiver of a block whose type is not the repository's may hold one of any name, so
     /// the name is unknown there.
     Member,
-    /// The callee of a decorator call (a Java or Kotlin annotation): `Value`, but no field of a
+    /// The callee of a decorator call (an annotation or attribute): `Value`, but no field of a
     /// base binds it, so a base from outside the repository hides no import from it. A member
     /// type of that base named like the annotation, which JLS 6.4.1 would put first, is read
     /// wrong (#354).
@@ -4912,7 +4912,7 @@ impl<'a> Code<'a> {
         self.outside_read(path, scope, name, by_path, false)
     }
 
-    /// `outside` for the callee of a decorator call (a Java or Kotlin annotation): no field of
+    /// `outside` for the callee of a decorator call (an annotation or attribute): no field of
     /// a base binds it (`Reading::Decorator`).
     pub fn outside_decorator(
         &self,

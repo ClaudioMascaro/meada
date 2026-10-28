@@ -8,6 +8,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A method annotation of a Java or Kotlin class whose family has a base from outside the
+  repository is read through the file's imports, so a Spring controller, a JAX-RS resource, a
+  declarative client (Feign, Retrofit) and a channel listener (`@KafkaListener`, `@RabbitListener`,
+  `@JmsListener`) that extends an internal library's base gives its providers and consumers.
+  Single-type and on-demand imports agree. A member type of the outside base named like the
+  annotation, which Java would read before the import, is the one case read wrong. Before, the
+  opaque base hid the single-type import and the class gave nothing.
 - A Kotlin call made on another call's result (`make().open()`, `Box().open()`,
   `find()?.open()`) resolves within the class of the first call's written return type, or the
   class its constructor builds, `exact` when one member fits. A type with arguments or a `?`

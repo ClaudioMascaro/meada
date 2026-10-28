@@ -277,7 +277,7 @@ fn retrofit_clients<'a>(
             if !is_method(facts, target) {
                 continue;
             }
-            // A verb JAX-RS may also bind is no Retrofit's: `known` accepts one spelling only.
+            // A verb JAX-RS may also bind is no Retrofit's: `annotation` accepts one spelling only.
             let verb = |s: &str| retrofit_verb(s).is_some() || jax_rs_annotation(s);
             let spelled = annotation(code, path, call, verb);
             let named = spelled.as_deref().and_then(retrofit_verb);
