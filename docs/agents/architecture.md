@@ -2548,10 +2548,14 @@ qualification budget does (ADR 0017).
   `jakarta.ws.rs.*` is two candidates and serves nothing. A `@Path`-only method and
   `@ApplicationPath` are not routes, and neither is a method of an interface (`Facts::interfaces`):
   a `@Path` interface is a MicroProfile or Quarkus client. A controller or resource class whose
-  family has an outside base (`extends com.corp.Base`, top-level or nested) gives no provider
-  (#354), since its annotations are read in the class scope, where an inherited member type
-  could shadow the import. A fully qualified annotation without an import (`@javax.ws.rs.GET`)
-  and annotations an implementation inherits from an interface are not read.
+  family has an outside base (`extends com.corp.Base`, top-level or nested) still gives its
+  providers (#354): the callee of a decorator call (`Call::decorates`) is read as
+  `Reading::Decorator` (`Code::outside_decorator`, `names::annotation`), which skips the inherited
+  field pass, so an opaque ancestor hides no import from an annotation, and single-type and
+  on-demand imports agree. The one miss, accepted and not detected, is a member type of the
+  outside base named like the annotation (JLS 6.4.1 would put it before the import); the same
+  reading serves the declarative clients and the channel listeners, in Java and Kotlin. A fully qualified annotation without an import
+  (`@javax.ws.rs.GET`) and annotations an implementation inherits from an interface are not read.
 - `http/csharp.rs` (spec #28, #109): an ASP.NET Core controller route is read from `Call::decorates`
   on a method of a class that is a controller: `[ApiController]`, or a base that `Code::outside`
   says is `Microsoft.AspNetCore.Mvc.ControllerBase` or `Controller`. The pack ships syntax only,

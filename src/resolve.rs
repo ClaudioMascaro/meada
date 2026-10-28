@@ -217,6 +217,11 @@ enum Reading {
     /// a receiver of a block whose type is not the repository's may hold one of any name, so
     /// the name is unknown there.
     Member,
+    /// The callee of a decorator call (a Java or Kotlin annotation): `Value`, but no field of a
+    /// base binds it, so a base from outside the repository hides no import from it. A member
+    /// type of that base named like the annotation, which JLS 6.4.1 would put first, is read
+    /// wrong (#354).
+    Decorator,
 }
 
 impl Reading {
@@ -234,7 +239,12 @@ impl Reading {
     fn value(self) -> bool {
         matches!(
             self,
-            Reading::Value | Reading::Path | Reading::Method | Reading::Read | Reading::Member
+            Reading::Value
+                | Reading::Decorator
+                | Reading::Path
+                | Reading::Method
+                | Reading::Read
+                | Reading::Member
         )
     }
 }
@@ -1133,7 +1143,13 @@ impl<'a> Resolver<'a> {
                 self.resolve_as(path, scope, callee, seen, work, Reading::Method)
             }
             (_, false, true) => self.resolve_as(path, scope, callee, seen, work, Reading::Path),
-            (_, false, false) => self.resolve_as(path, scope, callee, seen, work, Reading::Value),
+            (_, false, false) => {
+                let reading = match call.decorates {
+                    Some(_) => Reading::Decorator,
+                    None => Reading::Value,
+                };
+                self.resolve_as(path, scope, callee, seen, work, reading)
+            }
         };
         let binding = match binding {
             Binding::Several(all) if call.constructs => {
@@ -2875,7 +2891,10 @@ impl<'a> Resolver<'a> {
             if let Some((name, def)) = defs.get_key_value(candidate.as_str())
                 && def.kind != Kind::Method
                 && !(def.kind == Kind::Module
-                    && matches!(reading, Reading::Value | Reading::Read | Reading::Member))
+                    && matches!(
+                        reading,
+                        Reading::Value | Reading::Decorator | Reading::Read | Reading::Member
+                    ))
             {
                 return Binding::Def(Target { path, name });
             }
@@ -2886,6 +2905,7 @@ impl<'a> Resolver<'a> {
             // A field a class body sees may be its base's (`protected Repo repo`), before an
             // outer class's.
             if self.members_in_scope
+                && reading != Reading::Decorator
                 && defs.get(s).is_some_and(|d| d.kind == Kind::Class)
                 && let Some(found) = self.inherited_field(path, s, name)
             {
@@ -4889,10 +4909,33 @@ impl<'a> Code<'a> {
         name: &'a str,
         by_path: bool,
     ) -> Option<Outside<'a>> {
+        self.outside_read(path, scope, name, by_path, false)
+    }
+
+    /// `outside` for the callee of a decorator call (a Java or Kotlin annotation): no field of
+    /// a base binds it (`Reading::Decorator`).
+    pub fn outside_decorator(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Option<Outside<'a>> {
+        self.outside_read(path, scope, name, false, true)
+    }
+
+    fn outside_read(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        by_path: bool,
+        decorator: bool,
+    ) -> Option<Outside<'a>> {
         let r = self.resolver;
-        let (reading, head_reading) = match by_path {
-            true => (Reading::Path, Reading::Path),
-            false => (Reading::Value, Reading::Any),
+        let (reading, head_reading) = match (by_path, decorator) {
+            (true, _) => (Reading::Path, Reading::Path),
+            (false, true) => (Reading::Decorator, Reading::Decorator),
+            (false, false) => (Reading::Value, Reading::Any),
         };
         let resolve = |name| {
             let (seen, work) = (&mut r.seen(path, scope), &mut Work::default());

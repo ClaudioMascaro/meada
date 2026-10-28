@@ -35,7 +35,7 @@ use crate::index::Indexed;
 use crate::jvm::names::{array_of, jvm_files, kotlin};
 use crate::jvm::spring::{self, Configs, Properties};
 use crate::lang::{Call, Invocation, Kind, Part, Value};
-use crate::names::{declared, known, one, spellings, typed};
+use crate::names::{annotation, declared, known, one, spellings, typed};
 use crate::resolve::{Code, Expand, Inject, Injected, Keywords, Target, method as member};
 
 const KAFKA_LISTENER: &str = "org.springframework.kafka.annotation.KafkaListener";
@@ -141,9 +141,7 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
             if let Some(target) = &stored.decorates {
                 // A listener's annotation on a method; one on a class is not read. The
                 // annotation is asked first: most are no listener's (`@Override`).
-                let listener = known(code, path, &stored.scope, &stored.callee, |s| {
-                    LISTENERS.contains(&s)
-                });
+                let listener = annotation(code, path, stored, |s| LISTENERS.contains(&s));
                 let methods = || {
                     methods.get_or_init(|| {
                         (facts.defs.iter())
@@ -827,16 +825,19 @@ mod tests {
         );
     }
 
-    /// A listener in a class whose base comes from outside the repository has no handler: a
-    /// member type of that base may be the annotation's name (#354, "Opaque outside").
+    /// A listener's annotation in a class whose base comes from outside the repository is read
+    /// through the imports: a field of the base is no annotation (#354).
     #[test]
-    fn a_listener_in_a_class_with_an_outside_base_has_no_handler() {
+    fn a_listener_in_a_class_with_an_outside_base_has_a_handler() {
         let imports = format!("{KAFKA}import com.corp.shared.Base;\n");
         let body = "static class Based extends Base { @KafkaListener(topics = \"t\") void on(String m) {} }\n\
             static class Own { @KafkaListener(topics = \"t\") void on(String m) {} }";
         assert_eq!(
             read(&imports, body),
-            ["kafka t consumer a.C.Own.on(String)"]
+            [
+                "kafka t consumer a.C.Based.on(String)",
+                "kafka t consumer a.C.Own.on(String)"
+            ]
         );
     }
 
@@ -1332,13 +1333,16 @@ mod tests {
             kt(KT_KAFKA, body, &[], ""),
             ["kafka orders.shipped producer"]
         );
-        // A class whose base is outside may inherit a member type named like the annotation.
+        // A class whose base is outside hides no import from its annotations.
         let imports = format!("{KT_KAFKA}import com.corp.shared.Base\n");
         let body = "class Based : Base() { @KafkaListener(topics = [\"t\"]) fun on(m: String) {} }\n\
             class Own { @KafkaListener(topics = [\"t\"]) fun on(m: String) {} }";
         assert_eq!(
             kt(&imports, body, &[], ""),
-            ["kafka t consumer a.Own.on(String)"]
+            [
+                "kafka t consumer a.Based.on(String)",
+                "kafka t consumer a.Own.on(String)"
+            ]
         );
         // An `arrayOf` of the repository is no array of the annotation.
         let own = [(

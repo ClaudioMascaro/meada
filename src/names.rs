@@ -3,7 +3,7 @@
 //! so a kind accepts a name when exactly one of its spellings is in the kind's own table
 //! (`one`). The JVM and C# kinds share them.
 
-use crate::lang::{Facts, Kind};
+use crate::lang::{Call, Facts, Kind};
 use crate::resolve::{Code, Follow, Form, Of, Outside};
 
 /// Whether `target`, what an annotation of `facts` decorates, is a method of the file: a
@@ -30,7 +30,24 @@ pub fn known<'a>(
     name: &'a str,
     is_known: impl Fn(&str) -> bool,
 ) -> Option<String> {
-    let outside = code.outside(file, scope, name, false)?;
+    accepted(code.outside(file, scope, name, false)?, is_known)
+}
+
+/// `known` for the callee of an annotation (`Call::decorates`): a base from outside the
+/// repository hides no import from it (#354).
+pub fn annotation<'a>(
+    code: &Code<'a>,
+    file: &'a str,
+    call: &'a Call,
+    is_known: impl Fn(&str) -> bool,
+) -> Option<String> {
+    accepted(
+        code.outside_decorator(file, &call.scope, &call.callee)?,
+        is_known,
+    )
+}
+
+fn accepted(outside: Outside, is_known: impl Fn(&str) -> bool) -> Option<String> {
     let spellings = match outside.candidates.is_empty() {
         true => vec![outside.spelled],
         false => outside.candidates,

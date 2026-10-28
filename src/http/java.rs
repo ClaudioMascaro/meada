@@ -18,7 +18,7 @@ use crate::contract::{Found, Site};
 use crate::index::Indexed;
 use crate::jvm::names::{LOCAL_DEPTH, array_of, java_files, jvm_files};
 use crate::lang::{Bound, Call, Value};
-use crate::names::{is_method, known, one, typed};
+use crate::names::{annotation as known_annotation, is_method, known, one, typed};
 use crate::resolve::{Code, Expand, Follow, Inject, Of, passes_nothing};
 
 const WEB: &str = "org.springframework.web.bind.annotation.";
@@ -55,9 +55,8 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
     let mut found = Vec::new();
     for (path, facts) in jvm_files(code) {
         // What Spring annotation a call is, by its name outside the repository.
-        let spring = |call: &'a Call| -> Option<String> {
-            known(code, path, &call.scope, &call.callee, annotation)
-        };
+        let spring =
+            |call: &'a Call| -> Option<String> { known_annotation(code, path, call, annotation) };
         let annotations: Vec<(usize, &'a Call, String)> = (facts.calls.iter().enumerate())
             .filter(|(_, c)| c.decorates.is_some())
             .filter_map(|(n, c)| Some((n, c, spring(c)?)))
@@ -146,7 +145,7 @@ fn jax_rs<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
         let annotations: Vec<(usize, &'a Call, String)> = (facts.calls.iter().enumerate())
             .filter(|(_, c)| c.decorates.is_some())
             .filter_map(|(n, c)| {
-                let name = known(code, path, &c.scope, &c.callee, jax_rs_annotation)?;
+                let name = known_annotation(code, path, c, jax_rs_annotation)?;
                 Some((n, c, name))
             })
             .collect();
@@ -458,14 +457,14 @@ mod tests {
         assert_eq!(served(IMPORTS, nested), ["http::GET::/in/x"]);
     }
 
-    /// A controller whose base comes from outside the repository serves nothing: a member type
-    /// of that base may be a method annotation's name (#354, "Opaque outside").
+    /// A controller whose base comes from outside the repository serves its methods: a method
+    /// annotation is read through the imports, no field of that base hiding them (#354).
     #[test]
-    fn a_controller_with_an_outside_base_serves_nothing() {
+    fn a_controller_with_an_outside_base_serves_its_methods() {
         let imports = format!("{IMPORTS}import com.corp.shared.BaseController;\n");
         let based = "@RestController @RequestMapping(\"/orders\") class C extends BaseController { \
             @GetMapping(\"/{id}\") void get() {} }";
-        assert!(served(&imports, based).is_empty());
+        assert_eq!(served(&imports, based), ["http::GET::/orders/{}"]);
         let own = "@RestController @RequestMapping(\"/orders\") class C { @GetMapping(\"/{id}\") void get() {} }";
         assert_eq!(served(&imports, own), ["http::GET::/orders/{}"]);
     }

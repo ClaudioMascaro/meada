@@ -32,7 +32,7 @@ use crate::jvm::names::{java_files, jvm_files, kotlin};
 use crate::jvm::spring::{self, Configs};
 use crate::lang::kotlin::TYPE_ARGUMENT;
 use crate::lang::{Call, Facts, Invocation, Part, Value, literal};
-use crate::names::{is_method, known, one, spellings};
+use crate::names::{annotation, is_method, known, one, spellings};
 use crate::resolve::Code;
 use crate::resolve::{Expand, Inject, Injected, method as member};
 use std::cell::OnceCell;
@@ -55,7 +55,7 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
     for (path, facts) in java_files(code) {
         let annotations: Vec<(usize, &'a Call, String)> = (facts.calls.iter().enumerate())
             .filter(|(_, c)| c.decorates.is_some())
-            .filter_map(|(n, c)| Some((n, c, known(code, path, &c.scope, &c.callee, is_feign)?)))
+            .filter_map(|(n, c)| Some((n, c, annotation(code, path, c, is_feign)?)))
             .collect();
         feign_clients(
             code,
@@ -263,7 +263,7 @@ fn retrofit_clients<'a>(
         }
         // A Feign interface is read by its Spring annotations alone.
         let feign: Vec<&str> = (facts.calls.iter())
-            .filter(|c| known(code, path, &c.scope, &c.callee, is_feign).as_deref() == Some(FEIGN))
+            .filter(|c| annotation(code, path, c, is_feign).as_deref() == Some(FEIGN))
             .filter_map(|c| c.decorates.as_deref())
             .collect();
         for (n, call) in facts.calls.iter().enumerate() {
@@ -279,7 +279,7 @@ fn retrofit_clients<'a>(
             }
             // A verb JAX-RS may also bind is no Retrofit's: `known` accepts one spelling only.
             let verb = |s: &str| retrofit_verb(s).is_some() || jax_rs_annotation(s);
-            let spelled = known(code, path, &call.scope, &call.callee, verb);
+            let spelled = annotation(code, path, call, verb);
             let named = spelled.as_deref().and_then(retrofit_verb);
             let Some(verb) = METHODS.iter().copied().find(|v| Some(*v) == named) else {
                 continue;
