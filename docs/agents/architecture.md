@@ -2556,7 +2556,11 @@ qualification budget does (ADR 0017).
   on-demand imports agree. The one miss, accepted and not detected, is a member type of the
   outside base named like the annotation (JLS 6.4.1 would put it before the import); the same
   reading serves the declarative clients and the channel listeners, in Java and Kotlin. A fully
-  qualified annotation without an import (`@javax.ws.rs.GET`) and annotations an implementation inherits from an interface are not read.
+  qualified annotation without an import (`@javax.ws.rs.GET`) is read too, as `names::known` and
+  `annotation` take a dotted name whose head nothing binds as its own spelling (`written_in_full`,
+  `in_full`), the repository winning: an import, or a definition of the repository named by the head
+  or by the full name, keeps its reading. Only the annotations an implementation inherits from an
+  interface are not read.
 - `http/csharp.rs` (spec #28, #109): an ASP.NET Core controller route is read from `Call::decorates`
   on a method of a class that is a controller: `[ApiController]`, or a base that `Code::outside`
   says is `Microsoft.AspNetCore.Mvc.ControllerBase` or `Controller`. The pack ships syntax only,
