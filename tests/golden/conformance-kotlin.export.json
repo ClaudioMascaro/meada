@@ -194,6 +194,10 @@
       "hash": "20abf79898c51f83a5ecd853bd4c6f2339f2f8812d14193d4ae5d701565cb6bd"
     },
     {
+      "path": "src/main/kotlin/example/jvm/Typed.kt",
+      "hash": "5eda8a9d69b8ed0576be59a916dce9189387fa0f06fe96bf648d7a288afd704a"
+    },
+    {
       "path": "src/main/kotlin/example/jvm/fake/Fake.kt",
       "hash": "6365537f4409fe50baf5e44284efd688e51fe6df26b848f0a8c44ea8b940ce97"
     },
@@ -3325,6 +3329,46 @@
         "path": "src/main/kotlin/example/jvm/Star.kt",
         "start": 421,
         "end": 484
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Typed.kt",
+        "start": 388,
+        "end": 556
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Typed.kt",
+        "start": 440,
+        "end": 554
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Typed.kt",
+        "start": 254,
+        "end": 386
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Typed.kt",
+        "start": 272,
+        "end": 384
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.make()",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Typed.kt",
+        "start": 88,
+        "end": 157
       }
     },
     {
@@ -10592,6 +10636,119 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()::(call_expression).retrieve#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Typed.kt",
+        "start": 502,
+        "end": 548
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()::(call_expression).uri#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Typed.kt",
+        "start": 502,
+        "end": 537
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()::client.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan.get()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.get()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.get()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.get()"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Typed.kt",
+        "start": 502,
+        "end": 514
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()::make#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.make()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Typed.kt",
+        "start": 487,
+        "end": 493
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()::(call_expression).retrieve#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Typed.kt",
+        "start": 333,
+        "end": 378
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()::(call_expression).uri#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Typed.kt",
+        "start": 333,
+        "end": 367
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()::client.get#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Typed.kt",
+        "start": 333,
+        "end": 345
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()::make#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.make()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Typed.kt",
+        "start": 318,
+        "end": 324
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.make()::WebClient.create#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.make()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/jvm/Typed.kt",
+        "start": 112,
+        "end": 157
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.probe(RestTemplate,WebClient)::(call_expression).uri#0",
       "caller": "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.probe(RestTemplate,WebClient)",
       "target": null,
@@ -12764,6 +12921,11 @@
       "contract": "http::GET::/star/web",
       "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Star.kt::example.jvm.Star.web()::(call_expression).uri#0",
       "via": "host:star.example.com"
+    },
+    {
+      "contract": "http::GET::/persons/typed",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()::(call_expression).uri#0",
+      "via": null
     }
   ],
   "bindings": [
@@ -13171,6 +13333,14 @@
         "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.drop()",
         "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.remove(String)",
         "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.send(HttpMethod,String)"
+      ]
+    },
+    {
+      "name": "src/main/kotlin/example/jvm#7",
+      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()",
+        "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.make()"
       ]
     },
     {
@@ -18601,6 +18771,95 @@
             "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.get()",
             "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.get()"
           ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()",
+      "kind": "export",
+      "label": "example.jvm.Shadowing.hidden()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.make()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()::(call_expression).uri#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()::client.get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan.get()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.get()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.get()",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.get()"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()",
+      "kind": "export",
+      "label": "example.jvm.Typed.typed()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.make()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()::(call_expression).uri#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
+            "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()::(call_expression).uri#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/persons/typed"
         }
       ]
     },

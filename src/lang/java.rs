@@ -201,7 +201,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
         depth: 0,
         generics: Rc::new(Vec::new()),
     }];
-    let mut fields = BTreeSet::new();
+    // The fields by declaring scope: a local is hidden by those of its class or an enclosing one.
+    let mut fields: BTreeSet<(String, String)> = BTreeSet::new();
     let mut locals = Vec::new();
     // The types declared so far: a local whose scope is one sits in an initializer.
     let mut classes = BTreeSet::new();
@@ -652,7 +653,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         }
                         _ => Class::Unknown,
                     };
-                    fields.insert(text(name, src).to_string());
+                    fields.insert((scope.as_ref().clone(), text(name, src).to_string()));
                     if definitions {
                         let is_static = modifiers(node).contains(&"static");
                         for annotation in annotations(node, src, &scope) {
@@ -742,7 +743,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         if let Class::Result(n) = local.class {
             local.class = call_at(&results[n]).map_or(Class::Unknown, Class::Result);
         }
-        if fields.contains(&local.name) {
+        if (fields.iter()).any(|(at, name)| *name == local.name && encloses(at, &local.scope)) {
             local.class = Class::Unknown;
         }
         facts.receivers.push(local);
@@ -1254,6 +1255,14 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
         }
         _ => Value::Unknown,
     }
+}
+
+/// Whether the class scope `class` is `scope` or encloses it.
+fn encloses(class: &str, scope: &str) -> bool {
+    scope == class
+        || scope
+            .strip_prefix(class)
+            .is_some_and(|rest| rest.starts_with('.'))
 }
 
 #[cfg(test)]
