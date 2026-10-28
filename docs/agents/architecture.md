@@ -1971,13 +1971,16 @@ one for the area a change touches.
   an opaque one as `null`), the `flexible` table (spec #27, #106: each function that takes more
   than one count of arguments, a default parameter or a vararg, by file and qualified name with
   its parameter types, with the least and the most count, `resolve::Flexible`), the `entry_points` table (spec #31:
-  each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
-  each community's name and member identities (`communities`, spec #31). `Call::args`,
+  each entry point's identity, kind, label and start symbol, rewritten with the contracts),
+  each community's name and member identities (`communities`, spec #31), and the paths of the
+  files whose values the last contract extraction read (`valued`, #391). `Call::args`,
   `Call::kwargs`, `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::return_values`, `Def::type_params`, `Param::default`,
   `Field::default`, `Const::value` and `Const::ty` are `serde(skip)`, so unchanged files come
   back from SQLite without them. An `interface` or `type` declaration is a `Const` too, so its
   name is stored (its members are not). `Code` records every file it needs but lacks as a miss, and
-  `refresh` re-parses those and extracts again until none is missed. A contract kind that reads a
+  every file of `full` it looks into (`Code::read`); `refresh` re-parses the files the last
+  extraction read (`valued`) before its first pass, then the missed ones, and extracts again the
+  packs that missed until none does. A contract kind that reads a
   value from a new place relies on this loop.
 - Links are never stored. They derive from the stored provider and consumer contracts, then the
   decisions replay, when a query runs, so a change on either side, or to a decisions file, needs
