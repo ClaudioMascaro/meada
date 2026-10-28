@@ -8,6 +8,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A static import of a class whose own base is looked up through it (a C# `using static N.A;`
+  beside `class A : Inner`, as in efcore; Java's `import static p.A.*;` the same way) no longer
+  overflows the stack of the indexer: the base is opaque unless another import names it, and
+  the depth limits bound the whole walk past every import.
 - A C# `internal` type (one with no access modifier too) links from its own project's files
   alone: a file of another project of the repository gets no link to it, and the name binds to
   the type that file sees (a public one of the same name, or one a `using` brings even from a
