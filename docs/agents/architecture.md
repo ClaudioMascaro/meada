@@ -1616,7 +1616,8 @@ one for the area a change touches.
   and every file the pack parsed, and which answers five things from one build (Rust's crate
   `Tree`, so the manifests are parsed and the module trees walked once): `Layout::members` (the
   files it builds; the rest keep their facts in `files` with an empty `resolved` and no rows,
-  and leave the export), `Layout::modules` (by default the pack's `modules`), `Layout::published`
+  and leave the export), `Layout::modules` (by default the pack's `modules`; it answers with a shared
+  list, `Rc<[String]>`, so a lookup costs the same whatever the namespace holds), `Layout::published`
   and `Layout::programs` (both below), and `Layout::reaches` (default: none, every file), the
   files a name match may reach from a caller (`Resolver::reaching`, called by `refresh`):
   Rust's are its crate's and those of the repository's libraries it depends on. A language whose

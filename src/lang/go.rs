@@ -97,7 +97,9 @@ impl LanguagePack for Go {
             modules: Box::new(move |from, specifier| {
                 (modules.dir(dir(from), specifier))
                     .and_then(|d| importable.get(&d))
-                    .map_or_else(Vec::new, |first| vec![first.clone()])
+                    .into_iter()
+                    .cloned()
+                    .collect()
             }),
             published: None,
             programs: Vec::new(),

@@ -3385,16 +3385,21 @@ impl<'a> Resolver<'a> {
         name: &'a Imported,
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
+        match name {
+            Imported::Path(target) => return self.alias(path, scope, target, seen),
+            Imported::Glob { .. } => return Binding::Unknown,
+            _ => {}
+        }
         let found = match (name, self.module(path, source)) {
-            (Imported::Path(target), _) => return self.alias(path, scope, target, seen),
-            (Imported::Glob { .. }, _) => return Binding::Unknown,
             (_, None) => Binding::External(source, name),
             (Imported::Namespace, Some(module)) => Binding::Module(module),
             (Imported::Qualified, Some(module)) => self.export(module, source, seen),
             (Imported::Name(name) | Imported::Member { name, .. }, Some(module)) => {
                 self.export(module, name, seen)
             }
-            (Imported::All, Some(_)) => Binding::Unknown,
+            (Imported::All | Imported::Path(_) | Imported::Glob { .. }, Some(_)) => {
+                Binding::Unknown
+            }
         };
         if let Imported::Member { module, .. } = name
             && matches!(found, Binding::Unknown | Binding::External(..))
@@ -7847,7 +7852,7 @@ mod tests {
         for reverse in [false, true] {
             let facts = Python.parse("a.py", chain(n, reverse).as_bytes()).unwrap();
             let files = BTreeMap::from([("a.py", &facts)]);
-            let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+            let resolver = Resolver::new(&files, Box::new(|_, _| std::rc::Rc::default()), &Python);
             let exact = |class: usize| {
                 let scope = format!("C{class}.go");
                 let call = facts.calls.iter().find(|c| c.scope == scope).unwrap();
@@ -7874,11 +7879,11 @@ mod tests {
     fn resolver<'a>(files: &'a BTreeMap<&'a str, &'a Facts>) -> Resolver<'a> {
         use crate::lang::rust::Rust;
         let modules: Modules = Box::new(|from, specifier| match (specifier, from) {
-            ("crate", _) => vec!["main.rs".into()],
-            ("self", from) => vec![from.into()],
-            ("super", "c.rs") => vec!["b.rs".into()],
-            ("super", "b.rs") => vec!["a.rs".into()],
-            ("super", _) => vec!["main.rs".into()],
+            ("crate", _) => ["main.rs".into()].into(),
+            ("self", from) => [from.into()].into(),
+            ("super", "c.rs") => ["b.rs".into()].into(),
+            ("super", "b.rs") => ["a.rs".into()].into(),
+            ("super", _) => ["main.rs".into()].into(),
             (s, _) => (s.strip_prefix("mod ").into_iter())
                 .map(|m| format!("{m}.rs"))
                 .collect(),
@@ -8129,7 +8134,7 @@ mod tests {
             );
             let facts = Python.parse("a.py", src.as_bytes()).unwrap();
             let files = BTreeMap::from([("a.py", &facts)]);
-            let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+            let resolver = Resolver::new(&files, Box::new(|_, _| std::rc::Rc::default()), &Python);
             let call = facts.calls.iter().find(|c| c.callee == "x0.m").unwrap();
             matches!(resolver.call("a.py", call), Resolution::Exact(t) if t.name == "K.C.m")
         };
@@ -8164,7 +8169,7 @@ mod tests {
             };
             let facts = Python.parse("a.py", src.as_bytes()).unwrap();
             let files = BTreeMap::from([("a.py", &facts)]);
-            let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+            let resolver = Resolver::new(&files, Box::new(|_, _| std::rc::Rc::default()), &Python);
             let call = facts.calls.iter().find(|c| c.callee == "z.m").unwrap();
             let found = resolver.call("a.py", call);
             assert!(
@@ -8199,7 +8204,7 @@ mod tests {
             };
             let facts = Python.parse("a.py", src.as_bytes()).unwrap();
             let files = BTreeMap::from([("a.py", &facts)]);
-            let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+            let resolver = Resolver::new(&files, Box::new(|_, _| std::rc::Rc::default()), &Python);
             for callee in ["k.m", "z.m"] {
                 let call = facts.calls.iter().find(|c| c.callee == callee).unwrap();
                 let found = resolver.call("a.py", call);
@@ -9316,7 +9321,7 @@ mod tests {
     fn pack_calls(pack: &dyn LanguagePack, path: &str, src: &str) -> BTreeMap<String, String> {
         let facts = pack.parse(path, src.as_bytes()).unwrap();
         let files = BTreeMap::from([(path, &facts)]);
-        let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), pack);
+        let resolver = Resolver::new(&files, Box::new(|_, _| std::rc::Rc::default()), pack);
         let mut out = BTreeMap::new();
         for call in &facts.calls {
             let found = match resolver.call(path, call) {
@@ -9637,7 +9642,7 @@ mod tests {
                    class C(B, A):\n    def go(self): self.f()\n";
         let facts = Python.parse("a.py", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("a.py", &facts)]);
-        let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+        let resolver = Resolver::new(&files, Box::new(|_, _| std::rc::Rc::default()), &Python);
         let call = facts.calls.iter().find(|c| c.scope == "C.go").unwrap();
         assert!(matches!(resolver.call("a.py", call), Resolution::Exact(t) if t.name == "B.f"));
     }
@@ -9724,6 +9729,41 @@ mod csharp_tests {
             layout.shared,
             &CSharp,
         ))
+    }
+
+    /// How long the 40000 unbound calls of a file that imports `P` take when `P` holds `files`
+    /// files: the fastest of three passes, against a loaded runner.
+    fn unbound_calls_against(files: usize) -> std::time::Duration {
+        let calls: String = (0..40_000).map(|i| format!("Missing{i}();\n")).collect();
+        let app = format!("using P;\nnamespace Q;\nclass C {{ void F() {{\n{calls}}} }}\n");
+        let mut sources: Vec<(String, String)> = (0..files)
+            .map(|i| {
+                let source = format!("namespace P;\npublic class T{i} {{}}\n");
+                (format!("P/T{i}.cs"), source)
+            })
+            .collect();
+        sources.push(("App/C.cs".into(), app));
+        let sources: Vec<(&str, &str)> = sources.iter().map(|(p, s)| (&**p, &**s)).collect();
+        with_resolver(&sources, &[("App/App.csproj", PROJECT)], |resolver| {
+            let facts = resolver.files["App/C.cs"];
+            let pass = || {
+                let start = std::time::Instant::now();
+                for call in &facts.calls {
+                    let found = resolver.call("App/C.cs", call);
+                    assert!(matches!(found, Resolution::Unresolved));
+                }
+                start.elapsed()
+            };
+            (0..3).map(|_| pass()).min().unwrap()
+        })
+    }
+
+    #[test]
+    fn unbound_calls_cost_the_same_whatever_the_namespaces_they_import_hold() {
+        let (one, fifty) = (unbound_calls_against(1), unbound_calls_against(50));
+        // Each lookup copied the namespace's file list, 0.17 us per call and file: 50 files
+        // took 1.4 times as long as one.
+        assert!(fifty < one * 6 / 5, "{one:?} {fifty:?}");
     }
 
     /// `resolved` over the project files `configs`.

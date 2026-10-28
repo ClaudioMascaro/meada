@@ -148,6 +148,10 @@ impl LanguagePack for CSharp {
                     .push(path.to_string());
             }
         }
+        let others: BTreeMap<String, Rc<[String]>> = others
+            .into_iter()
+            .map(|(ns, paths)| (ns, paths.into()))
+            .collect();
         let modules = layout.modules;
         Ok(Layout {
             modules: Box::new(move |from, name| match modules(from, name) {

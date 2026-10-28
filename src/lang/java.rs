@@ -139,13 +139,14 @@ impl LanguagePack for Java {
         // A package keeps its files against a top-level declaration of its name (`fun util()`
         // beside package `util`), whose import then binds nothing; a type wins over both, as
         // before (Java forbids a type and a package of one name).
-        let modules: BTreeMap<String, Vec<String>> = (tops.into_iter())
+        let modules: BTreeMap<String, Rc<[String]>> = (tops.into_iter())
             .chain(
                 packages
                     .iter()
                     .map(|(name, paths)| (name.clone(), paths.clone())),
             )
             .chain(types)
+            .map(|(name, paths)| (name, paths.into()))
             .collect();
         Ok(Layout {
             members: None,
