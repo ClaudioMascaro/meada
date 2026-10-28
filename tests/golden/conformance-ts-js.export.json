@@ -6,6 +6,10 @@
       "hash": "57087710dfb0c68c27e6af8fbd3a2235048a986fb6ab8a8c8527e0880f22a3f6"
     },
     {
+      "path": "src/assigned.js",
+      "hash": "aab76c2152cc0bd5ce3985d35957c373e9ef70dbe9701f8ed83808b68b450d91"
+    },
+    {
       "path": "src/legacy.cjs",
       "hash": "96061baec6b851852f232dad574d63195738d55c10b8e27b07ffaf7e4d7a0ee5"
     },
@@ -63,7 +67,7 @@
     },
     {
       "path": "src/shadow.ts",
-      "hash": "4189eb78482f9feafe4bb8732c1e27b66e88e17a37a136347ff1673fe29c828e"
+      "hash": "a10675999fa967795919e3a1b8b96029715054da9c598fef159efd1d33041ecc"
     },
     {
       "path": "src/shapes/circle.ts",
@@ -76,6 +80,10 @@
     {
       "path": "src/shapes/shape.ts",
       "hash": "4024a22b0752890a565e1ecabcaac372c0c5bd6ff77de60ca3345e52870f6250"
+    },
+    {
+      "path": "src/single.js",
+      "hash": "4326321833147b7b54571b6cbbc2fd87c8fd5c7583a92cbe7dc6bcb3ed99a43e"
     },
     {
       "path": "src/util/format.mjs",
@@ -105,6 +113,102 @@
         "path": "src/app.ts",
         "start": 249,
         "end": 509
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::V",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 146,
+        "end": 161
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::V.proto",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 162,
+        "end": 201
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::app.use",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 217,
+        "end": 246
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::caller",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 329,
+        "end": 422
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::decl",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 0,
+        "end": 18
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::expA",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 72,
+        "end": 101
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::expB",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 103,
+        "end": 144
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::hidden",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 423,
+        "end": 471
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::letArrow",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 23,
+        "end": 42
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::o.litM",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 260,
+        "end": 269
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::o.litP",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 271,
+        "end": 291
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::varFn",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 48,
+        "end": 70
       }
     },
     {
@@ -356,6 +460,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::bus.publish",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 1113,
+        "end": 1163
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/nats.ts::notPublished",
       "span": {
         "path": "src/messages/nats.ts",
@@ -473,6 +585,14 @@
         "path": "src/messages/produce.ts",
         "start": 996,
         "end": 1046
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::transport.send",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1145,
+        "end": 1203
       }
     },
     {
@@ -727,88 +847,88 @@
       "id": "example.com/acme/conformance::src/shadow.ts::again",
       "span": {
         "path": "src/shadow.ts",
-        "start": 1066,
-        "end": 1183
+        "start": 1216,
+        "end": 1333
       }
     },
     {
       "id": "example.com/acme/conformance::src/shadow.ts::caught",
       "span": {
         "path": "src/shadow.ts",
-        "start": 257,
-        "end": 357
+        "start": 367,
+        "end": 467
       }
     },
     {
       "id": "example.com/acme/conformance::src/shadow.ts::helper",
       "span": {
         "path": "src/shadow.ts",
-        "start": 151,
-        "end": 192
+        "start": 261,
+        "end": 302
       }
     },
     {
       "id": "example.com/acme/conformance::src/shadow.ts::hoisted",
       "span": {
         "path": "src/shadow.ts",
-        "start": 539,
-        "end": 603
+        "start": 669,
+        "end": 753
       }
     },
     {
       "id": "example.com/acme/conformance::src/shadow.ts::listed",
       "span": {
         "path": "src/shadow.ts",
-        "start": 808,
-        "end": 874
+        "start": 958,
+        "end": 1024
       }
     },
     {
       "id": "example.com/acme/conformance::src/shadow.ts::looped",
       "span": {
         "path": "src/shadow.ts",
-        "start": 366,
-        "end": 457
+        "start": 476,
+        "end": 567
       }
     },
     {
       "id": "example.com/acme/conformance::src/shadow.ts::nested",
       "span": {
         "path": "src/shadow.ts",
-        "start": 712,
-        "end": 799
+        "start": 862,
+        "end": 949
       }
     },
     {
       "id": "example.com/acme/conformance::src/shadow.ts::plain",
       "span": {
         "path": "src/shadow.ts",
-        "start": 201,
-        "end": 248
+        "start": 311,
+        "end": 358
       }
     },
     {
       "id": "example.com/acme/conformance::src/shadow.ts::rebound",
       "span": {
         "path": "src/shadow.ts",
-        "start": 466,
-        "end": 530
+        "start": 576,
+        "end": 660
       }
     },
     {
       "id": "example.com/acme/conformance::src/shadow.ts::twice",
       "span": {
         "path": "src/shadow.ts",
-        "start": 956,
-        "end": 1057
+        "start": 1106,
+        "end": 1207
       }
     },
     {
       "id": "example.com/acme/conformance::src/shadow.ts::unparenthesized",
       "span": {
         "path": "src/shadow.ts",
-        "start": 612,
-        "end": 703
+        "start": 762,
+        "end": 853
       }
     },
     {
@@ -865,6 +985,14 @@
         "path": "src/shapes/shape.ts",
         "start": 23,
         "end": 73
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/single.js::default",
+      "span": {
+        "path": "src/single.js",
+        "start": 0,
+        "end": 34
       }
     },
     {
@@ -1061,6 +1189,116 @@
         "path": "src/app.ts",
         "start": 368,
         "end": 382
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::caller::(new_expression).proto#0",
+      "caller": "example.com/acme/conformance::src/assigned.js::caller",
+      "target": "example.com/acme/conformance::src/assigned.js::V.proto",
+      "level": "inferred",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 378,
+        "end": 393
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::caller::V#0",
+      "caller": "example.com/acme/conformance::src/assigned.js::caller",
+      "target": "example.com/acme/conformance::src/assigned.js::V",
+      "level": "exact",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 378,
+        "end": 385
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::caller::app.use#0",
+      "caller": "example.com/acme/conformance::src/assigned.js::caller",
+      "target": "example.com/acme/conformance::src/assigned.js::app.use",
+      "level": "exact",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 357,
+        "end": 366
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::caller::decl#0",
+      "caller": "example.com/acme/conformance::src/assigned.js::caller",
+      "target": "example.com/acme/conformance::src/assigned.js::decl",
+      "level": "exact",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 349,
+        "end": 355
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::caller::f#0",
+      "caller": "example.com/acme/conformance::src/assigned.js::caller",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/assigned.js",
+        "start": 416,
+        "end": 419
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::caller::letArrow#0",
+      "caller": "example.com/acme/conformance::src/assigned.js::caller",
+      "target": "example.com/acme/conformance::src/assigned.js::letArrow",
+      "level": "exact",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 404,
+        "end": 414
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::caller::o.litM#0",
+      "caller": "example.com/acme/conformance::src/assigned.js::caller",
+      "target": "example.com/acme/conformance::src/assigned.js::o.litM",
+      "level": "exact",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 368,
+        "end": 376
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::caller::varFn#0",
+      "caller": "example.com/acme/conformance::src/assigned.js::caller",
+      "target": "example.com/acme/conformance::src/assigned.js::varFn",
+      "level": "exact",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 395,
+        "end": 402
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::hidden::app.use#0",
+      "caller": "example.com/acme/conformance::src/assigned.js::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/assigned.js",
+        "start": 449,
+        "end": 458
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::hidden::o.litM#0",
+      "caller": "example.com/acme/conformance::src/assigned.js::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/assigned.js",
+        "start": 460,
+        "end": 468
       }
     },
     {
@@ -1682,8 +1920,8 @@
     {
       "id": "example.com/acme/conformance::src/messages/nats.ts::notPublished::bus.publish#0",
       "caller": "example.com/acme/conformance::src/messages/nats.ts::notPublished",
-      "target": null,
-      "level": null,
+      "target": "example.com/acme/conformance::src/messages/nats.ts::bus.publish",
+      "level": "exact",
       "span": {
         "path": "src/messages/nats.ts",
         "start": 1236,
@@ -1869,8 +2107,8 @@
     {
       "id": "example.com/acme/conformance::src/messages/produce.ts::notProduced::transport.send#0",
       "caller": "example.com/acme/conformance::src/messages/produce.ts::notProduced",
-      "target": null,
-      "level": null,
+      "target": "example.com/acme/conformance::src/messages/produce.ts::transport.send",
+      "level": "exact",
       "span": {
         "path": "src/messages/produce.ts",
         "start": 1321,
@@ -2533,8 +2771,8 @@
       "level": null,
       "span": {
         "path": "src/shadow.ts",
-        "start": 1127,
-        "end": 1141
+        "start": 1277,
+        "end": 1291
       }
     },
     {
@@ -2544,8 +2782,8 @@
       "level": "inferred",
       "span": {
         "path": "src/shadow.ts",
-        "start": 1168,
-        "end": 1176
+        "start": 1318,
+        "end": 1326
       }
     },
     {
@@ -2555,8 +2793,8 @@
       "level": null,
       "span": {
         "path": "src/shadow.ts",
-        "start": 301,
-        "end": 315
+        "start": 411,
+        "end": 425
       }
     },
     {
@@ -2566,8 +2804,8 @@
       "level": "inferred",
       "span": {
         "path": "src/shadow.ts",
-        "start": 342,
-        "end": 350
+        "start": 452,
+        "end": 460
       }
     },
     {
@@ -2577,8 +2815,8 @@
       "level": "inferred",
       "span": {
         "path": "src/shadow.ts",
-        "start": 592,
-        "end": 600
+        "start": 742,
+        "end": 750
       }
     },
     {
@@ -2588,8 +2826,8 @@
       "level": "inferred",
       "span": {
         "path": "src/shadow.ts",
-        "start": 863,
-        "end": 871
+        "start": 1013,
+        "end": 1021
       }
     },
     {
@@ -2599,8 +2837,8 @@
       "level": "inferred",
       "span": {
         "path": "src/shadow.ts",
-        "start": 446,
-        "end": 454
+        "start": 556,
+        "end": 564
       }
     },
     {
@@ -2610,8 +2848,8 @@
       "level": "inferred",
       "span": {
         "path": "src/shadow.ts",
-        "start": 788,
-        "end": 796
+        "start": 938,
+        "end": 946
       }
     },
     {
@@ -2621,8 +2859,8 @@
       "level": "exact",
       "span": {
         "path": "src/shadow.ts",
-        "start": 237,
-        "end": 245
+        "start": 347,
+        "end": 355
       }
     },
     {
@@ -2632,8 +2870,8 @@
       "level": "inferred",
       "span": {
         "path": "src/shadow.ts",
-        "start": 519,
-        "end": 527
+        "start": 649,
+        "end": 657
       }
     },
     {
@@ -2643,8 +2881,8 @@
       "level": "inferred",
       "span": {
         "path": "src/shadow.ts",
-        "start": 1046,
-        "end": 1054
+        "start": 1196,
+        "end": 1204
       }
     },
     {
@@ -2654,8 +2892,8 @@
       "level": "inferred",
       "span": {
         "path": "src/shadow.ts",
-        "start": 678,
-        "end": 686
+        "start": 828,
+        "end": 836
       }
     },
     {
@@ -3055,12 +3293,29 @@
         "example.com/acme/conformance::src/math.ts::square",
         "example.com/acme/conformance::src/shapes/circle.ts::Circle.area",
         "example.com/acme/conformance::src/shapes/shape.ts::Shape",
+        "example.com/acme/conformance::src/shapes/shape.ts::Shape.area",
+        "example.com/acme/conformance::src/shapes/shape.ts::Shape.describe",
         "example.com/acme/conformance::src/shapes/shape.ts::Shape.unit",
-        "example.com/acme/conformance::src/util/log.js::default"
+        "example.com/acme/conformance::src/util/format.mjs::format",
+        "example.com/acme/conformance::src/util/log.js::default",
+        "example.com/acme/conformance::src/view.tsx::render"
       ]
     },
     {
       "name": "src#2",
+      "members": [
+        "example.com/acme/conformance::src/assigned.js::V",
+        "example.com/acme/conformance::src/assigned.js::V.proto",
+        "example.com/acme/conformance::src/assigned.js::app.use",
+        "example.com/acme/conformance::src/assigned.js::caller",
+        "example.com/acme/conformance::src/assigned.js::decl",
+        "example.com/acme/conformance::src/assigned.js::letArrow",
+        "example.com/acme/conformance::src/assigned.js::o.litM",
+        "example.com/acme/conformance::src/assigned.js::varFn"
+      ]
+    },
+    {
+      "name": "src#3",
       "members": [
         "example.com/acme/conformance::src/shadow.ts::again",
         "example.com/acme/conformance::src/shadow.ts::caught",
@@ -3076,13 +3331,6 @@
       ]
     },
     {
-      "name": "src#3",
-      "members": [
-        "example.com/acme/conformance::src/util/format.mjs::format",
-        "example.com/acme/conformance::src/view.tsx::render"
-      ]
-    },
-    {
       "name": "src/messages",
       "members": [
         "example.com/acme/conformance::src/messages/bullmq.ts::enqueue",
@@ -3092,26 +3340,40 @@
     {
       "name": "src/messages#10",
       "members": [
+        "example.com/acme/conformance::src/messages/queues.ts::enqueueReports",
+        "example.com/acme/conformance::src/messages/queues.ts::queue"
+      ]
+    },
+    {
+      "name": "src/messages#11",
+      "members": [
+        "example.com/acme/conformance::src/messages/queues.ts::record",
+        "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks"
+      ]
+    },
+    {
+      "name": "src/messages#12",
+      "members": [
         "example.com/acme/conformance::src/messages/redis.ts::append",
         "example.com/acme/conformance::src/messages/redis.ts::appendBilling"
       ]
     },
     {
-      "name": "src/messages#11",
+      "name": "src/messages#13",
       "members": [
         "example.com/acme/conformance::src/messages/redis.ts::read",
         "example.com/acme/conformance::src/messages/redis.ts::readBilling"
       ]
     },
     {
-      "name": "src/messages#12",
+      "name": "src/messages#14",
       "members": [
         "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail",
         "example.com/acme/conformance::src/messages/sqs.ts::record"
       ]
     },
     {
-      "name": "src/messages#13",
+      "name": "src/messages#15",
       "members": [
         "example.com/acme/conformance::src/messages/sqs.ts::enqueue",
         "example.com/acme/conformance::src/messages/sqs.ts::enqueueBilling"
@@ -3142,12 +3404,19 @@
     {
       "name": "src/messages#5",
       "members": [
+        "example.com/acme/conformance::src/messages/nats.ts::bus.publish",
+        "example.com/acme/conformance::src/messages/nats.ts::notPublished"
+      ]
+    },
+    {
+      "name": "src/messages#6",
+      "members": [
         "example.com/acme/conformance::src/messages/nats.ts::record",
         "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>"
       ]
     },
     {
-      "name": "src/messages#6",
+      "name": "src/messages#7",
       "members": [
         "example.com/acme/conformance::src/messages/produce.ts::deliver",
         "example.com/acme/conformance::src/messages/produce.ts::emit",
@@ -3155,31 +3424,17 @@
       ]
     },
     {
-      "name": "src/messages#7",
-      "members": [
-        "example.com/acme/conformance::src/messages/produce.ts::relay",
-        "example.com/acme/conformance::src/messages/produce.ts::retry"
-      ]
-    },
-    {
       "name": "src/messages#8",
       "members": [
-        "example.com/acme/conformance::src/messages/queues.ts::enqueueReports",
-        "example.com/acme/conformance::src/messages/queues.ts::queue"
+        "example.com/acme/conformance::src/messages/produce.ts::notProduced",
+        "example.com/acme/conformance::src/messages/produce.ts::transport.send"
       ]
     },
     {
       "name": "src/messages#9",
       "members": [
-        "example.com/acme/conformance::src/messages/queues.ts::record",
-        "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks"
-      ]
-    },
-    {
-      "name": "src/shapes",
-      "members": [
-        "example.com/acme/conformance::src/shapes/shape.ts::Shape.area",
-        "example.com/acme/conformance::src/shapes/shape.ts::Shape.describe"
+        "example.com/acme/conformance::src/messages/produce.ts::relay",
+        "example.com/acme/conformance::src/messages/produce.ts::retry"
       ]
     }
   ],
@@ -3566,6 +3821,34 @@
             "example.com/acme/conformance::src/view.tsx::render",
             "example.com/acme/conformance::src/widget.jsx::render"
           ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/assigned.js::expA",
+      "kind": "export",
+      "label": "expA",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/assigned.js::expA"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/assigned.js::expB",
+      "kind": "export",
+      "label": "expB",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/assigned.js::expB"
         }
       ]
     },
@@ -4073,6 +4356,13 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/messages/nats.ts::notPublished"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::bus.publish"
         }
       ]
     },
@@ -4274,6 +4564,13 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/messages/produce.ts::notProduced"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/produce.ts::transport.send"
         }
       ]
     },
@@ -5119,6 +5416,20 @@
           "level": "inferred",
           "via": "call",
           "node": "example.com/acme/conformance::src/shadow.ts::helper"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/single.js::default",
+      "kind": "export",
+      "label": "default",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/single.js::default"
         }
       ]
     }

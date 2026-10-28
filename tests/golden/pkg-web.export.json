@@ -76,6 +76,14 @@
       }
     },
     {
+      "id": "example.com/pkg/web::src/app.ts::shadowed.slugify",
+      "span": {
+        "path": "src/app.ts",
+        "start": 1160,
+        "end": 1186
+      }
+    },
+    {
       "id": "example.com/pkg/web::src/app.ts::welcome",
       "span": {
         "path": "src/app.ts",
@@ -301,8 +309,8 @@
     {
       "id": "example.com/pkg/web::src/app.ts::shadowed::slugify#0",
       "caller": "example.com/pkg/web::src/app.ts::shadowed",
-      "target": null,
-      "level": null,
+      "target": "example.com/pkg/web::src/app.ts::shadowed.slugify",
+      "level": "exact",
       "span": {
         "path": "src/app.ts",
         "start": 1190,
@@ -875,6 +883,13 @@
       "members": [
         "example.com/pkg/web::src/app.ts::caught",
         "example.com/pkg/web::src/app.ts::welcome"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/pkg/web::src/app.ts::shadowed",
+        "example.com/pkg/web::src/app.ts::shadowed.slugify"
       ]
     }
   ],

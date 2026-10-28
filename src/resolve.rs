@@ -323,6 +323,8 @@ pub struct Resolver<'a> {
     arities: HashMap<Target<'a>, Arity<'a>>,
     statics: HashSet<Target<'a>>,
     members_in_scope: bool,
+    /// The pack's `LanguagePack::assigned_members`.
+    assigned_members: bool,
     guesses_constructs: bool,
     unordered_globs: bool,
     qualified_types: bool,
@@ -900,6 +902,7 @@ impl<'a> Resolver<'a> {
             arities,
             statics,
             members_in_scope: language.members_in_scope(),
+            assigned_members: language.assigned_members(),
             guesses_constructs: language.guesses_constructs(),
             unordered_globs: language.unordered_globs(),
             qualified_types: language.qualified_types(),
@@ -1887,6 +1890,11 @@ impl<'a> Resolver<'a> {
             let found = self.base_member(path, scope, first, work);
             return self.walk(found, rest, seen, work, reading);
         }
+        if self.assigned_members
+            && let Some(found) = self.assigned(path, scope, callee)
+        {
+            return self.in_unit(path, self.accessible(path, found));
+        }
         let lexical = |seen: &mut Seen<'a>| {
             let (head, members) = callee.split_once('.').unwrap_or((callee, ""));
             // The head of a member chain is read, not called.
@@ -1930,6 +1938,31 @@ impl<'a> Resolver<'a> {
         }
         let found = self.walk(binding, members, seen, work, reading);
         self.in_unit(path, self.accessible(path, found))
+    }
+
+    /// The definition the whole of `callee` names from `scope` (`LanguagePack::assigned_members`),
+    /// innermost scope first. A local, constant or parameter of the head in a scope between hides
+    /// the definitions outside it.
+    fn assigned(&self, path: &'a str, scope: &str, callee: &str) -> Option<Binding<'a>> {
+        let head = callee.split_once('.')?.0;
+        let mut s = scope;
+        loop {
+            let candidate = crate::qualify(s, callee);
+            if let Some((name, def)) = self.defs[path].get_key_value(candidate.as_str())
+                && def.kind != Kind::Method
+            {
+                return Some(Binding::Def(Target { path, name }));
+            }
+            let held = crate::qualify(s, head);
+            if s.is_empty()
+                || self.locals[path].contains(held.as_str())
+                || self.consts[path].contains(held.as_str())
+                || self.params[path].contains_key(&(s, head))
+            {
+                return None;
+            }
+            s = crate::parent(s);
+        }
     }
 
     /// `binding`'s dotted `members`, each looked up in what the one before gives (`member` for

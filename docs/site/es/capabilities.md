@@ -17,6 +17,10 @@ El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [rete
 | C# | `.cs`, agrupados en proyectos por los `.csproj` de estilo SDK y resueltos por sus `namespace` |
 | Swift | `.swift` (salvo `Package.swift` y `Package@swift-<versión>.swift`), agrupados en módulos por los targets de `Package.swift` |
 
+### TypeScript y JavaScript
+
+Meada lee funciones, clases y métodos, bindings `const`, `let` y `var` de una función o clase, y `export default`. En JavaScript también lee funciones definidas por asignación en el nivel superior del archivo: `obj.y = function () {}` define `obj.y`, `X.prototype.y = function () {}` define el método `X.y`, `exports.y = ...` y `module.exports.y = ...` definen el export `y`, y `module.exports = function () {}` define el export por defecto. Un `let` o `var` solo es una definición si el archivo nunca vuelve a asignar ese nombre. Las funciones y métodos del objeto literal de un `const` de nivel superior definen `o.m`; los objetos de opciones escritos como argumento conservan sus definiciones inline. Una llamada `obj.y()` o `y()` en el mismo archivo alcanza esas definiciones. `require` y `module.exports` no son imports entre archivos, y `new F()` de una función constructora no alcanza los métodos de `F.prototype`.
+
 ### Rust
 
 Cada `Cargo.toml` con `[package]` define un crate, en cualquier carpeta. Meada sigue sus `mod` sin ejecutar el toolchain Rust. Lee funciones, tipos, traits, módulos y métodos de `impl`. Un archivo que ningún `mod` alcanza queda fuera.

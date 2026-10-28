@@ -5655,6 +5655,18 @@ fn typescript_and_javascript() {
         "conformance-ts-js",
         &[
             "src/app.ts::main",
+            "src/assigned.js::V",
+            "src/assigned.js::V.proto",
+            "src/assigned.js::app.use",
+            "src/assigned.js::caller",
+            "src/assigned.js::decl",
+            "src/assigned.js::expA",
+            "src/assigned.js::expB",
+            "src/assigned.js::hidden",
+            "src/assigned.js::letArrow",
+            "src/assigned.js::o.litM",
+            "src/assigned.js::o.litP",
+            "src/assigned.js::varFn",
             "src/legacy.cjs::legacy",
             "src/math.ts::add",
             "src/math.ts::double",
@@ -5698,6 +5710,7 @@ fn typescript_and_javascript() {
             "src/messages/redis.ts::readMany",
             "src/messages/redis.ts::readNamed",
             "src/messages/redis.ts::readNodeRedis",
+            "src/messages/nats.ts::bus.publish",
             "src/messages/nats.ts::notPublished",
             "src/messages/nats.ts::onAudit",
             "src/messages/nats.ts::publishAll",
@@ -5725,6 +5738,7 @@ fn typescript_and_javascript() {
             "src/messages/produce.ts::produceAll",
             "src/messages/produce.ts::relay",
             "src/messages/produce.ts::retry",
+            "src/messages/produce.ts::transport.send",
             "src/messages/queues.ts::enqueue",
             "src/messages/queues.ts::enqueueReports",
             "src/messages/queues.ts::queue",
@@ -5750,6 +5764,7 @@ fn typescript_and_javascript() {
             "src/shapes/shape.ts::Shape.area",
             "src/shapes/shape.ts::Shape.describe",
             "src/shapes/shape.ts::Shape.unit",
+            "src/single.js::default",
             "src/util/format.mjs::format",
             "src/util/log.js::default",
             "src/view.tsx::render",
@@ -5854,6 +5869,32 @@ fn typescript_and_javascript() {
             ),
             // No definition has the name.
             ("src/util/log.js::default::console.log#0", None, &[]),
+            // Functions defined by assignment: a member, `let`, `var`, an object literal's
+            // method and property. `f` is assigned again, so it is no definition.
+            (
+                "src/assigned.js::caller::app.use#0",
+                EXACT,
+                &["src/assigned.js::app.use"],
+            ),
+            (
+                "src/assigned.js::caller::o.litM#0",
+                EXACT,
+                &["src/assigned.js::o.litM"],
+            ),
+            (
+                "src/assigned.js::caller::varFn#0",
+                EXACT,
+                &["src/assigned.js::varFn"],
+            ),
+            (
+                "src/assigned.js::caller::letArrow#0",
+                EXACT,
+                &["src/assigned.js::letArrow"],
+            ),
+            ("src/assigned.js::caller::f#0", None, &[]),
+            // A parameter spelled like the head hides the definition.
+            ("src/assigned.js::hidden::app.use#0", None, &[]),
+            ("src/assigned.js::hidden::o.litM#0", None, &[]),
             // Hidden names: a `catch`, `for ... of`, `let` or `var` binding, an arrow parameter
             // without parentheses, a nested or array parameter pattern, and one spelled like a
             // constant or a parameter of the same function hide the top-level `helper`.
