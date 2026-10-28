@@ -864,9 +864,10 @@ one for the area a change touches.
   `channel::kafka::orders.created` (name kept as evaluated; `channel::kafka` alone for an
   unresolved side). A path parameter of any spelling (`:id`, `[id]`, `{id}`, `<id>`, `<int:id>`)
   is `{}`. A provider of every method is `http::ANY::<path>`.
-- Export JSON: `{repository, files, symbols (each `{id, span, hash}`, the BLAKE3 of the span's bytes), calls, providers, consumers, bindings, documents,
+- Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, documents,
   publishes, packages, dependencies, imports, communities, links, processes}`;
-  `communities` (absent when empty) lists each community as `{name, members}`, by name, with
+  each `symbols` entry is `{id, span, hash}`, `hash` the hex BLAKE3 of the span's exact bytes (`search` kind
+  `duplicate` groups by it); `communities` (absent when empty) lists each community as `{name, members}`, by name, with
   its sorted member identities; `processes` (absent when
   empty) lists the repository's entry points by identity as `{entry_point, kind, label, steps}`,
   `kind` being `route`, `export`, `channel` or `program`, each step `{depth, level, repository, via, node, ...}`: `via`
@@ -1990,7 +1991,8 @@ one for the area a change touches.
   unreadable one, is rebuilt beside it and renamed over it, and `status` says so. One whose stored facts do not
   parse is rebuilt by the first refresh that reads them (when a file changed), which `status`
   cannot tell.
-- The index holds no source text and no values, apart from the argument count, the argument
+- The index holds no source text and no values, apart from the BLAKE3 of each symbol's span
+  (`symbols.hash`, `Def::hash`), the argument count, the argument
   labels and constructor form of an overloaded call (`Call::arity`, `Call::labels`,
   `Call::constructs`), the argument label of a parameter and whether its written type takes a
   trailing closure, or the name it is written as (`Param::label`, `Param::closure`), the names

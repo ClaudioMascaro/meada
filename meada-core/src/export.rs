@@ -115,6 +115,7 @@ pub struct Symbol {
     pub id: String,
     pub span: Span,
     /// The BLAKE3 of the span's exact bytes, in hex.
+    #[serde(default)]
     pub hash: String,
 }
 

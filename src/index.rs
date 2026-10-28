@@ -46,6 +46,8 @@ pub(crate) fn schema_version() -> i32 {
 /// file's resolved symbol and call rows, empty for a file its pack leaves out (`Layout::members`: a
 /// Rust file no `mod` reaches), which has no rows and is no file of the export. `calls.narrowed` is 1 for an
 /// `inferred` call a family or scope narrowed from several definitions of its name.
+/// `symbols.hash` is the BLAKE3 of the exact bytes of the symbol's span, set when its file is
+/// parsed (`lang::hash_spans`, kept in the facts as `Def::hash`): `search` kind `duplicate` groups by it.
 /// `calls.decorates` is the identity of the definition an annotation, attribute or decorator call
 /// decorates, NULL for an ordinary call. `calls.target` holds the one definition an `exact` or
 /// `inferred` call reaches; an `ambiguous` call has no target and lists every definition that

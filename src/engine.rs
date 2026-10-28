@@ -592,13 +592,12 @@ impl Engine {
         self.refresh()?;
         let exports = self.exports()?;
         let needle = query.to_lowercase();
-        let mut groups: HashMap<&str, Vec<(&str, &Symbol, String)>> = HashMap::new();
-        for (export, repo) in exports.iter().zip(&self.workspace.repos) {
-            let mut files = Files::new(&repo.root);
+        // Symbols by hash, as (repository position, symbol); lines are built for the groups
+        // that survive, so a query reads only the files of the answer.
+        let mut groups: HashMap<&str, Vec<(usize, &Symbol)>> = HashMap::new();
+        for (n, export) in exports.iter().enumerate() {
             for symbol in &export.symbols {
-                let line = line(&repo.identity, &mut files, symbol, label(&symbol.id));
-                let group = groups.entry(&symbol.hash).or_default();
-                group.push((&symbol.id, symbol, line));
+                groups.entry(&symbol.hash).or_default().push((n, symbol));
             }
         }
         // ponytail: no folding of nested groups (a duplicated class lists its methods as groups of
@@ -607,8 +606,8 @@ impl Engine {
             .into_values()
             .filter(|g| g.len() > 1)
             .filter(|g| {
-                g.iter().any(|(id, symbol, _)| {
-                    let name = label(id).to_lowercase();
+                g.iter().any(|(_, symbol)| {
+                    let name = label(&symbol.id).to_lowercase();
                     let last = name.rsplit('.').next().unwrap_or(&name);
                     let path = symbol.span.path.to_lowercase();
                     [name.as_str(), last, path.as_str()]
@@ -617,18 +616,28 @@ impl Engine {
                 })
             })
             .collect();
+        // Overloads share an identity, so the position in the file settles ties.
+        let place = |(_, s): &(usize, &Symbol)| (s.id.clone(), s.span.path.clone(), s.span.start);
         for group in &mut groups {
-            group.sort_by(|a, b| a.0.cmp(b.0));
+            group.sort_by_key(place);
         }
-        let length = |g: &Vec<(&str, &Symbol, String)>| g[0].1.span.end - g[0].1.span.start;
-        groups.sort_by(|a, b| length(b).cmp(&length(a)).then_with(|| a[0].0.cmp(b[0].0)));
+        let length = |g: &Vec<(usize, &Symbol)>| g[0].1.span.end - g[0].1.span.start;
+        groups.sort_by(|a, b| {
+            (length(b).cmp(&length(a))).then_with(|| place(&a[0]).cmp(&place(&b[0])))
+        });
         if groups.is_empty() {
             return Ok(format!("no matches for `{query}`\n"));
         }
+        let mut files: Vec<Files> = (self.workspace.repos.iter())
+            .map(|repo| Files::new(&repo.root))
+            .collect();
         let mut lines = Vec::new();
         for group in groups {
             lines.push(format!("{} copies", group.len()));
-            lines.extend(group.into_iter().map(|(.., line)| line));
+            for (n, symbol) in group {
+                let identity = &self.workspace.repos[n].identity;
+                lines.push(line(identity, &mut files[n], symbol, label(&symbol.id)));
+            }
         }
         Ok(render::budgeted(&lines, budget))
     }
