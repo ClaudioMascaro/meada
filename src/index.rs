@@ -16,7 +16,7 @@ use serde::Serialize;
 use crate::Result;
 use crate::community::{self, Community};
 use crate::config::Serve;
-use crate::contract::{self, Level, Link, Names, Role, Site};
+use crate::contract::{self, Found, Level, Link, Names, Role, Site};
 use crate::decisions::Stale;
 use crate::document::{self, Summary};
 use crate::entry::{self, EntryKind, EntryPoint};
@@ -84,7 +84,9 @@ pub(crate) fn schema_version() -> i32 {
 /// `most` counts (`most` NULL for a vararg); rewritten with the contracts, and read to tell which
 /// overloads a call through an import may reach. `entry_points` holds the repository's doors (spec #31, `entry`): the `identity`, the `kind`
 /// (`route`, `export`, `channel` or `program`), the `label` that names its process and the `site` the process starts
-/// from; rewritten with the contracts.
+/// from; rewritten with the contracts. `valued` lists the files whose values (`Facts` as parsed,
+/// which the index does not keep) the last contract extraction read (`resolve::Code::read`): a
+/// refresh parses them again before it extracts, so one pass usually reads all it needs.
 const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -118,6 +120,7 @@ CREATE TABLE families (path TEXT NOT NULL, class TEXT NOT NULL, ancestors TEXT);
 CREATE TABLE flexible (path TEXT NOT NULL, name TEXT NOT NULL, least INTEGER NOT NULL, most INTEGER);
 CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL, site TEXT NOT NULL);
 CREATE TABLE communities (name TEXT NOT NULL, member TEXT NOT NULL);
+CREATE TABLE valued (path TEXT PRIMARY KEY);
 ";
 
 /// A file modified this close to a refresh may change again within the same mtime tick, so
@@ -586,7 +589,8 @@ pub struct Indexed<'a> {
 /// rewritten when the file changed or its rows now differ: that covers importers of a changed
 /// file's exports, re-export chains, name inference, config changes and inline route
 /// handlers renamed by a mount elsewhere alike. Contracts are extracted again for the whole
-/// repository, since constants and client wrappers reach across files. Deleted files leave
+/// repository, since constants and client wrappers reach across files, over the values of the
+/// files the last extraction read (`valued`), parsed again up front. Deleted files leave
 /// the index. The result equals a refresh of an empty index over the same files. Stored facts
 /// that do not parse (a change whose golden was not re-blessed) rebuild the index.
 ///
@@ -609,7 +613,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
                 "DELETE FROM meta; DELETE FROM files; DELETE FROM symbols; \
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
                  DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports; \
-                 DELETE FROM families; DELETE FROM flexible; DELETE FROM entry_points; DELETE FROM communities;",
+                 DELETE FROM families; DELETE FROM flexible; DELETE FROM entry_points; DELETE FROM communities; \
+                 DELETE FROM valued;",
             )?;
             None
         }
@@ -809,38 +814,76 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     };
 
     // Contracts, from every file. Values are not kept in the index, so the files whose
-    // values a kind reads are parsed again, until no kind misses one.
-    // ponytail: every contract is extracted again on any change; track which files each
-    // contract read if this shows up in profiles.
+    // values a kind reads are parsed again: up front those the last extraction read (`valued`),
+    // then those a kind misses, until no kind misses one. A kind only looks files up, so a file
+    // parsed for nothing changes no contract.
+    // ponytail: every contract is extracted again on any change, since a kind reads the whole
+    // pack at once (mounts across files, budgets spent in walk order); narrowing it per file
+    // needs each kind to say what its contracts read (#391).
+    let reparse = |path: &str| -> Result<Facts> {
+        let src = fs::read(root.join(path))?;
+        let pack = packs[path];
+        let mut facts = lang::pack(pack).parse_with(path, &src, &settings[&pack](path))?;
+        if let Some(join) = joins.get(&pack) {
+            join(path, &mut facts);
+        }
+        Ok(facts)
+    };
+    let valued = tx
+        .prepare("SELECT path FROM valued")?
+        .query_map([], |r| r.get::<_, String>(0))?
+        .collect::<rusqlite::Result<BTreeSet<String>>>()?;
     let mut reparsed: BTreeMap<String, Facts> = BTreeMap::new();
+    for path in &valued {
+        if packs.contains_key(path.as_str()) && !changed_paths.contains(path) {
+            reparsed.insert(path.clone(), reparse(path)?);
+        }
+    }
+    // A pack whose extraction missed nothing is done: a later pass only adds files to `full`,
+    // which it did not look into, so it would find the same contracts again.
+    let mut done: BTreeMap<usize, Vec<Found>> = BTreeMap::new();
+    let mut read: BTreeSet<String> = BTreeSet::new();
     let found = loop {
         let full: BTreeMap<&str, &Facts> = changed
             .iter()
             .map(|p| (p.path.as_str(), &p.facts))
             .chain(reparsed.iter().map(|(path, facts)| (path.as_str(), facts)))
             .collect();
-        let mut found = Vec::new();
         let mut misses = Vec::new();
         for (&pack, resolver) in &resolvers {
+            if done.contains_key(&pack) {
+                continue;
+            }
             let code = Code::new(resolver, &full, lang::pack(pack));
+            let mut found = Vec::new();
             for kind in contract::KINDS {
                 found.extend(kind.extract(&code, &indexed));
             }
-            misses.extend(code.misses().into_iter().map(String::from));
+            match code.misses() {
+                missed if missed.is_empty() => {
+                    read.extend(code.read().into_iter().map(String::from));
+                    done.insert(pack, found);
+                }
+                missed => misses.extend(missed.into_iter().map(String::from)),
+            }
         }
         if misses.is_empty() {
-            break found;
+            break done.into_values().flatten().collect::<Vec<_>>();
         }
+        // Two packs may miss the same file.
+        misses.sort();
+        misses.dedup();
         for path in misses {
-            let src = fs::read(root.join(&path))?;
-            let pack = packs[path.as_str()];
-            let mut facts = lang::pack(pack).parse_with(&path, &src, &settings[&pack](&path))?;
-            if let Some(join) = joins.get(&pack) {
-                join(&path, &mut facts);
-            }
+            let facts = reparse(&path)?;
             reparsed.insert(path, facts);
         }
     };
+    if read != valued {
+        tx.execute("DELETE FROM valued", [])?;
+        for path in &read {
+            tx.execute("INSERT INTO valued VALUES (?1)", params![path])?;
+        }
+    }
     let names = Names::new(&found);
 
     // ponytail: every file's calls are resolved again on any change, in memory; only the

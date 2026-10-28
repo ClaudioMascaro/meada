@@ -2306,7 +2306,9 @@ qualification budget does (ADR 0017).
 - `engine.rs`: one connection attaches every peer, so a workspace reads at most 10 peers
   (`MAX_PEERS`, SQLite's attach limit). `search` scans every symbol.
 - `index.rs`: every contract is extracted again and every call resolved again on any change
-  (rows rewritten only when they differ). An unreadable `contracts.fragments` value is read as
+  (rows rewritten only when they differ), and every file whose values the last extraction read
+  (`valued`) is parsed again for it: on this repository, a one-line edit of a Rust file parses
+  about 530 files again (#391). An unreadable `contracts.fragments` value is read as
   no fragments, since only `refresh` writes it. A manifest or pack config file (`package.json`,
   `pyproject.toml`, `requirements*.txt`, `Cargo.toml`, `go.mod`, `tsconfig.json`, `jsconfig.json`) is read up to one
   byte past `lang::MAX_BYTES`, and a provider document up to one byte past

@@ -102,15 +102,17 @@ fn axum_routers<'a>(
 
 /// The axum routers given to what `value`, written in `call`, is made of, when it is not a
 /// router itself: the arguments and receiver of its calls, the values a function of the
-/// repository returns (found by name too), and the values of constants.
+/// repository returns (found by name too), and the values of constants. A value in `seen` was
+/// read by an earlier call of the same extraction, whose routers every caller already took: it
+/// is not read again.
 fn axum_unread<'a>(
     code: &Code<'a>,
     path: &'a str,
     scope: &'a str,
     value: &'a Value,
+    seen: &mut HashSet<*const Value>,
 ) -> BTreeSet<CallAt<'a>> {
     let mut found = BTreeSet::new();
-    let mut seen = HashSet::new();
     let mut work = vec![(path, scope, value)];
     while let Some((path, scope, value)) = work.pop() {
         if !seen.insert(std::ptr::from_ref(value)) {
@@ -186,6 +188,9 @@ pub(super) fn providers(code: &Code) -> Vec<Found> {
     }
     let mut mounts = Mounts::new();
     let mut routes = Vec::new();
+    // Every caller marks the routers `axum_unread` finds as mounted nowhere, so a value one call
+    // read gives the others nothing new.
+    let mut unread_seen = HashSet::new();
     for (&path, facts) in code.files() {
         let mut touched = false;
         for (n, call) in facts.calls.iter().enumerate() {
@@ -237,18 +242,18 @@ pub(super) fn providers(code: &Code) -> Vec<Found> {
                     // A child Meada cannot read is a call it does not follow: the routers
                     // given to it are mounted there, so served nowhere.
                     if children.is_empty() {
-                        for unread in axum_unread(code, path, &call.scope, child) {
+                        for unread in axum_unread(code, path, &call.scope, child, &mut unread_seen)
+                        {
                             mounts.entry(unread).or_default();
                         }
                     }
                 }
                 // A service Meada does not read: the routers given to it are served there.
                 ("route_service" | "fallback_service", args) => {
-                    for unread in args
-                        .iter()
-                        .flat_map(|a| axum_unread(code, path, &call.scope, a))
-                    {
-                        mounts.entry(unread).or_default();
+                    for a in args {
+                        for unread in axum_unread(code, path, &call.scope, a, &mut unread_seen) {
+                            mounts.entry(unread).or_default();
+                        }
                     }
                 }
                 _ => {}
@@ -258,7 +263,7 @@ pub(super) fn providers(code: &Code) -> Vec<Found> {
         // Meada cannot follow it: it is served nowhere.
         if touched {
             for (scope, value) in code.rebound(path) {
-                for unread in axum_unread(code, path, scope, value) {
+                for unread in axum_unread(code, path, scope, value, &mut unread_seen) {
                     mounts.entry(unread).or_default();
                 }
             }

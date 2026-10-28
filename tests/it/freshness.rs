@@ -1863,6 +1863,55 @@ fn a_field_removed_from_a_zod_schema_adds_drift_like_a_cold_chain() {
     assert_eq!(refreshed, exports([&cold, &cold_web]));
 }
 
+/// The catalog's profile route adds `nickname` to the schema it declares in its own file: the
+/// web's consumers of the route, in other files of another repository, read it.
+fn add_a_profile_field(catalog: &Path) {
+    let path = catalog.join("app/api/profiles/route.ts");
+    let src = fs::read_to_string(&path).unwrap();
+    let edited = src.replace(
+        "  name: z.string(),\n",
+        "  name: z.string(),\n  nickname: z.string(),\n",
+    );
+    assert_ne!(src, edited);
+    fs::write(&path, edited).unwrap();
+}
+
+/// A refresh parses again, before it extracts, the files whose values the last extraction read
+/// (#391). Two refreshes in a row, each against a cold chain of the same files: the first edits
+/// a provider file, and the links of its consumers in another repository follow; the second,
+/// starting from what the first one read, edits the schema another file's route returns, and
+/// that route's contract follows.
+#[test]
+fn a_provider_file_then_a_schema_another_file_reads_refresh_like_a_cold_chain() {
+    let exports = |repos: [&Path; 2]| -> Vec<String> {
+        (repos.iter())
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let (web, _, catalog) = drift_chain("fresh_narrowed");
+    age(web.parent().unwrap());
+    let before = exports([&catalog, &web]);
+
+    add_a_profile_field(&catalog);
+    let provider = exports([&catalog, &web]);
+
+    let (cold_web, _, cold) = drift_chain("fresh_narrowed_provider_cold");
+    add_a_profile_field(&cold);
+    assert!(before[1].contains("\"items[].nickname\": \"exact\""));
+    assert!(!provider[1].contains("\"items[].nickname\": \"exact\""));
+    assert_eq!(provider, exports([&cold, &cold_web]));
+
+    drop_a_schema_field(&catalog);
+    let schema = exports([&catalog, &web]);
+
+    let (cold_web, _, cold) = drift_chain("fresh_narrowed_schema_cold");
+    add_a_profile_field(&cold);
+    drop_a_schema_field(&cold);
+    assert!(provider[0].contains("\"title\""));
+    assert_ne!(schema[0], provider[0]);
+    assert_eq!(schema, exports([&cold, &cold_web]));
+}
+
 /// The catalog's shared package drops `price` from its zod schema and `warehouse` from its
 /// constant, which consumers in the web app read; the routes importing them are unchanged.
 fn drop_shared_fields(catalog: &Path) {
