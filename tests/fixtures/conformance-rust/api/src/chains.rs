@@ -22,6 +22,7 @@ impl Plain {
     }
 }
 
+// Makes `route` ambiguous by name, so only the written return type can pick `Router.route`.
 pub struct Other;
 
 impl Other {
@@ -54,4 +55,12 @@ pub fn bound_plain() {
 
 pub async fn awaited() {
     make().await.route("/");
+}
+
+pub fn parenthesized() {
+    (Router::new()).route("/");
+}
+
+pub fn outside() {
+    reqwest::Client::new().route("/");
 }
