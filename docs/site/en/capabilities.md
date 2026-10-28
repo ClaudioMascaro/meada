@@ -9,7 +9,7 @@ Server mode includes the [console](console.md), [snapshots](snapshots.md), [rete
 | Language | Files read |
 | --- | --- |
 | TypeScript and JavaScript | `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs` |
-| Python | `.py` |
+| Python | `.py`; each `pyproject.toml` gives source roots (its directory, its declared roots or `src`) to the files under it |
 | Rust | `.rs` reachable through each crate's module tree |
 | Go | `.go` included by the package's build rules |
 | Java | `.java`, resolved by their `package` declarations |

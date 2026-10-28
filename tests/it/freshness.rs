@@ -2193,3 +2193,37 @@ fn a_nested_tsconfig_binds_its_own_imports_and_an_edit_rebinds_them() {
     assert!(target(&json, "a").0.is_null());
     assert_eq!(target(&json, "b").0, "exact");
 }
+
+const POETRY_FROM_LIB: &str = "[tool.poetry]\npackages = [{ include = \"pkg\", from = \"lib\" }]\n";
+
+#[test]
+fn a_new_nested_pyproject_binds_its_imports_like_a_cold_index() {
+    let level = |export: &str| {
+        let json: serde_json::Value = serde_json::from_str(export).unwrap();
+        let call = (json["calls"].as_array().unwrap().iter())
+            .find(|c| c["id"].as_str().unwrap().ends_with("c/main.py::main::g#0"))
+            .unwrap();
+        call["level"].clone()
+    };
+    let edit = |repo: &Path| {
+        fs::write(repo.join("c/pyproject.toml"), POETRY_FROM_LIB).unwrap();
+    };
+    let repo = fixture_repo("fresh_py_nested", "python-nested-pyproject", ORIGIN);
+    fs::remove_file(repo.join("c/pyproject.toml")).unwrap();
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    assert!(level(&before).is_null());
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_eq!(level(&refreshed), "exact");
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_py_nested_cold",
+            "python-nested-pyproject",
+            ORIGIN,
+            edit
+        )
+    );
+}
