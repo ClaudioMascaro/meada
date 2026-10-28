@@ -1546,7 +1546,7 @@ one for the area a change touches.
   star import takes), `stars_bind` (whether a star import rebinds names in statement order, as
   Python's does, or only re-exports, as an ES `export *` does) and `Param::binds` (which
   argument binds each parameter; `Binds::Optional`, a Kotlin parameter with a default value, and
-  `Binds::Rest` widen the argument counts an overload takes, `Arity` in `Resolver::narrow`). A pack
+  `Binds::Rest` (a Kotlin `vararg`, a Java spread parameter) widen the argument counts an overload takes, `Arity` in `Resolver::narrow`). A pack
   whose files resolve with another pack's says so through `LanguagePack::resolves_with` (Kotlin
   with Java): `refresh` keys its resolution groups by `lang::resolver_of`, so one `Resolver` and
   one `Code` built from that pack's `layout` and flags take both packs' files, and calls between

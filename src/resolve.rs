@@ -445,7 +445,7 @@ fn nested_in(inner: Target, outer: Target) -> bool {
 }
 
 /// The argument counts a function takes: one per parameter, fewer for the ones a call may leave
-/// out (`Binds::Optional`), and any number more for a `Binds::Rest` one (Kotlin's `vararg`).
+/// out (`Binds::Optional`), and any number more for a `Binds::Rest` one (Kotlin's `vararg`, Java's spread parameter).
 /// Where its parameters carry argument labels (`Param::label`, Swift), a call fits only with
 /// its labels in order (`Args::labels`).
 #[derive(Clone, Copy)]
