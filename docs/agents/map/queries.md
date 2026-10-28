@@ -122,8 +122,9 @@ modules updates it.
   line. The room is what the budget leaves after the header and community, less the note of
   the final cut. `context::Symbol::answer` cuts in this order: the span text first (`render::cut`, with
   its own note; left out when not even the note fits, so the agent reads it from the lines the
-  header's range names), then the tail (callers, callees, consumers, contracts) by
-  the usual cut; the header, community and processes lines survive it. An answer that fits
+  header's range names), then the tail (callers, callees, annotations, consumers, contracts) by
+  the usual cut (`annotations:` lists, only when non-empty, the symbol's calls with `CallSite::decorates`
+  set, each as its callee line ending in ` on <decorated definition>`, apart from the callees); the header, community and processes lines survive it. An answer that fits
   names every process and is cut nowhere. Two processes of one repository
   with the same label show as their `process::<identity>`.
 - `trace.rs` process walk (spec #31): `Graph::process(entry)` is the one walk (`Descent`, its own

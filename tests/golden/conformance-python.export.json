@@ -5411,7 +5411,8 @@
         "path": "defs.py",
         "start": 260,
         "end": 281
-      }
+      },
+      "decorates": "example.com/acme/conformance::defs.py::register.wrapper"
     },
     {
       "id": "example.com/acme/conformance::defs.py::sorted_names::plain#0",
@@ -8731,7 +8732,8 @@
         "path": "shop/orders/views.py",
         "start": 95,
         "end": 134
-      }
+      },
+      "decorates": "example.com/acme/conformance::shop/orders/views.py::order"
     },
     {
       "id": "example.com/acme/conformance::shop/urls.py::include#0",
@@ -8896,7 +8898,8 @@
         "path": "web/accounts.py",
         "start": 99,
         "end": 141
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/accounts.py::update"
     },
     {
       "id": "example.com/acme/conformance::web/api.py::APIRouter#0",
@@ -8929,7 +8932,8 @@
         "path": "web/api.py",
         "start": 284,
         "end": 331
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/api.py::ping"
     },
     {
       "id": "example.com/acme/conformance::web/api.py::app.api_route#1",
@@ -8940,7 +8944,8 @@
         "path": "web/api.py",
         "start": 365,
         "end": 387
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/api.py::echo"
     },
     {
       "id": "example.com/acme/conformance::web/api.py::app.get#0",
@@ -8951,7 +8956,8 @@
         "path": "web/api.py",
         "start": 224,
         "end": 242
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/api.py::health"
     },
     {
       "id": "example.com/acme/conformance::web/api.py::app.include_router#0",
@@ -9050,7 +9056,8 @@
         "path": "web/factory.py",
         "start": 160,
         "end": 192
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/factory.py::build_admin.remove_user"
     },
     {
       "id": "example.com/acme/conformance::web/factory.py::mount::target.include_router#0",
@@ -9094,7 +9101,8 @@
         "path": "web/items.py",
         "start": 88,
         "end": 112
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/items.py::read_item"
     },
     {
       "id": "example.com/acme/conformance::web/items.py::router.post#0",
@@ -9105,7 +9113,8 @@
         "path": "web/items.py",
         "start": 170,
         "end": 185
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/items.py::create_item"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::Blueprint#0",
@@ -9138,7 +9147,8 @@
         "path": "web/pages.py",
         "start": 479,
         "end": 499
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/pages.py::shortcut"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::app.register_blueprint#0",
@@ -9171,7 +9181,8 @@
         "path": "web/pages.py",
         "start": 254,
         "end": 268
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/pages.py::index"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::app.route#1",
@@ -9182,7 +9193,8 @@
         "path": "web/pages.py",
         "start": 303,
         "end": 365
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/pages.py::order"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::fetch#0",
@@ -9215,7 +9227,8 @@
         "path": "web/pages.py",
         "start": 415,
         "end": 444
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/pages.py::daily"
     },
     {
       "id": "example.com/acme/conformance::web/partial.py::APIRouter#0",
@@ -9248,7 +9261,8 @@
         "path": "web/partial.py",
         "start": 304,
         "end": 333
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/partial.py::read_part"
     },
     {
       "id": "example.com/acme/conformance::web/partial.py::app.include_router#0",
@@ -9303,7 +9317,8 @@
         "path": "web/partial.py",
         "start": 432,
         "end": 460
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/partial.py::build.items"
     },
     {
       "id": "example.com/acme/conformance::web/partial.py::users.get#0",
@@ -9314,7 +9329,8 @@
         "path": "web/partial.py",
         "start": 229,
         "end": 252
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/partial.py::read_user"
     }
   ],
   "providers": [

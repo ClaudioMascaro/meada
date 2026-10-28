@@ -7,7 +7,7 @@ use rusqlite::Connection;
 
 use crate::contract::{self, ContractKind, Hit, KINDS, Level, Link, Role, Search, View};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
-use crate::index::{Export, State, Symbol, schema};
+use crate::index::{CallSite, Export, State, Symbol, schema};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::{Fix, Msg};
 use crate::render::{
@@ -948,7 +948,8 @@ fn span_text(root: &Path, export: &Export, symbol: &Symbol) -> Option<(usize, Ve
     Some((render::line_of(&src, symbol.span.start), lines))
 }
 
-/// `callers:` and `callees:` of the symbol `id`, inside the repository `identity`.
+/// `callers:`, `callees:` and, when the symbol has calls that decorate a definition, `annotations:`
+/// of the symbol `id`, inside the repository `identity`.
 fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Vec<String> {
     let symbols: HashMap<&str, &Symbol> =
         export.symbols.iter().map(|s| (s.id.as_str(), s)).collect();
@@ -972,32 +973,46 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
             )
         })
         .collect();
-    let mut callees: Vec<_> = export.calls.iter().filter(|c| c.caller == id).collect();
-    callees.sort_by_key(|c| (c.target.is_none(), &c.id));
-    let mut callees: Vec<String> = callees
-        .iter()
-        .flat_map(|c| {
-            // An ambiguous call lists every candidate, marked, instead of a guess.
-            let targets: Vec<&Symbol> = c
-                .target
-                .iter()
-                .chain(&c.candidates)
-                .filter_map(|t| symbols.get(t.as_str()).copied())
-                .collect();
-            if targets.is_empty() {
-                let callee = callee(&c.id);
-                let location = files.at(&c.span.path, c.span.start);
-                return vec![format!("{identity} {location} (unresolved) {callee}")];
-            }
-            targets
-                .iter()
-                .map(|t| line(identity, files, t, label(&t.id)) + &mark(c))
-                .collect()
-        })
-        .collect();
-    callees.dedup();
+    let mut calls: Vec<_> = export.calls.iter().filter(|c| c.caller == id).collect();
+    calls.sort_by_key(|c| (c.target.is_none(), &c.id));
+    let lines_of = |calls: Vec<&CallSite>, files: &mut Files| -> Vec<String> {
+        let mut lines: Vec<String> = calls
+            .iter()
+            .flat_map(|c| {
+                // An ambiguous call lists every candidate, marked, instead of a guess.
+                let targets: Vec<&Symbol> = c
+                    .target
+                    .iter()
+                    .chain(&c.candidates)
+                    .filter_map(|t| symbols.get(t.as_str()).copied())
+                    .collect();
+                // An annotation says which definition it decorates.
+                let on = c
+                    .decorates
+                    .as_deref()
+                    .map_or(String::new(), |d| format!(" on {}", label(d)));
+                if targets.is_empty() {
+                    let callee = callee(&c.id);
+                    let location = files.at(&c.span.path, c.span.start);
+                    return vec![format!("{identity} {location} (unresolved) {callee}{on}")];
+                }
+                targets
+                    .iter()
+                    .map(|t| line(identity, files, t, label(&t.id)) + &mark(c) + &on)
+                    .collect()
+            })
+            .collect();
+        lines.dedup();
+        lines
+    };
+    let (annotations, callees) = calls.into_iter().partition(|c| c.decorates.is_some());
+    let callees = lines_of(callees, files);
+    let annotations = lines_of(annotations, files);
     let mut lines = section("callers", callers);
     lines.extend(section("callees", callees));
+    if !annotations.is_empty() {
+        lines.extend(section("annotations", annotations));
+    }
     lines
 }
 

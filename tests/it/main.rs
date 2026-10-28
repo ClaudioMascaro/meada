@@ -14,6 +14,7 @@ mod conformance;
 mod decide;
 mod decider;
 mod decisions;
+mod decorations;
 mod docs;
 mod documents;
 mod drift;

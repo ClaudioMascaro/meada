@@ -1118,6 +1118,7 @@ mod tests {
                     level: Some(Level::Exact),
                     candidates: Vec::new(),
                     narrowed: false,
+                    decorates: None,
                     span: span(),
                 })
                 .collect(),

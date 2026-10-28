@@ -401,7 +401,8 @@
         "path": "Controllers/OrdersController.cs",
         "start": 526,
         "end": 541
-      }
+      },
+      "decorates": "example.com/xlang-csharp/api::Controllers/OrdersController.cs::Api.Controllers.OrdersController.Status(string)"
     },
     {
       "id": "example.com/xlang-csharp/api::Controllers/OrdersController.cs::Api.Controllers.OrdersController::HttpPost#0",
@@ -412,7 +413,8 @@
         "path": "Controllers/OrdersController.cs",
         "start": 714,
         "end": 733
-      }
+      },
+      "decorates": "example.com/xlang-csharp/api::Controllers/OrdersController.cs::Api.Controllers.OrdersController.Reserve()"
     },
     {
       "id": "example.com/xlang-csharp/api::Controllers/OrdersController.cs::Api.Controllers::ApiController#0",
@@ -423,7 +425,8 @@
         "path": "Controllers/OrdersController.cs",
         "start": 81,
         "end": 94
-      }
+      },
+      "decorates": "example.com/xlang-csharp/api::Controllers/OrdersController.cs::Api.Controllers.OrdersController"
     },
     {
       "id": "example.com/xlang-csharp/api::Controllers/OrdersController.cs::Api.Controllers::Route#0",
@@ -434,7 +437,8 @@
         "path": "Controllers/OrdersController.cs",
         "start": 97,
         "end": 112
-      }
+      },
+      "decorates": "example.com/xlang-csharp/api::Controllers/OrdersController.cs::Api.Controllers.OrdersController"
     },
     {
       "id": "example.com/xlang-csharp/api::Messaging/ShipmentListener.cs::Api.Messaging.ShipmentListener.OnShipment()::_consumer.Subscribe#0",

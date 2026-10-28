@@ -226,7 +226,8 @@
         "path": "inventory/main.py",
         "start": 162,
         "end": 185
-      }
+      },
+      "decorates": "example.com/xlang/inventory::inventory/main.py::stock_level"
     },
     {
       "id": "example.com/xlang/inventory::inventory/main.py::app.post#0",
@@ -237,7 +238,8 @@
         "path": "inventory/main.py",
         "start": 335,
         "end": 361
-      }
+      },
+      "decorates": "example.com/xlang/inventory::inventory/main.py::reserve"
     },
     {
       "id": "example.com/xlang/inventory::inventory/main.py::audit::(call).strip#0",
