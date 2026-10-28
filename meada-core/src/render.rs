@@ -101,6 +101,45 @@ pub fn label(id: &str) -> &str {
     id.rsplit_once("::").map_or(id, |(_, name)| name)
 }
 
+/// `<repository>::<path>::<Class>.<method>` of a symbol id that names a method, without its
+/// parameters; a free function has no class, so no key.
+fn overload_key(id: &str) -> Option<&str> {
+    let name = id.splitn(3, "::").nth(2)?;
+    let key = id.get(..id.len() - name.len())?;
+    let method = name.split('(').next()?;
+    method
+        .contains('.')
+        .then(|| &id[..key.len() + method.len()])
+}
+
+/// Groups `items` by id into overload sets, in the order of each group's first member: the
+/// items that share a file, a class and a method name form one group, every other item its own.
+pub fn overload_sets<T>(items: Vec<T>, id: impl Fn(&T) -> &str) -> Vec<Vec<T>> {
+    let mut sets: Vec<Vec<T>> = Vec::new();
+    let mut keys: Vec<Option<String>> = Vec::new();
+    for item in items {
+        let key = overload_key(id(&item)).map(str::to_string);
+        match key
+            .is_some()
+            .then(|| keys.iter().position(|k| *k == key))
+            .flatten()
+        {
+            Some(n) => sets[n].push(item),
+            None => {
+                keys.push(key);
+                sets.push(vec![item]);
+            }
+        }
+    }
+    sets
+}
+
+/// `Class.method` of the overload set holding `id`.
+pub fn overload_name(id: &str) -> &str {
+    let name = id.splitn(3, "::").nth(2).unwrap_or(id);
+    name.split('(').next().unwrap_or(name)
+}
+
 /// The callee of the call site `<caller>::<callee>#<ordinal>`.
 pub fn callee(site: &str) -> &str {
     let callee = label(site);

@@ -996,9 +996,18 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
                     let location = files.at(&c.span.path, c.span.start);
                     return vec![format!("{identity} {location} (unresolved) {callee}{on}")];
                 }
-                targets
-                    .iter()
-                    .map(|t| line(identity, files, t, label(&t.id)) + &mark(c) + &on)
+                // Overloads of one method show as one set: the first by id stands for them.
+                render::overload_sets(targets, |t| &t.id)
+                    .into_iter()
+                    .map(|set| match set.as_slice() {
+                        [t] => line(identity, files, t, label(&t.id)) + &mark(c) + &on,
+                        [first, ..] => {
+                            let name = render::overload_name(&first.id);
+                            let at = line(identity, files, first, name);
+                            format!("{at} (one of {} overloads){}{on}", set.len(), mark(c))
+                        }
+                        [] => unreachable!(),
+                    })
                     .collect()
             })
             .collect();

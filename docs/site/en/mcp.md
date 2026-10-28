@@ -32,7 +32,10 @@ There are three tools, always in English, and none of them writes:
   who reads it, with the symbol and line, or `(repository-level)` for the whole repository; on
   a channel (`channel::kafka::orders.created`), it lists producers and consumers, those that
   reach it through a wildcard or a binding included, with the level and the reason, and a side
-  whose name Meada cannot evaluate shows as `(unresolved)` and is never linked;
+  whose name Meada cannot evaluate shows as `(unresolved)` and is never linked; the candidates
+  of an ambiguous call that are overloads of one method (one file, one class, one name) show
+  as one set, `(one of N overloads)`, and `trace` writes them as `Class.name (N overloads)`;
+  the call stays `ambiguous` and the export lists every candidate as before;
 - `trace` follows a chain of calls across repositories, downstream (`down`) or upstream (`up`);
   with `changes: uncommitted`, it starts from the working-tree diff, which covers the impact
   analysis of what was just edited.

@@ -32,6 +32,7 @@ mod manifest;
 mod mcp;
 mod nugetpkg;
 mod oidc;
+mod overloads;
 mod packages;
 mod processes;
 mod pypi;
