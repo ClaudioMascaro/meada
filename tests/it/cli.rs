@@ -498,6 +498,30 @@ fn status_reports_documents_follow_lang() {
     }
 }
 
+/// A C# file whose qualified names pass the pack's budget is dropped, and `status` names it
+/// and the limit.
+#[test]
+fn status_reports_a_file_over_a_pack_budget_follow_lang() {
+    let repo = fixture_repo("cli_budget", "ts-basic", None);
+    let mut source = format!("namespace N{};\npublic class C {{\n", "a".repeat(4096));
+    for n in 0..2000 {
+        source += &format!("public void M{n}() {{ F(); }}\n");
+    }
+    fs::write(repo.join("Broad.cs"), source + "}\n").unwrap();
+    // A file a pack leaves unbuilt on purpose is not this drop.
+    fs::write(
+        repo.join("cgo.go"),
+        "package x\n\nimport \"C\"\n\nfunc F() {}\n",
+    )
+    .unwrap();
+    meada(&repo, "en_US.UTF-8", "index");
+    for (lang, name) in LANGS {
+        let status = meada(&repo, lang, "status");
+        assert!(!status.contains("cgo.go"), "{status}");
+        assert_golden(&format!("cli.status-budget.{name}.txt"), &status);
+    }
+}
+
 #[test]
 fn status_reports_drift_follow_lang() {
     let (web, _, _) = drift_chain("cli_drift");

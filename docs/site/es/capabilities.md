@@ -15,7 +15,7 @@ El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [rete
 | Java | `.java`, resueltos por sus declaraciones de `package` |
 | Kotlin | `.kt` y `.kts` (salvo `build.gradle.kts` y `settings.gradle.kts`), resueltos por sus declaraciones de `package` |
 | C# | `.cs`, agrupados en proyectos por los `.csproj` de estilo SDK y resueltos por sus `namespace` |
-| Swift | `.swift` (salvo `Package.swift`), agrupados en módulos por los targets de `Package.swift` |
+| Swift | `.swift` (salvo `Package.swift` y `Package@swift-<versión>.swift`), agrupados en módulos por los targets de `Package.swift` |
 
 ### Rust
 
@@ -25,7 +25,7 @@ Llamadas como `crate::a::f()`, `Tipo::new()` y `Self::f()` siguen la ruta escrit
 
 Para `x.m()`, Meada usa el tipo del receptor escrito en un `let`, parámetro, campo, `self` o retorno de función. Un `dyn Trait` o genérico limitado por trait llega al método del trait. Sin tipo escrito, resuelve por nombre. Los métodos ausentes de los `impl` del tipo, como los generados por `derive` o de traits externos, no producen vínculos. Los atributos de ruta tampoco se vinculan con funciones.
 
-El análisis usa la configuración por defecto de cada crate para x86_64 Linux. Elementos con `#[cfg(..)]` falso y features fuera de `default` quedan fuera; se incluyen módulos `#[cfg(test)]`. No se indexan llamadas dentro de macros. Los contratos Rust cubren paquetes, HTTP y canales.
+El análisis usa la configuración por defecto de cada crate para x86_64 Linux. Elementos con `#[cfg(..)]` falso y features fuera de `default` quedan fuera; se incluyen los módulos compilados en un build de test, no solo los `#[cfg(test)]`. No se indexan llamadas dentro de macros. Los contratos Rust cubren paquetes, HTTP y canales.
 
 ### Go
 
@@ -61,7 +61,7 @@ Cada `.csproj` de estilo SDK (con `Sdk`) es un proyecto y contiene los `.cs` de 
 
 `using`, `using static`, los alias (`using X = A.B`) y `global using` se resuelven por los namespaces de todos los proyectos; un `global using`, los `<Using>` del `.csproj` y los implicit usings activados (`ImplicitUsings`) valen en todos los archivos del proyecto, y solo en él. Las llamadas sin receptor, con `this`, `base`, estáticas (`Tipo.Metodo()`) y por `using static` son `exact` cuando la cantidad de argumentos deja un solo método, contando `params` y los parámetros con valor por defecto; las sobrecargas con la misma cantidad quedan `ambiguous`. Los tipos de fuera del repositorio siguen siendo externos. Las llamadas sobre un receptor de tipo escrito todavía no se resuelven por ese tipo. Los elementos (`<Using>`, `PackageReference`, `ProjectReference`) y las propiedades de un `Directory.Build.props` valen en los proyectos que tiene debajo como si estuvieran en el `.csproj`, evaluados antes que los de este (el `props` más cercano oculta los de arriba, salvo que importe a su padre con `GetPathOfFileAbove`); un `ProjectReference` ahí es relativo a cada proyecto, y uno construido sobre `$(MSBuildThisFileDirectory)` cuenta como calculado. Un `props` con más de 256 `<Using>` y referencias no se lee. `nameof(x)` vale el texto del último identificador de `x` (`nameof(Pedidos.Topico)` es `"Topico"`), así que un nombre de canal o una parte de URL escritos con él son conocidos.
 
-Los tipos públicos y sus miembros públicos o protegidos forman la superficie exportada. La indexación no necesita .NET SDK ni MSBuild y no ejecuta código del repositorio.
+Los tipos públicos y sus miembros públicos o protegidos forman la superficie exportada. Un archivo se omite por demasiado amplio cuando los nombres envolventes que repite (namespace, tipos y método, la parte del nombre envolvente entero de más de 256 bytes, cobrada en cada nodo bajo él) pasan de 4 MiB en total: queda sin símbolos ni llamadas, los demás archivos se indexan y `meada status` lo nombra. Los archivos generados con nombres comunes, como los snapshots de modelo de Entity Framework, se leen enteros a cualquier tamaño. La indexación no necesita .NET SDK ni MSBuild y no ejecuta código del repositorio.
 
 ### Swift
 

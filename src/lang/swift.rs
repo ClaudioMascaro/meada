@@ -50,9 +50,12 @@ impl LanguagePack for Swift {
         &["swift"]
     }
 
-    /// `Package.swift` is the package's manifest, read as a config file (`manifest`).
+    /// `Package.swift` is the package's manifest, read as a config file (`manifest`); a
+    /// version-specific `Package@swift-<version>.swift` is a manifest too, but only read by SwiftPM.
     fn is_code(&self, path: &str) -> bool {
-        path.rsplit('/').next() != Some(manifest::MANIFEST)
+        let name = path.rsplit('/').next();
+        name != Some(manifest::MANIFEST)
+            && !name.is_some_and(|n| n.starts_with("Package@swift-") && n.ends_with(".swift"))
     }
 
     fn parse(&self, path: &str, src: &[u8]) -> Result<Facts> {
@@ -1437,6 +1440,15 @@ mod tests {
 
     fn script(src: &str) -> Facts {
         parse(src.as_bytes(), true).unwrap()
+    }
+
+    #[test]
+    fn manifests_are_not_code_but_lookalikes_are() {
+        assert!(!Swift.is_code("Package.swift"));
+        assert!(!Swift.is_code("Package@swift-5.9.swift"));
+        assert!(!Swift.is_code("sub/dir/Package@swift-6.0.swift"));
+        assert!(Swift.is_code("PackageInfo.swift"));
+        assert!(Swift.is_code("App/Package+Extras.swift"));
     }
 
     #[test]

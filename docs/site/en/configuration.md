@@ -56,3 +56,24 @@ NuGet package contracts are discovered from the SDK-style `.csproj` files. They 
 
 Swift package contracts are discovered from `Package.swift`. They need no additional `meada.toml` key: a `.package(url:)` links to the workspace repository with the same remote identity and a `.package(path:)` to the repository at that path, which must be a `[[peer]]` of the workspace when it is another repository. Use literal URLs, paths and names for `exact` links.
 
+
+## What is indexed
+
+The walk covers every file of the repository, tracked or not, except what these exclude:
+
+- **Always skipped**, whether or not an ignore file lists them: directories named `node_modules` or `Pods`, a `Checkouts` directory inside `Carthage`, files named `*.min.js` or `*.min.css`, and .NET build output (`obj` or `bin` beside a `.csproj`). They are dependency caches and build artifacts, never first-party code.
+- **`.gitignore` and `.ignore`**, honoured with or without git, at the root and in subdirectories, and only inside the repository.
+- **`.meadaignore`**, with `.gitignore` syntax, read the same way. It cannot bring back a file the defaults skip.
+
+`vendor`, `dist`, `build` and generated code (Entity Framework migrations, for instance) are not skipped by default: any of them may be first-party code or hold a contract, and Meada cannot tell. List what you do not want indexed in `.meadaignore`:
+
+```gitignore
+vendor/
+dist/
+build/
+Migrations/
+*ModelSnapshot.cs
+*.Designer.cs
+```
+
+A file a new default or a new entry excludes leaves the index on the next refresh, as a deleted file does.

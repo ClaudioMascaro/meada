@@ -282,3 +282,68 @@ fn an_oversized_manifest_is_read_up_to_the_limit_and_refreshes_as_cold() {
     let prefix = blake3::hash(&oversized.as_bytes()[..read]);
     assert_eq!(hash, prefix.to_hex().to_string());
 }
+
+/// Writes a function named `name` at `path`, creating its directory.
+fn put(repo: &Path, path: &str, name: &str) {
+    let file = repo.join(path);
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(file, format!("function {name}() {{}}\n")).unwrap();
+}
+
+/// The default skips (`node_modules`, `Pods`, `Carthage/Checkouts`, `*.min.js`, `*.min.css`)
+/// leave only first-party code, and `vendor` stays indexed.
+#[test]
+fn dependency_caches_and_minified_assets_are_not_indexed() {
+    let repo = fixture_repo("dependency_caches", "ts-basic", None);
+    for (path, name) in [
+        ("node_modules/lib/index.ts", "inNodeModules"),
+        ("ios/Pods/lib/a.ts", "inPods"),
+        ("Carthage/Checkouts/lib/a.ts", "inCheckouts"),
+        ("static/app.min.js", "inMinJs"),
+        ("static/app.min.css", "inMinCss"),
+        ("vendor/own.ts", "inVendor"),
+    ] {
+        put(&repo, path, name);
+    }
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    for gone in ["inNodeModules", "inPods", "inCheckouts", "inMinJs"] {
+        assert!(!export.contains(gone), "{gone} indexed");
+    }
+    assert!(export.contains("inVendor"));
+}
+
+/// `.ignore` and `.meadaignore` (root and nested) drop their files; a refresh after adding an
+/// entry equals a cold index of the same tree.
+#[test]
+fn ignore_files_are_honoured_and_a_refresh_drops_what_they_add() {
+    let tree = |repo: &Path| {
+        put(repo, "own/a.ts", "ownA");
+        put(repo, "ign/a.ts", "ignA");
+        put(repo, "pkg/gen/a.ts", "nestedGen");
+        put(repo, "pkg/keep.ts", "nestedKeep");
+        put(repo, "gen/a.ts", "rootGen");
+    };
+    let ignores = |repo: &Path| {
+        fs::write(repo.join(".ignore"), "ign/\n").unwrap();
+        fs::write(repo.join(".meadaignore"), "own/\n").unwrap();
+        fs::write(repo.join("pkg/.meadaignore"), "gen/\n").unwrap();
+    };
+    let repo = fixture_repo("ignore_files", "ts-basic", None);
+    tree(&repo);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    assert!(before.contains("ownA") && before.contains("ignA") && before.contains("nestedGen"));
+
+    ignores(&repo);
+    let refreshed = engine.export().unwrap();
+    for gone in ["ownA", "ignA", "nestedGen"] {
+        assert!(!refreshed.contains(gone), "{gone} kept");
+    }
+    assert!(refreshed.contains("nestedKeep") && refreshed.contains("rootGen"));
+
+    let cold = fixture_repo("ignore_files_cold", "ts-basic", None);
+    tree(&cold);
+    ignores(&cold);
+    assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
+}

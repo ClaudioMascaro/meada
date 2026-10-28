@@ -887,7 +887,10 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
         }
         let (scope, module, pure, body, open) = inner;
         let kids = match node.kind() {
-            "source_file" if inner_off(node, &features, src) => {
+            "source_file"
+                if inner_off(node, &features, src, false)
+                    && inner_off(node, &features, src, true) =>
+            {
                 facts.unbuilt = true;
                 Vec::new()
             }
@@ -1232,20 +1235,25 @@ fn built<'t>(
     routes: &mut HashMap<usize, Routes<'t>>,
 ) -> Vec<Node<'t>> {
     let mut out = Vec::new();
-    let (mut on, mut test, mut path) = (true, false, None);
+    let (mut on, mut on_test, mut path) = (true, true, None);
     let kids: Vec<Node> = children(node).collect();
     for (at, &child) in kids.iter().enumerate() {
         match child.kind() {
             "attribute_item" => {
-                let (holds, only_test) = attribute_holds(child, features, src);
-                (on, test) = (on && holds, test || only_test);
+                let (plain, test) = attribute_holds(child, features, src);
+                (on, on_test) = (on && plain, on_test && test);
                 path = path_value(child, src).or(path);
             }
             "line_comment" | "block_comment" | "inner_attribute_item" => out.push(child),
             _ => {
-                // Test modules are indexed; any other item under `#[cfg(test)]` is not.
-                let kept = on && (!test || child.kind() == "mod_item");
-                if kept && !inner_off(child, features, src) {
+                // A module a test build compiles is indexed; any other item is judged with `test`
+                // false.
+                // Its inner `#![cfg(..)]` is judged in the same build as its outer one.
+                let kept = (on && !inner_off(child, features, src, false))
+                    || (on_test
+                        && child.kind() == "mod_item"
+                        && !inner_off(child, features, src, true));
+                if kept {
                     if let Some(value) = path {
                         paths.insert(child.id(), value);
                     }
@@ -1257,27 +1265,27 @@ fn built<'t>(
                     }
                     out.push(child);
                 }
-                (on, test, path) = (true, false, None);
+                (on, on_test, path) = (true, true, None);
             }
         }
     }
     out
 }
 
-/// Whether an attribute item is no `#[cfg(..)]`, or one that holds, and whether it is exactly
-/// `#[cfg(test)]`.
+/// Whether an attribute item is no `#[cfg(..)]`, or one that holds, with `test` false and with
+/// it true.
 fn attribute_holds(item: Node, features: &BTreeSet<String>, src: &[u8]) -> (bool, bool) {
     let attribute = named(item).find(|n| n.kind() == "attribute");
     let condition = attribute.and_then(|a| text(a, src).strip_prefix("cfg"));
     let condition = condition.filter(|c| c.trim_start().starts_with('('));
     let condition = condition.map(str::trim_start);
-    let holds = condition.is_none_or(|c| cfg::holds(c, features));
-    (holds, condition.is_some_and(cfg::only_test))
+    let holds = |test| condition.is_none_or(|c| cfg::holds(c, features, test));
+    (holds(false), holds(true))
 }
 
 /// Whether the file or the module written in place that `node` is (or holds as its body) opens
-/// with an inner `#![cfg(..)]` that does not hold.
-fn inner_off(node: Node, features: &BTreeSet<String>, src: &[u8]) -> bool {
+/// with an inner `#![cfg(..)]` that does not hold, with `test` as given.
+fn inner_off(node: Node, features: &BTreeSet<String>, src: &[u8], test: bool) -> bool {
     let body = match node.kind() {
         "mod_item" => field(node, "body"),
         _ => Some(node),
@@ -1292,7 +1300,7 @@ fn inner_off(node: Node, features: &BTreeSet<String>, src: &[u8]) -> bool {
                 let attribute = named(inner).find(|n| n.kind() == "attribute");
                 let condition = attribute.and_then(|a| text(a, src).strip_prefix("cfg"));
                 let condition = condition.filter(|c| c.trim_start().starts_with('('));
-                if condition.is_some_and(|c| !cfg::holds(c.trim_start(), features)) {
+                if condition.is_some_and(|c| !cfg::holds(c.trim_start(), features, test)) {
                     return true;
                 }
             }
@@ -2232,12 +2240,14 @@ mod tests {
     }
 
     #[test]
-    fn cfg_test_keeps_modules_and_nothing_else() {
+    fn a_test_build_keeps_its_modules_and_nothing_else() {
         let src = "#[cfg(test)]\nuse crate::mock::client;\n#[cfg(test)]\nfn helper() {}\n\
-                   #[cfg(test)]\nmod t { fn f() {} }\n#[cfg(all(test, unix))]\nmod u {}\n";
+                   #[cfg(test)]\nmod t { fn f() {} }\n#[cfg(all(test, unix))]\nmod u {}\n\
+                   #[cfg(any(test, feature = \"p\"))]\nmod v {}\n#[cfg(any(test, feature = \"p\"))]\nfn g() {}\n\
+                   #[cfg(all(test, feature = \"p\"))]\nmod w {}\n#[cfg(not(test))]\nmod x {}\n";
         let facts = facts(src);
         let names: Vec<&str> = facts.defs.iter().map(|d| d.name.as_str()).collect();
-        assert_eq!(names, ["t", "t.f"]);
+        assert_eq!(names, ["t", "t.f", "u", "v", "x"]);
         assert!(facts.imports.iter().all(|i| i.local != "client"));
     }
 
@@ -2247,9 +2257,17 @@ mod tests {
         assert!(file.unbuilt && file.defs.is_empty());
         let file = facts("// note\n#![cfg(unix)]\nfn a() {}\n");
         assert!(!file.unbuilt && file.defs.len() == 1);
+        // A file is a module: one a test build compiles stays.
+        let file = facts("#![cfg(any(test, feature = \"p\"))]\nfn a() {}\n");
+        assert!(!file.unbuilt);
         let src = "mod m {\n#![cfg(windows)]\nfn a() {}\n}\nmod n {\n#![cfg(unix)]\nfn b() {}\n}\n";
         let names: Vec<String> = facts(src).defs.into_iter().map(|d| d.name).collect();
         assert_eq!(names, ["n", "n.b"]);
+        // The outer and the inner cfg are judged in the same build: no build compiles both.
+        let src = "#[cfg(any(test, feature = \"p\"))]\nmod m {\n#![cfg(not(test))]\nfn a() {}\n}\n";
+        assert!(facts(src).defs.is_empty());
+        let src = "#[cfg(any(test, unix))]\nmod m {\n#![cfg(not(test))]\nfn a() {}\n}\n";
+        assert_eq!(facts(src).defs.len(), 2);
     }
 
     #[test]

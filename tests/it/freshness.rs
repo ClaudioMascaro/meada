@@ -1063,6 +1063,38 @@ fn contracts_follow_values_edited_in_other_files() {
     }
 }
 
+/// A cold index keeps no file's values past its parse (the index does not hold them), yet a
+/// kind that reads one still finds it: the constants a URL is built from, and the arguments of
+/// a client wrapper's call (#395).
+#[test]
+fn a_cold_index_still_reads_the_values_a_contract_kind_asks_for() {
+    let [paths, admin, _] = values("cold_values");
+    let consumers = |repo: &Path| -> Vec<String> {
+        let json: serde_json::Value =
+            serde_json::from_str(&Engine::open(repo).unwrap().export().unwrap()).unwrap();
+        let sides = json["consumers"].as_array().unwrap();
+        let contract = |c: &serde_json::Value| c["contract"].as_str().unwrap().to_string();
+        sides.iter().map(contract).collect()
+    };
+    assert_eq!(
+        consumers(&paths),
+        [
+            "http::GET::/api/users",
+            "http::GET::/api/users/{}",
+            "http::GET::/api/users"
+        ]
+    );
+    assert_eq!(
+        consumers(&admin),
+        [
+            "http::DELETE::/api/users/{}",
+            "http::GET::/api/users",
+            "http::GET::/api/users",
+            "http::GET::/api/users"
+        ]
+    );
+}
+
 /// Renames the topic the gateway produces through its wrapper, in the imported constant, and
 /// the topics the conformance fixture builds from a constant (spec #20).
 fn edit_topics(gateway: &Path, conformance: &Path) {
@@ -1861,6 +1893,55 @@ fn a_field_removed_from_a_zod_schema_adds_drift_like_a_cold_chain() {
     assert!(!before[1].contains("\"[].title\": \"inferred\""));
     assert!(refreshed[1].contains("\"[].title\": \"inferred\""));
     assert_eq!(refreshed, exports([&cold, &cold_web]));
+}
+
+/// The catalog's profile route adds `nickname` to the schema it declares in its own file: the
+/// web's consumers of the route, in other files of another repository, read it.
+fn add_a_profile_field(catalog: &Path) {
+    let path = catalog.join("app/api/profiles/route.ts");
+    let src = fs::read_to_string(&path).unwrap();
+    let edited = src.replace(
+        "  name: z.string(),\n",
+        "  name: z.string(),\n  nickname: z.string(),\n",
+    );
+    assert_ne!(src, edited);
+    fs::write(&path, edited).unwrap();
+}
+
+/// A refresh parses again, before it extracts, the files whose values the last extraction read
+/// (#391). Two refreshes in a row, each against a cold chain of the same files: the first edits
+/// a provider file, and the links of its consumers in another repository follow; the second,
+/// starting from what the first one read, edits the schema another file's route returns, and
+/// that route's contract follows.
+#[test]
+fn a_provider_file_then_a_schema_another_file_reads_refresh_like_a_cold_chain() {
+    let exports = |repos: [&Path; 2]| -> Vec<String> {
+        (repos.iter())
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let (web, _, catalog) = drift_chain("fresh_narrowed");
+    age(web.parent().unwrap());
+    let before = exports([&catalog, &web]);
+
+    add_a_profile_field(&catalog);
+    let provider = exports([&catalog, &web]);
+
+    let (cold_web, _, cold) = drift_chain("fresh_narrowed_provider_cold");
+    add_a_profile_field(&cold);
+    assert!(before[1].contains("\"items[].nickname\": \"exact\""));
+    assert!(!provider[1].contains("\"items[].nickname\": \"exact\""));
+    assert_eq!(provider, exports([&cold, &cold_web]));
+
+    drop_a_schema_field(&catalog);
+    let schema = exports([&catalog, &web]);
+
+    let (cold_web, _, cold) = drift_chain("fresh_narrowed_schema_cold");
+    add_a_profile_field(&cold);
+    drop_a_schema_field(&cold);
+    assert!(provider[0].contains("\"title\""));
+    assert_ne!(schema[0], provider[0]);
+    assert_eq!(schema, exports([&cold, &cold_web]));
 }
 
 /// The catalog's shared package drops `price` from its zod schema and `warehouse` from its

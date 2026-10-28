@@ -63,3 +63,11 @@ mod tests {
         super::always();
     }
 }
+
+// Compiled in a test build: kept, though `p` is no default feature.
+#[cfg(any(test, feature = "p"))]
+mod th;
+
+pub fn caller() {
+    th::Client::new();
+}

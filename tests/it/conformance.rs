@@ -6547,6 +6547,7 @@ fn rust() {
             "api/src/mock.rs::client",
             "api/src/native.rs::counter",
             "api/src/real.rs::client",
+            "api/src/gated.rs::caller",
             "api/src/gated.rs::connect",
             "api/src/gated.rs::outside_tests",
             "api/src/gated.rs::Gauge",
@@ -6555,9 +6556,12 @@ fn rust() {
             "api/src/gated.rs::always",
             "api/src/gated.rs::on_linux",
             "api/src/gated.rs::through_net",
+            "api/src/gated.rs::th",
             "api/src/gated.rs::tests",
             "api/src/gated.rs::tests.helper",
             "api/src/gated.rs::unix_without_metrics",
+            "api/src/gated/th.rs::Client",
+            "api/src/gated/th.rs::Client.new",
             "api/src/main.rs::hidden",
             "api/src/main.rs::isolated",
             "api/src/main.rs::isolated.far",
@@ -6925,6 +6929,12 @@ fn rust() {
             // `super::` out of an inline module is read from the file's top, past the
             // module's own `compute`.
             // `#[cfg(test)] use crate::mock::client;` binds nothing: the production client.
+            // A module a test build compiles is indexed: `th` is declared under `any(test, ..)`.
+            (
+                "api/src/gated.rs::caller::th.Client.new#0",
+                EXACT,
+                &["api/src/gated/th.rs::Client.new"],
+            ),
             (
                 "api/src/gated.rs::connect::client#0",
                 EXACT,

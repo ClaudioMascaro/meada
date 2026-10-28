@@ -58,3 +58,24 @@ Os contratos de pacotes NuGet são descobertos nos `.csproj` com SDK. Não preci
 
 Os contratos de pacote Swift são descobertos no `Package.swift`. Não precisam de chave nova no `meada.toml`: um `.package(url:)` liga ao repositório do workspace de mesma identidade de remoto e um `.package(path:)` ao repositório nesse caminho, que precisa ser um `[[peer]]` do workspace quando é outro repositório. Use URLs, caminhos e nomes literais para ligações `exact`.
 
+
+## O que é indexado
+
+A varredura cobre todos os arquivos do repositório, versionados ou não, exceto o que estes excluem:
+
+- **Sempre ignorados**, com ou sem arquivo de ignore que os liste: diretórios chamados `node_modules` ou `Pods`, um diretório `Checkouts` dentro de `Carthage`, arquivos chamados `*.min.js` ou `*.min.css` e a saída de build do .NET (`obj` ou `bin` ao lado de um `.csproj`). São caches de dependências e artefatos de build, nunca código próprio.
+- **`.gitignore` e `.ignore`**, respeitados com ou sem git, na raiz e em subdiretórios, e só dentro do repositório.
+- **`.meadaignore`**, com a sintaxe do `.gitignore`, lido da mesma forma. Ele não traz de volta um arquivo que os padrões ignoram.
+
+`vendor`, `dist`, `build` e código gerado (as migrações do Entity Framework, por exemplo) não são ignorados por padrão: qualquer um pode ser código próprio ou conter um contrato, e o Meada não sabe distinguir. Liste no `.meadaignore` o que você não quer indexar:
+
+```gitignore
+vendor/
+dist/
+build/
+Migrations/
+*ModelSnapshot.cs
+*.Designer.cs
+```
+
+Um arquivo que um novo padrão ou uma nova entrada exclui sai do índice no próximo refresh, como um arquivo apagado.

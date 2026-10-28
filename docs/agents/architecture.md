@@ -1922,7 +1922,8 @@ one for the area a change touches.
   static-member names (`Facts::overloads`, `Facts::constructors` and
   `Facts::statics`), the namespaces and types a C# file's `global using` directives name
   (`Facts::project`, names as `Facts::imports` holds them), the qualified names of the types a C#
-  file declares in `partial` parts (`Facts::partial`), the literal URL path fragments and the
+  file declares in `partial` parts (`Facts::partial`), the size of the budget a file exhausted
+  (`Facts::budget`, which `meada status` names), the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
   consumer reads from the parsed response, and those of the zod schema or object literals a
@@ -1971,13 +1972,16 @@ one for the area a change touches.
   an opaque one as `null`), the `flexible` table (spec #27, #106: each function that takes more
   than one count of arguments, a default parameter or a vararg, by file and qualified name with
   its parameter types, with the least and the most count, `resolve::Flexible`), the `entry_points` table (spec #31:
-  each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
-  each community's name and member identities (`communities`, spec #31). `Call::args`,
+  each entry point's identity, kind, label and start symbol, rewritten with the contracts),
+  each community's name and member identities (`communities`, spec #31), and the paths of the
+  files whose values the last contract extraction read (`valued`, #391). `Call::args`,
   `Call::kwargs`, `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::return_values`, `Def::type_params`, `Param::default`,
   `Field::default`, `Const::value` and `Const::ty` are `serde(skip)`, so unchanged files come
   back from SQLite without them. An `interface` or `type` declaration is a `Const` too, so its
   name is stored (its members are not). `Code` records every file it needs but lacks as a miss, and
-  `refresh` re-parses those and extracts again until none is missed. A contract kind that reads a
+  every file of `full` it looks into (`Code::read`); `refresh` re-parses the files the last
+  extraction read (`valued`) before its first pass, then the missed ones, and extracts again the
+  packs that missed until none does. A contract kind that reads a
   value from a new place relies on this loop.
 - Links are never stored. They derive from the stored provider and consumer contracts, then the
   decisions replay, when a query runs, so a change on either side, or to a decisions file, needs
@@ -2193,7 +2197,11 @@ qualification budget does (ADR 0017).
 - `lang/csharp.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the C# pack as they bound the Java pack's, with the same
   outcome past each (a call inside a definition nested too deep is `(opaque).`, resolving to
-  nothing); `PROJECT_USINGS` (256) bounds the distinct usings `join` adds to every file of a
+  nothing); the budget is charged each visit only for the enclosing name past
+  `QUALIFICATION_FREE` (256 bytes), so a generated file of short names reads whole at any size
+  (`MAX_BYTES`), and a file past it keeps no facts and `Facts::budget` (not `unbuilt`, which a
+  pack sets for a file it leaves out on purpose) makes `meada status` name it (`index::export`
+  reads it from the stored facts of the files with no symbols, as `Export::dropped`); `PROJECT_USINGS` (256) bounds the distinct usings `join` adds to every file of a
   project, past which the project's files keep no facts, since a partial set could make a
   name exact that a missing using leaves ambiguous. The C# hostile-depth, long-prefix and
   pack unit tests exceed them. Beyond the limits, what the pack leaves out (spec #28, #107):
@@ -2306,7 +2314,9 @@ qualification budget does (ADR 0017).
 - `engine.rs`: one connection attaches every peer, so a workspace reads at most 10 peers
   (`MAX_PEERS`, SQLite's attach limit). `search` scans every symbol.
 - `index.rs`: every contract is extracted again and every call resolved again on any change
-  (rows rewritten only when they differ). An unreadable `contracts.fragments` value is read as
+  (rows rewritten only when they differ), and every file whose values the last extraction read
+  (`valued`) is parsed again for it: on this repository, a one-line edit of a Rust file parses
+  about 530 files again (#391). An unreadable `contracts.fragments` value is read as
   no fragments, since only `refresh` writes it. A manifest or pack config file (`package.json`,
   `pyproject.toml`, `requirements*.txt`, `Cargo.toml`, `go.mod`, `tsconfig.json`, `jsconfig.json`) is read up to one
   byte past `lang::MAX_BYTES`, and a provider document up to one byte past
@@ -2351,15 +2361,21 @@ qualification budget does (ADR 0017).
   that is absent, so every member of the class is unknown (a name match at most), and the
   linearization recurses no deeper down the bases. The bases count from where the walk
   started, a family looked up for a member a base names (`class Z(K.D)` linearizes `K`'s)
-  included.
+  included. The families being linearized are the resolver's (`Resolver::linearizing`), so a
+  lookup that begins its own walk (a glob, an alias, an on-demand import, a base, a receiver)
+  sees and counts them too: a `using static N.A;` read to name `A`'s base (`class A : Inner`)
+  does not linearize `A` inside itself, the member it asks of `A` is answered as in a cycle, and
+  the base is opaque unless another import names it.
   `LINK_DEPTH` (64): a name followed through more links than that, each into the next (a file
   re-exporting it from another: `export { x } from`, `export * from`, a Python `from m import x`
   or `import *`, a Rust `pub use`; a Rust alias, `use a as b`, or glob, `use m::*`), is unknown
   (a name match at most), and no other import, `export *`, glob or submodule binds it in its
-  place. A star import from outside the repository (`from numpy import *`) is taken to bind
-  nothing (`ponytail:` in `Resolver::imported`): a name it rebinds stays linked `exact` to the
-  import or definition before it, as with the standard library's accelerator modules (`from
-  _heapq import *` after `def heappush`). Where a Python star import sits is not compared with
+  place. The links count across a walk begun past a glob, an alias or an on-demand import: it
+  goes on from the links already followed (`Resolver::links`). A star import from outside the
+  repository (`from numpy import *`) is taken to bind nothing (`ponytail:` in
+  `Resolver::imported`): a name it rebinds stays linked `exact` to the import or definition
+  before it, as with the standard library's accelerator modules (`from _heapq import *` after
+  `def heappush`). Where a Python star import sits is not compared with
   the code that reads a name it rebinds (`ponytail:` in `Resolver::rebound`): code run while
   the module loads (its top level, a class body there, its main guard) gets the name unknown, as
   it may run before the star import, and a function's code gets the star import's, as for every
@@ -2368,8 +2384,9 @@ qualification budget does (ADR 0017).
   takes the class of a call's result on the next, `let x = y.f()`, `Class::Returned`), holds an
   unknown class.
   The receivers count from where the walk started. When `FAMILY_DEPTH` or `RECEIVER_DEPTH` cuts
-  a walk, the families being linearized give up and none is kept: each is linearized again when
-  asked for, and does not depend on the walk that first reached it.
+  a walk, or `LINK_DEPTH` cuts one begun past an import, the families being linearized give up
+  and none is kept: each is linearized again when asked for, and does not depend on the walk
+  that first reached it.
 - `lang/go/values.rs`: `VALUE_DEPTH` (64): a value (an argument, a returned or held expression)
   nested deeper (`f(g(h(..)))`) is unknown. A name is a constant only when it is bound once in
   the function (`:=` or `var`, one name, never assigned, in a statement of the function body, not

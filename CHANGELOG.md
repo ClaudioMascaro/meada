@@ -8,6 +8,20 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A C# file of a few hundred KB (an Entity Framework model snapshot) is no longer dropped
+  silently: the qualification budget is charged for enclosing names past 256 bytes, not for every
+  node, so a generated file reads whole. A file the budget still drops (a long namespace repeated
+  across a broad file) is named by a `meada status` line.
+- `node_modules` and `Pods` directories, the `Checkouts` of `Carthage` and `*.min.js` and
+  `*.min.css` files stay out of the index, whether or not an ignore file lists them. A
+  `.meadaignore` file, at the root or nested, is read like a `.gitignore`.
+- A Rust `mod` a test build compiles (`#[cfg(any(test, feature = "p"))]`, `#[cfg(all(test, unix))]`)
+  is indexed, not only a `#[cfg(test)]` one; any other item is still judged with `test` false.
+- A Swift `Package@swift-<version>.swift` is a manifest, not code: it yields no symbols or calls.
+- A static import of a class whose own base is looked up through it (a C# `using static N.A;`
+  beside `class A : Inner`, as in efcore; Java's `import static p.A.*;` the same way) no longer
+  overflows the stack of the indexer: the base is opaque unless another import names it, and
+  the depth limits bound the whole walk past every import.
 - A C# `internal` type (one with no access modifier too) links from its own project's files
   alone: a file of another project of the repository gets no link to it, and the name binds to
   the type that file sees (a public one of the same name, or one a `using` brings even from a

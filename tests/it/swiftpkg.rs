@@ -312,3 +312,35 @@ fn edited_package_swift_files_refresh_like_a_cold_workspace() {
     change_manifests(&cold);
     assert_eq!(refreshed, exports(&cold));
 }
+
+#[test]
+fn a_version_specific_manifest_is_not_code_and_a_lookalike_is() {
+    let kit = fixture_repo("swift_version_manifest", "swift-pkg-kit", None);
+    let json = |repo: &Path| -> Value { serde_json::from_str(&export(repo)).unwrap() };
+    let paths = |json: &Value| -> Vec<String> {
+        (json["files"].as_array().unwrap().iter())
+            .map(|f| f["path"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let before = json(&kit);
+    fs::copy(
+        kit.join("Package.swift"),
+        kit.join("Package@swift-6.0.swift"),
+    )
+    .unwrap();
+    fs::write(
+        kit.join("Sources/Kit/Package+Extras.swift"),
+        "func extra() {}\n",
+    )
+    .unwrap();
+    let after = json(&kit);
+    assert_eq!(after["providers"], before["providers"]);
+    assert_eq!(after["packages"], before["packages"]);
+    let after_files = paths(&after);
+    assert!(!after_files.iter().any(|p| p.contains("Package@swift")));
+    assert!(
+        after_files
+            .iter()
+            .any(|p| p.ends_with("Package+Extras.swift"))
+    );
+}
