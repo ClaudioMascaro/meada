@@ -600,6 +600,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 let ctor = qualify(&scope, &format!("{class}({})", types.join(",")));
                 facts.defs.push(Def {
                     result: Some(Class::Type(class.to_string())),
+                    suspends: false,
                     ..definition(&ctor, Kind::Method, node.byte_range(), params)
                 });
                 if access.max(own_access(node, src)) != Access::Public {
@@ -916,6 +917,7 @@ fn definition(name: &str, kind: Kind, range: Range<usize>, params: Vec<Param>) -
         returns: None,
         type_params: Vec::new(),
         result: None,
+        suspends: false,
     }
 }
 
@@ -1589,6 +1591,7 @@ fn call(node: Node, src: &[u8], scope: &str, implicit: Implicit, lambdas: bool) 
         scope: scope.to_string(),
         callee,
         arity: Some(args.len()),
+        awaited: false,
         labels: None,
         constructs: false,
         range: node.byte_range(),
@@ -1961,6 +1964,7 @@ fn annotations_of<'s>(modifiers: Node, src: &'s [u8], scope: &str) -> Vec<(Call,
             scope: scope.to_string(),
             callee: name,
             arity: None,
+            awaited: false,
             labels: None,
             constructs: false,
             range: annotation.byte_range(),

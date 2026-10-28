@@ -92,6 +92,7 @@ impl LanguagePack for TsJs {
                         .and_then(|t| types::returned(t, src, &parents)),
                     type_params: types::type_parameters(node, src),
                     result: None,
+                    suspends: false,
                     name: inner.clone(),
                     kind,
                     range,
@@ -116,6 +117,7 @@ impl LanguagePack for TsJs {
                         facts.calls.push(Call {
                             arity: None,
                             labels: None,
+                            awaited: false,
                             constructs: false,
                             scope: scope.clone(),
                             callee: callee(function, src),

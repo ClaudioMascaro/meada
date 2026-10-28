@@ -1,0 +1,218 @@
+{
+  "repository": "example.com/acme/conformance",
+  "files": [
+    {
+      "path": "Sources/Plain.swift",
+      "hash": "9300d641cc6579803e3ff237f3d0731f6444f232254aa5286351785cee27b31f"
+    },
+    {
+      "path": "Sources/Uses.swift",
+      "hash": "669a25b37d3111e1542ef36bbe36bf2e7c7e9fa273537cab4ec7173d1bd729a4"
+    },
+    {
+      "path": "Sources/Wrapper.swift",
+      "hash": "ecae0b3cba4b4d01a85d442869ba62ca3f9731717f46fd29c24bcf96a8e4301c"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/conformance::Sources/Plain.swift::Check(_:)",
+      "span": {
+        "path": "Sources/Plain.swift",
+        "start": 0,
+        "end": 23
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Plain.swift::check(_:)",
+      "span": {
+        "path": "Sources/Plain.swift",
+        "start": 24,
+        "end": 47
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Plain.swift::run()",
+      "span": {
+        "path": "Sources/Plain.swift",
+        "start": 48,
+        "end": 81
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::Store",
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 15,
+        "end": 64
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::Store.init(initialState:)",
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 38,
+        "end": 62
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::awaited()",
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 96,
+        "end": 154
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::g()",
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 66,
+        "end": 94
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::synchronous()",
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 156,
+        "end": 206
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::types()",
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 208,
+        "end": 279
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Wrapper.swift::XCTAssertNoThrow(_:file:)",
+      "span": {
+        "path": "Sources/Wrapper.swift",
+        "start": 15,
+        "end": 129
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/conformance::Sources/Plain.swift::run()::Check#0",
+      "caller": "example.com/acme/conformance::Sources/Plain.swift::run()",
+      "target": "example.com/acme/conformance::Sources/Plain.swift::Check(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Plain.swift",
+        "start": 61,
+        "end": 69
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Plain.swift::run()::check#0",
+      "caller": "example.com/acme/conformance::Sources/Plain.swift::run()",
+      "target": "example.com/acme/conformance::Sources/Plain.swift::check(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Plain.swift",
+        "start": 71,
+        "end": 79
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::awaited()::XCTAssertNoThrow#0",
+      "caller": "example.com/acme/conformance::Sources/Uses.swift::awaited()",
+      "target": "example.com/acme/conformance::Sources/Wrapper.swift::XCTAssertNoThrow(_:file:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 127,
+        "end": 152
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::awaited()::g#0",
+      "caller": "example.com/acme/conformance::Sources/Uses.swift::awaited()",
+      "target": "example.com/acme/conformance::Sources/Uses.swift::g()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 148,
+        "end": 151
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::synchronous()::XCTAssertNoThrow#0",
+      "caller": "example.com/acme/conformance::Sources/Uses.swift::synchronous()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 179,
+        "end": 204
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::synchronous()::g#0",
+      "caller": "example.com/acme/conformance::Sources/Uses.swift::synchronous()",
+      "target": "example.com/acme/conformance::Sources/Uses.swift::g()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 200,
+        "end": 203
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::types()::Store#0",
+      "caller": "example.com/acme/conformance::Sources/Uses.swift::types()",
+      "target": "example.com/acme/conformance::Sources/Uses.swift::Store.init(initialState:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 229,
+        "end": 261
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::types()::Text#0",
+      "caller": "example.com/acme/conformance::Sources/Uses.swift::types()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 268,
+        "end": 277
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [],
+  "communities": [
+    {
+      "name": "Sources",
+      "members": [
+        "example.com/acme/conformance::Sources/Plain.swift::Check(_:)",
+        "example.com/acme/conformance::Sources/Plain.swift::check(_:)",
+        "example.com/acme/conformance::Sources/Plain.swift::run()"
+      ]
+    },
+    {
+      "name": "Sources#2",
+      "members": [
+        "example.com/acme/conformance::Sources/Uses.swift::Store.init(initialState:)",
+        "example.com/acme/conformance::Sources/Uses.swift::types()"
+      ]
+    },
+    {
+      "name": "Sources#3",
+      "members": [
+        "example.com/acme/conformance::Sources/Uses.swift::awaited()",
+        "example.com/acme/conformance::Sources/Uses.swift::g()",
+        "example.com/acme/conformance::Sources/Uses.swift::synchronous()",
+        "example.com/acme/conformance::Sources/Wrapper.swift::XCTAssertNoThrow(_:file:)"
+      ]
+    }
+  ],
+  "links": []
+}

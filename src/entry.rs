@@ -278,6 +278,7 @@ mod tests {
                 returns: None,
                 type_params: Vec::new(),
                 result: None,
+                suspends: false,
             });
         }
         let files = BTreeMap::from([("cmd.py", &facts)]);
@@ -319,6 +320,7 @@ mod tests {
                 returns: None,
                 type_params: Vec::new(),
                 result: None,
+                suspends: false,
             });
             exported.push(Exported {
                 path: "cmd.py".into(),
@@ -385,6 +387,7 @@ mod tests {
             returns: None,
             type_params: Vec::new(),
             result: None,
+            suspends: false,
         };
         // `T` holds `n` lower-case methods, no door each, and `Run`.
         let methods = (0..n).map(|i| format!("T.a{i}"));

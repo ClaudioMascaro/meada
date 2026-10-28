@@ -112,6 +112,7 @@ impl LanguagePack for Python {
                             returns: None,
                             type_params: Vec::new(),
                             result: None,
+                            suspends: false,
                         });
                         facts.programs.push(MAIN.to_string());
                     }
@@ -159,6 +160,7 @@ impl LanguagePack for Python {
                                 returns: None,
                                 type_params: Vec::new(),
                                 result: None,
+                                suspends: false,
                             });
                         }
                         if !is_class {
@@ -198,6 +200,7 @@ impl LanguagePack for Python {
                         let (args, kwargs) = arguments(node, src);
                         facts.calls.push(Call {
                             arity: None,
+                            awaited: false,
                             labels: None,
                             constructs: false,
                             scope: scope.clone(),

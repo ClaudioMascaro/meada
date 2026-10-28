@@ -362,6 +362,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 decorators: Vec::new(),
                 return_values: Vec::new(),
                 returns: None,
+                suspends: false,
                 type_params: Vec::new(),
                 result: match node
                     .child_by_field_name("type")
@@ -1091,6 +1092,7 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
         arity: None,
         labels: None,
         constructs: false,
+        awaited: false,
         range,
         args: Vec::new(),
         kwargs: Vec::new(),

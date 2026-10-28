@@ -944,6 +944,7 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
         arity: None,
         labels: None,
         constructs: false,
+        awaited: false,
         scope: scope.to_string(),
         callee,
         range,
@@ -971,6 +972,7 @@ fn def(name: String, kind: Kind, range: Range<usize>, params: Vec<Param>) -> Def
         returns: None,
         type_params: Vec::new(),
         result: None,
+        suspends: false,
     }
 }
 
