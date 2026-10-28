@@ -4,4 +4,5 @@ example.com/chain/catalog (../chain-catalog) indexed, 4 files
   resource::postgres::orders: `via` lib/gone.ts::sync matches no symbol, ignored
   resource::postgres::orders: no `via` matches a symbol, so the repository as a whole is the side
 example.com/chain/web (../chain-web) indexed, 5 files
+  wrong conclusion? report it: https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml
 example.com/chain/worker (../chain-worker) indexed, 3 files

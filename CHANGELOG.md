@@ -8,6 +8,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- `meada status` ends a repository's lines with a pointer to the new `inference` issue form when the
+  repository holds a shape drift or an `inferred` link, so a wrong conclusion can be reported.
+  The MCP tools never print it.
 - `search` with kind `duplicate` lists the symbols whose text is the same in two or more places
   of the workspace, across repositories or within one: groups of exact copies (no
   normalisation), longest first, found by a member's name or path. Each symbol stores the BLAKE3
