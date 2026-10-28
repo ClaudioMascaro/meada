@@ -1840,11 +1840,12 @@ one for the area a change touches.
   text-only literal (any other fallback is a `Hole`: which value is the base is unknown); it
   is also the one value an interpolation may hold besides a name. The pack decides by the
   spelling alone, as Go's and Rust's do; a repository type named `ProcessInfo` is not looked for. Vapor's
-  `Environment.get` and an optional binding are no reads. `http` takes the leading `Env` as the
+  `Environment.get` is no read; an `if let` or `guard let` of one read is (see `Facts::bound`). `http` takes the leading `Env` as the
   `base_url_env` variable, as for every language. A closure written in code (not in a
   type's property initializer) is a `Kind::Inline` definition named `<scope>.@<offset>`, and the
   calls and names inside it belong to that scope. `Facts::bound` holds a `let` or `var` of one name given
-  a call, a name or a string (#121), and drops the name when another binding of the
+  a call, a name or a string (#121), and an `if let` or `guard let` of one name given one
+  environment read (#388), and drops the name when another binding of the
   function (a loop variable, an `if let`, a `guard let`, a `catch`, a `case let`, a `var` or
   another `let` in a block) also declares it, when its function (or a closure in it) assigns it
   (`x = ..`, `&x`) or calls a method on a `var` of the name that holds a string, a name or a URL

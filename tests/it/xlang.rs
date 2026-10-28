@@ -786,6 +786,10 @@ fn a_swift_base_url_is_the_variable_of_exactly_one_process_environment_read() {
         ("interpolated", "INTERPOLATED_URL"),
         ("topLevel", "PKG_URL"),
         ("typeLevel", "STATIC_URL"),
+        ("optionalBinding", "BINDING_URL"),
+        ("guardLet", "GUARD_URL"),
+        ("guardWithCondition", "COND_URL"),
+        ("guardFallback", "GUARD_FALLBACK_URL"),
     ];
     for (function, variable) in read {
         let expected = format!("env:{variable}");
@@ -807,7 +811,9 @@ fn a_swift_base_url_is_the_variable_of_exactly_one_process_environment_read() {
         "assignedAgain",
         "vaporEnvironment",
         "ofAnotherObject",
-        "optionalBinding",
+        "guardVar",
+        "guardVapor",
+        "shadowed",
     ];
     for function in unread {
         assert_eq!(vias.get(function), Some(&None), "{function}");
