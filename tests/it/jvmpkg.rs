@@ -621,6 +621,36 @@ fn on_demand_candidates_and_shadowing_names_never_give_a_wrong_exact() {
 }
 
 #[test]
+fn a_call_with_several_arguments_reaches_a_provider_varargs_method() {
+    let [maven, _, client, _] = workspace("jvm_imports_varargs");
+    let write = |root: &PathBuf, path: &str, source: &str| {
+        let path = root.join(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, source).unwrap();
+    };
+    write(
+        &maven,
+        "models/src/main/java/example/models/Pack.java",
+        "package example.models; public class Pack { public static int all(String... parts) { return 0; } }",
+    );
+    write(
+        &client,
+        "src/main/java/example/web/Packs.java",
+        "package example.web; import example.models.Pack; public class Packs { public int two() { return Pack.all(\"a\", \"b\"); } }",
+    );
+    let json: Value =
+        serde_json::from_str(&Engine::open(&client).unwrap().export().unwrap()).unwrap();
+    let found = imports(&json, &format!("{CLIENT}Packs.java::"));
+    assert_eq!(found.len(), 1, "{found:?}");
+    let (_, _, name, level, _, target) = found[0];
+    assert_eq!((name, level), ("all(2)", "exact"));
+    assert!(
+        target.ends_with("Pack.java::example.models.Pack.all(String...)"),
+        "{target}"
+    );
+}
+
+#[test]
 fn an_import_merges_the_overloads_of_the_provider_class_family() {
     let [_, _, client, _] = workspace("jvm_imports_family");
     let json: Value =

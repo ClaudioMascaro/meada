@@ -320,9 +320,13 @@ fn parse(src: &[u8]) -> Result<Facts> {
             );
             let params = parameters
                 .into_iter()
-                .map(|(name, _, _)| Param {
+                .map(|(name, ty, _)| Param {
                     name,
-                    binds: Binds::Any,
+                    binds: if ty.ends_with("...") {
+                        Binds::Rest
+                    } else {
+                        Binds::Any
+                    },
                     label: None,
                     default: None,
                     fields: Vec::new(),

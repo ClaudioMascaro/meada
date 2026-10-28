@@ -682,6 +682,66 @@ fn java_static_calls_resolve_overloads_by_argument_count() {
 }
 
 #[test]
+fn a_java_spread_parameter_takes_any_number_of_arguments() {
+    let repo = fixture_repo("java_varargs", "conformance-java", Some(ORIGIN));
+    for (path, source) in [
+        (
+            "p/Asserts.java",
+            "package p; public final class Asserts { \
+             public static void eq(int a, int b) {} public static void eq(long a, long b) {} \
+             public static void eq(Object a, Object b) {} public static void eq(int a, int b, String m) {} \
+             public static void any(String... parts) {} public static void one(int a) {} \
+             public static void f(int a, String... r) {} }",
+        ),
+        (
+            "q/Use.java",
+            "package q; import static p.Asserts.*; public class Use { public static void run() { \
+             any(); any(\"a\"); any(\"a\", \"b\"); eq(1, 2, \"m\"); one(1); eq(1, 2); \
+             f(1); f(1, \"x\", \"y\"); f(); } }",
+        ),
+    ] {
+        let path = repo.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, source).unwrap();
+    }
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let calls: Vec<_> = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["caller"].as_str().unwrap().ends_with("q.Use.run()"))
+        .collect();
+    let at = |id: &str| {
+        calls
+            .iter()
+            .find(|c| c["id"].as_str().unwrap().ends_with(id))
+            .unwrap()
+    };
+    for (id, level, target) in [
+        ("::any#0", "exact", "any(String...)"),
+        ("::any#1", "exact", "any(String...)"),
+        ("::any#2", "exact", "any(String...)"),
+        ("::eq#0", "exact", "eq(int,int,String)"),
+        ("::one#0", "exact", "one(int)"),
+        ("::f#0", "exact", "f(int,String...)"),
+        ("::f#1", "exact", "f(int,String...)"),
+    ] {
+        let found = at(id);
+        assert_eq!(found["level"], level, "{id}: {found}");
+        assert!(
+            found["target"].as_str().unwrap().ends_with(target),
+            "{id}: {found}"
+        );
+    }
+    let two = at("::eq#1");
+    assert_eq!(two["level"], "ambiguous", "{two}");
+    assert_eq!(two["candidates"].as_array().unwrap().len(), 3);
+    assert!(at("::f#2")["target"].is_null());
+    assert_ne!(at("::f#2")["level"], "exact");
+}
+
+#[test]
 fn java_imports_constructors_and_enclosed_calls_reach_the_written_symbols() {
     let repo = fixture_repo("java_imports", "conformance-java", Some(ORIGIN));
     let engine = Engine::open(&repo).unwrap();

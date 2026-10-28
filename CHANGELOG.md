@@ -8,6 +8,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Java call with two or more arguments to a varargs method (`any(String... parts)`) reaches it:
+  a spread parameter takes any number of arguments, as Kotlin's `vararg` does, and the method is
+  among the functions of the `flexible` table.
 - A method annotation of a Java or Kotlin class whose family has a base from outside the
   repository is read through the file's imports, so a Spring controller, a JAX-RS resource, a
   declarative client (Feign, Retrofit) and a channel listener (`@KafkaListener`, `@RabbitListener`,
