@@ -2412,13 +2412,28 @@ impl<'a> Resolver<'a> {
         std::borrow::Cow::Owned(parts.collect())
     }
 
-    /// One class for `all` when they are the parts of one type (`parts`): the first part.
+    /// One class for `all` when they are the parts of one type (`parts`): the first part; or
+    /// when they are a Kotlin `expect` class and `actual` ones of its name (`Facts::expect`):
+    /// the `expect` one, whatever the source set asking.
     fn one_type(&self, all: &[Target<'a>]) -> Option<Target<'a>> {
         let first = *all.iter().min()?;
-        let paths = self.parts_of(first)?;
-        all.iter()
-            .all(|t| t.name == first.name && paths.contains(&t.path))
-            .then_some(first)
+        if let Some(paths) = self.parts_of(first) {
+            return (all.iter())
+                .all(|t| t.name == first.name && paths.contains(&t.path))
+                .then_some(first);
+        }
+        let declares = |t: &Target, of: fn(&Facts) -> &Vec<String>| {
+            self.files
+                .get(t.path)
+                .is_some_and(|f| of(f).iter().any(|n| n == t.name))
+        };
+        let mut expect = all.iter().filter(|t| declares(t, |f| &f.expect));
+        let (Some(&expect), None) = (expect.next(), expect.next()) else {
+            return None;
+        };
+        (all.iter())
+            .all(|t| *t == expect || (t.name == expect.name && declares(t, |f| &f.actual)))
+            .then_some(expect)
     }
 
     /// `member` of `class` in its blocks (`Facts::impls`): the inherent blocks' first, else the
@@ -3277,7 +3292,10 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
     ) -> Option<Binding<'a>> {
         let imports = &self.files[path].imports;
-        let mut candidates = Vec::new();
+        // Where globs combine, the `inside` ones that give the name come before the others,
+        // and combine with each other (Kotlin's written star imports, which see `internal`
+        // members), but for the file's own package's, which stops the reading.
+        let (mut candidates, mut inner) = (Vec::new(), Vec::new());
         for &at in self.by_local[path]
             .of(&crate::qualify(scope, "*"))
             .iter()
@@ -3323,13 +3341,28 @@ impl<'a> Resolver<'a> {
                     | Binding::External(..)
                     | Binding::Module(_)
             ) {
-                if !self.unordered_globs || *inside {
-                    return Some(found);
+                match (self.unordered_globs, *inside) {
+                    (false, _) => return Some(found),
+                    (true, true) if inner.is_empty() && self.own_glob(path, target) => {
+                        return Some(found);
+                    }
+                    (true, true) => inner.push(found),
+                    (true, false) if inner.is_empty() => candidates.push(found),
+                    (true, false) => break,
                 }
-                candidates.push(found);
             }
         }
-        alternatives(candidates)
+        alternatives(if inner.is_empty() { candidates } else { inner })
+    }
+
+    /// Whether the glob of `path` whose target is the import `target` takes the file's own
+    /// package (`wildcard`'s `Imported::Namespace` source).
+    fn own_glob(&self, path: &'a str, target: &str) -> bool {
+        let facts = &self.files[path];
+        (self.by_local[path].of(target).iter().rev())
+            .map(|&at| &facts.imports[at])
+            .find(|i| matches!(i.name, Imported::Namespace))
+            .is_some_and(|i| i.source == facts.package)
     }
 
     /// What the callee-like name `target` written in `scope` gives (a `use` path): its head
@@ -10525,6 +10558,67 @@ mod csharp_tests {
                 ("Util.Go".to_string(), "exact", a),
                 ("Util.Go".to_string(), "exact", o),
             ]
+        );
+    }
+}
+
+#[cfg(test)]
+mod kotlin_tests {
+    use super::*;
+    use crate::lang::LanguagePack;
+    use crate::lang::java::Java;
+    use crate::lang::kotlin::Kotlin;
+
+    /// How each call of the Kotlin `files` resolves, with Java's resolver as the index builds
+    /// it: `path scope callee` to the level and each target's `path::name`.
+    fn resolved(files: &[(&str, &str)]) -> BTreeMap<String, String> {
+        let parsed: Vec<(&str, Facts)> = (files.iter())
+            .map(|(p, s)| (*p, Kotlin.parse(p, s.as_bytes()).unwrap()))
+            .collect();
+        let files: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let layout = Java.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
+        let at = |t: &Target| format!("{}::{}", t.path, t.name);
+        let mut out = BTreeMap::new();
+        for (&path, facts) in &files {
+            for call in &facts.calls {
+                let found = match resolver.call(path, call) {
+                    Resolution::Exact(t) => format!("exact {}", at(&t)),
+                    Resolution::Inferred(t) | Resolution::Narrowed(t) => {
+                        format!("inferred {}", at(&t))
+                    }
+                    Resolution::Ambiguous(ts) => {
+                        format!(
+                            "ambiguous {}",
+                            ts.iter().map(at).collect::<Vec<_>>().join(" ")
+                        )
+                    }
+                    Resolution::Unresolved => "none".to_string(),
+                };
+                out.insert(format!("{path} {} {}", call.scope, call.callee), found);
+            }
+        }
+        out
+    }
+
+    /// A class of the file's own package hides one a star import gives, and two star imports
+    /// that give one name leave it ambiguous, as the compiler finds it.
+    #[test]
+    fn the_own_package_comes_before_star_imports_and_two_stars_are_ambiguous() {
+        let base = |package: &str| format!("package {package}\nopen class Base\n");
+        let (t, v) = (base("t"), base("v"));
+        let own = "package u\nimport t.*\nclass Base\nfun go() { Base() }\n";
+        let two = "package w\nimport t.*\nimport v.*\nfun go() { Base() }\n";
+        let found = resolved(&[
+            ("t/Base.kt", &t),
+            ("v/Base.kt", &v),
+            ("u/U.kt", own),
+            ("w/W.kt", two),
+        ]);
+        assert_eq!(found["u/U.kt u.go() Base"], "exact u/U.kt::u.Base");
+        assert_eq!(
+            found["w/W.kt w.go() Base"],
+            "ambiguous t/Base.kt::t.Base v/Base.kt::v.Base"
         );
     }
 }
