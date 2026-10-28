@@ -12,7 +12,7 @@ use tree_sitter_language::LanguageFn;
 use super::{
     Annotated, Binds, Bound, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported,
     Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Receiver, Value, bare_calls,
-    children, named, text, wildcard,
+    children, field_write, named, text, wildcard,
 };
 use crate::{Result, qualify};
 
@@ -265,8 +265,13 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     // Names a class or the file declares as properties, and the typed locals, which a field of
     // the same name hides where the source does not say which one a use reads.
     let mut fields: BTreeSet<(String, String)> = BTreeSet::new();
-    // The names some assignment writes, which no one value stands for (`Code::field_written`).
-    let mut writes = BTreeSet::new();
+    // The assignments to a name that can be a property (`f = v`, `this.f = v`, `o.f = v`, `f++`)
+    // with where each is and whether it may be a property of the class around it (`this.f`, or
+    // a bare `f` no local or parameter declares), and the properties by the class `Marked`
+    // names, which `Code::field_written_in` is asked about.
+    let mut writes: Vec<(String, String, bool)> = Vec::new();
+    let mut members: BTreeSet<(String, String)> = BTreeSet::new();
+    let mut classes: BTreeSet<String> = BTreeSet::new();
     let mut locals: Vec<Receiver> = Vec::new();
     // The `val`s of unknown class a `Bound` was recorded for, by qualified name.
     let mut vals: Vec<String> = Vec::new();
@@ -326,6 +331,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     None => continue,
                 };
                 inner = Rc::new(qualify(&scope, &name));
+                classes.insert(inner.as_ref().clone());
                 inner_access = access.max(own_access(node, src));
                 inner_place = Place::Class;
                 inner_generics = with_parameters(&generics, node, src);
@@ -522,6 +528,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                             class: class.clone(),
                         };
                         property(&mut facts, place, bound, constant, initial, src);
+                        members.insert((scope.as_ref().clone(), name.to_string()));
                         let on = Marked::Field {
                             class: scope.as_ref().clone(),
                             name: name.to_string(),
@@ -550,6 +557,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     let on = Marked::Param(scope.as_ref().clone(), at);
                     mark(&mut facts, on, node, src, &scope, PARAM_TARGETS);
                     if written {
+                        members.insert((scope.as_ref().clone(), name.to_string()));
                         let on = Marked::Field {
                             class: scope.as_ref().clone(),
                             name: name.to_string(),
@@ -705,9 +713,23 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     }
                 }
             }
-            "assignment" => {
-                assigned(&mut facts.calls, node, src);
-                writes.extend(assignee(node, src));
+            "assignment" | "unary_expression" => {
+                let target = if node.kind() == "assignment" {
+                    assigned(&mut facts.calls, node, src);
+                    node.child_by_field_name("left")
+                } else {
+                    let step = text(node, src);
+                    let step = ["++", "--"]
+                        .iter()
+                        .any(|op| step.starts_with(op) || step.ends_with(op));
+                    node.child_by_field_name("argument").filter(|_| step)
+                };
+                if let Some((name, own)) = target.and_then(|t| write_target(t, src)) {
+                    // The `this` and the members of a lambda or an object literal are not the
+                    // class's.
+                    let own = own && !opaque && implicit == Implicit::Enclosing;
+                    writes.push((scope.as_ref().clone(), text(name, src).to_string(), own));
+                }
             }
             "call_expression" => {
                 if let Some((lambda, found)) = tracked_call(node, src) {
@@ -825,13 +847,20 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
             local.class = Class::Unknown;
         }
     }
-    for name in writes {
-        facts.consts.push(Const {
-            name: format!(".{name}"),
-            value: Value::Unknown,
-            ty: None,
-            scope: None,
-        });
+    // A write of a property of the class around it, the innermost one, names that class; any
+    // other, a property it inherits, one of an outer class its own class may inherit, an
+    // extension receiver's or one of another object, names none.
+    let writes: BTreeSet<(String, Option<String>)> = (writes.into_iter())
+        .map(|(scope, name, own)| {
+            let around = (classes.iter())
+                .filter(|at| encloses(at, &scope))
+                .max_by_key(|at| at.len());
+            let owner = around.filter(|at| own && members.contains(&((*at).clone(), name.clone())));
+            (name, owner.cloned())
+        })
+        .collect();
+    for (name, class) in writes {
+        facts.consts.push(field_write(&name, class.as_deref()));
     }
     facts.receivers.extend(locals);
     facts.receivers = merge(std::mem::take(&mut facts.receivers));
@@ -1713,15 +1742,59 @@ fn template(parts: &mut Vec<Part>, text: &str) {
     append(parts, vec![Part::Text(rest.into())]);
 }
 
-/// The name an assignment writes: a bare name, or the last of a path (`this.base`, `o.base`).
-fn assignee(node: Node, src: &[u8]) -> Option<String> {
-    let left = node.child_by_field_name("left")?;
-    let name = match left.kind() {
-        "identifier" => Some(left),
-        "navigation_expression" => named(left).last().filter(|n| n.kind() == "identifier"),
+/// The name `target`, the left side of an assignment or the operand of `++`, writes if it is
+/// one that can be a property, and whether it may be a property of the class around it: a bare
+/// name no local or parameter declared before it, or `this.name`; the last of any other path
+/// (`o.base`) is one of another object.
+fn write_target<'t>(target: Node<'t>, src: &[u8]) -> Option<(Node<'t>, bool)> {
+    match target.kind() {
+        "identifier" => (!declared_before(target, src)).then_some((target, true)),
+        "navigation_expression" => {
+            let parts: Vec<Node> = named(target).collect();
+            let name = parts.last().filter(|n| n.kind() == "identifier")?;
+            let this = parts.len() == 2 && text(parts[0], src) == "this";
+            Some((*name, this))
+        }
         _ => None,
-    };
-    name.map(|n| text(n, src).to_string())
+    }
+}
+
+/// Whether the identifier `name` is a local or a parameter declared before it, in a block
+/// around it, a loop, a `catch`, a lambda or the function.
+// ponytail: a local of the script around it is not read, so an assignment to one counts as a
+// write of a property of that name.
+fn declared_before(name: Node, src: &[u8]) -> bool {
+    let wanted = text(name, src);
+    let mut child = name;
+    while let Some(parent) = child.parent() {
+        let outer = |n: Node| matches!(n.kind(), "class_body" | "enum_class_body" | "source_file");
+        // A property's own name is no local of its initializer.
+        let member = parent.kind() == "property_declaration" && parent.parent().is_some_and(outer);
+        if outer(parent) {
+            return false;
+        }
+        let mut before = named(parent).take_while(|n| n.id() != child.id());
+        if !member && before.any(|s| declares(parent, s, wanted, src)) {
+            return true;
+        }
+        child = parent;
+    }
+    false
+}
+
+/// Whether `sibling`, a child of `parent`, declares the name `wanted`.
+fn declares(parent: Node, sibling: Node, wanted: &str, src: &[u8]) -> bool {
+    match sibling.kind() {
+        "variable_declaration" | "parameter" => named(sibling)
+            .next()
+            .is_some_and(|i| i.kind() == "identifier" && text(i, src) == wanted),
+        "property_declaration"
+        | "multi_variable_declaration"
+        | "function_value_parameters"
+        | "lambda_parameters" => named(sibling).any(|n| declares(sibling, n, wanted, src)),
+        "identifier" => parent.kind() == "catch_block" && text(sibling, src) == wanted,
+        _ => false,
+    }
 }
 
 /// Records `name = value` and `this.name = value`, written in a lambda that is a call's
@@ -2672,9 +2745,9 @@ mod tests {
     }
 
     /// A field some code assigns holds no one value, so Spring's injection is not its value
-    /// (`Code::field_written`, which reads the `.name` constants).
+    /// (`Code::field_written_in`, which reads the `.name` constants).
     #[test]
-    fn every_assignment_to_a_name_is_recorded_as_a_write() {
+    fn every_assignment_to_a_name_that_can_be_a_property_is_recorded_as_a_write() {
         let source = br#"package a
 class C {
     @Value("\${k}") lateinit var base: String
@@ -2687,7 +2760,7 @@ class C {
             .filter_map(|c| c.name.strip_prefix('.'))
             .collect();
         written.sort();
-        assert_eq!(written, ["base", "other", "third"]);
+        assert_eq!(written, ["base@a.C", "other", "third"]);
     }
 
     /// Spring injects a property annotated with no target or with `field`, `param`, `set` or
@@ -2874,5 +2947,51 @@ class A {
                 "a.A", "a.A.p", "a.A.q", "a.A.r", "a.A.s", "a.A.t", "a.A.z()"
             ]
         );
+    }
+
+    /// The markers `Code::field_written_in` reads (`Const`s named `.f` or `.f@class`) of a source.
+    fn writes(src: &str) -> Vec<String> {
+        let facts = parse(src.as_bytes(), false).unwrap();
+        let mut marks: Vec<_> = (facts.consts.iter())
+            .filter(|c| c.name.starts_with('.'))
+            .map(|c| c.name.clone())
+            .collect();
+        marks.sort();
+        marks
+    }
+
+    #[test]
+    fn an_assignment_to_a_local_or_a_parameter_is_no_write() {
+        let src = "package a
+            class C(var base: String) {
+                var url = \"u\"
+                fun f(host: String) { var base = \"a\"; base = \"b\"; var h = host; h = \"c\" }
+                fun g() { for (url in list) { var x = url; x += \"d\" } }
+                fun h() { try { } catch (base: Exception) { var y = 1; y++ } }
+                fun i() { list.forEach { url -> var z = url; z = \"e\" } }
+            }";
+        assert_eq!(writes(src), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_write_names_its_class_when_it_is_known() {
+        let src = "package a
+            class C(var base: String) {
+                var url = \"u\"
+                var n = 0
+                fun f(o: C) { this.base = \"a\"; n++; o.url = \"b\" }
+                fun g() { list.forEach { url = it } }
+                class D { var base = \"\"; fun h() { base = \"c\" } }
+            }";
+        assert_eq!(writes(src), [".base@a.C", ".base@a.C.D", ".n@a.C", ".url"]);
+    }
+
+    #[test]
+    fn a_write_of_a_name_only_an_outer_class_or_the_package_declares_names_no_class() {
+        let src = "package a
+            var base = \"\"
+            fun C.reset() { this.base = \"x\" }
+            class C { var url = \"\"; class D : B() { fun s() { url = \"y\" } } }";
+        assert_eq!(writes(src), [".base", ".url"]);
     }
 }

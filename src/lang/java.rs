@@ -8,7 +8,8 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Annotated, Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
-    LanguagePack, Layout, Marked, Modules, Param, Part, Receiver, children, named, text, wildcard,
+    LanguagePack, Layout, Marked, Modules, Param, Part, Receiver, children, field_write, named,
+    text, wildcard,
 };
 use crate::{Result, qualify};
 
@@ -215,8 +216,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // fields, by class and field.
     let mut finals: Vec<(String, String, Option<Value>)> = Vec::new();
     let mut assigned: BTreeMap<(String, String), Vec<(Value, String)>> = BTreeMap::new();
-    // The names assigned anywhere in the file (`f = v`, `x.f = v`), marked as constants `.f`.
-    let mut written = BTreeSet::new();
+    // The writes of a name that can be a field (`f = v`, `this.f = v`, `x.f = v`, `f++`): where
+    // each is, its name, and whether it may be a field of the class around it (`this.f`, or a
+    // bare `f` no local or parameter declares).
+    let mut written: Vec<(String, String, bool)> = Vec::new();
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
         node,
@@ -628,14 +631,28 @@ fn parse(src: &[u8]) -> Result<Facts> {
             "type_identifier" => {
                 outside.insert(text(node, src).to_string());
             }
-            "assignment_expression" => {
-                let left = node.child_by_field_name("left");
-                let name = match left {
-                    Some(n) if n.kind() == "identifier" => Some(n),
-                    Some(n) if n.kind() == "field_access" => n.child_by_field_name("field"),
+            "assignment_expression" | "update_expression" => {
+                let left = match node.kind() {
+                    "assignment_expression" => node.child_by_field_name("left"),
+                    _ => named(node).next(),
+                };
+                let write = match left {
+                    Some(n) if n.kind() == "identifier" => {
+                        (!declared_before(n, src)).then_some((n, true))
+                    }
+                    Some(n) if n.kind() == "field_access" => {
+                        let this = n
+                            .child_by_field_name("object")
+                            .is_some_and(|o| o.kind() == "this");
+                        n.child_by_field_name("field").map(|f| (f, this))
+                    }
                     _ => None,
                 };
-                written.extend(name.map(|n| text(n, src).to_string()));
+                if let Some((name, own)) = write {
+                    // The `this` of an anonymous class is not the class around it.
+                    let own = own && definitions;
+                    written.push((scope.as_ref().clone(), text(name, src).to_string(), own));
+                }
             }
             _ => {}
         }
@@ -720,14 +737,21 @@ fn parse(src: &[u8]) -> Result<Facts> {
             });
         }
     }
-    // What `Code::field_written` reads: a field so assigned holds no one value.
-    for name in written {
-        facts.consts.push(Const {
-            name: format!(".{name}"),
-            value: Value::Unknown,
-            ty: None,
-            scope: None,
-        });
+    // What `Code::field_written_in` reads: a field so assigned holds no one value. A write of
+    // the field of the class around it, the innermost one, names that class; any other, a field
+    // it inherits, one of an outer class its own class may inherit or one of another object,
+    // names none.
+    let written: BTreeSet<(String, Option<String>)> = (written.into_iter())
+        .map(|(scope, name, own)| {
+            let around = (classes.iter())
+                .filter(|at| encloses(at, &scope))
+                .max_by_key(|at| at.len());
+            let owner = around.filter(|at| own && fields.contains(&((*at).clone(), name.clone())));
+            (name, owner.cloned())
+        })
+        .collect();
+    for (name, class) in written {
+        facts.consts.push(field_write(&name, class.as_deref()));
     }
     // A local is typed only where it is the one binding of its name in its scope; one named
     // like a field may be read as the field before its declaration, so its class is unknown.
@@ -878,6 +902,59 @@ fn assignments(
             _ => {}
         }
         pending.extend(named(n));
+    }
+}
+
+/// Whether the identifier `name` is a local or a parameter declared before it, in a block
+/// around it, a loop, a `catch`, a `try` resource, a lambda or the method.
+// ponytail: a pattern variable (`o instanceof Foo base`) and a local of an earlier `case` group
+// are not read, so an assignment to either counts as a write of a field of that name.
+fn declared_before(name: Node, src: &[u8]) -> bool {
+    let wanted = text(name, src);
+    let mut child = name;
+    while let Some(parent) = child.parent() {
+        if parent.kind() == "class_body" {
+            return false;
+        }
+        let mut before = named(parent).take_while(|n| n.id() != child.id());
+        if before.any(|s| declares(parent, s, wanted, src))
+            || (parent.kind() == "compact_constructor_declaration")
+                && formal_parameters(parent).any(|p| declares(parent, p, wanted, src))
+        {
+            return true;
+        }
+        child = parent;
+    }
+    false
+}
+
+/// Whether `sibling`, a child of `parent`, declares the name `wanted`.
+fn declares(parent: Node, sibling: Node, wanted: &str, src: &[u8]) -> bool {
+    let is = |n: Option<Node>| n.is_some_and(|n| text(n, src) == wanted);
+    match sibling.kind() {
+        "local_variable_declaration" | "spread_parameter" => named(sibling)
+            .filter(|n| n.kind() == "variable_declarator")
+            .any(|d| is(d.child_by_field_name("name"))),
+        "formal_parameter" | "catch_formal_parameter" | "resource" => {
+            is(sibling.child_by_field_name("name"))
+        }
+        "formal_parameters" | "inferred_parameters" | "resource_specification" => {
+            named(sibling).any(|n| declares(sibling, n, wanted, src))
+        }
+        // A lambda's parameter, or a loop's variable.
+        "identifier" => {
+            let declared =
+                (parent.child_by_field_name("name")).or(parent.child_by_field_name("parameters"));
+            let declared = match parent.kind() {
+                "lambda_expression" | "enhanced_for_statement" => {
+                    declared.is_some_and(|d| d.id() == sibling.id())
+                }
+                "inferred_parameters" => true,
+                _ => false,
+            };
+            declared && is(Some(sibling))
+        }
+        _ => false,
     }
 }
 
@@ -1283,5 +1360,59 @@ mod tests {
             })
             .collect();
         assert_eq!(fields, [("s", true), ("t", false)]);
+    }
+
+    /// The markers `Code::field_written_in` reads (`Const`s named `.f` or `.f@class`) of a source.
+    fn writes(src: &str) -> Vec<String> {
+        let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
+        let mut marks: Vec<_> = (facts.consts.iter())
+            .filter(|c| c.name.starts_with('.'))
+            .map(|c| c.name.clone())
+            .collect();
+        marks.sort();
+        marks
+    }
+
+    #[test]
+    fn an_assignment_to_a_local_or_a_parameter_is_no_write() {
+        let src = "class C { String base; String url;
+            void a(String url) { String base = \"a\"; base = \"b\"; url = \"c\"; }
+            void b() { for (String base : list) { base = \"d\"; } }
+            void c() { { String base; } base = \"e\"; }
+            void d() { Runnable r = () -> { String url = \"f\"; url += \"g\"; }; }
+        }";
+        assert_eq!(writes(src), [".base@C"]);
+    }
+
+    #[test]
+    fn a_catch_parameter_a_varargs_one_and_a_compact_constructors_are_no_write() {
+        let src = "class C { String base; String url;
+            void a() { try { } catch (Exception base) { base = null; } }
+            void b(String... url) { url = null; }
+            void c() { try (Res base = open()) { base = null; } }
+        }";
+        assert_eq!(writes(src), Vec::<String>::new());
+        let src = "record R(String base) { R { base = base.trim(); } }";
+        assert_eq!(writes(src), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_write_names_its_class_when_it_is_known() {
+        let src = "class C { String base; String url; int n;
+            void a() { this.base = \"a\"; n++; }
+            void b(C other) { other.url = \"b\"; }
+            class D { String base; void c() { base = \"c\"; } }
+            void d() { new Object() { void e() { this.url = \"d\"; } }; }
+        }";
+        assert_eq!(writes(src), [".base@C", ".base@C.D", ".n@C", ".url"]);
+    }
+
+    #[test]
+    fn a_write_of_a_name_only_an_outer_class_declares_names_no_class() {
+        // `D` may inherit a `base` of its own.
+        let src = "class C { String base; class D extends B { void s() { base = \"y\"; } } }";
+        assert_eq!(writes(src), [".base"]);
+        let src = "class C { void m() { java.util.function.BiConsumer<String, String> f = (url, x) -> { url = null; }; } }";
+        assert_eq!(writes(src), Vec::<String>::new());
     }
 }
