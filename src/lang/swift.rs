@@ -165,11 +165,11 @@ impl LanguagePack for Swift {
 
     /// The standard library's protocols whose members are few and fixed (operators are no
     /// callable name), the raw value types an enum may carry, and Vapor's `RouteCollection`
-    /// (ADR 0019); the table grows with evidence from the dogfood repositories, never by guess.
-    fn known_outside(&self) -> &'static [(&'static str, &'static [&'static str])] {
+    /// (ADR 0019), with Foundation's `localizedDescription` on `Error`; the table grows with evidence from the dogfood repositories, never by guess.
+    fn known_outside(&self) -> super::KnownOutside {
         &[
             ("Swift.Sendable", &[]),
-            ("Swift.Error", &[]),
+            ("Swift.Error", &["localizedDescription"]),
             ("Swift.Equatable", &[]),
             ("Swift.Comparable", &[]),
             ("Swift.Hashable", &["hash(into:)", "hashValue"]),

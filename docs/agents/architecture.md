@@ -1642,7 +1642,7 @@ one for the area a change touches.
   (`Resolver::inherited_field`). Overloads merge across the family, so an opaque base anywhere
   in it keeps them from `exact` (Opaque outside), unless the pack knows its members
   (`LanguagePack::known_outside`, Known outside members, ADR 0019): a base its table lists is
-  opaque only for the names it declares (`Resolver::hides`, asked by `Resolver::opaque`,
+  opaque only for the names it declares (`Resolver::may_declare`, asked by `Resolver::opaque`,
   `overloaded`, `member`, `inherited` and `inherited_field`), and for any other name the family
   resolves as one without bases, so a class `implements Serializable, Comparable<T>` has its own
   overloads `exact` and its `compareTo` a name match. The base is spelled as
@@ -1657,7 +1657,8 @@ one for the area a change touches.
   of that call's exact target names (`Resolver::result_of`, bounded by `RECEIVER_DEPTH`). A name
   match of a call narrowed by `Call::arity` (`Resolver::matched`) reads the family that owns it:
   a typed receiver, `this` or a bare call match within that family alone, a bare call past an
-  opaque base falls back to what its scope binds, and any other receiver takes, from several,
+  opaque base, or past a class around it with one for the name (`Resolver::outer_opaque`), falls
+  back to what its scope binds, and any other receiver takes, from several,
   the one declared in the family of the class around the call other than the caller; a match
   narrowed from several is `Resolution::Narrowed`, stored as `inferred` with `calls.narrowed`. A language whose imports name a path rather than a file (Rust's
   `use a::b as c`) writes `Imported::Path` (what the dotted callee-like name gives, resolved
@@ -1767,7 +1768,7 @@ one for the area a change touches.
   protocol a block conforms to, with that protocol's inherent blocks; a signature an earlier
   level declares overrides a later one. A protocol from outside the repository a block conforms
   to makes the family opaque (`Resolver::opaque`, which `inherited` and `matched` read as an
-  opaque base) for the names it may declare (`Block::outside`, `Resolver::hides`): every name,
+  opaque base) for the names it may declare (`Block::outside`, `Resolver::may_declare`): every name,
   unless the Swift table of known outside members lists it (`Hashable`, `Codable`,
   `CustomStringConvertible`, the raw value types, Vapor's `RouteCollection`), whose entries are
   compared without their labels. The same table weighs a written base (`: NSObject` stays
@@ -2112,10 +2113,11 @@ one for the area a change touches.
 
 ## Known ceilings
 
-- `resolve.rs` (`Resolver::hides`, ADR 0019): a base among a pack's known outside members is
+- `resolve.rs` (`Resolver::may_declare`, ADR 0019): a base among a pack's known outside members is
   matched by its spelling, so a same-named type of a wildcard-imported outside package that
   declares an overload of the called name may give a wrong `exact`; a Swift entry is compared
-  without its labels, so `hash(into:)` keeps every `hash` call at the strict level. A base the
+  without its labels, so `hash(into:)` keeps every `hash` call at the strict level; an extension
+  the tables do not list, in scope of a call no own overload fits by type, is missed. A base the
   tables do not list keeps every name opaque.
 - `jvm/spring.rs` (`read_yaml`): the dotted keys a YAML file flattens to are charged to
   `YAML_KEY_BUDGET` (1 MiB); a file past it (a long key over thousands of children) reads as
@@ -2169,7 +2171,7 @@ one for the area a change touches.
   a method call. A companion's outside base leaves the companion's members unknown, so
   `Type.create()` then resolves to nothing (Opaque outside, as Java's: a base among the known
   outside members, the JDK's of Java's table or `kotlin.Comparable`, hides only the names it
-  declares). Kotlin files
+  declares, which for Kotlin include the standard library's extensions on it: `use`, `coerceIn`). Kotlin files
   resolve with Java's flags, so `java.lang.Object`'s members are the implicit members of a Kotlin
   class too: a bare `notify()` in a class is unknown. A star import of a Java package from Kotlin sees its
   package-private classes. The Kotlin pack lists the same Spring configuration files as the Java

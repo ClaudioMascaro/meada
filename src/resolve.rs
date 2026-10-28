@@ -373,7 +373,7 @@ pub struct Resolver<'a> {
     /// The pack's `LanguagePack::implicit_members`.
     implicit: &'static [&'static str],
     /// The pack's known outside members (`lang::known_outside`).
-    known: Vec<(&'static str, &'static [&'static str])>,
+    known: Vec<crate::lang::KnownEntry>,
     /// The pack's names bound everywhere (`LanguagePack::globals`).
     globals: &'static [&'static str],
     /// The call sites whose single target is each definition, `exact`, sorted. One only a name
@@ -1388,9 +1388,11 @@ impl<'a> Resolver<'a> {
         match within[..] {
             [one] => narrowed(one, all.len()),
             [_, _, ..] => Resolution::Ambiguous(within),
-            [] if bare && self.opaque(&family, callee) => {
+            [] if bare
+                && (self.opaque(&family, callee) || self.outer_opaque(path, scope, callee)) =>
+            {
                 // What the scope would bind with the family's base read as declaring nothing:
-                // that base may declare the name and hide it.
+                // that base, or the base of a class around it, may declare the name and hide it.
                 let found = self.resolve_as(
                     path,
                     scope,
@@ -2090,7 +2092,7 @@ impl<'a> Resolver<'a> {
         for ancestor in self.with_parts(&family).iter() {
             let c = match ancestor {
                 Ancestor::Class(c) => *c,
-                Ancestor::Opaque(o) if !self.hides(o, member) => continue,
+                Ancestor::Opaque(o) if !self.may_declare(o, member) => continue,
                 Ancestor::Opaque(_) => return Binding::Unknown,
             };
             if let Some(found) = self.block_member(c, member) {
@@ -2131,7 +2133,7 @@ impl<'a> Resolver<'a> {
     /// name: in family order, each written signature from the first class that declares it,
     /// so a class's `f(int)` overrides its base's and keeps the base's `f()`. `None` when no
     /// class declares one; unknown when the family has a base anywhere that may declare
-    /// `member` (`hides`), since overloads merge across the family and that base may declare or
+    /// `member` (`may_declare`), since overloads merge across the family and that base may declare or
     /// override any of its overloads (Opaque outside, with Known outside members). Other
     /// bindings of the name (a field) are not methods and do not join the family, nor does a
     /// Kotlin extension written in its class's file (`fun Foo.x()` beside `class Foo`, a
@@ -2151,7 +2153,7 @@ impl<'a> Resolver<'a> {
             let c = match ancestor {
                 Ancestor::Class(c) => *c,
                 Ancestor::Opaque(o) => {
-                    opaque |= self.hides(o, member);
+                    opaque |= self.may_declare(o, member);
                     continue;
                 }
             };
@@ -2159,7 +2161,7 @@ impl<'a> Resolver<'a> {
             for b in blocks(c) {
                 scopes.push((b.path, b.scope));
                 conformed.extend(b.of);
-                opaque |= (b.outside.as_deref()).is_some_and(|o| self.hides(o, member));
+                opaque |= (b.outside.as_deref()).is_some_and(|o| self.may_declare(o, member));
             }
             levels.push((c, scopes));
         }
@@ -2246,7 +2248,7 @@ impl<'a> Resolver<'a> {
         for ancestor in self.with_parts(family).iter() {
             let c = match ancestor {
                 Ancestor::Class(c) => *c,
-                Ancestor::Opaque(o) if !self.hides(o, name) => continue,
+                Ancestor::Opaque(o) if !self.may_declare(o, name) => continue,
                 Ancestor::Opaque(_) => return Some(Binding::Unknown),
             };
             let qualified = format!("{}.{name}", c.name);
@@ -2267,16 +2269,39 @@ impl<'a> Resolver<'a> {
     }
 
     /// Whether the member `name` (or the last name of a callee, `this.f`) of `family` may come
-    /// from outside the repository: a base that may declare it (`hides`), or a protocol from
+    /// from outside the repository: a base that may declare it (`may_declare`), or a protocol from
     /// outside that may and that a block of one of its classes conforms to (Swift's
     /// `extension S: Sequence`).
     fn opaque(&self, family: &[Ancestor<'a>], name: &str) -> bool {
         let name = name.rsplit('.').next().unwrap_or(name);
         family.iter().any(|a| match a {
-            Ancestor::Opaque(o) => self.hides(o, name),
+            Ancestor::Opaque(o) => self.may_declare(o, name),
             Ancestor::Class(c) => (self.impls.get(c).into_iter().flatten())
-                .any(|b| (b.outside.as_deref()).is_some_and(|o| self.hides(o, name))),
+                .any(|b| (b.outside.as_deref()).is_some_and(|o| self.may_declare(o, name))),
         })
+    }
+
+    /// Whether a class around the class of `scope` of `path` has a family that may take `name`
+    /// from outside (`opaque`): a bare call that its own class does not answer climbs there.
+    fn outer_opaque(&self, path: &'a str, scope: &str, name: &str) -> bool {
+        let Binding::Def(class) = self.class(path, scope) else {
+            return false;
+        };
+        let mut at = crate::parent(class.name);
+        while !at.is_empty() {
+            if let Some((name_at, def)) = self.defs[path].get_key_value(at)
+                && def.kind == Kind::Class
+                && let Some(Some(family)) = self.families.get(&Target {
+                    path,
+                    name: name_at,
+                })
+                && self.opaque(family, name)
+            {
+                return true;
+            }
+            at = crate::parent(at);
+        }
+        false
     }
 
     /// Whether the outside type `outside` (an opaque base or protocol, as `imported_name`
@@ -2284,7 +2309,7 @@ impl<'a> Resolver<'a> {
     /// declares `name` does (Known outside members, `docs/adr/0019-known-outside-members.md`).
     /// A type matches by its qualified name, or a bare `outside` by its last name; a Swift
     /// member is compared without its labels, so `hash(into:)` keeps every `hash` opaque.
-    fn hides(&self, outside: &str, name: &str) -> bool {
+    fn may_declare(&self, outside: &str, name: &str) -> bool {
         let base = |n: &'static str| n.split('(').next().unwrap_or(n);
         let name = name.split('(').next().unwrap_or(name);
         let known = || {
@@ -9371,6 +9396,30 @@ mod tests {
         assert_eq!(calls["p.Both.g() f"], "inferred p.Both.f()");
     }
 
+    /// A bare call a nested class does not answer climbs to the class around it: past that
+    /// class's opaque base it is a name match, whatever the nested class's own bases are.
+    #[test]
+    fn a_bare_call_past_an_outer_opaque_base_is_a_name_match() {
+        let calls = java_calls(
+            "package p;
+             abstract class Listing extends ArrayList<String> {
+                 void own() {}
+                 class Plain { void run() { own(); } }
+                 class Task implements Runnable { public void run() { own(); } }
+             }
+             class Mine { void own() {} class Plain { void run() { own(); } } }",
+        );
+        assert_eq!(
+            calls["p.Listing.Plain.run() own"],
+            "inferred p.Listing.own()"
+        );
+        assert_eq!(
+            calls["p.Listing.Task.run() own"],
+            "inferred p.Listing.own()"
+        );
+        assert_eq!(calls["p.Mine.Plain.run() own"], "exact p.Mine.own()");
+    }
+
     #[test]
     fn a_redundant_interface_keeps_the_family_and_its_subclasses() {
         let calls = java_calls(
@@ -9787,6 +9836,22 @@ mod csharp_tests {
         ] {
             assert_eq!(calls(body).0.0, "ambiguous", "{body}");
         }
+    }
+
+    /// Known outside members: `IDisposable` hides `Dispose` alone, while `IEnumerable` stays
+    /// opaque, since LINQ's extension methods (`Contains`) answer a call no own overload fits.
+    #[test]
+    fn a_known_base_hides_its_names_and_ienumerable_stays_opaque() {
+        let src = "using System;\nusing System.Collections.Generic;\nnamespace P;\n\
+                   class Lease : IDisposable { public void Open(int n) { } public void Dispose() { } \
+                   void Run() { this.Open(1); this.Dispose(); } }\n\
+                   class Bag : IEnumerable<int> { public bool Contains(string k) => true; \
+                   void Run() { this.Contains(1); } }\n";
+        let found = resolved(&[("App/Lease.cs", src)]);
+        let level = |callee: &str| (found.iter()).find(|c| c.1 == callee).map(|c| c.2).unwrap();
+        assert_eq!(level("this.Open"), "exact");
+        assert_eq!(level("this.Dispose"), "inferred");
+        assert_eq!(level("this.Contains"), "inferred");
     }
 
     /// The overloads of one family merge across projects: a base's overload in another project

@@ -78,7 +78,7 @@ impl LanguagePack for Java {
 
     /// The JDK types whose members are few and fixed; the table grows with evidence from the
     /// dogfood repositories, never by guess (ADR 0019).
-    fn known_outside(&self) -> &'static [(&'static str, &'static [&'static str])] {
+    fn known_outside(&self) -> super::KnownOutside {
         &[
             ("java.io.Serializable", &[]),
             ("java.lang.Cloneable", &[]),

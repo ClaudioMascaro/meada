@@ -94,15 +94,15 @@ impl LanguagePack for CSharp {
     }
 
     /// The BCL types whose members are few and fixed; the table grows with evidence from the
-    /// dogfood repositories, never by guess (ADR 0019).
-    fn known_outside(&self) -> &'static [(&'static str, &'static [&'static str])] {
+    /// dogfood repositories, never by guess (ADR 0019). `IEnumerable` is left out: the LINQ
+    /// extension methods every file sees (`Contains`, `Count`, `First`) answer a call no own
+    /// overload fits by type.
+    fn known_outside(&self) -> super::KnownOutside {
         &[
             ("System.IDisposable", &["Dispose"]),
             ("System.IAsyncDisposable", &["DisposeAsync"]),
             ("System.IEquatable", &["Equals"]),
             ("System.IComparable", &["CompareTo"]),
-            ("System.Collections.IEnumerable", &["GetEnumerator"]),
-            ("System.Collections.Generic.IEnumerable", &["GetEnumerator"]),
         ]
     }
 

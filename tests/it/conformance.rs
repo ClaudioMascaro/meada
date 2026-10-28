@@ -320,12 +320,10 @@ const JAVA_CALLS: &[ExpectedCall] = &[
         INFERRED,
         &["maven/api/src/main/java/example/calls/Port.java::example.calls.Port.send(String)"],
     ),
-    // `Runnable` declares `run` alone (Known outside members): `Task` is read as a class
-    // without bases, whose bare call stops, unknown, at the opaque base of the class around it.
     (
         "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.Task.run()::own#0",
-        None,
-        &[],
+        INFERRED,
+        &["maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.own()"],
     ),
     // Known outside members: `Serializable` and `Comparable` hide `compareTo` alone.
     (

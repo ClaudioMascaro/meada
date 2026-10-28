@@ -151,7 +151,7 @@ pub trait LanguagePack {
     /// member (with its labels in Swift). Such a base hides from its family only the names it
     /// declares; any other outside base may hide every name (Opaque outside). The `Resolver`
     /// of a pack reads the tables of the packs that resolve with it too.
-    fn known_outside(&self) -> &'static [(&'static str, &'static [&'static str])] {
+    fn known_outside(&self) -> KnownOutside {
         &[]
     }
 
@@ -277,6 +277,13 @@ pub fn names_config(pattern: &str, file: &str) -> bool {
     }
 }
 
+/// One known outside type (`LanguagePack::known_outside`): its qualified name and the member
+/// names it declares.
+pub type KnownEntry = (&'static str, &'static [&'static str]);
+
+/// A pack's table of known outside types.
+pub type KnownOutside = &'static [KnownEntry];
+
 /// The index of the pack that parses `path`, if any.
 pub fn pack_for(path: &str) -> Option<usize> {
     let (_, extension) = path.rsplit_once('.')?;
@@ -296,7 +303,7 @@ pub fn resolver_of(index: usize) -> usize {
 
 /// The known outside members (`LanguagePack::known_outside`) the `Resolver` of `language` reads:
 /// its own, then those of every pack that resolves with it (Kotlin's, with Java's).
-pub fn known_outside(language: &dyn LanguagePack) -> Vec<(&'static str, &'static [&'static str])> {
+pub fn known_outside(language: &dyn LanguagePack) -> Vec<KnownEntry> {
     let with = |p: &&dyn LanguagePack| {
         (p.resolves_with()).is_some_and(|w| w.extensions() == language.extensions())
     };

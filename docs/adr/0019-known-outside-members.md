@@ -46,8 +46,8 @@ Option 2, generalized to the four packs that merge overloads.
   of a pack reads its table with the tables of the packs that resolve with it (Kotlin's, through
   Java's: `lang::known_outside`).
 - A family is opaque for a called name only when some outside ancestor is unlisted or declares
-  that name (`Resolver::hides`, read by `Resolver::opaque`, `overloaded`, `member`, `inherited`
-  and `inherited_field`). When every outside ancestor is listed and none declares the name, the
+  that name (`Resolver::may_declare`, read by `Resolver::opaque`, `overloaded`, `member`,
+  `inherited` and `inherited_field`). When every outside ancestor is listed and none declares the name, the
   family resolves as one without bases: a call to an own member narrows by argument count (and
   labels) and lands `exact`, or `ambiguous` among the family's own overloads; a name neither
   the family nor the listed types declares resolves to nothing. This holds through lineage and
@@ -60,9 +60,16 @@ Option 2, generalized to the four packs that merge overloads.
   implicit import (`java.lang`, `import java.io.*`, `import Foundation`, `using System`); a
   generic base without its arguments. It matches an entry by the full qualified name, or a bare
   name by the entry's last segment.
+- A name an extension in scope of every file adds to a listed type counts as one it declares:
+  a call no own overload fits by type takes the extension, and Meada narrows by count alone.
+  Kotlin's standard library adds `use` to `Closeable` and `AutoCloseable` and `coerceIn`,
+  `rangeTo` and their kin to `Comparable`; Foundation adds `localizedDescription` to Swift's
+  `Error`. C#'s `IEnumerable` stays out of the table: the LINQ extension methods every file sees
+  through the implicit usings (`Contains`, `Count`, `First`, `Select`) are many and grow with
+  .NET, and a collection class often declares one of those names.
 - The initial tables hold the JDK markers and `Runnable`, `Comparable`, `AutoCloseable` and
-  `Closeable` (Java), `kotlin.Comparable` (Kotlin, with Java's), `IDisposable`,
-  `IAsyncDisposable`, `IEquatable`, `IComparable` and both `IEnumerable` (C#), and the Swift
+  `Closeable` (Java), `kotlin.Comparable` and the standard library's extensions (Kotlin, with
+  Java's), `IDisposable`, `IAsyncDisposable`, `IEquatable` and `IComparable` (C#), and the Swift
   standard library's marker and small protocols, the raw value types an enum may carry and
   Vapor's `RouteCollection` (Swift). A table grows with evidence from the dogfood repositories,
   never by guess. Vapor's entry is the one library type in a pack's table: its one requirement
@@ -77,7 +84,13 @@ Option 2, generalized to the four packs that merge overloads.
 - Accepted risk: a same-named type from a wildcard-imported outside package (`import com.x.*`
   with a `com.x.Runnable`) that declares an overload of the called name. Its bare spelling
   matches the platform's entry, and the call may land a wrong `exact`. A qualified spelling (an
-  explicit import or a written qualified name) never matches another package's entry.
+  explicit import or a written qualified name) never matches another package's entry. In Swift
+  (every import takes a whole module) and in C# (`using System;`) the bare spelling is the
+  usual one, so there the risk is any imported module or namespace that declares a type of a
+  listed name (an `Error` or a `RouteCollection` of its own) with an overload of the called
+  name.
+- Another accepted risk: an extension the tables do not list, in scope of a call (a library's
+  extension of `Comparable` or `IDisposable`), that a call no own overload fits by type takes.
 - A Swift entry is compared without its labels, since the resolver looks members up by base
   name: `hash(into:)` keeps every call named `hash` at today's level, a stricter reading than
   the table spells.
