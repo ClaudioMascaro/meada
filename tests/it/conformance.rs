@@ -14019,6 +14019,52 @@ fn swift_an_implicit_member_call_resolves_by_name() {
     );
 }
 
+/// Swift modules are targets of one package (issue #410): two packages that each declare a
+/// target `App` give two modules, each package's call binds its own function, a
+/// `@testable import App` reaches the `internal` function of the package's own `App` but not
+/// its `fileprivate` one, and a plain `import App` reaches neither.
+#[test]
+fn swift_same_named_targets_of_two_packages_are_two_modules() {
+    let at = |pkg: &str, file: &str, name: &str| format!("{pkg}/{file}::{name}");
+    let app = |pkg: &str, name: &str| at(pkg, "Sources/App/App.swift", name);
+    let test = |pkg: &str, name: &str| at(pkg, "Tests/AppTests/AppTests.swift", name);
+    let mut symbols = Vec::new();
+    for pkg in ["one", "two", "plain"] {
+        symbols.extend(["buildApplication()", "secret()", "start()"].map(|n| app(pkg, n)));
+        symbols.push(test(pkg, "check()"));
+    }
+    let symbols: Vec<&str> = symbols.iter().map(String::as_str).collect();
+    let mut calls: Vec<(String, Option<&str>, Vec<String>)> = Vec::new();
+    for pkg in ["one", "two"] {
+        let build = vec![app(pkg, "buildApplication()")];
+        calls.push((
+            app(pkg, "start()::buildApplication#0"),
+            EXACT,
+            build.clone(),
+        ));
+        calls.push((
+            app(pkg, "start()::secret#0"),
+            EXACT,
+            vec![app(pkg, "secret()")],
+        ));
+        calls.push((test(pkg, "check()::buildApplication#0"), EXACT, build));
+        calls.push((test(pkg, "check()::secret#0"), None, vec![]));
+    }
+    calls.push((
+        app("plain", "start()::buildApplication#0"),
+        EXACT,
+        vec![app("plain", "buildApplication()")],
+    ));
+    calls.push((test("plain", "check()::buildApplication#0"), None, vec![]));
+    let targets: Vec<Vec<&str>> = (calls.iter())
+        .map(|(_, _, t)| t.iter().map(String::as_str).collect())
+        .collect();
+    let calls: Vec<ExpectedCall> = (calls.iter().zip(&targets))
+        .map(|((call, level, _), targets)| (call.as_str(), *level, targets.as_slice()))
+        .collect();
+    conform("conformance-swift-packages", &symbols, &[], &calls);
+}
+
 /// Swift calls through a `typealias`, a hidden initializer and a trailing closure (issue #411):
 /// a receiver written as an alias is typed as its target (through an alias of an alias, an
 /// optional and a property), a cycle of aliases types nothing and an alias of an outside type

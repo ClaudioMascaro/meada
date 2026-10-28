@@ -74,7 +74,7 @@ impl LanguagePack for Swift {
     /// and the module's own names, which come before what an import brings: the inside glob,
     /// read first as the last import.
     fn join(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Join {
-        let targets = targets(configs);
+        let targets = Targets::new(configs);
         // The type parameters and associated types of each type, in whichever file declares it:
         // an extension's body sees those of the type it extends.
         let mut generics: HashMap<String, HashSet<String>> = HashMap::new();
@@ -86,9 +86,13 @@ impl LanguagePack for Swift {
         }
         let function_aliases = function_aliases(files);
         Box::new(move |path, facts| {
-            let module = module_of(&targets, path);
+            let module = targets.module_of(path);
             wildcard(module, true, facts);
             facts.unit = module.to_string();
+            facts.internals = (facts.testable.iter())
+                .flat_map(|name| targets.named_from(path, name))
+                .map(str::to_string)
+                .collect();
             // Whether `ty` written in `scope` names a type parameter of a type around it.
             let held = |scope: &str, ty: &str| {
                 enclosing(scope).any(|t| generics.get(t).is_some_and(|g| g.contains(head(ty))))
@@ -130,10 +134,10 @@ impl LanguagePack for Swift {
     /// The files of a module share its scope, and an import of the module's name names them
     /// all through its first file. A module that is no target of the repository is outside it.
     fn layout(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Result<Layout> {
-        let targets = targets(configs);
+        let targets = Targets::new(configs);
         let mut modules: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for path in files.keys() {
-            let module = module_of(&targets, path).to_string();
+            let module = targets.module_of(path).to_string();
             modules.entry(module).or_default().push(path.to_string());
         }
         let first: HashMap<String, String> = (modules.iter())
@@ -141,7 +145,13 @@ impl LanguagePack for Swift {
             .collect();
         Ok(Layout {
             members: None,
-            modules: Box::new(move |_, name| first.get(name).cloned().into_iter().collect()),
+            // A module's own glob names it by its unit; an import, by the target's name.
+            modules: Box::new(move |from, name| match first.get(name) {
+                Some(file) => [file.clone()].into(),
+                None => (targets.named_from(from, name).into_iter())
+                    .filter_map(|unit| first.get(unit).cloned())
+                    .collect(),
+            }),
             published: None,
             programs: Vec::new(),
             reaches: None,
@@ -209,24 +219,70 @@ impl LanguagePack for Swift {
     }
 }
 
-/// The module of each target directory the manifests declare (empty at the root); of two
-/// targets of one directory, the last by name.
-fn targets(configs: &[(&str, &[u8])]) -> HashMap<String, String> {
-    (configs.iter())
-        .filter(|(path, _)| !Swift.is_code(path))
-        .flat_map(|(path, src)| manifest::targets(path, src))
-        .map(|t| (t.dir, t.name))
-        .collect()
+/// The modules the manifests declare: a module is a target of one package, named by the
+/// package's directory and the target's name (its `unit`).
+struct Targets {
+    /// The module of each target directory (empty at the root); of two targets of one
+    /// directory, the last by name.
+    dirs: HashMap<String, String>,
+    /// The module of each target name, by the directory of its package.
+    named: HashMap<String, BTreeMap<String, String>>,
 }
 
-/// The module of the file `path`: the target whose directory holds it, the deepest one when
-/// several do, else `NO_TARGET`. Its directories are looked up, so the cost is the path's depth.
-// ponytail: two packages of the repository that name a target alike make one module of both.
-fn module_of<'t>(targets: &'t HashMap<String, String>, path: &str) -> &'t str {
-    let dirs = (path.rmatch_indices('/').map(|(at, _)| &path[..at])).chain([""]);
-    dirs.into_iter()
-        .find_map(|dir| targets.get(dir))
-        .map_or(NO_TARGET, String::as_str)
+impl Targets {
+    fn new(configs: &[(&str, &[u8])]) -> Self {
+        let found = (configs.iter())
+            .filter(|(path, _)| !Swift.is_code(path))
+            .flat_map(|(path, src)| manifest::targets(path, src));
+        let mut targets = Targets {
+            dirs: HashMap::new(),
+            named: HashMap::new(),
+        };
+        for t in found {
+            let unit = format!("{}:{}", t.package, t.name);
+            targets.dirs.insert(t.dir, unit.clone());
+            (targets.named.entry(t.name).or_default()).insert(t.package, unit);
+        }
+        targets
+    }
+
+    /// The module of the file `path`: the target whose directory holds it, the deepest one
+    /// when several do, else `NO_TARGET`. Its directories are looked up, so the cost is the
+    /// path's depth.
+    fn module_of(&self, path: &str) -> &str {
+        let dirs = (path.rmatch_indices('/').map(|(at, _)| &path[..at])).chain([""]);
+        dirs.into_iter()
+            .find_map(|dir| self.dirs.get(dir))
+            .map_or(NO_TARGET, String::as_str)
+    }
+
+    /// The modules `import name` in the file `from` binds: the target of that name in the
+    /// package the file sits in, else in the package nearest it in the directory tree (every
+    /// one when several are as near). The cost is the path's depth.
+    fn named_from(&self, from: &str, name: &str) -> Vec<&str> {
+        let Some(packages) = self.named.get(name) else {
+            return Vec::new();
+        };
+        let dirs = (from.rmatch_indices('/').map(|(at, _)| &from[..at])).chain([""]);
+        for dir in dirs {
+            if let Some(own) = packages.get(dir) {
+                return vec![own];
+            }
+            let inside = if dir.is_empty() {
+                String::new()
+            } else {
+                format!("{dir}/")
+            };
+            let near: Vec<&str> = (packages.range(inside.clone()..))
+                .take_while(|(package, _)| package.starts_with(&inside))
+                .map(|(_, unit)| unit.as_str())
+                .collect();
+            if !near.is_empty() {
+                return near;
+            }
+        }
+        Vec::new()
+    }
 }
 
 /// Swift's access levels, least first (`open` is `public`).
@@ -558,6 +614,9 @@ fn walk(
                 }
                 if place != Place::Code && own < Access::Public {
                     facts.private.push(inner.as_ref().clone());
+                    if own < Access::Internal {
+                        facts.confined.push(inner.as_ref().clone());
+                    }
                 }
             }
             // An alias of a named type binds its name to that type, as an import does: a type
@@ -1078,6 +1137,9 @@ fn publish(facts: &mut Facts, place: Place, access: Access, qualified: &str, nam
     if access < Access::Public {
         facts.private.push(qualified.to_string());
     }
+    if access < Access::Internal {
+        facts.confined.push(qualified.to_string());
+    }
     if place != Place::Top || access < Access::Internal {
         return;
     }
@@ -1088,9 +1150,8 @@ fn publish(facts: &mut Facts, place: Place, access: Access, qualified: &str, nam
 }
 
 /// `import Module` (or `import struct Module.Type`): the module's public names on demand,
-/// and its name as a qualifier (`Module.f()`).
-// ponytail: `@testable import` sees no `internal` declarations here, and an import of one
-// declaration takes the whole module.
+/// and its name as a qualifier (`Module.f()`); `@testable` lists it in `Facts::testable`.
+// ponytail: an import of one declaration takes the whole module.
 fn import(node: Node, src: &[u8], facts: &mut Facts) {
     let Some(path) = named(node).find(|n| n.kind() == "identifier") else {
         return;
@@ -1103,6 +1164,9 @@ fn import(node: Node, src: &[u8], facts: &mut Facts) {
         source: module.clone(),
         name: Imported::Namespace,
     });
+    if named(node).any(|n| n.kind() == "modifiers" && text(n, src).contains("@testable")) {
+        facts.testable.push(module.clone());
+    }
     wildcard(&module, false, facts);
 }
 
@@ -2105,6 +2169,13 @@ mod tests {
         assert_eq!(exported, ["StoreOf", "Maybe", "Box"]);
         assert!(facts.private.contains(&"Maybe".to_string()));
         assert_eq!(facts.function_aliases, ["Handler"]);
+    }
+
+    #[test]
+    fn a_testable_import_is_listed() {
+        let facts =
+            facts("@testable import App\nimport Lib\n@preconcurrency @testable import Other\n");
+        assert_eq!(facts.testable, ["App", "Other"]);
     }
 
     /// `join` follows an alias of an alias of a function type `ALIAS_DEPTH` deep: a parameter

@@ -332,6 +332,8 @@ pub struct Resolver<'a> {
     /// The types each file of a compilation keeps to it (`Facts::private` of a file with a
     /// `Facts::unit`), for `hidden`.
     internal: HashMap<&'a str, HashSet<&'a str>>,
+    /// The names of each file with some (`Facts::confined`).
+    confined: HashMap<&'a str, HashSet<&'a str>>,
     /// The names some file of the repository writes through a selector (`cfg.Base = ..`): a
     /// constant marked `.Name` (Go, and a Java or Kotlin write whose class is unknown). A
     /// variable of such a name holds no one value.
@@ -796,6 +798,10 @@ impl<'a> Resolver<'a> {
             .filter(|(_, facts)| !facts.unit.is_empty() && !facts.private.is_empty())
             .map(|(path, facts)| (*path, facts.private.iter().map(String::as_str).collect()))
             .collect();
+        let confined = (files.iter())
+            .filter(|(_, facts)| !facts.confined.is_empty())
+            .map(|(path, facts)| (*path, facts.confined.iter().map(String::as_str).collect()))
+            .collect();
         let locals = files
             .iter()
             .map(|(path, facts)| (*path, facts.locals.iter().map(String::as_str).collect()))
@@ -902,6 +908,7 @@ impl<'a> Resolver<'a> {
             written_in,
             consts,
             internal,
+            confined,
             locals,
             receivers,
             params,
@@ -3120,10 +3127,20 @@ impl<'a> Resolver<'a> {
         }
     }
 
+    /// Whether `path` sees the `internal` names of the file `module` (`Facts::internals`).
+    fn sees_internals(&self, path: &str, module: &str) -> bool {
+        let (Some(from), Some(at)) = (self.files.get(path), self.files.get(module)) else {
+            return false;
+        };
+        from.internals.contains(&at.unit)
+    }
+
     /// Whether `t` is, or is declared in, a type its file keeps to its compilation
     /// (`Facts::private` of a file with a `Facts::unit`: C#'s `internal` types) and `path` is
     /// in another one. A file in no project (its own unit) neither hides nor is hidden.
     // ponytail: `InternalsVisibleTo` is not read, so a friend project gets no link.
+    // A file sees the `private` names of the units it lists in `Facts::internals`, but for the
+    // `confined` ones.
     fn hidden(&self, path: &str, t: Target) -> bool {
         let (Some(from), Some(at)) = (self.files.get(path), self.files.get(t.path)) else {
             return false;
@@ -3134,10 +3151,14 @@ impl<'a> Resolver<'a> {
         let Some(internal) = self.internal.get(t.path) else {
             return false;
         };
+        let sees = from.internals.contains(&at.unit);
         let mut name = t.name;
         while !name.is_empty() {
             if internal.contains(name) {
-                return true;
+                let confined = self.confined.get(t.path).is_some_and(|c| c.contains(name));
+                if !sees || confined {
+                    return true;
+                }
             }
             name = crate::parent(name);
         }
@@ -3322,7 +3343,7 @@ impl<'a> Resolver<'a> {
                     // names are bound before this is asked.
                     _ if *inside => Ok(None),
                     other => match self
-                        .through_glob(other, false, name, work, seen)
+                        .through_glob(path, other, false, name, work, seen)
                         .of_namespace(self, self.glob_namespace(path, target))
                     {
                         Binding::Unknown => Ok(None),
@@ -3363,6 +3384,7 @@ impl<'a> Resolver<'a> {
     /// What a glob import whose target is `bound` gives `name` (`globs`).
     fn through_glob(
         &self,
+        path: &str,
         bound: Binding<'a>,
         inside: bool,
         name: &'a str,
@@ -3370,7 +3392,10 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
         match bound {
-            Binding::Module(m) if inside => self.export(m, name, seen),
+            // A module `path` imports `testable` gives its `internal` names as its own do.
+            Binding::Module(m) if inside || self.sees_internals(path, m) => {
+                self.export(m, name, seen)
+            }
             Binding::Module(m) => self.star(m, name, seen).unwrap_or(Binding::Unknown),
             // A module written in place states no visibility of its items: only a glob
             // from inside it, which sees them all, is read.
@@ -3454,7 +3479,7 @@ impl<'a> Resolver<'a> {
             let found = self.past(seen, |seen| {
                 let work = &mut Work::default();
                 let bound = self.resolve_as(path, scope, target, seen, work, Reading::Alias);
-                self.through_glob(bound, *inside, name, work, seen)
+                self.through_glob(path, bound, *inside, name, work, seen)
             });
             let found = found.of_namespace(self, self.glob_namespace(path, target));
             // A definition `path` may not reach is not there: the lookup goes on past it.

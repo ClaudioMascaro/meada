@@ -1,4 +1,5 @@
 import Store
+@testable import Kit
 
 public struct Order {
     public init(id: String) {}
@@ -21,3 +22,5 @@ func on(_ handler: Handler? = nil) {}
 func settle() async {
     await flush()
 }
+
+fileprivate func local() {}
