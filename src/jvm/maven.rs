@@ -6,7 +6,7 @@ use crate::lang::MAX_BYTES;
 use crate::package::{Entry, Summary};
 use crate::xml::{XML_NODES, within_limits};
 use roxmltree::{Document, Node, ParsingOptions};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 fn child<'a, 'input>(node: Node<'a, 'input>, name: &str) -> Option<Node<'a, 'input>> {
     let mut children = node.children().filter(|n| {
@@ -36,16 +36,22 @@ fn text(at: Node<'_, '_>) -> Option<String> {
 }
 
 /// The longest chain of properties naming properties a `${..}` follows.
-// ponytail: real poms nest a few; this bounds a cycle (`a` is `${b}`, `b` is `${a}`).
+// ponytail: real poms nest a few; this bounds the stack over a hostile chain.
 const PROPERTY_DEPTH: usize = 16;
 
 /// `value` with each `${name}` that `lookup` gives a literal replaced by it, through the
-/// properties that name properties. A hole whose value has a hole left stays as written.
+/// properties that name properties. A hole whose value has a hole left, or a value longer than a
+/// package name, stays as written. Each property is read once per call, a cycle included.
 pub fn fill<'a>(value: &str, lookup: &impl Fn(&str) -> Option<&'a str>) -> String {
-    fill_to(value, lookup, PROPERTY_DEPTH)
+    fill_to(value, lookup, &mut HashMap::new(), PROPERTY_DEPTH)
 }
 
-fn fill_to<'a>(value: &str, lookup: &impl Fn(&str) -> Option<&'a str>, depth: usize) -> String {
+fn fill_to<'a>(
+    value: &str,
+    lookup: &impl Fn(&str) -> Option<&'a str>,
+    read: &mut HashMap<String, Option<String>>,
+    depth: usize,
+) -> String {
     let mut out = String::new();
     let mut rest = value;
     while let Some(at) = rest.find("${") {
@@ -54,12 +60,18 @@ fn fill_to<'a>(value: &str, lookup: &impl Fn(&str) -> Option<&'a str>, depth: us
             break;
         };
         let hole = &rest[at..=at + end];
-        let filled = (depth > 0)
-            .then(|| lookup(&hole[2..hole.len() - 1]))
-            .flatten()
-            .map(|v| fill_to(v, lookup, depth - 1))
-            .filter(|v| !v.contains("${"));
-        out.push_str(filled.as_deref().unwrap_or(hole));
+        let name = &hole[2..hole.len() - 1];
+        if !read.contains_key(name) {
+            // Marked read before it is, so a property naming itself finds no literal.
+            read.insert(name.to_string(), None);
+            let literal = (depth > 0)
+                .then(|| lookup(name))
+                .flatten()
+                .map(|v| fill_to(v, lookup, read, depth - 1))
+                .filter(|v| !v.contains("${") && v.len() <= crate::package::MAX_NAME);
+            read.insert(name.to_string(), literal);
+        }
+        out.push_str(read[name].as_deref().unwrap_or(hole));
         rest = &rest[at + end + 1..];
     }
     out.push_str(rest);
@@ -278,6 +290,30 @@ mod tests {
             dependency("${project.groupId}", "models")
         );
         assert_eq!(dependencies(&pom), [("example:models".to_string(), None)]);
+    }
+
+    #[test]
+    fn properties_naming_each_other_many_times_are_read_once() {
+        // Fifty holes per value over a chain as long as the depth bound would take 50^16 steps
+        // without the memo; the last value is a literal, and every value is longer than a name.
+        let holes = "${p1}".repeat(40);
+        let chain: String = (1..40)
+            .map(|i| {
+                format!(
+                    "<p{i}>{}</p{i}>",
+                    holes.replace("p1", &format!("p{}", i + 1))
+                )
+            })
+            .collect();
+        let properties =
+            format!("<properties><p40>x</p40><self>{holes}</self>{chain}</properties>");
+        let body = format!("{properties}{}", dependency("example", "${p1}"));
+        assert_eq!(
+            dependencies(&project("", &body)),
+            [("example:*".to_string(), Some("computed".to_string()))]
+        );
+        let body = format!("{properties}{}", dependency("example", "${self}"));
+        assert_eq!(dependencies(&project("", &body)).len(), 1);
     }
 
     #[test]

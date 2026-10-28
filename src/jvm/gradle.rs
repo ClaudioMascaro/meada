@@ -351,10 +351,22 @@ fn assigns(tokens: &[Token], name: &str) -> bool {
 /// The name and the string of a statement that only gives a name a string with no interpolation:
 /// `val name = "x"`, `def name = 'x'`, `name = 'x'`, `ext.name = 'x'`.
 fn literal_assignment(tokens: &[Token]) -> Option<(&str, &str)> {
-    let tokens = match tokens.first().and_then(Token::word) {
+    let typed = tokens.first().and_then(Token::word);
+    let tokens = match typed {
         Some("val" | "def") => &tokens[1..],
         _ => tokens,
     };
+    // `val name: Type = "x"`
+    if let [
+        Token::Word(name),
+        Token::Mark(':'),
+        Token::Word(_),
+        Token::Mark('='),
+        Token::String(value, false),
+    ] = tokens
+    {
+        return Some((name, value));
+    }
     let target = tokens.first()?.word()?;
     let name = ["ext.", "project.ext."]
         .iter()
@@ -830,6 +842,7 @@ mod tests {
             ("def s = 'pi'\next.s = 'qa'", computed("example:a*")),
             ("def s = 'pi'\nif (c) { s = 'qa' }", computed("example:a*")),
             ("def s = 'pi'\nif (c) s = 'qa'", computed("example:a*")),
+            ("val s: String = \"pi\"", written("example:api")),
             ("val s: String = \"pi\"\ns = \"qa\"", computed("example:a*")),
             ("def s = 'p'\ns += 'i'", computed("example:a*")),
             // Not a plain string: interpolated, computed, in a condition, a block or a call.

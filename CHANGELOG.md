@@ -8,6 +8,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Maven or Gradle dependency whose group or artifact names a property or variable the build
+  files declare as a literal reads as that literal, and links like a written coordinate: a pom
+  `<properties>` entry, `project.groupId` or `project.artifactId`, or a property of a parent pom
+  in the repository; a Gradle `val`, `def` or `ext` name assigned once to a plain string, the
+  project's `group` included. A name the build files do not declare, declare more than once or
+  compute stays `ambiguous`, as before. Versions are untouched. The stored summary of a `pom.xml`
+  gains `properties`, `parent` and a computed entry's `template`, so an existing index is rebuilt.
+
 - A Java local declared with an initializer and never assigned again in its file is followed into
   its value, as a Kotlin `val` is: `String base = System.getenv("WEB_URL");` then
   `rest.getForObject(base + "/api", ..)` carries `env:WEB_URL`, so `base_url_env` maps it to its
