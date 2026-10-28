@@ -334,7 +334,7 @@ fn a_version_specific_manifest_is_not_code_and_a_lookalike_is() {
     )
     .unwrap();
     let after = json(&kit);
-    assert_eq!(after["modules"], before["modules"]);
+    assert_eq!(after["providers"], before["providers"]);
     assert_eq!(after["packages"], before["packages"]);
     let after_files = paths(&after);
     assert!(!after_files.iter().any(|p| p.contains("Package@swift")));
