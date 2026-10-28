@@ -14286,6 +14286,7 @@ fn python_imports_resolve_through_the_nearest_nested_pyproject() {
         ("a", "f", "a/app/util.py::f"),
         ("b", "f", "b/app/util.py::f"),
         ("c", "g", "c/lib/pkg/mod.py::g"),
+        ("d", "g", "d/lib/pkg/mod.py::g"),
     ] {
         let (level, to) = nested_pyproject_call(&json, dir, callee);
         assert_eq!(level.as_deref(), Some("exact"), "{dir}");
@@ -14295,17 +14296,19 @@ fn python_imports_resolve_through_the_nearest_nested_pyproject() {
 
 #[test]
 fn python_nested_pyproject_that_cannot_be_read_declares_no_roots() {
-    let repo = fixture_repo(
-        "python_nested_invalid",
-        "python-nested-pyproject",
-        Some(ORIGIN),
-    );
-    std::fs::write(repo.join("c/pyproject.toml"), "[tool\n").unwrap();
-    let export = Engine::open(&repo).unwrap().export().unwrap();
-    let json: Value = serde_json::from_str(&export).unwrap();
-    assert_eq!(nested_pyproject_call(&json, "c", "g").0, None);
-    assert_eq!(
-        nested_pyproject_call(&json, "a", "f").0.as_deref(),
-        Some("exact")
-    );
+    // Not TOML, not UTF-8, or past the size limit: no declared roots, and the rest indexes.
+    let large = format!("[tool.poetry]\n# {}\n", "x".repeat(1 << 20));
+    for (case, bytes) in [
+        ("python_nested_invalid", b"[tool\n".to_vec()),
+        ("python_nested_binary", vec![0xff, 0xfe, 0x00]),
+        ("python_nested_large", large.into_bytes()),
+    ] {
+        let repo = fixture_repo(case, "python-nested-pyproject", Some(ORIGIN));
+        std::fs::write(repo.join("c/pyproject.toml"), bytes).unwrap();
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        let json: Value = serde_json::from_str(&export).unwrap();
+        assert_eq!(nested_pyproject_call(&json, "c", "g").0, None, "{case}");
+        let a = nested_pyproject_call(&json, "a", "f").0;
+        assert_eq!(a.as_deref(), Some("exact"), "{case}");
+    }
 }

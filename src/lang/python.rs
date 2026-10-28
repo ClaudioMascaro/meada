@@ -375,8 +375,9 @@ impl LanguagePack for Python {
 
     fn modules(&self, configs: &[(&str, &[u8])], _: &BTreeMap<&str, &Facts>) -> Result<Modules> {
         // Read as a PyPI manifest is: one past the size limit, not UTF-8 or not TOML declares
-        // nothing, and indexing carries on. An importer tries the roots of the manifest in its
-        // directory or the nearest ancestor with one, then each further ancestor's.
+        // nothing, and indexing carries on. An importer tries the roots of each manifest in its
+        // directory and above, nearest first; the repository root always has some (`src` when
+        // it has no manifest).
         let mut by_dir: HashMap<String, Vec<String>> = (configs.iter())
             .map(|(path, src)| {
                 let dir = path.rsplit_once('/').map_or("", |(dir, _)| dir);
