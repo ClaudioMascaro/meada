@@ -24,3 +24,8 @@ func settle() async {
 }
 
 fileprivate func local() {}
+
+func shared() {
+    let session = URLSession.shared
+    session.finishTasksAndInvalidate()
+}

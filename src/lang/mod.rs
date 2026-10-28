@@ -579,6 +579,10 @@ pub enum Class {
     /// make(1)`): as `Call::on` reads it, so the overload the call's argument count picks
     /// decides.
     Result(usize),
+    /// A member read on a callee-like name, as written (Swift's `let s = URLSession.shared`):
+    /// not a constructor, a returned value or a call result, so it gives no instance. Its head,
+    /// the first segment, may name a type outside the repository, which makes the value opaque.
+    Member(String),
     /// Bound by an import in the scope: what the file's imports bind the name to.
     Imported,
     /// Bound otherwise, so an outer binding of the name is hidden.

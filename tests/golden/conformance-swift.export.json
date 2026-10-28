@@ -1612,8 +1612,8 @@
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.fetch(_:)::session.data#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Api.fetch(_:)",
-      "target": "example.com/acme/conformance::Sources/Checkout/Clients.swift::Cache.data(from:)",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "Sources/Checkout/Clients.swift",
         "start": 2398,

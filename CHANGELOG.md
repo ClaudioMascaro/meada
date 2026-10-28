@@ -8,6 +8,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Swift local or property bound to a member read on a name from outside the repository
+  (`let session = URLSession.shared`) is opaque, as the direct chain `URLSession.shared.data(..)`
+  is: a call on it no longer matches a repository method of the same name and labels
+  (`Cache.data(from:)`). A `var` assigned again keeps the name match. The stored facts of a Swift
+  file gain `Class::Member`, so an existing index is rebuilt.
+
 - A Swift module is a target of one package: two packages of a repository that each declare a
   target `App` are two modules, so a call binds its own package's declaration instead of staying
   `ambiguous` among the others; `import App` binds the importer's own package's target, else the

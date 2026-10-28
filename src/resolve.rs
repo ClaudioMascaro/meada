@@ -1304,7 +1304,8 @@ impl<'a> Resolver<'a> {
     /// from outside the repository the receiver `head` (bound to `receiver`) is of: the type
     /// the source writes or constructs for it, or the capitalized name it starts with, when
     /// nothing in the repository binds that name. `Some(None)` for a member read on such a name
-    /// (`URLSession.shared`), whose type is not known; `None` for any other receiver.
+    /// (`URLSession.shared`, or a local bound to it: `Class::Member`), whose type is not known;
+    /// `None` for any other receiver.
     fn outside_type(
         &self,
         path: &'a str,
@@ -1321,6 +1322,14 @@ impl<'a> Resolver<'a> {
         if let Some((p, s, n)) = self.holder(receiver) {
             return match self.receivers[p].get(&(s, n)) {
                 Some(Class::Type(ty) | Class::Named(ty)) if outside(ty, work) => Some(Some(ty)),
+                // A member read on a name from outside (`let s = URLSession.shared`): opaque.
+                Some(Class::Member(read)) => {
+                    // As a direct chain, only a capitalized head is a type: `h.cache` is a member
+                    // of a local or a parameter.
+                    let first = read.split('.').next().unwrap_or(read);
+                    (first.starts_with(|c: char| c.is_ascii_uppercase()) && outside(first, work))
+                        .then_some(None)
+                }
                 _ => None,
             };
         }
@@ -2102,7 +2111,7 @@ impl<'a> Resolver<'a> {
             Class::Returned(callee) => self.returned(path, scope, callee, false, work),
             Class::Called(callee) => self.returned(path, scope, callee, true, work),
             Class::Result(index) => self.result_of(path, *index, work),
-            Class::Imported | Class::Unknown => Binding::Unknown,
+            Class::Imported | Class::Member(_) | Class::Unknown => Binding::Unknown,
         };
         work.busy.pop();
         match found {
@@ -9874,6 +9883,45 @@ mod tests {
              func run(o: Own, n: inout Int) { o.hash(into: &n) }",
         );
         assert_eq!(own["run(o:n:) o.hash"], "exact Own.hash(into:)");
+    }
+
+    /// A Swift local bound to a member read on a name nothing in the repository binds is opaque
+    /// (`let session = URLSession.shared`), as the direct chain is; on a name the repository
+    /// declares (`Remote.shared`) the call stays the name match it was (issue #385).
+    #[test]
+    fn a_swift_member_read_on_an_outside_name_is_opaque() {
+        let calls = pack_calls(
+            &crate::lang::swift::Swift,
+            "A.swift",
+            "struct Cache { func data(from key: String) -> Int { 0 } }
+             enum Remote { static let shared = Cache() }
+             func outside() {
+                 let session = URLSession.shared
+                 _ = session.data(from: \"k\")
+                 _ = URLSession.shared.data(from: \"k\")
+             }
+             func inside() {
+                 let cache = Remote.shared
+                 _ = cache.data(from: \"k\")
+             }
+             struct Holder { let cache = Cache() }
+             func viaParam(h: Holder) {
+                 let c = h.cache
+                 _ = c.data(from: \"k\")
+             }
+             func again(other: URLSession) {
+                 var client = URLSession.shared
+                 client = other
+                 _ = client.data(from: \"k\")
+             }",
+        );
+        assert_eq!(calls["outside() session.data"], "none");
+        assert_eq!(calls["outside() URLSession.shared.data"], "none");
+        assert_eq!(calls["inside() cache.data"], "inferred Cache.data(from:)");
+        assert_eq!(
+            calls["again(other:) client.data"],
+            "inferred Cache.data(from:)"
+        );
     }
 
     /// A bare call a nested class does not answer climbs to the class around it: past that
