@@ -1769,7 +1769,9 @@ one for the area a change touches.
   (`lang/swift/manifest.rs`: every `.target`, `.executableTarget`, `.testTarget`, `.macro` and
   `.plugin` call with a literal `name:` outside a `dependencies:` argument, under its literal
   `path:` inside the package or the default directory) as a config file (`**/Package.swift`,
-  no code: `is_code`). Each target is a module of the files under its directory, the deepest
+  no code: `is_code`). Each target is a module of its package (`Targets`: the package's directory
+  and the target's name, which is the file's `Facts::unit`, so two packages that name a target
+  alike give two modules) of the files under its directory, the deepest
   one when several hold a file (looked up by the file's directories, so the cost is the path's
   depth), and the files no target holds (all of them without a manifest) are one module no
   import names. The layout shares a module's scope among its files (`Layout::shared`), whose
@@ -1778,7 +1780,13 @@ one for the area a change touches.
   `Facts::unit` to its module, so `internal` declarations (`Facts::private`) stay in it
   (`Resolver::hidden`), and appends the module's own inside glob after the imports, so its
   names come before an import's. `import M` is a namespace import of `M` and an outside glob
-  of it, which takes `M`'s public names (`Facts::star`). A function's name carries its
+  of it, which takes `M`'s public names (`Facts::star`); `M` is the target of that name in the
+  importer's own package (the deepest around it), else in the nearest package by steps through
+  the directory tree, every one when several are as near (`Targets::named_from`). An import written
+  `@testable` is also listed in `Facts::testable`; `join` sets `Facts::internals` to the modules
+  it names, whose `internal` declarations the file sees (`Resolver::hidden`, and the glob reads
+  the module's exports, `Resolver::sees_internals`), but for the `fileprivate` and `private`
+  ones (`Facts::confined`). A function's name carries its
   argument labels (`place(order:quantity:)`, `init(baseURL:)`, `_` for none); declarations of
   one scope in a file (a type's body and its extensions alike) with the same labels and other
   types carry each label's written type too (`audit(_:Order)`): `parse` walks the file twice,
@@ -2261,8 +2269,7 @@ qualification budget does (ADR 0017).
   keeps no facts; `ALIAS_DEPTH` (16) bounds the aliases of aliases of a function type `join`
   follows (`function_aliases`), past which a parameter written as one takes no trailing closure.
   The pack's unit tests exceed each. Beyond the limits, what the pack leaves out
-  (spec #29, #117): a target's `sources:` and `exclude:`, two packages of the repository that
-  name a target alike (one module), `@testable import` (no `internal` access), a closure,
+  (spec #29, #117): a target's `sources:` and `exclude:`, a closure,
   deinitializer, subscript or accessor (their calls and locals are the enclosing symbol's, so
   an accessor's local hides its name in the whole type), an operator
   function, enum cases, `Self` as a type's name, a local typed by a call result or a closure

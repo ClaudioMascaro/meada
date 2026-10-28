@@ -8,6 +8,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Swift module is a target of one package: two packages of a repository that each declare a
+  target `App` are two modules, so a call binds its own package's declaration instead of staying
+  `ambiguous` among the others; `import App` binds the importer's own package's target, else the
+  nearest one's. `@testable import App` shows the `internal` declarations of that module
+  (`fileprivate` and `private` stay hidden), so a test's call to them resolves. The stored facts of
+  a Swift file gain `testable` and `confined`, so an existing index is rebuilt.
+
 - A Swift receiver whose written type is a `typealias` (`store: StoreOf<Feature>`, optional or
   not, on a parameter, a property or a local) is typed as the alias's target, through an alias of
   an alias; a cycle of aliases types nothing and an alias of an outside type leaves the receiver

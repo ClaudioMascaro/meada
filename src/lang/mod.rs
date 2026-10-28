@@ -483,6 +483,19 @@ pub struct Facts {
     /// Not kept in the index: it is joined again.
     #[serde(skip)]
     pub unit_references: Vec<String>,
+    /// The modules the file imports `@testable` (Swift), by the name written: they show it their
+    /// `internal` declarations.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub testable: Vec<String>,
+    /// The `private` names only their file sees (Swift's `fileprivate` and `private`), which
+    /// even a module imported `testable` keeps to itself.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub confined: Vec<String>,
+    /// The compilations (`unit`) whose `private` declarations the file sees, which
+    /// `LanguagePack::join` sets (Swift's `testable` imports, as the modules they name here).
+    /// Not kept in the index: it is joined again.
+    #[serde(skip)]
+    pub internals: Vec<String>,
     /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,
