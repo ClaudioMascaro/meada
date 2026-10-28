@@ -7,7 +7,7 @@
     },
     {
       "path": "Sources/App/main.swift",
-      "hash": "ce8195c13b342ca923ae25f9975ac74a601fe70fe633c4c3e6b1a3a54d29fd83"
+      "hash": "ff7a42ba9678c733d5ba7be5f2ec4a4d4f99ae56f6180cf291ce08f32fa191ef"
     },
     {
       "path": "Sources/Lib/Lib.swift",
@@ -29,6 +29,38 @@
         "path": "Sources/App/Aliases.swift",
         "start": 167,
         "end": 199
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Box",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 905,
+        "end": 987
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Box.g(_:)",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 950,
+        "end": 985
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Other",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 857,
+        "end": 903
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Other.ping()",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 877,
+        "end": 901
       }
     },
     {
@@ -72,11 +104,35 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Wheel",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 695,
+        "end": 731
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Wheel.spin()",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 715,
+        "end": 729
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/App/main.swift::cycle(_:_:)",
       "span": {
         "path": "Sources/App/main.swift",
         "start": 241,
         "end": 306
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::generic(_:)",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 802,
+        "end": 855
       }
     },
     {
@@ -88,11 +144,19 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::local()",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 733,
+        "end": 800
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/App/main.swift::main",
       "span": {
         "path": "Sources/App/main.swift",
         "start": 0,
-        "end": 694
+        "end": 1040
       }
     },
     {
@@ -109,6 +173,14 @@
         "path": "Sources/App/main.swift",
         "start": 549,
         "end": 649
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::untyped()",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 989,
+        "end": 1039
       }
     },
     {
@@ -197,6 +269,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Box.g(_:)::s.ping#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::Box.g(_:)",
+      "target": "example.com/acme/conformance::Sources/App/main.swift::Other.ping()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 975,
+        "end": 983
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/App/main.swift::cycle(_:_:)::a.spin#0",
       "caller": "example.com/acme/conformance::Sources/App/main.swift::cycle(_:_:)",
       "target": null,
@@ -219,6 +302,22 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::generic(_:)::x.send#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::generic(_:)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/App/main.swift::Sender.send(_:animation:)",
+        "example.com/acme/conformance::Sources/App/main.swift::Sender.send(_:assert:)",
+        "example.com/acme/conformance::Sources/Lib/Lib.swift::Store.send(_:)"
+      ],
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 844,
+        "end": 853
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/App/main.swift::hidden(_:)::x.send#0",
       "caller": "example.com/acme/conformance::Sources/App/main.swift::hidden(_:)",
       "target": null,
@@ -227,6 +326,28 @@
         "path": "Sources/App/main.swift",
         "start": 682,
         "end": 691
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::local()::make#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::local()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 774,
+        "end": 780
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::local()::x.send#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::local()",
+      "target": "example.com/acme/conformance::Sources/Lib/Lib.swift::Store.send(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 789,
+        "end": 798
       }
     },
     {
@@ -275,6 +396,28 @@
         "path": "Sources/App/main.swift",
         "start": 605,
         "end": 614
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::untyped()::make#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::untyped()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 1018,
+        "end": 1024
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::untyped()::w.spin#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::untyped()",
+      "target": "example.com/acme/conformance::Sources/App/main.swift::Wheel.spin()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 1029,
+        "end": 1037
       }
     },
     {
@@ -375,6 +518,7 @@
       "name": "Sources/App",
       "members": [
         "example.com/acme/conformance::Sources/App/Aliases.swift::Feature.tap()",
+        "example.com/acme/conformance::Sources/App/main.swift::local()",
         "example.com/acme/conformance::Sources/App/main.swift::use(_:_:_:_:)",
         "example.com/acme/conformance::Sources/Lib/Lib.swift::Store.send(_:)"
       ]
@@ -382,10 +526,24 @@
     {
       "name": "Sources/App#2",
       "members": [
+        "example.com/acme/conformance::Sources/App/main.swift::Box.g(_:)",
+        "example.com/acme/conformance::Sources/App/main.swift::Other.ping()"
+      ]
+    },
+    {
+      "name": "Sources/App#3",
+      "members": [
         "example.com/acme/conformance::Sources/App/main.swift::Sender.on(_:h:)",
         "example.com/acme/conformance::Sources/App/main.swift::Sender.send(_:assert:)",
         "example.com/acme/conformance::Sources/App/main.swift::run(_:)",
         "example.com/acme/conformance::Sources/App/main.swift::trailing(_:)"
+      ]
+    },
+    {
+      "name": "Sources/App#4",
+      "members": [
+        "example.com/acme/conformance::Sources/App/main.swift::Wheel.spin()",
+        "example.com/acme/conformance::Sources/App/main.swift::untyped()"
       ]
     },
     {

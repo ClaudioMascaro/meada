@@ -28,3 +28,24 @@ func trailing(_ x: Sender) {
 }
 
 func hidden(_ x: Hidden) { _ = x.send(1) }
+
+final class Wheel { func spin() {} }
+
+func local() {
+    let x: StoreOf<Int> = make()
+    _ = x.send(1)
+}
+
+func generic<StoreOf>(_ x: StoreOf) { _ = x.send(1) }
+
+final class Other { func ping() -> Int { 0 } }
+
+struct Box {
+    typealias Store = Other
+    func g(_ s: Store) { _ = s.ping() }
+}
+
+func untyped() {
+    let w = make()
+    w.spin()
+}

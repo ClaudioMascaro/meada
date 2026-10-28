@@ -1788,9 +1788,9 @@ one for the area a change touches.
   value, a variadic one taking the unlabelled arguments after its first, a trailing closure any
   label of a parameter that takes one), so a tie is `ambiguous` with each overload. Each
   `Param::closure` is read from the written type: a function type (through `?`, parentheses and
-  attributes such as `@escaping`) or a type parameter takes a trailing closure, a name is
+  attributes such as `@escaping`), a type parameter or `Any` takes a trailing closure, a name is
   `Closure::Named` until `join` looks it up among the repository's aliases of a function type
-  (`Facts::closures`, and aliases of those to `ALIAS_DEPTH`, by last segment in any scope), and
+  (`Facts::function_aliases`, and aliases of those to `ALIAS_DEPTH`, by last segment in any scope), and
   any other type refuses it. A `typealias` of a named type is an `Imported::Path` import of its
   target under the alias's qualified name, exported by its access as a declaration is: a type
   written as the alias resolves through `Resolver::alias` (a cycle or `LINK_DEPTH` ends with
@@ -1976,7 +1976,7 @@ one for the area a change touches.
   labels and constructor form of an overloaded call (`Call::arity`, `Call::labels`,
   `Call::constructs`), the argument label of a parameter and whether its written type takes a
   trailing closure, or the name it is written as (`Param::label`, `Param::closure`), the names
-  of a Swift file's aliases of a function type (`Facts::closures`), the place of the call a
+  of a Swift file's aliases of a function type (`Facts::function_aliases`), the place of the call a
   chained call is made on (`Call::on`), whether an `inferred` call was narrowed from several
   definitions of its name (`calls.narrowed`), callable-to-signature and
   static-member names (`Facts::overloads`, `Facts::constructors` and
@@ -2259,7 +2259,7 @@ qualification budget does (ADR 0017).
   symbol and a callee is `(navigation_expression)`); `QUALIFICATION_BYTES` (4 MiB) bounds the
   enclosing-name bytes a file's definitions, calls and bindings store, past which the file
   keeps no facts; `ALIAS_DEPTH` (16) bounds the aliases of aliases of a function type `join`
-  follows (`closure_aliases`), past which a parameter written as one takes no trailing closure.
+  follows (`function_aliases`), past which a parameter written as one takes no trailing closure.
   The pack's unit tests exceed each. Beyond the limits, what the pack leaves out
   (spec #29, #117): a target's `sources:` and `exclude:`, two packages of the repository that
   name a target alike (one module), `@testable import` (no `internal` access), a closure,
@@ -2268,7 +2268,10 @@ qualification budget does (ADR 0017).
   function, enum cases, `Self` as a type's name, a local typed by a call result or a closure
   parameter's type (#118), a typed local of a nested block, closure or accessor (a name match
   where Java and C# keep it function-wide), a `typealias` as a symbol, one written in a type
-  seen from another file (its extensions included), and the
+  seen from another file (its extensions included), the repository's extension of an outside
+  type reached through an alias of it (the receiver stays outside under the alias's name, so
+  it reaches no block), an outside alias of a function type (`Ext.Handler`, which takes no
+  trailing closure, as the brief of #411 decides for every outside name), and the
   protocols a conformed protocol inherits when the conformance is written on an extension. As in Java, an outside base
   the pack does not list among its known outside members (`NSObject`, `View`) keeps a type's own
   overloads from `exact`, and a listed one (`Codable`, a raw value type) the names it declares.

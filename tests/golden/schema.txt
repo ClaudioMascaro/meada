@@ -2552,7 +2552,7 @@ sample.swift
   "hidden": [
     "Order.place(order:quantity:_:)"
   ],
-  "closures": [
+  "function_aliases": [
     "Handler"
   ]
 }

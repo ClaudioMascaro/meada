@@ -14052,6 +14052,15 @@ fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
         app("run(_:)"),
         app("trailing(_:)"),
         app("hidden(_:)"),
+        app("Wheel"),
+        app("Wheel.spin()"),
+        app("local()"),
+        app("generic(_:)"),
+        app("Other"),
+        app("Other.ping()"),
+        app("Box"),
+        app("Box.g(_:)"),
+        app("untyped()"),
     ];
     let symbols: Vec<&str> = symbols.iter().map(String::as_str).collect();
     let (send, init, internal) = (
@@ -14074,8 +14083,28 @@ fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
         ),
         (lib("inside()::Reduce#0"), EXACT, vec![internal]),
         (aliases("Feature.tap()::store.send#0"), EXACT, vec![send]),
+        // A cycle of aliases and an alias of an outside type type their receivers: neither
+        // reaches the repository's `spin` by name, as a receiver of no known type does.
         (app("cycle(_:_:)::a.spin#0"), None, vec![]),
         (app("cycle(_:_:)::anim.spin#0"), None, vec![]),
+        (
+            app("untyped()::w.spin#0"),
+            INFERRED,
+            vec![app("Wheel.spin()")],
+        ),
+        (app("local()::x.send#0"), EXACT, vec![lib("Store.send(_:)")]),
+        // A type parameter named like an alias hides it, and an alias in a type hides a type
+        // of its name around it.
+        (
+            app("generic(_:)::x.send#0"),
+            AMBIGUOUS,
+            vec![
+                app("Sender.send(_:animation:)"),
+                app("Sender.send(_:assert:)"),
+                lib("Store.send(_:)"),
+            ],
+        ),
+        (app("Box.g(_:)::s.ping#0"), EXACT, vec![app("Other.ping()")]),
         (
             trailing("x.send#0"),
             EXACT,
