@@ -18,6 +18,7 @@ func gateway() throws {
     let shared = deeper(admin)
     shared.get("hammer") { _, _ in "tool" }
     router.group().get("bare") { _, _ in "bare" }
+    router.group(Paths.api()).get("unread") { _, _ in "unread" }
     router.group(String(describing: router)).get("unread") { _, _ in "unread" }
     router.get("a/b") { _, _ in "nested" }
     // `on` needs `method:` after the path: neither a missing one nor Vapor's order is a route.

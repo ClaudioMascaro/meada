@@ -29,6 +29,8 @@ func routes(_ app: Application) throws {
     pick(app)
     pick(spin(app))
     app.grouped(AuthMiddleware()).get("guarded") { req in "guarded" }
+    app.grouped(User.authenticator(), User.guardMiddleware()).get("me") { req in "me" }
+    app.grouped(User.authenticator(), app.sessions.middleware).get("mixed") { req in "unread" }
     app.grouped(PathComponent("typed")).get("unread") { req in "unread" }
     app.grouped(String(describing: app)).get("unread") { req in "unread" }
     shadowedByLet(app)

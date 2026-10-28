@@ -12,4 +12,5 @@ pub(super) const HUMMINGBIRD: Dialect = Dialect {
     group: "group",
     method_first: false,
     collections: false,
+    middleware: false,
 };

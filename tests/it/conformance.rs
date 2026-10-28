@@ -12682,6 +12682,7 @@ fn swift() {
         checkout("Routes.swift", "explicit(_:)"),
         checkout("Routes.swift", "routes(_:).GET /api/v1/ex/explicit"),
         checkout("Routes.swift", "routes(_:).GET /guarded"),
+        checkout("Routes.swift", "routes(_:).GET /me"),
         checkout("Routes.swift", "spin(_:)"),
         checkout("Routes.swift", "pick(_:)"),
         checkout("Routes.swift", "pick(_:).GET /pick/one"),
