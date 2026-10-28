@@ -331,8 +331,12 @@ pub struct Resolver<'a> {
     /// `Facts::unit`), for `hidden`.
     internal: HashMap<&'a str, HashSet<&'a str>>,
     /// The names some file of the repository writes through a selector (`cfg.Base = ..`): a
-    /// constant marked `.Name` (Go). A variable of such a name holds no one value.
+    /// constant marked `.Name` (Go, and a Java or Kotlin write whose class is unknown). A
+    /// variable of such a name holds no one value.
     written: HashSet<&'a str>,
+    /// The fields some file writes in the code of their class (`.name@class`, Java and Kotlin),
+    /// by class and name.
+    written_in: HashSet<(&'a str, &'a str)>,
     /// The other names bindings make (`Facts::locals`): each hides an outer name.
     locals: HashMap<&'a str, HashSet<&'a str>>,
     /// Each file's `Facts::receivers`, by scope and name.
@@ -738,9 +742,17 @@ impl<'a> Resolver<'a> {
             paths.dedup();
             (2..=TYPE_PARTS).contains(&paths.len())
         });
-        let written = (files.values())
+        let marks: Vec<&str> = (files.values())
             .flat_map(|f| f.consts.iter())
             .filter_map(|c| c.name.strip_prefix('.'))
+            .collect();
+        let written = (marks.iter())
+            .filter(|m| !m.contains('@'))
+            .copied()
+            .collect();
+        let written_in = (marks.iter())
+            .filter_map(|m| m.split_once('@'))
+            .map(|(name, class)| (class, name))
             .collect();
         // Those of the definition `defs` keeps for each name.
         let params = (defs.iter())
@@ -873,6 +885,7 @@ impl<'a> Resolver<'a> {
             qualified_types: language.qualified_types(),
             namespaced: language.namespaced(),
             written,
+            written_in,
             consts,
             internal,
             locals,
@@ -5183,6 +5196,12 @@ impl<'a> Code<'a> {
         self.resolver.written.contains(field)
     }
 
+    /// Whether some file of the repository writes the field `field` of `class` (Java and
+    /// Kotlin): a write in the code of `class`, or one whose class the pack could not tell.
+    pub fn field_written_in(&self, class: &str, field: &str) -> bool {
+        self.field_written(field) || self.resolver.written_in.contains(&(class, field))
+    }
+
     /// The argument the call at `index` of `path` passes for parameter `n` of `function`: by
     /// position, or by the parameter's name among its keyword arguments. A method called on
     /// an instance (`x.m(a)`) is passed no argument for its receiver parameter.
@@ -6353,7 +6372,7 @@ impl<'a> Code<'a> {
             }
             // A field no file assigns holds what an annotation on it injects.
             Binding::Local(at, class, field) => match fold.inject {
-                Some(inject) if !self.field_written(field) => {
+                Some(inject) if !self.field_written_in(class, field) => {
                     let marks = |on: &Marked| matches!(on, Marked::Field { class: c, name, .. } if c == class && name == field);
                     self.injected(at, marks, inject).unwrap_or(Value::Unknown)
                 }

@@ -802,6 +802,21 @@ fn unknown() -> Value {
     Value::Unknown
 }
 
+/// The marker constant for a write of the field `name` (`Code::field_written`): `.name` for a
+/// write whose class is unknown, `.name@class` for one in the code of `class`. The value is
+/// none: a field so written holds no one value.
+pub fn field_write(name: &str, class: Option<&str>) -> Const {
+    Const {
+        name: match class {
+            Some(class) => format!(".{name}@{class}"),
+            None => format!(".{name}"),
+        },
+        value: Value::Unknown,
+        ty: None,
+        scope: None,
+    }
+}
+
 /// A call site. `scope` is the qualified name of the enclosing definition, empty at the top
 /// level; `callee` is the normalized call expression: `a.b.c` for identifier and member
 /// chains, `(<node kind>)` for any other expression.

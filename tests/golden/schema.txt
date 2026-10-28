@@ -1491,7 +1491,7 @@ sample.java
       "name": "example.Store.PREFIX"
     },
     {
-      "name": ".client"
+      "name": ".client@example.Store"
     }
   ],
   "receivers": [

@@ -1012,8 +1012,10 @@ one for the area a change touches.
   again through `Code::misses`), and, for a parameter no annotation on it injects into, what it
   gives the parameter itself (`Injected::Param(function, n)`: a dependency injection container
   passes a constructor's parameter by its type, with no annotation, as C#'s typed client takes
-  its `HttpClient`). The shared side asks it for a field no file assigns (`Code::field_written`, the `.f` marker
-  constants the Java pack writes for every `f = v` and `x.f = v`) and for a parameter no frame
+  its `HttpClient`). The shared side asks it for a field no file assigns (`Code::field_written_in`, the `.f` and
+  `.f@class` marker constants the Java pack writes for a field write: `f = v` of a name no local or parameter declared
+  before it, `f++`, `this.f = v` and `x.f = v`; an assignment to a local or a parameter is not one, and a write carries
+  its class when the pack knows it, which a classless write, as `x.f = v`, does not) and for a parameter no frame
   binds of a function no call of the repository may reach (`Code::may_be_called`: an exact
   caller, or any callee ending in its name, so a name match, a call on an opaque receiver, a
   `new` inside an anonymous class and `this(..)` or `super(..)`, which the Java pack emits as
@@ -2851,9 +2853,11 @@ qualification budget does (ADR 0017).
   a `val` or `var` declares, whose `Const` is dropped when annotated, as a `lateinit var` has
   none, so the annotation is what it holds) and a function's parameter, by use-site target: none,
   `field`, `set` and `setparam` for a property, none and `param` for a parameter; `get`,
-  `property` and the others inject nothing. Every assignment to a name (`base = ..`,
-  `this.base += ..`, `o.base = ..`) is a `.name` constant, as Java's, which `Code::field_written`
-  reads: a field some code assigns holds no injected value. `value()` reads
+  `property` and the others inject nothing. Every assignment to a name that can be a
+  property (`base = ..` of a name no local or parameter declared before it, `this.base += ..`, `base++`, `o.base = ..`)
+  is a `.name` constant, or `.name@class` when the pack knows the class, as Java's, which
+  `Code::field_written_in` reads; an assignment to a local or a parameter is not one, and a classless write
+  matches the name in every class: a field some code of its class assigns holds no injected value. `value()` reads
   `System.getenv("X")`, `java.lang.System.getenv("X")` and `System.getenv()["X"]` as `Part::Env`,
   through `!!`, parentheses, `?:` fallbacks and the string methods of `STRING_METHODS`
   (`trimEnd`, `removeSuffix`, ...), unless the file binds `System` to another type
