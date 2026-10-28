@@ -4071,11 +4071,14 @@ pub fn method(callee: &str) -> &str {
 ///
 /// The index keeps no values (they hold string literals), so `full` holds the parsed facts
 /// of only some files. A lookup into any other file answers `Unknown` and records the file
-/// in `misses`; the index parses those files and asks again until nothing is missed.
+/// in `misses`; the index parses those files and asks again until nothing is missed. The files
+/// of `full` looked into are in `read`, which the index keeps to parse them up front next time.
 pub struct Code<'a> {
     resolver: &'a Resolver<'a>,
     full: &'a BTreeMap<&'a str, &'a Facts>,
     misses: RefCell<BTreeSet<&'a str>>,
+    /// The files of `full` looked into.
+    read: RefCell<HashSet<&'a str>>,
     chains: RefCell<HashMap<(&'a str, usize), Option<Tail>>>,
     /// What folding and tracing values has spent of each file's `EVAL_BUDGET`.
     folded: RefCell<HashMap<&'a str, usize>>,
@@ -4243,6 +4246,7 @@ impl<'a> Code<'a> {
             resolver,
             full,
             misses: RefCell::new(BTreeSet::new()),
+            read: RefCell::new(HashSet::new()),
             chains: RefCell::new(HashMap::new()),
             folded: RefCell::new(HashMap::new()),
             by_name: full.keys().map(|&path| (path, OnceCell::new())).collect(),
@@ -4509,6 +4513,11 @@ impl<'a> Code<'a> {
     /// The files looked into that `full` lacks, sorted.
     pub fn misses(&self) -> Vec<&'a str> {
         self.misses.borrow().iter().copied().collect()
+    }
+
+    /// The files of `full` looked into, in no order.
+    pub fn read(&self) -> Vec<&'a str> {
+        self.read.borrow().iter().copied().collect()
     }
 
     /// Every file of the pack, with the facts the index keeps (no values).
@@ -5305,9 +5314,10 @@ impl<'a> Code<'a> {
 
     fn full(&self, path: &'a str) -> Option<&'a Facts> {
         let found = self.full.get(path).copied();
-        if found.is_none() {
-            self.misses.borrow_mut().insert(path);
-        }
+        match found {
+            Some(_) => self.read.borrow_mut().insert(path),
+            None => self.misses.borrow_mut().insert(path),
+        };
         found
     }
 

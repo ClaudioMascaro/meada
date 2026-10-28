@@ -41,7 +41,10 @@ modules updates it.
   only changed files, resolve every file's calls in memory, rewrite rows only when a file's
   `resolved` digest changed, re-extract contracts for the whole repository (one row per side, the
   `Found::shape`s of a side reached several ways merged, as JSON in `contracts.shape`, which `export` loads into `Provider::shape` and
-  `Consumer::shape`). `refresh(db, root,
+  `Consumer::shape`). The extraction reads values the index does not keep, so it parses again
+  the files whose values the last extraction read (the `valued` table, `Code::read`) before its
+  first pass, then each file a kind misses (`Code::misses`) until none does; a pack that missed
+  nothing in a pass is done and is not extracted again (#391). `refresh(db, root,
   identity, serve)` first brings the `documents` table (path, hash, mtime, size, `summary`) up
   to date the same way (`refresh_documents`, sharing `stat`), before the early exit and apart
   from the code rows: a document edit re-extracts no code. Without `serve.declared` the

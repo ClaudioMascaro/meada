@@ -1971,13 +1971,16 @@ one for the area a change touches.
   an opaque one as `null`), the `flexible` table (spec #27, #106: each function that takes more
   than one count of arguments, a default parameter or a vararg, by file and qualified name with
   its parameter types, with the least and the most count, `resolve::Flexible`), the `entry_points` table (spec #31:
-  each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
-  each community's name and member identities (`communities`, spec #31). `Call::args`,
+  each entry point's identity, kind, label and start symbol, rewritten with the contracts),
+  each community's name and member identities (`communities`, spec #31), and the paths of the
+  files whose values the last contract extraction read (`valued`, #391). `Call::args`,
   `Call::kwargs`, `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::return_values`, `Def::type_params`, `Param::default`,
   `Field::default`, `Const::value` and `Const::ty` are `serde(skip)`, so unchanged files come
   back from SQLite without them. An `interface` or `type` declaration is a `Const` too, so its
   name is stored (its members are not). `Code` records every file it needs but lacks as a miss, and
-  `refresh` re-parses those and extracts again until none is missed. A contract kind that reads a
+  every file of `full` it looks into (`Code::read`); `refresh` re-parses the files the last
+  extraction read (`valued`) before its first pass, then the missed ones, and extracts again the
+  packs that missed until none does. A contract kind that reads a
   value from a new place relies on this loop.
 - Links are never stored. They derive from the stored provider and consumer contracts, then the
   decisions replay, when a query runs, so a change on either side, or to a decisions file, needs
@@ -2306,7 +2309,9 @@ qualification budget does (ADR 0017).
 - `engine.rs`: one connection attaches every peer, so a workspace reads at most 10 peers
   (`MAX_PEERS`, SQLite's attach limit). `search` scans every symbol.
 - `index.rs`: every contract is extracted again and every call resolved again on any change
-  (rows rewritten only when they differ). An unreadable `contracts.fragments` value is read as
+  (rows rewritten only when they differ), and every file whose values the last extraction read
+  (`valued`) is parsed again for it: on this repository, a one-line edit of a Rust file parses
+  about 530 files again (#391). An unreadable `contracts.fragments` value is read as
   no fragments, since only `refresh` writes it. A manifest or pack config file (`package.json`,
   `pyproject.toml`, `requirements*.txt`, `Cargo.toml`, `go.mod`, `tsconfig.json`, `jsconfig.json`) is read up to one
   byte past `lang::MAX_BYTES`, and a provider document up to one byte past
