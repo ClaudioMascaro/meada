@@ -11,7 +11,7 @@ const GRADLE_DEPTH: usize = 64;
 // ponytail: a project names a few source directories; the rest of a hostile file is dropped.
 const MAX_ROOTS: usize = 64;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 enum Token {
     Word(String),
     String(String, bool),
@@ -235,7 +235,42 @@ fn named(args: &[Token]) -> Option<Option<(String, String, Option<String>)>> {
     Some(group.zip(artifact).map(|(g, a)| (g, a, version)))
 }
 
-fn dependency(field: &str, args: &[Token]) -> Option<Entry> {
+/// A template with each `$name` or `${name}` that `literals` gives a value replaced by it. A bare
+/// `$name.rest` stays: Groovy reads it as a property of `name`, Kotlin as `name` and `.rest`.
+fn filled(value: &str, literals: &BTreeMap<String, String>) -> String {
+    let mut out = String::new();
+    let mut rest = value;
+    while let Some(at) = rest.find('$') {
+        out.push_str(&rest[..at]);
+        let after = &rest[at + 1..];
+        let (name, used) = match after.strip_prefix('{') {
+            Some(braced) => braced
+                .split_once('}')
+                .map_or(("", 0), |(name, _)| (name, name.len() + 2)),
+            None => {
+                let len = after
+                    .find(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+                    .unwrap_or(after.len());
+                let dotted = after[len..].starts_with('.');
+                (if dotted { "" } else { &after[..len] }, len)
+            }
+        };
+        match literals.get(name) {
+            Some(literal) => {
+                out.push_str(literal);
+                rest = &after[used..];
+            }
+            None => {
+                out.push('$');
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+fn dependency(field: &str, args: &[Token], literals: &BTreeMap<String, String>) -> Option<Entry> {
     // A call (`project(...)`, `files(...)`, `platform(...)`) or no string at all
     // (`libs.models`) declares no `group:artifact` coordinate.
     let call = args
@@ -255,8 +290,8 @@ fn dependency(field: &str, args: &[Token]) -> Option<Entry> {
             (g.to_string(), a.to_string(), v.map(str::to_string))
         }
     };
-    let (group, group_computed) = piece(&group)?;
-    let (artifact, artifact_computed) = piece(&artifact)?;
+    let (group, group_computed) = piece(&filled(&group, literals))?;
+    let (artifact, artifact_computed) = piece(&filled(&artifact, literals))?;
     // A coordinate without one literal fragment fits every provider: it names none.
     if group == "*" && artifact == "*" {
         return None;
@@ -284,23 +319,49 @@ fn control(name: &str) -> bool {
     )
 }
 
-fn assigns(tokens: &[Token], name: &str) -> bool {
+/// The names a statement assigns: `name =`, `name +=`, `val name =`, `val name: T =`, among its
+/// first tokens, or anywhere in a control statement.
+fn targets(tokens: &[Token]) -> impl Iterator<Item = &str> {
+    let typed = matches!(tokens.first().and_then(Token::word), Some("val" | "var"))
+        && matches!(tokens.get(2), Some(Token::Mark(':')));
     let tokens = if tokens.first().and_then(Token::word).is_some_and(control) {
         tokens
     } else {
         &tokens[..tokens.len().min(3)]
     };
-    tokens.iter().enumerate().any(|(i, token)| {
-        token.word() == Some(name)
-            && (matches!(tokens.get(i + 1), Some(Token::Mark('=')))
+    (tokens.iter().enumerate())
+        .filter(move |&(i, _)| {
+            typed && i == 1
+                || matches!(tokens.get(i + 1), Some(Token::Mark('=')))
                 || matches!(
                     (tokens.get(i + 1), tokens.get(i + 2)),
                     (
                         Some(Token::Mark('+' | '-' | '*' | '/')),
                         Some(Token::Mark('='))
                     )
-                ))
-    })
+                )
+        })
+        .filter_map(|(_, token)| token.word())
+}
+
+fn assigns(tokens: &[Token], name: &str) -> bool {
+    targets(tokens).any(|target| target == name)
+}
+
+/// The name and the string of a statement that only gives a name a string with no interpolation:
+/// `val name = "x"`, `def name = 'x'`, `name = 'x'`, `ext.name = 'x'`.
+fn literal_assignment(tokens: &[Token]) -> Option<(&str, &str)> {
+    let tokens = match tokens.first().and_then(Token::word) {
+        Some("val" | "def") => &tokens[1..],
+        _ => tokens,
+    };
+    let target = tokens.first()?.word()?;
+    let name = ["ext.", "project.ext."]
+        .iter()
+        .find_map(|prefix| target.strip_prefix(prefix))
+        .unwrap_or(target);
+    (!name.contains('.')).then_some(())?;
+    Some((name, assigned(tokens, target)??))
 }
 
 /// The arguments of a call, `f(a, b)` or `f a, b`, split at the commas outside brackets.
@@ -454,9 +515,28 @@ struct Scan {
     unplaced: bool,
     /// The literal source directories of the source sets, with whether the set is `main`.
     sources: Vec<(bool, String)>,
+    /// Each name the script assigns, with its string when that is its one assignment, at the
+    /// top level or in `ext { }`, outside any condition.
+    names: BTreeMap<String, Option<String>>,
+    /// The `dependencies` statements, read once `names` is complete.
+    pending: Vec<(String, Vec<Token>)>,
 }
 
 fn statement(tokens: &[Token], blocks: &[String], controlled: bool, scan: &mut Scan) {
+    // `allprojects` configures this project too, so its assignments are never literal here.
+    let conditional = controlled
+        || blocks.iter().any(|b| b == "allprojects")
+        || tokens.first().and_then(Token::word).is_some_and(control);
+    let sole = literal_assignment(tokens)
+        .filter(|_| !conditional && (blocks.is_empty() || blocks == ["ext"]));
+    for target in targets(tokens) {
+        let name = target.rsplit('.').next().unwrap_or(target);
+        let literal = sole.filter(|(n, _)| *n == name).map(|(_, v)| v.to_string());
+        // A second assignment leaves no literal.
+        (scan.names.entry(name.to_string()))
+            .and_modify(|v| *v = None)
+            .or_insert(literal);
+    }
     let Scan { build, summary, .. } = scan;
     if blocks.is_empty() {
         if let Some(group) = assigned(tokens, "group") {
@@ -483,10 +563,6 @@ fn statement(tokens: &[Token], blocks: &[String], controlled: bool, scan: &mut S
             }
         }
     }
-    // `allprojects` configures this project too, so its assignments are never literal here.
-    let conditional = controlled
-        || blocks.iter().any(|b| b == "allprojects")
-        || tokens.first().and_then(Token::word).is_some_and(control);
     for (name, value) in [
         ("group", &mut build.group),
         ("rootProject.name", &mut build.project),
@@ -540,9 +616,8 @@ fn statement(tokens: &[Token], blocks: &[String], controlled: bool, scan: &mut S
             .first()
             .and_then(Token::word)
             .filter(|s| configuration(s))
-        && let Some(entry) = dependency(kind, &tokens[1..])
     {
-        scan.summary.dependencies.push(entry);
+        scan.pending.push((kind.to_string(), tokens[1..].to_vec()));
     }
 }
 
@@ -604,7 +679,15 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
         moved,
         unplaced,
         sources,
+        names,
+        pending,
     } = scan;
+    let literals: BTreeMap<String, String> = (names.into_iter())
+        .filter_map(|(name, value)| Some((name, value.filter(|v| super::literal(v))?)))
+        .collect();
+    summary.dependencies = (pending.iter())
+        .filter_map(|(field, args)| dependency(field, args, &literals))
+        .collect();
     let settings = path
         .rsplit('/')
         .next()
@@ -720,6 +803,75 @@ mod tests {
         assert_eq!(names("project(':app').projectDir = file('x')\n"), ["tools"]);
         assert!(names("rootProject.children.each { it.name = 'x' }\n").is_empty());
         assert!(names("findProject(':app')?.name = 'svc'\n").is_empty());
+    }
+
+    /// The `(name, via)` of each dependency of a script.
+    fn coordinates(src: &str) -> Vec<(String, Option<String>)> {
+        let summary = read("build.gradle", src.as_bytes());
+        (summary.dependencies.into_iter())
+            .map(|e| (e.name, e.via))
+            .collect()
+    }
+
+    #[test]
+    fn a_name_assigned_once_to_a_plain_string_reads_as_it() {
+        let written = |name: &str| (name.to_string(), None);
+        let computed = |name: &str| (name.to_string(), Some("computed".to_string()));
+        let dep = r#"dependencies { implementation "example:a${s}:1" }"#;
+        for (declaration, expected) in [
+            ("def s = 'pi'", written("example:api")),
+            ("val s = \"pi\"", written("example:api")),
+            ("ext.s = 'pi'", written("example:api")),
+            ("ext {\n s = 'pi'\n}", written("example:api")),
+            ("project.ext.s = 'pi'", written("example:api")),
+            ("s = 'pi'", written("example:api")),
+            // Assigned twice, however it is written, or not once at the top level.
+            ("def s = 'pi'\ns = 'qa'", computed("example:a*")),
+            ("def s = 'pi'\next.s = 'qa'", computed("example:a*")),
+            ("def s = 'pi'\nif (c) { s = 'qa' }", computed("example:a*")),
+            ("def s = 'pi'\nif (c) s = 'qa'", computed("example:a*")),
+            ("val s: String = \"pi\"\ns = \"qa\"", computed("example:a*")),
+            ("def s = 'p'\ns += 'i'", computed("example:a*")),
+            // Not a plain string: interpolated, computed, in a condition, a block or a call.
+            ("def s = \"p${i}\"", computed("example:a*")),
+            ("def s = 'p' + 'i'", computed("example:a*")),
+            ("def s = prop('s')", computed("example:a*")),
+            ("if (c) { def s = 'pi' }", computed("example:a*")),
+            ("allprojects { ext.s = 'pi' }", computed("example:a*")),
+            ("subprojects { def s = 'pi' }", computed("example:a*")),
+            ("dependencies { def s = 'pi' }", computed("example:a*")),
+            // Declared nowhere in the script.
+            ("def other = 'pi'", computed("example:a*")),
+        ] {
+            assert_eq!(
+                coordinates(&format!("{declaration}\n{dep}")),
+                [expected],
+                "{declaration}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_projects_own_group_fills_a_hole_and_the_holes_left_stay_computed() {
+        let src = |group: &str| {
+            format!(
+                "{group}\ndependencies {{\n  api \"$group:models:1\"\n  api \"${{group}}.x:\" + v\n  \
+                 api \"$group.models:tools\"\n  api \"$other:${{group}}-kit\"\n}}"
+            )
+        };
+        let (written, computed) = (None, Some("computed".to_string()));
+        assert_eq!(
+            coordinates(&src("group = 'example'")),
+            [
+                ("*.models:tools".to_string(), computed.clone()),
+                ("*:example-kit".to_string(), computed.clone()),
+                ("example.x:*".to_string(), computed),
+                ("example:models".to_string(), written),
+            ]
+        );
+        // A group the script sets again leaves every hole.
+        let again = coordinates(&src("group = 'a'\ngroup = 'b'"));
+        assert!(again.iter().all(|(_, via)| via.is_some()), "{again:?}");
     }
 
     fn roots(src: &str) -> (Vec<String>, Vec<String>) {

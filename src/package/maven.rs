@@ -320,6 +320,65 @@ fn methods(
 // ponytail: real builds nest a few modules deep; this bounds the walk over a hostile one.
 const MODULE_DEPTH: usize = 32;
 
+/// A pom's computed dependencies take the literal the properties of the pom, then of the
+/// `<parent>` poms of the repository, give a `${..}` of their group or artifact. A parent is the
+/// one pom named so; two or none leave the chain there. Maven reads a value the parent gives in
+/// the child, so `${project.groupId}` is the child's.
+fn parent_properties(manifests: &mut [Manifest]) {
+    let pom = |m: &Manifest| m.path.rsplit('/').next() == Some("pom.xml");
+    let mut named: HashMap<&str, Vec<usize>> = HashMap::new();
+    for (i, m) in manifests.iter().enumerate().filter(|(_, m)| pom(m)) {
+        if let Some(name) = &m.summary.name {
+            named.entry(name).or_default().push(i);
+        }
+    }
+    let mut filled = Vec::new();
+    for (i, m) in manifests.iter().enumerate().filter(|(_, m)| pom(m)) {
+        if !m.summary.dependencies.iter().any(|e| e.template.is_some()) {
+            continue;
+        }
+        let mut chain = vec![i];
+        while chain.len() <= MODULE_DEPTH
+            && let Some(parent) = manifests[chain[chain.len() - 1]].summary.parent.as_deref()
+            && let Some(&[only]) = named.get(parent).map(Vec::as_slice)
+            && !chain.contains(&only)
+        {
+            chain.push(only);
+        }
+        let (group, artifact) = (m.summary.name.as_deref())
+            .and_then(|n| n.split_once(':'))
+            .unzip();
+        let lookup = |name: &str| match name {
+            "project.groupId" => group,
+            "project.artifactId" => artifact,
+            _ => (chain.iter())
+                .find_map(|&j| manifests[j].summary.properties.get(name))
+                .map(String::as_str),
+        };
+        let entries: Vec<Entry> = (m.summary.dependencies.iter())
+            .filter_map(|e| {
+                let Some((g, a)) = &e.template else {
+                    return Some(e.clone());
+                };
+                let (g, a) = (jvm::maven::fill(g, &lookup), jvm::maven::fill(a, &lookup));
+                let (name, computed) = jvm::maven::named(&g, &a)?;
+                Some(Entry {
+                    name,
+                    via: computed.then(|| "computed".into()),
+                    template: computed.then_some((g, a)),
+                    ..e.clone()
+                })
+            })
+            .collect();
+        filled.push((i, entries));
+    }
+    for (i, mut entries) in filled {
+        entries.sort_by(|a, b| (&a.field, &a.name).cmp(&(&b.field, &b.name)));
+        entries.dedup();
+        manifests[i].summary.dependencies = entries;
+    }
+}
+
 pub struct Maven;
 
 impl Ecosystem for Maven {
@@ -464,6 +523,7 @@ impl Ecosystem for Maven {
         declares(self, exports, providers, at, from, import)
     }
     fn inherit(&self, manifests: &mut [Manifest]) {
+        parent_properties(manifests);
         let settings: Vec<_> = manifests
             .iter()
             .filter(|m| {
@@ -778,6 +838,59 @@ pub(super) fn declares<'e>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The `(name, via)` of the dependencies of `app/pom.xml` after `inherit`, given the poms of
+    /// the repository as `(path, source)`.
+    fn inherited(poms: &[(&str, &str)]) -> Vec<(String, Option<String>)> {
+        let mut manifests: Vec<_> = (poms.iter())
+            .map(|(path, src)| Manifest {
+                path: path.to_string(),
+                summary: jvm::maven::read(src.as_bytes()),
+            })
+            .collect();
+        Maven.inherit(&mut manifests);
+        let app = manifests.iter().find(|m| m.path == "app/pom.xml").unwrap();
+        (app.summary.dependencies.iter())
+            .map(|e| (e.name.clone(), e.via.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn a_parent_pom_of_the_repository_gives_its_properties_to_the_dependencies_below() {
+        let pom = |parent: &str, id: &str, properties: &str, dependency: &str| {
+            format!(
+                "<project>{parent}<groupId>example</groupId><artifactId>{id}</artifactId>\
+                 <properties>{properties}</properties><dependencies><dependency>{dependency}\
+                 </dependency></dependencies></project>"
+            )
+        };
+        let parent = |id: &str| {
+            format!("<parent><groupId>example</groupId><artifactId>{id}</artifactId></parent>")
+        };
+        let hole = "<groupId>${shared.group}</groupId><artifactId>m${suffix}</artifactId>";
+        let app = pom(&parent("mid"), "app", "", hole);
+        let mid = pom(&parent("root"), "mid", "<suffix>odels</suffix>", "");
+        let root = pom("", "root", "<shared.group>example</shared.group>", "");
+        let [a, m, r] = ["app", "mid", "root"].map(|id| format!("{id}/pom.xml"));
+        let all = [(&a, &app), (&m, &mid), (&r, &root)].map(|(p, s)| (p.as_str(), s.as_str()));
+        // Two levels up, the nearest declaration first.
+        assert_eq!(inherited(&all), [("example:models".to_string(), None)]);
+        // The child's own property wins over the parent's.
+        let own = pom(&parent("mid"), "app", "<suffix>ore</suffix>", hole);
+        let all = [(a.as_str(), own.as_str()), (&m, &mid), (&r, &root)];
+        assert_eq!(inherited(&all), [("example:more".to_string(), None)]);
+        // A parent missing from the repository, or named by two poms, gives nothing.
+        let computed = |name: &str| [(name.to_string(), Some("computed".to_string()))];
+        let missing = [(a.as_str(), app.as_str()), (&r, &root)];
+        assert_eq!(inherited(&missing), computed("*:m*"));
+        let twin = ("twin/pom.xml", mid.as_str());
+        let twice = [(a.as_str(), app.as_str()), (&m, &mid), twin, (&r, &root)];
+        assert_eq!(inherited(&twice), computed("*:m*"));
+        // A cycle of parents ends where it began.
+        let loop_a = pom(&parent("app"), "mid", "", "");
+        let looped = [(a.as_str(), app.as_str()), (&m, loop_a.as_str())];
+        assert_eq!(inherited(&looped), computed("*:m*"));
+    }
 
     #[test]
     fn a_chain_carries_the_method_and_its_argument_count() {

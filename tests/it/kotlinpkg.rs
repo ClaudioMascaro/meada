@@ -72,10 +72,6 @@ fn kotlin_dsl_builds_export_packages_and_link_literal_dependencies() {
         let reason = format!("package::maven::{contract} {range} (local 3.1), range unchecked");
         format!("{field} package::maven::{contract} exact {provider} | {reason}")
     };
-    let guessed = |provider: &str| {
-        let reason = "2 providers fit; computed coordinate; package::maven::dev.kt:* 3.1 (local 3.1), range unchecked";
-        format!("implementation package::maven::dev.kt:* ambiguous {provider} | {reason}")
-    };
     let mut expected = vec![
         exact("api", "dev.kt.core:core", "core/build.gradle.kts", "3.1"),
         exact("api", "dev.kt:toolbox", "build.gradle.kts", "3.1"),
@@ -116,9 +112,13 @@ fn kotlin_dsl_builds_export_packages_and_link_literal_dependencies() {
             "3.1",
         ),
         "implementation package::maven::dev.kit:kit exact build.gradle.kts | package::maven::dev.kit:kit 1.0 (local 1.0), range unchecked".to_string(),
-        // Every provider whose literal parts fit, and no other.
-        guessed("build.gradle.kts"),
-        guessed("util/build.gradle.kts"),
+        // `${artifact}` is the one literal `val artifact = "util"` gives it: a written coordinate.
+        exact(
+            "implementation",
+            "dev.kt:util",
+            "util/build.gradle.kts",
+            "3.1",
+        ),
     ];
     expected.sort();
     // project(":web") and okhttp declare no coordinate; nor does a Kotlin comment, which nests.
@@ -534,7 +534,7 @@ fn several_providers_declaring_the_package_and_declaration_make_the_import_ambig
                 "Stamp.now#0",
                 "dev.kt.shared.Stamp",
                 "Companion.now(0)",
-                "lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()"
+                "lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()"
             ),
             row(
                 "stamped#0",
@@ -546,7 +546,7 @@ fn several_providers_declaring_the_package_and_declaration_make_the_import_ambig
                 "stamped#0",
                 "dev.kt.shared",
                 "stamped(0)",
-                "lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()"
+                "lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()"
             ),
         ]
     );

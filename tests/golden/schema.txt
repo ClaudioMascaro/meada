@@ -2720,7 +2720,11 @@ sample.pom.xml
       "field": "dependencies",
       "name": "example:shared*",
       "range": "${release}",
-      "via": "computed"
+      "via": "computed",
+      "template": [
+        "example",
+        "shared${suffix}"
+      ]
     }
   ],
   "roots": [
@@ -2732,7 +2736,8 @@ sample.pom.xml
   "test_roots": [
     "src/test/java",
     "src/test/kotlin"
-  ]
+  ],
+  "parent": "example:parent"
 }
 
 sample.build.gradle.kts

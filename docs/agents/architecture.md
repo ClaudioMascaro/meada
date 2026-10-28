@@ -1241,7 +1241,10 @@ one for the area a change touches.
     spelling of the one provider whose id differs by case only, before `consume` reads them,
     each by one folded-location map (linear in the manifests).
   - `fits`: literal package-name equality; Maven matches the literal fragments of a computed
-    coordinate (`pattern_fits`). `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
+    coordinate (`pattern_fits`), a coordinate being computed only for a `${..}` or `$name` hole the
+    build files leave without a literal (a pom property, `project.groupId` or `project.artifactId`,
+    a parent pom's property through `inherit`; a Gradle name assigned once to a plain string).
+    `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
   - `flag`: the range is unchecked (`range unchecked`); npm checks semver.
   - `reaches`: every provider; npm's `workspace:` keeps the dependent's own repository, Cargo
     and Go share `sourced`, in the seam (a `path` by the folded location, a `git` by the
@@ -1989,7 +1992,9 @@ one for the area a change touches.
   when it leaves the repository, or the normalized `git` URL; `workspace = true` as a flag; the
   `[workspace.dependencies]` entries; the `[workspace.package]` version), and of JVM build files
   (spec #26: literal Maven coordinates and versions, dependency coordinate fragments with `*`
-  for computed parts, declared ranges and a `computed` source flag, source roots with the test ones marked, and Gradle's
+  for computed parts, declared ranges and a `computed` source flag, source roots with the test ones marked, a pom's
+  `<properties>` and `<parent>` coordinate, with the group and artifact of a computed entry as
+  written (`Entry::template`, for `Maven::inherit` to fill from the parent poms), and Gradle's
   literal group, root project name and included project names/directories in `Summary::build`),
   of each SDK-style `.csproj` (spec #28: the package id, else assembly name, else file name, the
   literal version, each `PackageReference` with its range as written, each `ProjectReference`
@@ -3534,7 +3539,9 @@ qualification budget does (ADR 0017).
   declares one and checks a tag's attributes pairwise; `XML_NODES` (65,536) bounds the parsed
   tree, in addition to `lang::MAX_BYTES`. `roxmltree` rejects DTDs and never loads external
   entities. An over-limit, unterminated or malformed manifest reads as an empty summary (a
-  project file as no project); indexing continues. `jvm/gradle.rs`: `GRADLE_DEPTH` (64) bounds nested blocks; a deeper build
+  project file as no project); indexing continues. `jvm/maven.rs`: `PROPERTY_DEPTH` (16) bounds
+  how many properties a `${..}` follows, a cycle included; a property longer than a package name
+  is not kept. `jvm/gradle.rs`: `GRADLE_DEPTH` (64) bounds nested blocks; a deeper build
   or settings file reads as an empty summary. The Gradle scanner does not read Groovy slashy
   strings, and reads a triple-quoted string as quoted pairs. It keeps at most `MAX_ROOTS` (64)
   source directories. The Groovy and the Kotlin DSL files (`*.gradle`, `*.gradle.kts`) go

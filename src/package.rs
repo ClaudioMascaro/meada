@@ -462,8 +462,13 @@ pub struct Summary {
     /// directory relative to the repository.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub targets: Vec<(String, String)>,
-    /// NuGet only: the package properties a project or props file writes, as written, for the
-    /// seam's `inherit` to name a project under the props files above it (`msbuild::package`).
+    /// Maven only: the `groupId:artifactId` of the `<parent>`, whose `<properties>` a `${..}` of
+    /// this pom may name (the seam's `inherit` looks them up).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+    /// NuGet and a `pom.xml`: the package properties a project or props file writes, or a pom's
+    /// `<properties>`, as written, for the seam's `inherit` to name a project under the props
+    /// files above it (`msbuild::package`), or a dependency under the parent poms (`Maven`).
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub properties: crate::dotnet::msbuild::Properties,
 }
@@ -491,6 +496,10 @@ pub struct Entry {
     /// other than `compile`, or `optional`; also when the file computes either).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub private: bool,
+    /// A `pom.xml` under a `<parent>` only: the group and artifact of a computed entry as written,
+    /// until the seam's `inherit` fills the `${..}` the parent poms declare.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template: Option<(String, String)>,
 }
 
 impl Entry {

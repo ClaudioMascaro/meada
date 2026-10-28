@@ -5251,9 +5251,9 @@
   ],
   "consumers": [
     {
-      "contract": "package::maven::example:a*",
-      "site": "example.com/acme/conformance::gradle/build.gradle::implementation::example:a*",
-      "via": "computed"
+      "contract": "package::maven::example:api",
+      "site": "example.com/acme/conformance::gradle/build.gradle::implementation::example:api",
+      "via": null
     },
     {
       "contract": "channel::amqp::invoices",
@@ -5516,7 +5516,7 @@
     {
       "manifest": "gradle/build.gradle",
       "field": "implementation",
-      "name": "example:a*"
+      "name": "example:api"
     }
   ],
   "communities": [
@@ -5646,11 +5646,11 @@
   ],
   "links": [
     {
-      "consumer": "example.com/acme/conformance::gradle/build.gradle::implementation::example:a*",
+      "consumer": "example.com/acme/conformance::gradle/build.gradle::implementation::example:api",
       "provider": "example.com/acme/conformance::maven/api/pom.xml",
-      "contract": "package::maven::example:a*",
-      "level": "ambiguous",
-      "reason": "computed coordinate; package::maven::example:a* none (local none), range unchecked"
+      "contract": "package::maven::example:api",
+      "level": "exact",
+      "reason": "package::maven::example:api none (local none), range unchecked"
     },
     {
       "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onInvoice(String)",
