@@ -264,7 +264,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     let mut outside = BTreeSet::new();
     // Names a class or the file declares as properties, and the typed locals, which a field of
     // the same name hides where the source does not say which one a use reads.
-    let mut fields = BTreeSet::new();
+    let mut fields: BTreeSet<(String, String)> = BTreeSet::new();
     // The names some assignment writes, which no one value stands for (`Code::field_written`).
     let mut writes = BTreeSet::new();
     let mut locals: Vec<Receiver> = Vec::new();
@@ -515,7 +515,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     };
                     for name in names {
                         let name = text(name, src);
-                        fields.insert(name.to_string());
+                        fields.insert((owner(node, &scope), name.to_string()));
                         let bound = Receiver {
                             scope: scope.as_ref().clone(),
                             name: name.to_string(),
@@ -568,7 +568,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                         // stands in for what the annotation gives it (`Code::expand_with`).
                         let constant = children(node).any(|c| c.kind() == "val")
                             && annotations(node, src, &scope).is_empty();
-                        fields.insert(name.to_string());
+                        fields.insert((scope.as_ref().clone(), name.to_string()));
                         let bound = Receiver {
                             scope: scope.as_ref().clone(),
                             name: name.to_string(),
@@ -821,7 +821,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     // A local is typed only where it is the one binding of its name in its scope; one named
     // like a property may be read as the property, so its class is unknown.
     for local in &mut locals {
-        if fields.contains(&local.name) {
+        if (fields.iter()).any(|(at, name)| *name == local.name && encloses(at, &local.scope)) {
             local.class = Class::Unknown;
         }
     }
@@ -2302,6 +2302,27 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
         }
         _ => Value::Unknown,
     }
+}
+
+/// The scope whose locals a property of `node` in `scope` hides: a companion's members belong
+/// to its class.
+fn owner(node: Node, scope: &str) -> String {
+    let companion = node.parent().and_then(|b| b.parent());
+    match scope.rsplit_once('.') {
+        Some((class, _)) if companion.is_some_and(|c| c.kind() == "companion_object") => {
+            class.to_string()
+        }
+        _ => scope.to_string(),
+    }
+}
+
+/// Whether the scope `class` is `scope` or encloses it (the package, possibly empty, does).
+fn encloses(class: &str, scope: &str) -> bool {
+    class.is_empty()
+        || scope == class
+        || scope
+            .strip_prefix(class)
+            .is_some_and(|rest| rest.starts_with('.'))
 }
 
 #[cfg(test)]

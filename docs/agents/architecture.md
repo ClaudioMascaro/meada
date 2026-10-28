@@ -2175,7 +2175,8 @@ one for the area a change touches.
   through `?.`, `!!` and a property) has `Call::on` and resolves within that class's family. A
   local initialized with `make()` is a name match. A typealias is no class of the repository:
   a receiver typed by one is outside it, and resolves to nothing. A name bound twice in one
-  scope with different types, or named like a property, holds an unknown type. A call `X.f(..)`
+  scope with different types, or named like a property of its class or of an enclosing class (or
+  of the file), holds an unknown type. A call `X.f(..)`
   is read as a constructor only when `f` is capitalized, as Kotlin names classes. An import alias
   of an extension (`import a.slug as s`) brings nothing in scope for it. A bare call a top-level function of its name answers is
   exact to that function, though Kotlin prefers an extension of the implicit receiver. A star import of a class (`import a.C.*`) reads every export of
@@ -2816,7 +2817,7 @@ qualification budget does (ADR 0017).
   pack recorded (`Facts::bound`: a `val x = Callee(..)` with no written type, and the parameter
   of a `let`, `also` or `use` lambda, whose value is the receiver; `Code::local` takes the
   nearest binding of the name and none when another binding of it shares its scope, so a
-  parameter, a loop variable, a `var`, a local named like a property of the file or one declared
+  parameter, a loop variable, a `var`, a local named like a property of its class, of an enclosing class or of the file, or one declared
   twice hides it) followed through `origins` again, or one whose written type is it
   (`names::typed`); a map, another library's client and a name a local hides are none. The
   call is read whole (`Expand::Chain`, which also gives the reader the call's keyword arguments),
@@ -3407,7 +3408,7 @@ qualification budget does (ADR 0017).
   are not read. A `defaultRequest` base given by a parameter of a client factory is a hole. A
   local client is followed only when its `val` is written with the constructor call (or a
   `let`, `also` or `use` receiver): `val b = a` and a `var` are not, and a local named like a
-  property of its file is typed unknown by the pack, so it is not either. A nested lambda's
+  property of its class, of an enclosing class or of its file is typed unknown by the pack, so it is not either. A nested lambda's
   `method = X` makes the outer request's method unknown even when the inner lambda always runs
   (`headers { }`).
 - Kotlin base URLs (spec #27, #100): `STRING_METHODS` also lets `replace`, `lowercase` and the
