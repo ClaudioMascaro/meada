@@ -1324,8 +1324,11 @@ impl<'a> Resolver<'a> {
                 Some(Class::Type(ty) | Class::Named(ty)) if outside(ty, work) => Some(Some(ty)),
                 // A member read on a name from outside (`let s = URLSession.shared`): opaque.
                 Some(Class::Member(read)) => {
+                    // As a direct chain, only a capitalized head is a type: `h.cache` is a member
+                    // of a local or a parameter.
                     let first = read.split('.').next().unwrap_or(read);
-                    outside(first, work).then_some(None)
+                    (first.starts_with(|c: char| c.is_ascii_uppercase()) && outside(first, work))
+                        .then_some(None)
                 }
                 _ => None,
             };
@@ -9900,6 +9903,11 @@ mod tests {
              func inside() {
                  let cache = Remote.shared
                  _ = cache.data(from: \"k\")
+             }
+             struct Holder { let cache = Cache() }
+             func viaParam(h: Holder) {
+                 let c = h.cache
+                 _ = c.data(from: \"k\")
              }
              func again(other: URLSession) {
                  var client = URLSession.shared

@@ -425,6 +425,8 @@ fn walk(
     // The names assigned (`x = v`, `x += v`, `&x`), by the scope written in, which hold no one
     // value there, and the members assigned through a name (`request.httpMethod = v`).
     let mut assigned: Vec<(Rc<String>, String)> = Vec::new();
+    // The properties assigned as `self.name = v`: they hold no one value to a receiver alone.
+    let mut self_assigned: Vec<(Rc<String>, String)> = Vec::new();
     let mut members: Vec<Member> = Vec::new();
     // The names a `var` declares, and those a method is called on, by the scope written in
     // (`url.appendPathComponent(..)` mutates a value in place).
@@ -805,6 +807,9 @@ fn walk(
                     match name.split_once('.') {
                         None => assigned.push((scope.clone(), name)),
                         Some((head, rest)) if !name.contains('(') => {
+                            if head == "self" && plain && !rest.contains('.') {
+                                self_assigned.push((scope.clone(), rest.to_string()));
+                            }
                             // Only a plain `=` as a statement of the body runs once, in place.
                             let direct = plain && !rest.contains('.') && runs_once(node);
                             let value = match (direct, result) {
@@ -926,7 +931,8 @@ fn walk(
             .map(|(s, n)| (function(s).to_string(), n.clone()))
             .collect()
     };
-    let (assigned, called) = (by_function(&assigned), by_function(&called));
+    let (self_assigned, called) = (by_function(&self_assigned), by_function(&called));
+    let assigned = by_function(&assigned);
     facts.bound.retain(|b| {
         let at = (function(&b.scope).to_string(), b.name.clone());
         !assigned.contains(&at)
@@ -961,7 +967,7 @@ fn walk(
         .retain(|b| !shared.contains(&qualify(&b.scope, &b.name)));
     // A `var` read from outside and assigned again holds no one value: its calls keep the name
     // match (the assignment may be in a function of the type, for a property).
-    let reassigned: HashSet<(&str, &str)> = (assigned.iter())
+    let reassigned: HashSet<(&str, &str)> = (assigned.iter().chain(&self_assigned))
         .flat_map(|(f, n)| enclosing(f).map(move |s| (s, n.as_str())))
         .collect();
     for receiver in &mut facts.receivers {
@@ -1391,7 +1397,7 @@ fn declared(node: Node, src: &[u8], generics: &Generics) -> Class {
     }
     let mut value = node.child_by_field_name("value");
     // The grammar leaves the `?` of `URLSession.shared?` beside the value.
-    let chained = value
+    let optional_chain = value
         .and_then(|v| v.next_sibling())
         .is_some_and(|n| n.kind() == "?");
     while let Some(inner) =
@@ -1399,7 +1405,10 @@ fn declared(node: Node, src: &[u8], generics: &Generics) -> Class {
     {
         value = inner.child_by_field_name("expr");
     }
-    if let Some(read) = value.filter(|_| !chained).and_then(|v| member_read(v, src)) {
+    if let Some(read) = value
+        .filter(|_| !optional_chain)
+        .and_then(|v| member_read(v, src))
+    {
         return match generics.holds(head(&read)) {
             true => Class::Unknown,
             false => Class::Member(read),
@@ -1426,7 +1435,7 @@ fn member_read(node: Node, src: &[u8]) -> Option<String> {
     let mut segments = Vec::new();
     let mut at = node;
     while at.kind() == "navigation_expression" {
-        if segments.len() >= PATH_DEPTH || children(at).any(|c| c.kind() == "?") {
+        if segments.len() + 1 >= PATH_DEPTH || children(at).any(|c| c.kind() == "?") {
             return None;
         }
         let suffix = at.child_by_field_name("suffix")?;
@@ -1827,10 +1836,12 @@ mod tests {
              j = other\n\
              }\n\
              struct S { var k = URLSession.shared\n\
-             func swap() { k = other } }\n",
+             func swap() { k = other } }\n\
+             struct P { var m = URLSession.shared\n\
+             func swap() { self.m = other } }\n",
         );
         // A reassigned `var` keeps its name, with no class: it only hides an outer one.
-        assert_eq!(found, ["j = ?", "k = ?"]);
+        assert_eq!(found, ["j = ?", "k = ?", "m = ?"]);
     }
 
     #[test]
@@ -1932,6 +1943,24 @@ mod tests {
         let chain = vec!["a"; PATH_DEPTH].join(".");
         let calls = facts(&format!("func f() {{ {chain}() }}\n")).calls;
         assert_eq!(calls[0].callee, chain);
+    }
+
+    #[test]
+    fn a_member_read_past_the_path_limit_is_unknown() {
+        let read = |depth: usize| {
+            classes(&format!(
+                "func f() {{ let x = {} }}\n",
+                vec!["A"; depth].join(".")
+            ))
+        };
+        assert_eq!(read(PATH_DEPTH).len(), 1);
+        assert!(read(PATH_DEPTH + 1).is_empty());
+    }
+
+    #[test]
+    fn a_type_parameter_is_no_head_of_an_outside_read() {
+        let found = classes("struct S<T> { func f() { let x = T.shared; let y = U.shared } }\n");
+        assert_eq!(found, ["y = member U.shared"]);
     }
 
     #[test]
