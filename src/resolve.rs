@@ -167,14 +167,40 @@ struct Seen<'a> {
     /// The file whose code being run while it loads (at its top level, in a class body there or
     /// in its main guard) the name is resolved from (`Resolver::seen`).
     load: Option<&'a str>,
+    /// The families being linearized when the name's walk began (`Resolver::bases`): a lookup
+    /// that begins its own `Work` (`Seen::work`) carries them, so a family met again through an
+    /// import (a `using static` of the class whose base is resolved) is not linearized inside
+    /// itself.
+    families: Vec<Target<'a>>,
+    /// Whether such a lookup gave a family up (`Work::cut`): those being linearized give up too.
+    gave_up: bool,
 }
 
 /// What a pair exports, and whether it met a cycle (`Seen::looped`).
 type Given<'a> = (Option<Binding<'a>>, bool);
 
-impl Seen<'_> {
+impl<'a> Seen<'a> {
     fn new() -> Self {
         Self::default()
+    }
+
+    /// The `Work` of a lookup that begins one: it sees the families being linearized and the
+    /// links followed, so `FAMILY_DEPTH` and `LINK_DEPTH` bound the whole walk.
+    fn work(&self) -> Work<'a> {
+        Work {
+            busy: self.families.iter().map(|&f| Busy::Family(f)).collect(),
+            links: self.depth,
+            ..Work::default()
+        }
+    }
+
+    /// Records what the lookup that began `work` (`Seen::work`) gave up: a family cut there
+    /// leaves the name unknown, and the families being linearized give up (`Resolver::bases`).
+    fn ended(&mut self, work: &Work) {
+        if work.cut {
+            self.cut = true;
+            self.gave_up = true;
+        }
     }
 }
 
@@ -264,6 +290,9 @@ struct Work<'a> {
     busy: Vec<Busy<'a>>,
     families: HashMap<Target<'a>, Family<'a>>,
     cut: bool,
+    /// The links the lookup that began this `Work` had followed (`Seen::work`): a base resolved
+    /// from it goes on from there.
+    links: usize,
 }
 
 /// One entry of a class family: a class of the repository, or a base that is not one
@@ -2443,15 +2472,29 @@ impl<'a> Resolver<'a> {
         Ok(family)
     }
 
-    /// What each base `class` writes is, in order, resolved from the scope enclosing it.
+    /// What each base `class` writes is, in order, resolved from the scope enclosing it, with
+    /// the families being linearized and the links `work` followed: a cut that depends on them
+    /// (a family given up past an import, or a link cut past the links followed before) gives
+    /// the families being linearized up (`Work::cut`).
     fn bases(&self, class: Target<'a>, work: &mut Work<'a>) -> Vec<Ancestor<'a>> {
         let scope = crate::parent(class.name);
+        let families: Vec<_> = (work.busy.iter())
+            .filter_map(|b| match b {
+                Busy::Family(f) => Some(*f),
+                _ => None,
+            })
+            .collect();
         let mut out = Vec::new();
         // A type written in parts has the bases every part writes, its own first.
         for class in self.parts(class) {
             for (n, base) in self.defs[class.path][class.name].bases.iter().enumerate() {
                 let seen = &mut self.seen(class.path, scope);
-                let base = match self.resolve(class.path, scope, base, seen, work) {
+                (seen.depth, seen.families) = (work.links, families.clone());
+                let found = self.resolve(class.path, scope, base, seen, work);
+                if seen.gave_up || (seen.cut && work.links > 0) {
+                    work.cut = true;
+                }
+                let base = match found {
                     Binding::Def(t) if self.is_class(t) => Ancestor::Class(t),
                     _ if base.starts_with('(') => {
                         Ancestor::Opaque(format!("{}::{}#{n}", class.path, class.name))
@@ -3055,7 +3098,7 @@ impl<'a> Resolver<'a> {
                 return Vec::new();
             }
             seen.depth += 1;
-            let work = &mut Work::default();
+            let work = &mut seen.work();
             let bound = self.resolve_as(path, "", target, seen, work, Reading::Alias);
             let source = match bound {
                 Binding::External(source, Imported::Namespace | Imported::Qualified) => {
@@ -3073,6 +3116,7 @@ impl<'a> Resolver<'a> {
                     _ => return Vec::new(),
                 },
             };
+            seen.ended(work);
             seen.depth -= 1;
             if seen.cut {
                 return Vec::new();
@@ -3183,12 +3227,13 @@ impl<'a> Resolver<'a> {
                 continue;
             }
             seen.depth += 1;
-            let work = &mut Work::default();
+            let work = &mut seen.work();
             let bound = self.resolve_as(path, scope, target, seen, work, Reading::Alias);
             let found = self.through_glob(bound, *inside, name, work, seen);
             let found = found.of_namespace(self, self.glob_namespace(path, target));
             // A definition `path` may not reach is not there: the lookup goes on past it.
             let found = self.accessible(path, found);
+            seen.ended(work);
             seen.depth -= 1;
             if seen.cut {
                 return Some(Binding::Unknown);
@@ -3228,8 +3273,9 @@ impl<'a> Resolver<'a> {
             return Binding::Unknown;
         }
         seen.depth += 1;
-        let work = &mut Work::default();
+        let work = &mut seen.work();
         let found = self.resolve_as(path, scope, target, seen, work, Reading::Alias);
+        seen.ended(work);
         seen.depth -= 1;
         found
     }
@@ -9439,11 +9485,12 @@ mod csharp_tests {
         resolved_in(files, &configs)
     }
 
-    /// `resolved` over the project files `configs`.
-    fn resolved_in(
+    /// What `f` makes of the resolver of `files`, joined into the projects `configs`.
+    fn with_resolver<R>(
         files: &[(&str, &str)],
         configs: &[(&str, &[u8])],
-    ) -> Vec<(String, String, &'static str, Vec<String>)> {
+        f: impl FnOnce(Resolver) -> R,
+    ) -> R {
         let mut parsed: Vec<(&str, Facts)> = (files.iter())
             .map(|(p, s)| (*p, CSharp.parse(p, s.as_bytes()).unwrap()))
             .collect();
@@ -9456,22 +9503,136 @@ mod csharp_tests {
         }
         let files: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
         let layout = CSharp.layout(configs, &files).unwrap();
-        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &CSharp);
-        let paths = |ts: &[Target]| ts.iter().map(|t| t.path.to_string()).collect();
-        let mut out = Vec::new();
-        for (&path, facts) in &files {
-            for call in &facts.calls {
-                let (level, targets) = match resolver.call(path, call) {
-                    Resolution::Exact(t) => ("exact", paths(&[t])),
-                    Resolution::Inferred(t) => ("inferred", paths(&[t])),
-                    Resolution::Narrowed(t) => ("narrowed", paths(&[t])),
-                    Resolution::Ambiguous(ts) => ("ambiguous", paths(&ts)),
-                    Resolution::Unresolved => ("unresolved", Vec::new()),
-                };
-                out.push((path.to_string(), call.callee.clone(), level, targets));
+        f(Resolver::with_shared(
+            &files,
+            layout.modules,
+            layout.shared,
+            &CSharp,
+        ))
+    }
+
+    /// `resolved` over the project files `configs`.
+    fn resolved_in(
+        files: &[(&str, &str)],
+        configs: &[(&str, &[u8])],
+    ) -> Vec<(String, String, &'static str, Vec<String>)> {
+        with_resolver(files, configs, |resolver| {
+            let files = resolver.files;
+            let paths = |ts: &[Target]| ts.iter().map(|t| t.path.to_string()).collect();
+            let mut out = Vec::new();
+            for (&path, facts) in files {
+                for call in &facts.calls {
+                    let (level, targets) = match resolver.call(path, call) {
+                        Resolution::Exact(t) => ("exact", paths(&[t])),
+                        Resolution::Inferred(t) => ("inferred", paths(&[t])),
+                        Resolution::Narrowed(t) => ("narrowed", paths(&[t])),
+                        Resolution::Ambiguous(ts) => ("ambiguous", paths(&ts)),
+                        Resolution::Unresolved => ("unresolved", Vec::new()),
+                    };
+                    out.push((path.to_string(), call.callee.clone(), level, targets));
+                }
             }
-        }
-        out
+            out
+        })
+    }
+
+    /// The family of each class of `files`, joined into the projects `configs`, by its name:
+    /// each ancestor's name, or what an opaque base is named by.
+    fn families_in(
+        files: &[(&str, &str)],
+        configs: &[(&str, &[u8])],
+    ) -> BTreeMap<String, Option<Vec<String>>> {
+        with_resolver(files, configs, |resolver| {
+            let name = |a: &Ancestor| match a {
+                Ancestor::Class(t) => t.name.to_string(),
+                Ancestor::Opaque(name) => format!("opaque {name}"),
+            };
+            (resolver.families.iter())
+                .map(|(t, f)| {
+                    (
+                        t.name.to_string(),
+                        f.as_ref().map(|f| f.iter().map(name).collect()),
+                    )
+                })
+                .collect()
+        })
+    }
+
+    /// A `using static` of the class whose base is looked up through it is a cycle: the
+    /// linearization ends, and the base is opaque.
+    #[test]
+    fn a_static_import_of_a_class_naming_its_own_base_leaves_the_base_opaque() {
+        let files = [(
+            "App/A.cs",
+            "using static N.A;\nnamespace N { public class A : Inner { } }\n",
+        )];
+        let families = families_in(&files, &[("App/App.csproj", PROJECT)]);
+        let a = Some(vec!["N.A".to_string(), "opaque Inner".to_string()]);
+        assert_eq!(families["N.A"], a);
+    }
+
+    /// efcore's shape: an interface whose file imports statically the class that implements it
+    /// names its own base through the project's `using`. Met from either end (the class's file
+    /// first, or the interface's), every family is the same, and the base binds through the
+    /// `using`.
+    #[test]
+    fn a_static_import_cycle_gives_the_same_families_from_either_end() {
+        let project = b"<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup>\
+                        <Using Include=\"Acme.Query\" /></ItemGroup></Project>";
+        let service = "namespace Acme.Query;\npublic interface ILanguageBasedService { }\n";
+        let interface = "using static Acme.Query.Internal.Generator;\n\
+                         namespace Acme.Query.Internal;\n\
+                         public interface IGenerator : ILanguageBasedService { }\n";
+        let class = "namespace Acme.Query.Internal;\npublic class Generator : IGenerator { }\n";
+        let families = |class_file: &str| {
+            let files = [
+                ("Acme/Query/ILanguageBasedService.cs", service),
+                ("Acme/Query/Internal/IGenerator.cs", interface),
+                (class_file, class),
+            ];
+            families_in(&files, &[("Acme/Acme.csproj", project)])
+        };
+        let first = families("Acme/Query/Internal/Generator.cs");
+        assert_eq!(first, families("Acme/Query/Internal/ZGenerator.cs"));
+        let names = |names: &[&str]| Some(names.iter().map(|n| n.to_string()).collect());
+        let (service, interface) = (
+            "Acme.Query.ILanguageBasedService",
+            "Acme.Query.Internal.IGenerator",
+        );
+        assert_eq!(first[interface], names(&[interface, service]));
+        assert_eq!(
+            first["Acme.Query.Internal.Generator"],
+            names(&["Acme.Query.Internal.Generator", interface, service])
+        );
+    }
+
+    /// A glob lookup while families are linearized (`Seen::families`) sees them: the member a
+    /// static import of a family being linearized would give is not read from that family.
+    #[test]
+    fn a_glob_lookup_during_linearization_sees_the_families_being_linearized() {
+        let src = "using static N.A;\nnamespace N { public class B { public static void Go() {} } \
+                   public class A : B { } }\n";
+        with_resolver(
+            &[("App/A.cs", src)],
+            &[("App/App.csproj", PROJECT)],
+            |mut resolver| {
+                // As while `Resolver::new` linearizes: no family known yet.
+                resolver.families.clear();
+                let go = |families: Vec<Target<'static>>| {
+                    let seen = &mut Seen {
+                        families,
+                        ..Seen::new()
+                    };
+                    resolver.globs("App/A.cs", "", "Go", false, seen)
+                };
+                assert!(matches!(go(vec![]), Some(Binding::Def(t)) if t.name == "N.B.Go()"));
+                let a = Target {
+                    path: "App/A.cs",
+                    name: "N.A",
+                };
+                assert!(!matches!(go(vec![a]), Some(Binding::Def(_))));
+            },
+        );
     }
 
     /// A lambda parameter with a written type types its receiver as a method's does, in every

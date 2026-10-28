@@ -1518,6 +1518,80 @@ parts! {
 /// Locals in a chain, past `RECEIVER_DEPTH` (64) by 16: `var a1 = a0.m(); var a2 = a1.m(); ..`.
 const LOCALS: usize = 80;
 
+/// A static import of the class whose base is looked up through it (`using static N.A;` and
+/// `class A : Inner`; efcore's shape, where an interface's file imports statically the class
+/// that implements it, met from either end; Java's `import static p.A.*;`) is a cycle the
+/// linearization ends: indexing carries on, each type a symbol.
+#[test]
+fn a_static_import_of_a_class_naming_its_own_base_is_indexed() {
+    let project = "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup>\
+                   <Using Include=\"Acme.Query\" /></ItemGroup></Project>";
+    let efcore = |class_file: &str| {
+        vec![
+            ("Acme/Acme.csproj".into(), project.into()),
+            (
+                "Acme/Query/ILanguageBasedService.cs".into(),
+                "namespace Acme.Query;\npublic interface ILanguageBasedService { }\n".into(),
+            ),
+            (
+                "Acme/Query/Internal/IGenerator.cs".into(),
+                "using static Acme.Query.Internal.Generator;\nnamespace Acme.Query.Internal;\n\
+                 public interface IGenerator : ILanguageBasedService { }\n"
+                    .into(),
+            ),
+            (
+                format!("Acme/Query/Internal/{class_file}"),
+                "namespace Acme.Query.Internal;\npublic class Generator : IGenerator { }\n".into(),
+            ),
+        ]
+    };
+    let efcore_types: &[&str] = &[
+        "Acme.Query.ILanguageBasedService",
+        "Acme.Query.Internal.IGenerator",
+        "Acme.Query.Internal.Generator",
+    ];
+    let cases = [
+        (
+            "cs",
+            "static-own-base",
+            one(
+                "A.cs",
+                "using static N.A;\nnamespace N { public class A : Inner { } }\n".into(),
+            ),
+            &["N.A"][..],
+        ),
+        ("cs", "efcore", efcore("Generator.cs"), efcore_types),
+        (
+            "cs",
+            "efcore-other-end",
+            efcore("ZGenerator.cs"),
+            efcore_types,
+        ),
+        (
+            "java",
+            "static-own-base",
+            one(
+                "p/A.java",
+                "package p;\nimport static p.A.*;\nclass A extends Inner { }\n".into(),
+            ),
+            &["p.A"][..],
+        ),
+    ];
+    for (pack, name, files, types) in cases {
+        let export: serde_json::Value = serde_json::from_str(&index(pack, name, &files)).unwrap();
+        let ids: Vec<&str> = (export["symbols"].as_array().unwrap().iter())
+            .map(|s| s["id"].as_str().unwrap())
+            .collect();
+        for t in types {
+            let symbol = format!("::{t}");
+            assert!(
+                ids.iter().any(|id| id.ends_with(&symbol)),
+                "{pack}/{name}: {t} in {ids:?}"
+            );
+        }
+    }
+}
+
 /// How a pack writes the chain of `LOCALS` locals, each holding a call on the one before it:
 /// the pack's name, how its repository holds a source, and the head of the source and the type
 /// of `a0` for a receiver typed outside the repository and for one the repository declares.
