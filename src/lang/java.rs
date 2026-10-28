@@ -338,6 +338,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     label: None,
                     default: None,
                     fields: Vec::new(),
+                    closure: Default::default(),
                 })
                 .collect();
             let modifiers = modifiers(node);

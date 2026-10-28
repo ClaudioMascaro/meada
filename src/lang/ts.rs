@@ -553,6 +553,7 @@ fn params(node: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Param> {
             label: None,
             default: None,
             fields: Vec::new(),
+            closure: Default::default(),
         }];
     }
     named(list)
@@ -580,6 +581,7 @@ fn params(node: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Param> {
                 fields: pattern
                     .filter(|n| n.kind() == "object_pattern")
                     .map_or_else(Vec::new, |n| fields(n, src, scope, up)),
+                closure: Default::default(),
             }
         })
         .collect()

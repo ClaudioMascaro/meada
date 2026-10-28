@@ -18,9 +18,9 @@ use std::rc::Rc;
 use tree_sitter::{Node, Parser};
 
 use super::{
-    Binds, Bound, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Join, Kind,
-    LanguagePack, Layout, Modules, Param, Receiver, Star, Value, bare_calls, children, named, text,
-    wildcard,
+    Binds, Bound, Call, Class, Closure, Const, Def, Export, Facts, Impl, Import, Imported, Join,
+    Kind, LanguagePack, Layout, Modules, Param, Receiver, Star, Value, bare_calls, children, named,
+    text, wildcard,
 };
 use crate::{Result, qualify};
 use values::Ctx;
@@ -36,6 +36,10 @@ const PATH_DEPTH: usize = 256;
 /// it keeps no facts: a partial overload family could turn an ambiguous call into an exact one.
 // ponytail: a long nested name must not multiply across a broad file without a budget.
 const QUALIFICATION_BYTES: usize = 4 * 1024 * 1024;
+/// How many aliases deep an alias of an alias of a function type is followed
+/// (`function_aliases`): a parameter written as one past it takes no trailing closure.
+// ponytail: real aliases chain once or twice; this keeps a crafted chain cheap.
+const ALIAS_DEPTH: usize = 16;
 
 /// The module of the files no target of a `Package.swift` holds, which no import can name.
 const NO_TARGET: &str = "(no target)";
@@ -80,24 +84,35 @@ impl LanguagePack for Swift {
                     .extend(def.type_params.iter().cloned());
             }
         }
+        let function_aliases = function_aliases(files);
         Box::new(move |path, facts| {
             let module = module_of(&targets, path);
             wildcard(module, true, facts);
             facts.unit = module.to_string();
+            // Whether `ty` written in `scope` names a type parameter of a type around it.
+            let held = |scope: &str, ty: &str| {
+                enclosing(scope).any(|t| generics.get(t).is_some_and(|g| g.contains(head(ty))))
+            };
             for call in facts.calls.iter_mut().filter(|c| c.constructs) {
-                let ty = head(&call.callee);
-                let held =
-                    enclosing(&call.scope).any(|t| generics.get(t).is_some_and(|g| g.contains(ty)));
-                call.constructs = !held;
+                call.constructs = !held(&call.scope, &call.callee);
+            }
+            for def in &mut facts.defs {
+                for param in &mut def.params {
+                    let Closure::Named(ty) = &param.closure else {
+                        continue;
+                    };
+                    let takes = held(&def.name, ty) || function_aliases.contains(last(ty));
+                    param.closure = match takes {
+                        true => Closure::Takes,
+                        false => Closure::Refuses,
+                    };
+                }
             }
             for receiver in &mut facts.receivers {
                 let (Class::Type(ty) | Class::Named(ty)) = &receiver.class else {
                     continue;
                 };
-                let ty = head(ty);
-                if enclosing(&receiver.scope)
-                    .any(|t| generics.get(t).is_some_and(|g| g.contains(ty)))
-                {
+                if held(&receiver.scope, ty) {
                     receiver.class = Class::Unknown;
                 }
             }
@@ -543,6 +558,29 @@ fn walk(
                 }
                 if place != Place::Code && own < Access::Public {
                     facts.private.push(inner.as_ref().clone());
+                }
+            }
+            // An alias of a named type binds its name to that type, as an import does: a type
+            // written as the alias resolves through it (`StoreOf<X>` names `Store`). One of a
+            // function type is a parameter type that takes a trailing closure.
+            "typealias_declaration" if defining => {
+                let mut cursor = node.walk();
+                let names: Vec<Node> = node.children_by_field_name("name", &mut cursor).collect();
+                if let [alias, target] = names[..] {
+                    let name = unbacktick(text(alias, src));
+                    let local = qualify(&scope, &name);
+                    let own = access(node, src).unwrap_or(default).min(ceiling);
+                    let generics = with_generics(&generics, node, src);
+                    if let Class::Type(target) = class_of(target, src, &generics) {
+                        facts.imports.push(Import {
+                            local: local.clone(),
+                            source: String::new(),
+                            name: Imported::Path(target),
+                        });
+                        publish(&mut facts, place, own, &local, &name);
+                    } else if closure(target, src, &Generics::default()) == Closure::Takes {
+                        facts.function_aliases.push(local);
+                    }
                 }
             }
             // A deinitializer, a subscript and an accessor are code of the type around them.
@@ -1098,6 +1136,8 @@ fn signature(node: Node, src: &[u8], generics: &Generics) -> Option<Signature> {
                     label: Some(label),
                     default: None,
                     fields: Vec::new(),
+                    closure: (names.get(1))
+                        .map_or(Closure::Refuses, |t| closure(*t, src, generics)),
                 });
                 let ty = names.get(1).map_or("", |t| text(*t, src));
                 types.push(ty.split_whitespace().collect());
@@ -1184,6 +1224,49 @@ fn class_of(node: Node, src: &[u8], generics: &Generics) -> Class {
     }
 }
 
+/// Whether a trailing closure may fill a parameter of the written type `node`: a function type
+/// (through `?`, parentheses and attributes), a type parameter of `generics` or `Any` does, a
+/// name is left to `join` (`Closure::Named`), and any other type does not.
+fn closure(mut node: Node, src: &[u8], generics: &Generics) -> Closure {
+    // A loop, not a recursion: a type nested deep costs no stack.
+    loop {
+        node = match node.kind() {
+            "function_type" => return Closure::Takes,
+            "optional_type" => match node.child_by_field_name("wrapped") {
+                Some(wrapped) => wrapped,
+                None => return Closure::Refuses,
+            },
+            // `(T)`: one element without a name.
+            "tuple_type" => {
+                let only = match named(node).collect::<Vec<_>>()[..] {
+                    [item] => {
+                        let mut cursor = item.walk();
+                        let names = item.children_by_field_name("name", &mut cursor);
+                        match names.collect::<Vec<_>>()[..] {
+                            [ty] => Some(ty),
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                };
+                match only {
+                    Some(ty) => ty,
+                    None => return Closure::Refuses,
+                }
+            }
+            "user_type" => {
+                return match type_name(node, src) {
+                    name if name.is_empty() => Closure::Refuses,
+                    // `Any` holds a closure as it holds any value.
+                    name if name == "Any" || generics.holds(head(&name)) => Closure::Takes,
+                    name => Closure::Named(name),
+                };
+            }
+            _ => return Closure::Refuses,
+        };
+    }
+}
+
 /// The type parameters a declaration brings (`<T: P>`) and, for a protocol, its associated
 /// types.
 fn own_generics(node: Node, src: &[u8]) -> Vec<String> {
@@ -1237,6 +1320,37 @@ fn declared(node: Node, src: &[u8], generics: &Generics) -> Class {
         }
         _ => Class::Unknown,
     }
+}
+
+/// The names (their last segment) of the repository's aliases of a function type
+/// (`Facts::function_aliases`), and of the aliases of those, `ALIAS_DEPTH` deep. A name matches an alias
+/// of any scope, so a parameter written as it takes a closure rather than lose a candidate.
+fn function_aliases(files: &BTreeMap<&str, &Facts>) -> HashSet<String> {
+    let mut takes: HashSet<String> = (files.values().flat_map(|f| &f.function_aliases))
+        .map(|c| last(c).to_string())
+        .collect();
+    let aliases: Vec<(&str, &str)> = (files.values().flat_map(|f| &f.imports))
+        .filter_map(|i| match &i.name {
+            Imported::Path(target) => Some((last(&i.local), last(target))),
+            _ => None,
+        })
+        .collect();
+    for _ in 0..ALIAS_DEPTH {
+        let more: Vec<&str> = (aliases.iter())
+            .filter(|(alias, target)| !takes.contains(*alias) && takes.contains(*target))
+            .map(|(alias, _)| *alias)
+            .collect();
+        if more.is_empty() {
+            break;
+        }
+        takes.extend(more.into_iter().map(str::to_string));
+    }
+    takes
+}
+
+/// The last segment of a dotted name.
+fn last(name: &str) -> &str {
+    name.rsplit('.').next().unwrap_or_default()
 }
 
 /// The receivers with one class per scope and name: a name bound twice to other classes, or
@@ -1926,5 +2040,86 @@ mod tests {
         let facts = facts("enum Api {\n  static let host = \"h\"\n  var other = \"o\"\n}\n");
         let names: Vec<&str> = facts.consts.iter().map(|c| c.name.as_str()).collect();
         assert_eq!(names, ["Api.host"]);
+    }
+
+    /// What each written parameter type says about a trailing closure (issue #411): a function
+    /// type through `?`, parentheses and attributes, a type parameter of the function or its
+    /// type, and `Any`, take one; a name is left to `join`; any other type refuses it.
+    #[test]
+    fn a_parameter_type_tells_whether_it_takes_a_trailing_closure() {
+        let facts = facts(
+            "struct Box<T> {\n  func f<F>(a: @escaping (Int) -> Void, b: ((Int) -> Void)? = nil, \
+             c: @MainActor @Sendable () -> Void, d: F, e: T, g: Handler?, h: Lib.Handler, \
+             i: some Reducer, j: [Int], k: (Int, Int), l: Any?) {}\n}\n",
+        );
+        let def = (facts.defs.iter())
+            .find(|d| d.name.starts_with("Box.f("))
+            .unwrap();
+        let named = |n: &str| Closure::Named(n.to_string());
+        let closures: Vec<Closure> = def.params.iter().map(|p| p.closure.clone()).collect();
+        let expected = [
+            Closure::Takes,
+            Closure::Takes,
+            Closure::Takes,
+            Closure::Takes,
+            Closure::Takes,
+            named("Handler"),
+            named("Lib.Handler"),
+            Closure::Refuses,
+            Closure::Refuses,
+            Closure::Refuses,
+            Closure::Takes,
+        ];
+        assert_eq!(closures, expected);
+    }
+
+    /// A `typealias` of a named type binds its name as an import of that type, exported by its
+    /// access; one of a function type is listed in `Facts::function_aliases` (issue #411).
+    #[test]
+    fn a_typealias_binds_its_name_to_its_target() {
+        let facts = facts(
+            "public typealias StoreOf<S> = Store<S, Int>\ntypealias Maybe = Lib.Store?\n\
+             typealias Id<T> = T\npublic typealias Handler = ((Int) -> Void)?\n\
+             struct Box { typealias Inner = Store }\n",
+        );
+        let imports: Vec<(&str, &str)> = (facts.imports.iter())
+            .filter_map(|i| match &i.name {
+                Imported::Path(target) => Some((i.local.as_str(), target.as_str())),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            imports,
+            [
+                ("StoreOf", "Store"),
+                ("Maybe", "Lib.Store"),
+                ("Box.Inner", "Store")
+            ]
+        );
+        let exported: Vec<&str> = (facts.exports.iter())
+            .filter_map(|e| match e {
+                Export::Local { exported, .. } => Some(exported.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(exported, ["StoreOf", "Maybe", "Box"]);
+        assert!(facts.private.contains(&"Maybe".to_string()));
+        assert_eq!(facts.function_aliases, ["Handler"]);
+    }
+
+    /// `join` follows an alias of an alias of a function type `ALIAS_DEPTH` deep: a parameter
+    /// written as one past it takes no trailing closure, and a cycle ends.
+    #[test]
+    fn an_alias_chain_of_a_function_type_is_followed_to_its_limit() {
+        let mut src = String::from("typealias A0 = () -> Void\ntypealias X = Y\ntypealias Y = X\n");
+        for n in 1..=ALIAS_DEPTH + 1 {
+            src.push_str(&format!("typealias A{n} = A{}\n", n - 1));
+        }
+        let facts = facts(&src);
+        let files = BTreeMap::from([("a.swift", &facts)]);
+        let takes = function_aliases(&files);
+        assert!(takes.contains(&format!("A{ALIAS_DEPTH}")));
+        assert!(!takes.contains(&format!("A{}", ALIAS_DEPTH + 1)));
+        assert!(!takes.contains("X") && !takes.contains("Y"));
     }
 }

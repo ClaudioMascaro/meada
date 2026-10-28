@@ -2287,7 +2287,10 @@ sample.swift
         {
           "name": "id",
           "binds": "Any",
-          "label": "id"
+          "label": "id",
+          "closure": {
+            "Named": "String"
+          }
         }
       ]
     },
@@ -2302,17 +2305,26 @@ sample.swift
         {
           "name": "o",
           "binds": "Any",
-          "label": "order"
+          "label": "order",
+          "closure": {
+            "Named": "Order"
+          }
         },
         {
           "name": "quantity",
           "binds": "Optional",
-          "label": "quantity"
+          "label": "quantity",
+          "closure": {
+            "Named": "Int"
+          }
         },
         {
           "name": "rest",
           "binds": "Rest",
-          "label": "_"
+          "label": "_",
+          "closure": {
+            "Named": "Int"
+          }
         }
       ]
     },
@@ -2326,11 +2338,29 @@ sample.swift
       "params": []
     },
     {
+      "name": "on(_:)",
+      "kind": "Function",
+      "range": {
+        "start": 292,
+        "end": 329
+      },
+      "params": [
+        {
+          "name": "handler",
+          "binds": "Optional",
+          "label": "_",
+          "closure": {
+            "Named": "Handler"
+          }
+        }
+      ]
+    },
+    {
       "name": "settle()",
       "kind": "Function",
       "range": {
-        "start": 225,
-        "end": 266
+        "start": 331,
+        "end": 372
       },
       "params": [],
       "suspends": true
@@ -2342,6 +2372,9 @@ sample.swift
     ],
     "Order.place": [
       "Order.place(order:quantity:_:)"
+    ],
+    "on": [
+      "on(_:)"
     ],
     "settle": [
       "settle()"
@@ -2373,6 +2406,13 @@ sample.swift
           "public": false
         }
       }
+    },
+    {
+      "local": "Orders",
+      "source": "",
+      "name": {
+        "Path": "Order"
+      }
     }
   ],
   "exports": [
@@ -2386,6 +2426,18 @@ sample.swift
       "Local": {
         "exported": "limit",
         "local": "limit"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Orders",
+        "local": "Orders"
+      }
+    },
+    {
+      "Local": {
+        "exported": "on",
+        "local": "on"
       }
     },
     {
@@ -2434,8 +2486,8 @@ sample.swift
       "labels": [],
       "awaited": true,
       "range": {
-        "start": 257,
-        "end": 264
+        "start": 363,
+        "end": 370
       },
       "by_path": true
     }
@@ -2466,6 +2518,13 @@ sample.swift
       "class": {
         "Type": "Int"
       }
+    },
+    {
+      "scope": "on(_:)",
+      "name": "handler",
+      "class": {
+        "Type": "Handler"
+      }
     }
   ],
   "impls": [
@@ -2484,11 +2543,17 @@ sample.swift
   "private": [
     "Order.place(order:quantity:_:)",
     "limit",
+    "Orders",
+    "on(_:)",
     "settle()",
+    "on",
     "settle"
   ],
   "hidden": [
     "Order.place(order:quantity:_:)"
+  ],
+  "function_aliases": [
+    "Handler"
   ]
 }
 

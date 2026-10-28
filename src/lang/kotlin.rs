@@ -1025,6 +1025,7 @@ fn constructor(node: Node, src: &[u8]) -> Option<Vec<Param>> {
             label: None,
             default: None,
             fields: Vec::new(),
+            closure: Default::default(),
         });
     Some(params.collect())
 }
@@ -1113,6 +1114,7 @@ fn parameters(
                     label: None,
                     default: None,
                     fields: Vec::new(),
+                    closure: Default::default(),
                 });
                 vararg = false;
             }

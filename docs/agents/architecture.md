@@ -1786,7 +1786,15 @@ one for the area a change touches.
   unlabelled argument, empty for a trailing closure) is kept with the facts, and `Arity`
   narrows an overload family by them (`labelled`: in order, past parameters with a default
   value, a variadic one taking the unlabelled arguments after its first, a trailing closure any
-  label), so a tie is `ambiguous` with each overload. An extension is no definition but a
+  label of a parameter that takes one), so a tie is `ambiguous` with each overload. Each
+  `Param::closure` is read from the written type: a function type (through `?`, parentheses and
+  attributes such as `@escaping`), a type parameter or `Any` takes a trailing closure, a name is
+  `Closure::Named` until `join` looks it up among the repository's aliases of a function type
+  (`Facts::function_aliases`, and aliases of those to `ALIAS_DEPTH`, by last segment in any scope), and
+  any other type refuses it. A `typealias` of a named type is an `Imported::Path` import of its
+  target under the alias's qualified name, exported by its access as a declaration is: a type
+  written as the alias resolves through `Resolver::alias` (a cycle or `LINK_DEPTH` ends with
+  nothing). An extension is no definition but a
   `Facts::impls` block of the extended type, one more per protocol it writes (`Impl::of`).
   `Resolver::overloaded` reads one level per class of the family, the class with its blocks in
   any file (two declarations of one signature there are two overloads, but for a protocol a
@@ -1801,8 +1809,9 @@ one for the area a change touches.
   opaque, `: String, CaseIterable` does not). A protocol extension's member of the requirement's signature in the
   requirement's file is that one definition. A capitalized callee (`Order(id:)`,
   `Order.Line()`) constructs (`Call::constructs`): the type's initializers in its body and its
-  blocks (`Facts::constructors`, also the family `Type.init` for `self.init(..)`), or the type
-  itself when it declares none (a memberwise initializer). The case is a guess
+  blocks (`Facts::constructors`, also the family `Type.init` for `self.init(..)`), without
+  those its module keeps to itself when the call is in another (`Resolver::accessible`), or the
+  type itself when it declares none (a memberwise initializer). The case is a guess
   (`LanguagePack::guesses_constructs`): a capitalized callee that binds a function instead of a
   type is a plain call of it (`Check(1)`), and `await` decides an `async` target (`Call::awaited`
   from the `await_expression` or `async let` around the call, up to its function or closure;
@@ -1843,8 +1852,8 @@ one for the area a change touches.
   `labelled` decides the fit with (`labelled_args`, one table of which parameters take which
   arguments): an unlabelled argument takes a parameter written `_`, a labelled one a parameter
   of its label, a parameter that may be left out gives its label to a later one when the call
-  fits no other way, and the first trailing closure takes the first parameter that cannot be
-  left out; a trailing closure after the first (`f { } other: { }`) is not bound.
+  fits no other way, and the first trailing closure takes the first parameter that takes one
+  (`Param::closure`) and cannot be left out; a trailing closure after the first (`f { } other: { }`) is not bound.
   Method calls on a receiver (spec #29, #118) use the seams Java's and C#'s do, with no new
   one. The pack writes `Facts::receivers` from the written type of a stored property, a
   parameter (scope: the function's labelled name) and a `let` or `var` of code or the top level
@@ -1965,7 +1974,9 @@ one for the area a change touches.
   cannot tell.
 - The index holds no source text and no values, apart from the argument count, the argument
   labels and constructor form of an overloaded call (`Call::arity`, `Call::labels`,
-  `Call::constructs`) and the argument label of a parameter (`Param::label`), the place of the call a
+  `Call::constructs`), the argument label of a parameter and whether its written type takes a
+  trailing closure, or the name it is written as (`Param::label`, `Param::closure`), the names
+  of a Swift file's aliases of a function type (`Facts::function_aliases`), the place of the call a
   chained call is made on (`Call::on`), whether an `inferred` call was narrowed from several
   definitions of its name (`calls.narrowed`), callable-to-signature and
   static-member names (`Facts::overloads`, `Facts::constructors` and
@@ -2247,14 +2258,20 @@ qualification budget does (ADR 0017).
   around a definition and the segments of a callee (past them a body keeps its enclosing
   symbol and a callee is `(navigation_expression)`); `QUALIFICATION_BYTES` (4 MiB) bounds the
   enclosing-name bytes a file's definitions, calls and bindings store, past which the file
-  keeps no facts. The pack's unit tests exceed each. Beyond the limits, what the pack leaves out
+  keeps no facts; `ALIAS_DEPTH` (16) bounds the aliases of aliases of a function type `join`
+  follows (`function_aliases`), past which a parameter written as one takes no trailing closure.
+  The pack's unit tests exceed each. Beyond the limits, what the pack leaves out
   (spec #29, #117): a target's `sources:` and `exclude:`, two packages of the repository that
   name a target alike (one module), `@testable import` (no `internal` access), a closure,
   deinitializer, subscript or accessor (their calls and locals are the enclosing symbol's, so
   an accessor's local hides its name in the whole type), an operator
   function, enum cases, `Self` as a type's name, a local typed by a call result or a closure
   parameter's type (#118), a typed local of a nested block, closure or accessor (a name match
-  where Java and C# keep it function-wide), and the
+  where Java and C# keep it function-wide), a `typealias` as a symbol, one written in a type
+  seen from another file (its extensions included), the repository's extension of an outside
+  type reached through an alias of it (the receiver stays outside under the alias's name, so
+  it reaches no block), an outside alias of a function type (`Ext.Handler`, which takes no
+  trailing closure, as the brief of #411 decides for every outside name), and the
   protocols a conformed protocol inherits when the conformance is written on an extension. As in Java, an outside base
   the pack does not list among its known outside members (`NSObject`, `View`) keeps a type's own
   overloads from `exact`, and a listed one (`Codable`, a raw value type) the names it declares.

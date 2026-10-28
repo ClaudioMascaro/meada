@@ -215,6 +215,7 @@ fn fits(params: &[&str], (least, most): (usize, Option<usize>), labels: &[String
             label: Some(label.to_string()),
             default: None,
             fields: Vec::new(),
+            closure: Default::default(),
         })
         .collect();
     least <= n && most.is_none_or(|m| n <= m) && labelled(&params, labels)
