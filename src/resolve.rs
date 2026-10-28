@@ -9731,10 +9731,10 @@ mod csharp_tests {
         ))
     }
 
-    /// How long the 40000 unbound calls of a file that imports `P` take when `P` holds `files`
+    /// How long the 10000 unbound calls of a file that imports `P` take when `P` holds `files`
     /// files: the fastest of three passes, against a loaded runner.
     fn unbound_calls_against(files: usize) -> std::time::Duration {
-        let calls: String = (0..40_000).map(|i| format!("Missing{i}();\n")).collect();
+        let calls: String = (0..10_000).map(|i| format!("Missing{i}();\n")).collect();
         let app = format!("using P;\nnamespace Q;\nclass C {{ void F() {{\n{calls}}} }}\n");
         let mut sources: Vec<(String, String)> = (0..files)
             .map(|i| {
@@ -9760,10 +9760,11 @@ mod csharp_tests {
 
     #[test]
     fn unbound_calls_cost_the_same_whatever_the_namespaces_they_import_hold() {
-        let (one, fifty) = (unbound_calls_against(1), unbound_calls_against(50));
-        // Each lookup copied the namespace's file list, 0.17 us per call and file: 50 files
-        // took 1.4 times as long as one.
-        assert!(fifty < one * 6 / 5, "{one:?} {fifty:?}");
+        let (one, fifty) = (unbound_calls_against(1), unbound_calls_against(4000));
+        // Each lookup copied the namespace's file list, about 0.17 us per file: 4000 files made
+        // a debug build several times slower (50 files, as on bitwarden, only 1.4 times in a
+        // release build, too close to the noise to pin).
+        assert!(fifty < one * 3 / 2, "{one:?} {fifty:?}");
     }
 
     /// `resolved` over the project files `configs`.
