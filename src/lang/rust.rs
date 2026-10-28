@@ -137,7 +137,7 @@ impl LanguagePack for Rust {
             members: Some(tree.members()),
             published: Some(tree.published()),
             programs,
-            modules: Box::new(move |from, specifier| lookup.lookup(from, specifier)),
+            modules: Box::new(move |from, specifier| lookup.lookup(from, specifier).into()),
             reaches: Some(Box::new(move |from, to| tree.reaches(from, to))),
             shared: Vec::new(),
         })

@@ -4,6 +4,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ops::Range;
+use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
 use tree_sitter::Node;
@@ -217,8 +218,9 @@ pub trait LanguagePack {
 
 /// The repository-relative paths an import of a specifier (second argument) from a file
 /// (first argument) may name, most likely first. The shared side takes the first one that
-/// the pack parses.
-pub type Modules = Box<dyn Fn(&str, &str) -> Vec<String>>;
+/// the pack parses. A namespace's list is shared, not copied, so a lookup costs the same
+/// whatever the namespace holds.
+pub type Modules = Box<dyn Fn(&str, &str) -> Rc<[String]>>;
 
 /// What `LanguagePack::join` does to a file's facts (second argument), by its path (first).
 pub type Join = Box<dyn Fn(&str, &mut Facts)>;

@@ -1109,7 +1109,7 @@ mod tests {
             deep.as_bytes(),
             b"{\"a\": \"\xff\"}",
         ] {
-            assert_eq!(resolve(config), (Vec::new(), relative.clone()));
+            assert_eq!(resolve(config), (std::rc::Rc::default(), relative.clone()));
         }
     }
 
