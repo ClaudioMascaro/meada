@@ -2687,9 +2687,13 @@ qualification budget does (ADR 0017).
   `VAPOR_NODES` (4096) nodes serves nothing. Also: a helper `boot` calls (`mount(routes)`) is
   followed only when the call is exact, and a call made inside a type of an outside protocol
   (`RouteCollection` always is) is a name match, so its routes are not served;
-  `grouped(User.authenticator(), User.guardMiddleware())` (a lowercase callee, an unread mount)
-  leaves the routes under it unserved; an inline handler served under two prefixes has one
-  symbol, named by one of them (as in C#); a factory that calls itself serves nothing through
+  a `grouped` whose every argument is a call on a capitalized head with no path producer
+  (`String`, `Substring`, `PathComponent`) in its callee (`AuthMiddleware()`,
+  `User.authenticator()`) is the middleware overload (`Dialect::middleware`, Vapor only) and
+  adds no segment, by shape: a member read argument (`app.sessions.middleware`) leaves the
+  group unread, and a static call that returns a path component (`Paths.api()`) is read as
+  middleware, so its routes are served under the parent prefix (accepted false positive); an inline handler
+  served under two prefixes has one symbol, named by one of them (as in C#); a factory that calls itself serves nothing through
   it, and a builder it reaches by one origin among others serves its routes under the others.
 - `http/swift/hummingbird.rs` (spec #29, #120): Hummingbird routes, a `Dialect` that
   `vapor.rs::providers` runs with Vapor's value flow, mounts and handler rules. The root is a
