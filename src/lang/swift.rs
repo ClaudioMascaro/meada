@@ -1468,6 +1468,35 @@ mod tests {
         parse(src.as_bytes(), true).unwrap()
     }
 
+    /// The standard-library protocols whose members are known, with the names each declares
+    /// (issue #409): a change to the table is a change to what stays opaque.
+    #[test]
+    fn the_known_outside_table_pins_the_standard_protocols() {
+        let table: HashMap<_, _> = Swift.known_outside().iter().copied().collect();
+        let none: &[&str] = &[];
+        for (protocol, names) in [
+            ("Swift.Sendable", none),
+            ("Swift.Error", &["localizedDescription"]),
+            ("Swift.Equatable", none),
+            ("Swift.Comparable", none),
+            ("Swift.Hashable", &["hash(into:)", "hashValue"]),
+            ("Swift.Encodable", &["encode(to:)"]),
+            ("Swift.Decodable", &["init(from:)"]),
+            ("Swift.Codable", &["encode(to:)", "init(from:)"]),
+            ("Swift.Identifiable", &["id"]),
+            ("Swift.CustomStringConvertible", &["description"]),
+            ("Swift.CaseIterable", &["allCases"]),
+            ("Vapor.RouteCollection", &["boot(routes:)"]),
+        ] {
+            assert_eq!(table.get(protocol), Some(&names), "{protocol}");
+        }
+        for raw in ["String", "Int", "UInt", "Double", "Float", "Character"] {
+            let names: &[&str] = &["rawValue", "init(rawValue:)"];
+            assert_eq!(table.get(format!("Swift.{raw}").as_str()), Some(&names));
+        }
+        assert_eq!(table.len(), 18);
+    }
+
     #[test]
     fn manifests_are_not_code_but_lookalikes_are() {
         assert!(!Swift.is_code("Package.swift"));
