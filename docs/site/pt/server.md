@@ -76,3 +76,25 @@ os blocos do manifesto são ignorados (o `meada status` os nomeia). Um espelho �
 - `meada status --workspace <manifesto>` mostra o estado de cada índice, e
   `meada export --workspace <manifesto> --repo <identidade>` imprime o índice de um repositório,
   por exemplo para alimentar uma base de conhecimento.
+
+## Decidir em um pipeline
+
+O servidor não roda modelo (invariantes 2 e 6 do [ADR 0002](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0002-product-invariants.md); a
+justificativa está em `.out-of-scope/server-side-decider.md`). Os itens abertos são decididos onde
+[`meada decide --decider`](decisions.md#decisor-por-modelo) já roda, como um passo em um clone do
+repositório (um job de CI, uma activity de workflow), contra o seu próprio gateway de modelos:
+
+```sh
+export MEADA_DECIDER_PROTOCOL=chat            # `decisions` só se o gateway repassa /api/alpha/decisions
+export MEADA_DECIDER_URL=https://llm.acme.internal
+export MEADA_DECIDER_MODEL=<o alias do modelo no gateway>
+export MEADA_DECIDER_KEY=<chave do gateway>
+meada decide --decider
+```
+
+1. O passo grava `meada.decisions.toml` no clone.
+2. Abre um pull request com esse arquivo: uma pessoa revisa cada saída do modelo como um diff.
+3. Depois do merge, o job de fetch atualiza o mirror e `meada index --workspace <manifesto>`
+   reaplica as decisões no índice.
+4. O servidor as serve como `decided`. Ele lê `meada.decisions.toml` uma vez, na partida;
+   reinicie-o depois que o mirror receber o arquivo novo.

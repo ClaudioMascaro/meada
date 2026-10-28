@@ -76,3 +76,25 @@ refused.
 - `meada status --workspace <manifest>` shows each index's state, and
   `meada export --workspace <manifest> --repo <identity>` prints one repository's index, for
   instance to feed a knowledge base.
+
+## Decide in a pipeline
+
+The server runs no model (invariants 2 and 6 of [ADR 0002](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0002-product-invariants.md); the
+reasoning is in `.out-of-scope/server-side-decider.md`). Open items are decided where
+[`meada decide --decider`](decisions.md#model-decider) already runs, as a step on a clone of
+the repository (a CI job, a workflow activity), against your own model gateway:
+
+```sh
+export MEADA_DECIDER_PROTOCOL=chat            # `decisions` only if the gateway passes /api/alpha/decisions through
+export MEADA_DECIDER_URL=https://llm.acme.internal
+export MEADA_DECIDER_MODEL=<the gateway's model alias>
+export MEADA_DECIDER_KEY=<gateway key>
+meada decide --decider
+```
+
+1. The step writes `meada.decisions.toml` on the clone.
+2. It opens a pull request with that file: a person reviews every model output as a diff.
+3. After the merge, the fetch job updates the mirror and `meada index --workspace <manifest>`
+   replays the decisions into the index.
+4. The server serves them as `decided`. It reads `meada.decisions.toml` once, at start, so
+   restart it after the mirror gets the new file.

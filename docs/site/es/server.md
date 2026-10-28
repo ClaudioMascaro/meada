@@ -77,3 +77,25 @@ Un espejo es un checkout con árbol de trabajo; un clon bare no tiene qué index
 - `meada status --workspace <manifiesto>` muestra el estado de cada índice, y
   `meada export --workspace <manifiesto> --repo <identidad>` imprime el índice de un
   repositorio, por ejemplo para alimentar una base de conocimiento.
+
+## Decidir en un pipeline
+
+El servidor no ejecuta ningún modelo (invariantes 2 y 6 del [ADR 0002](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0002-product-invariants.md); el
+razonamiento está en `.out-of-scope/server-side-decider.md`). Los ítems abiertos se deciden donde
+[`meada decide --decider`](decisions.md#decisor-por-modelo) ya corre, como un paso sobre un clon
+del repositorio (un job de CI, una activity de workflow), contra tu propio gateway de modelos:
+
+```sh
+export MEADA_DECIDER_PROTOCOL=chat            # `decisions` solo si el gateway reenvía /api/alpha/decisions
+export MEADA_DECIDER_URL=https://llm.acme.internal
+export MEADA_DECIDER_MODEL=<el alias del modelo en el gateway>
+export MEADA_DECIDER_KEY=<clave del gateway>
+meada decide --decider
+```
+
+1. El paso escribe `meada.decisions.toml` en el clon.
+2. Abre un pull request con ese archivo: una persona revisa cada salida del modelo como un diff.
+3. Tras el merge, el job de fetch actualiza el mirror y `meada index --workspace <manifiesto>`
+   reaplica las decisiones en el índice.
+4. El servidor las sirve como `decided`. Lee `meada.decisions.toml` una sola vez, al arrancar;
+   reinícialo cuando el mirror reciba el archivo nuevo.
