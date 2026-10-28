@@ -8,7 +8,7 @@
 //! `Code::outside` asks what an import from outside binds a name to. The walks behind both are
 //! private; `Code::expand` reads the wrappers a value passes through.
 
-use std::cell::{OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
@@ -167,40 +167,17 @@ struct Seen<'a> {
     /// The file whose code being run while it loads (at its top level, in a class body there or
     /// in its main guard) the name is resolved from (`Resolver::seen`).
     load: Option<&'a str>,
-    /// The families being linearized when the name's walk began (`Resolver::bases`): a lookup
-    /// that begins its own `Work` (`Seen::work`) carries them, so a family met again through an
-    /// import (a `using static` of the class whose base is resolved) is not linearized inside
-    /// itself.
-    families: Vec<Target<'a>>,
-    /// Whether such a lookup gave a family up (`Work::cut`): those being linearized give up too.
-    gave_up: bool,
+    /// The links the walks around it had followed when it began (`Resolver::links`): a link cut
+    /// past them depends on those walks (`Resolver::cut_link`).
+    from: usize,
 }
 
 /// What a pair exports, and whether it met a cycle (`Seen::looped`).
 type Given<'a> = (Option<Binding<'a>>, bool);
 
-impl<'a> Seen<'a> {
+impl Seen<'_> {
     fn new() -> Self {
         Self::default()
-    }
-
-    /// The `Work` of a lookup that begins one: it sees the families being linearized and the
-    /// links followed, so `FAMILY_DEPTH` and `LINK_DEPTH` bound the whole walk.
-    fn work(&self) -> Work<'a> {
-        Work {
-            busy: self.families.iter().map(|&f| Busy::Family(f)).collect(),
-            links: self.depth,
-            ..Work::default()
-        }
-    }
-
-    /// Records what the lookup that began `work` (`Seen::work`) gave up: a family cut there
-    /// leaves the name unknown, and the families being linearized give up (`Resolver::bases`).
-    fn ended(&mut self, work: &Work) {
-        if work.cut {
-            self.cut = true;
-            self.gave_up = true;
-        }
     }
 }
 
@@ -262,15 +239,13 @@ impl Reading {
     }
 }
 
-/// A local whose class, or a class whose family, is being resolved: one met again while
-/// resolving itself (`a: b.C` and `b: a.D`, `class A(B)` and `class B(A)`) resolves to
-/// nothing.
+/// A local whose class is being resolved: one met again while resolving itself (`a: b.C` and
+/// `b: a.D`) resolves to nothing, as a class whose family is (`Resolver::linearizing`) does.
 #[derive(PartialEq)]
 enum Busy<'a> {
     Local(&'a str, &'a str, &'a str),
     /// A call whose result is being resolved (`Call::on`, `Class::Result`): its file and place.
     Call(&'a str, usize),
-    Family(Target<'a>),
 }
 
 /// The most receivers a class is followed through, each naming its class through the next
@@ -280,19 +255,13 @@ enum Busy<'a> {
 // chain of thousands of parameters from overflowing the stack.
 const RECEIVER_DEPTH: usize = 64;
 
-/// What resolving one name carries along: what is being resolved, the families linearized so
-/// far (while `Resolver::new` linearizes them all), and whether a receiver was cut at
-/// `RECEIVER_DEPTH`, or a family a member lookup reached was cut at `FAMILY_DEPTH`, since the
-/// outermost family began. The cut counts the receivers or bases of the walk that reached a
-/// family, so every family then being linearized gives up (`Cut`).
+/// What resolving one name carries along: the receivers and calls being resolved, and the
+/// families linearized so far (while `Resolver::new` linearizes them all). The families being
+/// linearized and a cut are the `Resolver`'s, shared by every `Work` (`Resolver::linearizing`).
 #[derive(Default)]
 struct Work<'a> {
     busy: Vec<Busy<'a>>,
     families: HashMap<Target<'a>, Family<'a>>,
-    cut: bool,
-    /// The links the lookup that began this `Work` had followed (`Seen::work`): a base resolved
-    /// from it goes on from there.
-    links: usize,
 }
 
 /// One entry of a class family: a class of the repository, or a base that is not one
@@ -325,7 +294,7 @@ const TYPE_PARTS: usize = 64;
 
 /// A linearization given up because the bases nest deeper than `FAMILY_DEPTH` below the
 /// families being resolved, or a receiver or a family reached through a member was cut
-/// (`Work::cut`): no family is kept on the way up, since the cut depends on where the walk
+/// (`Resolver::cut`): no family is kept on the way up, since the cut depends on where the walk
 /// started.
 struct Cut;
 
@@ -372,6 +341,23 @@ pub struct Resolver<'a> {
     takers: HashMap<&'a str, Taker<'a>>,
     /// Every class's family, linearized once.
     families: HashMap<Target<'a>, Family<'a>>,
+    /// The families being linearized, outermost first, whatever `Work` each began in: a lookup
+    /// that begins its own `Work` or `Seen` (a glob, an alias, an on-demand import, a base, a
+    /// receiver) sees them too, so a family met again through an import (a `using static` of
+    /// the class whose base is resolved) is not linearized inside itself, and `FAMILY_DEPTH`
+    /// counts them all. Each is held by its file and name, owned: a `Target` here would make
+    /// the resolver invariant in `'a`.
+    linearizing: RefCell<Vec<(String, String)>>,
+    /// Whether a receiver was cut at `RECEIVER_DEPTH`, a family a member lookup reached at
+    /// `FAMILY_DEPTH`, or a link at `LINK_DEPTH` past the links of the walks around it
+    /// (`Resolver::cut_link`), since the outermost family began. The cut counts the receivers,
+    /// bases or links of the walk that reached a family, so every family then being linearized
+    /// gives up (`Cut`).
+    cut: Cell<bool>,
+    /// The links the walks around the lookup now begun had followed (`Seen::depth`): a glob, an
+    /// alias or an on-demand import sets it (`Resolver::past`), and a `Seen` begins there
+    /// (`Resolver::seen`), so `LINK_DEPTH` bounds the whole walk.
+    links: Cell<usize>,
     /// Each class's Kotlin companion (`Resolver::companion`), read once.
     companions: HashMap<Target<'a>, Target<'a>>,
     /// The pack's keyword for the instance of the enclosing class (`LanguagePack::receiver`).
@@ -876,6 +862,9 @@ impl<'a> Resolver<'a> {
             pathed,
             takers,
             families: HashMap::new(),
+            linearizing: RefCell::new(Vec::new()),
+            cut: Cell::new(false),
+            links: Cell::new(0),
             companions: HashMap::new(),
             receiver: language.receiver(),
             base_receiver: language.base_receiver(),
@@ -1425,7 +1414,7 @@ impl<'a> Resolver<'a> {
             .filter(|b| matches!(b, Busy::Local(..) | Busy::Call(..)))
             .count();
         if depth >= RECEIVER_DEPTH {
-            work.cut = true;
+            self.cut.set(true);
             return Binding::Unknown;
         }
         if work.busy.contains(&key) {
@@ -1985,7 +1974,7 @@ impl<'a> Resolver<'a> {
             .filter(|b| matches!(b, Busy::Local(..) | Busy::Call(..)))
             .count();
         if depth >= RECEIVER_DEPTH {
-            work.cut = true;
+            self.cut.set(true);
             return Binding::Unknown;
         }
         if work.busy.contains(&key) {
@@ -2401,9 +2390,9 @@ impl<'a> Resolver<'a> {
     /// `class` and its ancestors in C3 order, from the bases each class writes: Python's
     /// method resolution order. Without written bases (TypeScript) it is `class` alone.
     fn family(&self, class: Target<'a>, work: &mut Work<'a>) -> Family<'a> {
-        let first = !(work.busy.iter()).any(|b| matches!(b, Busy::Family(_)));
+        let first = self.linearizing.borrow().is_empty();
         if first {
-            work.cut = false;
+            self.cut.set(false);
         }
         self.lineage(class, work).unwrap_or_else(|Cut| {
             // From no other family, a cut of the bases is the class's own: longer than the
@@ -2411,37 +2400,31 @@ impl<'a> Resolver<'a> {
             // in `class Z(K.D)`), the cut counts that family's bases too, and a receiver cut
             // depends on the families linearized before: those being linearized give up, and
             // each is linearized again when asked for.
-            if first && !work.cut {
+            if first && !self.cut.get() {
                 work.families.insert(class, None);
             } else {
-                work.cut = true;
+                self.cut.set(true);
             }
             None
         })
     }
 
     /// `family`, or `Cut` when the bases nest deeper than `FAMILY_DEPTH` below the families
-    /// `work` is resolving, or a receiver was cut on the way (`Work::cut`).
+    /// being linearized, or a receiver was cut on the way (`Resolver::cut`).
     fn lineage(&self, class: Target<'a>, work: &mut Work<'a>) -> Result<Family<'a>, Cut> {
         if let Some(family) = self.families.get(&class).or(work.families.get(&class)) {
             return Ok(family.clone());
         }
-        let key = Busy::Family(class);
-        if work.busy.contains(&key) {
+        if (self.linearizing.borrow().iter()).any(|(p, n)| *p == class.path && *n == class.name) {
             return Ok(None);
         }
-        if work.cut
-            || (work.busy.iter())
-                .filter(|b| matches!(b, Busy::Family(_)))
-                .count()
-                >= FAMILY_DEPTH
-        {
+        if self.cut.get() || self.linearizing.borrow().len() >= FAMILY_DEPTH {
             return Err(Cut);
         }
-        work.busy.push(key);
+        (self.linearizing.borrow_mut()).push((class.path.into(), class.name.into()));
         let mut bases = self.bases(class, work);
-        if work.cut {
-            work.busy.pop();
+        if self.cut.get() {
+            self.linearizing.borrow_mut().pop();
             return Err(Cut);
         }
         // A class nested in the class and written as its base (a Kotlin companion object) is
@@ -2453,7 +2436,7 @@ impl<'a> Resolver<'a> {
                 Ancestor::Class(base) => match self.lineage(*base, work) {
                     Ok(family) => family,
                     Err(cut) => {
-                        work.busy.pop();
+                        self.linearizing.borrow_mut().pop();
                         return Err(cut);
                     }
                 },
@@ -2467,34 +2450,20 @@ impl<'a> Resolver<'a> {
         let family = (lists.into_iter().collect::<Option<Vec<_>>>())
             .and_then(merge)
             .map(|rest| [Ancestor::Class(class)].into_iter().chain(rest).collect());
-        work.busy.pop();
+        self.linearizing.borrow_mut().pop();
         work.families.insert(class, family.clone());
         Ok(family)
     }
 
-    /// What each base `class` writes is, in order, resolved from the scope enclosing it, with
-    /// the families being linearized and the links `work` followed: a cut that depends on them
-    /// (a family given up past an import, or a link cut past the links followed before) gives
-    /// the families being linearized up (`Work::cut`).
+    /// What each base `class` writes is, in order, resolved from the scope enclosing it.
     fn bases(&self, class: Target<'a>, work: &mut Work<'a>) -> Vec<Ancestor<'a>> {
         let scope = crate::parent(class.name);
-        let families: Vec<_> = (work.busy.iter())
-            .filter_map(|b| match b {
-                Busy::Family(f) => Some(*f),
-                _ => None,
-            })
-            .collect();
         let mut out = Vec::new();
         // A type written in parts has the bases every part writes, its own first.
         for class in self.parts(class) {
             for (n, base) in self.defs[class.path][class.name].bases.iter().enumerate() {
                 let seen = &mut self.seen(class.path, scope);
-                (seen.depth, seen.families) = (work.links, families.clone());
-                let found = self.resolve(class.path, scope, base, seen, work);
-                if seen.gave_up || (seen.cut && work.links > 0) {
-                    work.cut = true;
-                }
-                let base = match found {
+                let base = match self.resolve(class.path, scope, base, seen, work) {
                     Binding::Def(t) if self.is_class(t) => Ancestor::Class(t),
                     _ if base.starts_with('(') => {
                         Ancestor::Opaque(format!("{}::{}#{n}", class.path, class.name))
@@ -2631,8 +2600,10 @@ impl<'a> Resolver<'a> {
     }
 
     /// A `Seen` to resolve a name written in `scope` of `path` with: one that runs while the
-    /// module loads, unless it is in a function (`Seen::load`).
+    /// module loads, unless it is in a function (`Seen::load`), and goes on from the links the
+    /// walks around it followed (`Resolver::links`).
     fn seen(&self, path: &'a str, scope: &str) -> Seen<'a> {
+        let links = self.links.get();
         let mut s = scope;
         while !s.is_empty() {
             let program = self.files[path].programs.iter().any(|p| p == s);
@@ -2641,14 +2612,38 @@ impl<'a> Resolver<'a> {
                     .get(s)
                     .is_some_and(|d| d.kind == Kind::Class)
             {
-                return Seen::new();
+                return Seen {
+                    depth: links,
+                    from: links,
+                    ..Seen::new()
+                };
             }
             s = crate::parent(s);
         }
         Seen {
             load: Some(path),
+            depth: links,
+            from: links,
             ..Seen::new()
         }
+    }
+
+    /// `seen` cut at `LINK_DEPTH`: past the links of the walks around it, the cut depends on
+    /// them, so the families being linearized give up (`Resolver::cut`).
+    fn cut_link(&self, seen: &mut Seen<'a>) {
+        seen.cut = true;
+        if seen.from > 0 {
+            self.cut.set(true);
+        }
+    }
+
+    /// What `lookup` gives, begun past an import from `seen` (a glob, an alias, an on-demand
+    /// import): a `Seen` it begins goes on from the links `seen` followed (`Resolver::links`).
+    fn past<R>(&self, seen: &mut Seen<'a>, lookup: impl FnOnce(&mut Seen<'a>) -> R) -> R {
+        let outer = self.links.replace(seen.depth);
+        let found = lookup(seen);
+        self.links.set(outer);
+        found
     }
 
     /// What `name` refers to from `scope`: the innermost enclosing definition first (a local
@@ -3098,25 +3093,29 @@ impl<'a> Resolver<'a> {
                 return Vec::new();
             }
             seen.depth += 1;
-            let work = &mut seen.work();
-            let bound = self.resolve_as(path, "", target, seen, work, Reading::Alias);
-            let source = match bound {
-                Binding::External(source, Imported::Namespace | Imported::Qualified) => {
-                    Some(source)
+            // `Err` when the glob gives the name from the repository.
+            let source = self.past(seen, |seen| {
+                let work = &mut Work::default();
+                match self.resolve_as(path, "", target, seen, work, Reading::Alias) {
+                    Binding::External(source, Imported::Namespace | Imported::Qualified) => {
+                        Ok(Some(source))
+                    }
+                    // An `inside` glob (the own package's; Kotlin's written ones, which see
+                    // `internal` members) gives an outside source only, as the repository's
+                    // names are bound before this is asked.
+                    _ if *inside => Ok(None),
+                    other => match self
+                        .through_glob(other, false, name, work, seen)
+                        .of_namespace(self, self.glob_namespace(path, target))
+                    {
+                        Binding::Unknown => Ok(None),
+                        _ => Err(()),
+                    },
                 }
-                // An `inside` glob (the own package's; Kotlin's written ones, which see
-                // `internal` members) gives an outside source only, as the repository's names
-                // are bound before this is asked.
-                _ if *inside => None,
-                other => match self
-                    .through_glob(other, false, name, work, seen)
-                    .of_namespace(self, self.glob_namespace(path, target))
-                {
-                    Binding::Unknown => None,
-                    _ => return Vec::new(),
-                },
+            });
+            let Ok(source) = source else {
+                return Vec::new();
             };
-            seen.ended(work);
             seen.depth -= 1;
             if seen.cut {
                 return Vec::new();
@@ -3220,20 +3219,21 @@ impl<'a> Resolver<'a> {
                 continue;
             }
             if seen.depth >= LINK_DEPTH {
-                seen.cut = true;
+                self.cut_link(seen);
                 return Some(Binding::Unknown);
             }
             if !seen.globs.insert((path, at, name)) {
                 continue;
             }
             seen.depth += 1;
-            let work = &mut seen.work();
-            let bound = self.resolve_as(path, scope, target, seen, work, Reading::Alias);
-            let found = self.through_glob(bound, *inside, name, work, seen);
+            let found = self.past(seen, |seen| {
+                let work = &mut Work::default();
+                let bound = self.resolve_as(path, scope, target, seen, work, Reading::Alias);
+                self.through_glob(bound, *inside, name, work, seen)
+            });
             let found = found.of_namespace(self, self.glob_namespace(path, target));
             // A definition `path` may not reach is not there: the lookup goes on past it.
             let found = self.accessible(path, found);
-            seen.ended(work);
             seen.depth -= 1;
             if seen.cut {
                 return Some(Binding::Unknown);
@@ -3266,16 +3266,17 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
         if seen.depth >= LINK_DEPTH {
-            seen.cut = true;
+            self.cut_link(seen);
             return Binding::Unknown;
         }
         if !seen.aliases.insert((path, target)) {
             return Binding::Unknown;
         }
         seen.depth += 1;
-        let work = &mut seen.work();
-        let found = self.resolve_as(path, scope, target, seen, work, Reading::Alias);
-        seen.ended(work);
+        let found = self.past(seen, |seen| {
+            let work = &mut Work::default();
+            self.resolve_as(path, scope, target, seen, work, Reading::Alias)
+        });
         seen.depth -= 1;
         found
     }
@@ -3437,7 +3438,7 @@ impl<'a> Resolver<'a> {
         value: bool,
     ) -> Option<Binding<'a>> {
         if seen.depth >= LINK_DEPTH {
-            seen.cut = true;
+            self.cut_link(seen);
             return Some(Binding::Unknown);
         }
         let key = (path, name, value);
@@ -8015,10 +8016,11 @@ mod tests {
                     .collect(),
                 ..Work::default()
             };
+            resolver.cut.set(false);
             let found = resolver.instance(Binding::Local("main.rs", "f", "s"), &mut work);
             (
                 matches!(found, Binding::Instance(t) if t.name == "S"),
-                work.cut,
+                resolver.cut.get(),
             )
         };
         assert_eq!(s(0), (true, false));
@@ -9606,8 +9608,9 @@ mod csharp_tests {
         );
     }
 
-    /// A glob lookup while families are linearized (`Seen::families`) sees them: the member a
-    /// static import of a family being linearized would give is not read from that family.
+    /// A glob lookup while families are linearized (`Resolver::linearizing`) sees them, though it
+    /// begins its own `Work`: the member a static import of a family being linearized would
+    /// give is not read from that family.
     #[test]
     fn a_glob_lookup_during_linearization_sees_the_families_being_linearized() {
         let src = "using static N.A;\nnamespace N { public class B { public static void Go() {} } \
@@ -9618,19 +9621,38 @@ mod csharp_tests {
             |mut resolver| {
                 // As while `Resolver::new` linearizes: no family known yet.
                 resolver.families.clear();
-                let go = |families: Vec<Target<'static>>| {
-                    let seen = &mut Seen {
-                        families,
-                        ..Seen::new()
-                    };
-                    resolver.globs("App/A.cs", "", "Go", false, seen)
+                let go = |families: Vec<(String, String)>| {
+                    *resolver.linearizing.borrow_mut() = families;
+                    resolver.globs("App/A.cs", "", "Go", false, &mut Seen::new())
                 };
                 assert!(matches!(go(vec![]), Some(Binding::Def(t)) if t.name == "N.B.Go()"));
-                let a = Target {
-                    path: "App/A.cs",
-                    name: "N.A",
-                };
+                let a = ("App/A.cs".to_string(), "N.A".to_string());
                 assert!(!matches!(go(vec![a]), Some(Binding::Def(_))));
+            },
+        );
+    }
+
+    /// A `Seen` begun past an import goes on from the links the walks around it followed
+    /// (`Resolver::links`): at `LINK_DEPTH` a glob is cut, and the cut, which depends on those
+    /// walks, gives the families being linearized up (`Resolver::cut`).
+    #[test]
+    fn a_lookup_past_an_import_goes_on_from_the_links_followed() {
+        let src =
+            "using static N.B;\nnamespace N { public class B { public static void Go() {} } }\n";
+        with_resolver(
+            &[("App/A.cs", src)],
+            &[("App/App.csproj", PROJECT)],
+            |resolver| {
+                let go = |links: usize| {
+                    resolver.links.set(links);
+                    resolver.cut.set(false);
+                    let seen = &mut resolver.seen("App/A.cs", "");
+                    let found = resolver.globs("App/A.cs", "", "Go", false, seen);
+                    let found = matches!(found, Some(Binding::Def(t)) if t.name == "N.B.Go()");
+                    (found, seen.cut, resolver.cut.get())
+                };
+                assert_eq!(go(0), (true, false, false));
+                assert_eq!(go(LINK_DEPTH), (false, true, true));
             },
         );
     }

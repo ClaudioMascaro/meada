@@ -1515,9 +1515,6 @@ parts! {
     go_survives_hostile_input_3 = "go", go, 3;
 }
 
-/// Locals in a chain, past `RECEIVER_DEPTH` (64) by 16: `var a1 = a0.m(); var a2 = a1.m(); ..`.
-const LOCALS: usize = 80;
-
 /// A static import of the class whose base is looked up through it (`using static N.A;` and
 /// `class A : Inner`; efcore's shape, where an interface's file imports statically the class
 /// that implements it, met from either end; Java's `import static p.A.*;`) is a cycle the
@@ -1591,6 +1588,9 @@ fn a_static_import_of_a_class_naming_its_own_base_is_indexed() {
         }
     }
 }
+
+/// Locals in a chain, past `RECEIVER_DEPTH` (64) by 16: `var a1 = a0.m(); var a2 = a1.m(); ..`.
+const LOCALS: usize = 80;
 
 /// How a pack writes the chain of `LOCALS` locals, each holding a call on the one before it:
 /// the pack's name, how its repository holds a source, and the head of the source and the type

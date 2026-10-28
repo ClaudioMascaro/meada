@@ -2356,19 +2356,21 @@ qualification budget does (ADR 0017).
   that is absent, so every member of the class is unknown (a name match at most), and the
   linearization recurses no deeper down the bases. The bases count from where the walk
   started, a family looked up for a member a base names (`class Z(K.D)` linearizes `K`'s)
-  included, and so does a lookup past an import that begins its own walk (a glob, an alias, an
-  on-demand import), which sees the families being linearized: a `using static N.A;` read to
-  name `A`'s base (`class A : Inner`) does not linearize `A` inside itself, so the member it
-  asks of `A` is answered as in a cycle and the base is opaque unless another import names it.
+  included. The families being linearized are the resolver's (`Resolver::linearizing`), so a
+  lookup that begins its own walk (a glob, an alias, an on-demand import, a base, a receiver)
+  sees and counts them too: a `using static N.A;` read to name `A`'s base (`class A : Inner`)
+  does not linearize `A` inside itself, the member it asks of `A` is answered as in a cycle, and
+  the base is opaque unless another import names it.
   `LINK_DEPTH` (64): a name followed through more links than that, each into the next (a file
   re-exporting it from another: `export { x } from`, `export * from`, a Python `from m import x`
   or `import *`, a Rust `pub use`; a Rust alias, `use a as b`, or glob, `use m::*`), is unknown
   (a name match at most), and no other import, `export *`, glob or submodule binds it in its
-  place. The links count across such a lookup too: a base resolved from it goes on from the links
-  already followed. A star import from outside the repository (`from numpy import *`) is taken to bind
-  nothing (`ponytail:` in `Resolver::imported`): a name it rebinds stays linked `exact` to the
-  import or definition before it, as with the standard library's accelerator modules (`from
-  _heapq import *` after `def heappush`). Where a Python star import sits is not compared with
+  place. The links count across a walk begun past a glob, an alias or an on-demand import: it
+  goes on from the links already followed (`Resolver::links`). A star import from outside the
+  repository (`from numpy import *`) is taken to bind nothing (`ponytail:` in
+  `Resolver::imported`): a name it rebinds stays linked `exact` to the import or definition
+  before it, as with the standard library's accelerator modules (`from _heapq import *` after
+  `def heappush`). Where a Python star import sits is not compared with
   the code that reads a name it rebinds (`ponytail:` in `Resolver::rebound`): code run while
   the module loads (its top level, a class body there, its main guard) gets the name unknown, as
   it may run before the star import, and a function's code gets the star import's, as for every
@@ -2377,9 +2379,9 @@ qualification budget does (ADR 0017).
   takes the class of a call's result on the next, `let x = y.f()`, `Class::Returned`), holds an
   unknown class.
   The receivers count from where the walk started. When `FAMILY_DEPTH` or `RECEIVER_DEPTH` cuts
-  a walk, or `LINK_DEPTH` cuts a base resolved past such a lookup, the families being linearized
-  give up and none is kept: each is linearized again when
-  asked for, and does not depend on the walk that first reached it.
+  a walk, or `LINK_DEPTH` cuts one begun past an import, the families being linearized give up
+  and none is kept: each is linearized again when asked for, and does not depend on the walk
+  that first reached it.
 - `lang/go/values.rs`: `VALUE_DEPTH` (64): a value (an argument, a returned or held expression)
   nested deeper (`f(g(h(..)))`) is unknown. A name is a constant only when it is bound once in
   the function (`:=` or `var`, one name, never assigned, in a statement of the function body, not
