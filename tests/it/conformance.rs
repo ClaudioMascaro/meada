@@ -5663,6 +5663,9 @@ fn typescript_and_javascript() {
             "src/assigned.js::expA",
             "src/assigned.js::expB",
             "src/assigned.js::hidden",
+            "src/assigned.js::innerCatch",
+            "src/assigned.js::innerDef",
+            "src/assigned.js::innerDef.app",
             "src/assigned.js::letArrow",
             "src/assigned.js::o.litM",
             "src/assigned.js::o.litP",
@@ -5895,6 +5898,9 @@ fn typescript_and_javascript() {
             // A parameter spelled like the head hides the definition.
             ("src/assigned.js::hidden::app.use#0", None, &[]),
             ("src/assigned.js::hidden::o.litM#0", None, &[]),
+            // So do a nested definition, a `catch` binding.
+            ("src/assigned.js::innerDef::app.use#0", None, &[]),
+            ("src/assigned.js::innerCatch::o.litM#0", None, &[]),
             // Hidden names: a `catch`, `for ... of`, `let` or `var` binding, an arrow parameter
             // without parentheses, a nested or array parameter pattern, and one spelled like a
             // constant or a parameter of the same function hide the top-level `helper`.

@@ -436,8 +436,8 @@ fn definition(
     let (kind, (name, range)) = match node.kind() {
         "function_declaration" | "generator_function_declaration" => (Kind::Function, own()?),
         "class_declaration" | "abstract_class_declaration" => (Kind::Class, own()?),
-        // Methods of object literals are not definitions: only those of a class body, and
-        // those of an options object, which are written in place like an argument.
+        // Methods of object literals are definitions only in a class body, in an options
+        // object (written in place like an argument) and in a top-level `const` (below).
         "method_definition" if up.of(node)?.kind() == "class_body" => (Kind::Method, own()?),
         "method_definition" if in_options(node, up) => {
             (Kind::Inline, (inline(node), node.byte_range()))
@@ -764,6 +764,7 @@ fn assignment(node: Node, src: &[u8], up: &Parents) -> Option<Assigned> {
         ["exports", y] | ["module", "exports", y] => (y.to_string(), false, true),
         ["exports" | "module", ..] => return None,
         [.., "prototype"] => return None,
+        ["prototype", _] => return None,
         [x @ .., "prototype", y] => (format!("{}.{y}", x.join(".")), true, false),
         _ => (path.clone(), false, false),
     };

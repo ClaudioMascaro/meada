@@ -7,7 +7,7 @@
     },
     {
       "path": "src/assigned.js",
-      "hash": "aab76c2152cc0bd5ce3985d35957c373e9ef70dbe9701f8ed83808b68b450d91"
+      "hash": "74c056c57b44e87218922c50df9e8b0691a3eadb3980a06695527bcc2d060c64"
     },
     {
       "path": "src/legacy.cjs",
@@ -177,6 +177,30 @@
         "path": "src/assigned.js",
         "start": 423,
         "end": 471
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::innerCatch",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 529,
+        "end": 585
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::innerDef",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 472,
+        "end": 528
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::innerDef.app",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 500,
+        "end": 514
       }
     },
     {
@@ -1299,6 +1323,28 @@
         "path": "src/assigned.js",
         "start": 460,
         "end": 468
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::innerCatch::o.litM#0",
+      "caller": "example.com/acme/conformance::src/assigned.js::innerCatch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/assigned.js",
+        "start": 572,
+        "end": 580
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/assigned.js::innerDef::app.use#0",
+      "caller": "example.com/acme/conformance::src/assigned.js::innerDef",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/assigned.js",
+        "start": 516,
+        "end": 525
       }
     },
     {

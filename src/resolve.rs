@@ -1941,8 +1941,8 @@ impl<'a> Resolver<'a> {
     }
 
     /// The definition the whole of `callee` names from `scope` (`LanguagePack::assigned_members`),
-    /// innermost scope first. A local, constant or parameter of the head in a scope between hides
-    /// the definitions outside it.
+    /// innermost scope first. A local, constant, parameter or definition of the head in a scope
+    /// between hides the definitions outside it.
     fn assigned(&self, path: &'a str, scope: &str, callee: &str) -> Option<Binding<'a>> {
         let head = callee.split_once('.')?.0;
         let mut s = scope;
@@ -1957,6 +1957,7 @@ impl<'a> Resolver<'a> {
             if s.is_empty()
                 || self.locals[path].contains(held.as_str())
                 || self.consts[path].contains(held.as_str())
+                || self.defs[path].contains_key(held.as_str())
                 || self.params[path].contains_key(&(s, head))
             {
                 return None;

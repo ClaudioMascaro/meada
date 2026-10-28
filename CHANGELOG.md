@@ -8,6 +8,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- TypeScript and JavaScript: a function defined by assignment is a symbol, and the calls of its
+  file reach it: `obj.y = function`, `X.prototype.y = function` (the method `X.y`), `exports.y =`,
+  `module.exports.y =` and `module.exports = function` (the export), a `let` or `var` function
+  the file assigns nowhere else, and the methods and function properties of a top-level `const`
+  object literal (`o.m`).
+
 - A Swift local or property bound to a member read on a name from outside the repository
   (`let session = URLSession.shared`) is opaque, as the direct chain `URLSession.shared.data(..)`
   is: a call on it no longer matches a repository method of the same name and labels
