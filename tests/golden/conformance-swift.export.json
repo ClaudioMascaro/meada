@@ -19,7 +19,7 @@
     },
     {
       "path": "Sources/Checkout/Routes.swift",
-      "hash": "62a3d936eb296fd7b018f6e20ebbd14b23fc81a56a494af20dabcc97f5d983a1"
+      "hash": "37d28d5ae77e3c0e7232b3900deaf640161498f60375e7e090bc1a917a103171"
     },
     {
       "path": "Sources/Checkout/Server.swift",
@@ -512,7 +512,7 @@
       "span": {
         "path": "Sources/Checkout/Routes.swift",
         "start": 2381,
-        "end": 3040
+        "end": 3267
       }
     },
     {
@@ -520,15 +520,15 @@
       "span": {
         "path": "Sources/Checkout/Routes.swift",
         "start": 2427,
-        "end": 2750
+        "end": 2779
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:).GET /api/v1/alias",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 2706,
-        "end": 2724
+        "start": 2735,
+        "end": 2753
       }
     },
     {
@@ -543,48 +543,64 @@
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.list(req:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 2921,
-        "end": 2975
+        "start": 3148,
+        "end": 3202
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.mountReports(_:)",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 3051,
+        "end": 3142
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.mountReports(_:).GET /api/v1/beta/orders/reports",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 3116,
+        "end": 3136
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.show(req:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 2981,
-        "end": 3038
+        "start": 3208,
+        "end": 3265
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.tally()",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 2878,
-        "end": 2915
+        "start": 2907,
+        "end": 2944
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::explicit(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3881,
-        "end": 3994
+        "start": 4108,
+        "end": 4221
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mount(admin:_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3607,
-        "end": 3708
+        "start": 3834,
+        "end": 3935
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::mount(admin:_:).GET /admin/stats",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3688,
-        "end": 3706
+        "start": 3915,
+        "end": 3933
       }
     },
     {
@@ -631,24 +647,24 @@
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::orphan(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3378,
-        "end": 3463
+        "start": 3605,
+        "end": 3690
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::pick(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4282,
-        "end": 4380
+        "start": 4509,
+        "end": 4607
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::pick(_:).GET /pick/one",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4359,
-        "end": 4378
+        "start": 4586,
+        "end": 4605
       }
     },
     {
@@ -743,40 +759,40 @@
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::secured(on:_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3710,
-        "end": 3833
+        "start": 3937,
+        "end": 4060
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::secured(on:_:).GET /api/v1/sec/secured",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3811,
-        "end": 3831
+        "start": 4038,
+        "end": 4058
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::shadowedByIf(_:_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4815,
-        "end": 4985
+        "start": 5042,
+        "end": 5212
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::shadowedByLet(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4469,
-        "end": 4664
+        "start": 4696,
+        "end": 4891
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::shadowedByLoop(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4666,
-        "end": 4813
+        "start": 4893,
+        "end": 5040
       }
     },
     {
@@ -807,24 +823,24 @@
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::spin(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4064,
-        "end": 4153
+        "start": 4291,
+        "end": 4380
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:)",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3230,
-        "end": 3321
+        "start": 3457,
+        "end": 3548
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:).GET /api/v1/unlisted",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3298,
-        "end": 3319
+        "start": 3525,
+        "end": 3546
       }
     },
     {
@@ -3208,8 +3224,19 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 2687,
-        "end": 2724
+        "start": 2716,
+        "end": 2753
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)::mountReports#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)",
+      "target": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.mountReports(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 2635,
+        "end": 2655
       }
     },
     {
@@ -3263,8 +3290,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 2737,
-        "end": 2744
+        "start": 2766,
+        "end": 2773
       }
     },
     {
@@ -3274,8 +3301,19 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 2635,
-        "end": 2651
+        "start": 2664,
+        "end": 2680
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.mountReports(_:)::r.get#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.mountReports(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Checkout/Routes.swift",
+        "start": 3099,
+        "end": 3136
       }
     },
     {
@@ -3285,8 +3323,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3955,
-        "end": 3975
+        "start": 4182,
+        "end": 4202
       }
     },
     {
@@ -3296,8 +3334,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3669,
-        "end": 3706
+        "start": 3896,
+        "end": 3933
       }
     },
     {
@@ -3362,8 +3400,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3421,
-        "end": 3461
+        "start": 3648,
+        "end": 3688
       }
     },
     {
@@ -3373,8 +3411,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4324,
-        "end": 4378
+        "start": 4551,
+        "end": 4605
       }
     },
     {
@@ -3384,8 +3422,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4324,
-        "end": 4347
+        "start": 4551,
+        "end": 4574
       }
     },
     {
@@ -4033,8 +4071,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3789,
-        "end": 3831
+        "start": 4016,
+        "end": 4058
       }
     },
     {
@@ -4044,8 +4082,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4891,
-        "end": 4908
+        "start": 5118,
+        "end": 5135
       }
     },
     {
@@ -4055,8 +4093,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4941,
-        "end": 4977
+        "start": 5168,
+        "end": 5204
       }
     },
     {
@@ -4066,8 +4104,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4523,
-        "end": 4540
+        "start": 4750,
+        "end": 4767
       }
     },
     {
@@ -4077,8 +4115,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4579,
-        "end": 4615
+        "start": 4806,
+        "end": 4842
       }
     },
     {
@@ -4088,8 +4126,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4626,
-        "end": 4662
+        "start": 4853,
+        "end": 4889
       }
     },
     {
@@ -4099,8 +4137,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4721,
-        "end": 4738
+        "start": 4948,
+        "end": 4965
       }
     },
     {
@@ -4110,8 +4148,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4769,
-        "end": 4805
+        "start": 4996,
+        "end": 5032
       }
     },
     {
@@ -4132,8 +4170,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4122,
-        "end": 4151
+        "start": 4349,
+        "end": 4378
       }
     },
     {
@@ -4143,8 +4181,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 4122,
-        "end": 4134
+        "start": 4349,
+        "end": 4361
       }
     },
     {
@@ -4154,8 +4192,8 @@
       "level": null,
       "span": {
         "path": "Sources/Checkout/Routes.swift",
-        "start": 3275,
-        "end": 3319
+        "start": 3502,
+        "end": 3546
       }
     },
     {
@@ -4903,6 +4941,10 @@
       "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.list(req:)"
     },
     {
+      "contract": "http::GET::/api/v1/beta/orders/reports",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.mountReports(_:).GET /api/v1/beta/orders/reports"
+    },
+    {
       "contract": "http::GET::/api/v1/beta/orders/{}",
       "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.show(req:)"
     },
@@ -4917,6 +4959,10 @@
     {
       "contract": "http::GET::/api/v1/orders",
       "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.list(req:)"
+    },
+    {
+      "contract": "http::GET::/api/v1/orders/reports",
+      "site": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.mountReports(_:).GET /api/v1/beta/orders/reports"
     },
     {
       "contract": "http::GET::/api/v1/orders/{}",
@@ -5308,6 +5354,7 @@
       "name": "Sources/Checkout#8",
       "members": [
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.boot(routes:)",
+        "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.mountReports(_:)",
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.tally()",
         "example.com/acme/conformance::Sources/Checkout/Routes.swift::unlisted(_:)"
       ]
@@ -5675,6 +5722,34 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.list(req:)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.mountReports(_:).GET /api/v1/beta/orders/reports::http::GET::/api/v1/beta/orders/reports",
+      "kind": "route",
+      "label": "GET /api/v1/beta/orders/reports",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.mountReports(_:).GET /api/v1/beta/orders/reports"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.mountReports(_:).GET /api/v1/beta/orders/reports::http::GET::/api/v1/orders/reports",
+      "kind": "route",
+      "label": "GET /api/v1/orders/reports",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Checkout/Routes.swift::OrderController.mountReports(_:).GET /api/v1/beta/orders/reports"
         }
       ]
     },

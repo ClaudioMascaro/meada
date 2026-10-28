@@ -2684,9 +2684,11 @@ qualification budget does (ADR 0017).
   binds (`Code::origins_unbound`), through the arguments of exact calls. Ceilings as the
   minimal APIs': a builder Meada does not read serves nothing (a parameter no call reaches, a
   `var`, a property), the closure form `group("api") { }` is not read, and a repository past
-  `VAPOR_NODES` (4096) nodes serves nothing. Also: a helper `boot` calls (`mount(routes)`) is
-  followed only when the call is exact, and a call made inside a type of an outside protocol
-  (`RouteCollection` always is) is a name match, so its routes are not served;
+  `VAPOR_NODES` (4096) nodes serves nothing. Also: a helper `boot` calls
+  (`mountReports(routes)`, bare or through `self`) is followed when the call is exact: a member
+  `RouteCollection` does not declare is the collection's own (Known outside members), so a
+  helper method of the collection is, and the routes it registers serve under the builder it
+  was given;
   a `grouped` whose every argument is a call on a capitalized head with no path producer
   (`String`, `Substring`, `PathComponent`) in its callee (`AuthMiddleware()`,
   `User.authenticator()`) is the middleware overload (`Dialect::middleware`, Vapor only) and
