@@ -1232,19 +1232,20 @@ fn built<'t>(
     routes: &mut HashMap<usize, Routes<'t>>,
 ) -> Vec<Node<'t>> {
     let mut out = Vec::new();
-    let (mut on, mut test, mut path) = (true, false, None);
+    let (mut on, mut on_test, mut path) = (true, true, None);
     let kids: Vec<Node> = children(node).collect();
     for (at, &child) in kids.iter().enumerate() {
         match child.kind() {
             "attribute_item" => {
-                let (holds, only_test) = attribute_holds(child, features, src);
-                (on, test) = (on && holds, test || only_test);
+                let (plain, test) = attribute_holds(child, features, src);
+                (on, on_test) = (on && plain, on_test && test);
                 path = path_value(child, src).or(path);
             }
             "line_comment" | "block_comment" | "inner_attribute_item" => out.push(child),
             _ => {
-                // Test modules are indexed; any other item under `#[cfg(test)]` is not.
-                let kept = on && (!test || child.kind() == "mod_item");
+                // A module a test build compiles is indexed; any other item is judged with `test`
+                // false.
+                let kept = on || (on_test && child.kind() == "mod_item");
                 if kept && !inner_off(child, features, src) {
                     if let Some(value) = path {
                         paths.insert(child.id(), value);
@@ -1257,22 +1258,22 @@ fn built<'t>(
                     }
                     out.push(child);
                 }
-                (on, test, path) = (true, false, None);
+                (on, on_test, path) = (true, true, None);
             }
         }
     }
     out
 }
 
-/// Whether an attribute item is no `#[cfg(..)]`, or one that holds, and whether it is exactly
-/// `#[cfg(test)]`.
+/// Whether an attribute item is no `#[cfg(..)]`, or one that holds, with `test` false and with
+/// it true.
 fn attribute_holds(item: Node, features: &BTreeSet<String>, src: &[u8]) -> (bool, bool) {
     let attribute = named(item).find(|n| n.kind() == "attribute");
     let condition = attribute.and_then(|a| text(a, src).strip_prefix("cfg"));
     let condition = condition.filter(|c| c.trim_start().starts_with('('));
     let condition = condition.map(str::trim_start);
-    let holds = condition.is_none_or(|c| cfg::holds(c, features));
-    (holds, condition.is_some_and(cfg::only_test))
+    let holds = |test| condition.is_none_or(|c| cfg::holds(c, features, test));
+    (holds(false), holds(true))
 }
 
 /// Whether the file or the module written in place that `node` is (or holds as its body) opens
@@ -1292,7 +1293,10 @@ fn inner_off(node: Node, features: &BTreeSet<String>, src: &[u8]) -> bool {
                 let attribute = named(inner).find(|n| n.kind() == "attribute");
                 let condition = attribute.and_then(|a| text(a, src).strip_prefix("cfg"));
                 let condition = condition.filter(|c| c.trim_start().starts_with('('));
-                if condition.is_some_and(|c| !cfg::holds(c.trim_start(), features)) {
+                if condition.is_some_and(|c| {
+                    let c = c.trim_start();
+                    !cfg::holds(c, features, false) && !cfg::holds(c, features, true)
+                }) {
                     return true;
                 }
             }
@@ -2232,12 +2236,14 @@ mod tests {
     }
 
     #[test]
-    fn cfg_test_keeps_modules_and_nothing_else() {
+    fn a_test_build_keeps_its_modules_and_nothing_else() {
         let src = "#[cfg(test)]\nuse crate::mock::client;\n#[cfg(test)]\nfn helper() {}\n\
-                   #[cfg(test)]\nmod t { fn f() {} }\n#[cfg(all(test, unix))]\nmod u {}\n";
+                   #[cfg(test)]\nmod t { fn f() {} }\n#[cfg(all(test, unix))]\nmod u {}\n\
+                   #[cfg(any(test, feature = \"p\"))]\nmod v {}\n#[cfg(any(test, feature = \"p\"))]\nfn g() {}\n\
+                   #[cfg(all(test, feature = \"p\"))]\nmod w {}\n#[cfg(not(test))]\nmod x {}\n";
         let facts = facts(src);
         let names: Vec<&str> = facts.defs.iter().map(|d| d.name.as_str()).collect();
-        assert_eq!(names, ["t", "t.f"]);
+        assert_eq!(names, ["t", "t.f", "u", "v", "x"]);
         assert!(facts.imports.iter().all(|i| i.local != "client"));
     }
 
