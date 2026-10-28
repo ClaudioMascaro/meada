@@ -340,8 +340,8 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     bases.push(format!("{name}.{own}"));
                 }
                 // A class's name called constructs it: the class joins the callables of its
-                // name (`Facts::overloads`, with a factory function of that name) with its
-                // primary constructor's parameters, when it declares no other constructor.
+                // name (`Facts::overloads`, with a factory function of that name and its
+                // secondary constructors) with its primary constructor's parameters.
                 let params = constructor(node, src);
                 if params.is_some() {
                     let family = facts.overloads.entry(inner.as_ref().clone()).or_default();
@@ -575,6 +575,21 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                         facts.locals.push(qualify(&scope, name));
                     }
                 }
+                inner_place = Place::Init;
+            }
+            // A secondary constructor is a callable of its class's name, with its own
+            // parameter list (`Facts::overloads`); its body is read in the class's scope.
+            "secondary_constructor" if defining => {
+                let (params, types, _) = parameters(node, src, &generics, &mut outside);
+                let class = scope.rsplit('.').next().unwrap_or_default();
+                let ctor = qualify(&scope, &format!("{class}({})", types.join(",")));
+                facts
+                    .defs
+                    .push(definition(&ctor, Kind::Method, node.byte_range(), params));
+                if access.max(own_access(node, src)) != Access::Public {
+                    facts.hidden.push(ctor.clone());
+                }
+                (facts.overloads.entry(scope.as_ref().clone()).or_default()).push(ctor);
                 inner_place = Place::Init;
             }
             "anonymous_initializer" | "secondary_constructor" => inner_place = Place::Init,
@@ -927,15 +942,16 @@ fn platform<'s>(node: Node, src: &'s [u8]) -> Option<&'s str> {
         .map(|n| text(n, src))
 }
 
-/// The primary constructor's parameters of a class that declares no other constructor; `None`
-/// for an interface, an object, a companion or a class with secondary constructors, whose
-/// argument counts are not one list.
+/// The primary constructor's parameters of a class; `None` for an interface, an object, a
+/// companion or a class whose constructors are all secondary, which join the callables of its
+/// name one by one.
 fn constructor(node: Node, src: &[u8]) -> Option<Vec<Param>> {
     let class = node.kind() == "class_declaration"
         && children(node).all(|c| c.kind() != "interface")
-        && body(node)
-            .flat_map(named)
-            .all(|n| n.kind() != "secondary_constructor");
+        && (named(node).any(|n| n.kind() == "primary_constructor")
+            || body(node)
+                .flat_map(named)
+                .all(|n| n.kind() != "secondary_constructor"));
     if !class {
         return None;
     }
@@ -2242,6 +2258,21 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A secondary constructor is a method `C.C(types)` in the overload family of its class's
+    /// name, hidden when `internal` or `private`; an enum's included.
+    #[test]
+    fn a_secondary_constructor_joins_its_classs_overloads() {
+        let facts = parse(
+            b"package a\nclass C {\n constructor(x: Int) {}\n private constructor() {}\n}\n\
+              enum class E(val n: Int) {\n A(1);\n internal constructor() : this(0)\n}\n",
+            false,
+        )
+        .unwrap();
+        assert_eq!(facts.overloads["a.C"], ["a.C.C()", "a.C.C(Int)"]);
+        assert_eq!(facts.overloads["a.E"], ["a.E", "a.E.E()"]);
+        assert_eq!(facts.hidden, ["a.C.C()", "a.E.E()"]);
+    }
 
     #[test]
     fn a_declaration_read_as_an_infix_call_leaves_the_file_out() {

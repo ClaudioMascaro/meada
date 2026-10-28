@@ -2177,9 +2177,11 @@ one for the area a change touches.
   receiver typed `p.C`, though the extension's file may import another `C` over its package's. In the block of a receiver whose type is outside the repository (a Ktor
   `Application` or `Route` extension function), a constant's value and a call's receiver are
   the names outside the block, though that type may declare a member of the name; the object a
-  client walk or a declared type asks is unknown there. A fully qualified function call (`example.helper()`) is a name match. A class
-  with a secondary constructor is not in its name's overload family, so calling it resolves to
-  nothing. A single import of a top-level declaration named like a package of the repository
+  client walk or a declared type asks is unknown there. A fully qualified function call (`example.helper()`) is a name match. A class's
+  constructors, the primary one (the class's own definition) and each secondary one (a method
+  `C.C(types)`, `internal` and `private` ones hidden as a function's), are the callables of its
+  name, so a call narrows among them by argument count; a class with secondary constructors and
+  no primary one is only those. A single import of a top-level declaration named like a package of the repository
   (`import app.config` beside package `app.config`) binds nothing, since the package keeps the
   name. A property of function type that a base class declares, invoked by bare name, is read as
   a method call. A companion's outside base leaves the companion's members unknown, so

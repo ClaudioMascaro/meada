@@ -126,6 +126,10 @@
       "hash": "913553777de15c7c37f84db37df67915454138d4949f4794df39024c06f8eed0"
     },
     {
+      "path": "src/main/kotlin/example/ctors/Ctors.kt",
+      "hash": "c57faa416a1c70b75cd607d3cae7ab91736a20b49dfac29be29789044d60a77e"
+    },
+    {
       "path": "src/main/kotlin/example/declarative/Archive.kt",
       "hash": "8a65d4a94dbbc7184780192982269aa35ba7caaba833f69944c2dec13a50112b"
     },
@@ -553,6 +557,14 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 1118,
         "end": 1290
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Init.Init()",
+      "span": {
+        "path": "src/main/kotlin/example/Members.kt",
+        "start": 1228,
+        "end": 1288
       }
     },
     {
@@ -2265,6 +2277,118 @@
         "path": "src/main/kotlin/example/clients/urls/Urls.kt",
         "start": 179,
         "end": 402
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 23,
+        "end": 283
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 138,
+        "end": 281
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.Maker()",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 165,
+        "end": 181
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.Maker(Parcel)",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 190,
+        "end": 229
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.assemble()",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 239,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Parcel(String,String)",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 80,
+        "end": 132
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Plain",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 285,
+        "end": 319
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 390,
+        "end": 461
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(Int)",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 407,
+        "end": 429
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(String)",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 434,
+        "end": 459
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 321,
+        "end": 388
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two()",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 370,
+        "end": 386
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two(String)",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 337,
+        "end": 365
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 463,
+        "end": 634
       }
     },
     {
@@ -7945,6 +8069,120 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.assemble()::Parcel#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.assemble()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 264,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::(call_expression).assemble#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.assemble()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 595,
+        "end": 620
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Parcel#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 537,
+        "end": 548
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Parcel#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Parcel(String,String)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 553,
+        "end": 571
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Parcel.Maker#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.Maker()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 576,
+        "end": 590
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Parcel.Maker#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.Maker()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 595,
+        "end": 609
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Plain#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Plain",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 485,
+        "end": 502
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Same#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(Int)",
+        "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(String)"
+      ],
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 625,
+        "end": 632
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Two#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two(String)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 507,
+        "end": 522
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Two#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()",
+      "target": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two()",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/ctors/Ctors.kt",
+        "start": 527,
+        "end": 532
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive::GET#0",
       "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive",
       "target": null,
@@ -12278,6 +12516,19 @@
       ]
     },
     {
+      "name": "src/main/kotlin/example/ctors",
+      "members": [
+        "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel",
+        "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.Maker()",
+        "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.assemble()",
+        "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Parcel(String,String)",
+        "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Plain",
+        "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two()",
+        "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two(String)",
+        "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()"
+      ]
+    },
+    {
       "name": "src/main/kotlin/example/declarative",
       "members": [
         "example.com/acme/conformance::src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.entry(String)",
@@ -12652,6 +12903,20 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Base.log(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Init.Init()",
+      "kind": "export",
+      "label": "example.Init.Init()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Init.Init()"
         }
       ]
     },
@@ -15967,6 +16232,89 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.HttpClient.options(String)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()",
+      "kind": "export",
+      "label": "example.ctors.construct()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Plain"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two(String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Parcel(String,String)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.Maker()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.assemble()"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel",
+          "mark": "seen"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Same#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(Int)",
+            "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(String)"
+          ]
         }
       ]
     },
