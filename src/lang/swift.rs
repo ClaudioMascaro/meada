@@ -1468,6 +1468,34 @@ mod tests {
         parse(src.as_bytes(), true).unwrap()
     }
 
+    /// The known outside types, in order, with the names each declares (issue #409): the
+    /// standard library's protocols, the raw value types and Vapor's `RouteCollection`. A change
+    /// to the table, a duplicate entry included, is a change to what stays opaque.
+    #[test]
+    fn the_known_outside_table_is_pinned() {
+        let expected: super::super::KnownOutside = &[
+            ("Swift.Sendable", &[]),
+            ("Swift.Error", &["localizedDescription"]),
+            ("Swift.Equatable", &[]),
+            ("Swift.Comparable", &[]),
+            ("Swift.Hashable", &["hash(into:)", "hashValue"]),
+            ("Swift.Encodable", &["encode(to:)"]),
+            ("Swift.Decodable", &["init(from:)"]),
+            ("Swift.Codable", &["encode(to:)", "init(from:)"]),
+            ("Swift.Identifiable", &["id"]),
+            ("Swift.CustomStringConvertible", &["description"]),
+            ("Swift.CaseIterable", &["allCases"]),
+            ("Swift.String", &["rawValue", "init(rawValue:)"]),
+            ("Swift.Int", &["rawValue", "init(rawValue:)"]),
+            ("Swift.UInt", &["rawValue", "init(rawValue:)"]),
+            ("Swift.Double", &["rawValue", "init(rawValue:)"]),
+            ("Swift.Float", &["rawValue", "init(rawValue:)"]),
+            ("Swift.Character", &["rawValue", "init(rawValue:)"]),
+            ("Vapor.RouteCollection", &["boot(routes:)"]),
+        ];
+        assert_eq!(Swift.known_outside(), expected);
+    }
+
     #[test]
     fn manifests_are_not_code_but_lookalikes_are() {
         assert!(!Swift.is_code("Package.swift"));

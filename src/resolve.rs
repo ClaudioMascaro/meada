@@ -9304,13 +9304,17 @@ mod tests {
 
     /// What each call of one Java file resolves to, by `scope callee`: the level and target.
     fn java_calls(src: &str) -> BTreeMap<String, String> {
-        use crate::lang::java::Java;
-        let facts = Java.parse("A.java", src.as_bytes()).unwrap();
-        let files = BTreeMap::from([("A.java", &facts)]);
-        let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Java);
+        pack_calls(&crate::lang::java::Java, "A.java", src)
+    }
+
+    /// What each call of the one file `path` of `pack` resolves to, by `scope callee`.
+    fn pack_calls(pack: &dyn LanguagePack, path: &str, src: &str) -> BTreeMap<String, String> {
+        let facts = pack.parse(path, src.as_bytes()).unwrap();
+        let files = BTreeMap::from([(path, &facts)]);
+        let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), pack);
         let mut out = BTreeMap::new();
         for call in &facts.calls {
-            let found = match resolver.call("A.java", call) {
+            let found = match resolver.call(path, call) {
                 Resolution::Exact(t) => format!("exact {}", t.name),
                 Resolution::Inferred(t) | Resolution::Narrowed(t) => format!("inferred {}", t.name),
                 Resolution::Ambiguous(all) => {
@@ -9394,6 +9398,71 @@ mod tests {
         assert_eq!(calls["p.Late.go() open"], "exact p.Ticket.open(int)");
         assert_eq!(calls["p.Other.g() f"], "inferred p.Other.f()");
         assert_eq!(calls["p.Both.g() f"], "inferred p.Both.f()");
+    }
+
+    /// A Swift family whose outside bases are all listed protocols (`Sendable`, `Hashable`)
+    /// resolves the names they do not declare as if it had no outside base, the members of a
+    /// repository protocol's extension included (issue #409).
+    #[test]
+    fn listed_swift_protocols_hide_only_the_names_they_declare() {
+        let calls = pack_calls(
+            &crate::lang::swift::Swift,
+            "A.swift",
+            "protocol Builder { func add(_ x: Int) }
+             protocol Service {}
+             extension Builder {
+                 func get(_ path: String..., note: String? = nil, use closure: (Int) -> Int) -> Int { 0 }
+                 func get(_ path: [String], note: String? = nil, use closure: (Int) -> Int) -> Int { 0 }
+             }
+             final class App: Sendable, Service {}
+             extension App: Builder { func add(_ x: Int) {} }
+             final class Plain: Service {}
+             extension Plain: Builder { func add(_ x: Int) {} }
+             func f(_ x: Int) -> Int { x }
+             func trail(app: App, plain: Plain) { app.get(\"a\", \"b\") { _ in 1 }; plain.get(\"a\", \"b\") { _ in 1 } }
+             func use(app: App, plain: Plain) { app.get(\"a\", use: f); plain.get(\"a\", use: f); app.add(1); plain.add(1) }
+             struct Point: Hashable {
+                 func scaled(by k: Int) -> Point { self }
+                 func hash(into hasher: inout Hasher) {}
+             }
+             func runPoint(p: Point, h: inout Hasher) { _ = p.scaled(by: 2); p.hash(into: &h) }
+             struct Late { func scaled(by k: Int) -> Late { self } }
+             extension Late: Hashable { func hash(into hasher: inout Hasher) {} }
+             func runLate(l: Late, h: inout Hasher) { _ = l.scaled(by: 2); l.hash(into: &h) }
+             final class Mixed: Sendable, CustomDebugStringConvertible { func go() {} }
+             func runMixed(m: Mixed) { m.go() }",
+        );
+        let variadic = "Builder.get(_:String,note:String?,use:(Int)->Int)";
+        let both =
+            format!("ambiguous {variadic} Builder.get(_:[String],note:String?,use:(Int)->Int)");
+        for receiver in ["app", "plain"] {
+            let trail = format!("trail(app:plain:) {receiver}.get");
+            assert_eq!(calls[&trail], format!("exact {variadic}"), "{receiver}");
+            assert_eq!(
+                calls[&format!("use(app:plain:) {receiver}.get")],
+                both,
+                "{receiver}"
+            );
+        }
+        assert_eq!(calls["use(app:plain:) app.add"], "exact App.add(_:)");
+        assert_eq!(calls["use(app:plain:) plain.add"], "exact Plain.add(_:)");
+        assert_eq!(calls["runPoint(p:h:) p.scaled"], "exact Point.scaled(by:)");
+        // `Hashable` declares `hash(into:)`, and `CustomDebugStringConvertible` is unlisted: the
+        // strict rule stands.
+        assert_eq!(calls["runPoint(p:h:) p.hash"], "inferred Point.hash(into:)");
+        assert_eq!(calls["runMixed(m:) m.go"], "inferred Mixed.go()");
+        // A listed conformance written on an extension counts the same.
+        assert_eq!(calls["runLate(l:h:) l.scaled"], "exact Late.scaled(by:)");
+        assert_eq!(calls["runLate(l:h:) l.hash"], "inferred Late.hash(into:)");
+        // A repository protocol named like a listed one is a repository base: no name is hidden.
+        let own = pack_calls(
+            &crate::lang::swift::Swift,
+            "A.swift",
+            "protocol Hashable {}
+             struct Own: Hashable { func hash(into n: inout Int) {} }
+             func run(o: Own, n: inout Int) { o.hash(into: &n) }",
+        );
+        assert_eq!(own["run(o:n:) o.hash"], "exact Own.hash(into:)");
     }
 
     /// A bare call a nested class does not answer climbs to the class around it: past that
