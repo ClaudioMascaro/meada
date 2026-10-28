@@ -248,7 +248,8 @@ impl Engine {
 
     /// `decision_report`, with, for each repository of the workspace, in workspace order, the
     /// status lines: each kind's own (a `via` that names no symbol, a resource no link reaches),
-    /// its documents' (one ignored, a route listed twice) and the shape drift's.
+    /// its documents' (one ignored, a route listed twice), the source files a pack dropped for
+    /// passing a budget and the shape drift's.
     pub fn status_report(&self) -> Result<(Vec<Evaluation>, Vec<Vec<String>>)> {
         self.refresh()?;
         let exports = self.exports()?;

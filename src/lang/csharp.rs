@@ -31,9 +31,10 @@ const PATH_DEPTH: usize = 256;
 // ponytail: a long namespace prefix must not multiply across a broad file without a budget.
 const QUALIFICATION_BYTES: usize = 4 * 1024 * 1024;
 /// How long an enclosing name is before a visit is charged for it: a real qualified name is
-/// shorter, so a generated file of any size reads whole, while a long prefix still pays for
-/// every node (and every stored copy of it) that repeats it.
-// ponytail: a flat 256 bytes; a name this long is hostile, a crafted file pays the excess.
+/// shorter, so a generated file of any size reads whole, while a longer prefix pays its excess
+/// at every node that repeats it.
+// ponytail: a flat 256 bytes; a file under it keeps up to 256 bytes of scope per stored call,
+// about 130 MB of facts at `MAX_BYTES`. Lower it if that shows up.
 const QUALIFICATION_FREE: usize = 256;
 /// How many distinct usings a project adds to each of its files (`join`), its project file's
 /// and its `global using` directives together. A project past it keeps no facts in any file:

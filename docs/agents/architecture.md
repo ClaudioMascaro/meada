@@ -1922,7 +1922,8 @@ one for the area a change touches.
   static-member names (`Facts::overloads`, `Facts::constructors` and
   `Facts::statics`), the namespaces and types a C# file's `global using` directives name
   (`Facts::project`, names as `Facts::imports` holds them), the qualified names of the types a C#
-  file declares in `partial` parts (`Facts::partial`), the literal URL path fragments and the
+  file declares in `partial` parts (`Facts::partial`), the size of the budget a file exhausted
+  (`Facts::budget`, which `meada status` names), the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
   consumer reads from the parsed response, and those of the zod schema or object literals a

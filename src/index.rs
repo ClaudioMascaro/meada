@@ -1629,8 +1629,8 @@ pub(crate) struct Export {
     /// Where the repository stands in the workspace; set by the engine, never stored or shown.
     pub(crate) root: PathBuf,
     pub(crate) files: Vec<File>,
-    /// The files a pack dropped for exhausting a budget (`Facts::budget`), with its size in
-    /// bytes, in path order: no symbols, no calls. Shown by `meada status` only.
+    /// The files a pack dropped for exhausting a budget (`Facts::budget`), each with the
+    /// budget's size in bytes, in path order: no symbols, no calls. Shown by `meada status` only.
     pub(crate) dropped: Vec<(String, usize)>,
     pub(crate) symbols: Vec<Symbol>,
     pub(crate) calls: Vec<CallSite>,
