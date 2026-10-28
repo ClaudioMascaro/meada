@@ -242,9 +242,10 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         package,
         ..Facts::default()
     };
-    // Globs are read the latest first, and one `inside` stops the reading: the file's own
-    // package comes first, then the star imports, which see `internal` declarations, then the
-    // default imports. Explicit imports come before any glob.
+    // Globs are read the latest first: the file's own package comes first and stops the
+    // reading, then the star imports, which see `internal` declarations and combine (two that
+    // give a name leave it ambiguous), then the default imports. Explicit imports come before
+    // any glob.
     for package in DEFAULT_IMPORTS {
         wildcard(package, false, &mut facts);
     }

@@ -1736,8 +1736,10 @@ one for the area a change touches.
   Classes of one name that are not parts of one type stay several, `ambiguous`, but for a Kotlin
   `expect` class and `actual` ones of its name (`Facts::expect`, `Facts::actual`), which
   `one_type` makes the `expect` one wherever the name binds them all (`exports`, a constructor
-  call): a base or a receiver so named reads the `expect` class's family alone, so a member only
-  an `actual` declares is unknown. Where globs combine (`unordered_globs`), an `inside` glob
+  call): a base or a receiver so named reads the `expect` class's family, and a member only an
+  `actual` declares is a name match (`Resolver::matched` reads the `actual` classes of each
+  `expect` one of the family, `Resolver::actuals`, and `lacks` holds no `expect` class closed).
+  Where globs combine (`unordered_globs`), an `inside` glob
   that gives the name comes before the other globs of its scope, and the `inside` ones combine
   with each other (Kotlin's written star imports, which see `internal` members), but for the
   file's own package's (`Resolver::own_glob`), which stops the reading: a name two Kotlin star

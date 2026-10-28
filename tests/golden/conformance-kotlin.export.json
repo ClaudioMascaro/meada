@@ -223,7 +223,7 @@
     },
     {
       "path": "src/main/kotlin/example/platform/named/Named.kt",
-      "hash": "22f62c58a23f6e8558f51e3b594f46c408aca901349e11e7c4c47a3300a78837"
+      "hash": "5e8c9c6d03a584cf1998bc3147ccf6669b940737510ccea582151d5ff7e60794"
     },
     {
       "path": "src/main/kotlin/example/platform/star/Starred.kt",
@@ -3463,16 +3463,24 @@
       "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named",
       "span": {
         "path": "src/main/kotlin/example/platform/named/Named.kt",
-        "start": 139,
-        "end": 232
+        "start": 194,
+        "end": 366
       }
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()",
       "span": {
         "path": "src/main/kotlin/example/platform/named/Named.kt",
-        "start": 167,
-        "end": 230
+        "start": 222,
+        "end": 285
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)",
+      "span": {
+        "path": "src/main/kotlin/example/platform/named/Named.kt",
+        "start": 291,
+        "end": 364
       }
     },
     {
@@ -10697,8 +10705,8 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/platform/named/Named.kt",
-        "start": 217,
-        "end": 224
+        "start": 272,
+        "end": 279
       }
     },
     {
@@ -10708,19 +10716,41 @@
       "level": "exact",
       "span": {
         "path": "src/main/kotlin/example/platform/named/Named.kt",
-        "start": 186,
-        "end": 193
+        "start": 241,
+        "end": 248
       }
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()::tick#0",
       "caller": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()",
-      "target": null,
-      "level": null,
+      "target": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()",
+      "level": "inferred",
       "span": {
         "path": "src/main/kotlin/example/platform/named/Named.kt",
-        "start": 202,
-        "end": 208
+        "start": 257,
+        "end": 263
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)::clock.mark#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)",
+      "target": "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+      "level": "exact",
+      "span": {
+        "path": "src/main/kotlin/example/platform/named/Named.kt",
+        "start": 324,
+        "end": 337
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)::clock.tick#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)",
+      "target": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()",
+      "level": "inferred",
+      "span": {
+        "path": "src/main/kotlin/example/platform/named/Named.kt",
+        "start": 346,
+        "end": 358
       }
     },
     {
@@ -11975,7 +12005,9 @@
       "members": [
         "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock",
         "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
+        "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()",
         "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()",
+        "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)",
         "example.com/acme/conformance::src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred.go()"
       ]
     },
@@ -12509,20 +12541,6 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)"
-        }
-      ]
-    },
-    {
-      "entry_point": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()",
-      "kind": "export",
-      "label": "example.platform.Clock.tick()",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/acme/conformance",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()"
         }
       ]
     },
@@ -18212,9 +18230,44 @@
         {
           "depth": 1,
           "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)",
+      "kind": "export",
+      "label": "example.platform.named.Named.hold(Clock)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()"
         }
       ]
     },
