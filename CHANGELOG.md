@@ -8,6 +8,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Swift call on an implicit member (`.make()`, `wait(.seconds(1))`) keeps its member name under
+  the head `(implicit)`, instead of the placeholder `(prefix_expression)`, and resolves by name
+  and labels among methods (`inferred` or `ambiguous`), never to a free function or a type of
+  that name; `.init(..)` stays unresolved. The call ids of such calls change.
+
 - A Swift call to a function with a capitalized name (`Check(1)`) resolves as a plain call, by
   scope, labels and arity, instead of staying unresolved as constructor syntax; a name that binds
   a type still constructs it and a name the repository does not declare stays unresolved. A
