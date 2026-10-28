@@ -3266,11 +3266,8 @@ impl<'a> Resolver<'a> {
 
     /// What the glob imports written in `scope` give `name`, the latest first; `public` limits
     /// them to the re-exporting ones (`pub use`). A glob is asked for a name once: it may reach
-    /// itself. The walk claims its globs before it asks the first, so a lookup it leads back
-    /// into (an inside glob of the file's own namespace, whose exports read the file's globs)
-    /// leaves the rest to it rather than taking them for a binding the walk then drops. A glob
-    /// cut at `LINK_DEPTH` may give the name: it is unknown, and no other glob binds it in its
-    /// place.
+    /// itself. A glob cut at `LINK_DEPTH` may give the name: it is unknown, and no other glob
+    /// binds it in its place.
     fn globs(
         &self,
         path: &'a str,
@@ -3280,17 +3277,18 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
     ) -> Option<Binding<'a>> {
         let imports = &self.files[path].imports;
-        let mut claimed = Vec::new();
+        let mut candidates = Vec::new();
         for &at in self.by_local[path]
             .of(&crate::qualify(scope, "*"))
             .iter()
             .rev()
         {
+            let import = &imports[at];
             let Imported::Glob {
                 path: target,
                 inside,
                 public: re_exports,
-            } = &imports[at].name
+            } = &import.name
             else {
                 continue;
             };
@@ -3301,12 +3299,9 @@ impl<'a> Resolver<'a> {
                 self.cut_link(seen);
                 return Some(Binding::Unknown);
             }
-            if seen.globs.insert((path, at, name)) {
-                claimed.push((target, inside));
+            if !seen.globs.insert((path, at, name)) {
+                continue;
             }
-        }
-        let mut candidates = Vec::new();
-        for (target, inside) in claimed {
             seen.depth += 1;
             let found = self.past(seen, |seen| {
                 let work = &mut Work::default();
@@ -3589,6 +3584,11 @@ impl<'a> Resolver<'a> {
         let mut given = (index.stars.iter())
             .filter_map(|&at| self.gives(path, &exports[at], name, seen, value));
         let Some(first) = given.next() else {
+            // A namespace (Java's package, C#'s) exports its types alone: a file's on-demand
+            // imports are its own.
+            if self.unordered_globs && self.namespaced {
+                return None;
+            }
             return self.globs(path, "", name, false, seen);
         };
         match given.all(|other| same(&first, &other)) {
@@ -10381,14 +10381,14 @@ mod csharp_tests {
     fn enclosing(files: &[(&str, &str)], usings: &str, block: bool) -> (Vec<String>, String) {
         let body = "public class Gen { void M() { Util.Go(); new Util(); } }\n\
                     public class Sub : Util { }\n";
-        let gen_ = match block {
+        let source = match block {
             true => format!(
                 "{usings}namespace Acme {{ namespace Query {{ namespace Internal {{\n{body}}} }} }}\n"
             ),
             false => format!("{usings}namespace Acme.Query.Internal;\n{body}"),
         };
         let mut all = files.to_vec();
-        all.push(("App/Gen.cs", &gen_));
+        all.push(("App/Gen.cs", &source));
         let found = resolved(&all);
         let calls = (calls_in(&found, "App/Gen.cs").into_iter())
             .map(|(callee, level, targets)| format!("{callee} {level} {}", targets.join(" ")))
@@ -10463,5 +10463,27 @@ mod csharp_tests {
                 );
             }
         }
+    }
+
+    /// A namespace declared beside the one around the code, in the same file, does not enclose
+    /// it: its types are not seen, and the namespaces around the code still bind theirs.
+    #[test]
+    fn a_sibling_namespace_of_the_file_does_not_enclose_the_code() {
+        let (acme, other) = (util("Acme"), util("Other"));
+        let source = "namespace Acme.Query { public class Gen { void M() { Util.Go(); } } }\n\
+                    namespace Other.Query { public class Gen { void M() { Util.Go(); } } }\n";
+        let found = resolved(&[
+            ("App/A.cs", &acme),
+            ("App/O.cs", &other),
+            ("App/Gen.cs", source),
+        ]);
+        let (a, o) = (vec!["App/A.cs".to_string()], vec!["App/O.cs".to_string()]);
+        assert_eq!(
+            calls_in(&found, "App/Gen.cs"),
+            [
+                ("Util.Go".to_string(), "exact", a),
+                ("Util.Go".to_string(), "exact", o),
+            ]
+        );
     }
 }

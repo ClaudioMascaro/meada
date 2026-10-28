@@ -2022,7 +2022,7 @@ sample.cs
       "name": "Namespace"
     },
     {
-      "local": "*",
+      "local": "Example.*",
       "source": "",
       "name": {
         "Glob": {
