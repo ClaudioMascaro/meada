@@ -13615,3 +13615,173 @@ fn swift_search_finds_an_extension_member_and_context_lists_callers_and_callees(
         &engine.context("Boat.moor()", None).unwrap(),
     );
 }
+
+/// An annotation name on a method is read through the file's imports, past a base from outside
+/// the repository: a member type of that base could shadow it (JLS 6.4.1), an accepted miss
+/// (#354). Single-type and on-demand imports agree.
+#[test]
+fn java_method_annotations_resolve_past_an_outside_base() {
+    let repo = fixture_repo(
+        "java_outside_base_annotations",
+        "conformance-java",
+        Some(ORIGIN),
+    );
+    let dir = repo.join("maven/api/src/main/java/example/based");
+    std::fs::create_dir_all(&dir).unwrap();
+    let files = [
+        (
+            "Single.java",
+            "package example.based;
+import com.corp.shared.BaseController;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+@RestController @RequestMapping(\"/single\")
+class Single extends BaseController { @GetMapping(\"/{id}\") String get() { return \"\"; } }",
+        ),
+        (
+            "Wild.java",
+            "package example.based;
+import com.corp.shared.BaseController;
+import org.springframework.web.bind.annotation.*;
+@RestController @RequestMapping(\"/wild\")
+class Wild extends BaseController { @GetMapping(\"/{id}\") String get() { return \"\"; } }",
+        ),
+        (
+            "Resource.java",
+            "package example.based;
+import com.corp.shared.BaseResource;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+@Path(\"/resource\")
+class Resource extends BaseResource { @GET String get() { return \"\"; } }",
+        ),
+        (
+            "Remote.java",
+            "package example.based;
+import com.corp.shared.BaseClient;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+@FeignClient(name = \"remote\", url = \"https://remote.example.com\")
+interface Remote extends BaseClient { @GetMapping(\"/things\") String things(); }",
+        ),
+        (
+            "Listener.java",
+            "package example.based;
+import com.corp.shared.BaseListener;
+import org.springframework.kafka.annotation.KafkaListener;
+class Listener extends BaseListener { @KafkaListener(topics = \"based-topic\") void on(String m) {} }",
+        ),
+    ];
+    for (name, source) in files {
+        std::fs::write(dir.join(name), source).unwrap();
+    }
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let on = |kind: &str| -> Vec<(String, String)> {
+        let mut found: Vec<(String, String)> = json[kind]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|p| {
+                let site = p["site"].as_str().unwrap();
+                let site = site.strip_prefix(&format!("{REPO}::")).unwrap();
+                let site = site.strip_prefix("maven/api/src/main/java/example/based/")?;
+                Some((p["contract"].as_str()?.into(), site.into()))
+            })
+            .collect();
+        found.sort();
+        found
+    };
+    assert_eq!(
+        on("providers"),
+        pairs(&[
+            (
+                "http::GET::/resource",
+                "Resource.java::example.based.Resource.get()"
+            ),
+            (
+                "http::GET::/single/{}",
+                "Single.java::example.based.Single.get()"
+            ),
+            ("http::GET::/wild/{}", "Wild.java::example.based.Wild.get()"),
+        ])
+    );
+    assert_eq!(
+        on("consumers"),
+        pairs(&[
+            (
+                "channel::kafka::based-topic",
+                "Listener.java::example.based.Listener.on(String)"
+            ),
+            (
+                "http::GET::/things",
+                "Remote.java::example.based.Remote.things()"
+            ),
+        ])
+    );
+}
+
+/// The same in Kotlin: a method annotation of a class with an outside base is read through the
+/// imports, a class without a base alike, and a name no import binds stays unread.
+#[test]
+fn kotlin_method_annotations_resolve_past_an_outside_base() {
+    let repo = fixture_repo(
+        "kotlin_outside_base_annotations",
+        "conformance-kotlin",
+        Some(ORIGIN),
+    );
+    let dir = repo.join("src/main/kotlin/example/based");
+    std::fs::create_dir_all(&dir).unwrap();
+    let head = "package example.based
+import com.corp.shared.BaseController
+import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.RequestMapping
+";
+    let files = [
+        (
+            "Single.kt",
+            "import org.springframework.web.bind.annotation.GetMapping
+@RestController @RequestMapping(\"/single\")
+class Single : BaseController() { @GetMapping(\"/{id}\") fun get(): String = \"\" }",
+        ),
+        (
+            "Plain.kt",
+            "import org.springframework.web.bind.annotation.GetMapping
+@RestController @RequestMapping(\"/plain\")
+class Plain { @GetMapping(\"/{id}\") fun get(): String = \"\" }",
+        ),
+        (
+            "Unbound.kt",
+            "@RestController @RequestMapping(\"/unbound\")
+class Unbound : BaseController() { @GetMapping(\"/{id}\") fun get(): String = \"\" }",
+        ),
+    ];
+    for (name, source) in files {
+        std::fs::write(dir.join(name), format!("{head}{source}")).unwrap();
+    }
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let mut actual: Vec<(String, String)> = (json["providers"].as_array().unwrap().iter())
+        .filter_map(|p| {
+            let site = p["site"].as_str().unwrap();
+            let site = site.strip_prefix(&format!("{REPO}::")).unwrap();
+            let site = site.strip_prefix("src/main/kotlin/example/based/")?;
+            Some((p["contract"].as_str()?.into(), site.into()))
+        })
+        .collect();
+    actual.sort();
+    assert_eq!(
+        actual,
+        pairs(&[
+            (
+                "http::GET::/plain/{}",
+                "Plain.kt::example.based.Plain.get()"
+            ),
+            (
+                "http::GET::/single/{}",
+                "Single.kt::example.based.Single.get()"
+            ),
+        ])
+    );
+}
