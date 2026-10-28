@@ -1769,7 +1769,9 @@ one for the area a change touches.
   (`lang/swift/manifest.rs`: every `.target`, `.executableTarget`, `.testTarget`, `.macro` and
   `.plugin` call with a literal `name:` outside a `dependencies:` argument, under its literal
   `path:` inside the package or the default directory) as a config file (`**/Package.swift`,
-  no code: `is_code`). Each target is a module of its package (`Targets`: the package's directory and the target's name, which is the file's `Facts::unit`, so two packages that name a target alike give two modules) of the files under its directory, the deepest
+  no code: `is_code`). Each target is a module of its package (`Targets`: the package's directory
+  and the target's name, which is the file's `Facts::unit`, so two packages that name a target
+  alike give two modules) of the files under its directory, the deepest
   one when several hold a file (looked up by the file's directories, so the cost is the path's
   depth), and the files no target holds (all of them without a manifest) are one module no
   import names. The layout shares a module's scope among its files (`Layout::shared`), whose
@@ -1779,8 +1781,8 @@ one for the area a change touches.
   (`Resolver::hidden`), and appends the module's own inside glob after the imports, so its
   names come before an import's. `import M` is a namespace import of `M` and an outside glob
   of it, which takes `M`'s public names (`Facts::star`); `M` is the target of that name in the
-  importer's own package, else in the nearest package in the directory tree, every one when
-  several are as near (`Targets::named_from`, the cost the path's depth). An import written
+  importer's own package (the deepest around it), else in the nearest package by steps through
+  the directory tree, every one when several are as near (`Targets::named_from`). An import written
   `@testable` is also listed in `Facts::testable`; `join` sets `Facts::internals` to the modules
   it names, whose `internal` declarations the file sees (`Resolver::hidden`, and the glob reads
   the module's exports, `Resolver::sees_internals`), but for the `fileprivate` and `private`

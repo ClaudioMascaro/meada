@@ -227,6 +227,8 @@ struct Targets {
     dirs: HashMap<String, String>,
     /// The module of each target name, by the directory of its package.
     named: HashMap<String, BTreeMap<String, String>>,
+    /// The directory of every package that declares a target.
+    packages: HashSet<String>,
 }
 
 impl Targets {
@@ -237,10 +239,12 @@ impl Targets {
         let mut targets = Targets {
             dirs: HashMap::new(),
             named: HashMap::new(),
+            packages: HashSet::new(),
         };
         for t in found {
             let unit = format!("{}:{}", t.package, t.name);
             targets.dirs.insert(t.dir, unit.clone());
+            targets.packages.insert(t.package.clone());
             (targets.named.entry(t.name).or_default()).insert(t.package, unit);
         }
         targets
@@ -257,31 +261,38 @@ impl Targets {
     }
 
     /// The modules `import name` in the file `from` binds: the target of that name in the
-    /// package the file sits in, else in the package nearest it in the directory tree (every
-    /// one when several are as near). The cost is the path's depth.
+    /// package the file sits in (the deepest package around it), else in the package nearest
+    /// it in the directory tree, by the steps from the file's directory to the package's
+    /// through their common ancestor (every one when several are as near).
+    // ponytail: scans the packages that declare the name, so the cost is their number times
+    // the path's depth; index them by directory if a repository holds thousands alike.
     fn named_from(&self, from: &str, name: &str) -> Vec<&str> {
         let Some(packages) = self.named.get(name) else {
             return Vec::new();
         };
         let dirs = (from.rmatch_indices('/').map(|(at, _)| &from[..at])).chain([""]);
-        for dir in dirs {
-            if let Some(own) = packages.get(dir) {
-                return vec![own];
-            }
-            let inside = if dir.is_empty() {
-                String::new()
-            } else {
-                format!("{dir}/")
-            };
-            let near: Vec<&str> = (packages.range(inside.clone()..))
-                .take_while(|(package, _)| package.starts_with(&inside))
-                .map(|(_, unit)| unit.as_str())
-                .collect();
-            if !near.is_empty() {
-                return near;
-            }
+        let own = dirs.into_iter().find(|dir| self.packages.contains(*dir));
+        if let Some(unit) = own.and_then(|own| packages.get(own)) {
+            return vec![unit];
         }
-        Vec::new()
+        let here: Vec<&str> = from
+            .rsplit_once('/')
+            .map_or("", |(dir, _)| dir)
+            .split('/')
+            .collect();
+        let steps = |package: &str| {
+            let there: Vec<&str> = package.split('/').collect();
+            let shared = (here.iter().zip(&there))
+                .take_while(|(a, b)| a == b && !a.is_empty())
+                .count();
+            let depth = |parts: &[&str]| parts.iter().filter(|p| !p.is_empty()).count();
+            depth(&here) + depth(&there) - 2 * shared
+        };
+        let nearest = packages.keys().map(|p| steps(p)).min();
+        (packages.iter())
+            .filter(|(package, _)| Some(steps(package)) == nearest)
+            .map(|(_, unit)| unit.as_str())
+            .collect()
     }
 }
 
@@ -2169,6 +2180,42 @@ mod tests {
         assert_eq!(exported, ["StoreOf", "Maybe", "Box"]);
         assert!(facts.private.contains(&"Maybe".to_string()));
         assert_eq!(facts.function_aliases, ["Handler"]);
+    }
+
+    /// `import App` binds the target of the importer's own package, else the nearest package's
+    /// by steps through the tree, every one when several are as near.
+    #[test]
+    fn an_import_names_the_nearest_package_target() {
+        let manifest = |name: &str| {
+            format!("let p = Package(name: \"p\", targets: [.target(name: \"{name}\")])")
+        };
+        let sources = [
+            ("Package.swift", manifest("Root")),
+            ("a/Package.swift", manifest("App")),
+            ("b/c/Package.swift", manifest("App")),
+            ("d/Package.swift", manifest("App")),
+            ("e/Package.swift", manifest("App")),
+            ("e/Fixtures/Package.swift", manifest("App")),
+            ("e/Sources/App/x.swift", String::new()),
+        ];
+        let configs: Vec<(&str, &[u8])> = (sources.iter())
+            .filter(|(path, _)| path.ends_with("Package.swift"))
+            .map(|(path, src)| (*path, src.as_bytes()))
+            .collect();
+        let targets = Targets::new(&configs);
+        let from = |path: &str, name: &str| targets.named_from(path, name);
+        // The file's own package, though a nested one sits nearer.
+        assert_eq!(from("e/Sources/App/x.swift", "App"), ["e:App"]);
+        // The root package has no `App`: `a`, `d` and `e` are three steps away, `b/c` four.
+        assert_eq!(
+            from("Sources/Root/x.swift", "App"),
+            ["a:App", "d:App", "e:App"]
+        );
+        // Outside every package but the root: `b/c` is two steps away, `a` three.
+        assert_eq!(from("b/x/y.swift", "App"), ["b/c:App"]);
+        // The target of an outer package, when the file's own has none of that name.
+        assert_eq!(from("a/x.swift", "Root"), [":Root"]);
+        assert!(from("a/x.swift", "Missing").is_empty());
     }
 
     #[test]
