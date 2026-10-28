@@ -22,6 +22,9 @@ pub enum Fix<'a> {
     Generation { id: &'a str, dir: &'a str },
 }
 
+const REPORT_URL: &str =
+    "https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml";
+
 pub enum Msg<'a> {
     NotIndexed,
     OtherVersion,
@@ -109,6 +112,9 @@ pub enum Msg<'a> {
     UnlinkedResource(&'a str),
     /// The missing reads of the repository's consumers against the routes they call (spec #23).
     Drift(usize),
+    /// The line for the human at the end of a repository's status when it holds a drift or an
+    /// `inferred` link: where a wrong conclusion goes.
+    ReportHint,
     /// A source file whose qualified names passed a pack's budget: no symbols, no calls.
     FileTooBroad {
         path: &'a str,
@@ -1039,6 +1045,10 @@ impl Msg<'_> {
             Msg::Drift(n) => pick(
                 format!("shape drift, missing reads: {n}"),
                 format!("drift de formato, leituras ausentes: {n}"),
+            ),
+            Msg::ReportHint => pick(
+                format!("wrong conclusion? report it: {REPORT_URL}"),
+                format!("conclusão errada? relate: {REPORT_URL}"),
             ),
             Msg::FileTooBroad { path, limit } => pick(
                 format!("{path}: too broad, its qualified names passed the {limit}-byte budget: no symbols or calls"),

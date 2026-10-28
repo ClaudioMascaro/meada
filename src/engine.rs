@@ -246,6 +246,7 @@ impl Engine {
         let drift = drift_view::counts(repos.len(), &entries);
         let lines = (repos.iter().zip(&exports).zip(drift))
             .map(|((repo, export), drift)| {
+                let prefix = format!("{}::", repo.identity);
                 let mut lines: Vec<String> = (contract::KINDS.iter())
                     .flat_map(|kind| kind.status(repo, export, &links))
                     .collect();
@@ -259,6 +260,11 @@ impl Engine {
                 }));
                 if drift > 0 {
                     lines.push(Msg::Drift(drift).text());
+                }
+                let inferred = (links.iter())
+                    .any(|l| l.level == Level::Inferred && l.consumer.starts_with(&prefix));
+                if drift > 0 || inferred {
+                    lines.push(Msg::ReportHint.text());
                 }
                 lines
             })

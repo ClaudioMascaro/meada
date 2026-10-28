@@ -1,5 +1,6 @@
 example.com/chain/web (.) indexed, 17 files
   shape drift, missing reads: 39
+  wrong conclusion? report it: https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml
 example.com/chain/gateway (../chain-gateway) indexed, 12 files
   broken.openapi.yaml:7: unreadable document (while parsing a flow sequence, expected ',' or ']'), ignored
   docs/api-contract.yaml: openapi 3.0.3, routes: 1

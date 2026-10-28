@@ -26,6 +26,8 @@ change and what the project expects of you. By taking part, you agree to follow 
 
 - Look for an open issue that already covers your idea. If there is none, open one. For large
   changes, talk it over in the issue before writing code.
+- For a wrong Meada conclusion (drift, link or level), use the `inference` form, next to the bug
+  and feature ones; replace private names with placeholders such as `repoA` and `fn1`.
 - Issues labelled `good first issue` are meant for newcomers, and `help wanted` marks where help
   is needed most.
 - The v1 scope and the order of work are in

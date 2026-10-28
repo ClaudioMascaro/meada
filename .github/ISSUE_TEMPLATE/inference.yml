@@ -1,0 +1,47 @@
+name: Inferência errada · Wrong inference · Inferencia errónea
+description: Uma conclusão do Meada está errada · A Meada conclusion is wrong · Una conclusión de Meada es errónea
+labels: ["needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Escreva em português, español ou English. · Write in Portuguese, Spanish or English. · Escribe en portugués, español o inglés.
+
+        Nomes de repositórios, arquivos, símbolos e campos podem virar marcadores (`repoA`, `fileA`, `fn1`, `f1`), desde que a estrutura, os níveis e o motivo fiquem. Não cole código privado. · Names of repositories, files, symbols and fields may be replaced by placeholders (`repoA`, `fileA`, `fn1`, `f1`) as long as structure, levels and the reason stay. Do not paste private code. · Los nombres de repositorios, archivos, símbolos y campos pueden reemplazarse por marcadores (`repoA`, `fileA`, `fn1`, `f1`) mientras la estructura, los niveles y el motivo se mantengan. No pegues código privado.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Tipo · Kind · Tipo
+      options:
+        - Drift falso · False drift · Drift falso
+        - Drift não detectado · Missed drift · Drift no detectado
+        - Ligação errada · Wrong link · Enlace erróneo
+        - Nível errado · Wrong level · Nivel erróneo
+        - Ligação ausente · Missing link · Enlace ausente
+    validations:
+      required: true
+  - type: textarea
+    id: concluded
+    attributes:
+      label: O que o Meada concluiu · What Meada concluded · Qué concluyó Meada
+      description: Linhas literais de `meada export` ou `meada status` (contrato, nível, motivo, caminhos com seus níveis). Troque nomes por marcadores se preferir. Não cole código privado. · Verbatim lines from `meada export` or `meada status` (contract, level, reason, paths with their levels). Replace names with placeholders if you prefer. Do not paste private code. · Líneas literales de `meada export` o `meada status` (contrato, nivel, motivo, rutas con sus niveles). Reemplaza nombres por marcadores si prefieres. No pegues código privado.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: O que você esperava · What you expected · Qué esperabas
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versão, commit e linguagens · Version, commit and languages · Versión, commit y lenguajes
+      description: Saída de `meada --version` e as linguagens do repositório · Output of `meada --version` and the languages of the repository · Salida de `meada --version` y los lenguajes del repositorio
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reprodução mínima · Minimal reproduction · Reproducción mínima
+      description: Como seria um fixture, um consumidor e um provedor, com o formato de cada arquivo · Described as a fixture would be, one consumer and one provider, with the shape of each file · Descrita como un fixture, un consumidor y un proveedor, con la forma de cada archivo
