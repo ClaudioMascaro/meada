@@ -1065,16 +1065,16 @@ fn contracts_follow_values_edited_in_other_files() {
 
 /// A cold index keeps no file's values past its parse (the index does not hold them), yet a
 /// kind that reads one still finds it: the constants a URL is built from, and the arguments of
-/// a client wrapper's call.
+/// a client wrapper's call (#395).
 #[test]
 fn a_cold_index_still_reads_the_values_a_contract_kind_asks_for() {
     let [paths, admin, _] = values("cold_values");
     let consumers = |repo: &Path| -> Vec<String> {
         let json: serde_json::Value =
             serde_json::from_str(&Engine::open(repo).unwrap().export().unwrap()).unwrap();
-        let consumers = json["consumers"].as_array().unwrap();
+        let sides = json["consumers"].as_array().unwrap();
         let contract = |c: &serde_json::Value| c["contract"].as_str().unwrap().to_string();
-        consumers.iter().map(contract).collect()
+        sides.iter().map(contract).collect()
     };
     assert_eq!(
         consumers(&paths),

@@ -748,6 +748,9 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     // Past the joins, which read some values (`Def::type_params`), a changed file keeps what the
     // index keeps, as a kept file does: the files a contract kind reads values of are parsed
     // again by the miss loop below.
+    // ponytail: serializes each changed file a second time and holds every file's values until
+    // here, since a join reads some (`Def::type_params`); dropping them at parse needs those
+    // fields kept in the index.
     for p in &mut changed {
         p.facts = serde_json::from_str(&serde_json::to_string(&p.facts)?)?;
         joins[&packs[p.path.as_str()]](&p.path, &mut p.facts);
