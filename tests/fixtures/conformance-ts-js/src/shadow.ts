@@ -1,5 +1,6 @@
 // Hidden names: in each function below a binding spells the top-level `helper`, so the call
-// after it never reaches that definition exactly.
+// after it never reaches that definition exactly. A `let` or `var` holding a function is a
+// definition of its own unless it is assigned again, as it is here.
 export function helper(): number {
   return 1;
 }
@@ -22,11 +23,13 @@ export function looped(items: Array<() => void>): void {
 
 export function rebound(): void {
   let helper = () => 2;
+  helper = () => 5;
   helper();
 }
 
 export function hoisted(): void {
   var helper = () => 3;
+  helper = () => 6;
   helper();
 }
 

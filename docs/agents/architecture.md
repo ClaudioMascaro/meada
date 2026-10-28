@@ -1541,6 +1541,8 @@ one for the area a change touches.
   `files.setting` and `Facts::setting`) and takes it in `parse_with`; a file whose setting
   changed is parsed again, whatever its content. Besides `parse` and `modules`, it says what the
   shared resolution cannot guess: `members_in_scope` (bare names may name class members),
+  `assigned_members` (a definition named by a dotted path, `app.use` of `app.use = function`, is what
+  that path written in a call reaches, though its head is a local or constant: JavaScript's),
   `guesses_constructs` (`Call::constructs` is a guess from the callee's case: a guess that is no
   `exact` type is read again as a plain call, and a function it binds wins),
   `unordered_globs` (combine wildcard candidates, with an inside glob taking priority),

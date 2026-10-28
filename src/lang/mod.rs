@@ -105,6 +105,13 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether a definition named by a dotted path (`app.use` of `app.use = function () {}`, `o.m`
+    /// of a method of `const o = {}`) is what that path written in a call reaches, though its
+    /// head is a local or a constant (JavaScript's).
+    fn assigned_members(&self) -> bool {
+        false
+    }
+
     /// Whether `Call::constructs` is a guess from the case of the callee (Swift has no `new`): a
     /// call that constructs nothing the repository holds is read again as a plain call.
     fn guesses_constructs(&self) -> bool {

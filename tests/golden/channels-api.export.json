@@ -140,6 +140,14 @@
       }
     },
     {
+      "id": "example.com/channels/api::src/orders.ts::mailer.send",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 923,
+        "end": 981
+      }
+    },
+    {
       "id": "example.com/channels/api::src/orders.ts::ship",
       "span": {
         "path": "src/orders.ts",
@@ -427,8 +435,8 @@
     {
       "id": "example.com/channels/api::src/orders.ts::mail::mailer.send#0",
       "caller": "example.com/channels/api::src/orders.ts::mail",
-      "target": null,
-      "level": null,
+      "target": "example.com/channels/api::src/orders.ts::mailer.send",
+      "level": "exact",
       "span": {
         "path": "src/orders.ts",
         "start": 1021,
@@ -522,6 +530,13 @@
       "members": [
         "example.com/channels/api::src/dynamic.ts::announce",
         "example.com/channels/api::src/dynamic.ts::currentRegion"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/channels/api::src/orders.ts::mail",
+        "example.com/channels/api::src/orders.ts::mailer.send"
       ]
     }
   ],
