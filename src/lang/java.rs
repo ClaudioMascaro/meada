@@ -7,9 +7,9 @@ use std::rc::Rc;
 use tree_sitter::{Node, Parser};
 
 use super::{
-    Annotated, Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
-    LanguagePack, Layout, Marked, Modules, Param, Part, Receiver, children, field_write, named,
-    text, wildcard,
+    Annotated, Binds, Bound, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation,
+    Kind, LanguagePack, Layout, Marked, Modules, Param, Part, Receiver, children, field_write,
+    named, text, wildcard,
 };
 use crate::{Result, qualify};
 
@@ -220,6 +220,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // each is, its name, and whether it may be a field of the class around it (`this.f`, or a
     // bare `f` no local or parameter declares).
     let mut written: Vec<(String, String, bool)> = Vec::new();
+    // The locals declared with an initializer, and every name the file assigns: a local the
+    // file assigns holds no one value, so its bound is dropped (`Facts::bound`).
+    let mut initialized: Vec<Bound> = Vec::new();
+    let mut reassigned: BTreeSet<String> = BTreeSet::new();
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
         node,
@@ -555,10 +559,18 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 for declaration in named(node).filter(|n| n.kind() == "variable_declarator") {
                     if let Some(name) = declaration.child_by_field_name("name") {
                         let dimensions = declaration.child_by_field_name("dimensions").is_some();
-                        bind(
-                            name,
-                            typed(declaration.child_by_field_name("value"), dimensions),
-                        );
+                        let initial = declaration.child_by_field_name("value");
+                        bind(name, typed(initial, dimensions));
+                        // An initializer block's local sits in its class's scope, which a method
+                        // of the class reads through: it is no bound.
+                        if let Some(initial) = initial.filter(|_| !initializer) {
+                            initialized.push(Bound {
+                                scope: scope.as_ref().clone(),
+                                within: scope.as_ref().clone(),
+                                name: text(name, src).to_string(),
+                                value: value(initial, src, 0),
+                            });
+                        }
                     }
                 }
             }
@@ -636,6 +648,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     "assignment_expression" => node.child_by_field_name("left"),
                     _ => named(node).next(),
                 };
+                if let Some(n) = left.filter(|n| n.kind() == "identifier") {
+                    reassigned.insert(text(n, src).to_string());
+                }
                 let write = match left {
                     Some(n) if n.kind() == "identifier" => {
                         (!declared_before(n, src)).then_some((n, true))
@@ -763,11 +778,27 @@ fn parse(src: &[u8]) -> Result<Facts> {
     for (outer, inner) in chains {
         facts.calls[outer].on = call_at(&inner);
     }
+    // A local is bound to its initializer when it is the one binding of its name in its
+    // definition, no field of an enclosing class shares the name and the file never assigns it.
+    let mut declared: BTreeMap<(&str, &str), usize> = BTreeMap::new();
+    for local in &locals {
+        *declared.entry((&local.scope, &local.name)).or_default() += 1;
+    }
+    let field_hides = |name: &str, scope: &str| {
+        (fields.iter()).any(|(at, field)| field == name && encloses(at, scope))
+    };
+    facts.bound = (initialized.into_iter())
+        .filter(|b| {
+            declared.get(&(b.scope.as_str(), b.name.as_str())) == Some(&1)
+                && !reassigned.contains(&b.name)
+                && !field_hides(&b.name, &b.scope)
+        })
+        .collect();
     for mut local in locals {
         if let Class::Result(n) = local.class {
             local.class = call_at(&results[n]).map_or(Class::Unknown, Class::Result);
         }
-        if (fields.iter()).any(|(at, name)| *name == local.name && encloses(at, &local.scope)) {
+        if field_hides(&local.name, &local.scope) {
             local.class = Class::Unknown;
         }
         facts.receivers.push(local);
@@ -1414,5 +1445,51 @@ mod tests {
         assert_eq!(writes(src), [".base"]);
         let src = "class C { void m() { java.util.function.BiConsumer<String, String> f = (url, x) -> { url = null; }; } }";
         assert_eq!(writes(src), Vec::<String>::new());
+    }
+
+    /// A local with no initializer, a loop variable, a `try` resource, a `catch` parameter and a
+    /// lambda parameter are no bounds, and one sharing the name of a bound leaves it unread.
+    #[test]
+    fn a_local_is_bound_only_when_declared_once_with_an_initializer() {
+        let held = |body: &str| {
+            let src = format!("package a;\nclass C {{ void f() {{\n{body}\n}} }}\n");
+            let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
+            facts.bound.into_iter().map(|b| b.name).collect::<Vec<_>>()
+        };
+        assert_eq!(held("String a = x(); int b = 1, c;"), ["a", "b"]);
+        // An initializer block's local is keyed by its class, which methods read through.
+        let src = "class C { { String a = x(); } }";
+        assert!(
+            Java.parse("a/C.java", src.as_bytes())
+                .unwrap()
+                .bound
+                .is_empty()
+        );
+        assert_eq!(held("String a; a = x();"), Vec::<String>::new());
+        assert_eq!(
+            held("for (String a : xs) { use(a); }"),
+            Vec::<String>::new()
+        );
+        assert_eq!(held("try (R a = open()) { use(a); }"), Vec::<String>::new());
+        assert_eq!(
+            held("try { x(); } catch (E a) { use(a); }"),
+            Vec::<String>::new()
+        );
+        assert_eq!(held("xs.forEach(a -> use(a));"), Vec::<String>::new());
+        assert_eq!(
+            held("if (o instanceof T a) { use(a); }"),
+            Vec::<String>::new()
+        );
+        assert_eq!(held("String a = x(); a += y();"), Vec::<String>::new());
+        assert_eq!(held("int a = 0; a++;"), Vec::<String>::new());
+        assert_eq!(held("int a = 0; --a;"), Vec::<String>::new());
+        assert_eq!(
+            held("String a = x(); run(() -> { a = y(); });"),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            held("String a = x(); for (String a : xs) {}"),
+            Vec::<String>::new()
+        );
     }
 }

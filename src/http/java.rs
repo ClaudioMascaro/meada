@@ -273,8 +273,9 @@ fn reach<'a>(
 
 /// What the local `client` (a name the source writes no type for) holds, folded where it is made:
 /// the chain `WebClient.create(..)` or `Retrofit.Builder()...build()` it is bound to, whose base
-/// a reader joins. `None` for anything but a name bound to exactly one call (Kotlin's
-/// `Facts::bound`, so never in Java) and for a call a wrapper's callers fold to several values.
+/// a reader joins. `None` for anything but a name bound to exactly one call (`Facts::bound`:
+/// a Java local the file never reassigns, a Kotlin `val`) and for a call a wrapper's callers fold
+/// to several values.
 fn folded_local<'a>(
     code: &Code<'a>,
     (path, scope): (&'a str, &'a str),

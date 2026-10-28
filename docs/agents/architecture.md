@@ -1909,7 +1909,10 @@ one for the area a change touches.
   still climb exact calls alone. A local the pack bound to one value (`Facts::bound`: every
   local declared in a definition, dropped when the file assigns its name anywhere with `=`,
   a compound operator, `++`, `--`, `out` or `ref`) is followed into that value, for every pack
-  that fills `Facts::bound` (Kotlin's `val` too). The pack fills `Def::return_values` from
+  that fills `Facts::bound` (Kotlin's `val` and a Java local declared with an initializer, too:
+  the Java pack drops it when the file assigns its name anywhere, when another binding of the
+  name shares its definition or when a field of an enclosing class has the name). The pack
+  fills `Def::return_values` from
   `return x;` and a method's or local function's `=> x`, and makes every lambda written in a
   definition (not in a type's initializer) a `Kind::Inline` scope `@<offset>` with its
   parameters, which a call's argument names (`Value::Function`) and which folds into the
@@ -2153,8 +2156,8 @@ one for the area a change touches.
 - `jvm/names.rs`: `LOCAL_DEPTH` (8) bounds how many locals a JVM client reader (Ktor,
   `RestTemplate`, `WebClient`, Retrofit) follows a client through (`val b = a`, `val a =
   HttpClient(..)`) where the value flow does not reach it; past it the client is not followed
-  and its calls are no consumers. The value flow follows a Kotlin `val` itself (`Facts::bound`),
-  as deep as `EVAL_DEPTH`.
+  and its calls are no consumers. The value flow follows a Kotlin `val` or a Java local the file
+  never reassigns itself (`Facts::bound`), as deep as `EVAL_DEPTH`.
 
 - `lang/kotlin.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the Kotlin pack as they bound the Java pack's, with the same
@@ -2530,7 +2533,8 @@ qualification budget does (ADR 0017).
   so the `uri` and `build` steps of `clients.rs` match a chain step spelled
   `(call_expression).name`, `constructs` takes a `RestTemplate(..)` call for the written type, and
   `made` falls back, after typed and origin lookups, to `Code::local` (Kotlin's
-  `Facts::bound`, shared with the Ktor reader and indexed by scope and name in `ByName`, so a
+  `Facts::bound` (Kotlin's `val`, a Java local the file never reassigns), shared with the Ktor
+  reader and indexed by scope and name in `ByName`, so a
   lookup costs its scope depth) up to `jvm::names::LOCAL_DEPTH`. The value evaluation reads the
   same local (`Code::eval`, a `Binding::Hidden` or `Binding::Local` with a bound): a URL or a
   topic written through a local `val` of a function folds where the `val` is written, an
