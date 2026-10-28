@@ -8,6 +8,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Rust type a glob import brings (`use super::*;`, `use crate::x::*;`) heads a path called,
+  as a function it brings is called: `Def::new()` under `use super::*;` resolves `exact`, also
+  when the parent imports `Def` by name. Before, a glob gave its functions alone and the call
+  stayed unresolved (axum's `Router::new()` and actix-web's `ResourceDef::new()` in their test
+  modules).
 - A Kotlin `expect` class and its `actual` classes of one name are one class, the `expect` one:
   as a base, a constructor or a written type the name binds it, so the members it declares
   resolve `exact` on its subclasses. Before, the name bound every declaration, ambiguously, and

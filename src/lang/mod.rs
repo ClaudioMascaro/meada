@@ -119,7 +119,8 @@ pub trait LanguagePack {
 
     /// Whether a type's qualified name starts with the namespace an on-demand import names
     /// (Java's `p.Own`, C#'s namespaces), so a glob of a namespace takes the types declared in
-    /// it alone (`Binding::of_namespace`). A Swift module is no part of its types' names.
+    /// it alone (`Binding::of_namespace`). A Swift module is no part of its types' names, and a
+    /// Rust type's name is its path in its file.
     fn namespaced(&self) -> bool {
         true
     }

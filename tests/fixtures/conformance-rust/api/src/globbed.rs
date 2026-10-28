@@ -59,6 +59,15 @@ mod own {
     }
 }
 
+mod renamed {
+    use super::*;
+    use crate::store::Store as Def;
+
+    fn make() -> Def {
+        Def::new()
+    }
+}
+
 mod outside {
     use serde::*;
 

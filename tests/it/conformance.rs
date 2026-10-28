@@ -6842,6 +6842,8 @@ fn rust() {
             "api/src/globbed.rs::own.Def",
             "api/src/globbed.rs::own.Def.new",
             "api/src/globbed.rs::own.make",
+            "api/src/globbed.rs::renamed",
+            "api/src/globbed.rs::renamed.make",
             "api/src/globbed.rs::outside",
             "api/src/globbed.rs::outside.make",
             "api/src/main.rs::imp",
@@ -7230,13 +7232,9 @@ fn rust() {
                 EXACT,
                 &["api/src/main.rs::inner.helper"],
             ),
-            // `super::` out of an inline module is read from the file's top, past the
-            // module's own `compute`.
-            // `#[cfg(test)] use crate::mock::client;` binds nothing: the production client.
-            // A module a test build compiles is indexed: `th` is declared under `any(test, ..)`.
             // A glob gives a path's head as it gives a name called: through `super::*`, a
             // parent's named import, `super::super::*` and `crate::<path>::*`, after the
-            // module's own items. A glob of an outside crate gives nothing.
+            // module's own items and named imports. A glob of an outside crate gives nothing.
             (
                 "api/src/globbed.rs::inner.make::free#0",
                 EXACT,
@@ -7267,7 +7265,16 @@ fn rust() {
                 EXACT,
                 &["api/src/globbed.rs::own.Def.new"],
             ),
+            (
+                "api/src/globbed.rs::renamed.make::Def.new#0",
+                EXACT,
+                &["api/src/store.rs::Store.new"],
+            ),
             ("api/src/globbed.rs::outside.make::Ext.new#0", None, &[]),
+            // `super::` out of an inline module is read from the file's top, past the
+            // module's own `compute`.
+            // `#[cfg(test)] use crate::mock::client;` binds nothing: the production client.
+            // A module a test build compiles is indexed: `th` is declared under `any(test, ..)`.
             (
                 "api/src/gated.rs::caller::th.Client.new#0",
                 EXACT,

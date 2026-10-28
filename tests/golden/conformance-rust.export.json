@@ -31,7 +31,7 @@
     },
     {
       "path": "api/src/globbed.rs",
-      "hash": "bcd7fd7ad0666e3f37a6d28e3010363734d6712b51259bd049c4b2fcd6b6b229"
+      "hash": "ddf26b0590c0f20380cff8ed03c36a2fcdf2c4a81777099a6263035547ad8384"
     },
     {
       "path": "api/src/launch.rs",
@@ -583,16 +583,16 @@
       "id": "example.com/acme/conformance::api/src/globbed.rs::outside",
       "span": {
         "path": "api/src/globbed.rs",
-        "start": 922,
-        "end": 998
+        "start": 1042,
+        "end": 1118
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/globbed.rs::outside.make",
       "span": {
         "path": "api/src/globbed.rs",
-        "start": 959,
-        "end": 996
+        "start": 1079,
+        "end": 1116
       }
     },
     {
@@ -625,6 +625,22 @@
         "path": "api/src/globbed.rs",
         "start": 875,
         "end": 918
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/globbed.rs::renamed",
+      "span": {
+        "path": "api/src/globbed.rs",
+        "start": 922,
+        "end": 1040
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/globbed.rs::renamed.make",
+      "span": {
+        "path": "api/src/globbed.rs",
+        "start": 995,
+        "end": 1038
       }
     },
     {
@@ -4258,8 +4274,8 @@
       "level": null,
       "span": {
         "path": "api/src/globbed.rs",
-        "start": 979,
-        "end": 989
+        "start": 1099,
+        "end": 1109
       }
     },
     {
@@ -4271,6 +4287,17 @@
         "path": "api/src/globbed.rs",
         "start": 902,
         "end": 912
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/globbed.rs::renamed.make::Def.new#0",
+      "caller": "example.com/acme/conformance::api/src/globbed.rs::renamed.make",
+      "target": "example.com/acme/conformance::api/src/store.rs::Store.new",
+      "level": "exact",
+      "span": {
+        "path": "api/src/globbed.rs",
+        "start": 1022,
+        "end": 1032
       }
     },
     {
@@ -15136,6 +15163,7 @@
         "example.com/acme/conformance::api/src/extras.rs::dup",
         "example.com/acme/conformance::api/src/globbed.rs::inner.deep.open",
         "example.com/acme/conformance::api/src/globbed.rs::inner.open",
+        "example.com/acme/conformance::api/src/globbed.rs::renamed.make",
         "example.com/acme/conformance::api/src/launch.rs::launch",
         "example.com/acme/conformance::api/src/main.rs::checks.verify",
         "example.com/acme/conformance::api/src/main.rs::isolated.far",

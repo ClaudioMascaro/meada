@@ -8138,24 +8138,50 @@ mod tests {
     }
 
     #[test]
-    fn a_path_head_a_glob_of_a_module_by_path_gives_is_found_through_it() {
+    fn a_path_head_a_glob_of_a_file_module_gives_is_found_through_it() {
         // axum's routing tests: the parent imports the type by name, the tests glob the parent.
         let found = calls(&[
             ("main.rs", "mod a;\nmod x;\nfn main() {}\n"),
             (
                 "x.rs",
                 "pub struct Def;\nimpl Def { pub fn new() -> Self { Def } }\n\
+                 struct Priv;\nimpl Priv { pub fn new() -> Self { Priv } }\n\
                  mod named { use crate::x::*; fn h() { Def::new(); } }\n",
             ),
             (
                 "a.rs",
                 "use crate::x::Def;\nmod tests { use super::*; fn f() { Def::new(); }\n\
-                 mod deep { use super::super::*; fn g() { Def::new(); } } }\n",
+                 mod deep { use super::super::*; fn g() { Def::new(); } } }\n\
+                 mod sibling { use crate::x::*; fn p() { Priv::new(); } }\n",
             ),
         ]);
         assert_eq!(found["x.rs named.h Def.new"], "exact x.rs::Def.new");
         assert_eq!(found["a.rs tests.f Def.new"], "exact x.rs::Def.new");
         assert_eq!(found["a.rs tests.deep.g Def.new"], "exact x.rs::Def.new");
+        // A private type is not the glob's outside its module.
+        assert_eq!(found["a.rs sibling.p Priv.new"], "none");
+    }
+
+    #[test]
+    fn a_path_head_two_globs_give_is_read_as_a_name_called_is() {
+        let found = calls(&[
+            (
+                "main.rs",
+                "mod x;\nmod y;\nmod m { use crate::x::*; use crate::y::*;\n\
+             fn f() { Def::new(); free(); } }\n",
+            ),
+            (
+                "x.rs",
+                "pub struct Def;\nimpl Def { pub fn new() -> Self { Def } }\npub fn free() {}\n",
+            ),
+            (
+                "y.rs",
+                "pub struct Def;\nimpl Def { pub fn new() -> Self { Def } }\npub fn free() {}\n",
+            ),
+        ]);
+        // The latest glob, for both.
+        assert_eq!(found["main.rs m.f Def.new"], "exact y.rs::Def.new");
+        assert_eq!(found["main.rs m.f free"], "exact y.rs::free");
     }
 
     #[test]
