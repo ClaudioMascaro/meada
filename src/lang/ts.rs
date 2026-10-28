@@ -236,7 +236,7 @@ impl LanguagePack for TsJs {
     }
 
     fn config_files(&self) -> &'static [&'static str] {
-        &["tsconfig.json", "jsconfig.json"]
+        &["**/tsconfig.json", "**/jsconfig.json"]
     }
 
     fn receiver(&self) -> Option<&'static str> {
@@ -258,14 +258,34 @@ impl LanguagePack for TsJs {
     fn modules(&self, configs: &[(&str, &[u8])], _: &BTreeMap<&str, &Facts>) -> Result<Modules> {
         // Read as `package::read_tsconfig` reads one: a config past the size limit, not UTF-8,
         // not JSON or not an object declares no paths, and indexing carries on.
-        let aliases =
-            (configs.first()).map_or_else(Aliases::default, |(_, src)| Aliases::parse(src));
+        // The nearest config above an importer serves it; in one directory `tsconfig.json`
+        // comes first in `configs`, so it wins. A config under `node_modules` declares nothing.
+        let mut by_dir: HashMap<String, Aliases> = HashMap::new();
+        for (path, src) in configs {
+            let dir = path.rsplit_once('/').map_or("", |(dir, _)| dir);
+            if !path.split('/').any(|s| s == "node_modules") {
+                by_dir
+                    .entry(dir.to_string())
+                    .or_insert_with(|| Aliases::parse(dir, src));
+            }
+        }
         Ok(Box::new(move |importer, specifier| {
+            let dir = importer.rsplit_once('/').map_or("", |(dir, _)| dir);
             let bases: Vec<String> = if specifier.starts_with('.') {
-                let dir = importer.rsplit_once('/').map_or("", |(dir, _)| dir);
                 join(dir, specifier).into_iter().collect()
             } else {
-                aliases.expand(specifier)
+                let mut up = Some(dir);
+                let mut found = None;
+                while let Some(d) = up {
+                    if let Some(aliases) = by_dir.get(d) {
+                        found = Some(aliases);
+                        break;
+                    }
+                    up = d
+                        .rsplit_once('/')
+                        .map_or((!d.is_empty()).then_some(""), |(p, _)| Some(p));
+                }
+                found.map_or_else(Vec::new, |aliases| aliases.expand(specifier))
             };
             bases
                 .iter()
@@ -275,18 +295,23 @@ impl LanguagePack for TsJs {
     }
 }
 
-/// `compilerOptions.baseUrl` and `paths` of the root `tsconfig.json` (or `jsconfig.json`).
-// ponytail: `extends` and nested project configs are not followed.
+/// `compilerOptions.baseUrl` and `paths` of a `tsconfig.json` (or `jsconfig.json`) in `dir`.
+// ponytail: `extends` and project `references` are not followed.
 #[derive(Default)]
 struct Aliases {
+    dir: String,
     base_url: Option<String>,
     paths: Vec<(String, Vec<String>)>,
 }
 
 impl Aliases {
-    fn parse(src: &[u8]) -> Self {
+    fn parse(dir: &str, src: &[u8]) -> Self {
+        let none = Self {
+            dir: dir.to_string(),
+            ..Self::default()
+        };
         let Some(config) = package::tsconfig_root(src) else {
-            return Self::default();
+            return none;
         };
         let options = &config["compilerOptions"];
         let paths = options["paths"]
@@ -300,14 +325,15 @@ impl Aliases {
             })
             .collect();
         Self {
-            base_url: options["baseUrl"].as_str().and_then(|b| join("", b)),
+            base_url: options["baseUrl"].as_str().and_then(|b| join(dir, b)),
             paths,
+            ..none
         }
     }
 
     /// The paths a bare specifier names: the targets of the `paths` pattern with the
     /// longest prefix that matches, then the specifier under `baseUrl`. Without `baseUrl`,
-    /// targets are relative to the config file, at the repository root.
+    /// targets are relative to the config file's directory.
     fn expand(&self, specifier: &str) -> Vec<String> {
         let mut best: Option<(usize, &str, &[String])> = None;
         for (pattern, targets) in &self.paths {
@@ -324,7 +350,7 @@ impl Aliases {
                 best = Some((rank, star, targets));
             }
         }
-        let root = self.base_url.as_deref().unwrap_or("");
+        let root = self.base_url.as_deref().unwrap_or(&self.dir);
         let mut out: Vec<String> = best
             .into_iter()
             .flat_map(|(_, star, targets)| {
@@ -1259,6 +1285,35 @@ mod tests {
         ] {
             assert_eq!(resolve(config), (std::rc::Rc::default(), relative.clone()));
         }
+    }
+
+    #[test]
+    fn the_nearest_config_serves_an_importer_and_node_modules_declares_nothing() {
+        let config = |t: &str| format!(r#"{{"compilerOptions": {{"paths": {{"@/*": ["{t}"]}}}}}}"#);
+        let (root, app, js, hidden) = (
+            config("lib/*"),
+            config("./src/*"),
+            config("./js/*"),
+            config("./x/*"),
+        );
+        let modules = TsJs
+            .modules(
+                &[
+                    ("tsconfig.json", root.as_bytes()),
+                    ("app/tsconfig.json", app.as_bytes()),
+                    ("app/node_modules/p/tsconfig.json", hidden.as_bytes()),
+                    ("app/jsconfig.json", js.as_bytes()),
+                    ("web/jsconfig.json", js.as_bytes()),
+                ],
+                &BTreeMap::new(),
+            )
+            .unwrap();
+        let has = |from: &str, file: &str| modules(from, "@/b").contains(&file.to_string());
+        assert!(has("x.ts", "lib/b.ts"));
+        assert!(has("app/src/a.ts", "app/src/b.ts"));
+        assert!(!has("app/src/a.ts", "app/js/b.ts"));
+        assert!(has("web/a.ts", "web/js/b.ts"));
+        assert!(!has("app/node_modules/p/a.ts", "app/node_modules/p/x/b.ts"));
     }
 
     #[test]

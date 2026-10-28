@@ -3082,8 +3082,10 @@ qualification budget does (ADR 0017).
   written result. Not through `?`, which unwraps that result (`Result<T>`, `Option<T>`): the call
   stays a name match. `.await` takes the written result as the awaited value, as an `async fn`
   writes it; on a plain `fn` that returns `impl Future<Output = T>` the call resolves to nothing.
-- `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. The root
-  `tsconfig.json` (else `jsconfig.json`) is read as `package::read_tsconfig` reads one
+- `lang/ts.rs`: tsconfig `extends` and `references` are not followed. Every `tsconfig.json` and
+  `jsconfig.json` but those under `node_modules` is read; an importer uses the nearest one in its
+  directory or above (`tsconfig.json` over `jsconfig.json`), `paths` and `baseUrl` relative to it.
+  Each is read as `package::read_tsconfig` reads one
   (`package::tsconfig_root`, `MAX_BYTES`), so one past the size limit, not UTF-8, not JSON or
   not an object declares no `paths` or `baseUrl` and the refresh carries on, with no status
   line. `require` and

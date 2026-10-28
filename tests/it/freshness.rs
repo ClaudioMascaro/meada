@@ -2152,3 +2152,44 @@ fn a_rust_export_does_not_depend_on_the_order_files_and_manifests_are_found() {
 
     assert_eq!(reversed, normal);
 }
+
+/// A nested `tsconfig.json` serves the importers beneath it (each of `frontend`, `a` and `b`
+/// maps `@/*` to its own `src`), and editing its `paths` rebinds them: the refreshed export
+/// equals a cold one.
+#[test]
+fn a_nested_tsconfig_binds_its_own_imports_and_an_edit_rebinds_them() {
+    let target = |json: &serde_json::Value, project: &str| {
+        let id = format!("{project}/src/main.ts::main::cn#0");
+        let call = (json["calls"].as_array().unwrap().iter())
+            .find(|c| c["id"].as_str().unwrap().ends_with(&id))
+            .unwrap_or_else(|| panic!("no call {id}"));
+        (call["level"].clone(), call["target"].clone())
+    };
+    let edit = |repo: &Path| {
+        replace(repo, "a/tsconfig.json", "./src/*", "./nowhere/*");
+    };
+    let repo = fixture_repo("fresh_ts_nested", "ts-nested-config", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&before).unwrap();
+    for project in ["frontend", "a", "b"] {
+        let (level, to) = target(&json, project);
+        assert_eq!(level, "exact", "{project}");
+        assert!(
+            to.as_str()
+                .unwrap()
+                .ends_with(&format!("{project}/src/lib/utils.ts::cn"))
+        );
+    }
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_ts_nested_cold", "ts-nested-config", ORIGIN, edit)
+    );
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    assert!(target(&json, "a").0.is_null());
+    assert_eq!(target(&json, "b").0, "exact");
+}
