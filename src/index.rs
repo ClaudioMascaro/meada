@@ -1486,14 +1486,33 @@ fn is_build_output(path: &Path) -> bool {
             })
 }
 
-/// Every file under `root` but what `.gitignore` excludes, sorted (reversed under
-/// [`with_reversed_walk`]).
+/// A dependency cache or a minified asset, whether or not an ignore file lists it: a
+/// `node_modules` or `Pods` directory, the `Checkouts` of `Carthage`, a `*.min.js` or
+/// `*.min.css` file. `vendor`, `dist` and `build` can be first-party, so `.meadaignore` has them.
+fn is_default_skip(path: &Path) -> bool {
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    match name {
+        "node_modules" | "Pods" => path.is_dir(),
+        "Checkouts" => {
+            path.is_dir()
+                && path
+                    .parent()
+                    .and_then(|p| p.file_name())
+                    .is_some_and(|n| n == "Carthage")
+        }
+        _ => name.ends_with(".min.js") || name.ends_with(".min.css"),
+    }
+}
+
+/// Every file under `root` but what `.gitignore`, `.ignore` and `.meadaignore` exclude and the
+/// defaults skip, sorted (reversed under [`with_reversed_walk`]).
 fn walk(root: &Path) -> Vec<(String, PathBuf)> {
     let mut files: Vec<(String, PathBuf)> = WalkBuilder::new(root)
         .require_git(false)
         // The repository's own ignore files only, never those of directories above it.
         .parents(false)
-        .filter_entry(|e| !is_build_output(e.path()))
+        .add_custom_ignore_filename(".meadaignore")
+        .filter_entry(|e| !is_build_output(e.path()) && !is_default_skip(e.path()))
         .build()
         .filter_map(|entry| entry.ok())
         .filter(|entry| entry.file_type().is_some_and(|t| t.is_file()))
@@ -2460,6 +2479,37 @@ mod tests {
         assert_eq!(
             seen,
             ["App/App.csproj", "App/Program.cs", "tools/obj/Thing.cs"]
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_walk_skips_dependency_caches_and_minified_assets() {
+        let (dir, _) = index_dir("default_skips");
+        for path in [
+            "src/a.js",
+            "node_modules/x/a.js",
+            "ios/Pods/x/a.swift",
+            "Carthage/Checkouts/x/a.swift",
+            "Checkouts/own.swift",
+            "static/app.min.js",
+            "static/app.min.css",
+            "static/app.css",
+            "vendor/a.js",
+        ] {
+            let file = dir.join(path);
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(file, "").unwrap();
+        }
+        let seen: Vec<String> = walk(&dir).into_iter().map(|(p, _)| p).collect();
+        assert_eq!(
+            seen,
+            [
+                "Checkouts/own.swift",
+                "src/a.js",
+                "static/app.css",
+                "vendor/a.js"
+            ]
         );
         let _ = fs::remove_dir_all(&dir);
     }
