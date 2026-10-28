@@ -2688,7 +2688,7 @@ qualification budget does (ADR 0017).
   (`mountReports(routes)`, bare or through `self`) is followed when the call is exact: a member
   `RouteCollection` does not declare is the collection's own (Known outside members), so a
   helper method of the collection is, and the routes it registers serve under the builder it
-  was given;
+  was given (a free function helper is exact too, for the same reason);
   a `grouped` whose every argument is a call on a capitalized head with no path producer
   (`String`, `Substring`, `PathComponent`) in its callee (`AuthMiddleware()`,
   `User.authenticator()`) is the middleware overload (`Dialect::middleware`, Vapor only) and

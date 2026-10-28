@@ -74,6 +74,7 @@ struct OrderController: RouteCollection {
         orders.get(":id", use: self.show)
         orders.post { req in "placed" }
         mountReports(orders)
+        self.mountSelf(orders)
         unlisted(routes)
         let alias = routes
         alias.get("alias") { req in "alias" }
@@ -89,6 +90,10 @@ struct OrderController: RouteCollection {
     // A helper method of the collection: its call is exact, so the builder it is given is followed.
     func mountReports(_ r: RoutesBuilder) {
         r.get("reports") { req in "reports" }
+    }
+
+    func mountSelf(_ r: RoutesBuilder) {
+        r.get("self") { req in "self" }
     }
 
     func list(req: Request) -> [String] {

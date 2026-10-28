@@ -12713,6 +12713,11 @@ fn swift() {
             "Routes.swift",
             "OrderController.mountReports(_:).GET /api/v1/beta/orders/reports",
         ),
+        checkout("Routes.swift", "OrderController.mountSelf(_:)"),
+        checkout(
+            "Routes.swift",
+            "OrderController.mountSelf(_:).GET /api/v1/beta/orders/self",
+        ),
         checkout("Gateway.swift", "gateway()"),
         checkout("Gateway.swift", "gateway().GET /health"),
         checkout("Gateway.swift", "gateway().POST /v1/items"),
@@ -12951,6 +12956,14 @@ fn swift() {
             ),
             EXACT,
             one(checkout("Routes.swift", "OrderController.mountReports(_:)")),
+        ),
+        (
+            checkout(
+                "Routes.swift",
+                "OrderController.boot(routes:)::self.mountSelf#0",
+            ),
+            EXACT,
+            one(checkout("Routes.swift", "OrderController.mountSelf(_:)")),
         ),
         // Across the import: a public initializer and function, the module's name as a
         // qualifier, and an internal function the import does not reach.
