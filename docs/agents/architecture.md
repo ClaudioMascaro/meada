@@ -1640,7 +1640,16 @@ one for the area a change touches.
   opaque base and declares none, or that does not declare a name every class has
   (`LanguagePack::implicit_members`); a bare field name reads the family's fields first
   (`Resolver::inherited_field`). Overloads merge across the family, so an opaque base anywhere
-  in it keeps them from `exact` (Opaque outside, strict; #353 tracks a relaxation).
+  in it keeps them from `exact` (Opaque outside), unless the pack knows its members
+  (`LanguagePack::known_outside`, Known outside members, ADR 0019): a base its table lists is
+  opaque only for the names it declares (`Resolver::may_declare`, asked by `Resolver::opaque`,
+  `overloaded`, `member`, `inherited` and `inherited_field`), and for any other name the family
+  resolves as one without bases, so a class `implements Serializable, Comparable<T>` has its own
+  overloads `exact` and its `compareTo` a name match. The base is spelled as
+  `Resolver::imported_name` spells it (qualified under an explicit import, bare under a wildcard
+  or `java.lang`) and matches an entry by its qualified name, or a bare name by the entry's last
+  segment. A pack's `Resolver` reads the tables of the packs that resolve with it too
+  (`lang::known_outside`).
   `LanguagePack::unordered_bases` drops the written base list from the C3 merge (Java's
   `implements I, J` with `J extends I`), and a `base_receiver` call reads the overloads of the
   family past the class (`Resolver::base_member`). A call made on a call's result names it
@@ -1648,7 +1657,8 @@ one for the area a change touches.
   of that call's exact target names (`Resolver::result_of`, bounded by `RECEIVER_DEPTH`). A name
   match of a call narrowed by `Call::arity` (`Resolver::matched`) reads the family that owns it:
   a typed receiver, `this` or a bare call match within that family alone, a bare call past an
-  opaque base falls back to what its scope binds, and any other receiver takes, from several,
+  opaque base, or past a class around it with one for the name (`Resolver::outer_opaque`), falls
+  back to what its scope binds, and any other receiver takes, from several,
   the one declared in the family of the class around the call other than the caller; a match
   narrowed from several is `Resolution::Narrowed`, stored as `inferred` with `calls.narrowed`. A language whose imports name a path rather than a file (Rust's
   `use a::b as c`) writes `Imported::Path` (what the dotted callee-like name gives, resolved
@@ -1758,7 +1768,11 @@ one for the area a change touches.
   protocol a block conforms to, with that protocol's inherent blocks; a signature an earlier
   level declares overrides a later one. A protocol from outside the repository a block conforms
   to makes the family opaque (`Resolver::opaque`, which `inherited` and `matched` read as an
-  opaque base). A protocol extension's member of the requirement's signature in the
+  opaque base) for the names it may declare (`Block::outside`, `Resolver::may_declare`): every name,
+  unless the Swift table of known outside members lists it (`Hashable`, `Codable`,
+  `CustomStringConvertible`, the raw value types, Vapor's `RouteCollection`), whose entries are
+  compared without their labels. The same table weighs a written base (`: NSObject` stays
+  opaque, `: String, CaseIterable` does not). A protocol extension's member of the requirement's signature in the
   requirement's file is that one definition. A capitalized callee (`Order(id:)`,
   `Order.Line()`) constructs (`Call::constructs`): the type's initializers in its body and its
   blocks (`Facts::constructors`, also the family `Type.init` for `self.init(..)`), or the type
@@ -1846,7 +1860,9 @@ one for the area a change touches.
   `Ext.AddOrders(s)`, and `Code::arg` binds the receiver to that parameter.
   `LanguagePack::extension_methods` (C# only) lets an extension method answer a call no member
   does: on a receiver of a class of the repository whose family lacks the method and has no
-  opaque base, or whose written type is outside the repository (`List<T>`), the name match
+  opaque base (a base among the C# known outside members, `IDisposable` or `IComparable`, is
+  opaque only for the names it declares, as Java's), or whose written type is outside the
+  repository (`List<T>`), the name match
   keeps the methods with a `Binds::Instance` first parameter alone (`inferred`, or `ambiguous`
   with every one that fits). With an opaque base, or on a type's name (`Teller.Missing()`),
   or a bare call, the call resolves to nothing, and so does a method of the repository that
@@ -2097,6 +2113,12 @@ one for the area a change touches.
 
 ## Known ceilings
 
+- `resolve.rs` (`Resolver::may_declare`, ADR 0019): a base among a pack's known outside members is
+  matched by its spelling, so a same-named type of a wildcard-imported outside package that
+  declares an overload of the called name may give a wrong `exact`; a Swift entry is compared
+  without its labels, so `hash(into:)` keeps every `hash` call at the strict level; an extension
+  the tables do not list, in scope of a call no own overload fits by type, is missed. A base the
+  tables do not list keeps every name opaque.
 - `jvm/spring.rs` (`read_yaml`): the dotted keys a YAML file flattens to are charged to
   `YAML_KEY_BUDGET` (1 MiB); a file past it (a long key over thousands of children) reads as
   empty, so its `${key}` placeholders name environment variables.
@@ -2147,7 +2169,9 @@ one for the area a change touches.
   (`import app.config` beside package `app.config`) binds nothing, since the package keeps the
   name. A property of function type that a base class declares, invoked by bare name, is read as
   a method call. A companion's outside base leaves the companion's members unknown, so
-  `Type.create()` then resolves to nothing (Opaque outside, strict, as Java's #353). Kotlin files
+  `Type.create()` then resolves to nothing (Opaque outside, as Java's: a base among the known
+  outside members, the JDK's of Java's table or `kotlin.Comparable`, hides only the names it
+  declares, which for Kotlin include the standard library's extensions on it: `use`, `coerceIn`). Kotlin files
   resolve with Java's flags, so `java.lang.Object`'s members are the implicit members of a Kotlin
   class too: a bare `notify()` in a class is unknown. A star import of a Java package from Kotlin sees its
   package-private classes. The Kotlin pack lists the same Spring configuration files as the Java
@@ -2167,7 +2191,9 @@ qualification budget does (ADR 0017).
   one defining unit among those its project references, directly or through the references
   that pass on (`Facts::unit_references`, from the walk of `dotnet::references`;
   `Resolver::in_references`), and stays `ambiguous` with several or none, since a project
-  not referenced may still be visible through references not read.
+  not referenced may still be visible through references not read. The overloads of one
+  family's member are kept whole, since they merge across units (a base in another project, a
+  Swift extension in a test module): methods narrow only when two of their types share a name.
 
 - `resolve.rs` (`labelled_args`): `LABELLED_CELLS` (65,536) bounds the pairs of a parameter and
   an argument the label matcher weighs for one call; a wider call fits no function that labels
@@ -2188,7 +2214,8 @@ qualification budget does (ADR 0017).
   parameter's type (#118), a typed local of a nested block, closure or accessor (a name match
   where Java and C# keep it function-wide), and the
   protocols a conformed protocol inherits when the conformance is written on an extension. As in Java, an outside base
-  (`NSObject`, `Codable`, a raw value type) keeps a type's own overloads from `exact` (#353).
+  the pack does not list among its known outside members (`NSObject`, `View`) keeps a type's own
+  overloads from `exact`, and a listed one (`Codable`, a raw value type) the names it declares.
 - `http/swift/client.rs`: `CLIENT_DEPTH` (8) bounds the locals, properties and constants followed
   from a call's receiver to a client; past it the receiver is no client and the call is no
   consumer. The pack's unit tests and the hostile-URL integration test exceed the URL limits

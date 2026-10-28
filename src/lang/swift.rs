@@ -162,6 +162,32 @@ impl LanguagePack for Swift {
     fn outside_blocks(&self) -> bool {
         true
     }
+
+    /// The standard library's protocols whose members are few and fixed (operators are no
+    /// callable name), the raw value types an enum may carry, and Vapor's `RouteCollection`
+    /// (ADR 0019), with Foundation's `localizedDescription` on `Error`; the table grows with evidence from the dogfood repositories, never by guess.
+    fn known_outside(&self) -> super::KnownOutside {
+        &[
+            ("Swift.Sendable", &[]),
+            ("Swift.Error", &["localizedDescription"]),
+            ("Swift.Equatable", &[]),
+            ("Swift.Comparable", &[]),
+            ("Swift.Hashable", &["hash(into:)", "hashValue"]),
+            ("Swift.Encodable", &["encode(to:)"]),
+            ("Swift.Decodable", &["init(from:)"]),
+            ("Swift.Codable", &["encode(to:)", "init(from:)"]),
+            ("Swift.Identifiable", &["id"]),
+            ("Swift.CustomStringConvertible", &["description"]),
+            ("Swift.CaseIterable", &["allCases"]),
+            ("Swift.String", &["rawValue", "init(rawValue:)"]),
+            ("Swift.Int", &["rawValue", "init(rawValue:)"]),
+            ("Swift.UInt", &["rawValue", "init(rawValue:)"]),
+            ("Swift.Double", &["rawValue", "init(rawValue:)"]),
+            ("Swift.Float", &["rawValue", "init(rawValue:)"]),
+            ("Swift.Character", &["rawValue", "init(rawValue:)"]),
+            ("Vapor.RouteCollection", &["boot(routes:)"]),
+        ]
+    }
 }
 
 /// The module of each target directory the manifests declare (empty at the root); of two

@@ -145,6 +145,16 @@ pub trait LanguagePack {
         &[]
     }
 
+    /// Outside types whose declared member names are a fixed fact of the platform (Known
+    /// outside members, `docs/adr/0019-known-outside-members.md`): each type's qualified name
+    /// and the names it declares, empty for a marker, a name spelled as the pack spells a
+    /// member (with its labels in Swift). Such a base hides from its family only the names it
+    /// declares; any other outside base may hide every name (Opaque outside). The `Resolver`
+    /// of a pack reads the tables of the packs that resolve with it too.
+    fn known_outside(&self) -> KnownOutside {
+        &[]
+    }
+
     /// Whether a member call of the pack's files may reach an extension function
     /// (`Facts::extensions`) in scope of its file where no member answers it (Kotlin): those its
     /// explicit imports bring, then those of its package, then those of its star imports.
@@ -267,6 +277,13 @@ pub fn names_config(pattern: &str, file: &str) -> bool {
     }
 }
 
+/// One known outside type (`LanguagePack::known_outside`): its qualified name and the member
+/// names it declares.
+pub type KnownEntry = (&'static str, &'static [&'static str]);
+
+/// A pack's table of known outside types.
+pub type KnownOutside = &'static [KnownEntry];
+
 /// The index of the pack that parses `path`, if any.
 pub fn pack_for(path: &str) -> Option<usize> {
     let (_, extension) = path.rsplit_once('.')?;
@@ -282,6 +299,17 @@ pub fn resolver_of(index: usize) -> usize {
     (PACKS[index].resolves_with())
         .and_then(|with| (PACKS.iter()).position(|p| p.extensions() == with.extensions()))
         .unwrap_or(index)
+}
+
+/// The known outside members (`LanguagePack::known_outside`) the `Resolver` of `language` reads:
+/// its own, then those of every pack that resolves with it (Kotlin's, with Java's).
+pub fn known_outside(language: &dyn LanguagePack) -> Vec<KnownEntry> {
+    let with = |p: &&dyn LanguagePack| {
+        (p.resolves_with()).is_some_and(|w| w.extensions() == language.extensions())
+    };
+    (std::iter::once(language).chain(PACKS.iter().copied().filter(with)))
+        .flat_map(|p| p.known_outside().iter().copied())
+        .collect()
 }
 
 pub fn pack(index: usize) -> &'static dyn LanguagePack {

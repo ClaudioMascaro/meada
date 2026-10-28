@@ -93,6 +93,39 @@ impl LanguagePack for Kotlin {
         true
     }
 
+    /// Kotlin's own outside types the Java pack's table (the JDK's, which Kotlin files resolve
+    /// with) lacks, and the standard library's extension functions on the JDK's: a call no own
+    /// overload fits by type takes them, so they count as names the type declares.
+    fn known_outside(&self) -> super::KnownOutside {
+        &[
+            (
+                "kotlin.Comparable",
+                &[
+                    "compareTo",
+                    "coerceAtLeast",
+                    "coerceAtMost",
+                    "coerceIn",
+                    "rangeTo",
+                    "rangeUntil",
+                ],
+            ),
+            (
+                "java.lang.Comparable",
+                &[
+                    "compareTo",
+                    "coerceAtLeast",
+                    "coerceAtMost",
+                    "coerceIn",
+                    "rangeTo",
+                    "rangeUntil",
+                ],
+            ),
+            ("java.lang.AutoCloseable", &["close", "use"]),
+            ("java.io.Closeable", &["close", "use"]),
+            ("kotlin.AutoCloseable", &["close", "use"]),
+        ]
+    }
+
     /// Spring's base configuration, as the Java pack lists it: a Kotlin-only repository gives
     /// `@Value` its keys too.
     fn config_files(&self) -> &'static [&'static str] {

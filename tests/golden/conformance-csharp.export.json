@@ -62,6 +62,10 @@
       "hash": "4b7695397e7411a5d9bc3f03f986d456e83d3e9aadff2f3a0423c395acbe3a92"
     },
     {
+      "path": "src/Acme.Api/Known.cs",
+      "hash": "a7ce024c6af41d16043c05d5911e772d1695626faa431cde9b7667b2b0d8760e"
+    },
+    {
       "path": "src/Acme.Api/Namespaces.cs",
       "hash": "d2a21371a0839e609c4be2a4fa75ea1625f97d935da97ff791a463599e8c6a31"
     },
@@ -1385,6 +1389,54 @@
         "path": "src/Acme.Api/Inside.cs",
         "start": 89,
         "end": 125
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease",
+      "span": {
+        "path": "src/Acme.Api/Known.cs",
+        "start": 255,
+        "end": 568
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.CompareTo(object)",
+      "span": {
+        "path": "src/Acme.Api/Known.cs",
+        "start": 399,
+        "end": 447
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Dispose()",
+      "span": {
+        "path": "src/Acme.Api/Known.cs",
+        "start": 369,
+        "end": 394
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Open()",
+      "span": {
+        "path": "src/Acme.Api/Known.cs",
+        "start": 307,
+        "end": 329
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Open(int)",
+      "span": {
+        "path": "src/Acme.Api/Known.cs",
+        "start": 334,
+        "end": 364
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Use(Lease)",
+      "span": {
+        "path": "src/Acme.Api/Known.cs",
+        "start": 453,
+        "end": 566
       }
     },
     {
@@ -5204,6 +5256,50 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Use(Lease)::Open#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Use(Lease)",
+      "target": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Open()",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Known.cs",
+        "start": 511,
+        "end": 517
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Use(Lease)::l.Dispose#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Use(Lease)",
+      "target": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Dispose()",
+      "level": "inferred",
+      "span": {
+        "path": "src/Acme.Api/Known.cs",
+        "start": 527,
+        "end": 538
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Use(Lease)::l.Missing#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Use(Lease)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/Acme.Api/Known.cs",
+        "start": 548,
+        "end": 559
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Use(Lease)::l.Open#0",
+      "caller": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Use(Lease)",
+      "target": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Open(int)",
+      "level": "exact",
+      "span": {
+        "path": "src/Acme.Api/Known.cs",
+        "start": 492,
+        "end": 501
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside.Run()::Second.Make#0",
       "caller": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside.Run()",
       "target": null,
@@ -7724,12 +7820,21 @@
     {
       "name": "src/Acme.Api#11",
       "members": [
+        "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Dispose()",
+        "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Open()",
+        "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Open(int)",
+        "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Use(Lease)"
+      ]
+    },
+    {
+      "name": "src/Acme.Api#12",
+      "members": [
         "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi",
         "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Delete(string)"
       ]
     },
     {
-      "name": "src/Acme.Api#12",
+      "name": "src/Acme.Api#13",
       "members": [
         "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Item(string)",
         "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.Inventory.Find(string)"
@@ -10379,6 +10484,55 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second.Make()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.CompareTo(object)",
+      "kind": "export",
+      "label": "Acme.Api.Lease.CompareTo(object)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.CompareTo(object)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Use(Lease)",
+      "kind": "export",
+      "label": "Acme.Api.Lease.Use(Lease)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Use(Lease)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Open(int)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Open()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Dispose()"
         }
       ]
     },

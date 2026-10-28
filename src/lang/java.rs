@@ -76,6 +76,21 @@ impl LanguagePack for Java {
         ]
     }
 
+    /// The JDK types whose members are few and fixed; the table grows with evidence from the
+    /// dogfood repositories, never by guess (ADR 0019).
+    fn known_outside(&self) -> super::KnownOutside {
+        &[
+            ("java.io.Serializable", &[]),
+            ("java.lang.Cloneable", &[]),
+            ("java.util.RandomAccess", &[]),
+            ("java.util.EventListener", &[]),
+            ("java.lang.Runnable", &["run"]),
+            ("java.lang.Comparable", &["compareTo"]),
+            ("java.lang.AutoCloseable", &["close"]),
+            ("java.io.Closeable", &["close"]),
+        ]
+    }
+
     /// What the kinds read through `Indexed::configs`: Spring's base configuration, which its
     /// reader lists (`jvm::spring::CONFIG_FILES`).
     fn config_files(&self) -> &'static [&'static str] {

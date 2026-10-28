@@ -85,6 +85,11 @@ fn java() {
             "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.use()",
             "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.Task",
             "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.Task.run()",
+            "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket",
+            "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open()",
+            "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open(int)",
+            "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.compareTo(Ticket)",
+            "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)",
             "maven/api/src/main/java/example/calls/Client.java::example.calls.Client",
             "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.make()",
             "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.chained()",
@@ -319,6 +324,29 @@ const JAVA_CALLS: &[ExpectedCall] = &[
         "maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.Task.run()::own#0",
         INFERRED,
         &["maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.own()"],
+    ),
+    // Known outside members: `Serializable` and `Comparable` hide `compareTo` alone.
+    (
+        "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)::t.open#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open(int)"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)::open#0",
+        EXACT,
+        &["maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.open()"],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)::t.compareTo#0",
+        INFERRED,
+        &[
+            "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.compareTo(Ticket)",
+        ],
+    ),
+    (
+        "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)::t.missing#0",
+        None,
+        &[],
     ),
     (
         "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)::repo.save#0",
@@ -1464,6 +1492,11 @@ fn kotlin() {
             "src/main/kotlin/example/Members.kt::example.Quiet",
             "src/main/kotlin/example/Members.kt::example.Quiet.go()",
             "src/main/kotlin/example/Members.kt::example.Quiet.own()",
+            "src/main/kotlin/example/Known.kt::example.Ticket",
+            "src/main/kotlin/example/Known.kt::example.Ticket.open()",
+            "src/main/kotlin/example/Known.kt::example.Ticket.open(Int)",
+            "src/main/kotlin/example/Known.kt::example.Ticket.compareTo(Ticket)",
+            "src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)",
             "src/main/kotlin/example/Members.kt::example.Quiet.make()",
             "src/main/kotlin/example/Members.kt::example.Quiet.Companion",
             "src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
@@ -2122,6 +2155,27 @@ fn kotlin() {
                 "src/main/kotlin/example/Members.kt::example.Logged.go()::log#0",
                 INFERRED,
                 &["src/main/kotlin/example/Members.kt::example.log(String)"],
+            ),
+            // Known outside members: `Serializable` and `Comparable` hide `compareTo` alone.
+            (
+                "src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)::t.open#0",
+                EXACT,
+                &["src/main/kotlin/example/Known.kt::example.Ticket.open(Int)"],
+            ),
+            (
+                "src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)::open#0",
+                EXACT,
+                &["src/main/kotlin/example/Known.kt::example.Ticket.open()"],
+            ),
+            (
+                "src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)::t.compareTo#0",
+                INFERRED,
+                &["src/main/kotlin/example/Known.kt::example.Ticket.compareTo(Ticket)"],
+            ),
+            (
+                "src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)::t.missing#0",
+                None,
+                &[],
             ),
             (
                 "src/main/kotlin/example/util/Hidden.kt::example.util.viaPackage()::tool#0",
@@ -3349,6 +3403,12 @@ fn csharp() {
         api("Opaque.cs", "Acme.Api.Board"),
         api("Board.Show.cs", "Acme.Api.Board"),
         api("Board.Show.cs", "Acme.Api.Board.Show()"),
+        api("Known.cs", "Acme.Api.Lease"),
+        api("Known.cs", "Acme.Api.Lease.Open()"),
+        api("Known.cs", "Acme.Api.Lease.Open(int)"),
+        api("Known.cs", "Acme.Api.Lease.Dispose()"),
+        api("Known.cs", "Acme.Api.Lease.CompareTo(object)"),
+        api("Known.cs", "Acme.Api.Lease.Use(Lease)"),
         api("Controllers.cs", "Acme.Api.OrdersController"),
         api("Controllers.cs", "Acme.Api.OrdersController.List()"),
         api("Controllers.cs", "Acme.Api.OrdersController.Get(int)"),
@@ -3889,6 +3949,34 @@ fn csharp() {
             format!("{}::Upper#0", api("Board.Show.cs", "Acme.Api.Board.Show()")),
             INFERRED,
             vec![upper.clone()],
+        ),
+        // Known outside members: `IDisposable` and `IComparable` hide `Dispose` and `CompareTo`
+        // alone.
+        (
+            format!("{}::l.Open#0", api("Known.cs", "Acme.Api.Lease.Use(Lease)")),
+            EXACT,
+            vec![api("Known.cs", "Acme.Api.Lease.Open(int)")],
+        ),
+        (
+            format!("{}::Open#0", api("Known.cs", "Acme.Api.Lease.Use(Lease)")),
+            EXACT,
+            vec![api("Known.cs", "Acme.Api.Lease.Open()")],
+        ),
+        (
+            format!(
+                "{}::l.Dispose#0",
+                api("Known.cs", "Acme.Api.Lease.Use(Lease)")
+            ),
+            INFERRED,
+            vec![api("Known.cs", "Acme.Api.Lease.Dispose()")],
+        ),
+        (
+            format!(
+                "{}::l.Missing#0",
+                api("Known.cs", "Acme.Api.Lease.Use(Lease)")
+            ),
+            None,
+            vec![],
         ),
         // A type of a second namespace in a file binds under that namespace alone.
         (
@@ -11963,6 +12051,15 @@ fn swift() {
         service("Reporter"),
         service("Reporter.report()"),
         service("Reporter.summary()"),
+        store("Tag.swift", "Tag"),
+        store("Tag.swift", "Tag.open()"),
+        store("Tag.swift", "Tag.open(seat:)"),
+        store("Tag.swift", "Tag.hash(into:)"),
+        store("Tag.swift", "Tag.use(_:)"),
+        store("Tag.swift", "Status"),
+        store("Tag.swift", "Status.label()"),
+        store("Tag.swift", "Status.label(upper:)"),
+        store("Tag.swift", "Status.shout()"),
         probe("Pinger"),
         probe("Pinger.ping()"),
         probe("Pinger.trace()"),
@@ -11971,6 +12068,8 @@ fn swift() {
         probe("Probe.run()"),
         probe("Bag"),
         probe("Bag.run()"),
+        probe("Sack"),
+        probe("Sack.run()"),
         probe("describe()"),
         store("Probe+Tracer.swift", "Probe.trace()"),
         dispatch("Carrier"),
@@ -11992,6 +12091,8 @@ fn swift() {
         dispatch("Depot.lookup()"),
         checkout("Checkout.swift", "Checkout"),
         checkout("Checkout.swift", "Checkout.run()"),
+        checkout("Tagging.swift", "Tag.open(label:)"),
+        checkout("Tagging.swift", "tagging(_:)"),
         checkout("Summary.swift", "summarize()"),
         checkout("Summary.swift", "log(level:)"),
         checkout("Routes.swift", "routes(_:)"),
@@ -12009,6 +12110,7 @@ fn swift() {
         checkout("Routes.swift", "mountAudit(under:).GET /api/v1/audit/log"),
         checkout("Routes.swift", "orphan(_:)"),
         checkout("Routes.swift", "unlisted(_:)"),
+        checkout("Routes.swift", "unlisted(_:).GET /api/v1/unlisted"),
         checkout("Routes.swift", "nest(_:).GET /loop/leaf"),
         checkout("Routes.swift", "mount(admin:_:)"),
         checkout("Routes.swift", "mount(admin:_:).GET /admin/stats"),
@@ -12041,6 +12143,7 @@ fn swift() {
         ),
         checkout("Routes.swift", "OrderController.list(req:)"),
         checkout("Routes.swift", "OrderController.show(req:)"),
+        checkout("Routes.swift", "OrderController.tally()"),
         checkout("Gateway.swift", "gateway()"),
         checkout("Gateway.swift", "gateway().GET /health"),
         checkout("Gateway.swift", "gateway().POST /v1/items"),
@@ -12165,7 +12268,8 @@ fn swift() {
         ),
         // A protocol an extension conforms to: its requirement; the type's own member, from a
         // later extension of another file, before that protocol's default body; and an outside
-        // protocol keeps a bare name from the top-level function.
+        // protocol keeps a bare name from the top-level function, unless the pack knows it
+        // declares no such name (`CustomStringConvertible`, Known outside members).
         (
             probe("Probe.run()::ping#0"),
             EXACT,
@@ -12178,6 +12282,11 @@ fn swift() {
         ),
         (
             probe("Bag.run()::describe#0"),
+            EXACT,
+            one(probe("describe()")),
+        ),
+        (
+            probe("Sack.run()::describe#0"),
             INFERRED,
             one(probe("describe()")),
         ),
@@ -12230,6 +12339,41 @@ fn swift() {
             service("Reporter.report()::summary#0"),
             INFERRED,
             one(service("Reporter.summary()")),
+        ),
+        // Known outside members: `Hashable` and `Codable` hide `hash`, `encode` and `init`
+        // alone, a raw value type and `CaseIterable` their own names, and `RouteCollection`
+        // `boot`.
+        (
+            store("Tag.swift", "Tag.use(_:)::t.open#0"),
+            EXACT,
+            one(store("Tag.swift", "Tag.open(seat:)")),
+        ),
+        (
+            store("Tag.swift", "Tag.use(_:)::open#0"),
+            EXACT,
+            one(store("Tag.swift", "Tag.open()")),
+        ),
+        (
+            store("Tag.swift", "Tag.use(_:)::t.hash#0"),
+            INFERRED,
+            one(store("Tag.swift", "Tag.hash(into:)")),
+        ),
+        (store("Tag.swift", "Tag.use(_:)::t.missing#0"), None, vec![]),
+        // The overloads of a member merge across modules.
+        (
+            checkout("Tagging.swift", "tagging(_:)::tag.open#0"),
+            EXACT,
+            one(store("Tag.swift", "Tag.open(seat:)")),
+        ),
+        (
+            store("Tag.swift", "Status.shout()::label#0"),
+            EXACT,
+            one(store("Tag.swift", "Status.label(upper:)")),
+        ),
+        (
+            checkout("Routes.swift", "OrderController.boot(routes:)::tally#0"),
+            EXACT,
+            one(checkout("Routes.swift", "OrderController.tally()")),
         ),
         // Across the import: a public initializer and function, the module's name as a
         // qualifier, and an internal function the import does not reach.

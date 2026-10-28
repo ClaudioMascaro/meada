@@ -93,6 +93,19 @@ impl LanguagePack for CSharp {
         ]
     }
 
+    /// The BCL types whose members are few and fixed; the table grows with evidence from the
+    /// dogfood repositories, never by guess (ADR 0019). `IEnumerable` is left out: the LINQ
+    /// extension methods every file sees (`Contains`, `Count`, `First`) answer a call no own
+    /// overload fits by type.
+    fn known_outside(&self) -> super::KnownOutside {
+        &[
+            ("System.IDisposable", &["Dispose"]),
+            ("System.IAsyncDisposable", &["DisposeAsync"]),
+            ("System.IEquatable", &["Equals"]),
+            ("System.IComparable", &["CompareTo"]),
+        ]
+    }
+
     /// Every project file (an SDK-style one is a project, `join`), and the props files MSBuild
     /// imports into the projects below them.
     fn config_files(&self) -> &'static [&'static str] {

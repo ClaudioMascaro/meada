@@ -74,6 +74,13 @@ struct OrderController: RouteCollection {
         unlisted(routes)
         let alias = routes
         alias.get("alias") { req in "alias" }
+        _ = tally()
+    }
+
+    // `RouteCollection` declares `boot(routes:)` alone (Known outside members): a call to an
+    // own method is exact.
+    func tally() -> Int {
+        0
     }
 
     func list(req: Request) -> [String] {
@@ -85,8 +92,8 @@ struct OrderController: RouteCollection {
     }
 }
 
-// A call made inside a type of an outside protocol is a name match (`RouteCollection` may
-// declare the helper), so what `boot` passes it is not followed.
+// `RouteCollection` declares `boot(routes:)` alone (Known outside members), so the call from
+// `boot` is exact and what it passes is followed: the routes serve under both registrations.
 func unlisted(_ routes: RoutesBuilder) {
     routes.get("unlisted") { req in "unlisted" }
 }

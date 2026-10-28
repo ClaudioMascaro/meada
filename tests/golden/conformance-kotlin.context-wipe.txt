@@ -1,5 +1,5 @@
 example.com/acme/conformance src/main/kotlin/example/Receivers.kt:25-25 example.Cache.wipe()
-community: src/main/kotlin/example#11
+community: src/main/kotlin/example#12
 processes: 4 (4 export; 1 repository): example.called() (example.com/acme/conformance), example.nestedIt(Cache,List<Disk>) (example.com/acme/conformance), example.parameter(Cache,Store,Disk) (example.com/acme/conformance), example.scopes(Cache,Disk,Store) (example.com/acme/conformance)
 fun wipe() {}
 callers:
