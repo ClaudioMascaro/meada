@@ -23,7 +23,7 @@ Cada `Cargo.toml` con `[package]` define un crate, en cualquier carpeta. Meada s
 
 Llamadas como `crate::a::f()`, `Tipo::new()` y `Self::f()` siguen la ruta escrita. La resolución también sigue `use`, grupos, renombrados, globs, `pub use` y otros crates del workspace por nombre.
 
-Para `x.m()`, Meada usa el tipo del receptor escrito en un `let`, parámetro, campo, `self` o retorno de función. Una llamada sobre el resultado de otra (`Router::new().route(..)`, también tras `.await`, `?` o paréntesis) se resuelve por el tipo de retorno escrito de la llamada interna. Un `dyn Trait` o genérico limitado por trait llega al método del trait. Sin tipo escrito, resuelve por nombre. Los métodos ausentes de los `impl` del tipo, como los generados por `derive` o de traits externos, no producen vínculos. Los atributos de ruta tampoco se vinculan con funciones.
+Para `x.m()`, Meada usa el tipo del receptor escrito en un `let`, parámetro, campo, `self` o retorno de función. Una llamada sobre el resultado de otra (`Router::new().route(..)`, también tras `.await` o paréntesis) se resuelve por el tipo de retorno escrito de la llamada interna. Un `dyn Trait` o genérico limitado por trait llega al método del trait. Sin tipo escrito, resuelve por nombre. Los métodos ausentes de los `impl` del tipo, como los generados por `derive` o de traits externos, no producen vínculos. Los atributos de ruta tampoco se vinculan con funciones.
 
 El análisis usa la configuración por defecto de cada crate para x86_64 Linux. Elementos con `#[cfg(..)]` falso y features fuera de `default` quedan fuera; se incluyen los módulos compilados en un build de test, no solo los `#[cfg(test)]`. No se indexan llamadas dentro de macros. Los contratos Rust cubren paquetes, HTTP y canales.
 

@@ -1770,7 +1770,10 @@ fn member(node: Node, src: &[u8]) -> String {
 }
 
 /// The call a method call is made on (`Router::new()` in `Router::new().route(..)`), through
-/// `.await`, `?` and parentheses.
+/// `.await` and parentheses. Not through `?`: it unwraps the written result (`Result<T>`,
+/// `Option<T>`), so the receiver is not of that type and the call stays a name match.
+// ponytail: `.await` takes the written result as the awaited value, which holds for an `async
+// fn`; a plain `fn` that returns `impl Future<Output = T>` leaves the call unresolved.
 fn inner_call(function: Node) -> Option<Node> {
     if function.kind() != "field_expression" {
         return None;
@@ -1779,9 +1782,7 @@ fn inner_call(function: Node) -> Option<Node> {
     for _ in 0..PATH_DEPTH {
         match at.kind() {
             "call_expression" => return Some(at),
-            "try_expression" | "await_expression" | "parenthesized_expression" => {
-                at = at.named_child(0)?
-            }
+            "await_expression" | "parenthesized_expression" => at = at.named_child(0)?,
             _ => return None,
         }
     }

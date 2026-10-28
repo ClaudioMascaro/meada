@@ -3000,6 +3000,11 @@ qualification budget does (ADR 0017).
   so no repository type is guessed. The walk in `parse` carries each node's depth and the items
   around it, so `parameter` asks for no parent (each lookup walks down from the root of the
   tree).
+- `lang/rust.rs` (`inner_call`): a method called on another call (`Router::new().route(..)`)
+  names it (`Call::on`) through `.await` and parentheses, so its receiver is the inner target's
+  written result. Not through `?`, which unwraps that result (`Result<T>`, `Option<T>`): the call
+  stays a name match. `.await` takes the written result as the awaited value, as an `async fn`
+  writes it; on a plain `fn` that returns `impl Future<Output = T>` the call resolves to nothing.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. The root
   `tsconfig.json` (else `jsconfig.json`) is read as `package::read_tsconfig` reads one
   (`package::tsconfig_root`, `MAX_BYTES`), so one past the size limit, not UTF-8, not JSON or

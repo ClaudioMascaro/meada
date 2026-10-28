@@ -56,6 +56,19 @@ const DEFAULT_IMPORTS: &[&str] = &[
     "kotlin.text",
 ];
 
+/// The names `Comparable` declares, with the standard library's extensions on it.
+const COMPARABLE: &[&str] = &[
+    "compareTo",
+    "coerceAtLeast",
+    "coerceAtMost",
+    "coerceIn",
+    "rangeTo",
+    "rangeUntil",
+];
+
+/// The names `AutoCloseable` and `Closeable` declare, with the standard library's `use`.
+const CLOSEABLE: &[&str] = &["close", "use"];
+
 unsafe extern "C" {
     /// The vendored grammar's constructor, which `build.rs` compiles (ADR 0017).
     fn tree_sitter_kotlin() -> *const ();
@@ -98,31 +111,11 @@ impl LanguagePack for Kotlin {
     /// overload fits by type takes them, so they count as names the type declares.
     fn known_outside(&self) -> super::KnownOutside {
         &[
-            (
-                "kotlin.Comparable",
-                &[
-                    "compareTo",
-                    "coerceAtLeast",
-                    "coerceAtMost",
-                    "coerceIn",
-                    "rangeTo",
-                    "rangeUntil",
-                ],
-            ),
-            (
-                "java.lang.Comparable",
-                &[
-                    "compareTo",
-                    "coerceAtLeast",
-                    "coerceAtMost",
-                    "coerceIn",
-                    "rangeTo",
-                    "rangeUntil",
-                ],
-            ),
-            ("java.lang.AutoCloseable", &["close", "use"]),
-            ("java.io.Closeable", &["close", "use"]),
-            ("kotlin.AutoCloseable", &["close", "use"]),
+            ("kotlin.Comparable", COMPARABLE),
+            ("java.lang.Comparable", COMPARABLE),
+            ("java.lang.AutoCloseable", CLOSEABLE),
+            ("java.io.Closeable", CLOSEABLE),
+            ("kotlin.AutoCloseable", CLOSEABLE),
         ]
     }
 

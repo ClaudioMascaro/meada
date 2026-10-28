@@ -2173,6 +2173,7 @@ impl<'a> Resolver<'a> {
                     continue;
                 }
             };
+            opaque |= self.actual_adds(c, member);
             let mut scopes = vec![(c.path, c.name)];
             for b in blocks(c) {
                 scopes.push((b.path, b.scope));
@@ -2450,6 +2451,25 @@ impl<'a> Resolver<'a> {
         (all.iter())
             .all(|t| *t == expect || (t.name == expect.name && actual(t)))
             .then_some(expect)
+    }
+
+    /// Whether an `actual` class of `expect` class `c` declares an overload of `member` that `c`
+    /// does not: a call `c`'s overloads alone answer may reach it, so it is a name match.
+    fn actual_adds(&self, c: Target<'a>, member: &str) -> bool {
+        if !self.is_expect(c) {
+            return false;
+        }
+        let qualified = format!("{}.{member}", c.name);
+        let signatures = |path: &'a str| {
+            (self.overloads.get(path))
+                .and_then(|o| o.get(qualified.as_str()))
+                .into_iter()
+                .flatten()
+                .map(|t| t.name)
+        };
+        let own: HashSet<&str> = signatures(c.path).collect();
+        (self.actuals.get(c.name).into_iter().flatten())
+            .any(|&path| signatures(path).any(|s| !own.contains(s)))
     }
 
     /// Whether `t` is a class its file declares `expect` (`Facts::expect`).
@@ -9480,6 +9500,50 @@ mod tests {
         out
     }
 
+    /// A call on another call's result is typed by the inner target's written result, through
+    /// `.await` and parentheses; after `?` that result is the `Result` or `Option` around the
+    /// value, so the call stays the name match it was.
+    #[test]
+    fn a_rust_call_after_try_on_a_call_stays_a_name_match() {
+        let calls = pack_calls(
+            &crate::lang::rust::Rust,
+            "src/lib.rs",
+            "use anyhow::Result;
+             pub struct Cfg;
+             impl Cfg { pub fn port(&self) {} }
+             pub struct Other;
+             impl Other { pub fn port(&self) {} }
+             pub fn load() -> Result<Cfg> { todo!() }
+             pub fn opt() -> Option<Cfg> { todo!() }
+             pub fn cfg() -> Cfg { Cfg }
+             pub fn a() -> Result<()> { load()?.port(); Ok(()) }
+             pub fn b() -> Option<()> { opt()?.port(); None }
+             pub async fn c() { (cfg()).port(); }",
+        );
+        let both = "ambiguous Cfg.port Other.port";
+        assert_eq!(calls["a (try_expression).port"], both);
+        assert_eq!(calls["b (try_expression).port"], both);
+        assert_eq!(calls["c (parenthesized_expression).port"], "exact Cfg.port");
+    }
+
+    /// `T::new().m().m()..`: each Rust call is made on the one before and typed by its exact
+    /// target's written result (`Self`), so a link reads the links below it to `RECEIVER_DEPTH`
+    /// at most: the chain costs its length, not a factor per link.
+    #[test]
+    fn a_rust_chain_of_calls_on_call_results_is_read_in_linear_time() {
+        let n = 4 * RECEIVER_DEPTH;
+        let src = format!(
+            "pub struct T;\nimpl T {{ pub fn new() -> Self {{ T }} pub fn m(self) -> Self {{ self }} }}\n\
+             pub fn f() {{ T::new(){}; }}\n",
+            ".m()".repeat(n)
+        );
+        let start = std::time::Instant::now();
+        let calls = pack_calls(&crate::lang::rust::Rust, "src/lib.rs", &src);
+        let took = start.elapsed();
+        assert_eq!(calls["f T.new"], "exact T.new");
+        assert!(took.as_secs() < 10, "{took:?}");
+    }
+
     #[test]
     fn an_outside_base_anywhere_in_the_family_keeps_a_member_from_exact() {
         let calls = java_calls(
@@ -9902,11 +9966,11 @@ mod csharp_tests {
 
     #[test]
     fn unbound_calls_cost_the_same_whatever_the_namespaces_they_import_hold() {
-        let (one, fifty) = (unbound_calls_against(1), unbound_calls_against(4000));
+        let (one, many) = (unbound_calls_against(1), unbound_calls_against(4000));
         // Each lookup copied the namespace's file list, about 0.17 us per file: 4000 files made
         // a debug build several times slower (50 files, as on bitwarden, only 1.4 times in a
         // release build, too close to the noise to pin).
-        assert!(fifty < one * 3 / 2, "{one:?} {fifty:?}");
+        assert!(many < one * 3 / 2, "{one:?} {many:?}");
     }
 
     /// `resolved` over the project files `configs`.
@@ -10758,6 +10822,16 @@ mod kotlin_tests {
             ("u/U.kt", &*user_more),
         ];
         assert_eq!(level(&more, "c.more"), "inferred b/C.kt::e.C.more()");
+        // An overload only the `actual` adds may be the one called: a name match.
+        let overloaded = actual.replace("fun own() {}", "fun own() {} fun m(s: String) {}");
+        let added = [
+            ("a/C.kt", &*expect),
+            ("b/C.kt", &*overloaded),
+            ("u/U.kt", user),
+        ];
+        assert_ne!(level(&added, "c.m"), "exact a/C.kt::e.C.m(Int)");
+        assert!(!level(&added, "c.m").starts_with("none"));
+        assert_eq!(level(&added, "c.own"), "exact a/C.kt::e.C.own()");
         for other in [&expect, &plain] {
             let two = [("a/C.kt", &*expect), ("b/C.kt", &**other), ("u/U.kt", user)];
             assert_eq!(level(&two, "C"), "ambiguous a/C.kt::e.C b/C.kt::e.C");

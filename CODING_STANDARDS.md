@@ -144,5 +144,7 @@ in the same change:
   `RouteCollection`, an exception decided in ADR 0019. Two exceptions are pending (#383): the
   TypeScript pack's `RESPONSES` (Next.js `NextResponse`) and `INFERS` (zod and io-ts) in
   `lang/ts/types.rs`, type reads it makes at parse time. The test in `lang/mod.rs`
-  (`every_str_table_in_a_pack_is_listed_with_its_class`) lists every such table with its class,
-  so a new one is a decision visible in review: a table anywhere else in a pack is a finding.
+  (`every_str_table_in_a_pack_is_listed_with_its_class`) lists every such `&[&str]` table named
+  by a `const` or `static` with its class (a `known_outside` table is a literal its method
+  returns), so a new one is a decision visible in review: a table anywhere else in a pack is a
+  finding.

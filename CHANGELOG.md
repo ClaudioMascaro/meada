@@ -8,6 +8,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Rust method called on another call's result (`Router::new().route(..)`, also through
+  `.await` and parentheses) resolves within the family of the inner target's written result,
+  `exact` when one member fits. Before, it was a name match among every method of its name
+  (axum's `.route` after `Router::new()`). After `?` the call stays a name match: the written
+  result is the `Result` or `Option` around the value.
 - A Rust type a glob import brings (`use super::*;`, `use crate::x::*;`) heads a path called,
   as a function it brings is called: `Def::new()` under `use super::*;` resolves `exact`, also
   when the parent imports `Def` by name. Before, a glob gave its functions alone and the call
@@ -17,8 +22,13 @@ All notable changes to Meada are recorded here. The format follows
   as a base, a constructor or a written type the name binds it, so the members it declares
   resolve `exact` on its subclasses. Before, the name bound every declaration, ambiguously, and
   a subclass's bare calls of the base's members stayed unresolved. A member only an `actual`
-  declares stays a name match. A name two Kotlin star
-  imports both give is `ambiguous`; before, the last import gave it.
+  declares stays a name match, as does a call an `actual`'s own overload of the name may
+  answer. A name two Kotlin star imports both give is `ambiguous`; before, the last import gave
+  it.
+- A Kotlin class a star import brings (`import t.*`) binds as a base, a constructor and a
+  written type, and its members resolve on a subclass. Before, the file's own package was
+  asked first and its reading also took the file's star imports, whose answer it then dropped,
+  so the name stayed unresolved.
 - A C# type of a namespace around the file's (`Acme.Query` from `Acme.Query.Internal`) binds
   without a `using`, as a static call's receiver, a constructor and a base: the innermost
   namespace first, and before a type a `using` brings. Before, the name stayed unresolved, or
