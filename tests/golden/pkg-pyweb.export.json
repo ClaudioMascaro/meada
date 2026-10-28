@@ -25,7 +25,8 @@
         "path": "app/main.py",
         "start": 367,
         "end": 414
-      }
+      },
+      "hash": "ec6a18b446c4f01134fe09ac4f02eb073ec2b308b5f93a98b1dd70c444b80786"
     },
     {
       "id": "example.com/pkg/pyweb::app/main.py::extra",
@@ -33,7 +34,8 @@
         "path": "app/main.py",
         "start": 254,
         "end": 305
-      }
+      },
+      "hash": "00e528e233764971d9a22cc5ea18c63a8e49455cccabd27bfdc1ccdacc3ac507"
     },
     {
       "id": "example.com/pkg/pyweb::app/main.py::hidden",
@@ -41,7 +43,8 @@
         "path": "app/main.py",
         "start": 308,
         "end": 364
-      }
+      },
+      "hash": "f5f1a9ac7ba3520f20e62d12a27b63d4dfaff132c8f969c262b800b6b2a9447a"
     },
     {
       "id": "example.com/pkg/pyweb::app/main.py::lookup",
@@ -49,7 +52,8 @@
         "path": "app/main.py",
         "start": 157,
         "end": 210
-      }
+      },
+      "hash": "6dec8fba14f6df8a4735c39dfb5540b1ffa55ba7f095230d90067bad76d8ea9f"
     },
     {
       "id": "example.com/pkg/pyweb::app/main.py::make",
@@ -57,7 +61,8 @@
         "path": "app/main.py",
         "start": 213,
         "end": 251
-      }
+      },
+      "hash": "316ac0f621380ece4380a023f3e4884c91e5d398dd8181a56a9945bcabe4795d"
     },
     {
       "id": "example.com/pkg/pyweb::app/main.py::welcome",
@@ -65,7 +70,8 @@
         "path": "app/main.py",
         "start": 113,
         "end": 154
-      }
+      },
+      "hash": "3ee6cbf914a28e224b2aa7299fa51f2d77edb2becb9e01e5ce01a15501f61022"
     },
     {
       "id": "example.com/pkg/pyweb::app/rel.py::relative",
@@ -73,7 +79,8 @@
         "path": "app/rel.py",
         "start": 126,
         "end": 234
-      }
+      },
+      "hash": "bdce2662c79ae19452b70157e207270fcd3106feedea7537b5e3ba5fea66cb54"
     },
     {
       "id": "example.com/pkg/pyweb::tests/test_api.py::test_greet",
@@ -81,7 +88,8 @@
         "path": "tests/test_api.py",
         "start": 31,
         "end": 70
-      }
+      },
+      "hash": "a5a3b566d77c41f7b318eaa85331e72fe600fe3829d2e3743ea9f2f3db2b8375"
     },
     {
       "id": "example.com/pkg/pyweb::worker/job.py::run",
@@ -89,7 +97,8 @@
         "path": "worker/job.py",
         "start": 17,
         "end": 65
-      }
+      },
+      "hash": "912b9fc238601657ed3d511fe03a0fcd4a24a6bbf239f5df76c25b492ec39220"
     }
   ],
   "calls": [

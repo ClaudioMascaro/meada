@@ -33,7 +33,8 @@
         "path": "e2e/smoke.ts",
         "start": 105,
         "end": 156
-      }
+      },
+      "hash": "9bd341638fe4aab31513600c20c4be162d08f8ee16a4e2ed522a835c2d393f5d"
     },
     {
       "id": "example.com/pkg/web::src/app.ts::caught",
@@ -41,7 +42,8 @@
         "path": "src/app.ts",
         "start": 921,
         "end": 1017
-      }
+      },
+      "hash": "097f256a0cf2baedb467d64f9bc3b8002c9498aacac35b2f20eab87a1a1ec867"
     },
     {
       "id": "example.com/pkg/web::src/app.ts::destructured",
@@ -49,7 +51,8 @@
         "path": "src/app.ts",
         "start": 1026,
         "end": 1117
-      }
+      },
+      "hash": "d67bd0c7f2da979e633ad580b6463ac0453a1fbeadb29b5a4298b71e4288921a"
     },
     {
       "id": "example.com/pkg/web::src/app.ts::hidden",
@@ -57,7 +60,8 @@
         "path": "src/app.ts",
         "start": 830,
         "end": 912
-      }
+      },
+      "hash": "eb094ea0ffb728c4926d3c38b67b4e5bf477d85b01a4eba7bbbd66943f6e98b0"
     },
     {
       "id": "example.com/pkg/web::src/app.ts::main",
@@ -65,7 +69,8 @@
         "path": "src/app.ts",
         "start": 442,
         "end": 763
-      }
+      },
+      "hash": "f0cd9fcf999eba9ab426d3b928cd910e870e141f22ddb3817851ec2b41ac1bcf"
     },
     {
       "id": "example.com/pkg/web::src/app.ts::shadowed",
@@ -73,7 +78,8 @@
         "path": "src/app.ts",
         "start": 1126,
         "end": 1205
-      }
+      },
+      "hash": "99d41325791e829be1e23fff82f0db7cee6b176cd5795cbc78c19d41d04e219a"
     },
     {
       "id": "example.com/pkg/web::src/app.ts::shadowed.slugify",
@@ -81,7 +87,8 @@
         "path": "src/app.ts",
         "start": 1160,
         "end": 1186
-      }
+      },
+      "hash": "00a7ebd0918d23376a10dce0149285d2f048d8751aa34bc49e3da55cb2b1ab03"
     },
     {
       "id": "example.com/pkg/web::src/app.ts::welcome",
@@ -89,7 +96,8 @@
         "path": "src/app.ts",
         "start": 369,
         "end": 433
-      }
+      },
+      "hash": "4e27fee127c2a85ed00328effe80a1b718c2d6952b95883bb4bbecbb59a15f8f"
     },
     {
       "id": "example.com/pkg/web::src/entries.ts::entries",
@@ -97,7 +105,8 @@
         "path": "src/entries.ts",
         "start": 576,
         "end": 675
-      }
+      },
+      "hash": "99774b381f5af4fd4d1923a313047fae0e1557cde618182a5d2eee24f0548e7a"
     },
     {
       "id": "example.com/pkg/web::src/nest.ts::nest",
@@ -105,7 +114,8 @@
         "path": "src/nest.ts",
         "start": 352,
         "end": 408
-      }
+      },
+      "hash": "24e42df5c2ed0c81c37b8b5f452c0588e16961be343f5457cc31a836b497a214"
     },
     {
       "id": "example.com/pkg/web::src/text.ts::clean",
@@ -113,7 +123,8 @@
         "path": "src/text.ts",
         "start": 315,
         "end": 379
-      }
+      },
+      "hash": "d0786a0456d2852d8065307f57abd03e1237a0dc9061a50b599e463a11b2528f"
     },
     {
       "id": "example.com/pkg/web::src/text.ts::lock",
@@ -121,7 +132,8 @@
         "path": "src/text.ts",
         "start": 461,
         "end": 505
-      }
+      },
+      "hash": "7c0ad81cd51d9a7b3490919f67e2edf75c4b3001ebb6202ac3f82cc86c164321"
     },
     {
       "id": "example.com/pkg/web::src/text.ts::squash",
@@ -129,7 +141,8 @@
         "path": "src/text.ts",
         "start": 388,
         "end": 452
-      }
+      },
+      "hash": "194b7e9d23a262e36f9334ed59a18216e5782c8619689ccd9360f4dc124af66c"
     },
     {
       "id": "example.com/pkg/web::tools/run.ts::run",
@@ -137,7 +150,8 @@
         "path": "tools/run.ts",
         "start": 136,
         "end": 187
-      }
+      },
+      "hash": "0563ef6490c750dff492778d56e9220db2991f5d8b5bc9a1099ff2ccf74fcd48"
     }
   ],
   "calls": [

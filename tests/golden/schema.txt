@@ -3,7 +3,7 @@ CREATE TABLE files (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     facts TEXT NOT NULL, resolved TEXT NOT NULL, setting TEXT NOT NULL
 );
-CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL);
+CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, hash TEXT NOT NULL);
 CREATE INDEX symbols_path ON symbols (path);
 CREATE TABLE calls (
     id TEXT NOT NULL, caller TEXT NOT NULL, target TEXT, level TEXT,
@@ -43,7 +43,8 @@ sample.ts
         "start": 380,
         "end": 531
       },
-      "params": []
+      "params": [],
+      "hash": "1b8003202666560d7cff997c959c9de6ba2533f1bb54df8171cb51dd5993d6d3"
     },
     {
       "name": "Store.find",
@@ -67,7 +68,8 @@ sample.ts
             }
           ]
         }
-      ]
+      ],
+      "hash": "c46f963ef5aac487d6f5bb2f020a9fafcdaa7d9169fb31c344ea4d0e736b6f89"
     },
     {
       "name": "serve",
@@ -85,7 +87,8 @@ sample.ts
           "name": "",
           "binds": "Any"
         }
-      ]
+      ],
+      "hash": "4068abc75ba7fccb45eebab412c1c720ab04425be754b128606914c04dc36855"
     },
     {
       "name": "serve.@789",
@@ -103,7 +106,8 @@ sample.ts
           "name": "res",
           "binds": "Any"
         }
-      ]
+      ],
+      "hash": "6ec4bc6bc5441c5e5a99e545f448c4fda6e4dc4d3b4236d44e54b4415a46510c"
     },
     {
       "name": "serve.@851",
@@ -112,7 +116,8 @@ sample.ts
         "start": 851,
         "end": 876
       },
-      "params": []
+      "params": [],
+      "hash": "a8dcd98b64ed70e3783cb0e922c13cef23fdf485e138e2d7c1d274d56c21ec21"
     }
   ],
   "imports": [
@@ -298,7 +303,8 @@ sample.py
       "params": [],
       "bases": [
         "Shape"
-      ]
+      ],
+      "hash": "bdd3d157b61b4216fa37e1cacda450663029f8998af0c9d292a80f668db8a875"
     },
     {
       "name": "Circle.__init__",
@@ -316,7 +322,8 @@ sample.py
           "name": "radius",
           "binds": "Any"
         }
-      ]
+      ],
+      "hash": "156f3d27fa9fa22e6f76eb3fc925f5fd756fd80983b13b24b63fe300ced1c48b"
     },
     {
       "name": "Circle.unit",
@@ -345,7 +352,8 @@ sample.py
       ],
       "decorators": [
         "classmethod"
-      ]
+      ],
+      "hash": "ba999ab8d41bc86ef6ccf763aac12637f258219f5dcf99adef1406504677c9c9"
     },
     {
       "name": "Circle.describe",
@@ -362,7 +370,8 @@ sample.py
       ],
       "decorators": [
         "staticmethod"
-      ]
+      ],
+      "hash": "6c838bac6a025a39b7d54d5d0e7c6c966372b3a4a455a8ee83bb82d367280789"
     },
     {
       "name": "area",
@@ -383,7 +392,8 @@ sample.py
       ],
       "decorators": [
         "require_GET"
-      ]
+      ],
+      "hash": "f67aa80a0919c936f4ed1171e73a846bc2c44be4f8c961915c6c46de44c40324"
     },
     {
       "name": "legacy",
@@ -392,7 +402,8 @@ sample.py
         "start": 704,
         "end": 726
       },
-      "params": []
+      "params": [],
+      "hash": "e966a2c9a969f6c457ca28cf9e0d5dcba3484bb24532526fe42ff47a9d1d0a56"
     },
     {
       "name": "main",
@@ -401,7 +412,8 @@ sample.py
         "start": 745,
         "end": 807
       },
-      "params": []
+      "params": [],
+      "hash": "2c420469e96e5a133f3c28d89693ba5ecdfe3386b2e57d59bd9368a09283e62a"
     }
   ],
   "imports": [
@@ -696,7 +708,8 @@ sample.rs
         "start": 72,
         "end": 81
       },
-      "params": []
+      "params": [],
+      "hash": "615a65a31a1d3865e7d44eeff352c63281e25d827ffae0130508792cb4114b9b"
     },
     {
       "name": "util",
@@ -705,7 +718,8 @@ sample.rs
         "start": 109,
         "end": 122
       },
-      "params": []
+      "params": [],
+      "hash": "6f12806fbe7b91f902692e93e0baed4c43e4c0528abe97dcebf7c6ae0e7e1dab"
     },
     {
       "name": "Store",
@@ -714,7 +728,8 @@ sample.rs
         "start": 220,
         "end": 252
       },
-      "params": []
+      "params": [],
+      "hash": "ded43653674fa8efca077d13fbf97ea2b18018570fcb46aa624bf2af17775d6b"
     },
     {
       "name": "Persist",
@@ -723,7 +738,8 @@ sample.rs
         "start": 254,
         "end": 318
       },
-      "params": []
+      "params": [],
+      "hash": "e87d61438170dc6d4fb0e9ed532b46e863a46dbcacf43545ee8b0ecb066c5f50"
     },
     {
       "name": "Persist.describe",
@@ -735,7 +751,8 @@ sample.rs
       "params": [],
       "result": {
         "Type": "u32"
-      }
+      },
+      "hash": "588214c2513886a4ef3fb1600afd4176f3b33cb28de7e08ed0d6008eaf4b09b4"
     },
     {
       "name": "Store.new",
@@ -752,7 +769,8 @@ sample.rs
       ],
       "result": {
         "Type": "Self"
-      }
+      },
+      "hash": "d552684bd31cb3d6f758e49ccd841b54700c0edc9835af626b6c4f76ec914e3d"
     },
     {
       "name": "Store.empty",
@@ -769,7 +787,8 @@ sample.rs
       ],
       "result": {
         "Type": "Self"
-      }
+      },
+      "hash": "0ccd3d1a5eec9b8f21c3c76625be76ccd02905d603b6785fbfe31945564df6b9"
     },
     {
       "name": "inner",
@@ -778,7 +797,8 @@ sample.rs
         "start": 581,
         "end": 699
       },
-      "params": []
+      "params": [],
+      "hash": "9def66b763f900f00e94a7e61447d444631a1fa4b5ab60261f64ae4ab079a1bc"
     },
     {
       "name": "inner.helper",
@@ -787,7 +807,8 @@ sample.rs
         "start": 597,
         "end": 697
       },
-      "params": []
+      "params": [],
+      "hash": "359aa31e19a1f56cf489089d4a59092fc8abad479bc046f543128037f1e2a95a"
     },
     {
       "name": "save",
@@ -801,7 +822,8 @@ sample.rs
           "name": "store",
           "binds": "Any"
         }
-      ]
+      ],
+      "hash": "e6884722a1b1cd96f2baf3d9483c0ad26bec74fc34ecd3c6f126b6c6ad693829"
     }
   ],
   "imports": [
@@ -1088,7 +1110,8 @@ sample.go
         "start": 119,
         "end": 133
       },
-      "params": []
+      "params": [],
+      "hash": "f75a453ef683fdbb85a2400d741944a6787e67bfcf9019f1b0f43c866372ac18"
     },
     {
       "name": "Getter",
@@ -1097,7 +1120,8 @@ sample.go
         "start": 140,
         "end": 184
       },
-      "params": []
+      "params": [],
+      "hash": "e5d75616a1a42155674b4895cbd817dc1acd2d8537eab8dd8e89ea901fc912e4"
     },
     {
       "name": "Getter.Get",
@@ -1114,7 +1138,8 @@ sample.go
       ],
       "result": {
         "Type": "string"
-      }
+      },
+      "hash": "592310fd84fd1277962fdbaf582de53697c6e0327c58a8db0855ae4b8ae721fc"
     },
     {
       "name": "New",
@@ -1131,7 +1156,8 @@ sample.go
       ],
       "result": {
         "Type": "Store"
-      }
+      },
+      "hash": "5adb9ceba69b3c931e4e066c23fa4f024aef248a3636fd54a8f315de2f9d4795"
     },
     {
       "name": "Store.Get",
@@ -1148,7 +1174,8 @@ sample.go
       ],
       "result": {
         "Type": "string"
-      }
+      },
+      "hash": "a27706205d3f21f0f089c7a839dc1c352baad4142223cace58c65d74ed2041ce"
     }
   ],
   "imports": [
@@ -1283,7 +1310,8 @@ sample.java
       "bases": [
         "Base",
         "Comparable"
-      ]
+      ],
+      "hash": "4eab4589711270096acd26507d0cb69a09ef0fc058d065b1f573f063006d719a"
     },
     {
       "name": "example.Store.Store()",
@@ -1292,7 +1320,8 @@ sample.java
         "start": 233,
         "end": 250
       },
-      "params": []
+      "params": [],
+      "hash": "f151b591964a54d1388d0c63d84faf986548a26800b51971aba21f2b9f4efa96"
     },
     {
       "name": "example.Store.get(String)",
@@ -1309,7 +1338,8 @@ sample.java
       ],
       "result": {
         "Type": "String"
-      }
+      },
+      "hash": "50b91a9eaab3748d2d15d5ba1cf6036fc3e47b72655f0d73d63e0ce81442bb12"
     },
     {
       "name": "example.Store.get(String,int)",
@@ -1330,7 +1360,8 @@ sample.java
       ],
       "result": {
         "Type": "String"
-      }
+      },
+      "hash": "d0d41681acb893534fa14745ca003418f5e5dcfba1663156b7bd96a8e4ab6aa5"
     },
     {
       "name": "example.Store.hidden()",
@@ -1339,7 +1370,8 @@ sample.java
         "start": 387,
         "end": 451
       },
-      "params": []
+      "params": [],
+      "hash": "3001d812e93de91045c564d8299adb118a7e7347157dc0c7c04ce371a0e4b383"
     },
     {
       "name": "example.Store.reset()",
@@ -1348,7 +1380,8 @@ sample.java
         "start": 456,
         "end": 487
       },
-      "params": []
+      "params": [],
+      "hash": "a67f7394772f35463e36211ffe0f29dc75e005f33b894d14e572a20997ea4894"
     }
   ],
   "overloads": {
@@ -1573,7 +1606,8 @@ sample.kt
       ],
       "result": {
         "Type": "Store"
-      }
+      },
+      "hash": "a77713eed09f7eac9b528750ff695f40e4be997b7d124653dcce55091102a28a"
     },
     {
       "name": "example.Store.save(Int,vararg String)",
@@ -1591,7 +1625,8 @@ sample.kt
           "name": "tags",
           "binds": "Rest"
         }
-      ]
+      ],
+      "hash": "ea58eb73647f84d2266dba775fc7e1a3844bb83e030b8b526ac9442917aa358e"
     },
     {
       "name": "example.Store.Companion",
@@ -1600,7 +1635,8 @@ sample.kt
         "start": 153,
         "end": 213
       },
-      "params": []
+      "params": [],
+      "hash": "48bb9739af151f7deb38ba2b03438388741415bc03ebbc4f8b258ff71d899481"
     },
     {
       "name": "example.Store.Companion.open()",
@@ -1612,7 +1648,8 @@ sample.kt
       "params": [],
       "result": {
         "Type": "Store"
-      }
+      },
+      "hash": "70ebad64c87a472160e118b5fee967cce59a48e72a78519a592efd6f741627b5"
     },
     {
       "name": "example.helper()",
@@ -1624,7 +1661,8 @@ sample.kt
       "params": [],
       "result": {
         "Type": "Store"
-      }
+      },
+      "hash": "622be8c495da11327e837187dc621479c632a4f969d1e0d326a4e5e9b970cb7b"
     },
     {
       "name": "example.Clock",
@@ -1636,7 +1674,8 @@ sample.kt
       "params": [],
       "result": {
         "Type": "Clock"
-      }
+      },
+      "hash": "4002bb05f4c7f8aa00f74184f98b131298f1cd084b68a81f000e9b073fabf474"
     },
     {
       "name": "example.Timer",
@@ -1648,7 +1687,8 @@ sample.kt
       "params": [],
       "result": {
         "Type": "Timer"
-      }
+      },
+      "hash": "39fc47542b5863fcaa5f839af26c378ece70bd92fe1f91d2ae35849f4edd1eb2"
     },
     {
       "name": "example.OnlySecondary",
@@ -1660,7 +1700,8 @@ sample.kt
       "params": [],
       "result": {
         "Type": "OnlySecondary"
-      }
+      },
+      "hash": "48524cab1b639e750fd81d71cf633fe98f792fedc5422b97e78d99e479f2dfc7"
     },
     {
       "name": "example.OnlySecondary.OnlySecondary(Int)",
@@ -1677,7 +1718,8 @@ sample.kt
       ],
       "result": {
         "Type": "OnlySecondary"
-      }
+      },
+      "hash": "7f210f8442566a07e860fbbc2cc9b195d5d22ab827fb532b20b6ad76be724ac4"
     }
   ],
   "overloads": {
@@ -2063,7 +2105,8 @@ sample.cs
         "start": 81,
         "end": 331
       },
-      "params": []
+      "params": [],
+      "hash": "6cfdeaa6f813ebb2246b181f13292a565c9b6020b0f01ae364d6b452850904d6"
     },
     {
       "name": "Example.Store.Store(string)",
@@ -2077,7 +2120,8 @@ sample.cs
           "name": "name",
           "binds": "Any"
         }
-      ]
+      ],
+      "hash": "0c3c84334d0e1711acaeff99d621beb0a8abb9b4c4558f2fb05aa2e0fe81e9ff"
     },
     {
       "name": "Example.Store.Save(int,string[])",
@@ -2095,7 +2139,8 @@ sample.cs
           "name": "tags",
           "binds": "Rest"
         }
-      ]
+      ],
+      "hash": "d5a8b047c62fa14e8c3adb0b6c43db52e48fde139cf7795b223e0201941c58d8"
     },
     {
       "name": "Example.Store.Save(int,string[]).Twice",
@@ -2109,7 +2154,8 @@ sample.cs
           "name": "n",
           "binds": "Any"
         }
-      ]
+      ],
+      "hash": "131d6c66e4f40056a6c3b9ee34a63505952a188279988c53d607e611b0c6259f"
     },
     {
       "name": "Example.Store.Open()",
@@ -2121,7 +2167,8 @@ sample.cs
       "params": [],
       "result": {
         "Type": "Store"
-      }
+      },
+      "hash": "b85a336d063fd2c328f744f4da7620fb9a2619218bd3c32d54d408ee6a69eaa8"
     }
   ],
   "overloads": {
@@ -2275,7 +2322,8 @@ sample.swift
         "start": 35,
         "end": 89
       },
-      "params": []
+      "params": [],
+      "hash": "6c87d216434a6d8823c3ececc7707c894014697be4785562a299e8b5c8d665f6"
     },
     {
       "name": "Order.init(id:)",
@@ -2293,7 +2341,8 @@ sample.swift
             "Named": "String"
           }
         }
-      ]
+      ],
+      "hash": "8614bf6cc66bc440494b8b31b8f9b58b246623ee2479074c704ab1c8e2f48715"
     },
     {
       "name": "Order.place(order:quantity:_:)",
@@ -2327,7 +2376,8 @@ sample.swift
             "Named": "Int"
           }
         }
-      ]
+      ],
+      "hash": "3bcd149337e16e19b2c1b8ff6ab00a4ef99819269ab4d0f90618ef3b5818ead8"
     },
     {
       "name": "Order.place(order:quantity:_:).@217",
@@ -2336,7 +2386,8 @@ sample.swift
         "start": 217,
         "end": 220
       },
-      "params": []
+      "params": [],
+      "hash": "bdb534fba3e8f2530bda34b5d3b953c0c9b6d811fa339b5579661ac4e05fdf2d"
     },
     {
       "name": "on(_:)",
@@ -2354,7 +2405,8 @@ sample.swift
             "Named": "Handler"
           }
         }
-      ]
+      ],
+      "hash": "2023f9b0d05b3b0a455208b2bcfe9d562e873f48e8d834672e1a27e6d14640ca"
     },
     {
       "name": "settle()",
@@ -2364,7 +2416,8 @@ sample.swift
         "end": 393
       },
       "params": [],
-      "suspends": true
+      "suspends": true,
+      "hash": "cf8722d1b44e4ac78afeb79d22b6a6b6e3ef88d87a3978141b14bd2b9c160fcf"
     },
     {
       "name": "local()",
@@ -2373,7 +2426,8 @@ sample.swift
         "start": 395,
         "end": 422
       },
-      "params": []
+      "params": [],
+      "hash": "833e4d4ab61e3bd4357ad6e39d87da4d1feadb846c52ab92fe9851ff599fc5a2"
     },
     {
       "name": "shared()",
@@ -2382,7 +2436,8 @@ sample.swift
         "start": 424,
         "end": 516
       },
-      "params": []
+      "params": [],
+      "hash": "c9b9a0bd7799123ad3d1d8e1ed94caa3785e3f3782b3355abd240943746d2bc9"
     }
   ],
   "overloads": {

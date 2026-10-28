@@ -17,7 +17,8 @@
         "path": "src/label.js",
         "start": 53,
         "end": 101
-      }
+      },
+      "hash": "e99abf4f80023792e1ea252473cee09d3234427df9504cc058e2b680248a9ba7"
     },
     {
       "id": "example.com/pkg/api::src/report.js::report",
@@ -25,7 +26,8 @@
         "path": "src/report.js",
         "start": 46,
         "end": 90
-      }
+      },
+      "hash": "2f6d97faa1808cfa786816435eaff64a6ee28c3a32752ce24a7a77cd7ba3ae3f"
     }
   ],
   "calls": [

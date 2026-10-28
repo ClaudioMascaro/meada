@@ -21,7 +21,8 @@
         "path": "Sources/Plain.swift",
         "start": 0,
         "end": 23
-      }
+      },
+      "hash": "650b92a8a38bc96fec29c131a6dd304631ff9b0892a56c0df1b5ff53c5ab6c2c"
     },
     {
       "id": "example.com/acme/conformance::Sources/Plain.swift::Holder",
@@ -29,7 +30,8 @@
         "path": "Sources/Plain.swift",
         "start": 83,
         "end": 166
-      }
+      },
+      "hash": "6b3429e61b4ed79c27221e562a65aadbce612b506ad38b46cb0a7bb5b15cbee9"
     },
     {
       "id": "example.com/acme/conformance::Sources/Plain.swift::Holder.Pick()",
@@ -37,7 +39,8 @@
         "path": "Sources/Plain.swift",
         "start": 101,
         "end": 115
-      }
+      },
+      "hash": "a173a486d02ffc3be37f77d3abe3360215da1666055942d0511045a575abc1b5"
     },
     {
       "id": "example.com/acme/conformance::Sources/Plain.swift::Holder.pick()",
@@ -45,7 +48,8 @@
         "path": "Sources/Plain.swift",
         "start": 118,
         "end": 132
-      }
+      },
+      "hash": "db9c0d19f31caec74faa176f35db8ddf8d50b2c58f2a83bd850694b9677a440a"
     },
     {
       "id": "example.com/acme/conformance::Sources/Plain.swift::Holder.use()",
@@ -53,7 +57,8 @@
         "path": "Sources/Plain.swift",
         "start": 135,
         "end": 164
-      }
+      },
+      "hash": "ce24e07a24f95503e2a0eb72a953574bf7731e2956dd33f6059915fff5430857"
     },
     {
       "id": "example.com/acme/conformance::Sources/Plain.swift::check(_:)",
@@ -61,7 +66,8 @@
         "path": "Sources/Plain.swift",
         "start": 24,
         "end": 47
-      }
+      },
+      "hash": "4d38533d4d2eaa8c1b7c12dd62e382518e6893ec32b7598d4dc4ca4ac44e3bb7"
     },
     {
       "id": "example.com/acme/conformance::Sources/Plain.swift::run()",
@@ -69,7 +75,8 @@
         "path": "Sources/Plain.swift",
         "start": 48,
         "end": 81
-      }
+      },
+      "hash": "224634845c2c4e3eeb1802a363a7d3ca9adcc093f6f9953dab4be61c08aaef62"
     },
     {
       "id": "example.com/acme/conformance::Sources/Uses.swift::Load()",
@@ -77,7 +84,8 @@
         "path": "Sources/Uses.swift",
         "start": 281,
         "end": 311
-      }
+      },
+      "hash": "e6bed3a0628d3f29deb07d1b2fb285e592e12d8dedb059877837c2fb90bfff83"
     },
     {
       "id": "example.com/acme/conformance::Sources/Uses.swift::Store",
@@ -85,7 +93,8 @@
         "path": "Sources/Uses.swift",
         "start": 15,
         "end": 64
-      }
+      },
+      "hash": "e72538b8e0ac79aab6d17f7dce3ea299d815577ec024d11474201c9185716f28"
     },
     {
       "id": "example.com/acme/conformance::Sources/Uses.swift::Store.init(initialState:)",
@@ -93,7 +102,8 @@
         "path": "Sources/Uses.swift",
         "start": 38,
         "end": 62
-      }
+      },
+      "hash": "5d332238105f6fcff5ae8a08f594327f8b98357fb00054e20d58fa7ed6dfebb2"
     },
     {
       "id": "example.com/acme/conformance::Sources/Uses.swift::awaited()",
@@ -101,7 +111,8 @@
         "path": "Sources/Uses.swift",
         "start": 96,
         "end": 154
-      }
+      },
+      "hash": "c67575f002756963328f7c96fd25137ec17057408704bc15287a869769b0dc78"
     },
     {
       "id": "example.com/acme/conformance::Sources/Uses.swift::g()",
@@ -109,7 +120,8 @@
         "path": "Sources/Uses.swift",
         "start": 66,
         "end": 94
-      }
+      },
+      "hash": "120b135215cc3d855d2ac7d0a1a0192822d58a46876adbc382f2e80fa0c269a5"
     },
     {
       "id": "example.com/acme/conformance::Sources/Uses.swift::spawn()",
@@ -117,7 +129,8 @@
         "path": "Sources/Uses.swift",
         "start": 313,
         "end": 400
-      }
+      },
+      "hash": "7d259d0f0e3e370b938a53387dad6fb63c2fef24540bfc134ef80f03713aed45"
     },
     {
       "id": "example.com/acme/conformance::Sources/Uses.swift::synchronous()",
@@ -125,7 +138,8 @@
         "path": "Sources/Uses.swift",
         "start": 156,
         "end": 206
-      }
+      },
+      "hash": "e6e1cb404709d1a210aac8a0aeacc6182a644f8ee15bcb23e4275483afdb3a54"
     },
     {
       "id": "example.com/acme/conformance::Sources/Uses.swift::types()",
@@ -133,7 +147,8 @@
         "path": "Sources/Uses.swift",
         "start": 208,
         "end": 279
-      }
+      },
+      "hash": "c89b125df6ed4ae40665242d5c3a9730823656ee2aed332a44f660c9293a5c1e"
     },
     {
       "id": "example.com/acme/conformance::Sources/Wrapper.swift::XCTAssertNoThrow(_:file:)",
@@ -141,7 +156,8 @@
         "path": "Sources/Wrapper.swift",
         "start": 15,
         "end": 129
-      }
+      },
+      "hash": "d21b58471cbf4cfe15fe23a6717f240c13703be064edce2b390fcec11a34010f"
     }
   ],
   "calls": [

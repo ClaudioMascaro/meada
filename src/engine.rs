@@ -374,7 +374,8 @@ impl Engine {
     /// `ContractKind::own_search`); `community` lists the communities, matched by name, and `process`
     /// the processes, matched by their entry point's label (`search_communities`,
     /// `search_processes`); `drift` lists the fields consumers read that a route lacks (see
-    /// `search_drift`); `ambiguous` and `unresolved` list the open items whose enclosing
+    /// `search_drift`); `duplicate` lists the symbols whose span text is the same in two or more
+    /// places of the workspace, in groups (`search_duplicates`); `ambiguous` and `unresolved` list the open items whose enclosing
     /// symbol or call expression matches, each with the `meada decide` command that resolves
     /// it. The answer is cut at `budget` tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
@@ -400,6 +401,9 @@ impl Engine {
         }
         if kind == Some("process") {
             return self.search_processes(query, budget);
+        }
+        if kind == Some("duplicate") {
+            return self.search_duplicates(query, budget);
         }
         // Whether symbols match, and the prefix of the contracts that do.
         let (symbols, contracts) = match (kind, selected) {
@@ -578,6 +582,55 @@ impl Engine {
             }
         }
         Ok(search::answer(query, hits, budget))
+    }
+
+    /// The symbols whose span text is the same in two or more places of the workspace (across
+    /// repositories and within one), as groups: a header `<n> copies`, then one line per member in
+    /// the symbol format. A group is listed when any member's name or path matches `query`; groups
+    /// go by span length, longest first, then smallest member identity, members by identity.
+    fn search_duplicates(&self, query: &str, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
+        let exports = self.exports()?;
+        let needle = query.to_lowercase();
+        let mut groups: HashMap<&str, Vec<(&str, &Symbol, String)>> = HashMap::new();
+        for (export, repo) in exports.iter().zip(&self.workspace.repos) {
+            let mut files = Files::new(&repo.root);
+            for symbol in &export.symbols {
+                let line = line(&repo.identity, &mut files, symbol, label(&symbol.id));
+                let group = groups.entry(&symbol.hash).or_default();
+                group.push((&symbol.id, symbol, line));
+            }
+        }
+        // ponytail: no folding of nested groups (a duplicated class lists its methods as groups of
+        // their own) and no minimum span size; add either if one-line copies drown the answer.
+        let mut groups: Vec<_> = groups
+            .into_values()
+            .filter(|g| g.len() > 1)
+            .filter(|g| {
+                g.iter().any(|(id, symbol, _)| {
+                    let name = label(id).to_lowercase();
+                    let last = name.rsplit('.').next().unwrap_or(&name);
+                    let path = symbol.span.path.to_lowercase();
+                    [name.as_str(), last, path.as_str()]
+                        .iter()
+                        .any(|n| rank(n, &needle).is_some())
+                })
+            })
+            .collect();
+        for group in &mut groups {
+            group.sort_by(|a, b| a.0.cmp(b.0));
+        }
+        let length = |g: &Vec<(&str, &Symbol, String)>| g[0].1.span.end - g[0].1.span.start;
+        groups.sort_by(|a, b| length(b).cmp(&length(a)).then_with(|| a[0].0.cmp(b[0].0)));
+        if groups.is_empty() {
+            return Ok(format!("no matches for `{query}`\n"));
+        }
+        let mut lines = Vec::new();
+        for group in groups {
+            lines.push(format!("{} copies", group.len()));
+            lines.extend(group.into_iter().map(|(.., line)| line));
+        }
+        Ok(render::budgeted(&lines, budget))
     }
 
     /// The open items of `kind` whose enclosing symbol or call expression matches `query`.
@@ -1329,7 +1382,14 @@ fn status_lines(
 /// The `kind` words of `search` the engine answers itself: the first two come before the kinds'
 /// filter words, the rest after the kinds' own renderers (`document` sits between the two).
 const WORDS_BEFORE: [&str; 2] = ["symbol", "contract"];
-const WORDS_AFTER: [&str; 5] = ["drift", "community", "process", "ambiguous", "unresolved"];
+const WORDS_AFTER: [&str; 6] = [
+    "drift",
+    "community",
+    "process",
+    "duplicate",
+    "ambiguous",
+    "unresolved",
+];
 
 /// Every `kind` word of `search`, in the order its error names them: the engine's own, the
 /// kinds' filter words in kinds order, `document`, the kinds' own-renderer words, then the rest

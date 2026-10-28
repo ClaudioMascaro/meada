@@ -22,7 +22,8 @@ Son tres herramientas, siempre en inglés, y ninguna escribe:
 
 - `search` encuentra un símbolo, una ruta o un contrato por el nombre; con el tipo `resource`,
   un recurso por su tipo o su id; con el tipo `channel`, un canal (cola o tópico) por el broker
-  o el nombre; con el tipo `ambiguous` o `unresolved`, lista los ítems
+  o el nombre; con el tipo `duplicate`, grupos de símbolos con texto idéntico en dos o más lugares;
+  con el tipo `ambiguous` o `unresolved`, lista los ítems
   abiertos (ver Decisiones);
 - `context` describe un símbolo: su código leído del disco, quién lo llama, a quién llama y los
   contratos que toca; las anotaciones, atributos y decoradores escritos sobre una definición

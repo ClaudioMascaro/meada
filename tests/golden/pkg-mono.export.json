@@ -21,7 +21,8 @@
         "path": "packages/a/src/index.js",
         "start": 7,
         "end": 45
-      }
+      },
+      "hash": "c20c91ba2ddb1e2f9addee16e7620b1d5d23a7e370a5b0f138e52a67d9d9fb8d"
     },
     {
       "id": "example.com/pkg/mono::packages/b/src/app.ts::total",
@@ -29,7 +30,8 @@
         "path": "packages/b/src/app.ts",
         "start": 42,
         "end": 90
-      }
+      },
+      "hash": "4e7f2c8d7df1cdff0e4d952b658edc28001ec1c0c4bddf07e0fd2f416ef67ecd"
     },
     {
       "id": "example.com/pkg/mono::packages/c/src/use.js::sum",
@@ -37,7 +39,8 @@
         "path": "packages/c/src/use.js",
         "start": 42,
         "end": 80
-      }
+      },
+      "hash": "c359113755426ab9209decc6fbdf7550cade1bad2ec6b259a5179e382bb9889c"
     }
   ],
   "calls": [

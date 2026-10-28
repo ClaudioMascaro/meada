@@ -365,6 +365,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 return_values: Vec::new(),
                 returns: None,
                 suspends: false,
+                hash: String::new(),
                 type_params: Vec::new(),
                 result: match node
                     .child_by_field_name("type")

@@ -13,7 +13,8 @@
         "path": "src/main/java/example/worker/Job.java",
         "start": 111,
         "end": 341
-      }
+      },
+      "hash": "7a758aa84930bab29a7c409921c35467208362c531657bede8f456ceda97ae29"
     },
     {
       "id": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.check()",
@@ -21,7 +22,8 @@
         "path": "src/main/java/example/worker/Job.java",
         "start": 208,
         "end": 266
-      }
+      },
+      "hash": "f11a3a862c6c9394ff50ac6a3f1f8d562791e61741fd9b9ee98bd34e95164060"
     },
     {
       "id": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.count(Order)",
@@ -29,7 +31,8 @@
         "path": "src/main/java/example/worker/Job.java",
         "start": 272,
         "end": 339
-      }
+      },
+      "hash": "eb01ea31309209a94055d02f407796c5f591cb8966f9fcb998fac0d98ede503d"
     },
     {
       "id": "example.com/jvm/gradle-client::src/main/java/example/worker/Job.java::example.worker.Job.run(String)",
@@ -37,7 +40,8 @@
         "path": "src/main/java/example/worker/Job.java",
         "start": 134,
         "end": 202
-      }
+      },
+      "hash": "59363879f9f7d39e9334cc9ff6012566cf6bc2a5c82841e12ef36d0226b4d724"
     }
   ],
   "calls": [

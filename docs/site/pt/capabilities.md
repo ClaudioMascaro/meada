@@ -230,7 +230,7 @@ Um processo é a árvore de chamadas iniciada por um ponto de entrada, atravessa
 - Go: `func main` em um `package main`.
 - Swift: um tipo marcado `@main` (pelo seu método `main()` quando ele declara um) e o código de topo de um arquivo `main.swift`, num símbolo `main` dono das chamadas escritas ali.
 
-`trace` com `process::<identidade do ponto de entrada>` lê a árvore. `meada export` inclui cada processo. `search` com tipo `community` encontra comunidades pelo nome; com tipo `process`, encontra processos pelo rótulo do ponto de entrada. `context` mostra a comunidade do símbolo (ou `community: none`) e seus processos, percorrendo chamadas e ligações no sentido dos chamadores.
+`trace` com `process::<identidade do ponto de entrada>` lê a árvore. `meada export` inclui cada processo. `search` com tipo `community` encontra comunidades pelo nome; com tipo `process`, encontra processos pelo rótulo do ponto de entrada; com tipo `duplicate`, lista os símbolos cujo texto é idêntico em dois ou mais lugares do workspace (entre repositórios ou dentro de um), em grupos ordenados pelo tamanho do trecho, achados pelo nome ou pelo caminho de um membro. O export traz o `hash` BLAKE3 de cada símbolo; cópias quase iguais (uma diferença de espaço em branco) não são duplicatas. `context` mostra a comunidade do símbolo (ou `community: none`) e seus processos, percorrendo chamadas e ligações no sentido dos chamadores.
 
 ## Limites e próximos passos
 

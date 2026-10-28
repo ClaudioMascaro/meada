@@ -65,7 +65,10 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   export process, an ambiguous call, a missing peer, a budget cut), `community_queries`
   (`search` kinds `community` and `process`, and the community and processes lines of `context`
   over the chain: processes in three repositories, `community: none`, a decided link that counts
-  and an ambiguous call that does not, the processes line cut under the budget), `decisions`
+  and an ambiguous call that does not, the processes line cut under the budget), `duplicates`
+  (`search` kind `duplicate` over `duplicates-a` and its peer `duplicates-b`: three exact copies in
+  one group, the whitespace near copy left out, groups by span length, a match by path, and the
+  export's `hash`), `decisions`
   (replay, parse errors), `stale` (stale and waiting decisions in `status` and `export`), `decide`
   (the binary in human mode over scripted stdin), `decider` (decider mode against the stub),
   `freshness` (cold vs refreshed, also an edited zod schema dropping a field, edited calls moving

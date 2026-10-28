@@ -230,7 +230,7 @@ A process is the call tree from an entry point, across repositories. Routes, cha
 - Go: `func main` in a `package main`.
 - Swift: a type marked `@main` (through its `main()` method when it declares one) and the top-level code of a `main.swift` file, in a symbol `main` that owns the calls written there.
 
-`trace` with `process::<entry point identity>` reads the tree. `meada export` includes each process. `search` with kind `community` finds communities by name; kind `process` finds processes by their entry-point label. `context` reports the symbol's community (or `community: none`) and processes, walking calls and links toward callers.
+`trace` with `process::<entry point identity>` reads the tree. `meada export` includes each process. `search` with kind `community` finds communities by name; kind `process` finds processes by their entry-point label; kind `duplicate` lists the symbols whose text is identical in two or more places of the workspace (across repositories or within one), as groups ordered by span length, matched by a member's name or path. The export carries each symbol's BLAKE3 `hash`; near copies (a whitespace difference) are not duplicates. `context` reports the symbol's community (or `community: none`) and processes, walking calls and links toward callers.
 
 ## Limits and next steps
 

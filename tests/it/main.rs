@@ -18,6 +18,7 @@ mod decorations;
 mod docs;
 mod documents;
 mod drift;
+mod duplicates;
 mod freshness;
 mod gateway;
 mod generations;

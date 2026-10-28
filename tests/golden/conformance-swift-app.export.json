@@ -53,7 +53,8 @@
         "path": "Sources/App.swift",
         "start": 85,
         "end": 105
-      }
+      },
+      "hash": "bde4f81190ffd51d88752e25026c7d6143aa9f395b40a07c9dd89255eca6c8f4"
     },
     {
       "id": "example.com/acme/conformance::Sources/App.swift::Cli",
@@ -61,7 +62,8 @@
         "path": "Sources/App.swift",
         "start": 0,
         "end": 83
-      }
+      },
+      "hash": "bcca8d5efeb9ead81afbd670fd3b324438ddd3ef4ee9e60276a62aa9f0ff23e0"
     },
     {
       "id": "example.com/acme/conformance::Sources/App.swift::Cli.main()",
@@ -69,7 +71,8 @@
         "path": "Sources/App.swift",
         "start": 23,
         "end": 81
-      }
+      },
+      "hash": "61d1efbd3b510b21527a7241456c24663bdd68a849ccd1f4874171e25454f8e7"
     },
     {
       "id": "example.com/acme/conformance::Sources/Handler.swift::run()",
@@ -77,7 +80,8 @@
         "path": "Sources/Handler.swift",
         "start": 70,
         "end": 104
-      }
+      },
+      "hash": "f4066fbe081bafe7a154719013631f9767d86f7949f2e76631edd38c5508676c"
     },
     {
       "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader",
@@ -85,7 +89,8 @@
         "path": "Sources/Loading/FileLoader.swift",
         "start": 0,
         "end": 526
-      }
+      },
+      "hash": "035d68259f45868c13b54d33634858ff25ffb17c2f30915bd88740c89bcb3249"
     },
     {
       "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:)",
@@ -93,7 +98,8 @@
         "path": "Sources/Loading/FileLoader.swift",
         "start": 37,
         "end": 141
-      }
+      },
+      "hash": "6516263c13f455de07128e2ca9dd930a0c5c9803bcf7f35e7ba90b05f78ee193"
     },
     {
       "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.load(from:limit:)",
@@ -101,7 +107,8 @@
         "path": "Sources/Loading/FileLoader.swift",
         "start": 147,
         "end": 339
-      }
+      },
+      "hash": "d4066ab82c977dd092f076da3c25564fca6469ab6f073c9955d51c7801bc9066"
     },
     {
       "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::FileLoader.report(_:)",
@@ -109,7 +116,8 @@
         "path": "Sources/Loading/FileLoader.swift",
         "start": 345,
         "end": 524
-      }
+      },
+      "hash": "9e5bfd9b8fc08e93bd32622f76b40e64cfa9c3397360f563a7f22f3cd6d726f1"
     },
     {
       "id": "example.com/acme/conformance::Sources/Loading/FileLoader.swift::render(count:)",
@@ -117,7 +125,8 @@
         "path": "Sources/Loading/FileLoader.swift",
         "start": 528,
         "end": 579
-      }
+      },
+      "hash": "f9b6e48dd21fe4e89431463d21355ee77a057d40f15a91578eefa37b7205e9e6"
     },
     {
       "id": "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.Size.doubled()",
@@ -125,7 +134,8 @@
         "path": "Sources/Model/Item+Display.swift",
         "start": 106,
         "end": 164
-      }
+      },
+      "hash": "4b9fe2beee99232058ac73a6e41fb6e958e490a7397d973995ebbdc325fef141"
     },
     {
       "id": "example.com/acme/conformance::Sources/Model/Item+Display.swift::Item.display()",
@@ -133,7 +143,8 @@
         "path": "Sources/Model/Item+Display.swift",
         "start": 21,
         "end": 76
-      }
+      },
+      "hash": "f5d779bd2f5cc947d95dc153da3c6e5fbb58dd8dd415677a15a99b6569b343b8"
     },
     {
       "id": "example.com/acme/conformance::Sources/Model/Item+Display.swift::render(_:)",
@@ -141,7 +152,8 @@
         "path": "Sources/Model/Item+Display.swift",
         "start": 168,
         "end": 226
-      }
+      },
+      "hash": "9bd5431ca4b03b63d2eb28a11db13b8a4f03f94ef105a046c71ae54124bd05ca"
     },
     {
       "id": "example.com/acme/conformance::Sources/Model/Item.swift::Item",
@@ -149,7 +161,8 @@
         "path": "Sources/Model/Item.swift",
         "start": 19,
         "end": 242
-      }
+      },
+      "hash": "0d09b408e70a28f73ee1435c600930654332f11f940f28782270085b56163529"
     },
     {
       "id": "example.com/acme/conformance::Sources/Model/Item.swift::Item.Size",
@@ -157,7 +170,8 @@
         "path": "Sources/Model/Item.swift",
         "start": 115,
         "end": 240
-      }
+      },
+      "hash": "e21de8a4022710bb47bc1c551c640953aafdf0911887dfb18544c51fb0fb35c3"
     },
     {
       "id": "example.com/acme/conformance::Sources/Model/Item.swift::Item.Size.scaled(by:)",
@@ -165,7 +179,8 @@
         "path": "Sources/Model/Item.swift",
         "start": 162,
         "end": 234
-      }
+      },
+      "hash": "b325747b43f9ac45cf41d5c0624e6b4be98604fc32039af61743cb3a525e0edd"
     },
     {
       "id": "example.com/acme/conformance::Sources/Model/Item.swift::Item.label()",
@@ -173,7 +188,8 @@
         "path": "Sources/Model/Item.swift",
         "start": 59,
         "end": 109
-      }
+      },
+      "hash": "26c8a6819605df09fba29b8589abd330210d4de09db91386f34bf5f6c9023f6b"
     },
     {
       "id": "example.com/acme/conformance::Sources/Model/Item.swift::Loader",
@@ -181,7 +197,8 @@
         "path": "Sources/Model/Item.swift",
         "start": 244,
         "end": 306
-      }
+      },
+      "hash": "7aafd1820c3793af25cd6d5150c9ef4e4f125db2bb2a5d218d11842a22ca848c"
     },
     {
       "id": "example.com/acme/conformance::Sources/Model/Item.swift::Loader.load(from:)",
@@ -189,7 +206,8 @@
         "path": "Sources/Model/Item.swift",
         "start": 266,
         "end": 304
-      }
+      },
+      "hash": "cd50da3f09d3366ab5520fe7e3d908dea97b43b8306d62cc75d88e642feb54df"
     },
     {
       "id": "example.com/acme/conformance::Sources/Model/Item.swift::render(_:)",
@@ -197,7 +215,8 @@
         "path": "Sources/Model/Item.swift",
         "start": 308,
         "end": 371
-      }
+      },
+      "hash": "ae77c5d31691fe69c6bed43aabbed8640d66e3b4d0acfd4d29685c1fd057c60e"
     },
     {
       "id": "example.com/acme/conformance::Sources/Model/Item.swift::renderAll()",
@@ -205,7 +224,8 @@
         "path": "Sources/Model/Item.swift",
         "start": 373,
         "end": 418
-      }
+      },
+      "hash": "2678d116a6930afce6740e9f5fb86eb3dfbe990e7a0b30826f415fa2bd8d5e4c"
     },
     {
       "id": "example.com/acme/conformance::Sources/Page+Show.swift::Page.build()",
@@ -213,7 +233,8 @@
         "path": "Sources/Page+Show.swift",
         "start": 79,
         "end": 118
-      }
+      },
+      "hash": "a1afc3228ac80294e6c65e450bb70b07880bb829f5c2d6146142f6855746d380"
     },
     {
       "id": "example.com/acme/conformance::Sources/Page+Show.swift::Page.show(_:)",
@@ -221,7 +242,8 @@
         "path": "Sources/Page+Show.swift",
         "start": 21,
         "end": 73
-      }
+      },
+      "hash": "484c12c323998cc365d9a1f0a85bcd8157325c4c69fda50e902dc52e996d5442"
     },
     {
       "id": "example.com/acme/conformance::Sources/Receivers.swift::String.shout()",
@@ -229,7 +251,8 @@
         "path": "Sources/Receivers.swift",
         "start": 631,
         "end": 662
-      }
+      },
+      "hash": "87e970af229325d1c8daef96314562b84a22d583826d4ca49151368af392a119"
     },
     {
       "id": "example.com/acme/conformance::Sources/Receivers.swift::generic(_:)",
@@ -237,7 +260,8 @@
         "path": "Sources/Receivers.swift",
         "start": 553,
         "end": 606
-      }
+      },
+      "hash": "b3d913c796f65601c8c3a489ee7993ecd92d5a39d3832ca7d93938f164f6be9e"
     },
     {
       "id": "example.com/acme/conformance::Sources/Receivers.swift::hidden(_:_:)",
@@ -245,7 +269,8 @@
         "path": "Sources/Receivers.swift",
         "start": 235,
         "end": 355
-      }
+      },
+      "hash": "6031d5b5e68d00801e085f78040a2646005c6cc6b5dbf9c65635d5785781279b"
     },
     {
       "id": "example.com/acme/conformance::Sources/Receivers.swift::outside(_:_:_:_:)",
@@ -253,7 +278,8 @@
         "path": "Sources/Receivers.swift",
         "start": 0,
         "end": 233
-      }
+      },
+      "hash": "49777dcf9c02e519455566c2028ae394318cdb57f1eb6df1aa05cf1f36b8c7b0"
     },
     {
       "id": "example.com/acme/conformance::Sources/Receivers.swift::rebound(_:)",
@@ -261,7 +287,8 @@
         "path": "Sources/Receivers.swift",
         "start": 357,
         "end": 447
-      }
+      },
+      "hash": "6db1653235ad42d6686b99b6db9dad2ca4ef8daef635299db41581fcdf672f8c"
     },
     {
       "id": "example.com/acme/conformance::Sources/Receivers.swift::typed(_:)",
@@ -269,7 +296,8 @@
         "path": "Sources/Receivers.swift",
         "start": 449,
         "end": 551
-      }
+      },
+      "hash": "ca17bf82f1109c205512822523eb99c0d3049a34ad4ae3545aff19f104368e5b"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Base",
@@ -277,7 +305,8 @@
         "path": "Sources/Scopes.swift",
         "start": 75,
         "end": 113
-      }
+      },
+      "hash": "e488112ac31bff4c5543829ebafb8052186585f0834b2e15d9f4b4a0c5651fb9"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Desk",
@@ -285,7 +314,8 @@
         "path": "Sources/Scopes.swift",
         "start": 502,
         "end": 697
-      }
+      },
+      "hash": "32f2faf5dd3642887926e7042972f052a0ca3289ff7358672adffa3480788cc4"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Desk.submit(_:)",
@@ -293,7 +323,8 @@
         "path": "Sources/Scopes.swift",
         "start": 548,
         "end": 695
-      }
+      },
+      "hash": "2025185a7c24a68aca3157b858d05ab8c0b082e5d51f981cd3ea2d74fc50e36f"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Gone",
@@ -301,7 +332,8 @@
         "path": "Sources/Scopes.swift",
         "start": 286,
         "end": 500
-      }
+      },
+      "hash": "e5945604b57934b652a2bf257ee43295f3d6cc732972c095643d672de55b3a4f"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Gone.go()",
@@ -309,7 +341,8 @@
         "path": "Sources/Scopes.swift",
         "start": 459,
         "end": 498
-      }
+      },
+      "hash": "3de3be08b52309c5d77a05d4fac34ca3971f67130398f8eee1fa9995481b83b4"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Gone.init(store:)",
@@ -317,7 +350,8 @@
         "path": "Sources/Scopes.swift",
         "start": 325,
         "end": 378
-      }
+      },
+      "hash": "f10a2672dce6b62e131058807e0afa419148f910ba826f39c6e80d72a9fa1334"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Page",
@@ -325,7 +359,8 @@
         "path": "Sources/Scopes.swift",
         "start": 699,
         "end": 762
-      }
+      },
+      "hash": "064ff4c340c340059a45fa7290956dcdea317fcac3ed83cf5ec158e8f8218e8c"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Page.own()",
@@ -333,7 +368,8 @@
         "path": "Sources/Scopes.swift",
         "start": 723,
         "end": 760
-      }
+      },
+      "hash": "011d1f3f25381cc6e50c3c37956b5af41f010ead47dbe4e853c890958fcd7d58"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Shelf",
@@ -341,7 +377,8 @@
         "path": "Sources/Scopes.swift",
         "start": 764,
         "end": 806
-      }
+      },
+      "hash": "92a6a5c3512b3c95763808ecef6432c9665988da12c0a32bedcf629d17c81eae"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Shelf.stock(_:)",
@@ -349,7 +386,8 @@
         "path": "Sources/Scopes.swift",
         "start": 830,
         "end": 883
-      }
+      },
+      "hash": "900bae854ecf6f81daa3d1bf7f0d9f65b3b18003e0cfe251b38bd317a7343a00"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Ship",
@@ -357,7 +395,8 @@
         "path": "Sources/Scopes.swift",
         "start": 0,
         "end": 35
-      }
+      },
+      "hash": "0e08819b926402916cf27431407c85c4ad04d4ab2631fd3a45ff08b87c4373f7"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Ship.place()",
@@ -365,7 +404,8 @@
         "path": "Sources/Scopes.swift",
         "start": 18,
         "end": 33
-      }
+      },
+      "hash": "905d47f3a13df545f7729b35653777716ddd197211d25bdd52ea0ef73bee3911"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Store",
@@ -373,7 +413,8 @@
         "path": "Sources/Scopes.swift",
         "start": 37,
         "end": 73
-      }
+      },
+      "hash": "781bceb9f6901f833fecd73116845566139505f7b55e745aaa52b2cd571ec85d"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Store.place()",
@@ -381,7 +422,8 @@
         "path": "Sources/Scopes.swift",
         "start": 56,
         "end": 71
-      }
+      },
+      "hash": "905d47f3a13df545f7729b35653777716ddd197211d25bdd52ea0ef73bee3911"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Sub",
@@ -389,7 +431,8 @@
         "path": "Sources/Scopes.swift",
         "start": 115,
         "end": 284
-      }
+      },
+      "hash": "6acf16ee3d01ebafae07fc8937ef3f57afd9e6f9a9af824a2d71e14ba444cf62"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::Sub.go()",
@@ -397,7 +440,8 @@
         "path": "Sources/Scopes.swift",
         "start": 243,
         "end": 282
-      }
+      },
+      "hash": "3de3be08b52309c5d77a05d4fac34ca3971f67130398f8eee1fa9995481b83b4"
     },
     {
       "id": "example.com/acme/conformance::Sources/Scopes.swift::make()",
@@ -405,7 +449,8 @@
         "path": "Sources/Scopes.swift",
         "start": 887,
         "end": 947
-      }
+      },
+      "hash": "3adadcfdf4bc835144f3709535832a4606cd6a652bd16b31225ce6a98a7cbe6a"
     },
     {
       "id": "example.com/acme/conformance::Sources/Shadows.swift::Choice",
@@ -413,7 +458,8 @@
         "path": "Sources/Shadows.swift",
         "start": 35,
         "end": 75
-      }
+      },
+      "hash": "eae29690129f3291b717c9779d9f7e8dd90d1bf9115489c987964480e57692a3"
     },
     {
       "id": "example.com/acme/conformance::Sources/Shadows.swift::cases(_:)",
@@ -421,7 +467,8 @@
         "path": "Sources/Shadows.swift",
         "start": 514,
         "end": 616
-      }
+      },
+      "hash": "a3724b1702a4d04cf3c6f12b9efb5ce2c604de31a05501e46d6a40b06a981a49"
     },
     {
       "id": "example.com/acme/conformance::Sources/Shadows.swift::caught()",
@@ -429,7 +476,8 @@
         "path": "Sources/Shadows.swift",
         "start": 431,
         "end": 512
-      }
+      },
+      "hash": "b3eda23df107944e5152e9d8584a5a759c47d28f85193002255fa2af9e7d1d11"
     },
     {
       "id": "example.com/acme/conformance::Sources/Shadows.swift::closures(_:)",
@@ -437,7 +485,8 @@
         "path": "Sources/Shadows.swift",
         "start": 77,
         "end": 168
-      }
+      },
+      "hash": "f1519cbdef1aa65a8def2d8745af7a24c41055b2ff0c0b14204cde20c617522d"
     },
     {
       "id": "example.com/acme/conformance::Sources/Shadows.swift::error()",
@@ -445,7 +494,8 @@
         "path": "Sources/Shadows.swift",
         "start": 18,
         "end": 33
-      }
+      },
+      "hash": "467798a1f57c215c44b62d2322dd5ecf090728cd401ca6c9383f711ff87f36dd"
     },
     {
       "id": "example.com/acme/conformance::Sources/Shadows.swift::guarded(_:)",
@@ -453,7 +503,8 @@
         "path": "Sources/Shadows.swift",
         "start": 257,
         "end": 347
-      }
+      },
+      "hash": "1ed4e9564258e959d402e86e732d5ff552f9b27bae8fe3a92a565843cea50614"
     },
     {
       "id": "example.com/acme/conformance::Sources/Shadows.swift::loops(_:)",
@@ -461,7 +512,8 @@
         "path": "Sources/Shadows.swift",
         "start": 349,
         "end": 429
-      }
+      },
+      "hash": "34a0a86f15e67a40b45b0c7f466a8885dd81135fcc1ea698c32d27b483674229"
     },
     {
       "id": "example.com/acme/conformance::Sources/Shadows.swift::optionals(_:)",
@@ -469,7 +521,8 @@
         "path": "Sources/Shadows.swift",
         "start": 170,
         "end": 255
-      }
+      },
+      "hash": "9da020262ffff9ea9f2f294e975760282625f71e74e34902ba2c52b75ca471c4"
     },
     {
       "id": "example.com/acme/conformance::Sources/Shadows.swift::shadow()",
@@ -477,7 +530,8 @@
         "path": "Sources/Shadows.swift",
         "start": 0,
         "end": 16
-      }
+      },
+      "hash": "d4b88c8f4d17afbd3abcbd8920561d928cef54d2246025d24d34bd27c065de2a"
     },
     {
       "id": "example.com/acme/conformance::Sources/Shadows.swift::work()",
@@ -485,7 +539,8 @@
         "path": "Sources/Shadows.swift",
         "start": 618,
         "end": 639
-      }
+      },
+      "hash": "22d97044ee664a41c881609d55e7fa394f6d6bc3230189a83981c4a4720c5e30"
     },
     {
       "id": "example.com/acme/conformance::Sources/main.swift::main",
@@ -493,7 +548,8 @@
         "path": "Sources/main.swift",
         "start": 0,
         "end": 105
-      }
+      },
+      "hash": "52305e3beb2c1c0e3cab2d9efa48ce557e9e46138e7a2ecfab470d5580980286"
     }
   ],
   "calls": [

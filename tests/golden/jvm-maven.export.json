@@ -41,7 +41,8 @@
         "path": "models/src/main/java/example/models/Base.java",
         "start": 25,
         "end": 282
-      }
+      },
+      "hash": "d091942fcc65b9f5798506cb7e78d9639142df157bc33c552ac9851b42170b3b"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.find(long)",
@@ -49,7 +50,8 @@
         "path": "models/src/main/java/example/models/Base.java",
         "start": 49,
         "end": 101
-      }
+      },
+      "hash": "abc5d54e1c73aaf766c5c271d0f9b995435e055470d9c10965b920246eb0a6a7"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.name()",
@@ -57,7 +59,8 @@
         "path": "models/src/main/java/example/models/Base.java",
         "start": 180,
         "end": 231
-      }
+      },
+      "hash": "177647026ccd34017bb76dae61b10ce4367312223b4b5322546deda6cc2962c8"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.of(int)",
@@ -65,7 +68,8 @@
         "path": "models/src/main/java/example/models/Base.java",
         "start": 107,
         "end": 174
-      }
+      },
+      "hash": "e447091db5006b73dec23d2e4d546cc116a4b80b9da3fbf3eb95dcfe1832fcf0"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Base.java::example.models.Base.size()",
@@ -73,7 +77,8 @@
         "path": "models/src/main/java/example/models/Base.java",
         "start": 237,
         "end": 280
-      }
+      },
+      "hash": "c8a32fd095cb2765f29f524c4813b7275038faec540a74383f2f334fce4f3a65"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Event.java::example.models.Event",
@@ -81,7 +86,8 @@
         "path": "models/src/main/java/example/models/Event.java",
         "start": 55,
         "end": 149
-      }
+      },
+      "hash": "d2d3fb4ae6fdc214ccebf88b6761c34df8fb3b28d871ca0a008f05c2b7910d3d"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Event.java::example.models.Event.code()",
@@ -89,7 +95,8 @@
         "path": "models/src/main/java/example/models/Event.java",
         "start": 104,
         "end": 147
-      }
+      },
+      "hash": "87b2f1261ebea56da07cfb286f868cc7c2a2377e2113146f4e06da21cc963856"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Ledger.java::example.models.Ledger",
@@ -97,7 +104,8 @@
         "path": "models/src/main/java/example/models/Ledger.java",
         "start": 25,
         "end": 170
-      }
+      },
+      "hash": "757a047b7abd8a36604d49d68b787494938a0ab717de532193634434fb17e059"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Ledger.java::example.models.Ledger.of(int)",
@@ -105,7 +113,8 @@
         "path": "models/src/main/java/example/models/Ledger.java",
         "start": 51,
         "end": 112
-      }
+      },
+      "hash": "a3db45dc6ead4f7ac0fc10916655cb1b9b7d359b7fcc19a6db6c247772ac7da2"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Ledger.java::example.models.Ledger.open()",
@@ -113,7 +122,8 @@
         "path": "models/src/main/java/example/models/Ledger.java",
         "start": 118,
         "end": 168
-      }
+      },
+      "hash": "96250c2fd088de721e7210d46a33a67f5b0d65616255d02d2319362bceca335e"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Note.java::example.models.Note",
@@ -121,7 +131,8 @@
         "path": "models/src/main/java/example/models/Note.java",
         "start": 25,
         "end": 94
-      }
+      },
+      "hash": "f490a0a4785b85c514bf03792a0ed02502269acf82fb96f9a04b45d2f69e1564"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Note.java::example.models.Note.Note()#method",
@@ -129,7 +140,8 @@
         "path": "models/src/main/java/example/models/Note.java",
         "start": 49,
         "end": 92
-      }
+      },
+      "hash": "4311eb46851b3fb52dd08f2696e9c1dca73dd9b3545da0433029a5585fb8979a"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order",
@@ -137,7 +149,8 @@
         "path": "models/src/main/java/example/models/Order.java",
         "start": 25,
         "end": 577
-      }
+      },
+      "hash": "1d9a693c79912569915c12c9c75ace49a3bc8e725954bb9e2b373e1169a762c0"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.Order(int)",
@@ -145,7 +158,8 @@
         "path": "models/src/main/java/example/models/Order.java",
         "start": 50,
         "end": 84
-      }
+      },
+      "hash": "9a3138a2ae71f708155c0602b8efd27ca4d0b59daa58d03316159127d249463e"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.of(int)",
@@ -153,7 +167,8 @@
         "path": "models/src/main/java/example/models/Order.java",
         "start": 90,
         "end": 170
-      }
+      },
+      "hash": "0c7dbcf74384ffb600aeab78a7b72499164c45a74990f02ca6056ab628031819"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(String)",
@@ -161,7 +176,8 @@
         "path": "models/src/main/java/example/models/Order.java",
         "start": 309,
         "end": 376
-      }
+      },
+      "hash": "4f257e178ebd01e31f6b2eab294000ab5a81d058d859f1087090d0e6b7c635b5"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int)",
@@ -169,7 +185,8 @@
         "path": "models/src/main/java/example/models/Order.java",
         "start": 240,
         "end": 303
-      }
+      },
+      "hash": "acd7c7155893fe7b4d65348f24590cfbd56c4e4dbab82f6c76617e75a483f686"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.place(int,int)",
@@ -177,7 +194,8 @@
         "path": "models/src/main/java/example/models/Order.java",
         "start": 382,
         "end": 464
-      }
+      },
+      "hash": "4118ccefb51037c24c287b668935cc2f3ed4fdb30fd067d7aa8ae53d68ad2559"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.subtotal()",
@@ -185,7 +203,8 @@
         "path": "models/src/main/java/example/models/Order.java",
         "start": 470,
         "end": 511
-      }
+      },
+      "hash": "545e9f28373cdaaa96f15a09fb758e6f4e4b2431485cb68744492e27b667f6f5"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.tax(int)",
@@ -193,7 +212,8 @@
         "path": "models/src/main/java/example/models/Order.java",
         "start": 517,
         "end": 575
-      }
+      },
+      "hash": "7fc7e8e4652444f361b832cbd292222f23b4d7f12a0e0eabd3cf5a3263809588"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Order.java::example.models.Order.total()",
@@ -201,7 +221,8 @@
         "path": "models/src/main/java/example/models/Order.java",
         "start": 176,
         "end": 234
-      }
+      },
+      "hash": "d75cc70eb11f57796389d4bcd8463255c96e37b53dd45821f5bf33b3939f5ca0"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo",
@@ -209,7 +230,8 @@
         "path": "models/src/main/java/example/models/Repo.java",
         "start": 25,
         "end": 253
-      }
+      },
+      "hash": "e4f4c504ac31a8e698e8fe52cdbfc786188b49d7d3e575f8caedaba00accfd30"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.find(String)",
@@ -217,7 +239,8 @@
         "path": "models/src/main/java/example/models/Repo.java",
         "start": 62,
         "end": 120
-      }
+      },
+      "hash": "cfcf80db8f384d6745729af29201471bd5762124576e1e65a80aad2c761c892a"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.name()",
@@ -225,7 +248,8 @@
         "path": "models/src/main/java/example/models/Repo.java",
         "start": 200,
         "end": 251
-      }
+      },
+      "hash": "c39cba61b7f9becc3df2107bc46464ce16054a95ed957465996e15a4b285d847"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/models/Repo.java::example.models.Repo.of(String)",
@@ -233,7 +257,8 @@
         "path": "models/src/main/java/example/models/Repo.java",
         "start": 126,
         "end": 194
-      }
+      },
+      "hash": "6741220f0c48363eb7fda6682d53f88f01baf7df8359f9a23b9cfa6305e18e0d"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp",
@@ -241,7 +266,8 @@
         "path": "models/src/main/java/example/shared/Stamp.java",
         "start": 25,
         "end": 178
-      }
+      },
+      "hash": "5884731bd951a01a9eb8bad909d001ff515f3ea81aa691dcae85bb986f569a1c"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.later()",
@@ -249,7 +275,8 @@
         "path": "models/src/main/java/example/shared/Stamp.java",
         "start": 115,
         "end": 176
-      }
+      },
+      "hash": "b00bae63ada9a3f243a537e28fd11cb8639b8980be1655c050f8777a52477040"
     },
     {
       "id": "example.com/jvm/maven::models/src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()",
@@ -257,7 +284,8 @@
         "path": "models/src/main/java/example/shared/Stamp.java",
         "start": 50,
         "end": 109
-      }
+      },
+      "hash": "239980660681fb0cf808882003b2c31c8660d2882f3f6bbc8241c99e340d2344"
     },
     {
       "id": "example.com/jvm/maven::models/src/test/java/example/models/Fixtures.java::example.models.Fixtures",
@@ -265,7 +293,8 @@
         "path": "models/src/test/java/example/models/Fixtures.java",
         "start": 25,
         "end": 119
-      }
+      },
+      "hash": "da2f6a7fe1a6fcf18d34a45d4ab8120bdc139e360a475ca59213867ad8ee179f"
     },
     {
       "id": "example.com/jvm/maven::models/src/test/java/example/models/Fixtures.java::example.models.Fixtures.sample()",
@@ -273,7 +302,8 @@
         "path": "models/src/test/java/example/models/Fixtures.java",
         "start": 53,
         "end": 117
-      }
+      },
+      "hash": "55f6b44f0f63f94d82a1e09f668d5526f790fd076c30290a4b8e2ea025dc73e6"
     }
   ],
   "calls": [

@@ -201,7 +201,8 @@
         "path": "billing/invoice/invoice.go",
         "start": 17,
         "end": 54
-      }
+      },
+      "hash": "0bca6bdc81aaf00bc3d10bc71131c8424fcff43815f77cfb154345bc464b1101"
     },
     {
       "id": "example.com/acme/conformance::billing/invoice/invoice.go::round",
@@ -209,7 +210,8 @@
         "path": "billing/invoice/invoice.go",
         "start": 56,
         "end": 91
-      }
+      },
+      "hash": "f2166887aefbf0147adbfa00787974aba975e09b1e3bfd0612de93a1df360dab"
     },
     {
       "id": "example.com/acme/conformance::client/env.go::FromEnv",
@@ -217,7 +219,8 @@
         "path": "client/env.go",
         "start": 150,
         "end": 213
-      }
+      },
+      "hash": "e6b5ece045ca762ee5f065182495fe1c85c1c6fd3bf4ad95ae26be4e63893ed8"
     },
     {
       "id": "example.com/acme/conformance::client/env.go::FromLookup",
@@ -225,7 +228,8 @@
         "path": "client/env.go",
         "start": 215,
         "end": 376
-      }
+      },
+      "hash": "0c575395d818da5d967f552589fdba228f4bc8cdeb0bcba92371c7f3be01a827"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Billing",
@@ -233,7 +237,8 @@
         "path": "client/fields.go",
         "start": 148,
         "end": 184
-      }
+      },
+      "hash": "2a0adc6d1b5d5b799e9427f9078f5b6a3c8188587bb5ef2fa9581c0fadba2da6"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Billing.Items",
@@ -241,7 +246,8 @@
         "path": "client/fields.go",
         "start": 307,
         "end": 360
-      }
+      },
+      "hash": "deeeef314e99dfe30cd116b8a118d8cc44896f7961cfc4ca3ffd501fcc43e188"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Ledger",
@@ -249,7 +255,8 @@
         "path": "client/fields.go",
         "start": 416,
         "end": 452
-      }
+      },
+      "hash": "506720a9e1dce1d7fcbac1d393a25f59d1ec69a1588f71216ec9c83086fbba9b"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Ledger.Entries",
@@ -257,7 +264,8 @@
         "path": "client/fields.go",
         "start": 539,
         "end": 595
-      }
+      },
+      "hash": "61f63c20286ce017893628fb41184a2a571571e2ee9aa761a4afaf20d81a89c1"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Mirror",
@@ -265,7 +273,8 @@
         "path": "client/fields.go",
         "start": 672,
         "end": 709
-      }
+      },
+      "hash": "291130f1715f8998315629a3a7273890ed37b09fe9d1d4213d6bee28e22ffced"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Mirror.Sync",
@@ -273,7 +282,8 @@
         "path": "client/fields.go",
         "start": 911,
         "end": 963
-      }
+      },
+      "hash": "92d99d71db8d34ca4b12b8d1d17e7961ee0e35bc2802d109c0bd07a882b294c9"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::NewBilling",
@@ -281,7 +291,8 @@
         "path": "client/fields.go",
         "start": 186,
         "end": 305
-      }
+      },
+      "hash": "7fd77abb984bc519e2b09bdb39a1e38b825a842ce3a54cb5e838fc46d95ab44f"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::NewLedger",
@@ -289,7 +300,8 @@
         "path": "client/fields.go",
         "start": 454,
         "end": 537
-      }
+      },
+      "hash": "e6c2a28aa92ae00f1c5dfe133baeec261004f3892b9375f0be2b5ae3708f6f4a"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::NewPair",
@@ -297,7 +309,8 @@
         "path": "client/fields.go",
         "start": 2111,
         "end": 2205
-      }
+      },
+      "hash": "5a34d24dba978a42f821aab63c3de24640f0ec18d6b43dcca23409c04bc90f22"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::NewPool",
@@ -305,7 +318,8 @@
         "path": "client/fields.go",
         "start": 2421,
         "end": 2519
-      }
+      },
+      "hash": "6db6232916b36c275510ddc3ddb6dc9def1fbbbeb92f288af216a0e2dfa01604"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::NewProxy",
@@ -313,7 +327,8 @@
         "path": "client/fields.go",
         "start": 1078,
         "end": 1147
-      }
+      },
+      "hash": "3863004e16aa9477038cd2ee6e2874e22acdd5cc896574bcc934b6ced298d1aa"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::NewQueue",
@@ -321,7 +336,8 @@
         "path": "client/fields.go",
         "start": 1738,
         "end": 1837
-      }
+      },
+      "hash": "ac4588cb751771dc964ce04f92bded3bb2c79897782de8839729bb4e11db36bf"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::NewRelay",
@@ -329,7 +345,8 @@
         "path": "client/fields.go",
         "start": 1421,
         "end": 1520
-      }
+      },
+      "hash": "9d60f355a912edb16e6fcb1249975fb1776b6b98807036b9ee6319be9dd4e6a2"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Pair",
@@ -337,7 +354,8 @@
         "path": "client/fields.go",
         "start": 2052,
         "end": 2109
-      }
+      },
+      "hash": "4a706a5242138a061c7e81035ec5148ef9923c4dcd08e183e4954e5b93a22e98"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Pair.Left",
@@ -345,7 +363,8 @@
         "path": "client/fields.go",
         "start": 2274,
         "end": 2323
-      }
+      },
+      "hash": "240075ae38a54075aece1cc393868ff70fef73ecb658f4141ebc405d3aeb632e"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Pool",
@@ -353,7 +372,8 @@
         "path": "client/fields.go",
         "start": 2382,
         "end": 2419
-      }
+      },
+      "hash": "6be0c4872ab22d792a44633f1288c0e1a71378c8f2174b83cb3a10a6e27d3bab"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Pool.Lease",
@@ -361,7 +381,8 @@
         "path": "client/fields.go",
         "start": 2584,
         "end": 2637
-      }
+      },
+      "hash": "e40cdc85231f5b00ed0202bf8509eb574dd8e5c66c6b1765f749df795bb7de98"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Proxy",
@@ -369,7 +390,8 @@
         "path": "client/fields.go",
         "start": 1036,
         "end": 1076
-      }
+      },
+      "hash": "904f21f7e979c140abb06d5ab49fb279aae5599f6fbab43eb165cb8ef695366e"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Proxy.Forward",
@@ -377,7 +399,8 @@
         "path": "client/fields.go",
         "start": 1257,
         "end": 1318
-      }
+      },
+      "hash": "f55e2f0478d60ec9c3aab25bb813e402f4a8ef45a36a1005716a8ed6f9d4354c"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Queue",
@@ -385,7 +408,8 @@
         "path": "client/fields.go",
         "start": 1700,
         "end": 1736
-      }
+      },
+      "hash": "ba24cc37e5eb23cdb5139cd972ed7bea32a8d9de92b32a2c23d5f97ea76ec7b4"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Queue.Push",
@@ -393,7 +417,8 @@
         "path": "client/fields.go",
         "start": 1924,
         "end": 1976
-      }
+      },
+      "hash": "6804795c36a584b99c55ea173dde5f2f4c9d7b3a0201cdb7671c635a48de6c94"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Queue.Retarget",
@@ -401,7 +426,8 @@
         "path": "client/fields.go",
         "start": 1839,
         "end": 1922
-      }
+      },
+      "hash": "8016a685f609f89e5a06ba25ebdd69c7fd0496ff18df7929b93870a8f2be7d0c"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Relay",
@@ -409,7 +435,8 @@
         "path": "client/fields.go",
         "start": 1384,
         "end": 1419
-      }
+      },
+      "hash": "8a781bc01e550ccffde8477793ef6212b1e67602841555348d9606589f03b7ea"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Relay.Send",
@@ -417,7 +444,8 @@
         "path": "client/fields.go",
         "start": 1576,
         "end": 1627
-      }
+      },
+      "hash": "6843e84882ee3c07e2d5bf30cbd3616d23853e4047a1d73912990ee7783a7c87"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Relay.Swap",
@@ -425,7 +453,8 @@
         "path": "client/fields.go",
         "start": 1522,
         "end": 1574
-      }
+      },
+      "hash": "dd155fcc3982b179cbd42785ca833c394897279db3ef3941f05e466eab3167cf"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Unset",
@@ -433,7 +462,8 @@
         "path": "client/fields.go",
         "start": 2716,
         "end": 2752
-      }
+      },
+      "hash": "806b2b851774de678cb2db917f727f33231db12b729146558183787efa90a4f8"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Unset.Idle",
@@ -441,7 +471,8 @@
         "path": "client/fields.go",
         "start": 2754,
         "end": 2805
-      }
+      },
+      "hash": "0d94ade62d4070480bafe37d724326824efb198d39fd555c4a8c0ffe74a3179a"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::plainProxy",
@@ -449,7 +480,8 @@
         "path": "client/fields.go",
         "start": 1149,
         "end": 1255
-      }
+      },
+      "hash": "7064c2c74dcbb8817f3cdcc1cbbeced06be16a558623a45ac553525c9f243054"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::pools",
@@ -457,7 +489,8 @@
         "path": "client/fields.go",
         "start": 2521,
         "end": 2582
-      }
+      },
+      "hash": "0d726c1dc49710896b67a62db031a8f899b3543eb842551ed4347c6fa518c953"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::positional",
@@ -465,7 +498,8 @@
         "path": "client/fields.go",
         "start": 2207,
         "end": 2272
-      }
+      },
+      "hash": "91ac38c0d3cf1813e54e9b8b0d586d556075748bc511e977e18a84105d97f697"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::primary",
@@ -473,7 +507,8 @@
         "path": "client/fields.go",
         "start": 711,
         "end": 808
-      }
+      },
+      "hash": "154f8d6c215fd3e8afc0ef3842f52d2d85ba5db7f42a5302a011b9317c0f88c4"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::secondary",
@@ -481,7 +516,8 @@
         "path": "client/fields.go",
         "start": 810,
         "end": 909
-      }
+      },
+      "hash": "4ed224ba1740182a774a07fe7c8a05fb989673523004a3949a3a55805a866a3a"
     },
     {
       "id": "example.com/acme/conformance::client/flags.go::Configure",
@@ -489,7 +525,8 @@
         "path": "client/flags.go",
         "start": 265,
         "end": 448
-      }
+      },
+      "hash": "494f6fe341cc82dad4d850cd995d96d73845177a7cacaa4e1eec9a35b037541d"
     },
     {
       "id": "example.com/acme/conformance::client/net.go::Cache",
@@ -497,7 +534,8 @@
         "path": "client/net.go",
         "start": 3173,
         "end": 3187
-      }
+      },
+      "hash": "c1ef5581113d9f064b318275f74445c8f51610f764d45cde14a2cbc7efa682ee"
     },
     {
       "id": "example.com/acme/conformance::client/net.go::Cache.Get",
@@ -505,7 +543,8 @@
         "path": "client/net.go",
         "start": 3189,
         "end": 3242
-      }
+      },
+      "hash": "e455f1e9e1511a16b7ed8aae2990d50db108fda44c0d2d5c240472d6fe116ea6"
     },
     {
       "id": "example.com/acme/conformance::client/net.go::Clients",
@@ -513,7 +552,8 @@
         "path": "client/net.go",
         "start": 802,
         "end": 1075
-      }
+      },
+      "hash": "03643f07f385235f9b52b1bceeee391bca3c5848f65f06147f12e13f3b5e2f57"
     },
     {
       "id": "example.com/acme/conformance::client/net.go::Formats",
@@ -521,7 +561,8 @@
         "path": "client/net.go",
         "start": 2800,
         "end": 3166
-      }
+      },
+      "hash": "bad5e0ada3246ea8717b5342ed0210d9f22e5de8a2f623b3a9af3dacec008906"
     },
     {
       "id": "example.com/acme/conformance::client/net.go::Lookup",
@@ -529,7 +570,8 @@
         "path": "client/net.go",
         "start": 2323,
         "end": 2439
-      }
+      },
+      "hash": "e13a819bab2b070b0b42b3314da4830f3e08fe087eadf92f24aa89cf5b2ea409"
     },
     {
       "id": "example.com/acme/conformance::client/net.go::Package",
@@ -537,7 +579,8 @@
         "path": "client/net.go",
         "start": 577,
         "end": 800
-      }
+      },
+      "hash": "06a3eafa12caa39ce9353792df15e5abaca19808a2f849ce449b282b145a0f15"
     },
     {
       "id": "example.com/acme/conformance::client/net.go::Requests",
@@ -545,7 +588,8 @@
         "path": "client/net.go",
         "start": 1135,
         "end": 1435
-      }
+      },
+      "hash": "9c8d57b60c93c5b14c96c7281f5b1beb034d64cb34e680beebad02f198fa2ea8"
     },
     {
       "id": "example.com/acme/conformance::client/net.go::Unresolved",
@@ -553,7 +597,8 @@
         "path": "client/net.go",
         "start": 2070,
         "end": 2198
-      }
+      },
+      "hash": "2fbbce5babe422bf2c32c26c723254c36777ca648e7a7706058533513f72d749"
     },
     {
       "id": "example.com/acme/conformance::client/net.go::Urls",
@@ -561,7 +606,8 @@
         "path": "client/net.go",
         "start": 1534,
         "end": 2000
-      }
+      },
+      "hash": "6d299218b62ed6d470f29a6859ee8701ee8fbff84d042e4a7766bc2a5d800b50"
     },
     {
       "id": "example.com/acme/conformance::client/net.go::Written",
@@ -569,7 +615,8 @@
         "path": "client/net.go",
         "start": 2553,
         "end": 2712
-      }
+      },
+      "hash": "1aa6b35971ccf16b386d4d65a9e954a31203c04bd5437dbe0d7bd7f6ae24ada3"
     },
     {
       "id": "example.com/acme/conformance::client/net.go::init",
@@ -577,7 +624,8 @@
         "path": "client/net.go",
         "start": 461,
         "end": 501
-      }
+      },
+      "hash": "12c09cca4fdc0ff4b36773297382d4d402d0968d50ff0b0ad2d7a5cc81cf37f1"
     },
     {
       "id": "example.com/acme/conformance::client/net.go::lookup",
@@ -585,7 +633,8 @@
         "path": "client/net.go",
         "start": 2200,
         "end": 2234
-      }
+      },
+      "hash": "d96adfa2dd1af11c17f3deb09e924828bf358d03b1f9bf428d78f645222fd401"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::Factory",
@@ -593,7 +642,8 @@
         "path": "client/rest.go",
         "start": 2179,
         "end": 2320
-      }
+      },
+      "hash": "dcd34448edb2320127346d19942682a86f1d37b778f8fdb3f9ca0bbc4ec01295"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::Gateway",
@@ -601,7 +651,8 @@
         "path": "client/rest.go",
         "start": 1170,
         "end": 1229
-      }
+      },
+      "hash": "53bf224f0472bbbb9425d736b8f4e3f0c160043a562d2e6dd42b14f1a754a9ac"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::Gateway.Items",
@@ -609,7 +660,8 @@
         "path": "client/rest.go",
         "start": 1231,
         "end": 1332
-      }
+      },
+      "hash": "5197f009930c1dbb1d461bd5593919e4e40836fe7a55f490527e47b1b5b3773b"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::Mixed",
@@ -617,7 +669,8 @@
         "path": "client/rest.go",
         "start": 2480,
         "end": 2599
-      }
+      },
+      "hash": "e96fe326e5247131403575bbc6822746ac67bc8a034f300079f76b08460390ae"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::Other",
@@ -625,7 +678,8 @@
         "path": "client/rest.go",
         "start": 1801,
         "end": 1858
-      }
+      },
+      "hash": "12c6b180709ed67605f92b2b1afb3170b8cda295d394916cb1c22063a6692c5c"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::Reassigned",
@@ -633,7 +687,8 @@
         "path": "client/rest.go",
         "start": 2671,
         "end": 2793
-      }
+      },
+      "hash": "aa295527b677a2aa2f05e21dfd7e2baec3841c5daa5b1ca743fbbad64c1d88c0"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::Rest",
@@ -641,7 +696,8 @@
         "path": "client/rest.go",
         "start": 143,
         "end": 739
-      }
+      },
+      "hash": "cdbe00d378b052dc7ec4d5abadfe41a9092c910224ef9cbb30851e96cf9f8acf"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::Returned",
@@ -649,7 +705,8 @@
         "path": "client/rest.go",
         "start": 1482,
         "end": 1535
-      }
+      },
+      "hash": "09a9ff54324102b14f333db1ef94673667690509ea30ef844564311e623b907f"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::Reused",
@@ -657,7 +714,8 @@
         "path": "client/rest.go",
         "start": 1585,
         "end": 1741
-      }
+      },
+      "hash": "b9b75aa3efcb7e3ab7deadaa38451b5505a887cc68d32e87e8ed6f9b25db5cfb"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::Separate",
@@ -665,7 +723,8 @@
         "path": "client/rest.go",
         "start": 804,
         "end": 992
-      }
+      },
+      "hash": "385131d60041f9a72b31ddb5764ff6b3e8aa9d12948f47323bbf2c3a99584591"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::Typed",
@@ -673,7 +732,8 @@
         "path": "client/rest.go",
         "start": 1068,
         "end": 1163
-      }
+      },
+      "hash": "4d50e420a7048bed0c220ff7da888465f06d6328547fec8c4da5cd765a9798f3"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::Wrapper",
@@ -681,7 +741,8 @@
         "path": "client/rest.go",
         "start": 1956,
         "end": 2065
-      }
+      },
+      "hash": "1cd21cfbf8c81c88c662f81abb65c3aba4cc90099ed9e8cb93e3ada4bfad17f7"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::fetchBase",
@@ -689,7 +750,8 @@
         "path": "client/rest.go",
         "start": 2413,
         "end": 2478
-      }
+      },
+      "hash": "eefa549d57cd5d6f03ef8e842f6d15f381d9373ca4bf4f85393d4f1481914cad"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::fetchJSON",
@@ -697,7 +759,8 @@
         "path": "client/rest.go",
         "start": 1889,
         "end": 1954
-      }
+      },
+      "hash": "dd6cfa2e6b84557b63dddc73307eca3e686b183cfcd5241d1b4ae3159b6240a2"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::newClient",
@@ -705,7 +768,8 @@
         "path": "client/rest.go",
         "start": 1383,
         "end": 1480
-      }
+      },
+      "hash": "678a0c3eeb25bf7d9ad277fb5172bea5bc874813ea98fb8ad593c95b706d993f"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::plainClient",
@@ -713,7 +777,8 @@
         "path": "client/rest.go",
         "start": 2121,
         "end": 2177
-      }
+      },
+      "hash": "8c3197cdc08bd184a9595cb0b4f53d13d277d70f3661216a3b2e5e4ac5d8d214"
     },
     {
       "id": "example.com/acme/conformance::client/routes/routes.go::Move",
@@ -721,7 +786,8 @@
         "path": "client/routes/routes.go",
         "start": 267,
         "end": 304
-      }
+      },
+      "hash": "9cbce6de5056f870444f7b5295653f0acc341137252c5935c7e241974671ea62"
     },
     {
       "id": "example.com/acme/conformance::client/tenants.go::Rename",
@@ -729,7 +795,8 @@
         "path": "client/tenants.go",
         "start": 60,
         "end": 102
-      }
+      },
+      "hash": "23ada389a94a32ae5a2099dc70292401c9627ea37b931a794e306cd0457eb83e"
     },
     {
       "id": "example.com/acme/conformance::client/wrappers.go::Cycle",
@@ -737,7 +804,8 @@
         "path": "client/wrappers.go",
         "start": 815,
         "end": 847
-      }
+      },
+      "hash": "d197c12be4ee1c76bbdf6e24131e10910764f24a51f3482aed7f6e8cc8caf506"
     },
     {
       "id": "example.com/acme/conformance::client/wrappers.go::Wrapped",
@@ -745,7 +813,8 @@
         "path": "client/wrappers.go",
         "start": 462,
         "end": 639
-      }
+      },
+      "hash": "c00daa862435640200a91356b0aa8599218f5e6c7747c8dad863b5aaada5c5db"
     },
     {
       "id": "example.com/acme/conformance::client/wrappers.go::get",
@@ -753,7 +822,8 @@
         "path": "client/wrappers.go",
         "start": 193,
         "end": 272
-      }
+      },
+      "hash": "d67a59be63c90b7b2755468df904a2085d418d23915c0480c6116cc8c6a122bf"
     },
     {
       "id": "example.com/acme/conformance::client/wrappers.go::getUser",
@@ -761,7 +831,8 @@
         "path": "client/wrappers.go",
         "start": 274,
         "end": 353
-      }
+      },
+      "hash": "a1551e803d24076597e8269cfbe1307fc083dd225958fd1717b025480f55d59e"
     },
     {
       "id": "example.com/acme/conformance::client/wrappers.go::ping",
@@ -769,7 +840,8 @@
         "path": "client/wrappers.go",
         "start": 692,
         "end": 730
-      }
+      },
+      "hash": "38c907920f2df132a44c2153f71d5d01636ba76e99240a51160ea7ac41fd6469"
     },
     {
       "id": "example.com/acme/conformance::client/wrappers.go::pong",
@@ -777,7 +849,8 @@
         "path": "client/wrappers.go",
         "start": 732,
         "end": 813
-      }
+      },
+      "hash": "dc2b8c4c22e5b6e750b87c8d341f6cc9ea99fff913e3002516826583d634cb49"
     },
     {
       "id": "example.com/acme/conformance::client/wrappers.go::send",
@@ -785,7 +858,8 @@
         "path": "client/wrappers.go",
         "start": 355,
         "end": 460
-      }
+      },
+      "hash": "e8d2d48cea76a486e882db4c042b9412b96f94f5eb50d5b3d7c8964484993b80"
     },
     {
       "id": "example.com/acme/conformance::forks/billing/invoice/invoice.go::Total",
@@ -793,7 +867,8 @@
         "path": "forks/billing/invoice/invoice.go",
         "start": 58,
         "end": 95
-      }
+      },
+      "hash": "8c6d58bf67ca6f0ff26735a23929d5d16c8477dd4d3181d605017e0764196fab"
     },
     {
       "id": "example.com/acme/conformance::forks/billing/invoice/invoice.go::round",
@@ -801,7 +876,8 @@
         "path": "forks/billing/invoice/invoice.go",
         "start": 97,
         "end": 132
-      }
+      },
+      "hash": "f2166887aefbf0147adbfa00787974aba975e09b1e3bfd0612de93a1df360dab"
     },
     {
       "id": "example.com/acme/conformance::internal/http-utils/utils.go::NewRequest",
@@ -809,7 +885,8 @@
         "path": "internal/http-utils/utils.go",
         "start": 19,
         "end": 39
-      }
+      },
+      "hash": "54488537028bfb79c328887f63c3693e564accf215aa35a12dd672b3c39fb260"
     },
     {
       "id": "example.com/acme/conformance::internal/shapes/shapes.go::Circle",
@@ -817,7 +894,8 @@
         "path": "internal/shapes/shapes.go",
         "start": 138,
         "end": 171
-      }
+      },
+      "hash": "64237d24dcbd8324a7b48fb820deceb7da1694335df5ace4689df7b93cfe12c2"
     },
     {
       "id": "example.com/acme/conformance::internal/shapes/shapes.go::Circle.Area",
@@ -825,7 +903,8 @@
         "path": "internal/shapes/shapes.go",
         "start": 279,
         "end": 351
-      }
+      },
+      "hash": "7bee695f1fdaac09402be35e98ef3907142ece165d3d3755ef71e971e0d94baf"
     },
     {
       "id": "example.com/acme/conformance::internal/shapes/shapes.go::Circle.Perimeter",
@@ -833,7 +912,8 @@
         "path": "internal/shapes/shapes.go",
         "start": 353,
         "end": 424
-      }
+      },
+      "hash": "a5dab29fcedcc319aa8326e6ca6f8435a7473a5170632da777f66afba31bc520"
     },
     {
       "id": "example.com/acme/conformance::internal/shapes/shapes.go::Each",
@@ -841,7 +921,8 @@
         "path": "internal/shapes/shapes.go",
         "start": 497,
         "end": 686
-      }
+      },
+      "hash": "e8fff8715a9192472d027da29233c2c4fb5f8dcc7fda9a6b69854a436c0629c4"
     },
     {
       "id": "example.com/acme/conformance::internal/shapes/shapes.go::ID",
@@ -849,7 +930,8 @@
         "path": "internal/shapes/shapes.go",
         "start": 178,
         "end": 187
-      }
+      },
+      "hash": "b6f059f0363487543f98099f118e4eb9d913b6dbcf74ef78503432b92512b6d4"
     },
     {
       "id": "example.com/acme/conformance::internal/shapes/shapes.go::Label",
@@ -857,7 +939,8 @@
         "path": "internal/shapes/shapes.go",
         "start": 194,
         "end": 204
-      }
+      },
+      "hash": "4ab878d1697b68b2fe58b2bc437c00bbd9075afc9657bbe5738f93b8b2247fcc"
     },
     {
       "id": "example.com/acme/conformance::internal/shapes/shapes.go::NewCircle",
@@ -865,7 +948,8 @@
         "path": "internal/shapes/shapes.go",
         "start": 206,
         "end": 277
-      }
+      },
+      "hash": "7ee93926305aeb243e4d561da981efa2606a81e68f39e895e620dae764e44ce0"
     },
     {
       "id": "example.com/acme/conformance::internal/shapes/shapes.go::Shape",
@@ -873,7 +957,8 @@
         "path": "internal/shapes/shapes.go",
         "start": 75,
         "end": 131
-      }
+      },
+      "hash": "dfc16e43598a8c1e752d589db687c225757715c8743b5c0de93879507f1e90de"
     },
     {
       "id": "example.com/acme/conformance::internal/shapes/shapes.go::Shape.Area",
@@ -881,7 +966,8 @@
         "path": "internal/shapes/shapes.go",
         "start": 94,
         "end": 108
-      }
+      },
+      "hash": "69ab104c5be2908e3eb71267c6de210647202900c2bc37fd27049ea7ef978b77"
     },
     {
       "id": "example.com/acme/conformance::internal/shapes/shapes.go::Shape.Perimeter",
@@ -889,7 +975,8 @@
         "path": "internal/shapes/shapes.go",
         "start": 110,
         "end": 129
-      }
+      },
+      "hash": "aee1490943b93af60f43efb127d30b540f1f6d80a8138e6fee9cd941d45319c2"
     },
     {
       "id": "example.com/acme/conformance::internal/shapes/shapes.go::clamp",
@@ -897,7 +984,8 @@
         "path": "internal/shapes/shapes.go",
         "start": 426,
         "end": 495
-      }
+      },
+      "hash": "6a25ca13f2e308cf829a1529431e93d658cd05729702204245617173be49ff97"
     },
     {
       "id": "example.com/acme/conformance::internal/units/units.go::Meters",
@@ -905,7 +993,8 @@
         "path": "internal/units/units.go",
         "start": 15,
         "end": 59
-      }
+      },
+      "hash": "17d3b1be0519df02ee6f82217fbdfe32946619f6a816af536fd977f1cb55e45b"
     },
     {
       "id": "example.com/acme/conformance::legacy/old/old.go::Old",
@@ -913,7 +1002,8 @@
         "path": "legacy/old/old.go",
         "start": 13,
         "end": 26
-      }
+      },
+      "hash": "a8a399cfa0f751c2935ce1c07d45e1249b875fa5ef79f71caee8bb1c9835018d"
     },
     {
       "id": "example.com/acme/conformance::main.go::main",
@@ -921,7 +1011,8 @@
         "path": "main.go",
         "start": 203,
         "end": 318
-      }
+      },
+      "hash": "a1bee5d03b50da67ee872a35c8ff577c1d9e795633d4838780a657edeee6603e"
     },
     {
       "id": "example.com/acme/conformance::main.go::run",
@@ -929,7 +1020,8 @@
         "path": "main.go",
         "start": 320,
         "end": 485
-      }
+      },
+      "hash": "2edbc639a82e4fa3e8a42b9b5ae14600de1aa00124291a7fa61f50bca3e1e3bf"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.go::ConfluentConsume",
@@ -937,7 +1029,8 @@
         "path": "messages/confluent.go",
         "start": 957,
         "end": 1164
-      }
+      },
+      "hash": "6490d08a27de204617b69272c1b4bec4d787d6291b332412991f6f0e3b978aaf"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.go::ConfluentDeref",
@@ -945,7 +1038,8 @@
         "path": "messages/confluent.go",
         "start": 715,
         "end": 955
-      }
+      },
+      "hash": "8afb387c43a96e1c2ccfa4deafeb14fafd1e2c18af5fcc6d25b88cec8e1be685"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.go::ConfluentPattern",
@@ -953,7 +1047,8 @@
         "path": "messages/confluent.go",
         "start": 1242,
         "end": 1333
-      }
+      },
+      "hash": "a0bbfabaf0562ebb497762601a9e0b4c8be5765645ebff7d06fb23f40b0dd749"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.go::ConfluentProduce",
@@ -961,7 +1056,8 @@
         "path": "messages/confluent.go",
         "start": 92,
         "end": 636
-      }
+      },
+      "hash": "c094f07173942958e98e0f47ba792288dbdbe4168553fc47e4da25f4f75162da"
     },
     {
       "id": "example.com/acme/conformance::messages/queues.go::SqsConsume",
@@ -969,7 +1065,8 @@
         "path": "messages/queues.go",
         "start": 658,
         "end": 930
-      }
+      },
+      "hash": "c1f4dee0de7a4e5791bb3ca36bb880b50ec96eb927c2f37858e685f159189d97"
     },
     {
       "id": "example.com/acme/conformance::messages/queues.go::SqsProduce",
@@ -977,7 +1074,8 @@
         "path": "messages/queues.go",
         "start": 199,
         "end": 656
-      }
+      },
+      "hash": "40f00968c8d1dedcfda4a5cf0cf820f6d875802b342eb46a7d653d30e48ea56a"
     },
     {
       "id": "example.com/acme/conformance::messages/rabbit.go::Audit",
@@ -985,7 +1083,8 @@
         "path": "messages/rabbit.go",
         "start": 884,
         "end": 1030
-      }
+      },
+      "hash": "b2579687e2bcde49ee43b17bbc26a63f66aed81e6ba348923c5d339fedc509bb"
     },
     {
       "id": "example.com/acme/conformance::messages/rabbit.go::PublishAll",
@@ -993,7 +1092,8 @@
         "path": "messages/rabbit.go",
         "start": 195,
         "end": 555
-      }
+      },
+      "hash": "dc34296b6b10c4bc12d3473f5e0c1c85ec6b16519a69cf823c9d02f20f152ae2"
     },
     {
       "id": "example.com/acme/conformance::messages/rabbit.go::PublishUnknown",
@@ -1001,7 +1101,8 @@
         "path": "messages/rabbit.go",
         "start": 557,
         "end": 756
-      }
+      },
+      "hash": "d2c6a47fc1345abe7ba87a16f2586b46baf8f213afc7c701d100fe735e80f66b"
     },
     {
       "id": "example.com/acme/conformance::messages/rabbit.go::WorkJobs",
@@ -1009,7 +1110,8 @@
         "path": "messages/rabbit.go",
         "start": 758,
         "end": 882
-      }
+      },
+      "hash": "7cc1ac003f99a1e24ee27a8772b38b8c913f5824b46cd1e95d0af4d35d9be9c6"
     },
     {
       "id": "example.com/acme/conformance::messages/rabbit.go::channel",
@@ -1017,7 +1119,8 @@
         "path": "messages/rabbit.go",
         "start": 81,
         "end": 193
-      }
+      },
+      "hash": "44eb33d4b0cb46beaaaa15f34c2049358931b3e21bc73989e249c25fce548dcb"
     },
     {
       "id": "example.com/acme/conformance::messages/sarama.go::SaramaGroup",
@@ -1025,7 +1128,8 @@
         "path": "messages/sarama.go",
         "start": 1153,
         "end": 1417
-      }
+      },
+      "hash": "31f3d1d2fc41cebb5ef2412f135e206d852ae81f9218b02695d5138f916130c3"
     },
     {
       "id": "example.com/acme/conformance::messages/sarama.go::SaramaPartition",
@@ -1033,7 +1137,8 @@
         "path": "messages/sarama.go",
         "start": 541,
         "end": 696
-      }
+      },
+      "hash": "f9c408422038dccb7e7cbdd06771e38e13c7f0099fd6e6cdeee58c635bd5019c"
     },
     {
       "id": "example.com/acme/conformance::messages/sarama.go::SaramaProduce",
@@ -1041,7 +1146,8 @@
         "path": "messages/sarama.go",
         "start": 67,
         "end": 343
-      }
+      },
+      "hash": "445c00e2b9c2cf35089b4340f8484932273880348044a48b32425d1699068b20"
     },
     {
       "id": "example.com/acme/conformance::messages/sarama.go::SaramaSend",
@@ -1049,7 +1155,8 @@
         "path": "messages/sarama.go",
         "start": 429,
         "end": 539
-      }
+      },
+      "hash": "a3061a8b68a59213b2278720dfa5dbb1dc323217a41274aff1c9ae09a242cab9"
     },
     {
       "id": "example.com/acme/conformance::messages/sarama.go::orderHandler",
@@ -1057,7 +1164,8 @@
         "path": "messages/sarama.go",
         "start": 769,
         "end": 790
-      }
+      },
+      "hash": "6a3a658746c6b59e9484808393db3e96149674defcf673e97e096154210de6ed"
     },
     {
       "id": "example.com/acme/conformance::messages/sarama.go::orderHandler.Cleanup",
@@ -1065,7 +1173,8 @@
         "path": "messages/sarama.go",
         "start": 870,
         "end": 947
-      }
+      },
+      "hash": "1b77669b42b1902fa643d7f70591f959f18d9d5515f6fcd3e631dc404a58fa98"
     },
     {
       "id": "example.com/acme/conformance::messages/sarama.go::orderHandler.ConsumeClaim",
@@ -1073,7 +1182,8 @@
         "path": "messages/sarama.go",
         "start": 948,
         "end": 1151
-      }
+      },
+      "hash": "b64b2342b795db9f46319d4ead99fb86cf250e541e271c4c08f0caf558664c18"
     },
     {
       "id": "example.com/acme/conformance::messages/sarama.go::orderHandler.Setup",
@@ -1081,7 +1191,8 @@
         "path": "messages/sarama.go",
         "start": 792,
         "end": 869
-      }
+      },
+      "hash": "8efa78ac6e36fa0fff3aca126e1cfb4b3be4bfd7daf6f4498c99a149a690d380"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::ConsumeOrders",
@@ -1089,7 +1200,8 @@
         "path": "messages/segmentio.go",
         "start": 1633,
         "end": 1784
-      }
+      },
+      "hash": "63cd5bb53037dcd72a5975c737e9b31fe29af99805cec389b0ce227be9ef8822"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::ConsumeRefunds",
@@ -1097,7 +1209,8 @@
         "path": "messages/segmentio.go",
         "start": 1786,
         "end": 1949
-      }
+      },
+      "hash": "0123958d4bac9d3806c8e1672f4520941a30876696c7ecf4cdb385b7a0fe8513"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::ConsumeUnknown",
@@ -1105,7 +1218,8 @@
         "path": "messages/segmentio.go",
         "start": 1951,
         "end": 2068
-      }
+      },
+      "hash": "77702722d6056b6f3bdc771a07df75bd6520e5df9c39d36e4dc8390ae027ad95"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::EmitRefund",
@@ -1113,7 +1227,8 @@
         "path": "messages/segmentio.go",
         "start": 1265,
         "end": 1390
-      }
+      },
+      "hash": "1905a4b457118b331b72fb053f2bcab40f1fdc99abb93db46cffeb4a350f3297"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::NewWriter",
@@ -1121,7 +1236,8 @@
         "path": "messages/segmentio.go",
         "start": 2246,
         "end": 2342
-      }
+      },
+      "hash": "26957394d46cb6f7901598622926237e65c24f4571ceab7c3bf680a21531ed47"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::ProduceAll",
@@ -1129,7 +1245,8 @@
         "path": "messages/segmentio.go",
         "start": 157,
         "end": 451
-      }
+      },
+      "hash": "92e7091ac68bbdd065ecf85c7497d1dbdf7a2c42c9714d60d562359094c2fb35"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike",
@@ -1137,7 +1254,8 @@
         "path": "messages/segmentio.go",
         "start": 2344,
         "end": 2492
-      }
+      },
+      "hash": "cae86baaf745b2248fd9edbc3b1978573543c7ad980e0384b3cdd7c0354a5dc7"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::ProduceMade",
@@ -1145,7 +1263,8 @@
         "path": "messages/segmentio.go",
         "start": 1031,
         "end": 1145
-      }
+      },
+      "hash": "b14443e3b678efd739f5b5d1d5469be974e5e2042ff59815d9ec96e8f0e11106"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::ProduceMessages",
@@ -1153,7 +1272,8 @@
         "path": "messages/segmentio.go",
         "start": 508,
         "end": 839
-      }
+      },
+      "hash": "3027e0239148f026d36f730c4651d6b8e7e556232383a4df4369ef036fc3e3c8"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::ProduceUnknown",
@@ -1161,7 +1281,8 @@
         "path": "messages/segmentio.go",
         "start": 1392,
         "end": 1547
-      }
+      },
+      "hash": "8c7dbff4ff303c668254ce21fe11c0345353771c55bfecfec43797e04a28e295"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::Publisher",
@@ -1169,7 +1290,8 @@
         "path": "messages/segmentio.go",
         "start": 2583,
         "end": 2618
-      }
+      },
+      "hash": "6f2777569a82a49ca0419e72e995fdf16c8a4e36422104c88cdc5887dded2264"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::Publisher.Send",
@@ -1177,7 +1299,8 @@
         "path": "messages/segmentio.go",
         "start": 2620,
         "end": 2736
-      }
+      },
+      "hash": "4c1c6dc9956f3ed28e24abed3f5dedc97961a9b2d6b65796a9ec1486414ad061"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::ReadLoop",
@@ -1185,7 +1308,8 @@
         "path": "messages/segmentio.go",
         "start": 2738,
         "end": 2865
-      }
+      },
+      "hash": "3ee72e60cb2b315d4c949d94cd00d3466aeb10ec4e41014a05967c284dfd717f"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::WriterConfig",
@@ -1193,7 +1317,8 @@
         "path": "messages/segmentio.go",
         "start": 2209,
         "end": 2244
-      }
+      },
+      "hash": "61609654556e67ed19d14e48af7218f057cee65bd247a91616dd08154a977a66"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::emit",
@@ -1201,7 +1326,8 @@
         "path": "messages/segmentio.go",
         "start": 1147,
         "end": 1263
-      }
+      },
+      "hash": "4cb541513bffae8f9a274390a7acdf977bfd9c25656a07c326f48ce3155842ed"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::newWriter",
@@ -1209,7 +1335,8 @@
         "path": "messages/segmentio.go",
         "start": 922,
         "end": 1029
-      }
+      },
+      "hash": "d59771310d8e956bb35737ac6aeaad0b8e9938bc0600e634649541d365b9e48b"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::Outbox",
@@ -1217,7 +1344,8 @@
         "path": "messages/shadowed.go",
         "start": 208,
         "end": 223
-      }
+      },
+      "hash": "ede13d5f2ed81b87ee16d94195f9bf0f7f09941ce5b420c635fc7e82ad6e259f"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::Outbox.Publish",
@@ -1225,7 +1353,8 @@
         "path": "messages/shadowed.go",
         "start": 291,
         "end": 356
-      }
+      },
+      "hash": "5596e7fea5d647debeb01cc31e7ccd8efc54ec1d7d08ba9c7fdbe332c7a8f855"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::Outbox.WriteMessages",
@@ -1233,7 +1362,8 @@
         "path": "messages/shadowed.go",
         "start": 225,
         "end": 290
-      }
+      },
+      "hash": "2fe7000d01e48a803b28e163a3b73020837ff2b63ad93679fae636ffa41e4b54"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::Outbox.XAdd",
@@ -1241,7 +1371,8 @@
         "path": "messages/shadowed.go",
         "start": 357,
         "end": 422
-      }
+      },
+      "hash": "b07ba48fd85f62c129c6302f2e2020a762dd4a49ec1d2aeeddf43f4f89a19ea9"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::Service",
@@ -1249,7 +1380,8 @@
         "path": "messages/shadowed.go",
         "start": 1259,
         "end": 1286
-      }
+      },
+      "hash": "ef0a4b70d2276e2f665386b680d7bf147db914119a7518a81bb715b7a1421ebc"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::Service.Run",
@@ -1257,7 +1389,8 @@
         "path": "messages/shadowed.go",
         "start": 1288,
         "end": 1376
-      }
+      },
+      "hash": "2ccc0f72159ef2e30b3756459f9d6cc322de050444124b632edd20138c86b252"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::Shadowed",
@@ -1265,7 +1398,8 @@
         "path": "messages/shadowed.go",
         "start": 424,
         "end": 565
-      }
+      },
+      "hash": "56204b19aa760e0854c9278673ab7d33d84f670545a505db64349454cbf6bc11"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedBlock",
@@ -1273,7 +1407,8 @@
         "path": "messages/shadowed.go",
         "start": 795,
         "end": 999
-      }
+      },
+      "hash": "c91d902f6ba2a34efb48ceb6cc31a2697faed56c43b19e7cbae2911e29399470"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedImport",
@@ -1281,7 +1416,8 @@
         "path": "messages/shadowed.go",
         "start": 643,
         "end": 710
-      }
+      },
+      "hash": "6704ca4f3691f5992583e01cdac44db582eccc4cb4644659d83852f72cc79a10"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedRange",
@@ -1289,7 +1425,8 @@
         "path": "messages/shadowed.go",
         "start": 1001,
         "end": 1125
-      }
+      },
+      "hash": "0387613b042c03b52a339cad5f7b35b80c58a47ddd381b762c53c8ee75ffda52"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::Sink",
@@ -1297,7 +1434,8 @@
         "path": "messages/shadowed.go",
         "start": 1184,
         "end": 1252
-      }
+      },
+      "hash": "e5369ddf997d63b6cf64056239800d054b9804c50651fbce32abfa8260f36e8c"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::Sink.WriteMessages",
@@ -1305,7 +1443,8 @@
         "path": "messages/shadowed.go",
         "start": 1202,
         "end": 1250
-      }
+      },
+      "hash": "2ac1671e9c2f497fa0a8459e109a518bd88ec2a05176fa53e7297b0488f2063d"
     },
     {
       "id": "example.com/acme/conformance::messages/streams.go::RedisConsume",
@@ -1313,7 +1452,8 @@
         "path": "messages/streams.go",
         "start": 261,
         "end": 570
-      }
+      },
+      "hash": "fcc42f281640ec5f2608d7df1bd9f50d3b9fb8109e223557ed8b746db0d32afc"
     },
     {
       "id": "example.com/acme/conformance::messages/streams.go::RedisProduce",
@@ -1321,7 +1461,8 @@
         "path": "messages/streams.go",
         "start": 74,
         "end": 259
-      }
+      },
+      "hash": "a601d514e5c19a64f114aa886683d8682a8ab0122f94e6293f914c418ad0d6fd"
     },
     {
       "id": "example.com/acme/conformance::messages/subjects.go::NatsPublish",
@@ -1329,7 +1470,8 @@
         "path": "messages/subjects.go",
         "start": 123,
         "end": 277
-      }
+      },
+      "hash": "8fb55fa25cd2056b96c42443e9500c530700c8eef6649757d39b37474befc3db"
     },
     {
       "id": "example.com/acme/conformance::messages/subjects.go::NatsSubscribe",
@@ -1337,7 +1479,8 @@
         "path": "messages/subjects.go",
         "start": 279,
         "end": 503
-      }
+      },
+      "hash": "dd666dd4f31a61e8ea58b08206e8054fa4a47f40532a776386b51506d78ad03e"
     },
     {
       "id": "example.com/acme/conformance::messages/subjects.go::NatsSubscribe.nats orders.created",
@@ -1345,7 +1488,8 @@
         "path": "messages/subjects.go",
         "start": 377,
         "end": 397
-      }
+      },
+      "hash": "085d2fbcef82d24a914470809049efe6ea718c79af3c714b6ebef2d6ee1577fe"
     },
     {
       "id": "example.com/acme/conformance::messages/subjects.go::auditor",
@@ -1353,7 +1497,8 @@
         "path": "messages/subjects.go",
         "start": 65,
         "end": 81
-      }
+      },
+      "hash": "c5eb88fe6a3e5684796ed2e245efed23a4f86b4a7cd61517889c2ea7f4bef756"
     },
     {
       "id": "example.com/acme/conformance::messages/subjects.go::auditor.onAudit",
@@ -1361,7 +1506,8 @@
         "path": "messages/subjects.go",
         "start": 83,
         "end": 121
-      }
+      },
+      "hash": "6def0b443ff73b6211c01a39e782516f2d363534f297579cb8aef0c546d84a45"
     },
     {
       "id": "example.com/acme/conformance::messages/subjects.go::onOrder",
@@ -1369,7 +1515,8 @@
         "path": "messages/subjects.go",
         "start": 505,
         "end": 533
-      }
+      },
+      "hash": "5d3f4a19ccb7619229370454aa02c26fbe8aab7fd9eef53c3fa62283f12082f9"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::AfterBlock",
@@ -1377,7 +1524,8 @@
         "path": "methods/calls.go",
         "start": 2534,
         "end": 2610
-      }
+      },
+      "hash": "6edb80fa3c9c67155eb52a3533ec8f38e7fda9913cb7dd89092aa217a7640775"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::Capture",
@@ -1385,7 +1533,8 @@
         "path": "methods/calls.go",
         "start": 2058,
         "end": 2146
-      }
+      },
+      "hash": "878321ade5e72154bf343c29d9a7fdc0718a646844cee7c512d84af81d72172e"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::ForInitShadow",
@@ -1393,7 +1542,8 @@
         "path": "methods/calls.go",
         "start": 2865,
         "end": 2947
-      }
+      },
+      "hash": "67850b77eb9171bbfb7be2078d4f70b77fa2084ec7c8338ea814bb686fc95ec7"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromClosure",
@@ -1401,7 +1551,8 @@
         "path": "methods/calls.go",
         "start": 1226,
         "end": 1341
-      }
+      },
+      "hash": "a68c7de412a2f9cd92e5152cb96e754d5730c8dde40689b57c2f65ac41be92c5"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromInterface",
@@ -1409,7 +1560,8 @@
         "path": "methods/calls.go",
         "start": 1059,
         "end": 1100
-      }
+      },
+      "hash": "fa88b2402bcf36049b7112c94cc28ba61d0bdec4fe4db64f4a561b551cba6ee7"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromInterfaceAsShape",
@@ -1417,7 +1569,8 @@
         "path": "methods/calls.go",
         "start": 1102,
         "end": 1157
-      }
+      },
+      "hash": "9c4caa082ca3f1252b4ce4f423dcd26a765fc0fb2f18d271c9dc69e659ded253"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromLiteral",
@@ -1425,7 +1578,8 @@
         "path": "methods/calls.go",
         "start": 318,
         "end": 393
-      }
+      },
+      "hash": "c0aaeb4b51c75a326e59d12e7b00fcdcb51dd9947f7e903e09be14b299f1c26a"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromMethodResult",
@@ -1433,7 +1587,8 @@
         "path": "methods/calls.go",
         "start": 773,
         "end": 837
-      }
+      },
+      "hash": "040761400cd1c5d7b22c56c11ebb5bbd1ed90a01e8242684df0764706bacb377"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromPackageVar",
@@ -1441,7 +1596,8 @@
         "path": "methods/calls.go",
         "start": 940,
         "end": 995
-      }
+      },
+      "hash": "e28eea3394c71bac115de0e58beae9e9ec1721b7312abff40456a5dfa771895a"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromParam",
@@ -1449,7 +1605,8 @@
         "path": "methods/calls.go",
         "start": 159,
         "end": 199
-      }
+      },
+      "hash": "911ad2e67a3f03a6375ba65c7f8fa527097778a512660f657a54f3a0508d5bbf"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromQualifiedType",
@@ -1457,7 +1614,8 @@
         "path": "methods/calls.go",
         "start": 839,
         "end": 893
-      }
+      },
+      "hash": "07e4e80717465e87eb498913406912ae1b4eab38769a63ee7b0ad319f9d89d85"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromResult",
@@ -1465,7 +1623,8 @@
         "path": "methods/calls.go",
         "start": 535,
         "end": 667
-      }
+      },
+      "hash": "2f73375f4da80fce1fb19159e4964787637a941f319d8109c8acdaf1db628735"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromSecondResult",
@@ -1473,7 +1632,8 @@
         "path": "methods/calls.go",
         "start": 704,
         "end": 771
-      }
+      },
+      "hash": "f1040437ac73dd8e6dc70519b097d0e874695d35b9cc6d86f89cf85067727739"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromSibling",
@@ -1481,7 +1641,8 @@
         "path": "methods/calls.go",
         "start": 895,
         "end": 938
-      }
+      },
+      "hash": "7d6e6610e4860a9174dc45f48b060b1b2471abe638407f0d0daeeed4bb189e30"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromValueParam",
@@ -1489,7 +1650,8 @@
         "path": "methods/calls.go",
         "start": 201,
         "end": 245
-      }
+      },
+      "hash": "70949f0e4aa38580ad53abe9ba90bf9b1a315a1ce031a9ff24ed6b437a27e864"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromVar",
@@ -1497,7 +1659,8 @@
         "path": "methods/calls.go",
         "start": 247,
         "end": 316
-      }
+      },
+      "hash": "01a7a7d38be6191ebe3a1ee9b6d78e3207b190e223ed8b6ae572503a6c2605e9"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromVarLiteral",
@@ -1505,7 +1668,8 @@
         "path": "methods/calls.go",
         "start": 395,
         "end": 449
-      }
+      },
+      "hash": "0337bb40edc6a9def13af463ffa48002976726338c6dcce2eec5d1cb5b79efc8"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::IfInitShadow",
@@ -1513,7 +1677,8 @@
         "path": "methods/calls.go",
         "start": 2694,
         "end": 2773
-      }
+      },
+      "hash": "b29bd5533b7de66a510a8a28603268a0b673d4e4303f81a858b032f61bfba9de"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::LocalType",
@@ -1521,7 +1686,8 @@
         "path": "methods/calls.go",
         "start": 1894,
         "end": 1962
-      }
+      },
+      "hash": "73766f83f772f4fe8a23238f510c2d11f6f959430da6ac54288e9ef4c6d8be7a"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::NotWritten",
@@ -1529,7 +1695,8 @@
         "path": "methods/calls.go",
         "start": 1421,
         "end": 1494
-      }
+      },
+      "hash": "40790194b4914ba19924981b01fa34876ef2d7017b95bc6a003895e8a56599a7"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::NotWrittenMany",
@@ -1537,7 +1704,8 @@
         "path": "methods/calls.go",
         "start": 1552,
         "end": 1627
-      }
+      },
+      "hash": "dca6f2fd71c4fa0f50737366d7e567203e16b029e2c8796ad670ae52c7d75ed3"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::RangeShadow",
@@ -1545,7 +1713,8 @@
         "path": "methods/calls.go",
         "start": 3046,
         "end": 3130
-      }
+      },
+      "hash": "e180aa5e6056dea83a29d64850c8084404963c16c7669902f188c41191e499bd"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::Rebound",
@@ -1553,7 +1722,8 @@
         "path": "methods/calls.go",
         "start": 1700,
         "end": 1776
-      }
+      },
+      "hash": "28fc268a49f122455a757f91c13fb89aea29aefc94b01ee6558219fa38e800d5"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::ReboundByParam",
@@ -1561,7 +1731,8 @@
         "path": "methods/calls.go",
         "start": 1778,
         "end": 1855
-      }
+      },
+      "hash": "d7c7be054798abbee20bdcb479f031b45042ab885518c0a20a9eaccb7c9b372f"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::SwitchInitShadow",
@@ -1569,7 +1740,8 @@
         "path": "methods/calls.go",
         "start": 2775,
         "end": 2863
-      }
+      },
+      "hash": "f9f13bd6ef972987253798f8079800c116889758c0d5cf328070971a7f0ef064"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::TypeParam",
@@ -1577,7 +1749,8 @@
         "path": "methods/calls.go",
         "start": 2014,
         "end": 2056
-      }
+      },
+      "hash": "99582a2345f3393fcb6d96dd5563b42d20f15c1573596887ab9fa9ba41b2f90c"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::TypeSwitchShadow",
@@ -1585,7 +1758,8 @@
         "path": "methods/calls.go",
         "start": 2949,
         "end": 3044
-      }
+      },
+      "hash": "b106c584668acdcfdd855a080a220e155ca6233f66be5303d4cd25a9c0b1c7dd"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::UseBefore",
@@ -1593,7 +1767,8 @@
         "path": "methods/calls.go",
         "start": 2331,
         "end": 2390
-      }
+      },
+      "hash": "e488f4a1f2d0a29843b4ead7c708f0b7a4eb90c527a8057dca12c65de33b2e66"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure",
@@ -1601,7 +1776,8 @@
         "path": "methods/calls.go",
         "start": 2392,
         "end": 2487
-      }
+      },
+      "hash": "37b85fd2a8c00e67462d07055357281c90a3851f9de1264df56d38d0eb00bccd"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::opaque",
@@ -1609,7 +1785,8 @@
         "path": "methods/calls.go",
         "start": 2148,
         "end": 2180
-      }
+      },
+      "hash": "3dfb6b29d1e231e1d5fd9a0e0faa92906dae65053828c2cfdb79debecdc45720"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::run",
@@ -1617,7 +1794,8 @@
         "path": "methods/calls.go",
         "start": 78,
         "end": 99
-      }
+      },
+      "hash": "c96f346cb76dbc948a9650cb1ce10b456f83d7f299fc8f73a8e2ee2b47b738d1"
     },
     {
       "id": "example.com/acme/conformance::methods/reset.go::Counter.Reset",
@@ -1625,7 +1803,8 @@
         "path": "methods/reset.go",
         "start": 80,
         "end": 118
-      }
+      },
+      "hash": "f3fb4aa185781c8a16651059306e69b7fbcd0da85a7b8c74180d7ae175f48646"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Box",
@@ -1633,7 +1812,8 @@
         "path": "methods/types.go",
         "start": 1480,
         "end": 1506
-      }
+      },
+      "hash": "f9fb8e0ee581d004443471a6580bb4388b99f95df871c22df379f3ce55fb41f2"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Box.M",
@@ -1641,7 +1821,8 @@
         "path": "methods/types.go",
         "start": 1508,
         "end": 1557
-      }
+      },
+      "hash": "31274aafaf3872b33eb9e9f627b1ce5c69afcd5084ed2226fdcb85872ac0d4a2"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Counter",
@@ -1649,7 +1830,8 @@
         "path": "methods/types.go",
         "start": 187,
         "end": 212
-      }
+      },
+      "hash": "857b05396249dc47321fb125696029ddfa5592831e4bd229a9a8249c7e57f762"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Counter.Bump",
@@ -1657,7 +1839,8 @@
         "path": "methods/types.go",
         "start": 214,
         "end": 265
-      }
+      },
+      "hash": "d21ede69c86125109e837edc1fc10372407815b2f0217f620e8396d2c564a60a"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Counter.Twice",
@@ -1665,7 +1848,8 @@
         "path": "methods/types.go",
         "start": 319,
         "end": 368
-      }
+      },
+      "hash": "fc8b4e224a4e85294e50f69241dc457eacbb46f98b376d5e4821bf0d54ec514a"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Disk",
@@ -1673,7 +1857,8 @@
         "path": "methods/types.go",
         "start": 572,
         "end": 585
-      }
+      },
+      "hash": "95962521b64e568ad78f38281e86fe9680d5efaeef752d6b58185b1e51fe66b1"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Disk.Flush",
@@ -1681,7 +1866,8 @@
         "path": "methods/types.go",
         "start": 587,
         "end": 627
-      }
+      },
+      "hash": "f481d959deb331d170e947297650b711e6d8ccd6d29a6a24f352de2caa05ace5"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Gauge",
@@ -1689,7 +1875,8 @@
         "path": "methods/types.go",
         "start": 428,
         "end": 442
-      }
+      },
+      "hash": "2a93d846f8bdf8f8c225c431f077700494daca05a2ec82e10e41a11e86e418d7"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Gauge.Add",
@@ -1697,7 +1884,8 @@
         "path": "methods/types.go",
         "start": 444,
         "end": 477
-      }
+      },
+      "hash": "7fb15049d03522ee5bce2155b6f606a055f6bfe5f2f6c4fa2b5dfce3bbc804d9"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Holder",
@@ -1705,7 +1893,8 @@
         "path": "methods/types.go",
         "start": 734,
         "end": 838
-      }
+      },
+      "hash": "740a5e39656dcbe300ed021200635dacdc1a449996d56842a1647d3e46a826d4"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Holder.Counter",
@@ -1713,7 +1902,8 @@
         "path": "methods/types.go",
         "start": 937,
         "end": 994
-      }
+      },
+      "hash": "2cd77716c53731ecd7f8ccf1920a35864ca569871974d4238c8204bc29302bab"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Holder.Run",
@@ -1721,7 +1911,8 @@
         "path": "methods/types.go",
         "start": 840,
         "end": 935
-      }
+      },
+      "hash": "9716b97febdb7f561954f8da5fda7dc873026be5600768da109394fa6d05f636"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Log",
@@ -1729,7 +1920,8 @@
         "path": "methods/types.go",
         "start": 375,
         "end": 387
-      }
+      },
+      "hash": "f34b876fc7938c27b2d09211bb17af2f632942e29a32a6b25cd8ea7e58245c0e"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Log.Add",
@@ -1737,7 +1929,8 @@
         "path": "methods/types.go",
         "start": 389,
         "end": 421
-      }
+      },
+      "hash": "1f0b7a89778d6fb713dce0b4b09f5684a92694461df5a521099c98fec10afe84"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Mem",
@@ -1745,7 +1938,8 @@
         "path": "methods/types.go",
         "start": 634,
         "end": 646
-      }
+      },
+      "hash": "0d2a8d87d717d9246814311bd27d70874415cc5a120022141563bc8f1a5882dc"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Mem.Flush",
@@ -1753,7 +1947,8 @@
         "path": "methods/types.go",
         "start": 648,
         "end": 687
-      }
+      },
+      "hash": "83af59a3e63dde50c3b0c366256f39bf20968a763dd5c68229366c4b52699da7"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::NewCounter",
@@ -1761,7 +1956,8 @@
         "path": "methods/types.go",
         "start": 996,
         "end": 1045
-      }
+      },
+      "hash": "e6a6b58d010751f5ff8e1b0def7ece8df61e75e2fd005b198ee6724ad3e0cf99"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Open",
@@ -1769,7 +1965,8 @@
         "path": "methods/types.go",
         "start": 1109,
         "end": 1168
-      }
+      },
+      "hash": "e4a886511d65397c0c059cfdd2b866775fec064028ccbd9c92215a95813c358d"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Pair",
@@ -1777,7 +1974,8 @@
         "path": "methods/types.go",
         "start": 1170,
         "end": 1221
-      }
+      },
+      "hash": "41f4a19a15680b95695db73c9bc8e99b08e9124c3dd5a3f6c36f063d99c0ff39"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Sink",
@@ -1785,7 +1983,8 @@
         "path": "methods/types.go",
         "start": 532,
         "end": 565
-      }
+      },
+      "hash": "7119b38d3e0ad5e7acf699e6fe073e68594887465d0b3bef282f0c9c91cf6b93"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Sink.Flush",
@@ -1793,7 +1992,8 @@
         "path": "methods/types.go",
         "start": 550,
         "end": 563
-      }
+      },
+      "hash": "518f7954eae0fd448f2ba002f4500209f939f84447543bffe4c4fc86282056e7"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::T",
@@ -1801,7 +2001,8 @@
         "path": "methods/types.go",
         "start": 1290,
         "end": 1300
-      }
+      },
+      "hash": "408ff064fa418113f7dff074e540cbec740c569f53e5d34b8727c2e6ae61b276"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::T.Ping",
@@ -1809,7 +2010,8 @@
         "path": "methods/types.go",
         "start": 1302,
         "end": 1320
-      }
+      },
+      "hash": "f6d70d49b0b5b0c4cb6053f6c8bd2ec68b7638efd461290a7444f6b49dc99315"
     },
     {
       "id": "example.com/acme/conformance::report.go::report",
@@ -1817,7 +2019,8 @@
         "path": "report.go",
         "start": 174,
         "end": 461
-      }
+      },
+      "hash": "c0c711abaef17986532df21549e5c95f26db50186c5e000ba6b4f447a5133985"
     },
     {
       "id": "example.com/acme/conformance::scopes/clash.go::Clash",
@@ -1825,7 +2028,8 @@
         "path": "scopes/clash.go",
         "start": 149,
         "end": 184
-      }
+      },
+      "hash": "fae59514d53505c1c3c45c22a09706da7760cc8628775d9b21b3767b76656011"
     },
     {
       "id": "example.com/acme/conformance::scopes/other.go::Other",
@@ -1833,7 +2037,8 @@
         "path": "scopes/other.go",
         "start": 89,
         "end": 114
-      }
+      },
+      "hash": "0112d56378c486f01a2115284f911a2104e4008030288f61afa601d8fe04d816"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::Box",
@@ -1841,7 +2046,8 @@
         "path": "scopes/scopes.go",
         "start": 1275,
         "end": 1295
-      }
+      },
+      "hash": "4319627baa99a5cf2dba3f9981669e9cef66cabfad09f0365c8ba8f4ad375930"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::Box.Get",
@@ -1849,7 +2055,8 @@
         "path": "scopes/scopes.go",
         "start": 1367,
         "end": 1424
-      }
+      },
+      "hash": "4d33f36c9081c223846424ae01f14f47a977feb0d34c89aa28330a945fd48790"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::Capture",
@@ -1857,7 +2064,8 @@
         "path": "scopes/scopes.go",
         "start": 1051,
         "end": 1120
-      }
+      },
+      "hash": "dd8da4f8a2968e2ec09df4d92dbc06e9aad420c738ca8aee5eafec15e3e2a7cf"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::ForInit",
@@ -1865,7 +2073,8 @@
         "path": "scopes/scopes.go",
         "start": 598,
         "end": 663
-      }
+      },
+      "hash": "bd574a402a2591e139e0e3213d418b7e7c03138af0881c445e435f6890bb742f"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::Generic",
@@ -1873,7 +2082,8 @@
         "path": "scopes/scopes.go",
         "start": 1210,
         "end": 1268
-      }
+      },
+      "hash": "e717c007238f8197426c865b54da527a5a2de34f8b77d95b4ac54dcd15c0a9fc"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::H",
@@ -1881,7 +2091,8 @@
         "path": "scopes/scopes.go",
         "start": 1431,
         "end": 1439
-      }
+      },
+      "hash": "8d071ed97f70b32ec78cacdbc5cfcf77cfc2dcaf2914bc2fecea61076c35ff0b"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::H.Serve",
@@ -1889,7 +2100,8 @@
         "path": "scopes/scopes.go",
         "start": 1482,
         "end": 1517
-      }
+      },
+      "hash": "e1d0ef16d2424ee2662e7e5b18dcd1c345432a8cfa322ebc7af918a59de044ec"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::IfInit",
@@ -1897,7 +2109,8 @@
         "path": "scopes/scopes.go",
         "start": 457,
         "end": 523
-      }
+      },
+      "hash": "69734b86aff317058b93256f984eab516095371df88a3609bc3e7b9babae7c76"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::Import",
@@ -1905,7 +2118,8 @@
         "path": "scopes/scopes.go",
         "start": 1161,
         "end": 1208
-      }
+      },
+      "hash": "8ab2f3620dda7ecb35179d4c5019038e349d13d21bc827889cd5cfe82816f52d"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::LiteralParam",
@@ -1913,7 +2127,8 @@
         "path": "scopes/scopes.go",
         "start": 986,
         "end": 1049
-      }
+      },
+      "hash": "a94266a4462764d8c2b0c19a62b747cff4ba0b97e4aa2ac5fca2bb0452c40a52"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::LocalConst",
@@ -1921,7 +2136,8 @@
         "path": "scopes/scopes.go",
         "start": 1571,
         "end": 1681
-      }
+      },
+      "hash": "926160158b573944fad667cfca1382e44111841a9188deb68eeb77e0dd93f40d"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::LocalType",
@@ -1929,7 +2145,8 @@
         "path": "scopes/scopes.go",
         "start": 1519,
         "end": 1569
-      }
+      },
+      "hash": "cee07a93dde7eb78383b7492ef92294d1d34fa52441f2d3e5ff7c91080d3f45f"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::Named",
@@ -1937,7 +2154,8 @@
         "path": "scopes/scopes.go",
         "start": 936,
         "end": 984
-      }
+      },
+      "hash": "ec6e7d8c4d5782e52ff3d8dcfb7becf13473d5cd28e3437a7b435ae3efac22a3"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::Param",
@@ -1945,7 +2163,8 @@
         "path": "scopes/scopes.go",
         "start": 897,
         "end": 934
-      }
+      },
+      "hash": "faf76929c0fc9971bb05c9d7968b57dcea0d6ffc227fc91956f33d6714415104"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::Plain",
@@ -1953,7 +2172,8 @@
         "path": "scopes/scopes.go",
         "start": 303,
         "end": 341
-      }
+      },
+      "hash": "954f48d443c58dc275c30667efbcce84a212dc3a9d3ddde1a5911bc1210cff2a"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::Range",
@@ -1961,7 +2181,8 @@
         "path": "scopes/scopes.go",
         "start": 665,
         "end": 735
-      }
+      },
+      "hash": "29adeee2ce2515eeaea6108a4b9da6308a89cf5150ce0eb99c9571ce066adb43"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::Select",
@@ -1969,7 +2190,8 @@
         "path": "scopes/scopes.go",
         "start": 820,
         "end": 895
-      }
+      },
+      "hash": "de0b7f84ba14a2f337b703ad466a5d1657e81226e97e185d487465e7d287c7a8"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::ShortVar",
@@ -1977,7 +2199,8 @@
         "path": "scopes/scopes.go",
         "start": 343,
         "end": 404
-      }
+      },
+      "hash": "329fbc068250ecceac211197510219cf782bb54689d2287eb52b5ba7c51c2938"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::SwitchInit",
@@ -1985,7 +2208,8 @@
         "path": "scopes/scopes.go",
         "start": 525,
         "end": 596
-      }
+      },
+      "hash": "8d3cdf9d0a9753b5f428225465cd00004bf541fd2c1073f23ff7712c4d149e42"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::TypeSwitch",
@@ -1993,7 +2217,8 @@
         "path": "scopes/scopes.go",
         "start": 737,
         "end": 818
-      }
+      },
+      "hash": "6110eae3a6000e99c8da11d663319ce3b1abaab5563a352d1d4e39d9daa41a6a"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::Var",
@@ -2001,7 +2226,8 @@
         "path": "scopes/scopes.go",
         "start": 406,
         "end": 455
-      }
+      },
+      "hash": "96eca23b42fa04c2a28554fb055bc700fbcd3d1bfcad981feb005be9c29f2383"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::outer",
@@ -2009,7 +2235,8 @@
         "path": "scopes/scopes.go",
         "start": 191,
         "end": 206
-      }
+      },
+      "hash": "45ba8c89cee4a87f4accdd7ad08fbc6ac5b74ed2b07cbfacdbc762d5e3326c6a"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::pick",
@@ -2017,7 +2244,8 @@
         "path": "scopes/scopes.go",
         "start": 208,
         "end": 241
-      }
+      },
+      "hash": "12b31f473fd8dcc29037a3ecae508711da63a1306ab703f08a9d7f27c9305e0d"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::run",
@@ -2025,7 +2253,8 @@
         "path": "scopes/scopes.go",
         "start": 243,
         "end": 270
-      }
+      },
+      "hash": "aae4d3ab2c531c5432caf47f5d8158f46bf668ee9a46b233319bbf2c14693f86"
     },
     {
       "id": "example.com/acme/conformance::store/client_test.go::TestClient",
@@ -2033,7 +2262,8 @@
         "path": "store/client_test.go",
         "start": 180,
         "end": 236
-      }
+      },
+      "hash": "af348a4a16085f0763650261d5560654a28fc2dae6711e043142676fd87f06c5"
     },
     {
       "id": "example.com/acme/conformance::store/client_test.go::helper",
@@ -2041,7 +2271,8 @@
         "path": "store/client_test.go",
         "start": 162,
         "end": 178
-      }
+      },
+      "hash": "2644f784be5218b61169b1549520d3aee286eba42f86e5e5b35fbd717dcd352e"
     },
     {
       "id": "example.com/acme/conformance::store/codec_pure.go::encode",
@@ -2049,7 +2280,8 @@
         "path": "store/codec_pure.go",
         "start": 32,
         "end": 48
-      }
+      },
+      "hash": "bbdda242fdf77022cb1061f4fdea3a1449dc9ad9f3cc7d58d0d0e6c1f1c60630"
     },
     {
       "id": "example.com/acme/conformance::store/disk_linux.go::onLinux",
@@ -2057,7 +2289,8 @@
         "path": "store/disk_linux.go",
         "start": 61,
         "end": 89
-      }
+      },
+      "hash": "7a6294bddc57e33fb58bd41b22c84e364faf484f63d51bbe6379eabc030888bd"
     },
     {
       "id": "example.com/acme/conformance::store/entry.go::main",
@@ -2065,7 +2298,8 @@
         "path": "store/entry.go",
         "start": 88,
         "end": 102
-      }
+      },
+      "hash": "5b083824df8aaff92de4705988225cad499242704a396647fbd7fc2505c8e706"
     },
     {
       "id": "example.com/acme/conformance::store/helpers.go::Exported",
@@ -2073,7 +2307,8 @@
         "path": "store/helpers.go",
         "start": 33,
         "end": 60
-      }
+      },
+      "hash": "a64c79517544eca08fc78c6f24f33f6aa0554de3a28a71060073a4c32f7b7c82"
     },
     {
       "id": "example.com/acme/conformance::store/helpers.go::helper",
@@ -2081,7 +2316,8 @@
         "path": "store/helpers.go",
         "start": 15,
         "end": 31
-      }
+      },
+      "hash": "2644f784be5218b61169b1549520d3aee286eba42f86e5e5b35fbd717dcd352e"
     },
     {
       "id": "example.com/acme/conformance::store/store.go::New",
@@ -2089,7 +2325,8 @@
         "path": "store/store.go",
         "start": 65,
         "end": 263
-      }
+      },
+      "hash": "1a6d516fe428dd3738e959dfa00eca84cf4a1ca44b88511427c35f6adada06b5"
     },
     {
       "id": "example.com/acme/conformance::store/store.go::Store",
@@ -2097,7 +2334,8 @@
         "path": "store/store.go",
         "start": 34,
         "end": 63
-      }
+      },
+      "hash": "3663c173b14035291d138458808903e423dc61104c2da3aba75154c7dbb48000"
     },
     {
       "id": "example.com/acme/conformance::store/store.go::Store.Get",
@@ -2105,7 +2343,8 @@
         "path": "store/store.go",
         "start": 265,
         "end": 328
-      }
+      },
+      "hash": "96d61cc020596393f4da54bef4ac9111a6df2f7abb780cdb74950c0c5148ff57"
     },
     {
       "id": "example.com/acme/conformance::store/store.go::init",
@@ -2113,7 +2352,8 @@
         "path": "store/store.go",
         "start": 424,
         "end": 447
-      }
+      },
+      "hash": "489d06b7d7f49e3a8de2943274cda091c52158753f494c5e41a818f6e6f26dce"
     },
     {
       "id": "example.com/acme/conformance::store/store.go::init#2",
@@ -2121,7 +2361,8 @@
         "path": "store/store.go",
         "start": 449,
         "end": 474
-      }
+      },
+      "hash": "a5cec20d162da34c575e8c1750249d42c0159ad40bc18e37d0623027d7a9ccd0"
     },
     {
       "id": "example.com/acme/conformance::store/store.go::open",
@@ -2129,7 +2370,8 @@
         "path": "store/store.go",
         "start": 330,
         "end": 344
-      }
+      },
+      "hash": "b832c758ed8a3a46c443b52a0acdf7dd098ea18bfdbc504ed275e77330eb1d23"
     },
     {
       "id": "example.com/acme/conformance::store/store_test.go::TestNew",
@@ -2137,7 +2379,8 @@
         "path": "store/store_test.go",
         "start": 33,
         "end": 80
-      }
+      },
+      "hash": "317e81da4e6fdb486977f2d0f394eb8d976bda5719e83dcb719af6f9490977f5"
     },
     {
       "id": "example.com/acme/conformance::store/sys_unix.go::sysOpen",
@@ -2145,7 +2388,8 @@
         "path": "store/sys_unix.go",
         "start": 36,
         "end": 53
-      }
+      },
+      "hash": "b0e6c4e21aee7dc82e6e3c1606a1f68e900ea16b53a34f25af470c9e39991b46"
     },
     {
       "id": "example.com/acme/conformance::tools/ext_test.go::main",
@@ -2153,7 +2397,8 @@
         "path": "tools/ext_test.go",
         "start": 62,
         "end": 76
-      }
+      },
+      "hash": "5b083824df8aaff92de4705988225cad499242704a396647fbd7fc2505c8e706"
     },
     {
       "id": "example.com/acme/conformance::tools/runner.go::Runner",
@@ -2161,7 +2406,8 @@
         "path": "tools/runner.go",
         "start": 59,
         "end": 74
-      }
+      },
+      "hash": "3f1d688accf5996d35428bb243e957521a823a2905bc5653c46bffc7deaccdff"
     },
     {
       "id": "example.com/acme/conformance::tools/runner.go::Runner.main",
@@ -2169,7 +2415,8 @@
         "path": "tools/runner.go",
         "start": 76,
         "end": 99
-      }
+      },
+      "hash": "95aad0cad3f04e1d445fcd583420ee67b46c88f115186f4ad9ff2566866defd2"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiAdmin",
@@ -2177,7 +2424,8 @@
         "path": "web/chi.go",
         "start": 523,
         "end": 579
-      }
+      },
+      "hash": "82c19b8ca7febb5ae178808ae55a7a45bb62a0566b4747363c070b094b9a2467"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiAny",
@@ -2185,7 +2433,8 @@
         "path": "web/chi.go",
         "start": 352,
         "end": 406
-      }
+      },
+      "hash": "938c7dfeece0f2b9b7aa2e7b13f2fd80466569cb14d5387ec91fecde2d446a2a"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiAudit",
@@ -2193,7 +2442,8 @@
         "path": "web/chi.go",
         "start": 2644,
         "end": 2771
-      }
+      },
+      "hash": "58686712bb34968ccf0ccc8cc2a7f6dfdbab0224dfce94a87e2e47fd56a3a444"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiEdit",
@@ -2201,7 +2451,8 @@
         "path": "web/chi.go",
         "start": 295,
         "end": 350
-      }
+      },
+      "hash": "c234a02f67ef3cefcb009bfcfaae045bd4e866ca82a8546bba7ccb99b90acb4f"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiFiles",
@@ -2209,7 +2460,8 @@
         "path": "web/chi.go",
         "start": 408,
         "end": 464
-      }
+      },
+      "hash": "70cd019c823ba14ff6f7cc3c839609e5eb9dcb20ca965d2480c3e7914195891b"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiGuard",
@@ -2217,7 +2469,8 @@
         "path": "web/chi.go",
         "start": 687,
         "end": 826
-      }
+      },
+      "hash": "8c37c8507b9ba74dd673996cb869a36e54bb1c1f89b4ccc18f41f21f5383b8e1"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiHidden",
@@ -2225,7 +2478,8 @@
         "path": "web/chi.go",
         "start": 581,
         "end": 638
-      }
+      },
+      "hash": "cdd51f4a88b04e9c4b6cef5ea2555986f852aae27ebabbdf7219a663a6b76e87"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
@@ -2233,7 +2487,8 @@
         "path": "web/chi.go",
         "start": 2906,
         "end": 3282
-      }
+      },
+      "hash": "d519a0bef8028c2d2f74fcb3192ca49c033a89c111915ef554c5788c48233e6e"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiIndex",
@@ -2241,7 +2496,8 @@
         "path": "web/chi.go",
         "start": 123,
         "end": 179
-      }
+      },
+      "hash": "14954f26084c4cb5e0ed7429757ffb1b749e9af986e720eb768bd7e58bd9b1bd"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiMake",
@@ -2249,7 +2505,8 @@
         "path": "web/chi.go",
         "start": 238,
         "end": 293
-      }
+      },
+      "hash": "4f7a2f0d94d84353ac122af98f54d22d58321d5187d536115aac944f32d5865d"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiNest",
@@ -2257,7 +2514,8 @@
         "path": "web/chi.go",
         "start": 2583,
         "end": 2642
-      }
+      },
+      "hash": "379dce82d35643cc03dd48f08f293b61184da6e38bbadf004e800fef188c8e1f"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiPassed",
@@ -2265,7 +2523,8 @@
         "path": "web/chi.go",
         "start": 4077,
         "end": 4279
-      }
+      },
+      "hash": "6f4b88deb5619bedf2fd3a42d3971d689c5c0c3786392b61eb349d6aaf89da91"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiPing",
@@ -2273,7 +2532,8 @@
         "path": "web/chi.go",
         "start": 66,
         "end": 121
-      }
+      },
+      "hash": "53d25af928c08bfde1a79204e6e9c8f6ee525bcd1eacd3a599239062382bd1e3"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiRebound",
@@ -2281,7 +2541,8 @@
         "path": "web/chi.go",
         "start": 4534,
         "end": 4678
-      }
+      },
+      "hash": "9d5c7033cf351e4d1ac0dc971680a1d531ef66eae1847ceab0adada3d75a9c4b"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiRoutes",
@@ -2289,7 +2550,8 @@
         "path": "web/chi.go",
         "start": 1017,
         "end": 1926
-      }
+      },
+      "hash": "30a456f8b39ca9ff193c2805ea1151f4642971d0578c59443f4e258a929e2a46"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiRoutes.DELETE /things/{}",
@@ -2297,7 +2559,8 @@
         "path": "web/chi.go",
         "start": 1229,
         "end": 1276
-      }
+      },
+      "hash": "97ff92c3807ba47ca12ef32bdd73ab7161dd2f786ac097078fd6f93fa25bb8f5"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiShadow",
@@ -2305,7 +2568,8 @@
         "path": "web/chi.go",
         "start": 3426,
         "end": 3517
-      }
+      },
+      "hash": "79ea9d69c3a8ffc14d39787d3ecedf52766860eef3c1cbecebb11125b60855ab"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiShow",
@@ -2313,7 +2577,8 @@
         "path": "web/chi.go",
         "start": 181,
         "end": 236
-      }
+      },
+      "hash": "ca126ec6f253cbfdb39a79df63bc8d3c4f55891a18e3887c810f92ead6c16eed"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiTeam",
@@ -2321,7 +2586,8 @@
         "path": "web/chi.go",
         "start": 466,
         "end": 521
-      }
+      },
+      "hash": "269deec06bca342d43c4bda1d6a14eda1ac81495e59515c0726312b70de721ec"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiTwice",
@@ -2329,7 +2595,8 @@
         "path": "web/chi.go",
         "start": 2341,
         "end": 2497
-      }
+      },
+      "hash": "2b6fe2b535141355b0a1c84e6e39caa8da5d276743a96ab7bb7c318360d24d73"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiUnread",
@@ -2337,7 +2604,8 @@
         "path": "web/chi.go",
         "start": 3603,
         "end": 3900
-      }
+      },
+      "hash": "b68c33a72cf8ee3194748fee52f5188fd4054583656eb9f31be968e5b5ee6c62"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::adminRoutes",
@@ -2345,7 +2613,8 @@
         "path": "web/chi.go",
         "start": 2089,
         "end": 2213
-      }
+      },
+      "hash": "c8dce7ce468a083c412681d743be6e1b1444e11e27aa826b4355c64c79b8d031"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::chiMany",
@@ -2353,7 +2622,8 @@
         "path": "web/chi.go",
         "start": 4787,
         "end": 4829
-      }
+      },
+      "hash": "904b23cb7f043752dfd5a44f6c65ce059f5dfec0b0f55533fa1174ba34998a71"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::chiOther",
@@ -2361,7 +2631,8 @@
         "path": "web/chi.go",
         "start": 4744,
         "end": 4785
-      }
+      },
+      "hash": "e267c9e7b7d17a593e84512c6057776b0c1e1c29556760fa593f44b9a2cecadc"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::deepRoutes",
@@ -2369,7 +2640,8 @@
         "path": "web/chi.go",
         "start": 2215,
         "end": 2297
-      }
+      },
+      "hash": "3a81818de67413b474f40742fcd62f63c10a9a55b8ad91dfc0260b4ae5f607e0"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::passedLoop",
@@ -2377,7 +2649,8 @@
         "path": "web/chi.go",
         "start": 4406,
         "end": 4479
-      }
+      },
+      "hash": "93e9c79ad830e66297b04c6980d337e612c6e6a2fbe8eaae8678f6de970d2fdc"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::passedNever",
@@ -2385,7 +2658,8 @@
         "path": "web/chi.go",
         "start": 4680,
         "end": 4742
-      }
+      },
+      "hash": "7437f7869b44e38c43ec68f2dc3bdb6584c68a3c4e5dba996aacc1d5e710a748"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::passedStats",
@@ -2393,7 +2667,8 @@
         "path": "web/chi.go",
         "start": 4343,
         "end": 4404
-      }
+      },
+      "hash": "b6ae735c3bde7e0629be139ab6ce9151733349048330bc81364795b2eed2c0dc"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::passedUsers",
@@ -2401,7 +2676,8 @@
         "path": "web/chi.go",
         "start": 4281,
         "end": 4341
-      }
+      },
+      "hash": "966c1e7f5ff74c56b40a839c31b0bc62acfacac493f78f8c091ff3663ce9fda4"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::teamRoutes",
@@ -2409,7 +2685,8 @@
         "path": "web/chi.go",
         "start": 1928,
         "end": 2017
-      }
+      },
+      "hash": "65b4b8ca8b82b1ca75ac434ea7c646cd5cb13700f29f2c56ecb176d50f37006d"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::unreadable",
@@ -2417,7 +2694,8 @@
         "path": "web/chi.go",
         "start": 3284,
         "end": 3376
-      }
+      },
+      "hash": "12ca89dd34efe4214a7557b82c7c9e88268e92885e28314034e063beb4259437"
     },
     {
       "id": "example.com/acme/conformance::web/echo.go::Auth",
@@ -2425,7 +2703,8 @@
         "path": "web/echo.go",
         "start": 266,
         "end": 331
-      }
+      },
+      "hash": "07a91b3f921f26bb060c71d7510eeeedad2dae780eb53a746af1239d3d29a9ec"
     },
     {
       "id": "example.com/acme/conformance::web/echo.go::Billing",
@@ -2433,7 +2712,8 @@
         "path": "web/echo.go",
         "start": 215,
         "end": 264
-      }
+      },
+      "hash": "4fee3cfc426cb02ef5ec093ee4ad15670b41358935a7f3b08492f767b18ab3c7"
     },
     {
       "id": "example.com/acme/conformance::web/echo.go::Create",
@@ -2441,7 +2721,8 @@
         "path": "web/echo.go",
         "start": 117,
         "end": 165
-      }
+      },
+      "hash": "ed4c5fcd6df46321e35923f913e7eac486fbaab902ab877400e63f1b0a8f7566"
     },
     {
       "id": "example.com/acme/conformance::web/echo.go::EchoDynamic",
@@ -2449,7 +2730,8 @@
         "path": "web/echo.go",
         "start": 1007,
         "end": 1142
-      }
+      },
+      "hash": "464b6d096257fbd0e646c966d8f376707a9d61e8ea3e49deabbfd1f9f9ab2821"
     },
     {
       "id": "example.com/acme/conformance::web/echo.go::EchoRoutes",
@@ -2457,7 +2739,8 @@
         "path": "web/echo.go",
         "start": 428,
         "end": 890
-      }
+      },
+      "hash": "77ca902088866523f84d172c69b499bb5d87abf694d2d1d10222f2fc82f29870"
     },
     {
       "id": "example.com/acme/conformance::web/echo.go::EchoRoutes.DELETE /api/items/{}",
@@ -2465,7 +2748,8 @@
         "path": "web/echo.go",
         "start": 669,
         "end": 710
-      }
+      },
+      "hash": "f949c83cfbde3e3ebf1a7fc3f7e6a3ff141a5e19102183cf99839e7eb4a14b20"
     },
     {
       "id": "example.com/acme/conformance::web/echo.go::EchoWrapped",
@@ -2473,7 +2757,8 @@
         "path": "web/echo.go",
         "start": 1217,
         "end": 1398
-      }
+      },
+      "hash": "a3f3c65fadbe15e8aea4464b2ef507534fcc489f71f3ada2bf80aeb69ecaea4d"
     },
     {
       "id": "example.com/acme/conformance::web/echo.go::Item",
@@ -2481,7 +2766,8 @@
         "path": "web/echo.go",
         "start": 69,
         "end": 115
-      }
+      },
+      "hash": "3cf5bcb0012e85509b54a07834b1930d86eb515a478513f3f134922bb20ce7f3"
     },
     {
       "id": "example.com/acme/conformance::web/echo.go::RegisterBilling",
@@ -2489,7 +2775,8 @@
         "path": "web/echo.go",
         "start": 892,
         "end": 959
-      }
+      },
+      "hash": "ef730bd22576c9590bd72e35b739300a3068e784d2870f346151b5817ccc8799"
     },
     {
       "id": "example.com/acme/conformance::web/echo.go::Wide",
@@ -2497,7 +2784,8 @@
         "path": "web/echo.go",
         "start": 167,
         "end": 213
-      }
+      },
+      "hash": "530d0d5deeb6c78aab39696771036656e1f4e5b474c85de9b5c4aca946b27351"
     },
     {
       "id": "example.com/acme/conformance::web/echo.go::Wide2",
@@ -2505,7 +2793,8 @@
         "path": "web/echo.go",
         "start": 1400,
         "end": 1453
-      }
+      },
+      "hash": "026987c9d69b9df142b005134195ce695677241f5298f1da9b08ddb386736029"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::Audit",
@@ -2513,7 +2802,8 @@
         "path": "web/gin.go",
         "start": 124,
         "end": 151
-      }
+      },
+      "hash": "305527344a05af251918f3e0963269f783920d0a1f4492a076cb1778172225bb"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::GinCaptured",
@@ -2521,7 +2811,8 @@
         "path": "web/gin.go",
         "start": 1965,
         "end": 2040
-      }
+      },
+      "hash": "6f3e621d766b20a49716cd033257854a3ad577d0fc26b21d9be5622e36662d0c"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::GinEscaped",
@@ -2529,7 +2820,8 @@
         "path": "web/gin.go",
         "start": 2453,
         "end": 2538
-      }
+      },
+      "hash": "e4b2c5ad57477d59abd46a8aef6e36e70cd79dbb3cb6bb4d1f9f0506e226fd59"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::GinHidden",
@@ -2537,7 +2829,8 @@
         "path": "web/gin.go",
         "start": 1362,
         "end": 1599
-      }
+      },
+      "hash": "e5177cbba2cb4e6a60db2aa73a333e2e4927b77437a3afe6ab161199c01d75b8"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::GinReassigned",
@@ -2545,7 +2838,8 @@
         "path": "web/gin.go",
         "start": 1647,
         "end": 1793
-      }
+      },
+      "hash": "adca24766045df1c3b3f37a8a2998425cc4e46f600b6eaa5d9ce4a1939989218"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::GinRoutes",
@@ -2553,7 +2847,8 @@
         "path": "web/gin.go",
         "start": 407,
         "end": 1034
-      }
+      },
+      "hash": "b07e3648228e285d1e854d4a41c243509df511ab3d92a647bcdeace746f835ea"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::GinRoutes.DELETE /v1/users/{}",
@@ -2561,7 +2856,8 @@
         "path": "web/gin.go",
         "start": 681,
         "end": 702
-      }
+      },
+      "hash": "3c0e2eab73646769b7d5cec5836c734d2c8acbecebd1145ce79c806bcc9c987f"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::GinShadow",
@@ -2569,7 +2865,8 @@
         "path": "web/gin.go",
         "start": 1843,
         "end": 1921
-      }
+      },
+      "hash": "32d882d0fc4366270a3a595b556981e9b653329cfe75cb7abc07e2fe1b594721"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::GinWrapped",
@@ -2577,7 +2874,8 @@
         "path": "web/gin.go",
         "start": 2147,
         "end": 2325
-      }
+      },
+      "hash": "0749070e539a477545fcf11271b28535179decff60189953b162ee2bd902750d"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::Hidden",
@@ -2585,7 +2883,8 @@
         "path": "web/gin.go",
         "start": 239,
         "end": 267
-      }
+      },
+      "hash": "4014aa5a45508e2ed974e30b904ed1c243b9afa8feaf34e4d1b1203f9ad68490"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::Hidden2",
@@ -2593,7 +2892,8 @@
         "path": "web/gin.go",
         "start": 2327,
         "end": 2382
-      }
+      },
+      "hash": "a230e0e17e0a833c283608358dd9a44559581b671db96f7025aac41afedbe547"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::Mid",
@@ -2601,7 +2901,8 @@
         "path": "web/gin.go",
         "start": 212,
         "end": 237
-      }
+      },
+      "hash": "7eed863573682bad18021457de322962d73727b054b9eb3bf1e3cb417b2c3549"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::Operations",
@@ -2609,7 +2910,8 @@
         "path": "web/gin.go",
         "start": 1036,
         "end": 1107
-      }
+      },
+      "hash": "20262382059d6cd291585d03fc1fa9a444bb7e78a4ad0a53cd9135269e19755c"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::RegisterAudit",
@@ -2617,7 +2919,8 @@
         "path": "web/gin.go",
         "start": 1179,
         "end": 1293
-      }
+      },
+      "hash": "8a3c8cb033cefd2d5f4eb75ab15987273a08c34ec96b6f694bff9af90f21f2ac"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::Save",
@@ -2625,7 +2928,8 @@
         "path": "web/gin.go",
         "start": 96,
         "end": 122
-      }
+      },
+      "hash": "7cfc8467774e037f8bb40b0050079c311aca01f648ba90371ebc490107bb19a6"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::Serve",
@@ -2633,7 +2937,8 @@
         "path": "web/gin.go",
         "start": 183,
         "end": 210
-      }
+      },
+      "hash": "2ef7a1cf76a9b64e7f605662d0c3602d9913931115c81b71fd48687a02233572"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::Show",
@@ -2641,7 +2946,8 @@
         "path": "web/gin.go",
         "start": 68,
         "end": 94
-      }
+      },
+      "hash": "e9c7f9a16af0eed1daf7775578e8f56c85c6694e65b3838d6091d46acfc25401"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::Status",
@@ -2649,7 +2955,8 @@
         "path": "web/gin.go",
         "start": 153,
         "end": 181
-      }
+      },
+      "hash": "528f3627b3b80e29e99390b042f02b78a6141c9198a03a113a4a9ca31f6c32ed"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::other",
@@ -2657,7 +2964,8 @@
         "path": "web/gin.go",
         "start": 2042,
         "end": 2079
-      }
+      },
+      "hash": "8ca9144fb40406cc52754eccff18b60771987dce4e6006a3ececd3ff6d647f5e"
     },
     {
       "id": "example.com/acme/conformance::web/gin.go::setPath",
@@ -2665,7 +2973,8 @@
         "path": "web/gin.go",
         "start": 2540,
         "end": 2581
-      }
+      },
+      "hash": "f6961004a66686ea2954abfc692b4c4b871b4c6a25b9b3653c1e720c765b1326"
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::GorillaHidden",
@@ -2673,7 +2982,8 @@
         "path": "web/gorilla.go",
         "start": 2243,
         "end": 2474
-      }
+      },
+      "hash": "fd7d19a014ec0a8dda2bfba2913b4d4d2c69c6ede5a050d52f5f3f010838d5dc"
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
@@ -2681,7 +2991,8 @@
         "path": "web/gorilla.go",
         "start": 593,
         "end": 1461
-      }
+      },
+      "hash": "5948b805a6fd6dd69e807ffaf4344933357896832b025e00131513d51f85a5ad"
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes.DELETE /inline",
@@ -2689,7 +3000,8 @@
         "path": "web/gorilla.go",
         "start": 999,
         "end": 1046
-      }
+      },
+      "hash": "97ff92c3807ba47ca12ef32bdd73ab7161dd2f786ac097078fd6f93fa25bb8f5"
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::GorillaShadow",
@@ -2697,7 +3009,8 @@
         "path": "web/gorilla.go",
         "start": 2476,
         "end": 2577
-      }
+      },
+      "hash": "042023d182577c2e17f19e204b983828e12e8eca9ad096ec7fbd856c6db6d172"
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::GorillaUnread",
@@ -2705,7 +3018,8 @@
         "path": "web/gorilla.go",
         "start": 1824,
         "end": 2114
-      }
+      },
+      "hash": "b034709ec537fd51c7771b3b8c76a65b203ac58931965a6a6ebc31f5abc5f88e"
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::MuxAny",
@@ -2713,7 +3027,8 @@
         "path": "web/gorilla.go",
         "start": 236,
         "end": 290
-      }
+      },
+      "hash": "c04a115229562bfb594621eda2af31e0541971fb5ad9ae92b4320012dc14dfb9"
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::MuxHidden",
@@ -2721,7 +3036,8 @@
         "path": "web/gorilla.go",
         "start": 350,
         "end": 407
-      }
+      },
+      "hash": "2600fa4d4e93aa80ce28d27acc34bd243d146612702b5ba8717c6019dfe1b481"
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::MuxIndex",
@@ -2729,7 +3045,8 @@
         "path": "web/gorilla.go",
         "start": 64,
         "end": 120
-      }
+      },
+      "hash": "5fcae823c70a4d2d6102fb53066294adc91f4afde1229f765ea9a796c8ad5e9e"
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::MuxMake",
@@ -2737,7 +3054,8 @@
         "path": "web/gorilla.go",
         "start": 179,
         "end": 234
-      }
+      },
+      "hash": "3d781ffebadea09c40ac3261115ed304959d138aa1ee3305f40e4085ef993fa9"
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::MuxOrder",
@@ -2745,7 +3063,8 @@
         "path": "web/gorilla.go",
         "start": 292,
         "end": 348
-      }
+      },
+      "hash": "a734d16e2eccc0075c648971de9674cb5177979ad40f30568f9d0d60c93763a3"
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::MuxShow",
@@ -2753,7 +3072,8 @@
         "path": "web/gorilla.go",
         "start": 122,
         "end": 177
-      }
+      },
+      "hash": "3e6c278824045de282c018f8cd486ad17373029c2726c8e69ecc12250feefbce"
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::RegisterOrders",
@@ -2761,7 +3081,8 @@
         "path": "web/gorilla.go",
         "start": 1533,
         "end": 1691
-      }
+      },
+      "hash": "9cc514c5bb7d872fc2cd41b47e3b8e427798e9bcb79a55ec64286e5a30e6c5a8"
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::muxOther",
@@ -2769,7 +3090,8 @@
         "path": "web/gorilla.go",
         "start": 2579,
         "end": 2621
-      }
+      },
+      "hash": "260ea761f3266b9a8619f936ac818094f4bd65207e697d345d67ee9a7c586ed3"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::CreateUser",
@@ -2777,7 +3099,8 @@
         "path": "web/stdlib.go",
         "start": 199,
         "end": 257
-      }
+      },
+      "hash": "c254b274572570a3f2ff250a524e872f33f3fb4d3b157b7f80681f525e7b529b"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Default",
@@ -2785,7 +3108,8 @@
         "path": "web/stdlib.go",
         "start": 730,
         "end": 830
-      }
+      },
+      "hash": "d41e890b95db56567317483213ab883d5fc45ad93e5916735188c0da77272712"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Echo",
@@ -2793,7 +3117,8 @@
         "path": "web/stdlib.go",
         "start": 88,
         "end": 140
-      }
+      },
+      "hash": "43fdf468f67004c831670c6f290ad41f2facf733c03df9c5b82dceebafacbdeb"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Files",
@@ -2801,7 +3126,8 @@
         "path": "web/stdlib.go",
         "start": 259,
         "end": 312
-      }
+      },
+      "hash": "28b3281bb4c267949e6007af8c1c8646d7db6a8818a73ba7a4a5ed9ae6353f5f"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::GetUser",
@@ -2809,7 +3135,8 @@
         "path": "web/stdlib.go",
         "start": 142,
         "end": 197
-      }
+      },
+      "hash": "55afd5dd7198f62fdb585bc1ab50818f484a46ced80d138f8f10a14f7f31faa7"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Guard",
@@ -2817,7 +3144,8 @@
         "path": "web/stdlib.go",
         "start": 589,
         "end": 641
-      }
+      },
+      "hash": "cabbd8e344cf36684b77605a533726240abab8900ca5bde35fa167752e2efffe"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Health",
@@ -2825,7 +3153,8 @@
         "path": "web/stdlib.go",
         "start": 32,
         "end": 86
-      }
+      },
+      "hash": "3d594aee24b59a60b15b5ec337d5c5f23fecb1c0dde898e56f3f6ec007476c6b"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Home",
@@ -2833,7 +3162,8 @@
         "path": "web/stdlib.go",
         "start": 370,
         "end": 422
-      }
+      },
+      "hash": "1df0aeb84e8b79e90572ad2507cf3b8cc00a9f7302972e4ce63a8ed96c480a82"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Hosted",
@@ -2841,7 +3171,8 @@
         "path": "web/stdlib.go",
         "start": 314,
         "end": 368
-      }
+      },
+      "hash": "a5ee1f07614925519cb9154583d4c9146cb73eedff488aa779ded0e0c849676a"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Ledger",
@@ -2849,7 +3180,8 @@
         "path": "web/stdlib.go",
         "start": 533,
         "end": 587
-      }
+      },
+      "hash": "d369bb1b77744a9c400d52f2c3bb12d27d571d61fc0668371c9c8b00f9ea4a1f"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Literals",
@@ -2857,7 +3189,8 @@
         "path": "web/stdlib.go",
         "start": 3492,
         "end": 3580
-      }
+      },
+      "hash": "df1243693c4bcc44af58d4ac99743cd3b1912d4a86289a1068fde05ad1cc286c"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Mounted",
@@ -2865,7 +3198,8 @@
         "path": "web/stdlib.go",
         "start": 1638,
         "end": 2238
-      }
+      },
+      "hash": "efd6660e6b332911c1521eb6abae9af930e47a4e0ae3682ba7c2c313edc1429c"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Mux",
@@ -2873,7 +3207,8 @@
         "path": "web/stdlib.go",
         "start": 1021,
         "end": 1402
-      }
+      },
+      "hash": "0ea88e270a0fd66ff2e8de641dc5bd99391ac63bf4f73fd42f19f5dabdd4dd1e"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Mux.DELETE /users/{}",
@@ -2881,7 +3216,8 @@
         "path": "web/stdlib.go",
         "start": 1325,
         "end": 1372
-      }
+      },
+      "hash": "97ff92c3807ba47ca12ef32bdd73ab7161dd2f786ac097078fd6f93fa25bb8f5"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Ping",
@@ -2889,7 +3225,8 @@
         "path": "web/stdlib.go",
         "start": 424,
         "end": 476
-      }
+      },
+      "hash": "de7efe144367cfa8d9045a7d80946379b2d332d5d89cd7aefb056522724eceb7"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Register",
@@ -2897,7 +3234,8 @@
         "path": "web/stdlib.go",
         "start": 1404,
         "end": 1476
-      }
+      },
+      "hash": "1db0a3241ba6aa176ea5c5ed3d04545d266c3fd1d0fbae568fb6cdba7cc2ba8c"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Server",
@@ -2905,7 +3243,8 @@
         "path": "web/stdlib.go",
         "start": 3015,
         "end": 3050
-      }
+      },
+      "hash": "b283a4f94ce36005f846bd2eca350c68257d33a5c27c2b9d757ea6bda3f64de0"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Server.Routes",
@@ -2913,7 +3252,8 @@
         "path": "web/stdlib.go",
         "start": 3145,
         "end": 3392
-      }
+      },
+      "hash": "0c4628d74ae6f665dff9404887f3e518d678e18d60fd5271485e2169c34f30e4"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Stats",
@@ -2921,7 +3261,8 @@
         "path": "web/stdlib.go",
         "start": 478,
         "end": 531
-      }
+      },
+      "hash": "b93a6381f3051ef2bd665f201dbd288cdd8b8d69a413eb05cde746d67cc87119"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::Wrapped",
@@ -2929,7 +3270,8 @@
         "path": "web/stdlib.go",
         "start": 2456,
         "end": 2631
-      }
+      },
+      "hash": "b487d3b2a65f6f9afb557f370477594c64a7695c3476a095386ff22b44b948a6"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::newAPI",
@@ -2937,7 +3279,8 @@
         "path": "web/stdlib.go",
         "start": 2633,
         "end": 2783
-      }
+      },
+      "hash": "c4ec44ae366e426d1336b4e3ddd80d97ee89188f6147fa558ba5a604d83f2b56"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::newGuarded",
@@ -2945,7 +3288,8 @@
         "path": "web/stdlib.go",
         "start": 2898,
         "end": 3008
-      }
+      },
+      "hash": "19befd325dd4103d52c872d9b68a0313a9c782b9e4e7f3ea7f6e8d177b792c47"
     },
     {
       "id": "example.com/acme/conformance::web/stdlib.go::newStripped",
@@ -2953,7 +3297,8 @@
         "path": "web/stdlib.go",
         "start": 2785,
         "end": 2896
-      }
+      },
+      "hash": "1cb7e62653a40654fddb142d96dea64db52023b787276cdbd4a3703acdd3a014"
     },
     {
       "id": "example.com/acme/conformance::worker/jobs/jobs.go::Run",
@@ -2961,7 +3306,8 @@
         "path": "worker/jobs/jobs.go",
         "start": 14,
         "end": 27
-      }
+      },
+      "hash": "dfbf8d49cddb45b957c6b5a09768f195905131a0cd0483f4fc96f59597a32932"
     },
     {
       "id": "example.com/acme/conformance::worker/main.go::main",
@@ -2969,7 +3315,8 @@
         "path": "worker/main.go",
         "start": 125,
         "end": 310
-      }
+      },
+      "hash": "9f10ae2851576dfb58daf55a0b8e66044640d1b00f8eac9dd0b6d2e651f8efb0"
     }
   ],
   "calls": [

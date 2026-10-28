@@ -95,7 +95,7 @@ CREATE TABLE files (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     facts TEXT NOT NULL, resolved TEXT NOT NULL, setting TEXT NOT NULL
 );
-CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL);
+CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, hash TEXT NOT NULL);
 CREATE INDEX symbols_path ON symbols (path);
 CREATE TABLE calls (
     id TEXT NOT NULL, caller TEXT NOT NULL, target TEXT, level TEXT,
@@ -566,8 +566,8 @@ struct Resolved {
 
 /// The symbol and call rows of one file, before they are written.
 #[derive(Serialize)]
-struct Rows {
-    symbols: Vec<(String, i64, i64)>,
+struct Rows<'a> {
+    symbols: Vec<(String, i64, i64, &'a str)>,
     calls: Vec<Resolved>,
 }
 
@@ -676,7 +676,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             )?;
             continue;
         }
-        let facts = lang::pack(pack).parse_with(path, &src, &setting)?;
+        let mut facts = lang::pack(pack).parse_with(path, &src, &setting)?;
+        lang::hash_spans(&mut facts, &src);
         changed.push(Parsed {
             path: path.clone(),
             hash,
@@ -935,10 +936,10 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         }
         forget_calls(&tx, path)?;
         tx.execute("DELETE FROM symbols WHERE path = ?1", params![path])?;
-        for (id, start, end) in &rows.symbols {
+        for (id, start, end, hash) in &rows.symbols {
             tx.execute(
-                "INSERT INTO symbols VALUES (?1, ?2, ?3, ?4)",
-                params![id, path, start, end],
+                "INSERT INTO symbols VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![id, path, start, end, hash],
             )?;
         }
         for row in &rows.calls {
@@ -1603,7 +1604,7 @@ fn resolve_file<'a>(
     facts: &'a Facts,
     resolver: &Resolver<'a>,
     names: &Names,
-) -> Rows {
+) -> Rows<'a> {
     let id = |t: &Target| {
         let name = names.def(t.path, t.name).unwrap_or_else(|| t.name.into());
         format!("{identity}::{}::{name}", t.path)
@@ -1614,7 +1615,12 @@ fn resolve_file<'a>(
         .filter_map(|def| {
             let name = names.def(path, &def.name)?;
             let id = format!("{identity}::{path}::{name}");
-            Some((id, def.range.start as i64, def.range.end as i64))
+            Some((
+                id,
+                def.range.start as i64,
+                def.range.end as i64,
+                def.hash.as_str(),
+            ))
         })
         .collect();
     let calls = facts
@@ -1898,12 +1904,13 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         .collect();
     let symbols = db
         .prepare(&format!(
-            "SELECT id, path, start, end FROM {schema}.symbols ORDER BY id, path, start, end"
+            "SELECT id, path, start, end, hash FROM {schema}.symbols ORDER BY id, path, start, end"
         ))?
         .query_map([], |r| {
             Ok(Symbol {
                 id: r.get(0)?,
                 span: span(r, 1)?,
+                hash: r.get(4)?,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -2817,7 +2824,8 @@ mod tests {
             let src = fs::read(tests.join("fixtures/schema").join(&name)).unwrap_or_else(|_| {
                 panic!("add tests/fixtures/schema/{name}, a sample of the facts its pack stores")
             });
-            let facts = pack.parse(&name, &src).unwrap();
+            let mut facts = pack.parse(&name, &src).unwrap();
+            lang::hash_spans(&mut facts, &src);
             let facts = serde_json::to_string_pretty(&facts).unwrap();
             actual += &format!("\n{name}\n{facts}\n");
         }

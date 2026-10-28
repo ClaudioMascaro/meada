@@ -105,7 +105,8 @@
         "path": "bare/src/thing.ts",
         "start": 7,
         "end": 53
-      }
+      },
+      "hash": "8ccf2df8ae3ae2ad26a23b3265300794214df9a761f963f8c2579c98e1bf1b11"
     },
     {
       "id": "example.com/pkg/shared::dts/index.js::dts",
@@ -113,7 +114,8 @@
         "path": "dts/index.js",
         "start": 7,
         "end": 41
-      }
+      },
+      "hash": "3f5bc75016cc0dcaa38214bfdde9181f8255f01e37255e76e15f428b624add02"
     },
     {
       "id": "example.com/pkg/shared::esm/lib/parts/index.ts::part",
@@ -121,7 +123,8 @@
         "path": "esm/lib/parts/index.ts",
         "start": 7,
         "end": 51
-      }
+      },
+      "hash": "f02718a6769950d20eb724a2df286885545fadf7e207b0ff114f20872915be93"
     },
     {
       "id": "example.com/pkg/shared::esm/lib/tool.ts::tool",
@@ -129,7 +132,8 @@
         "path": "esm/lib/tool.ts",
         "start": 7,
         "end": 51
-      }
+      },
+      "hash": "fa22118e8561b784ae5341683b111b6526b9aa9b26459e127e74f4fa027a4ac7"
     },
     {
       "id": "example.com/pkg/shared::esm/src/index.mjs::esm",
@@ -137,7 +141,8 @@
         "path": "esm/src/index.mjs",
         "start": 7,
         "end": 41
-      }
+      },
+      "hash": "8249e9df2caea5e69460c8e9a965a25a1e3c1727546756d32649c6ad76b1de8b"
     },
     {
       "id": "example.com/pkg/shared::kit/src/format.ts::format",
@@ -145,7 +150,8 @@
         "path": "kit/src/format.ts",
         "start": 7,
         "end": 76
-      }
+      },
+      "hash": "a2d5943e4c48934b2033393f86b59c32be45201ec80fc3a0861ab4cdec364413"
     },
     {
       "id": "example.com/pkg/shared::kit/src/greet.ts::greet",
@@ -153,7 +159,8 @@
         "path": "kit/src/greet.ts",
         "start": 7,
         "end": 80
-      }
+      },
+      "hash": "22987b5bf9a58e295873519f2571caebbd3d03d0933760049dfb1c1bc3c4fc7c"
     },
     {
       "id": "example.com/pkg/shared::kit/src/greet.ts::shout",
@@ -161,7 +168,8 @@
         "path": "kit/src/greet.ts",
         "start": 82,
         "end": 151
-      }
+      },
+      "hash": "319f00bea985da0d78bc46ea4ac50778dbd5369faed998eefb2105afbc7c390c"
     },
     {
       "id": "example.com/pkg/shared::kit/src/index.ts::kit",
@@ -169,7 +177,8 @@
         "path": "kit/src/index.ts",
         "start": 159,
         "end": 201
-      }
+      },
+      "hash": "75fe70e168d20a3bf8005da125cbe4751a74563504d09902a4b4f764c6e68703"
     },
     {
       "id": "example.com/pkg/shared::kit/src/internal/secret.ts::secret",
@@ -177,7 +186,8 @@
         "path": "kit/src/internal/secret.ts",
         "start": 7,
         "end": 49
-      }
+      },
+      "hash": "1c9c30c31ebdff5b71fcd57fdf6cfef80c7d00346ea3043d832b4783a513af86"
     },
     {
       "id": "example.com/pkg/shared::kit/src/legacy.ts::greet",
@@ -185,7 +195,8 @@
         "path": "kit/src/legacy.ts",
         "start": 74,
         "end": 121
-      }
+      },
+      "hash": "0d193c2478edba8b2ab3fcfa57f87e159f487c155993755ca7b479bb8628b0d5"
     },
     {
       "id": "example.com/pkg/shared::kit/src/more.ts::Client",
@@ -193,7 +204,8 @@
         "path": "kit/src/more.ts",
         "start": 83,
         "end": 156
-      }
+      },
+      "hash": "7a1ba5f652c289fab086342acd0da3b380a125cc28e1d4367f4a4956667664b1"
     },
     {
       "id": "example.com/pkg/shared::kit/src/more.ts::Client.create",
@@ -201,7 +213,8 @@
         "path": "kit/src/more.ts",
         "start": 100,
         "end": 154
-      }
+      },
+      "hash": "044b5b1b85d93fd647ddf7b5bcfb97bd7b44348b48de4c3293c4971fcba3089b"
     },
     {
       "id": "example.com/pkg/shared::kit/src/more.ts::farewell",
@@ -209,7 +222,8 @@
         "path": "kit/src/more.ts",
         "start": 7,
         "end": 74
-      }
+      },
+      "hash": "17fda9409c7cd8de312886579888d49e067d1f0b30e3861c498afa144a264c37"
     },
     {
       "id": "example.com/pkg/shared::kit/src/utils/slug.ts::slugify",
@@ -217,7 +231,8 @@
         "path": "kit/src/utils/slug.ts",
         "start": 7,
         "end": 78
-      }
+      },
+      "hash": "4808c9ef48f4b7483068f555c59dc83f5cf954ea2335ddc939f92ac49f19c3b8"
     },
     {
       "id": "example.com/pkg/shared::nest/index/index.ts::inner",
@@ -225,7 +240,8 @@
         "path": "nest/index/index.ts",
         "start": 7,
         "end": 53
-      }
+      },
+      "hash": "d3958cfca30548ca73a96d55528a04ae83609255d96174e3a695571e8ccb94ab"
     },
     {
       "id": "example.com/pkg/shared::nest/sub/deep.ts::deep",
@@ -233,7 +249,8 @@
         "path": "nest/sub/deep.ts",
         "start": 7,
         "end": 51
-      }
+      },
+      "hash": "a00a7e00a4544749548260bb03a5c0843ee0d2cb65c32c4afaf76a02304edbc2"
     },
     {
       "id": "example.com/pkg/shared::plain/index.ts::plain",
@@ -241,7 +258,8 @@
         "path": "plain/index.ts",
         "start": 7,
         "end": 53
-      }
+      },
+      "hash": "80dcd2dbe02aaa39a1712e5cb3efcc34f9b0d97f0030175a5ddc491fd84c0278"
     },
     {
       "id": "example.com/pkg/shared::prec/index.ts::prec",
@@ -249,7 +267,8 @@
         "path": "prec/index.ts",
         "start": 7,
         "end": 52
-      }
+      },
+      "hash": "c519536703b1231b9169a86da2fa8f87f6b15908b9516b17c6ed4ac792ef4f0f"
     },
     {
       "id": "example.com/pkg/shared::prec/legacy.ts::prec",
@@ -257,7 +276,8 @@
         "path": "prec/legacy.ts",
         "start": 7,
         "end": 53
-      }
+      },
+      "hash": "492747a862abbf9ba151a22d6df7363e4261bd1b795ad4f7f4b0962b5459fa01"
     },
     {
       "id": "example.com/pkg/shared::sealed/src/one.ts::normalize",
@@ -265,7 +285,8 @@
         "path": "sealed/src/one.ts",
         "start": 154,
         "end": 211
-      }
+      },
+      "hash": "8d5f02969529827997e14297cc15cc53aa6fdd00ba30bfe7b78d4340ece75e98"
     },
     {
       "id": "example.com/pkg/shared::sealed/src/one.ts::seal",
@@ -273,7 +294,8 @@
         "path": "sealed/src/one.ts",
         "start": 7,
         "end": 50
-      }
+      },
+      "hash": "f052b24b515c5370e8803778c0a476505477f50badaef9862c3aa35cffeec753"
     },
     {
       "id": "example.com/pkg/shared::sealed/src/two.ts::seal",
@@ -281,7 +303,8 @@
         "path": "sealed/src/two.ts",
         "start": 7,
         "end": 50
-      }
+      },
+      "hash": "634cfdcc83802b81221db2a5cc812293186f26e10c70f80543d0b87cf52969e4"
     },
     {
       "id": "example.com/pkg/shared::src/text.ts::normalize",
@@ -289,7 +312,8 @@
         "path": "src/text.ts",
         "start": 90,
         "end": 177
-      }
+      },
+      "hash": "f20b461ba83e84ebd911710ee0897f10ac510f40aced6e713ea199ffdf194238"
     },
     {
       "id": "example.com/pkg/shared::src/utils/collapse.ts::collapse",
@@ -297,7 +321,8 @@
         "path": "src/utils/collapse.ts",
         "start": 7,
         "end": 86
-      }
+      },
+      "hash": "d6a602fdccfde1d620dc3f80db6c1bcd8e76b5e7e4f2c223dea93d3026e139f9"
     },
     {
       "id": "example.com/pkg/shared::src/utils/trim.ts::trim",
@@ -305,7 +330,8 @@
         "path": "src/utils/trim.ts",
         "start": 7,
         "end": 68
-      }
+      },
+      "hash": "9d3f5fa9aae61113b73d931aa8c4e5910723bc3bacff383edc8265db6ae8c8ba"
     },
     {
       "id": "example.com/pkg/shared::typed/src/index.ts::typed",
@@ -313,7 +339,8 @@
         "path": "typed/src/index.ts",
         "start": 7,
         "end": 53
-      }
+      },
+      "hash": "6e7da25911295aade7b73c6467f307f90283d04a7eb1618657d3fcd4ae0d6a97"
     }
   ],
   "calls": [

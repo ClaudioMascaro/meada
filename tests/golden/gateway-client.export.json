@@ -13,7 +13,8 @@
         "path": "src/client.ts",
         "start": 573,
         "end": 610
-      }
+      },
+      "hash": "a75f484a1187d5c6ca9be0438cdc199c177aa8dd7463ed29f07345015758e8da"
     },
     {
       "id": "example.com/acme/client::src/client.ts::direct",
@@ -21,7 +22,8 @@
         "path": "src/client.ts",
         "start": 205,
         "end": 236
-      }
+      },
+      "hash": "488307f8b1c7502ed4b8749161abb2940a6aa10922256df0a9c11d6478f60206"
     },
     {
       "id": "example.com/acme/client::src/client.ts::hosted",
@@ -29,7 +31,8 @@
         "path": "src/client.ts",
         "start": 910,
         "end": 978
-      }
+      },
+      "hash": "fb17567a911f334ca02e3b1b5767e37f43be01d4e238712a60152b4bb4815846"
     },
     {
       "id": "example.com/acme/client::src/client.ts::invoices",
@@ -37,7 +40,8 @@
         "path": "src/client.ts",
         "start": 306,
         "end": 349
-      }
+      },
+      "hash": "07a388516c27eab2b7f113a536598f16ba25f2fd050cbe875b6af2d24cc6d5e3"
     },
     {
       "id": "example.com/acme/client::src/client.ts::ledger",
@@ -45,7 +49,8 @@
         "path": "src/client.ts",
         "start": 1123,
         "end": 1154
-      }
+      },
+      "hash": "e29ee126b0a57a066f82f4d14360f3e3c6ec723ee80a7142ea024f8d5616ba26"
     },
     {
       "id": "example.com/acme/client::src/client.ts::order",
@@ -53,7 +58,8 @@
         "path": "src/client.ts",
         "start": 1283,
         "end": 1382
-      }
+      },
+      "hash": "4d813fad277920e391c62b3c7f18b1d28860bba4458beb56dc991c2b4a5ac7b9"
     },
     {
       "id": "example.com/acme/client::src/client.ts::staleVersion",
@@ -61,7 +67,8 @@
         "path": "src/client.ts",
         "start": 757,
         "end": 807
-      }
+      },
+      "hash": "a55a18ce071c0b6d809a4292b30fbf4af4f5d15a5f1f1ed7a444a6c9f6dcfd00"
     },
     {
       "id": "example.com/acme/client::src/client.ts::status",
@@ -69,7 +76,8 @@
         "path": "src/client.ts",
         "start": 442,
         "end": 481
-      }
+      },
+      "hash": "a9374195d91b18e786f70361ef43b41aa0353196e9a5d84886782d9d8960eb07"
     },
     {
       "id": "example.com/acme/client::src/client.ts::throughGateway",
@@ -77,7 +85,8 @@
         "path": "src/client.ts",
         "start": 87,
         "end": 131
-      }
+      },
+      "hash": "46e6eb88d71cf067d16c3018dae38285f2352794449c25111610a4451cad8a21"
     },
     {
       "id": "example.com/acme/client::src/client.ts::versioned",
@@ -85,7 +94,8 @@
         "path": "src/client.ts",
         "start": 703,
         "end": 742
-      }
+      },
+      "hash": "067fa2d9d58e1365184d16051a1206610418c381738aa3fedbbf5009de11bca0"
     }
   ],
   "calls": [

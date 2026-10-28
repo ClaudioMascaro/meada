@@ -37,7 +37,8 @@
         "path": "app/api/audit/route.ts",
         "start": 7,
         "end": 78
-      }
+      },
+      "hash": "d6796f24202059c8193e88d634859cf270655b584c7caa79dd37cb8ba8a0f45b"
     },
     {
       "id": "example.com/xlang-go/web::app/api/prices/[sku]/route.ts::GET",
@@ -45,7 +46,8 @@
         "path": "app/api/prices/[sku]/route.ts",
         "start": 7,
         "end": 145
-      }
+      },
+      "hash": "97f4c5fffc953a966e45f167020216909ea40b6dcf006fcd3ea5e696f5dc13b8"
     },
     {
       "id": "example.com/xlang-go/web::app/api/promotions/route.ts::GET",
@@ -53,7 +55,8 @@
         "path": "app/api/promotions/route.ts",
         "start": 7,
         "end": 59
-      }
+      },
+      "hash": "9d21b597cb7691cb42738687cdfa814ae9f380d9c16ffbc36c714d4045b079d0"
     },
     {
       "id": "example.com/xlang-go/web::app/api/stock/route.ts::GET",
@@ -61,7 +64,8 @@
         "path": "app/api/stock/route.ts",
         "start": 7,
         "end": 59
-      }
+      },
+      "hash": "9d21b597cb7691cb42738687cdfa814ae9f380d9c16ffbc36c714d4045b079d0"
     },
     {
       "id": "example.com/xlang-go/web::src/events.ts::announceShipment",
@@ -69,7 +73,8 @@
         "path": "src/events.ts",
         "start": 192,
         "end": 318
-      }
+      },
+      "hash": "039c91e5f95158e81a8dd583663734d75c55a38cca27b273363834abcdf4d161"
     },
     {
       "id": "example.com/xlang-go/web::src/orders.ts::orderStatus",
@@ -77,7 +82,8 @@
         "path": "src/orders.ts",
         "start": 75,
         "end": 150
-      }
+      },
+      "hash": "121653c4541919f4363733f9618a9548cafad5fd8d7982bf086d504e04357893"
     },
     {
       "id": "example.com/xlang-go/web::src/orders.ts::reserveOrder",
@@ -85,7 +91,8 @@
         "path": "src/orders.ts",
         "start": 195,
         "end": 300
-      }
+      },
+      "hash": "4bdd4b9b1d01a7d49f3400978a6c68355e860edf2a93a30bc3d1678129f7cf33"
     },
     {
       "id": "example.com/xlang-go/web::src/sync.ts::syncOrders",
@@ -93,7 +100,8 @@
         "path": "src/sync.ts",
         "start": 62,
         "end": 153
-      }
+      },
+      "hash": "85753b521b73cc9406d3736fa027cd7849e736e6b73776ff475f7ec35c1bf312"
     }
   ],
   "calls": [

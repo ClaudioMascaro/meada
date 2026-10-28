@@ -13,7 +13,8 @@
         "path": "src/client.ts",
         "start": 384,
         "end": 456
-      }
+      },
+      "hash": "37ee0ff9870818acce62dc5e68a4a888564c731bc8d99a9203efa5f20cec977f"
     },
     {
       "id": "example.com/acme/client::src/client.ts::health",
@@ -21,7 +22,8 @@
         "path": "src/client.ts",
         "start": 231,
         "end": 327
-      }
+      },
+      "hash": "132c913257fefabaaa243ffe8876b4fd224527bea8f5ac6c373ff20ea938b1d7"
     },
     {
       "id": "example.com/acme/client::src/client.ts::users",
@@ -29,7 +31,8 @@
         "path": "src/client.ts",
         "start": 87,
         "end": 143
-      }
+      },
+      "hash": "4befd03b8068a13c7edd7570ad6d16f9d085363e3d23be9036e682707398da66"
     }
   ],
   "calls": [

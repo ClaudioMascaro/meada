@@ -973,6 +973,7 @@ fn def(name: String, kind: Kind, range: Range<usize>, params: Vec<Param>) -> Def
         type_params: Vec::new(),
         result: None,
         suspends: false,
+        hash: String::new(),
     }
 }
 

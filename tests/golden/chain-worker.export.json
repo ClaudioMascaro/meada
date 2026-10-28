@@ -21,7 +21,8 @@
         "path": "src/consumer.ts",
         "start": 418,
         "end": 521
-      }
+      },
+      "hash": "8a715251b8bcb78c567886f5ca48a789d57ae443efaef3320ad4b9aae0a05614"
     },
     {
       "id": "example.com/chain/worker::src/consumer.ts::start",
@@ -29,7 +30,8 @@
         "path": "src/consumer.ts",
         "start": 207,
         "end": 345
-      }
+      },
+      "hash": "a71d428c887dfd9a2d1244eb2eb8be299343c52a814d7fbfd960355e15380d2d"
     },
     {
       "id": "example.com/chain/worker::src/jobs.ts::settleOrders",
@@ -37,7 +39,8 @@
         "path": "src/jobs.ts",
         "start": 101,
         "end": 149
-      }
+      },
+      "hash": "e368433a3e9e1c09b33d50c634f1be54461216a2b0bffd2a9191ecaa76e602a6"
     },
     {
       "id": "example.com/chain/worker::src/notify.ts::notify",
@@ -45,7 +48,8 @@
         "path": "src/notify.ts",
         "start": 7,
         "end": 67
-      }
+      },
+      "hash": "cd058f979e93b401f6f8b5358d6f73457e9b1207c85f2394d27dd76663cb3450"
     }
   ],
   "calls": [

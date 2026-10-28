@@ -37,7 +37,8 @@
         "path": "src/shared_lib/api.py",
         "start": 42,
         "end": 114
-      }
+      },
+      "hash": "08a9914ef79fa96414d85e033a6083932293638e2c647c663d870fdaeb5231c6"
     },
     {
       "id": "example.com/pkg/pylib::src/shared_lib/api.py::Client.create",
@@ -45,7 +46,8 @@
         "path": "src/shared_lib/api.py",
         "start": 60,
         "end": 114
-      }
+      },
+      "hash": "3dd4819109687c00862ea2bd2a3a1cae2b25e602b81befab199e74c9815777cb"
     },
     {
       "id": "example.com/pkg/pylib::src/shared_lib/api.py::fetch",
@@ -53,7 +55,8 @@
         "path": "src/shared_lib/api.py",
         "start": 0,
         "end": 39
-      }
+      },
+      "hash": "cd2f1eb51ac94144836d25a2df524a1a6706c93fe1b5c8f5ce689f9c573b9cc4"
     },
     {
       "id": "example.com/pkg/pylib::src/shared_lib/core.py::greet",
@@ -61,7 +64,8 @@
         "path": "src/shared_lib/core.py",
         "start": 26,
         "end": 76
-      }
+      },
+      "hash": "ae012ff4370cef033255abe2f6bdd1d9c057d7db80659971dc3cf2268677add3"
     },
     {
       "id": "example.com/pkg/pylib::src/shared_lib/text.py::shout",
@@ -69,7 +73,8 @@
         "path": "src/shared_lib/text.py",
         "start": 0,
         "end": 40
-      }
+      },
+      "hash": "6446b003c11bea16c691b56048bc0644ca8e5de58250b077a44292bd0e6f136d"
     },
     {
       "id": "example.com/pkg/pylib::src/sl_extras/__init__.py::boost",
@@ -77,7 +82,8 @@
         "path": "src/sl_extras/__init__.py",
         "start": 0,
         "end": 38
-      }
+      },
+      "hash": "286375f3f05c726aa651c9e74b0e2edd97c89864c04255b7953e5f31a4336e1d"
     },
     {
       "id": "example.com/pkg/pylib::tools/sl_extras/__init__.py::boost",
@@ -85,7 +91,8 @@
         "path": "tools/sl_extras/__init__.py",
         "start": 0,
         "end": 38
-      }
+      },
+      "hash": "66c9af83dc73837c26a5a7a4409c28522c3a94772dad178af1b28c0ddff14452"
     },
     {
       "id": "example.com/pkg/pylib::tools/toolkit/__init__.py::polish",
@@ -93,7 +100,8 @@
         "path": "tools/toolkit/__init__.py",
         "start": 0,
         "end": 43
-      }
+      },
+      "hash": "502e14e8d8c229799faf87eca77a23786e527fae169791bf9fec9f3f70e5662a"
     }
   ],
   "calls": [

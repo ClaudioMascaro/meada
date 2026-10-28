@@ -864,7 +864,7 @@ one for the area a change touches.
   `channel::kafka::orders.created` (name kept as evaluated; `channel::kafka` alone for an
   unresolved side). A path parameter of any spelling (`:id`, `[id]`, `{id}`, `<id>`, `<int:id>`)
   is `{}`. A provider of every method is `http::ANY::<path>`.
-- Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, documents,
+- Export JSON: `{repository, files, symbols (each `{id, span, hash}`, the BLAKE3 of the span's bytes), calls, providers, consumers, bindings, documents,
   publishes, packages, dependencies, imports, communities, links, processes}`;
   `communities` (absent when empty) lists each community as `{name, members}`, by name, with
   its sorted member identities; `processes` (absent when

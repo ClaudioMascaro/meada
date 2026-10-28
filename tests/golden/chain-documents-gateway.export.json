@@ -41,7 +41,8 @@
         "path": "src/catalog.ts",
         "start": 65,
         "end": 165
-      }
+      },
+      "hash": "4a2f3145d3e730c4a59d63d1a85244262f86dfa63db5646dc050f01e2f86ad3b"
     },
     {
       "id": "example.com/chain/gateway::src/checkout.ts::createOrder",
@@ -49,7 +50,8 @@
         "path": "src/checkout.ts",
         "start": 279,
         "end": 508
-      }
+      },
+      "hash": "fadb1ab707c2078d7649d18570c7add672370ff1f064d9bb94ac569f834122ae"
     },
     {
       "id": "example.com/chain/gateway::src/events.ts::publish",
@@ -57,7 +59,8 @@
         "path": "src/events.ts",
         "start": 129,
         "end": 237
-      }
+      },
+      "hash": "aba91460b15553a687d4ec3765417b83193820185a4e22b3c720769a91961ce4"
     },
     {
       "id": "example.com/chain/gateway::src/orders.ts::cancelOrder",
@@ -65,7 +68,8 @@
         "path": "src/orders.ts",
         "start": 274,
         "end": 392
-      }
+      },
+      "hash": "e880316bf61368dfdcaafb20a5eaff6fa1bde912d917707e8d38eafceb97e659"
     },
     {
       "id": "example.com/chain/gateway::src/orders.ts::listOrders",
@@ -73,7 +77,8 @@
         "path": "src/orders.ts",
         "start": 95,
         "end": 265
-      }
+      },
+      "hash": "959afabeacfcbc411939c9c7b50c4f2a00a343d0156996f01a49316baad72dfe"
     },
     {
       "id": "example.com/chain/gateway::src/routes.ts::POST /api/events",
@@ -81,7 +86,8 @@
         "path": "src/routes.ts",
         "start": 287,
         "end": 323
-      }
+      },
+      "hash": "d0b73b5e94b4fb35d14a8add8100bc340b115c907a4c0d4672413131fc0d39f5"
     },
     {
       "id": "example.com/chain/gateway::src/server.ts::GET /api/health",
@@ -89,7 +95,8 @@
         "path": "src/server.ts",
         "start": 196,
         "end": 225
-      }
+      },
+      "hash": "d20a5e68bc19266d19ea40faf79732e57fd758c7bc5c67974a7235a5dc03be85"
     }
   ],
   "calls": [

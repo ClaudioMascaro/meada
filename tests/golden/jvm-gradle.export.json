@@ -25,7 +25,8 @@
         "path": "src/main/java/example/kit/Ledger.java",
         "start": 22,
         "end": 111
-      }
+      },
+      "hash": "495b296fbf9b4d5a25400ec6bf45e278e85522fb03c8c19524a3c6927332c452"
     },
     {
       "id": "example.com/jvm/gradle::src/main/java/example/kit/Ledger.java::example.kit.Ledger.of(int)",
@@ -33,7 +34,8 @@
         "path": "src/main/java/example/kit/Ledger.java",
         "start": 48,
         "end": 109
-      }
+      },
+      "hash": "a3db45dc6ead4f7ac0fc10916655cb1b9b7d359b7fcc19a6db6c247772ac7da2"
     },
     {
       "id": "example.com/jvm/gradle::src/main/java/example/shared/Stamp.java::example.shared.Stamp",
@@ -41,7 +43,8 @@
         "path": "src/main/java/example/shared/Stamp.java",
         "start": 25,
         "end": 108
-      }
+      },
+      "hash": "14682b751df7ab2225eb91cd031494a5d35a57fe00b13dcef752174fc9163c73"
     },
     {
       "id": "example.com/jvm/gradle::src/main/java/example/shared/Stamp.java::example.shared.Stamp.now()",
@@ -49,7 +52,8 @@
         "path": "src/main/java/example/shared/Stamp.java",
         "start": 50,
         "end": 106
-      }
+      },
+      "hash": "ae6a20d0df507262b93f896909f06e44ec3290dcf180a9287ad06c776c4cf722"
     },
     {
       "id": "example.com/jvm/gradle::tools/src/check/java/example/tools/Checks.java::example.tools.Checks",
@@ -57,7 +61,8 @@
         "path": "tools/src/check/java/example/tools/Checks.java",
         "start": 24,
         "end": 107
-      }
+      },
+      "hash": "a59d8a4bd0d27067124b62072389de2a459781159998fc3105446e048f0dd179"
     },
     {
       "id": "example.com/jvm/gradle::tools/src/check/java/example/tools/Checks.java::example.tools.Checks.ok()",
@@ -65,7 +70,8 @@
         "path": "tools/src/check/java/example/tools/Checks.java",
         "start": 50,
         "end": 105
-      }
+      },
+      "hash": "33c88389d3cfa8802115610ce350b778892cbe6f1c160ff1283444793cb14e23"
     },
     {
       "id": "example.com/jvm/gradle::tools/src/core/java/example/tools/Slug.java::example.tools.Slug",
@@ -73,7 +79,8 @@
         "path": "tools/src/core/java/example/tools/Slug.java",
         "start": 24,
         "end": 122
-      }
+      },
+      "hash": "485d7e0e165911a96a06609ef1b4e1805ae14e831aca4ca9e923046b50b5f8ee"
     },
     {
       "id": "example.com/jvm/gradle::tools/src/core/java/example/tools/Slug.java::example.tools.Slug.of(String)",
@@ -81,7 +88,8 @@
         "path": "tools/src/core/java/example/tools/Slug.java",
         "start": 48,
         "end": 120
-      }
+      },
+      "hash": "01c2cf34b519fbb5ee1f87a383bbce91dab2174928bf67c5f685d59ce469270d"
     }
   ],
   "calls": [

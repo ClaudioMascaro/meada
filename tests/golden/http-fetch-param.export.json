@@ -13,7 +13,8 @@
         "path": "src/client.ts",
         "start": 723,
         "end": 783
-      }
+      },
+      "hash": "d137e45093a17aed1eff7a791be7f3b609c821dff52479177201249dfdd21067"
     },
     {
       "id": "example.com/acme/portal::src/client.ts::getItem",
@@ -21,7 +22,8 @@
         "path": "src/client.ts",
         "start": 442,
         "end": 548
-      }
+      },
+      "hash": "8afb22fe6c1c4b970a228432a16861fefb4aaa9670ce3f57829234e5adb688ff"
     },
     {
       "id": "example.com/acme/portal::src/client.ts::getOne",
@@ -29,7 +31,8 @@
         "path": "src/client.ts",
         "start": 563,
         "end": 597
-      }
+      },
+      "hash": "f2d1b2550bb41fedca7ce9bff950c692e2f79418b7c2e74f303c9a69c1251a1e"
     },
     {
       "id": "example.com/acme/portal::src/client.ts::listReports",
@@ -37,7 +40,8 @@
         "path": "src/client.ts",
         "start": 293,
         "end": 377
-      }
+      },
+      "hash": "0e632ed87cba4c2cf2aa339f87eebb03966b071722d97089228bbceddf12c6fe"
     },
     {
       "id": "example.com/acme/portal::src/client.ts::mirrors",
@@ -45,7 +49,8 @@
         "path": "src/client.ts",
         "start": 928,
         "end": 1040
-      }
+      },
+      "hash": "d7cbc66443f37408943273a34f9bec6369e453d0ad06a754c15cd1722b4e7dc2"
     },
     {
       "id": "example.com/acme/portal::src/client.ts::other",
@@ -53,7 +58,8 @@
         "path": "src/client.ts",
         "start": 636,
         "end": 714
-      }
+      },
+      "hash": "7975ef5482de0a68664543f959007951cd732bc042e5f801d7b596b9cdbeda19"
     },
     {
       "id": "example.com/acme/portal::src/client.ts::pushReport",
@@ -61,7 +67,8 @@
         "path": "src/client.ts",
         "start": 156,
         "end": 284
-      }
+      },
+      "hash": "0d67a011d43b1fd09d759be280c480542bb9de8f82401215d3438a27068c0148"
     },
     {
       "id": "example.com/acme/portal::src/client.ts::retry",
@@ -69,7 +76,8 @@
         "path": "src/client.ts",
         "start": 1049,
         "end": 1187
-      }
+      },
+      "hash": "11ec17533a6bfeafb8fb58d12f667417b57386c0c820d101c4427d461a98a888"
     }
   ],
   "calls": [

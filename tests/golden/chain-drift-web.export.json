@@ -77,7 +77,8 @@
         "path": "src/api/body.ts",
         "start": 137,
         "end": 297
-      }
+      },
+      "hash": "d8eb6cb6032177c931ceda1e66a3cfb8b2db0dfdc79bf5f2ac4b49b0720cb762"
     },
     {
       "id": "example.com/chain/web::src/api/client.ts::request",
@@ -85,7 +86,8 @@
         "path": "src/api/client.ts",
         "start": 127,
         "end": 223
-      }
+      },
+      "hash": "5cc3a63c2d48ea68365d5e97e54a4425c16d6ce5399c954dae54469e16e91111"
     },
     {
       "id": "example.com/chain/web::src/api/typed.ts::enveloped",
@@ -93,7 +95,8 @@
         "path": "src/api/typed.ts",
         "start": 923,
         "end": 1056
-      }
+      },
+      "hash": "104ca47d0a9d3b238bd39c250231158c214e23d373a271271304636b38649932"
     },
     {
       "id": "example.com/chain/web::src/api/typed.ts::fetchAs",
@@ -101,7 +104,8 @@
         "path": "src/api/typed.ts",
         "start": 663,
         "end": 784
-      }
+      },
+      "hash": "1f8c5ff30cdf3ea6237a177bf7d4d0ec5fe626ec7d0994bc3e9defb6601e6455"
     },
     {
       "id": "example.com/chain/web::src/api/typed.ts::getJson",
@@ -109,7 +113,8 @@
         "path": "src/api/typed.ts",
         "start": 125,
         "end": 259
-      }
+      },
+      "hash": "25a56ffcc68307fd9a686e002fbd8a75200576e76f04f4e927defe35bee81f2a"
     },
     {
       "id": "example.com/chain/web::src/api/typed.ts::search",
@@ -117,7 +122,8 @@
         "path": "src/api/typed.ts",
         "start": 407,
         "end": 570
-      }
+      },
+      "hash": "18e5d17cd63ab07811478d861f9b15d561b29153a9ad2e16d1b9b6d20d8bb22a"
     },
     {
       "id": "example.com/chain/web::src/batches.ts::handed",
@@ -125,7 +131,8 @@
         "path": "src/batches.ts",
         "start": 2157,
         "end": 2400
-      }
+      },
+      "hash": "e1720c41a805a4126ffc6ab052dce6a59706b6ef3a5c86f12255ef6bb5f14e72"
     },
     {
       "id": "example.com/chain/web::src/batches.ts::ids",
@@ -133,7 +140,8 @@
         "path": "src/batches.ts",
         "start": 592,
         "end": 897
-      }
+      },
+      "hash": "15b3f1129bf444664c36369d65ff936ae1c0d7b2d7d1688283cb776c0dd56af0"
     },
     {
       "id": "example.com/chain/web::src/batches.ts::pageOf",
@@ -141,7 +149,8 @@
         "path": "src/batches.ts",
         "start": 203,
         "end": 394
-      }
+      },
+      "hash": "a3e3d3caf855d42b693d6e6d009f1740414fa9fc50b72fd5d6bf56ec40faf885"
     },
     {
       "id": "example.com/chain/web::src/batches.ts::quantities",
@@ -149,7 +158,8 @@
         "path": "src/batches.ts",
         "start": 997,
         "end": 1277
-      }
+      },
+      "hash": "9a371d7cdef92eb1ffeb99f6c6fd1905097259bff5f1512a092dda1b1b5a228d"
     },
     {
       "id": "example.com/chain/web::src/batches.ts::rebound",
@@ -157,7 +167,8 @@
         "path": "src/batches.ts",
         "start": 1381,
         "end": 1609
-      }
+      },
+      "hash": "f26a847102447f45ca65a32c31ff38a5198676d6b84dd25501c87b8812533f2a"
     },
     {
       "id": "example.com/chain/web::src/batches.ts::shadowed",
@@ -165,7 +176,8 @@
         "path": "src/batches.ts",
         "start": 1766,
         "end": 2065
-      }
+      },
+      "hash": "f522d8df814c0eca81b0aad010aa805db6a5aca3c285ac0a200d1a46c85a9f6f"
     },
     {
       "id": "example.com/chain/web::src/batches.ts::shadowed.inner",
@@ -173,7 +185,8 @@
         "path": "src/batches.ts",
         "start": 2001,
         "end": 2027
-      }
+      },
+      "hash": "4a0ed54b5a941793ec88641996233628bbfb5c6bbe299ae087aaa79ef070d5b9"
     },
     {
       "id": "example.com/chain/web::src/comments.ts::comments",
@@ -181,7 +194,8 @@
         "path": "src/comments.ts",
         "start": 198,
         "end": 395
-      }
+      },
+      "hash": "3a628ba2f4fc525c0a5c8377cc3e1c285de4f3294e1807d75089dfa5fcfea66a"
     },
     {
       "id": "example.com/chain/web::src/comments.ts::submit",
@@ -189,7 +203,8 @@
         "path": "src/comments.ts",
         "start": 404,
         "end": 594
-      }
+      },
+      "hash": "aec5dd77113ae789e4c91ef0ce5348481aca2def080c5494ba7d0f44292dea2b"
     },
     {
       "id": "example.com/chain/web::src/comments.ts::summary",
@@ -197,7 +212,8 @@
         "path": "src/comments.ts",
         "start": 634,
         "end": 792
-      }
+      },
+      "hash": "b8bcacced63fdf58ecb0ed09523a41286a00e5002dce69cb4f60a785ba074573"
     },
     {
       "id": "example.com/chain/web::src/dashboard.ts::cancel",
@@ -205,7 +221,8 @@
         "path": "src/dashboard.ts",
         "start": 221,
         "end": 278
-      }
+      },
+      "hash": "6853a73487aac428d6245d07b3367abdba51a9bb33aea1cffa6de594ea3fd352"
     },
     {
       "id": "example.com/chain/web::src/dashboard.ts::dashboard",
@@ -213,7 +230,8 @@
         "path": "src/dashboard.ts",
         "start": 102,
         "end": 212
-      }
+      },
+      "hash": "c787308f2bdd2b995362f3de89985285809d0eb8afc7afb0405916b9dc5dba9d"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::cast",
@@ -221,7 +239,8 @@
         "path": "src/declared.ts",
         "start": 637,
         "end": 753
-      }
+      },
+      "hash": "084b2d1ea14b9a619feb2556917469d8866abe17bd26d960847c9d9a8c977317"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::counts",
@@ -229,7 +248,8 @@
         "path": "src/declared.ts",
         "start": 895,
         "end": 965
-      }
+      },
+      "hash": "f231016ec10bd78cd080c81ab5dee58d13b8e81812d71f43b55410668c14249f"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::foreign",
@@ -237,7 +257,8 @@
         "path": "src/declared.ts",
         "start": 1687,
         "end": 1889
-      }
+      },
+      "hash": "8b2ea1342c9b75898953a92a182397c14b1d5900337385b614b93a83f7ef1703"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::pages",
@@ -245,7 +266,8 @@
         "path": "src/declared.ts",
         "start": 1411,
         "end": 1562
-      }
+      },
+      "hash": "571a9813a3ed90bb6a4c3ffc126bb65f977597165c677d82619017209c48dbf6"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::plain",
@@ -253,7 +275,8 @@
         "path": "src/declared.ts",
         "start": 2795,
         "end": 2941
-      }
+      },
+      "hash": "2427e9157b499aa03cb95eb559ae1cfe22872280c87e21c809e03bd1d89ab12a"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::ranked",
@@ -261,7 +284,8 @@
         "path": "src/declared.ts",
         "start": 1134,
         "end": 1271
-      }
+      },
+      "hash": "7e94fb5e9f999d00ebd79b426a87778655174d87add0b05134fea3166442f4fb"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::searched",
@@ -269,7 +293,8 @@
         "path": "src/declared.ts",
         "start": 2187,
         "end": 2309
-      }
+      },
+      "hash": "d3dc06ccec50257dbae00904a7c3cffb6198222ffc37bfef6b3c4070497a828a"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::typedJson",
@@ -277,7 +302,8 @@
         "path": "src/declared.ts",
         "start": 1950,
         "end": 2063
-      }
+      },
+      "hash": "93f0228fdcdee1d6a0b905697967055b234197dfa4577109b0db50d3dfcf1c24"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::viaReturn",
@@ -285,7 +311,8 @@
         "path": "src/declared.ts",
         "start": 2383,
         "end": 2456
-      }
+      },
+      "hash": "e611d6cff3e928ef07c5b93c8d1eaa4ef8a9a5651dc1cba91e56c63fa4944a91"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::wrapped",
@@ -293,7 +320,8 @@
         "path": "src/declared.ts",
         "start": 2556,
         "end": 2663
-      }
+      },
+      "hash": "a3a21d8ce061b3514545be5ac564441967c55d979cc58c797379e92c1d883383"
     },
     {
       "id": "example.com/chain/web::src/drift.ts::both",
@@ -301,7 +329,8 @@
         "path": "src/drift.ts",
         "start": 2111,
         "end": 2263
-      }
+      },
+      "hash": "c908f4f0355811d5b572a1ffea8b12f4de20804ba9736cd8af61966277456487"
     },
     {
       "id": "example.com/chain/web::src/drift.ts::customerEmail",
@@ -309,7 +338,8 @@
         "path": "src/drift.ts",
         "start": 880,
         "end": 992
-      }
+      },
+      "hash": "1e0ea2ab2ef9b9fb258a5c3795ac503ef3dbbe4fe40406a9db49774498ba0f4c"
     },
     {
       "id": "example.com/chain/web::src/drift.ts::firstOrderId",
@@ -317,7 +347,8 @@
         "path": "src/drift.ts",
         "start": 372,
         "end": 527
-      }
+      },
+      "hash": "7431be1b539f0904d4e45cb08b13213f2de7e21e12d9ade85cdef3fcde5cfa10"
     },
     {
       "id": "example.com/chain/web::src/drift.ts::idLength",
@@ -325,7 +356,8 @@
         "path": "src/drift.ts",
         "start": 1330,
         "end": 1432
-      }
+      },
+      "hash": "b330ead949ba757ea72ad5e1b16dbec085b31eb1e78b133248e3edc8d585a240"
     },
     {
       "id": "example.com/chain/web::src/drift.ts::load",
@@ -333,7 +365,8 @@
         "path": "src/drift.ts",
         "start": 1617,
         "end": 1836
-      }
+      },
+      "hash": "2b66ae9c46ca17973a39547f99c3df6683a3eced348db3c3ec41e334bcf27f4d"
     },
     {
       "id": "example.com/chain/web::src/drift.ts::orderTotal",
@@ -341,7 +374,8 @@
         "path": "src/drift.ts",
         "start": 154,
         "end": 295
-      }
+      },
+      "hash": "b20e4fa32c5b04f2210d3098a0bb50d230e8bca4bbad8608255b2a6ed43f2a51"
     },
     {
       "id": "example.com/chain/web::src/drift.ts::page",
@@ -349,7 +383,8 @@
         "path": "src/drift.ts",
         "start": 1845,
         "end": 1957
-      }
+      },
+      "hash": "d2fcefefbdcc17630bac5a956481a259bc92979765788f67ee653cbb854f7bec"
     },
     {
       "id": "example.com/chain/web::src/drift.ts::pair",
@@ -357,7 +392,8 @@
         "path": "src/drift.ts",
         "start": 2272,
         "end": 2370
-      }
+      },
+      "hash": "74b488da25d30ea7a1a6286ddfb70da067c1c8bc07ea44dcba84d06d0ac4c80e"
     },
     {
       "id": "example.com/chain/web::src/drift.ts::productName",
@@ -365,7 +401,8 @@
         "path": "src/drift.ts",
         "start": 614,
         "end": 790
-      }
+      },
+      "hash": "aba0a6192d329f142bb002d181ff0ac7e8aaefd61ed0537794f15e74259a10a9"
     },
     {
       "id": "example.com/chain/web::src/drift.ts::rebound",
@@ -373,7 +410,8 @@
         "path": "src/drift.ts",
         "start": 1079,
         "end": 1235
-      }
+      },
+      "hash": "a0da114084b14d354003e297fb44a2dc838ee28d46d5e737c8d20c8c2f1212a0"
     },
     {
       "id": "example.com/chain/web::src/labels.ts::labels",
@@ -381,7 +419,8 @@
         "path": "src/labels.ts",
         "start": 164,
         "end": 347
-      }
+      },
+      "hash": "de825a565b90cd74486867679953b79211cb8f2e09218e807c80c1c5fb636b10"
     },
     {
       "id": "example.com/chain/web::src/open.ts::ping",
@@ -389,7 +428,8 @@
         "path": "src/open.ts",
         "start": 492,
         "end": 623
-      }
+      },
+      "hash": "4ae7cf8a0ad991b3b8b6b282a309e507502d6c9478140dc27a50bd6bfc354142"
     },
     {
       "id": "example.com/chain/web::src/open.ts::rate",
@@ -397,7 +437,8 @@
         "path": "src/open.ts",
         "start": 181,
         "end": 334
-      }
+      },
+      "hash": "7962f5dcf0ed54ce6ce54a2a2de18668ce73d1e35aa77352474db976e1e4b904"
     },
     {
       "id": "example.com/chain/web::src/orders.ts::cancelOrder",
@@ -405,7 +446,8 @@
         "path": "src/orders.ts",
         "start": 247,
         "end": 335
-      }
+      },
+      "hash": "812f86061cffadd47e9768c5d0b144b0168b84a42ecb87ac795b018f50b1717d"
     },
     {
       "id": "example.com/chain/web::src/orders.ts::createOrder",
@@ -413,7 +455,8 @@
         "path": "src/orders.ts",
         "start": 344,
         "end": 429
-      }
+      },
+      "hash": "e595d56f62921c79a2ab608d90418961f78b0eb203eff42361a170452bd18446"
     },
     {
       "id": "example.com/chain/web::src/orders.ts::listOrders",
@@ -421,7 +464,8 @@
         "path": "src/orders.ts",
         "start": 182,
         "end": 238
-      }
+      },
+      "hash": "6e3d64ac3f76355e2d40bc2ad7802e07734c283a7fd5dc716feb989af0f9fada"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::annotated",
@@ -429,7 +473,8 @@
         "path": "src/shared.ts",
         "start": 1419,
         "end": 1554
-      }
+      },
+      "hash": "c92697932613828e06627f98a5f368b3a1012e9e8da5c035ee4bbbd992cafbdd"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::argument",
@@ -437,7 +482,8 @@
         "path": "src/shared.ts",
         "start": 1642,
         "end": 1715
-      }
+      },
+      "hash": "ddd3145a6f82b29db7b7cb186e3c34c337987a28cb0e89707257c0a960941c3b"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::inferred",
@@ -445,7 +491,8 @@
         "path": "src/shared.ts",
         "start": 1796,
         "end": 1944
-      }
+      },
+      "hash": "6e4536e7d633740bf97e6996e202ace453b5de84dbcd601388bb92aa7293fb18"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::offer",
@@ -453,7 +500,8 @@
         "path": "src/shared.ts",
         "start": 2216,
         "end": 2354
-      }
+      },
+      "hash": "4726b6c8b9900f561e00d69dad72056f8ed55cc3b35671f71040819b7fd905b1"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::quote",
@@ -461,7 +509,8 @@
         "path": "src/shared.ts",
         "start": 332,
         "end": 479
-      }
+      },
+      "hash": "19a27da968ff9939fdf292a6659b916c971c72f8db07a661d0a6a2d6a6157027"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::receipt",
@@ -469,7 +518,8 @@
         "path": "src/shared.ts",
         "start": 791,
         "end": 913
-      }
+      },
+      "hash": "84dea0cfcfb8eb61c81f3369c66fbe9d6d6076f45a4bdbe36b4338a4caf079aa"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::shelf",
@@ -477,7 +527,8 @@
         "path": "src/shared.ts",
         "start": 552,
         "end": 716
-      }
+      },
+      "hash": "519c287efceb77eaf6cfc9513138b77a4317c5085dbebb51d0122e2e3bd810b2"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::shelves",
@@ -485,7 +536,8 @@
         "path": "src/shared.ts",
         "start": 981,
         "end": 1125
-      }
+      },
+      "hash": "402c5927a47e0d851f206102465ede377efa88bf6ba7496d61dc8fc6730adc79"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::status",
@@ -493,7 +545,8 @@
         "path": "src/shared.ts",
         "start": 1197,
         "end": 1335
-      }
+      },
+      "hash": "5a48c8140d141de30f3cb08a0aafad6901ce24c50748edbf276919f64288c3ca"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::tags",
@@ -501,7 +554,8 @@
         "path": "src/shared.ts",
         "start": 2456,
         "end": 2604
-      }
+      },
+      "hash": "cc667cf91f4279a62f147cb6f2088c772df2309b8af3166f166a24bece87ea4c"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::ticket",
@@ -509,7 +563,8 @@
         "path": "src/shared.ts",
         "start": 2005,
         "end": 2141
-      }
+      },
+      "hash": "50b91ece7ba83928c015e0f23e0dd7312e52dc14b1b268d73269f57b5fcacb24"
     },
     {
       "id": "example.com/chain/web::src/shipments.ts::edgeShipment",
@@ -517,7 +572,8 @@
         "path": "src/shipments.ts",
         "start": 507,
         "end": 610
-      }
+      },
+      "hash": "906f61ca7b3555fae5ea80e9719675182be753845a6a25a05f17bdbdf2fe64d3"
     },
     {
       "id": "example.com/chain/web::src/shipments.ts::euShipment",
@@ -525,7 +581,8 @@
         "path": "src/shipments.ts",
         "start": 684,
         "end": 784
-      }
+      },
+      "hash": "352beabea5249d42f0ec1db07dcc27099be7efaa1e718ea69c53387a623db53b"
     },
     {
       "id": "example.com/chain/web::src/shipments.ts::publicShipment",
@@ -533,7 +590,8 @@
         "path": "src/shipments.ts",
         "start": 310,
         "end": 416
-      }
+      },
+      "hash": "ef9fcc68ce7a00ac870778d791162e70c5e321adfca44c0c107d48122253b895"
     },
     {
       "id": "example.com/chain/web::src/shipments.ts::relativeShipment",
@@ -541,7 +599,8 @@
         "path": "src/shipments.ts",
         "start": 858,
         "end": 953
-      }
+      },
+      "hash": "7c01c8f18f94471d971a2f13e8e3885b40d850976ef1668fbf3d2fdb6d645ab5"
     },
     {
       "id": "example.com/chain/web::src/shipments.ts::shipment",
@@ -549,7 +608,8 @@
         "path": "src/shipments.ts",
         "start": 129,
         "end": 209
-      }
+      },
+      "hash": "1264f8ccfc5fde04f5f992fd01f65ecf62583cb178de6405c37618c15ccb1250"
     },
     {
       "id": "example.com/chain/web::src/shipments.ts::unsetShipment",
@@ -557,7 +617,8 @@
         "path": "src/shipments.ts",
         "start": 1028,
         "end": 1131
-      }
+      },
+      "hash": "04d1ac7751220039261ed95c795ea8944228cd6bcafb56ae37a979673de21fc2"
     },
     {
       "id": "example.com/chain/web::src/status.ts::health",
@@ -565,7 +626,8 @@
         "path": "src/status.ts",
         "start": 90,
         "end": 142
-      }
+      },
+      "hash": "d70d9dff30f2c4cb142aa3abc9425e9cdbc2358c155e157528de43bedf874100"
     },
     {
       "id": "example.com/chain/web::src/status.ts::track",
@@ -573,7 +635,8 @@
         "path": "src/status.ts",
         "start": 201,
         "end": 290
-      }
+      },
+      "hash": "f79e2f91eb6e6bcad447da1405be4ebb61d9e3ff29970e2fdc6f004595127ada"
     },
     {
       "id": "example.com/chain/web::src/stock.ts::cached",
@@ -581,7 +644,8 @@
         "path": "src/stock.ts",
         "start": 1569,
         "end": 1730
-      }
+      },
+      "hash": "bb25db00d68cf4c591f825d057d4ceaf415a667dacddd028943f3abe559df651"
     },
     {
       "id": "example.com/chain/web::src/stock.ts::image",
@@ -589,7 +653,8 @@
         "path": "src/stock.ts",
         "start": 1739,
         "end": 1909
-      }
+      },
+      "hash": "676122c0cfc08b107cbe2ab56ab3b1d9b9f86f48360225c2a16f9fd5574c1ee7"
     },
     {
       "id": "example.com/chain/web::src/stock.ts::item",
@@ -597,7 +662,8 @@
         "path": "src/stock.ts",
         "start": 282,
         "end": 511
-      }
+      },
+      "hash": "53a633f2ad4286b8cb057642e7eda8a183657d501c96e9276d88934fc831cad5"
     },
     {
       "id": "example.com/chain/web::src/stock.ts::one",
@@ -605,7 +671,8 @@
         "path": "src/stock.ts",
         "start": 1325,
         "end": 1486
-      }
+      },
+      "hash": "b809319579c1677001af377154ba9155e8141d4dbb2e375a05b986cc3b5440df"
     },
     {
       "id": "example.com/chain/web::src/stock.ts::price",
@@ -613,7 +680,8 @@
         "path": "src/stock.ts",
         "start": 2024,
         "end": 2196
-      }
+      },
+      "hash": "1ed9ef21d39e4bda6db71ada5885d38e01b6db054051014adf82bd84ea22b660"
     },
     {
       "id": "example.com/chain/web::src/stock.ts::restock",
@@ -621,7 +689,8 @@
         "path": "src/stock.ts",
         "start": 1109,
         "end": 1246
-      }
+      },
+      "hash": "204cbec752ecf79ab53fa80bed185e0e56a2833b9f94ddc214635ac705223801"
     },
     {
       "id": "example.com/chain/web::src/stock.ts::reviews",
@@ -629,7 +698,8 @@
         "path": "src/stock.ts",
         "start": 2205,
         "end": 2354
-      }
+      },
+      "hash": "76169ebfc7d2da48d66302b9ac3be3c33f33439f23ebceb44404f6ec5e15bc42"
     },
     {
       "id": "example.com/chain/web::src/stock.ts::save",
@@ -637,7 +707,8 @@
         "path": "src/stock.ts",
         "start": 610,
         "end": 769
-      }
+      },
+      "hash": "80fcf93b92612735b4716e5851ca7ca49e6731a9cf5e3b85582804724bed57b1"
     },
     {
       "id": "example.com/chain/web::src/stock.ts::stock",
@@ -645,7 +716,8 @@
         "path": "src/stock.ts",
         "start": 908,
         "end": 1100
-      }
+      },
+      "hash": "5108615460cf187ce5729bc74861f24096466fbf9ab6920ffcdeeb4825ed03c8"
     }
   ],
   "calls": [
