@@ -2196,7 +2196,11 @@ qualification budget does (ADR 0017).
 - `lang/csharp.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the C# pack as they bound the Java pack's, with the same
   outcome past each (a call inside a definition nested too deep is `(opaque).`, resolving to
-  nothing); `PROJECT_USINGS` (256) bounds the distinct usings `join` adds to every file of a
+  nothing); the budget is charged each visit only for the enclosing name past
+  `QUALIFICATION_FREE` (256 bytes), so a generated file of short names reads whole at any size
+  (`MAX_BYTES`), and a file past it keeps no facts and `Facts::budget` (not `unbuilt`, which a
+  pack sets for a file it leaves out on purpose) makes `meada status` name it (`index::export`
+  reads it from the stored facts of the files with no symbols, as `Export::dropped`); `PROJECT_USINGS` (256) bounds the distinct usings `join` adds to every file of a
   project, past which the project's files keep no facts, since a partial set could make a
   name exact that a missing using leaves ambiguous. The C# hostile-depth, long-prefix and
   pack unit tests exceed them. Beyond the limits, what the pack leaves out (spec #28, #107):

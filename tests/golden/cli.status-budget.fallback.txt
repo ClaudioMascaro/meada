@@ -1,0 +1,2 @@
+local/ts-basic (.) indexed, 3 files
+  Broad.cs: too broad, its qualified names passed the 4194304-byte budget: no symbols or calls

@@ -393,6 +393,11 @@ pub struct Facts {
     /// constraints exclude it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub unbuilt: bool,
+    /// The size in bytes of the budget the file exhausted, a hostile-input drop (C#'s
+    /// `QUALIFICATION_BYTES`): the file has no facts and `meada status` names it. Unlike
+    /// `unbuilt`, a file the pack leaves out on purpose never sets it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget: Option<usize>,
     /// The package the file declares (Go's `package` clause), which `layout` groups files by
     /// (`Layout::shared`).
     #[serde(default, skip_serializing_if = "String::is_empty")]

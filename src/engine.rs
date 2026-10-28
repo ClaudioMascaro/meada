@@ -262,6 +262,13 @@ impl Engine {
                     .flat_map(|kind| kind.status(repo, export, &links))
                     .collect();
                 lines.extend(document::report(repo, export));
+                lines.extend(export.dropped.iter().map(|(path, limit)| {
+                    Msg::FileTooBroad {
+                        path,
+                        limit: *limit,
+                    }
+                    .text()
+                }));
                 if drift > 0 {
                     lines.push(Msg::Drift(drift).text());
                 }

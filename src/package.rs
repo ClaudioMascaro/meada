@@ -2790,6 +2790,7 @@ mod tests {
                     hash: String::new(),
                 })
                 .collect(),
+            dropped: Vec::new(),
             symbols: Vec::new(),
             calls: Vec::new(),
             providers: Vec::new(),

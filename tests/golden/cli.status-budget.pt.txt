@@ -1,0 +1,2 @@
+local/ts-basic (.) indexado, 3 arquivos
+  Broad.cs: abrangente demais, seus nomes qualificados passaram do orçamento de 4194304 bytes: sem símbolos nem chamadas
