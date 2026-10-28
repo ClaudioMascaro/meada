@@ -11,5 +11,8 @@ class UseTest {
         eq(1, 2);
     }
 
+    @Marked
+    void m() {}
+
     void eq(int a, int b) {}
 }

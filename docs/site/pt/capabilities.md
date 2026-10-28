@@ -17,6 +17,8 @@ O modo servidor inclui [console](console.md), [snapshots](snapshots.md), [reten�
 | C# | `.cs`, agrupados em projetos pelos `.csproj` no estilo SDK e resolvidos pelos `namespace` |
 | Swift | `.swift` (fora `Package.swift` e `Package@swift-<versão>.swift`), agrupados em módulos pelos targets do `Package.swift` |
 
+Uma anotação (Java, Kotlin), um atributo (C#, Rust) ou um decorador (Python) escrito sobre uma definição é uma chamada do escopo que a envolve, no nível em que resolve. O ponto de chamada do export nomeia a definição que ela decora (`decorates`), e o `context` a lista à parte, em `annotations:`, e não entre os callees.
+
 ### TypeScript e JavaScript
 
 O Meada lê funções, classes e métodos, bindings `const`, `let` e `var` de função ou classe, e `export default`. Lê também funções definidas por atribuição no topo do arquivo: `obj.y = function () {}` define `obj.y`, `X.prototype.y = function () {}` define o método `X.y`, `exports.y = ...` e `module.exports.y = ...` definem o export `y`, e `module.exports = function () {}` define o export padrão. Um `let` ou `var` só é definição se o arquivo nunca atribuir esse nome de novo. Funções e métodos do objeto literal de um `const` no topo definem `o.m`; objetos de opções escritos como argumento mantêm as definições inline. Uma chamada `obj.y()` ou `y()` no mesmo arquivo alcança essas definições. `require` e `module.exports` não são imports entre arquivos, e `new F()` de uma função construtora não alcança os métodos de `F.prototype`. Um import usa os `paths` e o `baseUrl` do `tsconfig.json` (ou `jsconfig.json`) mais próximo, na pasta do arquivo ou acima; ambos são relativos à pasta desse config, e `node_modules` é ignorado.

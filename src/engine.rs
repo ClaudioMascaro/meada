@@ -948,7 +948,8 @@ fn span_text(root: &Path, export: &Export, symbol: &Symbol) -> Option<(usize, Ve
     Some((render::line_of(&src, symbol.span.start), lines))
 }
 
-/// `callers:` and `callees:` of the symbol `id`, inside the repository `identity`.
+/// `callers:`, `callees:` and, when the symbol has calls that decorate a definition, `annotations:`
+/// of the symbol `id`, inside the repository `identity`.
 fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Vec<String> {
     let symbols: HashMap<&str, &Symbol> =
         export.symbols.iter().map(|s| (s.id.as_str(), s)).collect();

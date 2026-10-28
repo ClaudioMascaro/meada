@@ -31,7 +31,9 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   Each row builds a file within `lang::MAX_BYTES` (many keys, deep nesting, wide fan-out), reads
   it on a thread of its own and answers the size of what came back; the test holds every row to
   30 s and four times `MAX_BYTES`, and names the rows that missed. A new reader adds its row.
-- Test modules of `tests/it/` by subject: `docs` (the repository map against the code:
+- Test modules of `tests/it/` by subject: `decorations` (the `decorations` fixture: Java, Kotlin, C#,
+  Python and Rust calls that decorate a definition carry `CallSite::decorates`, ordinary calls do
+  not, and `context` lists them under `annotations:`), `docs` (the repository map against the code:
   `ponytail:` limits in Known ceilings, entry point kinds and process marks in their lists),
   `conformance` (pack; for Python also its HTTP providers and consumers
   and its message channels, over `conformance-python` (`messages/`), `python-mounts` and
