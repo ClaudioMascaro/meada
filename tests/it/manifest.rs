@@ -34,7 +34,7 @@ pub(crate) fn chain_manifest(case: &str) -> PathBuf {
 /// mirror's `meada.toml` moves into its entry: `[serve]`, `[[peer]]` (without `path`) and
 /// `[[resource]]` become the entry's `[repository.serve]`, `[[repository.peer]]` and
 /// `[[repository.resource]]`, and the mirror is left without one.
-fn list(dir: &Path, repos: &[(&str, &str)], configs: bool) {
+pub(crate) fn list(dir: &Path, repos: &[(&str, &str)], configs: bool) {
     for left in ["indexes", "ops"] {
         let _ = fs::remove_dir_all(dir.join(left));
     }

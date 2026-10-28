@@ -331,7 +331,7 @@ pub fn publish(manifest: &Path) -> Result<String> {
         };
         let repo_id = r.identity.as_str();
         let checked = (|| -> Result<std::result::Result<rusqlite::Connection, String>> {
-            let db = index::open_read(&[(&r.index, repo_id)], Fix::Index(&shown))?;
+            let db = index::open_read(&r.index, repo_id, Fix::Index(&shown))?;
             if !index::fresh(&db, &r.root, repo_id, &r.config.serve)? {
                 let manifest = shown.as_str();
                 return Ok(Err(Msg::SnapshotBehind {
