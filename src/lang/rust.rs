@@ -2578,7 +2578,7 @@ mod tests {
             .map(|r| {
                 let class = match r.class {
                     Class::Enclosing => "Self".to_string(),
-                    Class::Named(n) | Class::Type(n) => n,
+                    Class::Named(n) | Class::Type(n) | Class::Member(n) => n,
                     Class::Returned(n) | Class::Called(n) => format!("{n}()"),
                     Class::Result(n) => format!("#{n}()"),
                     Class::Imported => "imported".into(),

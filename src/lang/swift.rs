@@ -113,7 +113,8 @@ impl LanguagePack for Swift {
                 }
             }
             for receiver in &mut facts.receivers {
-                let (Class::Type(ty) | Class::Named(ty)) = &receiver.class else {
+                let (Class::Type(ty) | Class::Named(ty) | Class::Member(ty)) = &receiver.class
+                else {
                     continue;
                 };
                 if held(&receiver.scope, ty) {
@@ -958,6 +959,17 @@ fn walk(
     facts
         .bound
         .retain(|b| !shared.contains(&qualify(&b.scope, &b.name)));
+    // A `var` read from outside and assigned again holds no one value: its calls keep the name
+    // match (the assignment may be in a function of the type, for a property).
+    let reassigned: HashSet<(&str, &str)> = (assigned.iter())
+        .flat_map(|(f, n)| enclosing(f).map(move |s| (s, n.as_str())))
+        .collect();
+    for receiver in &mut facts.receivers {
+        let at = (receiver.scope.as_str(), receiver.name.as_str());
+        if matches!(receiver.class, Class::Member(_)) && reassigned.contains(&at) {
+            receiver.class = Class::Unknown;
+        }
+    }
     facts.locals.sort();
     facts.locals.dedup();
     facts.receivers = one_class_each(std::mem::take(&mut facts.receivers), &facts.locals);
@@ -1378,10 +1390,20 @@ fn declared(node: Node, src: &[u8], generics: &Generics) -> Class {
             .map_or(Class::Unknown, |t| class_of(t, src, generics));
     }
     let mut value = node.child_by_field_name("value");
+    // The grammar leaves the `?` of `URLSession.shared?` beside the value.
+    let chained = value
+        .and_then(|v| v.next_sibling())
+        .is_some_and(|n| n.kind() == "?");
     while let Some(inner) =
         value.filter(|v| matches!(v.kind(), "try_expression" | "await_expression"))
     {
         value = inner.child_by_field_name("expr");
+    }
+    if let Some(read) = value.filter(|_| !chained).and_then(|v| member_read(v, src)) {
+        return match generics.holds(head(&read)) {
+            true => Class::Unknown,
+            false => Class::Member(read),
+        };
     }
     let Some(value) =
         value.filter(|v| matches!(v.kind(), "call_expression" | "constructor_expression"))
@@ -1395,6 +1417,35 @@ fn declared(node: Node, src: &[u8], generics: &Generics) -> Class {
         }
         _ => Class::Unknown,
     }
+}
+
+/// A member read on a plain name, as written (`URLSession.shared`, `Foundation.URLSession.shared`);
+/// `None` for anything else: a bare name, a subscript, a force unwrap or an optional chain at
+/// any point of the read, a call.
+fn member_read(node: Node, src: &[u8]) -> Option<String> {
+    let mut segments = Vec::new();
+    let mut at = node;
+    while at.kind() == "navigation_expression" {
+        if segments.len() >= PATH_DEPTH || children(at).any(|c| c.kind() == "?") {
+            return None;
+        }
+        let suffix = at.child_by_field_name("suffix")?;
+        if children(suffix).any(|c| c.kind() == "?") {
+            return None;
+        }
+        let name = suffix.child_by_field_name("suffix")?;
+        if name.kind() != "simple_identifier" {
+            return None;
+        }
+        segments.push(unbacktick(text(name, src)));
+        at = at.child_by_field_name("target")?;
+    }
+    if segments.is_empty() || at.kind() != "simple_identifier" {
+        return None;
+    }
+    segments.push(unbacktick(text(at, src)));
+    segments.reverse();
+    Some(segments.join("."))
 }
 
 /// The names (their last segment) of the repository's aliases of a function type
@@ -1718,6 +1769,68 @@ mod tests {
             ("Vapor.RouteCollection", &["boot(routes:)"]),
         ];
         assert_eq!(Swift.known_outside(), expected);
+    }
+
+    /// What the file's receivers hold, as `name = class`, sorted.
+    fn classes(src: &str) -> Vec<String> {
+        let mut found: Vec<String> = (facts(src).receivers.into_iter())
+            .map(|r| {
+                let class = match r.class {
+                    Class::Member(n) => format!("member {n}"),
+                    Class::Named(n) => format!("named {n}"),
+                    Class::Type(n) => format!("type {n}"),
+                    _ => "?".to_string(),
+                };
+                format!("{} = {class}", r.name)
+            })
+            .collect();
+        found.sort();
+        found
+    }
+
+    #[test]
+    fn a_member_read_on_a_name_is_the_class_as_written() {
+        let found = classes(
+            "func f() async throws {\n\
+             let a = URLSession.shared\n\
+             let b = try await Foundation.URLSession.shared\n\
+             let c = await try Net.Http.client\n\
+             let d = Session()\n\
+             }\n\
+             struct S { let e = URLSession.shared }\n",
+        );
+        assert_eq!(
+            found,
+            [
+                "a = member URLSession.shared",
+                "b = member Foundation.URLSession.shared",
+                "c = member Net.Http.client",
+                "d = named Session",
+                "e = member URLSession.shared",
+            ]
+        );
+    }
+
+    #[test]
+    fn no_member_read_of_a_plain_name_is_unknown() {
+        let found = classes(
+            "func f(items: [Int]) {\n\
+             let a = Remote\n\
+             let b = items[0]\n\
+             let c = URLSession.shared!\n\
+             let d = URLSession.shared?\n\
+             let e = URLSession?.shared\n\
+             let g = URLSession.shared!.configuration\n\
+             let h = URLSession.shared?.configuration\n\
+             let i = URLSession.make().shared\n\
+             var j = URLSession.shared\n\
+             j = other\n\
+             }\n\
+             struct S { var k = URLSession.shared\n\
+             func swap() { k = other } }\n",
+        );
+        // A reassigned `var` keeps its name, with no class: it only hides an outer one.
+        assert_eq!(found, ["j = ?", "k = ?"]);
     }
 
     #[test]

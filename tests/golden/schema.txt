@@ -2373,6 +2373,15 @@ sample.swift
         "end": 422
       },
       "params": []
+    },
+    {
+      "name": "shared()",
+      "kind": "Function",
+      "range": {
+        "start": 424,
+        "end": 516
+      },
+      "params": []
     }
   ],
   "overloads": {
@@ -2390,6 +2399,9 @@ sample.swift
     ],
     "settle": [
       "settle()"
+    ],
+    "shared": [
+      "shared()"
     ]
   },
   "constructors": {
@@ -2478,6 +2490,12 @@ sample.swift
         "exported": "settle",
         "local": "settle"
       }
+    },
+    {
+      "Local": {
+        "exported": "shared",
+        "local": "shared"
+      }
     }
   ],
   "star": {
@@ -2523,6 +2541,16 @@ sample.swift
         "end": 391
       },
       "by_path": true
+    },
+    {
+      "scope": "shared()",
+      "callee": "session.finishTasksAndInvalidate",
+      "arity": 0,
+      "labels": [],
+      "range": {
+        "start": 480,
+        "end": 514
+      }
     }
   ],
   "consts": [
@@ -2558,6 +2586,13 @@ sample.swift
       "class": {
         "Type": "Handler"
       }
+    },
+    {
+      "scope": "shared()",
+      "name": "session",
+      "class": {
+        "Member": "URLSession.shared"
+      }
     }
   ],
   "impls": [
@@ -2580,8 +2615,10 @@ sample.swift
     "on(_:)",
     "settle()",
     "local()",
+    "shared()",
     "on",
-    "settle"
+    "settle",
+    "shared"
   ],
   "hidden": [
     "Order.place(order:quantity:_:)"

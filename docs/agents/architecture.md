@@ -1886,9 +1886,13 @@ one for the area a change touches.
   whose written or constructed type nothing in the repository binds (`session: URLSession`, a
   standard-library type too), or a capitalized name nothing binds (`AF.request`), matches the
   members of that type's extensions in the repository alone (`Resolver::outside_type`), and a
-  call past a member read on such a name (`URLSession.shared.data(..)`) resolves to nothing.
-  Ceiling: a receiver whose value comes from outside but whose type the source does not write
-  (`let session = URLSession.shared`, a `var` assigned again) keeps the name match.
+  call past a member read on such a name (`URLSession.shared.data(..)`) resolves to nothing. A
+  local or property whose value is such a member read holds the read as written
+  (`Class::Member`, through `try` and `await`; not a force unwrap, an optional chain or a
+  subscript), and `outside_type` reads its head: outside the repository, the receiver is opaque
+  (`let session = URLSession.shared`); a head the repository declares leaves the call to the
+  name match. Ceiling: a `var` assigned again (`var client = URLSession.shared; client = other`)
+  holds no one value and keeps the name match.
   C# method calls (spec #28, #108) use the seams Java's do and add none but one flag. The pack
   writes `Facts::receivers` from the declared type of a field, a property, a parameter
   (primary constructors' too), a local with an explicit type, a `foreach`, `out` or pattern
