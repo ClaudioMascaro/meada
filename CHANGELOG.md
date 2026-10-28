@@ -8,6 +8,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Kotlin call made on another call's result (`make().open()`, `Box().open()`,
+  `find()?.open()`) resolves within the class of the first call's written return type, or the
+  class its constructor builds, `exact` when one member fits. A type with arguments or a `?`
+  names its class; an expression body, a type parameter, a function type and a type from outside
+  the repository give no class. Before, the Kotlin pack recorded no result and every such call
+  was a name match (okhttp's `Request.Builder().build()`).
 - A Kotlin class with a secondary constructor is constructible: each constructor, the primary
   one and each secondary one, is a callable of the class's name with its own parameter list, and
   a call narrows among them by argument count (`exact` when one fits, `ambiguous` when two take

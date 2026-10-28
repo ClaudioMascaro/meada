@@ -183,10 +183,10 @@ fn client<'a>(code: &Code<'a>, path: &'a str, calls: &'a [Call], index: usize) -
                     None => break,
                 }
             }
-            // Kotlin's pack gives no `Call::on`: the chain's start is read below.
+            // A Kotlin chain (`(call_expression).build`) starts at any call: it is read below.
             if self::member(&start.callee) != "newBuilder"
                 && !start.callee.starts_with("(expression).")
-                && !(stored.on.is_none() && start.callee.starts_with("(call_expression)."))
+                && !stored.callee.starts_with("(call_expression).")
             {
                 return None;
             }

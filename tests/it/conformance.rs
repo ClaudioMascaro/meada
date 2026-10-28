@@ -1927,6 +1927,18 @@ fn kotlin() {
             "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(Int)",
             "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(String)",
             "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Lid",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Lid.latch()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Box",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Epoch",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Epoch.toEpochMilli()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.make()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.find()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.g()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.pick()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.now()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.use()",
             "src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base",
             "src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base.mark(Int)",
             "src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both",
@@ -2411,11 +2423,8 @@ fn kotlin() {
             ),
             (
                 "src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)::(call_expression).tag#0",
-                AMBIGUOUS,
-                &[
-                    "src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.tag()",
-                    "src/main/kotlin/example/ext/Extensions.kt::example.ext.Store.tag()",
-                ],
+                EXACT,
+                &["src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.tag()"],
             ),
             (
                 "src/main/kotlin/example/Receivers.kt::example.scopes(Cache,Disk,Store)::size#0",
@@ -2730,6 +2739,43 @@ fn kotlin() {
                     "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(Int)",
                     "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(String)",
                 ],
+            ),
+            // A call made on another call's result is typed by the written return type of the
+            // first, or by the class a constructor builds.
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).latch#0",
+                EXACT,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Lid.latch()"],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#0",
+                EXACT,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#1",
+                EXACT,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#2",
+                EXACT,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#3",
+                INFERRED,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#4",
+                INFERRED,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).toEpochMilli#0",
+                None,
+                &[],
             ),
             // An explicit import wins over a star import; two star imports that give one name
             // leave it ambiguous, and the members of a base so named unknown.

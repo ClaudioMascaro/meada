@@ -270,6 +270,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     let mut locals: Vec<Receiver> = Vec::new();
     // The `val`s of unknown class a `Bound` was recorded for, by qualified name.
     let mut vals: Vec<String> = Vec::new();
+    let mut chains: Vec<(usize, Range<usize>)> = Vec::new();
     // The receivers of tracked lambdas, by the lambda's node.
     let mut tracked: HashMap<usize, Tracked> = HashMap::new();
     let mut later: Vec<Later> = Vec::new();
@@ -349,6 +350,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 }
                 let def = Def {
                     bases,
+                    result: Some(Class::Type(name.clone())),
                     ..definition(
                         &inner,
                         Kind::Class,
@@ -421,9 +423,13 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 } else {
                     Kind::Function
                 };
-                facts
-                    .defs
-                    .push(definition(&inner, kind, node.byte_range(), params));
+                let result = returned(node).map_or(Class::Unknown, |t| {
+                    class_of(t, src, &inner_generics, &mut outside)
+                });
+                facts.defs.push(Def {
+                    result: Some(result).filter(|c| matches!(c, Class::Type(_))),
+                    ..definition(&inner, kind, node.byte_range(), params)
+                });
                 let family = qualify(&scope, &base);
                 facts
                     .overloads
@@ -583,9 +589,10 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 let (params, types, _) = parameters(node, src, &generics, &mut outside);
                 let class = scope.rsplit('.').next().unwrap_or_default();
                 let ctor = qualify(&scope, &format!("{class}({})", types.join(",")));
-                facts
-                    .defs
-                    .push(definition(&ctor, Kind::Method, node.byte_range(), params));
+                facts.defs.push(Def {
+                    result: Some(Class::Type(class.to_string())),
+                    ..definition(&ctor, Kind::Method, node.byte_range(), params)
+                });
                 if access.max(own_access(node, src)) != Access::Public {
                     facts.hidden.push(ctor.clone());
                 }
@@ -707,6 +714,12 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 }
                 let lambdas = depth < DEFINITION_DEPTH;
                 if let Some(at) = call(node, src, &scope, implicit, lambdas) {
+                    if defining
+                        && at.callee.starts_with("(call_expression).")
+                        && let Some(inner) = chained(node)
+                    {
+                        chains.push((facts.calls.len(), inner.byte_range()));
+                    }
                     facts.calls.push(at);
                 }
             }
@@ -822,6 +835,13 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     facts.receivers.extend(locals);
     facts.receivers = merge(std::mem::take(&mut facts.receivers));
     scoped(&mut facts, later);
+    let called: BTreeMap<(usize, usize), usize> = (facts.calls.iter().enumerate())
+        .filter(|(_, c)| c.decorates.is_none())
+        .map(|(n, c)| ((c.range.start, c.range.end), n))
+        .collect();
+    for (outer, inner) in chains {
+        facts.calls[outer].on = called.get(&(inner.start, inner.end)).copied();
+    }
     facts.externs = outside.into_iter().collect();
     bare_calls(&mut facts);
     let private: std::collections::BTreeSet<&str> =
@@ -1163,6 +1183,34 @@ fn class_of(ty: Node, src: &[u8], generics: &[String], outside: &mut BTreeSet<St
         }
         _ => Class::Unknown,
     }
+}
+
+/// The type a function writes after its parameters (`Box?` of `fun find(): Box?`).
+fn returned(node: Node) -> Option<Node> {
+    children(node)
+        .skip_while(|c| c.kind() != "function_value_parameters")
+        .find(|c| {
+            matches!(
+                c.kind(),
+                "user_type" | "nullable_type" | "parenthesized_type" | "function_type"
+            )
+        })
+}
+
+/// The call a call is made on the result of: `make()` in `make().save()`, `make()?.save()`,
+/// `make()!!.save()` and `make().x.save()`.
+fn chained(node: Node) -> Option<Node> {
+    let mut at = parts(node).0?;
+    while let Some(next) = match at.kind() {
+        "navigation_expression" if children(at).all(|c| c.kind() != "::") => named(at).next(),
+        "unary_expression" if children(at).any(|c| c.kind() == "!!") => {
+            at.child_by_field_name("argument")
+        }
+        _ => None,
+    } {
+        at = next;
+    }
+    (at.kind() == "call_expression").then_some(at)
 }
 
 /// The class a variable declaration writes as its type.
