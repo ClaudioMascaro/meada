@@ -17,7 +17,7 @@ Server mode includes the [console](console.md), [snapshots](snapshots.md), [rete
 | C# | `.cs`, grouped into projects by SDK-style `.csproj` files and resolved by their `namespace` declarations |
 | Swift | `.swift` (except `Package.swift` and `Package@swift-<version>.swift`), grouped into modules by the targets of `Package.swift` |
 
-An annotation (Java, Kotlin), an attribute (C#, Rust) or a decorator (Python) written on a definition is a call of the enclosing scope, at the level it resolves to. The export's call site names the definition it decorates (`decorates`), and `context` lists it apart, under `annotations:`, not among the callees.
+An annotation (Java, Kotlin), an attribute (C#, or a Rust route attribute) or a decorator (Python) written on a definition is a call of the enclosing scope, at the level it resolves to. The export's call site names the definition it decorates (`decorates`), and `context` lists it apart, under `annotations:`, not among the callees.
 
 ### TypeScript and JavaScript
 
